@@ -1,0 +1,13 @@
+[package]
+name = "xtask"
+description = "Repository tasks. `cargo xtask verify` is the one gate for local runs and CI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true

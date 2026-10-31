@@ -1,0 +1,29 @@
+[package]
+name = "toknila"
+description = "Toknila command-line client (`toknila`, alias `tok`)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+repository.workspace = true
+publish.workspace = true
+default-run = "toknila"
+
+[lib]
+name = "toknila_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "toknila"
+path = "src/main.rs"
+
+[[bin]]
+name = "tok"
+path = "src/bin/tok.rs"
+
+[dependencies]
+toknila-core.workspace = true
+clap.workspace = true
+
+[lints]
+workspace = true

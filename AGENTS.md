@@ -1,0 +1,98 @@
+# Agent instructions for Toknila
+
+These rules are for any coding agent working in this repository (Claude Code reads them through
+`CLAUDE.md`, Codex and others read `AGENTS.md` directly). Project facts live here; generic
+techniques do not.
+
+## What this is
+
+Toknila is a local orchestrator for CLI coding agents: projects are planned as chains of tickets,
+each ticket runs on a ship (git worktree + agent runner), and ticket status moves from agent
+events. Phase 0 builds the model without real agents: a built-in `sim` profile accepts the same
+events phase 1 will get from MCP and hooks, but a human sends them from the CLI.
+
+Never name the reference product this project is modelled on, in code, docs, commits or PRs.
+Call it "the reference" if you must refer to it.
+
+## Layout and boundaries
+
+- `crates/core` (`toknila-core`): domain types and **pure** rules. No I/O, no `tokio`, no
+  `rusqlite`/`sqlx`, no `axum`. Every state transition goes through one function in core
+  (`apply(ticket, event) -> (ticket, effects)`); a transition outside the table is a typed error.
+  `cargo xtask guards` enforces the dependency ban.
+- `crates/daemon` (`toknila-daemon`): owns persistence (SQLite, one writer task, every command is
+  one transaction "state + events"), HTTP on `127.0.0.1` with a bearer token, WebSocket stream.
+- `crates/cli` (`toknila`, binaries `toknila` and `tok`): a thin client of the daemon API. No
+  business rules here; if the CLI needs a rule, the rule belongs in core.
+- `apps/web`: UI served by the daemon. `apps/desktop`: Tauri, later.
+- The database is the source of truth. TOML chain files are import/export only. Chain status,
+  progress and "where it stopped" are computed, never stored.
+
+## Commands
+
+```sh
+cargo xtask verify   # the one gate: fmt --check, clippy -D warnings, tests, guards
+cargo xtask guards   # architecture guards only
+cargo fmt --all      # fix formatting
+```
+
+CI runs `cargo xtask verify` on Ubuntu, Windows and macOS. Do not copy its steps into CI or
+scripts; add new checks to `xtask` so local and CI cannot drift.
+
+## Working on a ticket
+
+1. Read the ticket: description, acceptance criteria, dependencies. The ticket is the only source
+   of the task; do not invent scope.
+2. Write the failing test first where the criterion is testable, then the code.
+3. Keep the change to the ticket. Note follow-ups instead of doing them.
+4. Cross-platform from the first line: paths via `std::path`/`dirs`, no shell-only assumptions,
+   no hard-coded `/tmp`, line endings normalised by `.gitattributes`.
+5. One ticket, one branch, one PR, title `P0-XX: <title>`, body from the PR template.
+
+## Rust conventions
+
+- Edition 2024, stable toolchain. `unsafe` is forbidden workspace-wide.
+- Errors: typed (`thiserror`) in libraries, `anyhow` only at binary edges. No `unwrap()` outside
+  tests; `expect("why this cannot fail")` when an invariant guarantees it.
+- IDs are ULIDs; humans address tickets by short keys like `DEMO-3`.
+- Serialisation with `serde`; any JSON a user or another process sees is pinned by a snapshot test.
+- Public items get a one-line doc comment saying what, not how.
+
+## Verification discipline
+
+A check you have never seen fail is a claim, not a check.
+
+- Make every new gate fail once (break what it guards, watch it go red, restore). Mention it in
+  the PR under "Gate that was made to fail first".
+- Assert the value you expect, not the absence of one you do not.
+- Probes need controls: a search that finds nothing proves something only if the same probe finds
+  a thing you know is there.
+- Print the bytes that cross a boundary (HTTP bodies, event JSON), not the struct you meant to send.
+- Run the gate on exactly what you commit; stage the paths you changed, read `git diff --cached`.
+
+## Reporting
+
+Keep output short: do not narrate what you are about to do, do not paste code back. Report each
+check as **PASS / FAIL / NOT_RUN / BLOCKED**, say what CI does not cover, and mark local-only
+evidence as such. Decisions and reports use the ticket comment template:
+
+```markdown
+# [instruction | report | decision] <one-line gist>
+
+**What:** what to do or what was done
+**Why:** context and reason, one or two sentences
+**How to verify:** criterion or command
+**Alternatives:** what was rejected and why (decisions)
+**Consequences / risks:** what changes next (decisions)
+```
+
+Omit empty fields.
+
+## Checklist before saying done
+
+- [ ] `cargo xtask verify` passes locally on the committed tree.
+- [ ] Every acceptance criterion of the ticket has a test or a stated manual check.
+- [ ] New gates were seen failing once.
+- [ ] No business rule outside `crates/core`; core has no I/O dependency.
+- [ ] Nothing platform-specific without a Windows path.
+- [ ] PR body lists checks as PASS / FAIL / NOT_RUN / BLOCKED.

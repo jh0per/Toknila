@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # rust-toolchain.toml pins the channel and components; this only installs them.
+      - name: Install toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The same command developers run locally. Do not inline its steps here.
+      - name: cargo xtask verify
+        run: cargo xtask verify
+
+      - name: Smoke-test release binaries
+        shell: bash
+        run: |
+          cargo build --release --locked --bin toknila --bin tok
+          ./target/release/toknila --version
+          ./target/release/tok --version

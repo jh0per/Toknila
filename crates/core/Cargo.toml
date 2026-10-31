@@ -1,0 +1,16 @@
+[package]
+name = "toknila-core"
+description = "Toknila domain model and pure rules: chains, tickets, state machine. No I/O."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Guarded by `cargo xtask verify`: core must stay free of async runtimes and storage
+# (no tokio, rusqlite, sqlx, axum). Keep it pure so every rule is unit-testable.
+[dependencies]
+
+[lints]
+workspace = true
