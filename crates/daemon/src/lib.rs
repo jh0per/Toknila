@@ -1,5 +1,6 @@
-//! Toknila daemon. Skeleton only: the HTTP server, store and event stream arrive in
-//! P0-06 (SQLite), P0-07 (daemon frame) and P0-08 (command API).
+//! Toknila daemon: SQLite store, and (next tickets) the HTTP API and event stream.
+
+pub mod store;
 
 /// Name the daemon reports about itself, e.g. in `/healthz` later on.
 pub fn component_name() -> String {
