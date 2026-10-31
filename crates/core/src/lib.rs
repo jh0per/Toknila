@@ -4,6 +4,7 @@
 //! The daemon owns persistence and transport; core owns meaning.
 
 pub mod model;
+pub mod template;
 
 pub use model::*;
 
