@@ -103,6 +103,9 @@ pub enum StatusReason {
         reason: BlockedReason,
         /// Status to return to on unblock.
         resume_to: TicketStatus,
+        /// The open question when it was blocked from Waiting, restored on unblock.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        waiting: Option<WaitingReason>,
     },
     Cancelled {
         text: String,

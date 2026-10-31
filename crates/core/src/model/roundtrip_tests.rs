@@ -106,28 +106,33 @@ fn tickets_roundtrip_in_every_status_and_reason() {
                 text: "чекаємо ключ API".to_owned(),
             },
             resume_to: TicketStatus::Running,
+            waiting: None,
         },
         StatusReason::Blocked {
             reason: BlockedReason::Crashed {
                 detail: "exit 101".to_owned(),
             },
             resume_to: TicketStatus::Waiting,
+            waiting: Some(WaitingReason::Silent),
         },
         StatusReason::Blocked {
             reason: BlockedReason::DependencyReopened {
                 dependency: key("DEMO-1"),
             },
             resume_to: TicketStatus::Running,
+            waiting: None,
         },
         StatusReason::Blocked {
             reason: BlockedReason::MergeConflict {
                 detail: "src/lib.rs".to_owned(),
             },
             resume_to: TicketStatus::Review,
+            waiting: None,
         },
         StatusReason::Blocked {
             reason: BlockedReason::RunnerLost,
             resume_to: TicketStatus::Running,
+            waiting: None,
         },
         StatusReason::Cancelled {
             text: "won't do".to_owned(),
@@ -252,6 +257,7 @@ fn pinned_ticket_json_shape() {
             text: "key".to_owned(),
         },
         resume_to: TicketStatus::Running,
+        waiting: None,
     });
     let json = serde_json::to_string(&t).expect("serialize");
     assert_eq!(
