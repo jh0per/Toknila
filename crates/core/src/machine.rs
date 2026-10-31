@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use crate::{BlockedReason, StatusReason, Ticket, TicketStatus, Timestamp, WaitingReason};
 
 /// Something that happened to a ticket.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum TicketEvent {
@@ -86,6 +87,7 @@ impl TicketEvent {
 }
 
 /// Work the caller must do after a transition. Core decides; the daemon and graph execute.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "effect", rename_all = "snake_case")]
 pub enum Effect {

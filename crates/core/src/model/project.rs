@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::{ProjectId, ProjectKey};
 
 /// Who reviews a finished ticket before it merges.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewMode {
@@ -15,6 +16,7 @@ pub enum ReviewMode {
 }
 
 /// One product: one monorepo, its chains, depot and settings.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Project {
     pub id: ProjectId,

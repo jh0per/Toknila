@@ -34,8 +34,8 @@ pub enum StoreError {
     Corrupt(String),
 }
 
-/// One journal entry. `seq` is gap-free and increasing; clients resume from it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// One journal entry. `seq` is increasing; clients resume from it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct EventRecord {
     pub seq: i64,
     pub at: Timestamp,
@@ -43,6 +43,7 @@ pub struct EventRecord {
     pub entity: String,
     pub entity_id: String,
     pub kind: String,
+    #[schema(value_type = Object)]
     pub payload: serde_json::Value,
 }
 
@@ -162,42 +163,54 @@ impl Store {
 
     /// Runs `f` as one transaction. On `Ok` the state and the emitted events commit together and
     /// the events are published; on `Err` or panic nothing is written.
-    pub async fn write<T, F>(
+    pub async fn write<T, E, F>(
         &self,
         actor: Actor,
         now: Timestamp,
         f: F,
-    ) -> Result<(T, Vec<EventRecord>), StoreError>
+    ) -> Result<(T, Vec<EventRecord>), E>
     where
         T: Send + 'static,
-        F: FnOnce(&mut WriteTx<'_>) -> Result<T, StoreError> + Send + 'static,
+        E: From<StoreError> + Send + 'static,
+        F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
     {
         let events = self.events.clone();
-        self.run(move |conn| {
-            let tx = conn.transaction()?;
-            let mut w = WriteTx {
-                tx,
-                actor,
-                now,
-                events: Vec::new(),
-            };
-            let value = match catch_unwind(AssertUnwindSafe(|| f(&mut w))) {
-                Ok(r) => r?,
-                Err(p) => return Err(StoreError::Panicked(panic_message(&p))),
-            };
-            let WriteTx {
-                tx,
-                events: emitted,
-                ..
-            } = w;
-            tx.commit()?;
-            for e in &emitted {
-                // No subscribers is fine.
-                let _ = events.send(e.clone());
-            }
-            Ok((value, emitted))
-        })
-        .await
+        let outcome = self
+            .run(move |conn| {
+                let tx = match conn.transaction() {
+                    Ok(tx) => tx,
+                    Err(e) => return Ok(Err(E::from(e.into()))),
+                };
+                let mut w = WriteTx {
+                    tx,
+                    actor,
+                    now,
+                    events: Vec::new(),
+                };
+                let value = match catch_unwind(AssertUnwindSafe(|| f(&mut w))) {
+                    Ok(Ok(v)) => v,
+                    Ok(Err(e)) => return Ok(Err(e)),
+                    Err(p) => return Ok(Err(E::from(StoreError::Panicked(panic_message(&p))))),
+                };
+                let WriteTx {
+                    tx,
+                    events: emitted,
+                    ..
+                } = w;
+                if let Err(e) = tx.commit() {
+                    return Ok(Err(E::from(e.into())));
+                }
+                for e in &emitted {
+                    // No subscribers is fine.
+                    let _ = events.send(e.clone());
+                }
+                Ok(Ok((value, emitted)))
+            })
+            .await;
+        match outcome {
+            Ok(inner) => inner,
+            Err(e) => Err(E::from(e)),
+        }
     }
 
     /// Runs a read-only query on the writer's connection (so it sees every committed write).

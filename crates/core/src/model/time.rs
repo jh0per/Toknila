@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Milliseconds since the Unix epoch, UTC.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Timestamp(pub i64);

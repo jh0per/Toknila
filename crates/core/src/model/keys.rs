@@ -127,6 +127,35 @@ impl fmt::Display for TicketKey {
     }
 }
 
+/// Both keys are plain strings on the wire.
+#[cfg(feature = "openapi")]
+mod openapi {
+    use utoipa::openapi::RefOr;
+    use utoipa::openapi::schema::{ObjectBuilder, Schema, Type};
+
+    fn string_schema(pattern: &str, example: &str) -> RefOr<Schema> {
+        ObjectBuilder::new()
+            .schema_type(Type::String)
+            .pattern(Some(pattern))
+            .examples([example])
+            .into()
+    }
+
+    impl utoipa::PartialSchema for super::ProjectKey {
+        fn schema() -> RefOr<Schema> {
+            string_schema("^[A-Z][A-Z0-9]{1,9}$", "DEMO")
+        }
+    }
+    impl utoipa::ToSchema for super::ProjectKey {}
+
+    impl utoipa::PartialSchema for super::TicketKey {
+        fn schema() -> RefOr<Schema> {
+            string_schema("^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]*$", "DEMO-3")
+        }
+    }
+    impl utoipa::ToSchema for super::TicketKey {}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

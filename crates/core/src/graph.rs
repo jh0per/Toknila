@@ -58,6 +58,7 @@ fn format_cycle(path: &[String]) -> String {
 }
 
 /// Something the graph wants done.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum Action {
@@ -71,6 +72,7 @@ pub enum Action {
 }
 
 /// One applied step, for the event log.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Applied {
     pub action: Action,
@@ -78,6 +80,7 @@ pub struct Applied {
 }
 
 /// Everything the graph rules need about one chain, as plain data.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainView {
     pub chain: Chain,
@@ -89,6 +92,7 @@ pub struct ChainView {
 }
 
 /// Computed chain status (never stored).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChainStatus {
@@ -110,6 +114,7 @@ pub enum ChainStatus {
 }
 
 /// Where the chain stopped: the first ticket, in graph order, that waits on a person.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StoppedAt {
     pub ticket: TicketKey,
@@ -120,6 +125,7 @@ pub struct StoppedAt {
 }
 
 /// The next milestone on the graph.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NextRelease {
     pub release: ReleaseId,
@@ -129,6 +135,7 @@ pub struct NextRelease {
 }
 
 /// What a product person sees at a glance.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainSummary {
     pub status: ChainStatus,

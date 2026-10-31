@@ -6,6 +6,7 @@ use super::{
 };
 
 /// One unit of work for one ship.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ticket {
     pub id: TicketId,
@@ -34,6 +35,7 @@ pub struct Ticket {
 }
 
 /// A checklist item inside a ticket. Subtasks have no runners of their own.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Subtask {
     pub id: SubtaskId,

@@ -11,6 +11,7 @@ macro_rules! id_type {
     ($(#[$doc:meta])* $name:ident) => {
         $(#[$doc])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+        #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(value_type = String))]
         #[serde(transparent)]
         pub struct $name(pub Ulid);
 

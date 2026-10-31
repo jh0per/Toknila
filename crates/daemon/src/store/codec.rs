@@ -261,7 +261,28 @@ impl<'c> Repo<'c> {
         rows.map(|r| Self::chain_build(r?)).collect()
     }
 
+    /// Chains with this name, across projects.
+    pub fn chains_named(&self, name: &str) -> Result<Vec<Chain>, StoreError> {
+        let mut st = self.conn.prepare(&format!(
+            "SELECT {CHAIN_COLS} FROM chains WHERE name = ?1 ORDER BY rowid"
+        ))?;
+        let rows = st.query_map([name], Self::chain_from)?;
+        rows.map(|r| Self::chain_build(r?)).collect()
+    }
+
     // ---- tickets ----
+
+    /// All tickets, optionally of one chain, in key order.
+    pub fn tickets(&self, chain: Option<ChainId>) -> Result<Vec<Ticket>, StoreError> {
+        let mut out = match chain {
+            Some(c) => self.tickets_where("chain_id = ?1", c.to_string())?,
+            None => self.tickets_where("?1 = ?1", String::new())?,
+        };
+        out.sort_by(|a, b| {
+            (a.key.project(), a.key.number()).cmp(&(b.key.project(), b.key.number()))
+        });
+        Ok(out)
+    }
 
     pub fn upsert_ticket(&self, t: &Ticket) -> Result<(), StoreError> {
         self.conn.execute(
@@ -449,6 +470,25 @@ impl<'c> Repo<'c> {
             .releases(parse(&chain, "chain id")?)?
             .into_iter()
             .find(|r| r.id == id))
+    }
+
+    /// Releases with this version, across chains.
+    pub fn releases_by_version(&self, version: &str) -> Result<Vec<Release>, StoreError> {
+        let mut st = self
+            .conn
+            .prepare("SELECT chain_id FROM releases WHERE version = ?1 ORDER BY rowid")?;
+        let chains = st
+            .query_map([version], |r| r.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut out = Vec::new();
+        for c in chains {
+            out.extend(
+                self.releases(parse(&c, "chain id")?)?
+                    .into_iter()
+                    .filter(|r| r.version == version),
+            );
+        }
+        Ok(out)
     }
 
     /// Everything the graph rules need about one chain.

@@ -80,11 +80,17 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 
 /// The full router. `/healthz` is open; everything under `/v1` needs the bearer token.
 pub fn router(state: AppState) -> Router {
-    let v1 = Router::new()
+    let (api, doc) = crate::api::v1();
+    let doc = Arc::new(doc);
+    let v1 = api
         .route("/shutdown", post(shutdown))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_token));
     Router::new()
         .route("/healthz", get(healthz))
+        .route(
+            "/openapi.json",
+            get(move || async move { Json(doc.as_ref().clone()) }),
+        )
         .nest("/v1", v1)
         .with_state(state)
 }
@@ -116,13 +122,14 @@ pub async fn probe(info: &DaemonInfo) -> bool {
 /// Runs the daemon in the foreground until Ctrl-C, SIGTERM or `POST /v1/shutdown`.
 pub async fn run(paths: Paths) -> Result<(), RunError> {
     std::fs::create_dir_all(&paths.home)?;
-    if let Some(info) = DaemonInfo::read(&paths.daemon_json())? {
-        if info.pid != std::process::id() && probe(&info).await {
-            return Err(RunError::AlreadyRunning {
-                pid: info.pid,
-                port: info.port,
-            });
-        }
+    if let Some(info) = DaemonInfo::read(&paths.daemon_json())?
+        && info.pid != std::process::id()
+        && probe(&info).await
+    {
+        return Err(RunError::AlreadyRunning {
+            pid: info.pid,
+            port: info.port,
+        });
     }
     let store = Store::open(&paths.db())?;
     let token: Arc<str> = new_token().map_err(RunError::Other)?.into();

@@ -6,7 +6,7 @@ default-members = ["crates/core", "crates/daemon", "crates/cli"]
 [workspace.package]
 version = "0.0.1"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 license-file = "LICENSE"
 repository = "https://github.com/jh0per/Toknila"
 publish = false
@@ -24,6 +24,10 @@ rusqlite = { version = "0.41", features = ["bundled"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net", "fs", "io-util"] }
 tempfile = "3"
 anyhow = "1"
+utoipa = { version = "6", features = ["axum_extras"] }
+utoipa-axum = "0.3"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
 axum = "0.8"
 dirs = "7"
 getrandom = "0.4"

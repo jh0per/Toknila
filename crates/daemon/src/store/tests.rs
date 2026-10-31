@@ -112,7 +112,7 @@ async fn write_commits_state_and_events_together() {
     let p = project();
     let mut live = store.subscribe();
     let ((), events) = store
-        .write(Actor::Human, NOW, move |tx| {
+        .write(Actor::Human, NOW, move |tx| -> Result<(), StoreError> {
             tx.repo().insert_project(&p)?;
             tx.emit("project", p.id, "created", &p)?;
             Ok(())

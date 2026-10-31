@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::{ChainId, ReleaseId, Timestamp};
 
 /// Where a release milestone ships.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseChannel {
@@ -15,6 +16,7 @@ pub enum ReleaseChannel {
 }
 
 /// Whether the milestone cuts itself or waits for a person.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StartMode {
@@ -25,6 +27,7 @@ pub enum StartMode {
 }
 
 /// Milestone lifecycle (gitflow): planned, then `release/<version>` is cut, then shipped.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseState {
@@ -34,6 +37,7 @@ pub enum ReleaseState {
 }
 
 /// A release milestone between tickets on the chain graph.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Release {
     pub id: ReleaseId,

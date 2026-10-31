@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::TicketKey;
 
 /// Ticket status. Transitions between them are owned by the state machine (P0-04).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TicketStatus {
@@ -27,6 +28,7 @@ pub enum TicketStatus {
 }
 
 /// Board column a status belongs to, as in Jira.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StatusCategory {
@@ -67,6 +69,7 @@ impl TicketStatus {
 }
 
 /// Why a ticket is Waiting.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum WaitingReason {
@@ -79,6 +82,7 @@ pub enum WaitingReason {
 }
 
 /// Why a ticket is Blocked.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BlockedReason {
@@ -95,6 +99,7 @@ pub enum BlockedReason {
 }
 
 /// The reason attached to the current status, if that status carries one.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum StatusReason {
