@@ -23,6 +23,14 @@ proptest = "1.5"
 rusqlite = { version = "0.41", features = ["bundled"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net", "fs", "io-util"] }
 tempfile = "3"
+anyhow = "1"
+axum = "0.8"
+dirs = "7"
+getrandom = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+ureq = { version = "2.12", default-features = false, features = ["json"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

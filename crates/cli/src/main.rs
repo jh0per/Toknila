@@ -1,3 +1,3 @@
-fn main() {
-    toknila_cli::run();
+fn main() -> std::process::ExitCode {
+    toknila_cli::run()
 }

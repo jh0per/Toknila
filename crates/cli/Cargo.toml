@@ -24,6 +24,15 @@ path = "src/bin/tok.rs"
 [dependencies]
 toknila-core.workspace = true
 clap.workspace = true
+toknila-daemon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+ureq.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true
