@@ -11,6 +11,12 @@ publish.workspace = true
 # Guarded by `cargo xtask verify`: core must stay free of async runtimes and storage
 # (no tokio, rusqlite, sqlx, axum). Keep it pure so every rule is unit-testable.
 [dependencies]
+serde.workspace = true
+thiserror.workspace = true
+ulid.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

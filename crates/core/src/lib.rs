@@ -3,6 +3,10 @@
 //! This crate performs no I/O and does not depend on an async runtime or a database.
 //! The daemon owns persistence and transport; core owns meaning.
 
+pub mod model;
+
+pub use model::*;
+
 /// Crate version, shared by every binary in the workspace.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
