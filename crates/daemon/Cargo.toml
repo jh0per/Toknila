@@ -25,6 +25,7 @@ tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 
 [dev-dependencies]
+tungstenite.workspace = true
 tower.workspace = true
 http-body-util.workspace = true
 ureq.workspace = true

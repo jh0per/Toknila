@@ -5,6 +5,7 @@ pub mod info;
 pub mod paths;
 pub mod server;
 pub mod store;
+pub mod stream;
 
 /// Name the daemon reports about itself.
 pub fn component_name() -> String {

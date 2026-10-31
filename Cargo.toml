@@ -28,7 +28,8 @@ utoipa = { version = "6", features = ["axum_extras"] }
 utoipa-axum = "0.3"
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
-axum = "0.8"
+axum = { version = "0.8", features = ["ws"] }
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 dirs = "7"
 getrandom = "0.4"
 tracing = "0.1"

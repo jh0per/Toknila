@@ -58,11 +58,18 @@ async fn shutdown(State(state): State<AppState>) -> StatusCode {
 
 async fn require_token(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let expected = format!("Bearer {}", state.token);
-    let ok = req
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| constant_time_eq(v.as_bytes(), expected.as_bytes()));
+    // Browsers cannot set headers on a WebSocket, so `?token=` is accepted too.
+    let query_ok = req.uri().query().is_some_and(|q| {
+        q.split('&')
+            .filter_map(|kv| kv.split_once('='))
+            .any(|(k, v)| k == "token" && constant_time_eq(v.as_bytes(), state.token.as_bytes()))
+    });
+    let ok = query_ok
+        || req
+            .headers()
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| constant_time_eq(v.as_bytes(), expected.as_bytes()));
     if ok {
         next.run(req).await
     } else {
@@ -84,6 +91,7 @@ pub fn router(state: AppState) -> Router {
     let doc = Arc::new(doc);
     let v1 = api
         .route("/shutdown", post(shutdown))
+        .route("/stream", get(crate::stream::stream))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_token));
     Router::new()
         .route("/healthz", get(healthz))
