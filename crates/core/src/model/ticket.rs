@@ -34,6 +34,48 @@ pub struct Ticket {
     pub tokens_used: u64,
 }
 
+/// What a person or a chain file gives for a new ticket; the rest is set by
+/// [`Ticket::new_backlog`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TicketDraft {
+    pub title: String,
+    pub prompt: String,
+    pub acceptance: Vec<String>,
+    pub paused: bool,
+    pub profile: Option<String>,
+    pub review_mode: Option<ReviewMode>,
+    pub needs_secrets: bool,
+}
+
+impl Ticket {
+    /// A new ticket in Backlog, as every ticket starts; the graph decides when it is Ready.
+    pub fn new_backlog(
+        id: TicketId,
+        chain_id: ChainId,
+        key: TicketKey,
+        draft: TicketDraft,
+        now: Timestamp,
+    ) -> Self {
+        Self {
+            id,
+            chain_id,
+            key,
+            title: draft.title,
+            prompt: draft.prompt,
+            acceptance: draft.acceptance,
+            status: TicketStatus::Backlog,
+            status_reason: None,
+            status_since: now,
+            paused: draft.paused,
+            profile: draft.profile,
+            review_mode: draft.review_mode,
+            branch: None,
+            needs_secrets: draft.needs_secrets,
+            tokens_used: 0,
+        }
+    }
+}
+
 /// A checklist item inside a ticket. Subtasks have no runners of their own.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

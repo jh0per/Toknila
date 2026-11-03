@@ -5,15 +5,13 @@ use serde_json::json;
 use toknila_core::graph::{Action, ChainView, GraphError};
 use toknila_core::machine::{Effect, TicketEvent};
 use toknila_core::{
-    Actor, Chain, ChainId, Comment, CommentBody, CommentId, CommentKind, Edge, NodeRef, Project,
-    Release, ReleaseId, Subtask, SubtaskId, Ticket, TicketId, TicketKey, TicketStatus, Timestamp,
+    Actor, AgentProfile, Chain, ChainId, Comment, CommentBody, CommentId, CommentKind, Edge,
+    NodeRef, Project, Release, ReleaseId, Subtask, SubtaskId, Ticket, TicketId, TicketKey,
+    TicketStatus, Timestamp,
 };
 
 use super::error::ApiError;
 use crate::store::{Repo, WriteTx};
-
-/// Profile name of the built-in simulated agent.
-pub const SIM_PROFILE: &str = "sim";
 
 // ---- references: ids or human names ----
 
@@ -344,13 +342,13 @@ fn deliver_to_sim(tx: &mut WriteTx<'_>, ctx: &mut ChainTx) -> Result<bool, ApiEr
     let project = tx.repo().project(ctx.view.chain.project_id)?;
     let default_profile = project
         .map(|p| p.default_profile)
-        .unwrap_or_else(|| SIM_PROFILE.to_owned());
+        .unwrap_or_else(|| AgentProfile::SIM.to_owned());
     let candidates: Vec<(TicketId, TicketStatus)> = ctx
         .view
         .tickets
         .iter()
         .filter(|t| matches!(t.status, TicketStatus::Running | TicketStatus::Waiting))
-        .filter(|t| t.profile.as_deref().unwrap_or(&default_profile) == SIM_PROFILE)
+        .filter(|t| t.profile.as_deref().unwrap_or(&default_profile) == AgentProfile::SIM)
         .map(|t| (t.id, t.status))
         .collect();
     let mut changed = false;

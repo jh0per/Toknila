@@ -1,4 +1,8 @@
+use std::collections::HashMap;
+
 use super::*;
+use crate::graph::ChainView;
+use crate::{ProjectId, TicketKey, Timestamp};
 
 const DEMO: &str = include_str!("../../../../examples/demo.toml");
 

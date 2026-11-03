@@ -4,10 +4,11 @@ use super::{ChainId, ReleaseId, Timestamp};
 
 /// Where a release milestone ships.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseChannel {
-    /// Only merge into the release branch and tag.
+    /// Only merge into the release branch and tag. The default.
+    #[default]
     TagOnly,
     TestFlight,
     PlayInternal,
@@ -17,12 +18,13 @@ pub enum ReleaseChannel {
 
 /// Whether the milestone cuts itself or waits for a person.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StartMode {
     /// Cut as soon as everything before it is Merged.
     Auto,
-    /// Wait for `tok release start`.
+    /// Wait for `tok release start`. The default.
+    #[default]
     Manual,
 }
 
@@ -50,4 +52,27 @@ pub struct Release {
     pub branch: Option<String>,
     pub cut_at: Option<Timestamp>,
     pub released_at: Option<Timestamp>,
+}
+
+impl Release {
+    /// A new milestone in Planned, before any branch is cut.
+    pub fn planned(
+        id: ReleaseId,
+        chain_id: ChainId,
+        version: String,
+        channel: ReleaseChannel,
+        start_mode: StartMode,
+    ) -> Self {
+        Self {
+            id,
+            chain_id,
+            version,
+            channel,
+            start_mode,
+            state: ReleaseState::Planned,
+            branch: None,
+            cut_at: None,
+            released_at: None,
+        }
+    }
 }

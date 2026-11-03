@@ -234,9 +234,7 @@ pub fn apply(
             effects.push(Effect::RecheckReadiness);
             (from, ticket.status_reason.clone())
         }
-        (s, TicketEvent::Cancel { reason })
-            if !matches!(s, S::Merged | S::Released | S::Cancelled) =>
-        {
+        (s, TicketEvent::Cancel { reason }) if !s.is_done() => {
             non_empty(reason, "cancel")?;
             if matches!(s, S::Running | S::Waiting | S::Blocked | S::Review) {
                 effects.push(Effect::StopRunner);

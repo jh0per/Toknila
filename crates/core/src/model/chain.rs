@@ -17,6 +17,11 @@ pub struct Chain {
     pub review_mode: Option<ReviewMode>,
 }
 
+impl Chain {
+    /// Autostart of a chain that does not say.
+    pub const DEFAULT_AUTOSTART: bool = true;
+}
+
 /// A node of the chain graph: a ticket or a release milestone.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

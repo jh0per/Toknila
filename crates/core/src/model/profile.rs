@@ -29,10 +29,13 @@ pub struct AgentProfile {
 }
 
 impl AgentProfile {
+    /// Name of the built-in simulated profile.
+    pub const SIM: &str = "sim";
+
     /// The built-in simulated profile.
     pub fn sim() -> Self {
         Self {
-            name: "sim".to_owned(),
+            name: Self::SIM.to_owned(),
             role: AgentRole::Worker,
             kind: ProfileKind::Sim,
         }

@@ -4,6 +4,7 @@ use rusqlite::{Connection, OptionalExtension, Row, params};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_core::graph::ChainView;
+use toknila_core::wire::wire_name;
 use toknila_core::{
     Chain, ChainId, Comment, CommentId, Edge, NodeRef, Project, ProjectId, Release, ReleaseId,
     Subtask, Ticket, TicketId, TicketKey, Timestamp,
@@ -12,13 +13,9 @@ use toknila_core::{
 use super::{EventRecord, StoreError};
 
 /// Serde name of a unit enum value (`TicketStatus::Running` -> `"running"`).
-pub(crate) fn enum_str<T: Serialize>(value: &T) -> Result<String, StoreError> {
-    match serde_json::to_value(value)? {
-        serde_json::Value::String(s) => Ok(s),
-        other => Err(StoreError::Corrupt(format!(
-            "expected a unit enum, got {other}"
-        ))),
-    }
+pub(crate) fn enum_str<T: Serialize + std::fmt::Debug>(value: &T) -> Result<String, StoreError> {
+    wire_name(value)
+        .ok_or_else(|| StoreError::Corrupt(format!("expected a unit enum, got {value:?}")))
 }
 
 fn enum_from<T: DeserializeOwned>(s: &str) -> Result<T, StoreError> {
@@ -40,7 +37,7 @@ fn parse<T: std::str::FromStr>(s: &str, what: &str) -> Result<T, StoreError> {
         .map_err(|_| StoreError::Corrupt(format!("bad {what}: {s:?}")))
 }
 
-fn opt_enum<T: Serialize>(v: &Option<T>) -> Result<Option<String>, StoreError> {
+fn opt_enum<T: Serialize + std::fmt::Debug>(v: &Option<T>) -> Result<Option<String>, StoreError> {
     v.as_ref().map(enum_str).transpose()
 }
 
