@@ -36,9 +36,24 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # Builds the page the daemon embeds; the daemon test then requires it.
+      - name: cargo xtask web
+        run: cargo xtask web
+
       # The same command developers run locally. Do not inline its steps here.
       - name: cargo xtask verify
         run: cargo xtask verify
+        env:
+          TOKNILA_REQUIRE_WEB: "1"
+
+      - name: cargo xtask e2e-web
+        run: cargo xtask e2e-web
 
       - name: Smoke-test release binaries
         shell: bash

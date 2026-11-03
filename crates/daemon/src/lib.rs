@@ -7,6 +7,7 @@ pub mod recovery;
 pub mod server;
 pub mod store;
 pub mod stream;
+pub mod web;
 
 /// Name the daemon reports about itself.
 pub fn component_name() -> String {

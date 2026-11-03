@@ -94,6 +94,8 @@ pub fn router(state: AppState) -> Router {
         .route("/stream", get(crate::stream::stream))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_token));
     Router::new()
+        .route("/", get(crate::web::index))
+        .route("/assets/{*path}", get(crate::web::asset))
         .route("/healthz", get(healthz))
         .route(
             "/openapi.json",
@@ -130,9 +132,14 @@ pub async fn probe(info: &DaemonInfo) -> bool {
 /// Runs the daemon in the foreground until Ctrl-C, SIGTERM or `POST /v1/shutdown`.
 pub async fn run(paths: Paths) -> Result<(), RunError> {
     std::fs::create_dir_all(&paths.home)?;
-    if let Some(info) = DaemonInfo::read(&paths.daemon_json())?
+    let previous = DaemonInfo::read(&paths.daemon_json())?;
+    let reuse = match &previous {
+        Some(p) => Some(p.clone()),
+        None => DaemonInfo::read(&paths.daemon_last_json()).ok().flatten(),
+    };
+    if let Some(info) = &previous
         && info.pid != std::process::id()
-        && probe(&info).await
+        && probe(info).await
     {
         return Err(RunError::AlreadyRunning {
             pid: info.pid,
@@ -148,7 +155,11 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
     } else {
         tracing::warn!(?recovery, "stored state differs from the journal");
     }
-    let token: Arc<str> = new_token().map_err(RunError::Other)?.into();
+    // A restart keeps the address and token when it can, so an open page reconnects by itself.
+    let token: Arc<str> = match reuse.as_ref().filter(|i| i.token.len() >= 32) {
+        Some(i) => i.token.clone().into(),
+        None => new_token().map_err(RunError::Other)?.into(),
+    };
     let shutdown = Arc::new(Notify::new());
     let state = AppState {
         store,
@@ -156,7 +167,13 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         shutdown: shutdown.clone(),
     };
 
-    let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+    let listener = match reuse.as_ref().map(|i| i.port).filter(|p| *p != 0) {
+        Some(p) => match tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, p)).await {
+            Ok(l) => l,
+            Err(_) => tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?,
+        },
+        None => tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?,
+    };
     let port = listener.local_addr()?.port();
     let info = DaemonInfo {
         pid: std::process::id(),
@@ -183,7 +200,10 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         .flatten()
         .is_some_and(|i| i.pid == info.pid)
     {
-        let _ = std::fs::remove_file(paths.daemon_json());
+        // Kept aside so the next start can take the same address and token.
+        if std::fs::rename(paths.daemon_json(), paths.daemon_last_json()).is_err() {
+            let _ = std::fs::remove_file(paths.daemon_json());
+        }
     }
     tracing::info!("daemon stopped");
     result.map_err(RunError::Io)

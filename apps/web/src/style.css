@@ -1,0 +1,37 @@
+:root {
+  --bg: #fafaf9; --fg: #1c1917; --muted: #78716c; --card: #fff; --line: #e7e5e4;
+  --todo: #a8a29e; --ready: #0ea5e9; --run: #2563eb; --wait: #d97706; --block: #dc2626;
+  --review: #7c3aed; --done: #16a34a; --rel: #15803d; --cancel: #57534e;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg); background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0c0a09; --fg: #e7e5e4; --muted: #a8a29e; --card: #1c1917; --line: #292524; }
+}
+body { margin: 0; background: var(--bg); }
+main { max-width: 960px; margin: 0 auto; padding: 16px; }
+.top { display: flex; gap: 16px; align-items: center; }
+.top h1 { font-size: 20px; margin: 0; flex: 1; }
+.link { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--line); }
+.l-live { color: #fff; background: var(--done); }
+.l-offline { color: #fff; background: var(--block); }
+.chain { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 16px 0; }
+.chain header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.chain h2 { margin: 0; font-size: 17px; }
+.progress, .goal, .next, .since, .reason { color: var(--muted); font-size: 13px; }
+.stopped { font-size: 14px; }
+.nodes { list-style: none; margin: 8px 0 0; padding: 0; }
+.node { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.key { font-family: ui-monospace, monospace; font-size: 13px; min-width: 72px; }
+.title { flex: 1; min-width: 120px; }
+.status, .chain-status, .tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; color: #fff; background: var(--todo); }
+.tag { background: var(--line); color: var(--fg); }
+.human-tag { background: var(--wait); color: #fff; }
+.s-ready { background: var(--ready); } .s-running, .c-running { background: var(--run); }
+.s-waiting, .c-needs_human { background: var(--wait); } .s-blocked, .c-blocked { background: var(--block); }
+.s-review { background: var(--review); } .s-merged, .c-done { background: var(--done); }
+.s-released, .r-released, .c-released { background: var(--rel); } .s-cancelled { background: var(--cancel); }
+.r-cut { background: var(--run); } .r-planned { background: var(--todo); }
+.release .key { font-weight: 600; }
+.error { color: var(--block); }
+code { font-family: ui-monospace, monospace; }

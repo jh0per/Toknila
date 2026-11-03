@@ -817,3 +817,62 @@ async fn import_rejects_bad_files_and_leaves_nothing_behind() {
         .await;
     assert_eq!(s, StatusCode::CONFLICT, "same chain name twice");
 }
+
+#[tokio::test]
+async fn web_page_is_served_without_a_token() {
+    let api = Api::new();
+    let get = |uri: &str| {
+        Request::builder()
+            .uri(uri)
+            .body(Body::empty())
+            .expect("request")
+    };
+    let resp = api.app.clone().oneshot(get("/")).await.expect("response");
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.headers()["content-type"], "text/html; charset=utf-8");
+    let html = String::from_utf8(
+        resp.into_body()
+            .collect()
+            .await
+            .expect("body")
+            .to_bytes()
+            .to_vec(),
+    )
+    .expect("utf-8");
+
+    if std::env::var_os("TOKNILA_REQUIRE_WEB").is_some() {
+        assert!(
+            crate::web::embedded(),
+            "CI builds apps/web before the daemon"
+        );
+    }
+    if !crate::web::embedded() {
+        assert!(html.contains("cargo xtask web"), "{html}");
+        return;
+    }
+    assert!(html.contains(r#"<div id="root">"#), "{html}");
+    let script = html
+        .split(r#"src=""#)
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .expect("index.html loads a script");
+    assert!(script.starts_with("/assets/"), "{script}");
+    let resp = api
+        .app
+        .clone()
+        .oneshot(get(script))
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::OK, "{script}");
+    assert_eq!(
+        resp.headers()["content-type"],
+        "text/javascript; charset=utf-8"
+    );
+    let resp = api
+        .app
+        .clone()
+        .oneshot(get("/assets/missing.js"))
+        .await
+        .expect("response");
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}

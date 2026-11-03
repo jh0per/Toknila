@@ -2,6 +2,10 @@
 //!
 //! - `verify`: fmt check, clippy with warnings denied, tests, architecture guards.
 //! - `guards`: architecture guards only.
+//! - `web`: install, type-check and build `apps/web` (needs Node), so the daemon embeds it.
+//!   Run it before `verify` or a release build; CI does.
+//! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
+//!   With `CI` set it first installs Chromium; locally it uses an installed one.
 
 use std::process::{Command, ExitCode};
 
@@ -22,8 +26,10 @@ fn main() -> ExitCode {
     let result = match task.as_str() {
         "verify" => verify(),
         "guards" => guards(),
+        "web" => web(),
+        "e2e-web" => e2e_web(),
         _ => {
-            eprintln!("usage: cargo xtask <verify|guards>");
+            eprintln!("usage: cargo xtask <verify|guards|web|e2e-web>");
             return ExitCode::from(2);
         }
     };
@@ -90,6 +96,59 @@ fn banned_in_tree(tree: &str, banned: &[&str]) -> Vec<String> {
     hits.sort();
     hits.dedup();
     hits
+}
+
+fn web() -> Result<(), String> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../apps/web");
+    // npm is a .cmd script on Windows; Command does not add the extension itself.
+    let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
+    run(npm, &["ci", "--no-audit", "--no-fund"], &dir)?;
+    run(npm, &["run", "build"], &dir)?;
+    if !dir.join("dist/index.html").is_file() {
+        return Err("apps/web/dist/index.html was not produced".to_owned());
+    }
+    eprintln!("xtask web: PASS");
+    Ok(())
+}
+
+fn e2e_web() -> Result<(), String> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let web = root.join("apps/web");
+    cargo(&["build", "--locked", "--bin", "tok"])?;
+    let target = std::env::var_os("CARGO_TARGET_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| root.join("target"));
+    let tok = target
+        .join("debug")
+        .join(format!("tok{}", std::env::consts::EXE_SUFFIX));
+    if std::env::var_os("CI").is_some() {
+        let npx = if cfg!(windows) { "npx.cmd" } else { "npx" };
+        let mut args = vec!["playwright", "install", "chromium"];
+        if cfg!(target_os = "linux") {
+            args.push("--with-deps");
+        }
+        run(npx, &args, &web)?;
+    }
+    run("node", &["e2e/smoke.mjs", &tok.to_string_lossy()], &web)?;
+    eprintln!("xtask e2e-web: PASS");
+    Ok(())
+}
+
+fn run(program: &str, args: &[&str], dir: &std::path::Path) -> Result<(), String> {
+    eprintln!("$ {program} {}", args.join(" "));
+    let status = Command::new(program)
+        .args(args)
+        .current_dir(dir)
+        .status()
+        .map_err(|e| format!("cannot run {program}: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "`{program} {}` exited with {status}",
+            args.join(" ")
+        ))
+    }
 }
 
 fn cargo_bin() -> String {

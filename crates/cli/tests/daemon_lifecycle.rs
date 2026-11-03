@@ -81,6 +81,23 @@ fn start_status_auth_stop() {
     );
     assert_eq!(tok(h, &["daemon", "stop"])["stopped"], false);
 
+    // A restart takes the same address and token, so an open web page reconnects by itself.
+    let token = |h: &std::path::Path| -> String {
+        let v: Value = serde_json::from_str(
+            &std::fs::read_to_string(h.join("daemon.json")).expect("daemon.json"),
+        )
+        .expect("json");
+        v["token"].as_str().expect("token").to_owned()
+    };
+    let last: Value = serde_json::from_str(
+        &std::fs::read_to_string(h.join("daemon.last.json")).expect("clean stop keeps the address"),
+    )
+    .expect("json");
+    let again = tok(h, &["daemon", "start"]);
+    assert_eq!(again["port"], port, "same port after restart");
+    assert_eq!(token(h), last["token"].as_str().expect("token"));
+    assert_eq!(tok(h, &["daemon", "stop"])["stopped"], true);
+
     let logs: Vec<_> = std::fs::read_dir(h.join("logs"))
         .expect("logs dir")
         .collect();

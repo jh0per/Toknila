@@ -48,6 +48,11 @@ impl Paths {
         self.home.join("daemon.json")
     }
 
+    /// Address and token of the last cleanly stopped daemon, reused by the next start.
+    pub fn daemon_last_json(&self) -> PathBuf {
+        self.home.join("daemon.last.json")
+    }
+
     /// Rotated daemon logs.
     pub fn logs(&self) -> PathBuf {
         self.home.join("logs")
