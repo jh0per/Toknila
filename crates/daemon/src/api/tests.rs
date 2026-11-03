@@ -538,12 +538,14 @@ async fn openapi_describes_every_route() {
             "/chains",
             "/chains/{chain}",
             "/chains/{chain}/edges",
+            "/chains/{chain}/export",
             "/chains/{chain}/releases",
             "/chains/{chain}/tickets",
             "/events",
             "/projects",
             "/projects/{project}",
             "/projects/{project}/chains",
+            "/projects/{project}/import",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",
             "/tickets",
@@ -697,4 +699,121 @@ async fn release_agent_finishes_a_cut_release() {
         .await;
     assert_eq!(c["releases"][0]["state"], "released");
     assert_eq!(c["tickets"][0]["status"], "released");
+}
+
+const DEMO_TOML: &str = include_str!("../../../../examples/demo.toml");
+
+/// Edges as "from>to" by ticket title and release version, sorted.
+fn edge_titles(detail: &Value) -> Vec<String> {
+    let name = |n: &Value| -> String {
+        let id = &n["id"];
+        let kind = n["kind"].as_str().unwrap_or_default();
+        let list = if kind == "ticket" {
+            "tickets"
+        } else {
+            "releases"
+        };
+        let field = if kind == "ticket" { "title" } else { "version" };
+        detail[list]
+            .as_array()
+            .and_then(|a| a.iter().find(|x| &x["id"] == id))
+            .map(|x| x[field].as_str().unwrap_or_default().to_owned())
+            .unwrap_or_default()
+    };
+    let mut e: Vec<String> = detail["edges"]
+        .as_array()
+        .expect("edges")
+        .iter()
+        .map(|e| format!("{}>{}", name(&e["from"]), name(&e["to"])))
+        .collect();
+    e.sort();
+    e
+}
+
+#[tokio::test]
+async fn import_export_roundtrip() {
+    let api = Api::new();
+    api.post("/v1/projects", json!({ "key": "DEMO" })).await;
+    api.post("/v1/projects", json!({ "key": "COPY" })).await;
+    let (s, first) = api
+        .call(
+            Method::POST,
+            "/v1/projects/DEMO/import",
+            Some(json!({ "toml": DEMO_TOML })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{first}");
+    assert_eq!(edge_titles(&first), ["A>B", "A>D", "B>R1", "D>R1", "R1>C"]);
+    assert_eq!(
+        api.status("DEMO-1").await,
+        "running",
+        "autostart after import"
+    );
+    assert_eq!(api.status("DEMO-2").await, "backlog");
+    let a = api.get("/v1/tickets/DEMO-1").await;
+    assert_eq!(a["subtasks"][1]["text"], "make it pass");
+
+    let exported = api.get("/v1/chains/demo/export").await;
+    let text = exported["toml"].as_str().expect("toml").to_owned();
+    println!("{text}");
+    assert!(text.contains("id = \"DEMO-1\""), "{text}");
+
+    let second = api
+        .post("/v1/projects/COPY/import", json!({ "toml": text }))
+        .await;
+    assert_eq!(edge_titles(&first), edge_titles(&second));
+    let titles = |d: &Value| -> Vec<String> {
+        let mut t: Vec<String> = d["tickets"]
+            .as_array()
+            .expect("tickets")
+            .iter()
+            .map(|t| format!("{} {}", t["title"], t["profile"]))
+            .collect();
+        t.sort();
+        t
+    };
+    assert_eq!(titles(&first), titles(&second));
+    let c = api.get("/v1/tickets/COPY-1").await;
+    assert_eq!(c["ticket"]["title"], "A");
+    assert_eq!(c["subtasks"].as_array().map(Vec::len), Some(2));
+}
+
+#[tokio::test]
+async fn import_rejects_bad_files_and_leaves_nothing_behind() {
+    let api = Api::new();
+    api.post("/v1/projects", json!({ "key": "DEMO" })).await;
+    let bad = "[chain]\nname = \"x\"\n[[ticket]]\nid = \"A\"\nafter = [\"nope\"]\n";
+    let (s, v) = api
+        .call(
+            Method::POST,
+            "/v1/projects/DEMO/import",
+            Some(json!({ "toml": bad })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(v["error"], "line 5: unknown id \"nope\"", "{v}");
+
+    // Fails inside the transaction, after the chain row was written: all of it rolls back.
+    let late = "[chain]\nname = \"late\"\n[[ticket]]\nid = \"A\"\nsubtasks = [\"ok\", \" \"]\n";
+    let (s, v) = api
+        .call(
+            Method::POST,
+            "/v1/projects/DEMO/import",
+            Some(json!({ "toml": late })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert_eq!(api.get("/v1/chains").await, json!([]));
+    assert_eq!(api.get("/v1/tickets").await, json!([]));
+
+    api.post("/v1/projects/DEMO/import", json!({ "toml": DEMO_TOML }))
+        .await;
+    let (s, _) = api
+        .call(
+            Method::POST,
+            "/v1/projects/DEMO/import",
+            Some(json!({ "toml": DEMO_TOML })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CONFLICT, "same chain name twice");
 }

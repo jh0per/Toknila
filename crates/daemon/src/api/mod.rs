@@ -39,6 +39,8 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(list_projects, create_project))
         .routes(routes!(get_project))
         .routes(routes!(create_chain))
+        .routes(routes!(import_chain))
+        .routes(routes!(export_chain))
         .routes(routes!(list_chains))
         .routes(routes!(get_chain))
         .routes(routes!(add_edge, remove_edge))

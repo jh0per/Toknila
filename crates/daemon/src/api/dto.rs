@@ -195,3 +195,10 @@ impl From<(ReleaseId, TicketId)> for ReleaseMember {
 
 /// Project returned on create.
 pub type ProjectOut = Project;
+
+/// A chain file: body of `POST /v1/projects/{project}/import`, answer of
+/// `GET /v1/chains/{chain}/export`.
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+pub struct ChainFile {
+    pub toml: String,
+}

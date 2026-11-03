@@ -24,6 +24,7 @@ rusqlite = { version = "0.41", features = ["bundled"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net", "fs", "io-util"] }
 tempfile = "3"
 anyhow = "1"
+toml = "1"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Console"] }
 utoipa = { version = "6", features = ["axum_extras"] }
 utoipa-axum = "0.3"

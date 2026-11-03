@@ -165,6 +165,94 @@ pub async fn create_chain(
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
+#[utoipa::path(post, path = "/projects/{project}/import", tag = "chains", request_body = ChainFile,
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 201, body = ChainDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+pub async fn import_chain(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+    Json(input): Json<ChainFile>,
+) -> ApiResult<(StatusCode, Json<ChainDetail>)> {
+    let plan =
+        toknila_core::plan::parse(&input.toml).map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let at = now();
+    let (detail, _) = state
+        .store
+        .write(Actor::Human, at, move |tx| -> ApiResult<ChainDetail> {
+            let p = commands::resolve_project(&tx.repo(), &project)?;
+            if tx.repo().chain_by_name(p.id, &plan.chain.name)?.is_some() {
+                return Err(ApiError::conflict(format!(
+                    "chain {} already exists in {}",
+                    plan.chain.name, p.key
+                )));
+            }
+            let mut keys = Vec::with_capacity(plan.tickets.len());
+            for _ in &plan.tickets {
+                let n = tx.repo().take_ticket_number(p.id)?;
+                keys.push(
+                    TicketKey::new(p.key.clone(), n)
+                        .map_err(|e| ApiError::bad_request(e.to_string()))?,
+                );
+            }
+            let mut keys = keys.into_iter();
+            let (view, subtasks) = plan.instantiate(p.id, at, || {
+                keys.next().expect("one key was taken per ticket")
+            });
+            let chain_id = view.chain.id;
+            tx.repo().insert_chain(&view.chain)?;
+            tx.emit("chain", chain_id, "created", json!({ "chain": view.chain }))?;
+            // Every node and edge goes through the same path as single edits, then the chain
+            // settles once (autostart) and the whole import commits or nothing does.
+            with_chain(tx, chain_id, move |ctx, _| {
+                for t in view.tickets {
+                    ctx.add_ticket(t);
+                }
+                for r in view.releases {
+                    ctx.add_release(r);
+                }
+                for e in view.edges {
+                    ctx.add_edge(e)?;
+                }
+                Ok(())
+            })?;
+            for (id, texts) in subtasks {
+                let ticket = tx
+                    .repo()
+                    .ticket(id)?
+                    .ok_or_else(|| ApiError::not_found("ticket"))?;
+                for s in &texts {
+                    commands::add_subtask(tx, &ticket, s)?;
+                }
+            }
+            load_chain_detail(&tx.repo(), chain_id, at)
+        })
+        .await?;
+    Ok((StatusCode::CREATED, Json(detail)))
+}
+
+#[utoipa::path(get, path = "/chains/{chain}/export", tag = "chains",
+    params(("chain" = String, Path, description = "Chain id or name")),
+    responses((status = 200, body = ChainFile), (status = 404, body = ErrorBody)))]
+pub async fn export_chain(
+    State(state): State<AppState>,
+    Path(chain): Path<String>,
+) -> ApiResult<Json<ChainFile>> {
+    let toml = read(&state, move |repo| {
+        let c = commands::resolve_chain(repo, &chain)?;
+        let view = repo
+            .chain_view(c.id)?
+            .ok_or_else(|| ApiError::not_found(format!("chain {chain}")))?;
+        let mut subtasks = std::collections::HashMap::new();
+        for t in &view.tickets {
+            let texts: Vec<String> = repo.subtasks(t.id)?.into_iter().map(|s| s.text).collect();
+            subtasks.insert(t.id, texts);
+        }
+        Ok(toknila_core::plan::export(&view, &subtasks))
+    })
+    .await?;
+    Ok(Json(ChainFile { toml }))
+}
+
 #[utoipa::path(get, path = "/chains", tag = "chains",
     params(("project" = Option<String>, Query, description = "Project id or key")),
     responses((status = 200, body = Vec<ChainItem>)))]

@@ -7,6 +7,7 @@ pub mod agent;
 pub mod graph;
 pub mod machine;
 pub mod model;
+pub mod plan;
 pub mod template;
 
 pub use model::*;
