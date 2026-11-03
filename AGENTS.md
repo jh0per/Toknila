@@ -16,6 +16,9 @@ Call it "the reference" if you must refer to it.
 
 ## Layout and boundaries
 
+The target layering, the data flow and the UI pattern (MVI) are in `docs/architecture.md`; read it
+before moving code between crates. Summary of what holds today:
+
 - `crates/core` (`toknila-core`): domain types and **pure** rules. No I/O, no `tokio`, no
   `rusqlite`/`sqlx`, no `axum`. Every state transition goes through one function in core
   (`apply(ticket, event) -> (ticket, effects)`); a transition outside the table is a typed error.
@@ -25,6 +28,10 @@ Call it "the reference" if you must refer to it.
 - `crates/cli` (`toknila`, binaries `toknila` and `tok`): a thin client of the daemon API. No
   business rules here; if the CLI needs a rule, the rule belongs in core.
 - `apps/web`: UI served by the daemon. `apps/desktop`: Tauri, later.
+- A production source file (Rust or TypeScript, inline tests excluded) stays at or under 400
+  lines; `cargo xtask guards` enforces it. Files already over it may only shrink, and their entry
+  in `xtask/src/guards.rs` is lowered or removed in the same PR that shrinks them.
+- A rule that two places need moves one layer down; it is never copied.
 - The database is the source of truth. TOML chain files are import/export only. Chain status,
   progress and "where it stopped" are computed, never stored.
 

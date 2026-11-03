@@ -22,6 +22,7 @@ for a human, blocked, ready for review.
 | `apps/web` | Web UI served by the daemon (read-only page in phase 0). |
 | `apps/desktop` | Tauri 2 shell (later). |
 | `xtask` | Repository tasks; `cargo xtask verify` is the one gate for local runs and CI. |
+| `docs` | [Architecture](docs/architecture.md), decision records, install guide, agent event contract. |
 
 ## Build and check
 
