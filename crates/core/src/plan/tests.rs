@@ -161,3 +161,15 @@ fn self_and_duplicate_edges_are_rejected() {
     );
     assert_eq!(e.message, "A -> B is listed twice");
 }
+
+#[test]
+fn the_phase_1_plan_is_a_valid_chain() {
+    let plan =
+        parse(include_str!("../../../../plans/phase-1.toml")).expect("plans/phase-1.toml parses");
+    assert_eq!(plan.chain.name, "phase-1");
+    assert!(!plan.chain.autostart, "planned work waits for a person");
+    assert_eq!(plan.tickets.len(), 10);
+    assert_eq!(plan.releases[0].version, "v0.2.0");
+    let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
+    view.validate().expect("valid graph");
+}
