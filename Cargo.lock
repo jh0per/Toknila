@@ -1538,6 +1538,7 @@ dependencies = [
  "toknila-core",
  "toknila-daemon",
  "ureq",
+ "windows-sys",
 ]
 
 [[package]]

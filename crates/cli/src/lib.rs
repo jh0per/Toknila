@@ -2,6 +2,8 @@
 //! The CLI is a thin client of the daemon API; `toknila daemon run` is the daemon itself.
 
 mod daemon_cmd;
+#[cfg(windows)]
+mod win;
 
 use std::process::ExitCode;
 

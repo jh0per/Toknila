@@ -119,6 +119,8 @@ pub fn start(paths: &Paths) -> Result<DaemonInfo> {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     detach(&mut cmd);
+    #[cfg(windows)]
+    crate::win::stop_inheriting_stdio();
     let mut child = cmd.spawn().context("cannot start the daemon")?;
 
     let deadline = Instant::now() + Duration::from_secs(15);

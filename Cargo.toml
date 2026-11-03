@@ -24,6 +24,7 @@ rusqlite = { version = "0.41", features = ["bundled"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net", "fs", "io-util"] }
 tempfile = "3"
 anyhow = "1"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Console"] }
 utoipa = { version = "6", features = ["axum_extras"] }
 utoipa-axum = "0.3"
 tower = { version = "0.5", features = ["util"] }
@@ -38,7 +39,8 @@ tracing-appender = "0.2"
 ureq = { version = "2.12", default-features = false, features = ["json"] }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# deny, not forbid: one audited FFI call on Windows (crates/cli/src/win.rs) allows it locally.
+unsafe_code = "deny"
 missing_debug_implementations = "warn"
 
 [workspace.lints.clippy]

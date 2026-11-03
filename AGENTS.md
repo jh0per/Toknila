@@ -51,7 +51,8 @@ scripts; add new checks to `xtask` so local and CI cannot drift.
 
 ## Rust conventions
 
-- Edition 2024, stable toolchain. `unsafe` is forbidden workspace-wide.
+- Edition 2024, stable toolchain. `unsafe` is denied workspace-wide; the only exception is the
+  audited Windows FFI in `crates/cli/src/win.rs`. Do not add another without a `SAFETY:` comment.
 - Errors: typed (`thiserror`) in libraries, `anyhow` only at binary edges. No `unwrap()` outside
   tests; `expect("why this cannot fail")` when an invariant guarantees it.
 - IDs are ULIDs; humans address tickets by short keys like `DEMO-3`.
