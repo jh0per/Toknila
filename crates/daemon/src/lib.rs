@@ -3,6 +3,7 @@
 pub mod api;
 pub mod info;
 pub mod paths;
+pub mod recovery;
 pub mod server;
 pub mod store;
 pub mod stream;

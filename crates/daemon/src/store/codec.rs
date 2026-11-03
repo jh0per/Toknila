@@ -701,6 +701,30 @@ impl<'c> Repo<'c> {
         .collect()
     }
 
+    /// Payload of the newest journal event about one entity, if any.
+    pub fn last_event_payload(
+        &self,
+        entity: &str,
+        id: &str,
+    ) -> Result<Option<serde_json::Value>, StoreError> {
+        self.conn
+            .query_row(
+                "SELECT payload_json FROM events WHERE entity = ?1 AND entity_id = ?2 ORDER BY seq DESC LIMIT 1",
+                params![entity, id],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()?
+            .map(|s| from_json(&s))
+            .transpose()
+    }
+
+    /// Runs SQLite's own consistency check; `ok` means the file is sound.
+    pub fn integrity_check(&self) -> Result<String, StoreError> {
+        Ok(self
+            .conn
+            .query_row("PRAGMA integrity_check", [], |r| r.get::<_, String>(0))?)
+    }
+
     pub fn last_seq(&self) -> Result<i64, StoreError> {
         super::last_seq(self.conn)
     }

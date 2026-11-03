@@ -140,6 +140,14 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         });
     }
     let store = Store::open(&paths.db())?;
+    let recovery = crate::recovery::recover(&store)
+        .await
+        .map_err(|e| RunError::Other(format!("startup recovery: {e}")))?;
+    if recovery.drift.is_empty() {
+        tracing::info!(?recovery, "store checked");
+    } else {
+        tracing::warn!(?recovery, "stored state differs from the journal");
+    }
     let token: Arc<str> = new_token().map_err(RunError::Other)?.into();
     let shutdown = Arc::new(Notify::new());
     let state = AppState {
