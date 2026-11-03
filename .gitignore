@@ -6,3 +6,4 @@ apps/web/dist/
 .idea/
 .vscode/
 /.toknila/
+/dist/

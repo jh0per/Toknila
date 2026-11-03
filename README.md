@@ -6,8 +6,11 @@ dependencies and release milestones; each ticket runs on its own **ship** (a git
 agent runner), and the ticket's status moves by itself from the agent's events: running, waiting
 for a human, blocked, ready for review.
 
-> Status: phase 0 (skeleton). Nothing runs agents yet. Phase 0 proves the model with a simulated
-> agent profile driven from the CLI.
+> Status: phase 0 (v0.1.0). Nothing runs agents yet. Phase 0 proves the model with a simulated
+> agent profile driven from the CLI, a daemon that survives `kill -9`, and a live read-only page.
+>
+> Install and first run: [docs/install.md](docs/install.md). Binaries for macOS (Apple silicon and
+> Intel), Linux and Windows are on the [releases page](https://github.com/jh0per/Toknila/releases).
 
 ## Layout
 
@@ -25,11 +28,14 @@ for a human, blocked, ready for review.
 Requires a stable Rust toolchain (`rust-toolchain.toml` pins the channel and components).
 
 ```sh
+cargo xtask web             # build the web page the daemon embeds (needs Node 22)
 cargo xtask verify          # fmt check, clippy -D warnings, tests, architecture guards
+cargo xtask e2e-web         # browser smoke test of the page (Playwright)
 cargo run --bin tok -- --version
+cargo xtask dist aarch64-apple-darwin   # release archive in dist/
 ```
 
-CI runs the same `cargo xtask verify` on Ubuntu, Windows and macOS.
+CI runs the same tasks on Ubuntu, Windows and macOS. Pushing a `v*` tag builds the release.
 
 ## Roadmap
 

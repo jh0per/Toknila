@@ -6,6 +6,7 @@
 //!   Run it before `verify` or a release build; CI does.
 //! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
 //!   With `CI` set it first installs Chromium; locally it uses an installed one.
+//! - `dist <target>`: release archive for one target triple in `dist/` (web page embedded).
 
 use std::process::{Command, ExitCode};
 
@@ -28,8 +29,9 @@ fn main() -> ExitCode {
         "guards" => guards(),
         "web" => web(),
         "e2e-web" => e2e_web(),
+        "dist" => dist(std::env::args().nth(2)),
         _ => {
-            eprintln!("usage: cargo xtask <verify|guards|web|e2e-web>");
+            eprintln!("usage: cargo xtask <verify|guards|web|e2e-web|dist <target>>");
             return ExitCode::from(2);
         }
     };
@@ -131,6 +133,78 @@ fn e2e_web() -> Result<(), String> {
     }
     run("node", &["e2e/smoke.mjs", &tok.to_string_lossy()], &web)?;
     eprintln!("xtask e2e-web: PASS");
+    Ok(())
+}
+
+/// Archive name part for a target triple.
+fn platform(target: &str) -> Option<&'static str> {
+    Some(match target {
+        "aarch64-apple-darwin" => "macos-arm64",
+        "x86_64-apple-darwin" => "macos-x86_64",
+        "x86_64-unknown-linux-gnu" => "linux-x86_64",
+        "aarch64-unknown-linux-gnu" => "linux-arm64",
+        "x86_64-pc-windows-msvc" => "windows-x86_64",
+        _ => return None,
+    })
+}
+
+fn dist(target: Option<String>) -> Result<(), String> {
+    let target = target.ok_or("usage: cargo xtask dist <target triple>")?;
+    let platform = platform(&target).ok_or_else(|| format!("unsupported target {target}"))?;
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .canonicalize()
+        .map_err(|e| format!("repo root: {e}"))?;
+    let version = output(&["pkgid", "-p", "toknila"])?
+        .trim()
+        .rsplit(['@', '#'])
+        .next()
+        .unwrap_or_default()
+        .to_owned();
+    web()?;
+    cargo(&[
+        "build",
+        "--release",
+        "--locked",
+        "--target",
+        &target,
+        "--bin",
+        "tok",
+        "--bin",
+        "toknila",
+    ])?;
+    let windows = target.contains("windows");
+    let exe = if windows { ".exe" } else { "" };
+    let name = format!("toknila-{version}-{platform}");
+    let out = root.join("dist");
+    let stage = out.join(&name);
+    let _ = std::fs::remove_dir_all(&stage);
+    std::fs::create_dir_all(&stage).map_err(|e| format!("{}: {e}", stage.display()))?;
+    let bin = root.join("target").join(&target).join("release");
+    let copy = |from: std::path::PathBuf, to: &str| {
+        std::fs::copy(&from, stage.join(to))
+            .map(|_| ())
+            .map_err(|e| format!("copy {}: {e}", from.display()))
+    };
+    for b in ["tok", "toknila"] {
+        copy(bin.join(format!("{b}{exe}")), &format!("{b}{exe}"))?;
+    }
+    copy(root.join("LICENSE"), "LICENSE")?;
+    copy(root.join("README.md"), "README.md")?;
+    copy(root.join("docs/install.md"), "INSTALL.md")?;
+    copy(root.join("examples/demo.toml"), "demo.toml")?;
+    copy(root.join("plans/phase-1.toml"), "phase-1.toml")?;
+    // bsdtar (macOS, Windows) and GNU tar (Linux) both take these flags; -a picks zip by name.
+    let archive = if windows {
+        format!("{name}.zip")
+    } else {
+        format!("{name}.tar.gz")
+    };
+    let flags = if windows { "-a -cf" } else { "-czf" };
+    let mut args: Vec<&str> = flags.split(' ').collect();
+    args.extend([archive.as_str(), name.as_str()]);
+    run("tar", &args, &out)?;
+    eprintln!("xtask dist: PASS: dist/{archive}");
     Ok(())
 }
 
