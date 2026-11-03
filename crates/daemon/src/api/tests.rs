@@ -545,10 +545,12 @@ async fn openapi_describes_every_route() {
             "/projects/{project}",
             "/projects/{project}/chains",
             "/releases/{release}/actions/{action}",
+            "/releases/{release}/events",
             "/tickets",
             "/tickets/{ticket}",
             "/tickets/{ticket}/actions/{action}",
             "/tickets/{ticket}/comments",
+            "/tickets/{ticket}/events",
             "/tickets/{ticket}/subtasks",
             "/tickets/{ticket}/subtasks/{position}",
         ]
@@ -567,4 +569,132 @@ async fn openapi_describes_every_route() {
         );
     }
     assert!(doc["components"]["securitySchemes"]["bearer"].is_object());
+}
+
+#[tokio::test]
+async fn sim_agent_events_drive_a_ticket() {
+    let api = Api::new();
+    api.demo().await;
+    let t = api
+        .post(
+            "/v1/chains/demo/tickets",
+            json!({ "title": "A", "profile": "sim", "subtasks": ["test"] }),
+        )
+        .await;
+    assert_eq!(
+        t["ticket"]["status"], "running",
+        "autostart with the sim profile"
+    );
+    let t = api
+        .post("/v1/tickets/DEMO-1/events", json!({ "event": "started" }))
+        .await;
+    assert_eq!(
+        t["ticket"]["status"], "running",
+        "started on a running ticket is a no-op"
+    );
+
+    let t = api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "ask_human", "text": "який фреймворк?" }),
+        )
+        .await;
+    assert_eq!(t["ticket"]["status"], "waiting");
+    assert_eq!(t["ticket"]["status_reason"]["text"], "який фреймворк?");
+    assert_eq!(
+        (
+            t["comments"][0]["author"].as_str(),
+            t["comments"][0]["kind"].as_str()
+        ),
+        (Some("agent"), Some("report"))
+    );
+
+    let t = api
+        .post("/v1/tickets/DEMO-1/comments", json!({ "text": "Solid" }))
+        .await;
+    assert_eq!(t["ticket"]["status"], "running", "instruction delivered");
+    assert!(t["comments"][1]["delivered_at"].is_number());
+
+    let t = api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "subtask_done", "position": 1 }),
+        )
+        .await;
+    assert_eq!(t["subtasks"][0]["done_by"], "agent");
+    let t = api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "note", "body": { "gist": "half way" } }),
+        )
+        .await;
+    assert_eq!(t["comments"][2]["body"]["gist"], "half way");
+    let t = api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "finished", "summary": "зроблено X" }),
+        )
+        .await;
+    assert_eq!(t["ticket"]["status"], "review");
+    assert_eq!(t["comments"][3]["body"]["gist"], "зроблено X");
+
+    let t = api
+        .post(
+            "/v1/tickets/DEMO-1/actions/return",
+            json!({ "text": "додай тест" }),
+        )
+        .await;
+    assert_eq!(t["ticket"]["status"], "running");
+    let t = api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "crashed", "detail": "exit 101" }),
+        )
+        .await;
+    assert_eq!(t["ticket"]["status"], "blocked");
+    assert_eq!(t["ticket"]["status_reason"]["reason"]["kind"], "crashed");
+
+    let (s, _) = api
+        .call(
+            Method::POST,
+            "/v1/tickets/DEMO-1/events",
+            Some(json!({ "event": "teleport" })),
+        )
+        .await;
+    assert!(s.is_client_error());
+}
+
+#[tokio::test]
+async fn release_agent_finishes_a_cut_release() {
+    let api = Api::new();
+    api.demo().await;
+    api.post("/v1/chains/demo/tickets", json!({ "title": "A" }))
+        .await;
+    api.post(
+        "/v1/chains/demo/releases",
+        json!({ "version": "0.1.0", "after": ["DEMO-1"] }),
+    )
+    .await;
+    api.post(
+        "/v1/tickets/DEMO-1/events",
+        json!({ "event": "finished", "summary": "done" }),
+    )
+    .await;
+    api.post("/v1/tickets/DEMO-1/actions/accept", json!({}))
+        .await;
+    let (s, _) = api
+        .call(
+            Method::POST,
+            "/v1/releases/0.1.0/events",
+            Some(json!({ "event": "finished" })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CONFLICT, "not cut yet");
+    api.post("/v1/releases/0.1.0/actions/start", json!({}))
+        .await;
+    let c = api
+        .post("/v1/releases/0.1.0/events", json!({ "event": "finished" }))
+        .await;
+    assert_eq!(c["releases"][0]["state"], "released");
+    assert_eq!(c["tickets"][0]["status"], "released");
 }

@@ -18,6 +18,7 @@ use super::dto::*;
 use super::error::{ApiError, ErrorBody};
 use crate::server::{AppState, now};
 use crate::store::{EventRecord, Repo};
+use toknila_core::agent::{AgentEvent, ReleaseEvent};
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -644,4 +645,103 @@ pub async fn list_events(
 ) -> ApiResult<Json<Vec<EventRecord>>> {
     let limit = q.limit.unwrap_or(1000).min(10_000);
     Ok(Json(state.store.events_since(q.since, limit).await?))
+}
+
+// ---- agent events (P0-10) ----
+
+#[utoipa::path(post, path = "/tickets/{ticket}/events", tag = "agent", request_body = AgentEvent,
+    params(("ticket" = String, Path, description = "Ticket id or key")),
+    responses((status = 200, body = TicketDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+pub async fn agent_event(
+    State(state): State<AppState>,
+    Path(ticket): Path<String>,
+    Json(event): Json<AgentEvent>,
+) -> ApiResult<Json<TicketDetail>> {
+    ticket_write(&state, ticket, Actor::Agent, move |tx, t| match event {
+        AgentEvent::Started => with_chain(tx, t.chain_id, |ctx, _| {
+            if t.status == TicketStatus::Ready {
+                ctx.ticket_event(t.id, TicketEvent::Start)?;
+            } else if t.status != TicketStatus::Running {
+                return Err(ApiError::conflict(format!(
+                    "cannot start a ticket in {:?}",
+                    t.status
+                )));
+            }
+            Ok(())
+        }),
+        AgentEvent::AskHuman { text, permission } => {
+            if text.trim().is_empty() {
+                return Err(ApiError::bad_request("ask_human needs a text"));
+            }
+            let reason = AgentEvent::waiting_reason(&text, permission);
+            with_chain(tx, t.chain_id, |ctx, _| {
+                Ok(ctx.ticket_event(t.id, TicketEvent::AskHuman { reason })?)
+            })?;
+            let view = tx
+                .repo()
+                .chain_view(t.chain_id)?
+                .ok_or_else(|| ApiError::not_found("chain"))?;
+            commands::add_comment(
+                tx,
+                &view,
+                t.id,
+                Actor::Agent,
+                CommentKind::Report,
+                commands::body_from_text(&text),
+            )
+            .map(|_| ())
+        }
+        AgentEvent::SubtaskDone { position } => {
+            commands::update_subtask(tx, &t, position, Some(true), None).map(|_| ())
+        }
+        AgentEvent::Note { body } => {
+            let view = tx
+                .repo()
+                .chain_view(t.chain_id)?
+                .ok_or_else(|| ApiError::not_found("chain"))?;
+            commands::add_comment(tx, &view, t.id, Actor::Agent, CommentKind::Report, body)
+                .map(|_| ())
+        }
+        AgentEvent::Finished { summary } => {
+            if summary.trim().is_empty() {
+                return Err(ApiError::bad_request("finished needs a summary"));
+            }
+            with_chain(tx, t.chain_id, |ctx, _| {
+                Ok(ctx.ticket_event(t.id, TicketEvent::Finished { summary })?)
+            })
+        }
+        AgentEvent::Crashed { detail } => with_chain(tx, t.chain_id, |ctx, _| {
+            Ok(ctx.ticket_event(
+                t.id,
+                TicketEvent::Block {
+                    reason: BlockedReason::Crashed { detail },
+                },
+            )?)
+        }),
+    })
+    .await
+}
+
+#[utoipa::path(post, path = "/releases/{release}/events", tag = "agent", request_body = ReleaseEvent,
+    params(("release" = String, Path, description = "Release id or version")),
+    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+pub async fn release_event(
+    State(state): State<AppState>,
+    Path(release): Path<String>,
+    Json(event): Json<ReleaseEvent>,
+) -> ApiResult<Json<ChainDetail>> {
+    let at = now();
+    let (detail, _) = state
+        .store
+        .write(Actor::Agent, at, move |tx| -> ApiResult<ChainDetail> {
+            let r = commands::resolve_release(&tx.repo(), &release)?;
+            match event {
+                ReleaseEvent::Finished => {
+                    with_chain(tx, r.chain_id, |ctx, _| Ok(ctx.complete_release(r.id)?))?
+                }
+            }
+            load_chain_detail(&tx.repo(), r.chain_id, at)
+        })
+        .await?;
+    Ok(Json(detail))
 }

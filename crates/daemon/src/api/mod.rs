@@ -52,6 +52,8 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(patch_subtask))
         .routes(routes!(release_action))
         .routes(routes!(list_events))
+        .routes(routes!(agent_event))
+        .routes(routes!(release_event))
         .split_for_parts();
     // Routes are nested under /v1; say so in the document.
     api.servers = Some(vec![utoipa::openapi::Server::new("/v1")]);
