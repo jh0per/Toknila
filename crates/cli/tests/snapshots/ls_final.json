@@ -1,0 +1,92 @@
+[
+  {
+    "chain": "demo",
+    "in_status_ms": 0,
+    "needs_human": false,
+    "ticket": {
+      "acceptance": [
+        "A is done"
+      ],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "DEMO-1",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": "sim",
+      "prompt": "First step.",
+      "review_mode": null,
+      "status": "released",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "A",
+      "tokens_used": 0
+    }
+  },
+  {
+    "chain": "demo",
+    "in_status_ms": 0,
+    "needs_human": false,
+    "ticket": {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "DEMO-2",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": "sim",
+      "prompt": "",
+      "review_mode": null,
+      "status": "released",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "B",
+      "tokens_used": 0
+    }
+  },
+  {
+    "chain": "demo",
+    "in_status_ms": 0,
+    "needs_human": false,
+    "ticket": {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "DEMO-3",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": "sim",
+      "prompt": "",
+      "review_mode": null,
+      "status": "released",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "D",
+      "tokens_used": 0
+    }
+  },
+  {
+    "chain": "demo",
+    "in_status_ms": 0,
+    "needs_human": false,
+    "ticket": {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "DEMO-4",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": "sim",
+      "prompt": "",
+      "review_mode": null,
+      "status": "merged",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "C",
+      "tokens_used": 0
+    }
+  }
+]
