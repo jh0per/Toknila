@@ -1,10 +1,12 @@
 name: Release
 
 # Push a tag like v0.1.0 (or run by hand with that tag) to build every platform and publish a
-# GitHub release with the archives and their SHA-256 sums.
+# GitHub release with the archives and their SHA-256 sums. On a pull request it only builds the
+# archives (downloadable from the run's artifacts), so a release can never be the first build.
 on:
   push:
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
     inputs:
       tag:
@@ -17,6 +19,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   TAG: ${{ inputs.tag || github.ref_name }}
+  RELEASE: ${{ github.event_name != 'pull_request' }}
 
 jobs:
   build:
@@ -34,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ github.event_name == 'pull_request' && github.sha || env.TAG }}
 
       - name: Install toolchain
         run: |
@@ -53,6 +56,7 @@ jobs:
 
       # The tag must match the version in Cargo.toml; xtask dist names the archive from it.
       - name: Check version
+        if: env.RELEASE == 'true'
         shell: bash
         run: |
           v=$(cargo pkgid -p toknila | sed 's/.*[@#]//')
@@ -71,6 +75,7 @@ jobs:
 
   publish:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
