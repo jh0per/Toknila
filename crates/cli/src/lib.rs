@@ -1,13 +1,19 @@
 //! Toknila CLI. Both `toknila` and `tok` call [`run`]; the binaries differ only in name.
-//! The CLI is a thin client of the daemon API; `toknila daemon run` is the daemon itself.
+//! The CLI is a thin client of the daemon API (it starts the daemon when needed);
+//! `toknila daemon run` is the daemon itself. Business rules live in core, not here.
 
+mod client;
+mod commands;
 mod daemon_cmd;
+mod output;
 #[cfg(windows)]
 mod win;
 
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
+
+pub use commands::Command;
 
 /// Toknila: plan work as chains of tickets and let a fleet of coding agents execute them.
 #[derive(Debug, Parser)]
@@ -21,26 +27,15 @@ pub struct Cli {
     pub command: Option<Command>,
 }
 
-/// Top-level commands.
-#[derive(Debug, Subcommand)]
-pub enum Command {
-    /// Start, stop or inspect the background daemon.
-    #[command(subcommand)]
-    Daemon(daemon_cmd::DaemonCmd),
-}
-
 /// Parse arguments from the process and run the command.
 pub fn run() -> ExitCode {
     let cli = Cli::parse();
-    let result = match cli.command {
-        None => {
-            use clap::CommandFactory;
-            let _ = Cli::command().print_help();
-            Ok(())
-        }
-        Some(Command::Daemon(cmd)) => daemon_cmd::run(cmd, cli.json),
+    let Some(command) = cli.command else {
+        use clap::CommandFactory;
+        let _ = Cli::command().print_help();
+        return ExitCode::SUCCESS;
     };
-    match result {
+    match commands::run(command, cli.json) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e:#}");

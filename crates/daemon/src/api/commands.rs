@@ -49,12 +49,24 @@ pub fn resolve_ticket(repo: &Repo<'_>, r: &str) -> Result<Ticket, ApiError> {
     {
         return Ok(t);
     }
-    let key: TicketKey = r
-        .to_uppercase()
-        .parse()
-        .map_err(|_| ApiError::not_found(format!("ticket {r}")))?;
-    repo.ticket_by_key(&key)?
-        .ok_or_else(|| ApiError::not_found(format!("ticket {r}")))
+    if let Ok(key) = r.to_uppercase().parse::<TicketKey>()
+        && let Some(t) = repo.ticket_by_key(&key)?
+    {
+        return Ok(t);
+    }
+    // Last resort: an exact, unique title (handy in short demo chains: `tok sim A finish`).
+    let mut found: Vec<Ticket> = repo
+        .tickets(None)?
+        .into_iter()
+        .filter(|t| t.title == r)
+        .collect();
+    match found.len() {
+        0 => Err(ApiError::not_found(format!("ticket {r}"))),
+        1 => Ok(found.remove(0)),
+        n => Err(ApiError::ambiguous(format!(
+            "{n} tickets are titled {r:?}; use the key"
+        ))),
+    }
 }
 
 pub fn resolve_release(repo: &Repo<'_>, r: &str) -> Result<Release, ApiError> {
@@ -80,6 +92,15 @@ pub fn resolve_node(view: &ChainView, r: &str) -> Result<NodeRef, ApiError> {
         .tickets
         .iter()
         .find(|t| t.key.to_string() == upper || t.id.to_string() == r)
+    {
+        return Ok(NodeRef::Ticket(t.id));
+    }
+    if let [t] = view
+        .tickets
+        .iter()
+        .filter(|t| t.title == r)
+        .collect::<Vec<_>>()
+        .as_slice()
     {
         return Ok(NodeRef::Ticket(t.id));
     }

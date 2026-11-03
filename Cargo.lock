@@ -1537,6 +1537,7 @@ dependencies = [
  "tokio",
  "toknila-core",
  "toknila-daemon",
+ "tungstenite 0.30.0",
  "ureq",
  "windows-sys",
 ]
