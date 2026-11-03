@@ -1,0 +1,115 @@
+# Phase 1 (MVP): an agent really moves a ticket. Toknila's own next chain, kept as data.
+# Import: tok project new TOK && tok chain import plans/phase-1.toml --project TOK
+# Then:   tok chain show phase-1
+#
+# Gate 1 (the release at the end): a real Claude Code agent takes a ticket from Ready to
+# Merged in develop on a ship, through MCP events, with a human or agent review.
+
+[chain]
+name = "phase-1"
+goal = "An agent really moves a ticket: Ready -> Running -> Review -> Merged in develop"
+# Planned work, not a demo: nothing starts by itself until a person resumes it.
+autostart = false
+
+[[ticket]]
+id = "profiles"
+title = "Agent profiles as TOML"
+prompt = "Load agent profiles from TOML: launch command, instructions file, MCP and hook wiring, role (worker / reviewer / release), output rules, nudge thresholds. A new agent is a new file, not new code."
+acceptance = [
+  "tok profile ls lists built-in sim and claude-code plus files from the profiles folder",
+  "An invalid profile names the file and line",
+  "Profile JSON is pinned by a snapshot test",
+]
+
+[[ticket]]
+id = "ships"
+title = "Ships: worktree per ticket from develop"
+prompt = "Create a ship for a ticket: git worktree on branch ship/<chain>/<slug> from develop, removed after Merged. Cross-platform paths, no shell assumptions."
+acceptance = [
+  "Starting a ticket creates the worktree and branch; Merged removes the worktree",
+  "Works on Windows, Ubuntu and macOS in CI against a temporary repository",
+]
+
+[[ticket]]
+id = "pty"
+title = "PTY runner"
+prompt = "Run the profile's command on the ship in a pseudo-terminal (portable-pty in the daemon, never in core). Stream output to the web UI, keep a scrollback, survive daemon restarts by marking lost runners."
+acceptance = [
+  "A runner starts, streams output over WebSocket and stops on StopRunner",
+  "Killing the daemon marks Running tickets Blocked(runner_lost) on restart",
+]
+after = ["profiles", "ships"]
+
+[[ticket]]
+id = "mcp"
+title = "MCP server and hooks deliver agent events"
+prompt = "Expose the agent event contract (docs/events.md) as an MCP server on the ship, and wire Claude Code hooks as a second source. Same events the sim profile takes today."
+acceptance = [
+  "An agent's started / ask_human / subtask_done / note / finished / crashed move the ticket exactly like tok sim",
+  "Events from a ship that does not own the ticket are rejected",
+]
+after = ["pty"]
+
+[[ticket]]
+id = "nudge"
+title = "Silence detector and nudge loop"
+prompt = "Detect silence: MCP first, hooks second, output silence as the fallback. Nudge after 120 s of silence with no child process, up to 3 times in 15 min, then Waiting(silent). Thresholds come from the profile."
+acceptance = [
+  "Unit tests with a fake clock cover nudge, the limit and the move to Waiting",
+  "A real child process (a build) suppresses the nudge",
+]
+after = ["mcp"]
+
+[[ticket]]
+id = "claude-md"
+title = "Generated CLAUDE.md with short-output rules"
+prompt = "Generate CLAUDE.md on the ship: the ticket prompt, acceptance, comment template, short-output rules, and how to report through MCP. Instructions reach the agent only as ticket comments."
+acceptance = [
+  "The generated file is pinned by a snapshot test",
+  "An instruction comment is delivered to a running agent and marked delivered",
+]
+after = ["mcp"]
+
+[[ticket]]
+id = "review"
+title = "Review modes: human, agent, both"
+prompt = "Review on a ticket or chain: a person, a reviewer agent on its own runner, or the agent first and then a person who sees its remarks. Accept merges, Return sends the comment back."
+acceptance = [
+  "Each mode is covered by an integration test with sim reviewers",
+  "The review mode resolves ticket -> chain -> project",
+]
+after = ["mcp"]
+
+[[ticket]]
+id = "automerge"
+title = "Auto-merge into develop"
+prompt = "On Accept, merge the ship branch into develop; a conflict blocks the ticket with merge_conflict and the details. Dependents start from the new develop."
+acceptance = [
+  "Accept merges and the ticket is Merged; a conflict makes it Blocked(merge_conflict)",
+  "Tested against a temporary repository on three OSes",
+]
+after = ["review", "ships"]
+
+[[ticket]]
+id = "ui"
+title = "Three-panel web UI with xterm.js"
+prompt = "Grow apps/web into the three panels: chain graph, the runner terminal (xterm.js over the stream), ticket details with comments, subtasks and actions."
+acceptance = [
+  "Playwright test: open a ticket, see its live terminal, send an instruction, accept a review",
+]
+after = ["pty"]
+
+[[ticket]]
+id = "claude-code"
+title = "Claude Code profile end to end"
+prompt = "The built-in claude-code profile: launch, CLAUDE.md, MCP and hooks wired, worker and reviewer roles. Run one real ticket through it."
+acceptance = [
+  "A manual run on macOS moves a real ticket Ready -> Merged with an agent review; recorded in the PR",
+]
+after = ["nudge", "claude-md", "automerge", "ui"]
+
+[[release]]
+id = "v0.2.0"
+channel = "tag_only"
+start = "manual"
+after = ["claude-code"]

@@ -1,0 +1,493 @@
+use proptest::prelude::*;
+
+use super::*;
+use crate::{ChainId, TicketId, TicketKey};
+
+const T0: Timestamp = Timestamp(1_000);
+const NOW: Timestamp = Timestamp(5_000);
+
+fn ticket_in(status: TicketStatus) -> Ticket {
+    use TicketStatus as S;
+    let status_reason = match status {
+        S::Waiting => Some(StatusReason::Waiting(WaitingReason::Silent)),
+        S::Blocked => Some(StatusReason::Blocked {
+            reason: BlockedReason::Manual {
+                text: "key".to_owned(),
+            },
+            resume_to: S::Running,
+            waiting: None,
+        }),
+        S::Cancelled => Some(StatusReason::Cancelled {
+            text: "dup".to_owned(),
+        }),
+        _ => None,
+    };
+    Ticket {
+        id: TicketId::new(),
+        chain_id: ChainId::new(),
+        key: "DEMO-1".parse::<TicketKey>().expect("key"),
+        title: "t".to_owned(),
+        prompt: String::new(),
+        acceptance: Vec::new(),
+        status,
+        status_reason,
+        status_since: T0,
+        paused: false,
+        profile: None,
+        review_mode: None,
+        branch: None,
+        needs_secrets: false,
+        tokens_used: 0,
+    }
+}
+
+fn manual() -> BlockedReason {
+    BlockedReason::Manual {
+        text: "чекаємо ключ API".to_owned(),
+    }
+}
+
+fn ok(from: TicketStatus, event: TicketEvent) -> Transition {
+    let t = ticket_in(from);
+    let tr = apply(&t, &event, NOW).unwrap_or_else(|e| panic!("{from:?} + {event:?}: {e}"));
+    check_invariants(&tr.ticket).unwrap_or_else(|e| panic!("{from:?} + {event:?}: {e}"));
+    tr
+}
+
+// ---- one test per row of the transition table ----
+
+#[test]
+fn backlog_to_ready_when_deps_satisfied() {
+    let tr = ok(TicketStatus::Backlog, TicketEvent::DepsSatisfied);
+    assert_eq!(tr.ticket.status, TicketStatus::Ready);
+    assert_eq!(tr.ticket.status_since, NOW);
+    assert!(tr.effects.is_empty());
+}
+
+#[test]
+fn paused_backlog_does_not_become_ready() {
+    let mut t = ticket_in(TicketStatus::Backlog);
+    t.paused = true;
+    assert_eq!(
+        apply(&t, &TicketEvent::DepsSatisfied, NOW),
+        Err(TransitionError::Paused)
+    );
+}
+
+#[test]
+fn ready_back_to_backlog_when_deps_unsatisfied() {
+    assert_eq!(
+        ok(TicketStatus::Ready, TicketEvent::DepsUnsatisfied)
+            .ticket
+            .status,
+        TicketStatus::Backlog
+    );
+}
+
+#[test]
+fn ready_to_running_on_start() {
+    let tr = ok(TicketStatus::Ready, TicketEvent::Start);
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert_eq!(tr.effects, vec![Effect::EnsureRunner]);
+}
+
+#[test]
+fn running_to_waiting_on_ask_human() {
+    let reason = WaitingReason::Question {
+        text: "який фреймворк?".to_owned(),
+    };
+    let tr = ok(
+        TicketStatus::Running,
+        TicketEvent::AskHuman {
+            reason: reason.clone(),
+        },
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Waiting);
+    assert_eq!(tr.ticket.status_reason, Some(StatusReason::Waiting(reason)));
+}
+
+#[test]
+fn waiting_to_running_when_instruction_delivered() {
+    let tr = ok(TicketStatus::Waiting, TicketEvent::InstructionDelivered);
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert_eq!(tr.ticket.status_reason, None);
+}
+
+#[test]
+fn running_to_review_on_finished_records_report() {
+    let tr = ok(
+        TicketStatus::Running,
+        TicketEvent::Finished {
+            summary: "зроблено X".to_owned(),
+        },
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(
+        tr.effects,
+        vec![Effect::RecordReport {
+            summary: "зроблено X".to_owned()
+        }]
+    );
+}
+
+#[test]
+fn running_and_waiting_block_and_remember_where_they_were() {
+    for from in [TicketStatus::Running, TicketStatus::Waiting] {
+        let tr = ok(from, TicketEvent::Block { reason: manual() });
+        assert_eq!(tr.ticket.status, TicketStatus::Blocked);
+        assert_eq!(
+            tr.ticket.status_reason,
+            Some(StatusReason::Blocked {
+                reason: manual(),
+                resume_to: from,
+                waiting: (from == TicketStatus::Waiting).then_some(WaitingReason::Silent),
+            })
+        );
+    }
+}
+
+#[test]
+fn crash_blocks_and_stops_runner() {
+    let tr = ok(
+        TicketStatus::Running,
+        TicketEvent::Block {
+            reason: BlockedReason::Crashed {
+                detail: "exit 101".to_owned(),
+            },
+        },
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Blocked);
+    assert_eq!(tr.effects, vec![Effect::StopRunner]);
+}
+
+#[test]
+fn review_blocks_only_on_merge_conflict() {
+    let conflict = BlockedReason::MergeConflict {
+        detail: "src/lib.rs".to_owned(),
+    };
+    assert_eq!(
+        ok(
+            TicketStatus::Review,
+            TicketEvent::Block { reason: conflict }
+        )
+        .ticket
+        .status,
+        TicketStatus::Blocked
+    );
+    let t = ticket_in(TicketStatus::Review);
+    assert!(matches!(
+        apply(&t, &TicketEvent::Block { reason: manual() }, NOW),
+        Err(TransitionError::NotAllowed { .. })
+    ));
+}
+
+#[test]
+fn unblock_returns_to_previous_status() {
+    for from in [
+        TicketStatus::Running,
+        TicketStatus::Waiting,
+        TicketStatus::Review,
+    ] {
+        let reason = if from == TicketStatus::Review {
+            BlockedReason::MergeConflict {
+                detail: "x".to_owned(),
+            }
+        } else {
+            manual()
+        };
+        let blocked = apply(&ticket_in(from), &TicketEvent::Block { reason }, NOW).expect("block");
+        let tr = apply(&blocked.ticket, &TicketEvent::Unblock, Timestamp(9_000)).expect("unblock");
+        assert_eq!(tr.ticket.status, from);
+        assert_eq!(tr.ticket.status_since, Timestamp(9_000));
+        check_invariants(&tr.ticket).expect("invariants");
+    }
+}
+
+#[test]
+fn unblock_to_waiting_restores_the_open_question() {
+    let question = WaitingReason::Question {
+        text: "який фреймворк?".to_owned(),
+    };
+    let waiting = ok(
+        TicketStatus::Running,
+        TicketEvent::AskHuman {
+            reason: question.clone(),
+        },
+    );
+    let blocked = apply(
+        &waiting.ticket,
+        &TicketEvent::Block { reason: manual() },
+        NOW,
+    )
+    .expect("block");
+    let back = apply(&blocked.ticket, &TicketEvent::Unblock, NOW).expect("unblock");
+    assert_eq!(
+        back.ticket.status_reason,
+        Some(StatusReason::Waiting(question))
+    );
+    check_invariants(&back.ticket).expect("invariants");
+}
+
+#[test]
+fn review_back_to_running_on_return_with_comment() {
+    let tr = ok(
+        TicketStatus::Review,
+        TicketEvent::Return {
+            comment: "додай тест".to_owned(),
+        },
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert_eq!(
+        tr.effects,
+        vec![
+            Effect::RecordInstruction {
+                text: "додай тест".to_owned()
+            },
+            Effect::EnsureRunner
+        ]
+    );
+    let t = ticket_in(TicketStatus::Review);
+    assert_eq!(
+        apply(
+            &t,
+            &TicketEvent::Return {
+                comment: "  ".to_owned()
+            },
+            NOW
+        ),
+        Err(TransitionError::EmptyText("return"))
+    );
+}
+
+#[test]
+fn review_to_merged_on_accept_satisfies_dependents() {
+    let tr = ok(TicketStatus::Review, TicketEvent::Accept);
+    assert_eq!(tr.ticket.status, TicketStatus::Merged);
+    assert_eq!(
+        tr.effects,
+        vec![Effect::StopRunner, Effect::DependencySatisfied]
+    );
+}
+
+#[test]
+fn merged_to_released_when_milestone_released() {
+    assert_eq!(
+        ok(TicketStatus::Merged, TicketEvent::Released)
+            .ticket
+            .status,
+        TicketStatus::Released
+    );
+}
+
+#[test]
+fn merged_back_to_review_on_reopen() {
+    let tr = ok(TicketStatus::Merged, TicketEvent::Reopen);
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(tr.effects, vec![Effect::DependencyReopened]);
+}
+
+#[test]
+fn pause_sends_active_tickets_to_backlog() {
+    use TicketStatus as S;
+    for from in [S::Backlog, S::Ready, S::Running, S::Waiting, S::Blocked] {
+        let tr = ok(from, TicketEvent::Pause);
+        assert_eq!(tr.ticket.status, S::Backlog);
+        assert!(tr.ticket.paused);
+        assert_eq!(tr.ticket.status_reason, None);
+        let stops = tr.effects.contains(&Effect::StopRunner);
+        assert_eq!(
+            stops,
+            matches!(from, S::Running | S::Waiting | S::Blocked),
+            "{from:?}"
+        );
+    }
+}
+
+#[test]
+fn resume_clears_pause_and_rechecks() {
+    let paused = ok(TicketStatus::Running, TicketEvent::Pause).ticket;
+    let tr = apply(&paused, &TicketEvent::Resume, NOW).expect("resume");
+    assert!(!tr.ticket.paused);
+    assert_eq!(tr.ticket.status, TicketStatus::Backlog);
+    assert_eq!(tr.effects, vec![Effect::RecheckReadiness]);
+    assert_eq!(
+        apply(&tr.ticket, &TicketEvent::Resume, NOW),
+        Err(TransitionError::NotPaused)
+    );
+}
+
+#[test]
+fn cancel_from_anything_but_done() {
+    use TicketStatus as S;
+    for from in [
+        S::Backlog,
+        S::Ready,
+        S::Running,
+        S::Waiting,
+        S::Blocked,
+        S::Review,
+    ] {
+        let tr = ok(
+            from,
+            TicketEvent::Cancel {
+                reason: "won't do".to_owned(),
+            },
+        );
+        assert_eq!(tr.ticket.status, S::Cancelled);
+        assert!(tr.effects.contains(&Effect::DependencySatisfied));
+    }
+    for from in [S::Merged, S::Released, S::Cancelled] {
+        let r = apply(
+            &ticket_in(from),
+            &TicketEvent::Cancel {
+                reason: "x".to_owned(),
+            },
+            NOW,
+        );
+        assert!(
+            matches!(r, Err(TransitionError::NotAllowed { .. })),
+            "{from:?}"
+        );
+    }
+}
+
+// ---- the whole matrix: exactly the table's pairs are allowed ----
+
+fn sample_events() -> Vec<TicketEvent> {
+    vec![
+        TicketEvent::DepsSatisfied,
+        TicketEvent::DepsUnsatisfied,
+        TicketEvent::Start,
+        TicketEvent::AskHuman {
+            reason: WaitingReason::Silent,
+        },
+        TicketEvent::InstructionDelivered,
+        TicketEvent::Finished {
+            summary: "s".to_owned(),
+        },
+        TicketEvent::Block { reason: manual() },
+        TicketEvent::Unblock,
+        TicketEvent::Return {
+            comment: "c".to_owned(),
+        },
+        TicketEvent::Accept,
+        TicketEvent::Released,
+        TicketEvent::Reopen,
+        TicketEvent::Pause,
+        TicketEvent::Cancel {
+            reason: "r".to_owned(),
+        },
+    ]
+}
+
+#[test]
+fn only_table_transitions_are_allowed() {
+    use TicketStatus as S;
+    let allowed: &[(S, &str)] = &[
+        (S::Backlog, "deps_satisfied"),
+        (S::Ready, "deps_unsatisfied"),
+        (S::Ready, "start"),
+        (S::Running, "ask_human"),
+        (S::Waiting, "instruction_delivered"),
+        (S::Running, "finished"),
+        (S::Running, "block"),
+        (S::Waiting, "block"),
+        (S::Blocked, "unblock"),
+        (S::Review, "return"),
+        (S::Review, "accept"),
+        (S::Merged, "released"),
+        (S::Merged, "reopen"),
+    ];
+    for status in TicketStatus::ALL {
+        for event in sample_events() {
+            let pausable = matches!(
+                status,
+                S::Backlog | S::Ready | S::Running | S::Waiting | S::Blocked
+            );
+            let cancellable = !matches!(status, S::Merged | S::Released | S::Cancelled);
+            let expected = allowed.contains(&(status, event.name()))
+                || (event.name() == "pause" && pausable)
+                || (event.name() == "cancel" && cancellable);
+            let result = apply(&ticket_in(status), &event, NOW);
+            assert_eq!(
+                result.is_ok(),
+                expected,
+                "{status:?} + {}: {result:?}",
+                event.name()
+            );
+        }
+    }
+}
+
+// ---- property: no sequence of events breaks the invariants ----
+
+fn any_event() -> impl Strategy<Value = TicketEvent> {
+    let reason = prop_oneof![
+        Just(manual()),
+        Just(BlockedReason::Crashed {
+            detail: "c".to_owned()
+        }),
+        Just(BlockedReason::RunnerLost),
+        Just(BlockedReason::MergeConflict {
+            detail: "m".to_owned()
+        }),
+        Just(BlockedReason::DependencyReopened {
+            dependency: "DEMO-9".parse().expect("key")
+        }),
+        Just(BlockedReason::Manual {
+            text: " ".to_owned()
+        }),
+    ];
+    prop_oneof![
+        Just(TicketEvent::DepsSatisfied),
+        Just(TicketEvent::DepsUnsatisfied),
+        Just(TicketEvent::Start),
+        Just(TicketEvent::AskHuman {
+            reason: WaitingReason::Silent
+        }),
+        Just(TicketEvent::InstructionDelivered),
+        Just(TicketEvent::Finished {
+            summary: "s".to_owned()
+        }),
+        reason.prop_map(|reason| TicketEvent::Block { reason }),
+        Just(TicketEvent::Unblock),
+        Just(TicketEvent::Return {
+            comment: "c".to_owned()
+        }),
+        Just(TicketEvent::Return {
+            comment: String::new()
+        }),
+        Just(TicketEvent::Accept),
+        Just(TicketEvent::Released),
+        Just(TicketEvent::Reopen),
+        Just(TicketEvent::Pause),
+        Just(TicketEvent::Resume),
+        Just(TicketEvent::Cancel {
+            reason: "r".to_owned()
+        }),
+    ]
+}
+
+proptest! {
+    #[test]
+    fn no_event_sequence_breaks_invariants(events in proptest::collection::vec(any_event(), 0..60)) {
+        let mut t = ticket_in(TicketStatus::Backlog);
+        let mut now = T0;
+        for event in &events {
+            now = Timestamp(now.0 + 1);
+            if let Ok(tr) = apply(&t, event, now) {
+                    if let Err(e) = check_invariants(&tr.ticket) {
+                        prop_assert!(false, "{} after {:?}", e, event);
+                    }
+                    prop_assert!(tr.ticket.status_since >= t.status_since);
+                    if tr.ticket.status != t.status {
+                        prop_assert_eq!(tr.ticket.status_since, now);
+                    }
+                    // Identity never changes.
+                    prop_assert_eq!(tr.ticket.id, t.id);
+                    prop_assert_eq!(&tr.ticket.key, &t.key);
+                    t = tr.ticket;
+            }
+        }
+    }
+}

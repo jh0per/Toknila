@@ -1,0 +1,56 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/daemon", "crates/cli", "xtask"]
+default-members = ["crates/core", "crates/daemon", "crates/cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license-file = "LICENSE"
+repository = "https://github.com/jh0per/Toknila"
+publish = false
+
+[workspace.dependencies]
+toknila-core = { path = "crates/core" }
+toknila-daemon = { path = "crates/daemon" }
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+ulid = { version = "3.0", features = ["serde"] }
+proptest = "1.5"
+rusqlite = { version = "0.41", features = ["bundled"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net", "fs", "io-util"] }
+tempfile = "3"
+anyhow = "1"
+toml = "1"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Console"] }
+utoipa = { version = "6", features = ["axum_extras"] }
+utoipa-axum = "0.3"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+axum = { version = "0.8", features = ["ws"] }
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
+dirs = "7"
+getrandom = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+ureq = { version = "2.12", default-features = false, features = ["json"] }
+
+[workspace.lints.rust]
+# deny, not forbid: one audited FFI call on Windows (crates/cli/src/win.rs) allows it locally.
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

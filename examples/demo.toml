@@ -1,0 +1,38 @@
+# The phase-0 gate chain: A -> B -> release R1 -> C, and D after A, before R1.
+# Import: tok chain import examples/demo.toml --project DEMO
+
+[chain]
+name = "demo"
+goal = "Walk a chain through a manual release with simulated agents"
+
+[[ticket]]
+id = "A"
+title = "A"
+prompt = "First step."
+acceptance = ["A is done"]
+subtasks = ["write the test", "make it pass"]
+profile = "sim"
+
+[[ticket]]
+id = "B"
+title = "B"
+after = ["A"]
+profile = "sim"
+
+[[ticket]]
+id = "D"
+title = "D"
+after = ["A"]
+profile = "sim"
+
+[[release]]
+id = "R1"
+channel = "tag_only"
+start = "manual"
+after = ["B", "D"]
+
+[[ticket]]
+id = "C"
+title = "C"
+after = ["R1"]
+profile = "sim"

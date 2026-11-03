@@ -1,0 +1,193 @@
+{
+  "chain": {
+    "autostart": true,
+    "goal": "Walk a chain through a manual release with simulated agents",
+    "id": "<id>",
+    "name": "demo",
+    "project_id": "<id>",
+    "review_mode": null
+  },
+  "edges": [
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "release"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "release"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "release"
+      }
+    }
+  ],
+  "order": [
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    },
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    },
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    },
+    {
+      "id": "<id>",
+      "kind": "release"
+    },
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    }
+  ],
+  "release_tickets": [],
+  "releases": [
+    {
+      "branch": null,
+      "chain_id": "<id>",
+      "channel": "tag_only",
+      "cut_at": null,
+      "id": "<id>",
+      "released_at": null,
+      "start_mode": "manual",
+      "state": "planned",
+      "version": "R1"
+    }
+  ],
+  "summary": {
+    "done": 0,
+    "next_release": {
+      "channel": "tag_only",
+      "release": "<id>",
+      "state": "planned",
+      "version": "R1"
+    },
+    "released": 0,
+    "status": "running",
+    "stopped_at": null,
+    "total": 4
+  },
+  "tickets": [
+    {
+      "acceptance": [
+        "A is done"
+      ],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "DEMO-1",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": "sim",
+      "prompt": "First step.",
+      "review_mode": null,
+      "status": "running",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "A",
+      "tokens_used": 0
+    },
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "DEMO-2",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": "sim",
+      "prompt": "",
+      "review_mode": null,
+      "status": "backlog",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "B",
+      "tokens_used": 0
+    },
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "DEMO-3",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": "sim",
+      "prompt": "",
+      "review_mode": null,
+      "status": "backlog",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "D",
+      "tokens_used": 0
+    },
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "DEMO-4",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": "sim",
+      "prompt": "",
+      "review_mode": null,
+      "status": "backlog",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "C",
+      "tokens_used": 0
+    }
+  ]
+}

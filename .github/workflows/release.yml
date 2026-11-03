@@ -1,0 +1,115 @@
+name: Release
+
+# Push a tag like v0.1.0 (or run by hand with that tag) to build every platform and publish a
+# GitHub release with the archives and their SHA-256 sums. On a pull request it only builds the
+# archives (downloadable from the run's artifacts), so a release can never be the first build.
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  TAG: ${{ inputs.tag || github.ref_name }}
+  RELEASE: ${{ github.event_name != 'pull_request' }}
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || env.TAG }}
+
+      - name: Install toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # The tag must match the version in Cargo.toml; xtask dist names the archive from it.
+      - name: Check version
+        if: env.RELEASE == 'true'
+        shell: bash
+        run: |
+          v=$(cargo pkgid -p toknila | sed 's/.*[@#]//')
+          test "v$v" = "$TAG" || { echo "tag $TAG != version v$v"; exit 1; }
+
+      - name: cargo xtask dist
+        run: cargo xtask dist ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes=$(mktemp)
+          {
+            echo "Phase 0 of Toknila: the model, the daemon, the CLI and a read-only live web page, driven by a simulated agent profile. No real agent runs yet."
+            echo
+            echo "Install and first run (macOS, Linux, Windows): [docs/install.md](https://github.com/${{ github.repository }}/blob/$TAG/docs/install.md)"
+            echo
+            echo "| Platform | Archive |"
+            echo "|---|---|"
+            echo "| macOS, Apple silicon | \`toknila-${TAG#v}-macos-arm64.tar.gz\` |"
+            echo "| macOS, Intel | \`toknila-${TAG#v}-macos-x86_64.tar.gz\` |"
+            echo "| Linux x86_64 | \`toknila-${TAG#v}-linux-x86_64.tar.gz\` |"
+            echo "| Windows x86_64 | \`toknila-${TAG#v}-windows-x86_64.zip\` |"
+            echo
+            echo "The binaries are not signed yet; on macOS download with curl or run \`xattr -dr com.apple.quarantine .\` in the unpacked folder."
+          } > "$notes"
+          gh release create "$TAG" dist/* --title "Toknila $TAG" --notes-file "$notes" --verify-tag

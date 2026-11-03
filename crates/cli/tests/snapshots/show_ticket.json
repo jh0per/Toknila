@@ -1,0 +1,57 @@
+{
+  "chain": "demo",
+  "comments": [
+    {
+      "author": "agent",
+      "body": {
+        "gist": "which way?"
+      },
+      "created_at": 0,
+      "delivered_at": null,
+      "id": "<id>",
+      "kind": "report",
+      "ticket_id": "<id>"
+    },
+    {
+      "author": "human",
+      "body": {
+        "gist": "left"
+      },
+      "created_at": 0,
+      "delivered_at": 0,
+      "id": "<id>",
+      "kind": "instruction",
+      "ticket_id": "<id>"
+    },
+    {
+      "author": "agent",
+      "body": {
+        "gist": "B is done"
+      },
+      "created_at": 0,
+      "delivered_at": null,
+      "id": "<id>",
+      "kind": "report",
+      "ticket_id": "<id>"
+    }
+  ],
+  "in_status_ms": 0,
+  "subtasks": [],
+  "ticket": {
+    "acceptance": [],
+    "branch": null,
+    "chain_id": "<id>",
+    "id": "<id>",
+    "key": "DEMO-2",
+    "needs_secrets": false,
+    "paused": false,
+    "profile": "sim",
+    "prompt": "",
+    "review_mode": null,
+    "status": "merged",
+    "status_reason": null,
+    "status_since": 0,
+    "title": "B",
+    "tokens_used": 0
+  }
+}

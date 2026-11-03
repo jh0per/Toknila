@@ -1,0 +1,9 @@
+/target/
+**/node_modules/
+apps/web/dist/
+.DS_Store
+*.swp
+.idea/
+.vscode/
+/.toknila/
+/dist/

@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    # A hung test must fail the job, not hold a runner for six hours.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # rust-toolchain.toml pins the channel and components; this only installs them.
+      - name: Install toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # Builds the page the daemon embeds; the daemon test then requires it.
+      - name: cargo xtask web
+        run: cargo xtask web
+
+      # The same command developers run locally. Do not inline its steps here.
+      - name: cargo xtask verify
+        run: cargo xtask verify
+        env:
+          TOKNILA_REQUIRE_WEB: "1"
+
+      - name: cargo xtask e2e-web
+        run: cargo xtask e2e-web
+
+      - name: Smoke-test release binaries
+        shell: bash
+        run: |
+          cargo build --release --locked --bin toknila --bin tok
+          ./target/release/toknila --version
+          ./target/release/tok --version
