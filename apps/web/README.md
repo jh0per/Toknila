@@ -5,8 +5,17 @@ chain in dependency order: tickets with status colour, reason and time in status
 where the chain stopped, a "needs a human" filter, and live updates over the WebSocket stream
 (`/v1/stream`). It reconnects by itself, also across a daemon restart, which keeps its address.
 
+It follows MVI (`docs/architecture.md`): `src/store/reduce.ts` is a pure
+`reduce(state, msg) -> [state, effects]` with Vitest tests next to it, `src/store/effects.ts` runs
+the effects (the only network code), and `src/views/` only renders state and dispatches intents.
+Routes live in the URL: `/`, `/chains/<name>`, `/inbox`.
+
+API types are generated: `openapi.json` is the daemon's API document (pinned by a daemon test;
+refresh it with `TOKNILA_UPDATE_SNAPSHOTS=1 cargo test -p toknila-daemon openapi`), and
+`npm run gen` writes `src/gen/api.d.ts` from it.
+
 ```sh
-cargo xtask web       # npm ci + type-check + build into dist/; the daemon embeds dist/ at build time
+cargo xtask web       # npm ci, generated-types check, Vitest, type-check, build into dist/
 cargo xtask e2e-web   # Playwright smoke test against the real tok binary
 tok open              # prints http://127.0.0.1:<port>/?token=<token>
 ```

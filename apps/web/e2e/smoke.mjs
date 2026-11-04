@@ -3,7 +3,8 @@
 //
 // It starts a daemon in a private TOKNILA_HOME, imports examples/demo.toml, opens the page and
 // checks: statuses render, a change made from the CLI appears live, the "needs a human" filter
-// works, and the page reconnects by itself after the daemon restarts.
+// works, the inbox deep link and the title link navigate, and the page reconnects by itself
+// after the daemon restarts.
 
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -61,6 +62,18 @@ try {
   if (visible !== 1) throw new Error(`filter: expected 1 ticket, got ${visible}`);
   console.log("PASS needs-a-human filter: 1 ticket");
   await page.getByLabel("needs a human").uncheck();
+
+  // Navigation lives in the URL: a deep link opens the inbox, the title leads back.
+  await page.goto(url.replace("/?", "/inbox?"));
+  await expectText(page.locator("[data-testid=link]"), "live", "inbox deep link loads");
+  await page.locator('li[data-key="DEMO-1"]').waitFor({ timeout: 10_000 });
+  const inbox = await page.locator("li.ticket").count();
+  if (inbox !== 1) throw new Error(`inbox: expected 1 ticket, got ${inbox}`);
+  console.log("PASS inbox route: 1 ticket");
+  await page.getByRole("link", { name: "Toknila" }).click();
+  await page.locator('li[data-key="DEMO-2"]').waitFor({ timeout: 10_000 });
+  if (new URL(page.url()).pathname !== "/") throw new Error(`back home: at ${page.url()}`);
+  console.log("PASS title link: back to all chains");
 
   tok("daemon", "stop");
   await expectText(page.locator("[data-testid=link]"), "offline", "daemon stop seen");

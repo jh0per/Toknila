@@ -183,7 +183,10 @@ pub(crate) fn is_production_source(file_name: &str) -> bool {
     let source = [".rs", ".ts", ".tsx"]
         .iter()
         .any(|ext| file_name.ends_with(ext));
-    let test = file_name == "tests.rs" || file_name.ends_with("_tests.rs");
+    let test = file_name == "tests.rs"
+        || file_name.ends_with("_tests.rs")
+        || file_name.ends_with(".test.ts")
+        || file_name.ends_with(".test.tsx");
     source && !test && !file_name.ends_with(".d.ts")
 }
 
@@ -261,6 +264,8 @@ mod tests {
         assert!(!is_production_source("tests.rs"));
         assert!(!is_production_source("roundtrip_tests.rs"));
         assert!(!is_production_source("vite-env.d.ts"));
+        assert!(!is_production_source("reduce.test.ts"));
+        assert!(is_production_source("reduce.ts"));
         assert!(!is_production_source("README.md"));
     }
 
