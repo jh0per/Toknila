@@ -1,0 +1,48 @@
+//! Projects: the top of the hierarchy, addressed by key.
+
+use serde::{Deserialize, Serialize};
+use toknila_core::events::DomainEvent;
+use toknila_core::{AgentProfile, Project, ProjectId, ReviewMode};
+
+use crate::{AppError, AppResult, UnitOfWork};
+
+/// `POST /v1/projects`: a new project; unset fields take the project defaults.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct NewProject {
+    /// Short uppercase key, prefix of ticket keys (`DEMO`).
+    pub key: String,
+    pub name: Option<String>,
+    pub repo_path: Option<String>,
+    pub work_branch: Option<String>,
+    pub release_branch: Option<String>,
+    pub default_profile: Option<String>,
+    pub default_review_mode: Option<ReviewMode>,
+}
+
+/// Creates a project; its key must be valid and unused.
+pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResult<Project> {
+    let key = draft
+        .key
+        .parse()
+        .map_err(|e: toknila_core::KeyError| AppError::bad_request(e.to_string()))?;
+    let p = Project {
+        id: ProjectId::new(),
+        name: draft.name.unwrap_or_else(|| draft.key.clone()),
+        key,
+        repo_path: draft.repo_path,
+        work_branch: draft
+            .work_branch
+            .unwrap_or_else(|| Project::DEFAULT_WORK_BRANCH.to_owned()),
+        release_branch: draft
+            .release_branch
+            .unwrap_or_else(|| Project::DEFAULT_RELEASE_BRANCH.to_owned()),
+        default_profile: draft
+            .default_profile
+            .unwrap_or_else(|| AgentProfile::SIM.to_owned()),
+        default_review_mode: draft.default_review_mode.unwrap_or_default(),
+    };
+    uow.insert_project(&p)?;
+    uow.emit(&DomainEvent::ProjectCreated { project: p.clone() })?;
+    Ok(p)
+}

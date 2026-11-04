@@ -19,7 +19,7 @@ pub use profile::{AgentProfile, AgentRole, ProfileKind};
 pub use project::{Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};
-pub use ticket::{Subtask, Ticket, TicketDraft};
+pub use ticket::{Subtask, Ticket, TicketDraft, TicketPatch};
 pub use time::Timestamp;
 
 #[cfg(test)]

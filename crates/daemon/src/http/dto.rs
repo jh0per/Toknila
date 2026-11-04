@@ -3,33 +3,15 @@
 use serde::{Deserialize, Serialize};
 use toknila_core::graph::ChainSummary;
 use toknila_core::{
-    Chain, Comment, CommentBody, CommentKind, Edge, EdgeKind, NodeRef, Project, Release,
-    ReleaseChannel, ReleaseId, ReviewMode, StartMode, Subtask, Ticket, TicketId,
+    Chain, Comment, Edge, EdgeKind, NodeRef, Project, Release, ReleaseId, Subtask, Ticket, TicketId,
 };
 use utoipa::{IntoParams, ToSchema};
 
-/// `POST /v1/projects`.
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
-pub struct NewProject {
-    /// Short uppercase key, prefix of ticket keys (`DEMO`).
-    pub key: String,
-    pub name: Option<String>,
-    pub repo_path: Option<String>,
-    pub work_branch: Option<String>,
-    pub release_branch: Option<String>,
-    pub default_profile: Option<String>,
-    pub default_review_mode: Option<ReviewMode>,
-}
-
-/// `POST /v1/projects/{project}/chains`.
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
-pub struct NewChain {
-    pub name: String,
-    pub goal: Option<String>,
-    /// Defaults to true.
-    pub autostart: Option<bool>,
-    pub review_mode: Option<ReviewMode>,
-}
+pub use toknila_app::chains::NewChain;
+pub use toknila_app::projects::NewProject;
+pub use toknila_app::releases::NewRelease;
+pub use toknila_app::tickets::{NewComment, NewTicket};
+pub use toknila_core::TicketPatch as PatchTicket;
 
 /// A chain with its graph and computed status.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -56,39 +38,6 @@ pub struct ReleaseMember {
 pub struct ChainItem {
     pub chain: Chain,
     pub summary: ChainSummary,
-}
-
-/// `POST /v1/chains/{chain}/tickets`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
-pub struct NewTicket {
-    pub title: String,
-    #[serde(default)]
-    pub prompt: String,
-    #[serde(default)]
-    pub acceptance: Vec<String>,
-    /// Dependencies: ticket keys or release versions of the same chain.
-    #[serde(default)]
-    pub after: Vec<String>,
-    /// Checklist items.
-    #[serde(default)]
-    pub subtasks: Vec<String>,
-    pub profile: Option<String>,
-    pub review_mode: Option<ReviewMode>,
-    #[serde(default)]
-    pub needs_secrets: bool,
-    #[serde(default)]
-    pub paused: bool,
-}
-
-/// `PATCH /v1/tickets/{ticket}`: only the given fields change.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
-pub struct PatchTicket {
-    pub title: Option<String>,
-    pub prompt: Option<String>,
-    pub acceptance: Option<Vec<String>>,
-    pub profile: Option<String>,
-    pub review_mode: Option<ReviewMode>,
-    pub needs_secrets: Option<bool>,
 }
 
 /// A ticket with everything attached to it.
@@ -132,36 +81,10 @@ pub struct EdgeInput {
     pub kind: EdgeKind,
 }
 
-/// `POST /v1/chains/{chain}/releases`.
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
-pub struct NewRelease {
-    pub version: String,
-    /// Defaults to tag_only.
-    pub channel: Option<ReleaseChannel>,
-    /// Defaults to manual.
-    pub start_mode: Option<StartMode>,
-    /// Nodes the milestone waits for (ticket keys or versions).
-    #[serde(default)]
-    pub after: Vec<String>,
-    /// Nodes that wait for the milestone.
-    #[serde(default)]
-    pub before: Vec<String>,
-}
-
 /// Body of ticket actions. `text` is required by block, return and cancel.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct ActionInput {
     pub text: Option<String>,
-}
-
-/// `POST /v1/tickets/{ticket}/comments`. Give `text` (first line is the gist, the rest becomes
-/// "what") or a full `body`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
-pub struct NewComment {
-    /// Defaults to instruction.
-    pub kind: Option<CommentKind>,
-    pub text: Option<String>,
-    pub body: Option<CommentBody>,
 }
 
 /// `POST /v1/tickets/{ticket}/subtasks`.

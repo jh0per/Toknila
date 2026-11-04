@@ -1,4 +1,7 @@
+use std::net::Ipv4Addr;
+
 use super::*;
+use crate::info::{DaemonInfo, new_token};
 
 async fn spawn_test_server() -> (
     tempfile::TempDir,

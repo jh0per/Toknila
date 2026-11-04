@@ -12,6 +12,8 @@ use crate::AppResult;
 
 /// Read access to the current state.
 pub trait Reader {
+    /// Every project.
+    fn projects(&self) -> AppResult<Vec<Project>>;
     /// A project by id.
     fn project(&self, id: ProjectId) -> AppResult<Option<Project>>;
     /// A project by its upper-case key.
@@ -20,6 +22,8 @@ pub trait Reader {
     fn chain(&self, id: ChainId) -> AppResult<Option<Chain>>;
     /// Every chain, or the chains of one project.
     fn chains(&self, project: Option<ProjectId>) -> AppResult<Vec<Chain>>;
+    /// A project's chain by name.
+    fn chain_by_name(&self, project: ProjectId, name: &str) -> AppResult<Option<Chain>>;
     /// Chains with exactly this name, across projects.
     fn chains_named(&self, name: &str) -> AppResult<Vec<Chain>>;
     /// A ticket by id.
@@ -48,6 +52,12 @@ pub trait UnitOfWork: Reader {
     fn now(&self) -> Timestamp;
     /// Who issued this command.
     fn actor(&self) -> Actor;
+    /// Inserts a new project.
+    fn insert_project(&mut self, project: &Project) -> AppResult<()>;
+    /// Inserts a new, empty chain.
+    fn insert_chain(&mut self, chain: &Chain) -> AppResult<()>;
+    /// Takes the next ticket number of a project; never handed out twice.
+    fn take_ticket_number(&mut self, project: ProjectId) -> AppResult<u32>;
     /// Saves a chain's tickets, milestones and edges.
     fn save_chain_view(&mut self, view: &ChainView) -> AppResult<()>;
     /// Inserts or replaces a comment.
