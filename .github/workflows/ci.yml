@@ -61,3 +61,29 @@ jobs:
           cargo build --release --locked --bin toknila --bin tok
           ./target/release/toknila --version
           ./target/release/tok --version
+
+  # The Tauri shell needs the platform web view, so it has its own job; macOS is the first target.
+  desktop:
+    name: desktop (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: rustup toolchain install stable --profile minimal --component clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            apps/desktop/src-tauri -> target
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: cargo xtask desktop
+        run: cargo xtask desktop

@@ -101,6 +101,12 @@ a sidecar, or attaches to a running one through `daemon.json`, exactly like the 
 window does not stop agents. On macOS (the first target) the shell uses the system WebKit view;
 Windows and Linux use WebView2 and WebKitGTK with the same code.
 
+The shell (`apps/desktop/src-tauri`) is its own Cargo workspace, because it needs the platform web
+view, which `cargo xtask verify` does not assume. It runs `toknila daemon start` and
+`toknila open --json` through the bundled sidecar, so starting, attaching and the token follow
+the CLI's rules, and opens one window on that address. The window gets no Tauri IPC
+capabilities: the page talks to the daemon over HTTP like in a browser.
+
 ## Rules the guards enforce
 
 | Guard | Rule |
@@ -127,4 +133,4 @@ at each step.
 | R-05 | The daemon as thin adapters: the remaining use cases move to `toknila-app`, `http/routes/*`, `server.rs` split, typed ticket actions, one error body |
 | R-06 | `toknila-api-types` and `toknila-client`; the CLI on typed responses, split by command group into `cmd/*` |
 | R-07 | The web page on generated TypeScript types with an MVI store, a router and reducer tests |
-| R-08 | Platform data directories on macOS with migration of `~/.toknila`; Tauri 2 skeleton with the daemon as a sidecar |
+| R-08 | Platform data directory on macOS with migration of `~/.toknila`; Tauri 2 shell in `apps/desktop` with `toknila` as its sidecar, built by `cargo xtask desktop` (CI: macOS) |
