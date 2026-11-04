@@ -1,6 +1,5 @@
 //! The `/v1` command API and its OpenAPI description, generated from the handlers.
 
-pub mod commands;
 pub mod dto;
 pub mod error;
 pub mod handlers;

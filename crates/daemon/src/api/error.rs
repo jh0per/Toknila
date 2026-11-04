@@ -4,6 +4,7 @@ use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use toknila_app::{AppError, ErrorKind};
 use toknila_core::graph::GraphError;
 use toknila_core::machine::TransitionError;
 
@@ -18,103 +19,71 @@ pub struct ErrorBody {
     pub code: String,
 }
 
-/// An error that maps to an HTTP status.
+/// An application error on its way to an HTTP response.
 #[derive(Debug, Clone)]
-pub struct ApiError {
-    pub status: StatusCode,
-    pub code: &'static str,
-    pub message: String,
-}
+pub struct ApiError(pub AppError);
 
 impl ApiError {
     pub fn not_found(what: impl std::fmt::Display) -> Self {
-        Self {
-            status: StatusCode::NOT_FOUND,
-            code: "not_found",
-            message: format!("{what} not found"),
-        }
+        Self(AppError::not_found(what))
     }
 
     pub fn bad_request(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::BAD_REQUEST,
-            code: "bad_request",
-            message: msg.into(),
-        }
+        Self(AppError::bad_request(msg))
     }
 
     pub fn conflict(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::CONFLICT,
-            code: "conflict",
-            message: msg.into(),
-        }
+        Self(AppError::conflict(msg))
     }
 
-    pub fn ambiguous(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::CONFLICT,
-            code: "ambiguous",
-            message: msg.into(),
-        }
-    }
-
-    fn internal(msg: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            code: "internal",
-            message: msg.into(),
+    /// The HTTP status for this error's kind.
+    pub fn status(&self) -> StatusCode {
+        match self.0.kind {
+            ErrorKind::NotFound => StatusCode::NOT_FOUND,
+            ErrorKind::BadRequest => StatusCode::BAD_REQUEST,
+            ErrorKind::Conflict | ErrorKind::Ambiguous => StatusCode::CONFLICT,
+            ErrorKind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
 
 impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message)
+        self.0.fmt(f)
     }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        let status = self.status();
         let body = ErrorBody {
-            error: self.message,
-            code: self.code.to_owned(),
+            code: self.0.kind.code().to_owned(),
+            error: self.0.message,
         };
-        (self.status, Json(body)).into_response()
+        (status, Json(body)).into_response()
+    }
+}
+
+impl From<AppError> for ApiError {
+    fn from(e: AppError) -> Self {
+        Self(e)
     }
 }
 
 impl From<StoreError> for ApiError {
     fn from(e: StoreError) -> Self {
-        if let StoreError::Sqlite(rusqlite::Error::SqliteFailure(f, msg)) = &e
-            && f.code == rusqlite::ErrorCode::ConstraintViolation
-        {
-            return ApiError::conflict(format!(
-                "already exists: {}",
-                msg.as_deref().unwrap_or("constraint violation")
-            ));
-        }
-        tracing::error!(error = %e, "store error");
-        ApiError::internal(e.to_string())
+        Self(e.into())
     }
 }
 
 impl From<TransitionError> for ApiError {
     fn from(e: TransitionError) -> Self {
-        match e {
-            TransitionError::EmptyText(_) => ApiError::bad_request(e.to_string()),
-            _ => ApiError::conflict(e.to_string()),
-        }
+        Self(e.into())
     }
 }
 
 impl From<GraphError> for ApiError {
     fn from(e: GraphError) -> Self {
-        match e {
-            GraphError::Transition(t) => t.into(),
-            GraphError::UnknownTicket(_) | GraphError::UnknownRelease(_) => ApiError::not_found(e),
-            GraphError::NoFixpoint(_) => ApiError::internal(e.to_string()),
-            _ => ApiError::conflict(e.to_string()),
-        }
+        Self(e.into())
     }
 }

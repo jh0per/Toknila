@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/daemon", "crates/cli", "xtask"]
-default-members = ["crates/core", "crates/daemon", "crates/cli"]
+members = ["crates/core", "crates/app", "crates/daemon", "crates/cli", "xtask"]
+default-members = ["crates/core", "crates/app", "crates/daemon", "crates/cli"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,6 +13,7 @@ publish = false
 
 [workspace.dependencies]
 toknila-core = { path = "crates/core" }
+toknila-app = { path = "crates/app" }
 toknila-daemon = { path = "crates/daemon" }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }

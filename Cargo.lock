@@ -1552,6 +1552,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "toknila-app"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "toknila-core",
+]
+
+[[package]]
 name = "toknila-core"
 version = "0.1.0"
 dependencies = [
@@ -1578,6 +1588,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "toknila-app",
  "toknila-core",
  "tower",
  "tracing",

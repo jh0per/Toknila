@@ -9,15 +9,14 @@ use toknila_core::graph::ChainView;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
     Actor, AgentProfile, BlockedReason, Chain, ChainId, CommentKind, Edge, EdgeKind, Project,
-    ProjectId, Release, ReleaseId, Ticket, TicketDraft, TicketId, TicketKey, TicketStatus,
-    Timestamp,
+    ProjectId, Release, ReleaseId, Ticket, TicketDraft, TicketId, TicketKey, Timestamp,
 };
 
-use super::commands::{self, with_chain};
 use super::dto::*;
 use super::error::{ApiError, ErrorBody};
 use crate::server::{AppState, now};
 use crate::store::{EventRecord, Repo};
+use toknila_app::{ChainTx, agent, notes, resolve, with_chain};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 
 type ApiResult<T> = Result<T, ApiError>;
@@ -128,10 +127,7 @@ pub async fn get_project(
     Path(project): Path<String>,
 ) -> ApiResult<Json<Project>> {
     Ok(Json(
-        read(&state, move |repo| {
-            commands::resolve_project(repo, &project)
-        })
-        .await?,
+        read(&state, move |repo| Ok(resolve::project(repo, &project)?)).await?,
     ))
 }
 
@@ -152,7 +148,7 @@ pub async fn create_chain(
     let (detail, _) = state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<ChainDetail> {
-            let p = commands::resolve_project(&tx.repo(), &project)?;
+            let p = resolve::project(&tx.repo(), &project)?;
             let c = Chain {
                 id: ChainId::new(),
                 project_id: p.id,
@@ -183,7 +179,7 @@ pub async fn import_chain(
     let (detail, _) = state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<ChainDetail> {
-            let p = commands::resolve_project(&tx.repo(), &project)?;
+            let p = resolve::project(&tx.repo(), &project)?;
             if tx.repo().chain_by_name(p.id, &plan.chain.name)?.is_some() {
                 return Err(ApiError::conflict(format!(
                     "chain {} already exists in {}",
@@ -207,7 +203,7 @@ pub async fn import_chain(
             tx.emit(&DomainEvent::ChainCreated { chain })?;
             // Every node and edge goes through the same path as single edits, then the chain
             // settles once (autostart) and the whole import commits or nothing does.
-            with_chain(tx, chain_id, move |ctx, _| {
+            with_chain(tx, chain_id, move |ctx| {
                 for t in view.tickets {
                     ctx.add_ticket(t);
                 }
@@ -217,7 +213,7 @@ pub async fn import_chain(
                 for e in view.edges {
                     ctx.add_edge(e)?;
                 }
-                Ok(())
+                Ok::<_, ApiError>(())
             })?;
             for (id, texts) in subtasks {
                 let ticket = tx
@@ -225,7 +221,7 @@ pub async fn import_chain(
                     .ticket(id)?
                     .ok_or_else(|| ApiError::not_found("ticket"))?;
                 for s in &texts {
-                    commands::add_subtask(tx, &ticket, s)?;
+                    notes::add_subtask(tx, &ticket, s)?;
                 }
             }
             load_chain_detail(&tx.repo(), chain_id, at)
@@ -242,7 +238,7 @@ pub async fn export_chain(
     Path(chain): Path<String>,
 ) -> ApiResult<Json<ChainFile>> {
     let toml = read(&state, move |repo| {
-        let c = commands::resolve_chain(repo, &chain)?;
+        let c = resolve::chain(repo, &chain)?;
         let view = repo
             .chain_view(c.id)?
             .ok_or_else(|| ApiError::not_found(format!("chain {chain}")))?;
@@ -268,7 +264,7 @@ pub async fn list_chains(
     let items = read(&state, move |repo| {
         let project = q
             .get("project")
-            .map(|p| commands::resolve_project(repo, p))
+            .map(|p| resolve::project(repo, p))
             .transpose()?;
         let mut out = Vec::new();
         for c in repo.chains(project.map(|p| p.id))? {
@@ -295,7 +291,7 @@ pub async fn get_chain(
     let at = now();
     Ok(Json(
         read(&state, move |repo| {
-            let c = commands::resolve_chain(repo, &chain)?;
+            let c = resolve::chain(repo, &chain)?;
             load_chain_detail(repo, c.id, at)
         })
         .await?,
@@ -310,9 +306,9 @@ pub async fn add_edge(
     Path(chain): Path<String>,
     Json(input): Json<EdgeInput>,
 ) -> ApiResult<Json<ChainDetail>> {
-    chain_write(&state, chain, move |ctx, _| {
-        let from = commands::resolve_node(&ctx.view, &input.from)?;
-        let to = commands::resolve_node(&ctx.view, &input.to)?;
+    chain_write(&state, chain, move |ctx| {
+        let from = resolve::node(&ctx.view, &input.from)?;
+        let to = resolve::node(&ctx.view, &input.to)?;
         ctx.add_edge(Edge {
             chain_id: ctx.view.chain.id,
             from,
@@ -333,9 +329,9 @@ pub async fn remove_edge(
     Path(chain): Path<String>,
     Query(input): Query<EdgeInput>,
 ) -> ApiResult<Json<ChainDetail>> {
-    chain_write(&state, chain, move |ctx, _| {
-        let from = commands::resolve_node(&ctx.view, &input.from)?;
-        let to = commands::resolve_node(&ctx.view, &input.to)?;
+    chain_write(&state, chain, move |ctx| {
+        let from = resolve::node(&ctx.view, &input.from)?;
+        let to = resolve::node(&ctx.view, &input.to)?;
         ctx.remove_edge(from, to)
             .map(|_| ())
             .ok_or_else(|| ApiError::not_found(format!("edge {} -> {}", input.from, input.to)))
@@ -354,7 +350,7 @@ pub async fn create_release(
     if input.version.trim().is_empty() {
         return Err(ApiError::bad_request("release version is empty"));
     }
-    chain_write(&state, chain, move |ctx, _| {
+    chain_write(&state, chain, move |ctx| {
         if ctx.view.releases.iter().any(|r| r.version == input.version) {
             return Err(ApiError::conflict(format!(
                 "release {} already exists",
@@ -372,7 +368,7 @@ pub async fn create_release(
         ctx.add_release(r);
         let chain_id = ctx.view.chain.id;
         for a in &input.after {
-            let from = commands::resolve_node(&ctx.view, a)?;
+            let from = resolve::node(&ctx.view, a)?;
             ctx.add_edge(Edge {
                 chain_id,
                 from,
@@ -381,7 +377,7 @@ pub async fn create_release(
             })?;
         }
         for b in &input.before {
-            let to = commands::resolve_node(&ctx.view, b)?;
+            let to = resolve::node(&ctx.view, b)?;
             ctx.add_edge(Edge {
                 chain_id,
                 from: node,
@@ -397,13 +393,13 @@ pub async fn create_release(
 async fn chain_write(
     state: &AppState,
     chain: String,
-    f: impl FnOnce(&mut commands::ChainTx, &Repo<'_>) -> ApiResult<()> + Send + 'static,
+    f: impl FnOnce(&mut ChainTx) -> ApiResult<()> + Send + 'static,
 ) -> ApiResult<Json<ChainDetail>> {
     let at = now();
     let (detail, _) = state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<ChainDetail> {
-            let c = commands::resolve_chain(&tx.repo(), &chain)?;
+            let c = resolve::chain(&tx.repo(), &chain)?;
             with_chain(tx, c.id, f)?;
             load_chain_detail(&tx.repo(), c.id, at)
         })
@@ -428,7 +424,7 @@ pub async fn create_ticket(
     let (detail, _) = state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<TicketDetail> {
-            let c = commands::resolve_chain(&tx.repo(), &chain)?;
+            let c = resolve::chain(&tx.repo(), &chain)?;
             let project = tx
                 .repo()
                 .project(c.project_id)?
@@ -450,11 +446,11 @@ pub async fn create_ticket(
             let after = input.after;
             let subtasks = input.subtasks;
             // The ticket and its edges land together, then the chain settles (autostart).
-            with_chain(tx, c.id, move |ctx, _| {
+            with_chain(tx, c.id, move |ctx| {
                 let deps = after
                     .iter()
-                    .map(|a| commands::resolve_node(&ctx.view, a))
-                    .collect::<ApiResult<Vec<_>>>()?;
+                    .map(|a| resolve::node(&ctx.view, a))
+                    .collect::<toknila_app::AppResult<Vec<_>>>()?;
                 ctx.add_ticket(t);
                 for from in deps {
                     ctx.add_edge(Edge {
@@ -464,14 +460,14 @@ pub async fn create_ticket(
                         kind: EdgeKind::Normal,
                     })?;
                 }
-                Ok(())
+                Ok::<_, ApiError>(())
             })?;
             let ticket = tx
                 .repo()
                 .ticket(id)?
                 .ok_or_else(|| ApiError::not_found("ticket"))?;
             for s in &subtasks {
-                commands::add_subtask(tx, &ticket, s)?;
+                notes::add_subtask(tx, &ticket, s)?;
             }
             load_ticket_detail(&tx.repo(), id, at)
         })
@@ -490,7 +486,7 @@ pub async fn list_tickets(
         let chain = q
             .chain
             .as_deref()
-            .map(|c| commands::resolve_chain(repo, c))
+            .map(|c| resolve::chain(repo, c))
             .transpose()?;
         let names: std::collections::HashMap<ChainId, String> = repo
             .chains(None)?
@@ -523,7 +519,7 @@ pub async fn get_ticket(
     let at = now();
     Ok(Json(
         read(&state, move |repo| {
-            let t = commands::resolve_ticket(repo, &ticket)?;
+            let t = resolve::ticket(repo, &ticket)?;
             load_ticket_detail(repo, t.id, at)
         })
         .await?,
@@ -539,7 +535,7 @@ pub async fn patch_ticket(
     Json(p): Json<PatchTicket>,
 ) -> ApiResult<Json<TicketDetail>> {
     ticket_write(&state, ticket, Actor::Human, move |tx, t| {
-        with_chain(tx, t.chain_id, |ctx, _| {
+        with_chain(tx, t.chain_id, |ctx| {
             Ok(ctx.edit_ticket(t.id, |t| {
                 if let Some(v) = p.title {
                     t.title = v;
@@ -576,7 +572,7 @@ pub(crate) async fn ticket_write(
     let (detail, _) = state
         .store
         .write(actor, at, move |tx| -> ApiResult<TicketDetail> {
-            let t = commands::resolve_ticket(&tx.repo(), &ticket)?;
+            let t = resolve::ticket(&tx.repo(), &ticket)?;
             let id = t.id;
             f(tx, t)?;
             load_ticket_detail(&tx.repo(), id, at)
@@ -626,7 +622,7 @@ pub async fn ticket_action(
         other => return Err(ApiError::not_found(format!("action {other}"))),
     };
     ticket_write(&state, ticket, Actor::Human, move |tx, t| {
-        with_chain(tx, t.chain_id, |ctx, _| Ok(ctx.ticket_event(t.id, event)?))
+        with_chain(tx, t.chain_id, |ctx| Ok(ctx.ticket_event(t.id, event)?))
     })
     .await
 }
@@ -641,7 +637,7 @@ pub async fn add_comment(
 ) -> ApiResult<Json<TicketDetail>> {
     let body = match (input.body, input.text) {
         (Some(b), _) => b,
-        (None, Some(text)) => commands::body_from_text(&text),
+        (None, Some(text)) => notes::body_from_text(&text),
         (None, None) => return Err(ApiError::bad_request("give text or body")),
     };
     let kind = input.kind.unwrap_or(CommentKind::Instruction);
@@ -650,9 +646,9 @@ pub async fn add_comment(
             .repo()
             .chain_view(t.chain_id)?
             .ok_or_else(|| ApiError::not_found("chain"))?;
-        commands::add_comment(tx, &view, t.id, Actor::Human, kind, body)?;
+        notes::add_comment(tx, &view, t.id, Actor::Human, kind, body)?;
         // Delivery to a simulated agent happens as the chain settles.
-        with_chain(tx, t.chain_id, |_, _| Ok(()))
+        with_chain(tx, t.chain_id, |_| Ok(()))
     })
     .await
 }
@@ -666,7 +662,7 @@ pub async fn add_subtask(
     Json(input): Json<NewSubtask>,
 ) -> ApiResult<Json<TicketDetail>> {
     ticket_write(&state, ticket, Actor::Human, move |tx, t| {
-        commands::add_subtask(tx, &t, &input.text).map(|_| ())
+        Ok(notes::add_subtask(tx, &t, &input.text).map(|_| ())?)
     })
     .await
 }
@@ -680,7 +676,7 @@ pub async fn patch_subtask(
     Json(input): Json<PatchSubtask>,
 ) -> ApiResult<Json<TicketDetail>> {
     ticket_write(&state, ticket, Actor::Human, move |tx, t| {
-        commands::update_subtask(tx, &t, position, input.done, input.text).map(|_| ())
+        Ok(notes::update_subtask(tx, &t, position, input.done, input.text).map(|_| ())?)
     })
     .await
 }
@@ -701,14 +697,14 @@ pub async fn release_action(
     let (detail, _) = state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<ChainDetail> {
-            let r = commands::resolve_release(&tx.repo(), &release)?;
-            with_chain(tx, r.chain_id, |ctx, _| {
+            let r = resolve::release(&tx.repo(), &release)?;
+            with_chain(tx, r.chain_id, |ctx| {
                 if action == "start" {
                     ctx.cut_release(r.id)?
                 } else {
                     ctx.complete_release(r.id)?
                 }
-                Ok(())
+                Ok::<_, ApiError>(())
             })?;
             load_chain_detail(&tx.repo(), r.chain_id, at)
         })
@@ -738,67 +734,8 @@ pub async fn agent_event(
     Path(ticket): Path<String>,
     Json(event): Json<AgentEvent>,
 ) -> ApiResult<Json<TicketDetail>> {
-    ticket_write(&state, ticket, Actor::Agent, move |tx, t| match event {
-        AgentEvent::Started => with_chain(tx, t.chain_id, |ctx, _| {
-            if t.status == TicketStatus::Ready {
-                ctx.ticket_event(t.id, TicketEvent::Start)?;
-            } else if t.status != TicketStatus::Running {
-                return Err(ApiError::conflict(format!(
-                    "cannot start a ticket in {:?}",
-                    t.status
-                )));
-            }
-            Ok(())
-        }),
-        AgentEvent::AskHuman { text, permission } => {
-            if text.trim().is_empty() {
-                return Err(ApiError::bad_request("ask_human needs a text"));
-            }
-            let reason = AgentEvent::waiting_reason(&text, permission);
-            with_chain(tx, t.chain_id, |ctx, _| {
-                Ok(ctx.ticket_event(t.id, TicketEvent::AskHuman { reason })?)
-            })?;
-            let view = tx
-                .repo()
-                .chain_view(t.chain_id)?
-                .ok_or_else(|| ApiError::not_found("chain"))?;
-            commands::add_comment(
-                tx,
-                &view,
-                t.id,
-                Actor::Agent,
-                CommentKind::Report,
-                commands::body_from_text(&text),
-            )
-            .map(|_| ())
-        }
-        AgentEvent::SubtaskDone { position } => {
-            commands::update_subtask(tx, &t, position, Some(true), None).map(|_| ())
-        }
-        AgentEvent::Note { body } => {
-            let view = tx
-                .repo()
-                .chain_view(t.chain_id)?
-                .ok_or_else(|| ApiError::not_found("chain"))?;
-            commands::add_comment(tx, &view, t.id, Actor::Agent, CommentKind::Report, body)
-                .map(|_| ())
-        }
-        AgentEvent::Finished { summary } => {
-            if summary.trim().is_empty() {
-                return Err(ApiError::bad_request("finished needs a summary"));
-            }
-            with_chain(tx, t.chain_id, |ctx, _| {
-                Ok(ctx.ticket_event(t.id, TicketEvent::Finished { summary })?)
-            })
-        }
-        AgentEvent::Crashed { detail } => with_chain(tx, t.chain_id, |ctx, _| {
-            Ok(ctx.ticket_event(
-                t.id,
-                TicketEvent::Block {
-                    reason: BlockedReason::Crashed { detail },
-                },
-            )?)
-        }),
+    ticket_write(&state, ticket, Actor::Agent, move |tx, t| {
+        Ok(agent::ticket_event(tx, &t, event)?)
     })
     .await
 }
@@ -815,12 +752,8 @@ pub async fn release_event(
     let (detail, _) = state
         .store
         .write(Actor::Agent, at, move |tx| -> ApiResult<ChainDetail> {
-            let r = commands::resolve_release(&tx.repo(), &release)?;
-            match event {
-                ReleaseEvent::Finished => {
-                    with_chain(tx, r.chain_id, |ctx, _| Ok(ctx.complete_release(r.id)?))?
-                }
-            }
+            let r = resolve::release(&tx.repo(), &release)?;
+            agent::release_event(tx, &r, event)?;
             load_chain_detail(&tx.repo(), r.chain_id, at)
         })
         .await?;
