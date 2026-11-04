@@ -497,3 +497,38 @@ fn chain_view_json_roundtrips() {
     let back: ChainView = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(back, b.view);
 }
+
+#[test]
+fn settle_journals_every_intermediate_transition() {
+    use crate::events::DomainEvent;
+    let mut b = Builder::new(true);
+    let (a, c) = (b.ticket(), b.ticket());
+    b.edge(a, c);
+    let mut v = b.view;
+    let settled = v.settle(T).expect("settle");
+    let moves: Vec<(String, TicketStatus, TicketStatus)> = settled
+        .events
+        .iter()
+        .map(|e| match e {
+            DomainEvent::TicketStatusChanged { key, from, to, .. } => (key.to_string(), *from, *to),
+            other => panic!("unexpected event {other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        moves,
+        [
+            (
+                "DEMO-1".to_owned(),
+                TicketStatus::Backlog,
+                TicketStatus::Ready
+            ),
+            (
+                "DEMO-1".to_owned(),
+                TicketStatus::Ready,
+                TicketStatus::Running
+            ),
+        ]
+    );
+    assert_eq!(settled.applied.len(), 2);
+    assert_eq!(v.settle(T).expect("settle again").events, []);
+}

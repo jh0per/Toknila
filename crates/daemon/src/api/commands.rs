@@ -1,8 +1,8 @@
 //! Commands: each runs inside one store transaction, goes through the core state machine and
 //! chain graph, saves the result and journals every change as an event.
 
-use serde_json::json;
-use toknila_core::graph::{Action, ChainView, GraphError};
+use toknila_core::events::DomainEvent;
+use toknila_core::graph::{Action, Applied, ChainView, GraphError};
 use toknila_core::machine::{Effect, TicketEvent};
 use toknila_core::{
     Actor, AgentProfile, Chain, ChainId, Comment, CommentBody, CommentId, CommentKind, Edge,
@@ -117,40 +117,26 @@ pub fn resolve_node(view: &ChainView, r: &str) -> Result<NodeRef, ApiError> {
 
 // ---- chain transaction ----
 
-#[derive(Debug)]
-enum Change {
-    TicketCreated(Ticket),
-    Ticket {
-        before: Box<Ticket>,
-        after: Box<Ticket>,
-    },
-    ReleaseCreated(Release),
-    Release {
-        before: Release,
-        after: Release,
-    },
-    EdgeAdded(Edge),
-    EdgeRemoved(Edge),
-}
-
-/// A chain being changed by one command. Every step is diffed so that each transition,
-/// including intermediate ones (Backlog -> Ready -> Running), becomes its own event.
+/// A chain being changed by one command. Every step is journaled by the graph
+/// ([`ChainView::record`]) so each transition, including intermediate ones
+/// (Backlog -> Ready -> Running), becomes its own event.
 #[derive(Debug)]
 pub struct ChainTx {
     pub view: ChainView,
     now: Timestamp,
-    changes: Vec<Change>,
+    events: Vec<DomainEvent>,
     effects: Vec<(TicketId, Effect)>,
 }
 
-const MAX_STEPS: usize = 10_000;
+/// Settle-and-deliver rounds one command may take before it is declared stuck.
+const MAX_ROUNDS: usize = 10_000;
 
 impl ChainTx {
     fn new(view: ChainView, now: Timestamp) -> Self {
         Self {
             view,
             now,
-            changes: Vec::new(),
+            events: Vec::new(),
             effects: Vec::new(),
         }
     }
@@ -159,30 +145,19 @@ impl ChainTx {
         &mut self,
         f: impl FnOnce(&mut ChainView, Timestamp) -> Result<R, GraphError>,
     ) -> Result<R, GraphError> {
-        let tickets = self.view.tickets.clone();
-        let releases = self.view.releases.clone();
-        let out = f(&mut self.view, self.now)?;
-        for t in &self.view.tickets {
-            if let Some(b) = tickets.iter().find(|b| b.id == t.id)
-                && b != t
-            {
-                self.changes.push(Change::Ticket {
-                    before: Box::new(b.clone()),
-                    after: Box::new(t.clone()),
-                });
-            }
-        }
-        for r in &self.view.releases {
-            if let Some(b) = releases.iter().find(|b| b.id == r.id)
-                && b != r
-            {
-                self.changes.push(Change::Release {
-                    before: b.clone(),
-                    after: r.clone(),
-                });
-            }
-        }
+        let now = self.now;
+        let (out, events) = self.view.record(|v| f(v, now))?;
+        self.events.extend(events);
         Ok(out)
+    }
+
+    fn keep_effects(&mut self, applied: Vec<Applied>) {
+        for a in applied {
+            if let Action::Ticket { ticket, .. } = a.action {
+                self.effects
+                    .extend(a.effects.into_iter().map(|e| (ticket, e)));
+            }
+        }
     }
 
     /// Applies an event to a ticket through the state machine.
@@ -210,37 +185,40 @@ impl ChainTx {
         })
     }
 
+    /// Cuts a milestone (`release start`).
     pub fn cut_release(&mut self, release: ReleaseId) -> Result<(), GraphError> {
         self.step(|v, now| v.cut_release(release, now))
     }
 
+    /// Marks a cut milestone released; its tickets move to Released.
     pub fn complete_release(&mut self, release: ReleaseId) -> Result<(), GraphError> {
         let applied = self.step(|v, now| v.complete_release(release, now))?;
-        for a in applied {
-            if let Action::Ticket { ticket, .. } = a.action {
-                self.effects
-                    .extend(a.effects.into_iter().map(|e| (ticket, e)));
-            }
-        }
+        self.keep_effects(applied);
         Ok(())
     }
 
+    /// Adds a new ticket to the chain.
     pub fn add_ticket(&mut self, t: Ticket) {
-        self.changes.push(Change::TicketCreated(t.clone()));
+        self.events
+            .push(DomainEvent::TicketCreated { ticket: t.clone() });
         self.view.tickets.push(t);
     }
 
+    /// Adds a new milestone to the chain.
     pub fn add_release(&mut self, r: Release) {
-        self.changes.push(Change::ReleaseCreated(r.clone()));
+        self.events
+            .push(DomainEvent::ReleaseCreated { release: r.clone() });
         self.view.releases.push(r);
     }
 
+    /// Adds a dependency if the graph stays valid.
     pub fn add_edge(&mut self, e: Edge) -> Result<(), GraphError> {
         self.view.add_edge(e)?;
-        self.changes.push(Change::EdgeAdded(e));
+        self.events.push(DomainEvent::EdgeAdded { edge: e });
         Ok(())
     }
 
+    /// Removes a dependency; `None` if there was none.
     pub fn remove_edge(&mut self, from: NodeRef, to: NodeRef) -> Option<Edge> {
         let idx = self
             .view
@@ -248,22 +226,15 @@ impl ChainTx {
             .iter()
             .position(|e| e.from == from && e.to == to)?;
         let e = self.view.edges.remove(idx);
-        self.changes.push(Change::EdgeRemoved(e));
+        self.events.push(DomainEvent::EdgeRemoved { edge: e });
         Some(e)
     }
 
     fn settle(&mut self) -> Result<(), GraphError> {
-        for _ in 0..MAX_STEPS {
-            let Some(action) = self.view.next_actions().into_iter().next() else {
-                return Ok(());
-            };
-            let effects = self.step(|v, now| v.apply_action(&action, now))?;
-            if let Action::Ticket { ticket, .. } = action {
-                self.effects
-                    .extend(effects.into_iter().map(|e| (ticket, e)));
-            }
-        }
-        Err(GraphError::NoFixpoint(MAX_STEPS))
+        let settled = self.view.settle(self.now)?;
+        self.events.extend(settled.events);
+        self.keep_effects(settled.applied);
+        Ok(())
     }
 }
 
@@ -284,7 +255,7 @@ pub fn with_chain<R>(
         .ok_or_else(|| ApiError::not_found(format!("chain {chain}")))?;
     let mut ctx = ChainTx::new(view, tx.now());
     let out = f(&mut ctx, &tx.repo())?;
-    for _ in 0..MAX_STEPS {
+    for _ in 0..MAX_ROUNDS {
         ctx.settle()?;
         ctx.view.validate()?;
         tx.repo().save_chain_view(&ctx.view)?;
@@ -294,30 +265,12 @@ pub fn with_chain<R>(
             return Ok(out);
         }
     }
-    Err(GraphError::NoFixpoint(MAX_STEPS).into())
+    Err(GraphError::NoFixpoint(MAX_ROUNDS).into())
 }
 
 fn emit_changes(tx: &mut WriteTx<'_>, ctx: &mut ChainTx) -> Result<(), ApiError> {
-    for change in std::mem::take(&mut ctx.changes) {
-        match change {
-            Change::TicketCreated(t) => tx.emit("ticket", t.id, "created", json!({ "ticket": t }))?,
-            Change::Ticket { before, after } if before.status != after.status => tx.emit(
-                "ticket",
-                after.id,
-                "status_changed",
-                json!({ "key": after.key, "from": before.status, "to": after.status, "reason": after.status_reason, "ticket": after }),
-            )?,
-            Change::Ticket { after, .. } => tx.emit("ticket", after.id, "updated", json!({ "ticket": after }))?,
-            Change::ReleaseCreated(r) => tx.emit("release", r.id, "created", json!({ "release": r }))?,
-            Change::Release { before, after } => tx.emit(
-                "release",
-                after.id,
-                "state_changed",
-                json!({ "version": after.version, "from": before.state, "to": after.state, "release": after }),
-            )?,
-            Change::EdgeAdded(e) => tx.emit("chain", e.chain_id, "edge_added", json!({ "edge": e }))?,
-            Change::EdgeRemoved(e) => tx.emit("chain", e.chain_id, "edge_removed", json!({ "edge": e }))?,
-        }
+    for event in std::mem::take(&mut ctx.events) {
+        tx.emit(&event)?;
     }
     Ok(())
 }
@@ -370,12 +323,10 @@ fn deliver_to_sim(tx: &mut WriteTx<'_>, ctx: &mut ChainTx) -> Result<bool, ApiEr
             c.delivered_at = Some(tx.now());
             tx.repo().upsert_comment(&c)?;
             let key = label(&ctx.view, ticket);
-            tx.emit(
-                "comment",
-                c.id,
-                "delivered",
-                json!({ "ticket": key, "comment": c }),
-            )?;
+            tx.emit(&DomainEvent::CommentDelivered {
+                ticket: key,
+                comment: c,
+            })?;
         }
         if status == TicketStatus::Waiting {
             ctx.ticket_event(ticket, TicketEvent::InstructionDelivered)?;
@@ -422,12 +373,10 @@ pub fn add_comment(
         delivered_at: None,
     };
     tx.repo().upsert_comment(&c)?;
-    tx.emit(
-        "comment",
-        c.id,
-        "added",
-        json!({ "ticket": label(view, ticket), "comment": c }),
-    )?;
+    tx.emit(&DomainEvent::CommentAdded {
+        ticket: label(view, ticket),
+        comment: c.clone(),
+    })?;
     Ok(c)
 }
 
@@ -449,12 +398,10 @@ pub fn add_subtask(tx: &mut WriteTx<'_>, ticket: &Ticket, text: &str) -> Result<
         done_by: None,
     };
     tx.repo().upsert_subtask(&s)?;
-    tx.emit(
-        "subtask",
-        s.id,
-        "added",
-        json!({ "ticket": ticket.key, "subtask": s }),
-    )?;
+    tx.emit(&DomainEvent::SubtaskAdded {
+        ticket: ticket.key.clone(),
+        subtask: s.clone(),
+    })?;
     Ok(s)
 }
 
@@ -480,11 +427,9 @@ pub fn update_subtask(
         s.text = text;
     }
     tx.repo().upsert_subtask(&s)?;
-    tx.emit(
-        "subtask",
-        s.id,
-        "updated",
-        json!({ "ticket": ticket.key, "subtask": s }),
-    )?;
+    tx.emit(&DomainEvent::SubtaskUpdated {
+        ticket: ticket.key.clone(),
+        subtask: s.clone(),
+    })?;
     Ok(s)
 }

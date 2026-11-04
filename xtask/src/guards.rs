@@ -61,7 +61,7 @@ const OVERSIZED: &[(&str, usize)] = &[
     ("crates/daemon/src/api/handlers.rs", 828),
     ("crates/daemon/src/store/codec.rs", 728),
     ("crates/cli/src/commands.rs", 602),
-    ("crates/daemon/src/api/commands.rs", 490),
+    ("crates/daemon/src/api/commands.rs", 435),
 ];
 
 /// Source trees the size ratchet covers, relative to the repository root.

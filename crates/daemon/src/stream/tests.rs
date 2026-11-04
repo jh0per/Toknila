@@ -15,7 +15,7 @@ async fn emit(store: &Store, n: i64) {
                 Actor::System,
                 Timestamp(i),
                 move |tx| -> Result<(), StoreError> {
-                    tx.emit("test", i, "tick", serde_json::json!({ "i": i }))
+                    tx.append("test", i, "tick", serde_json::json!({ "i": i }))
                 },
             )
             .await

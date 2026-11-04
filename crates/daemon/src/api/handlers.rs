@@ -4,7 +4,7 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use serde_json::json;
+use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
@@ -113,7 +113,7 @@ pub async fn create_project(
         .store
         .write(Actor::Human, now(), move |tx| -> ApiResult<Project> {
             tx.repo().insert_project(&p)?;
-            tx.emit("project", p.id, "created", json!({ "project": p }))?;
+            tx.emit(&DomainEvent::ProjectCreated { project: p.clone() })?;
             Ok(p)
         })
         .await?;
@@ -162,7 +162,7 @@ pub async fn create_chain(
                 review_mode: input.review_mode,
             };
             tx.repo().insert_chain(&c)?;
-            tx.emit("chain", c.id, "created", json!({ "chain": c }))?;
+            tx.emit(&DomainEvent::ChainCreated { chain: c.clone() })?;
             load_chain_detail(&tx.repo(), c.id, at)
         })
         .await?;
@@ -202,9 +202,9 @@ pub async fn import_chain(
             let (view, subtasks) = plan.instantiate(p.id, at, || {
                 keys.next().expect("one key was taken per ticket")
             });
-            let chain_id = view.chain.id;
-            tx.repo().insert_chain(&view.chain)?;
-            tx.emit("chain", chain_id, "created", json!({ "chain": view.chain }))?;
+            let (chain_id, chain) = (view.chain.id, view.chain.clone());
+            tx.repo().insert_chain(&chain)?;
+            tx.emit(&DomainEvent::ChainCreated { chain })?;
             // Every node and edge goes through the same path as single edits, then the chain
             // settles once (autostart) and the whole import commits or nothing does.
             with_chain(tx, chain_id, move |ctx, _| {

@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
+use toknila_core::events::DomainEvent;
 use toknila_core::{Actor, Timestamp};
 
 pub use codec::Repo;
@@ -85,8 +86,13 @@ impl<'c> WriteTx<'c> {
         Repo::new(&self.tx)
     }
 
-    /// Appends an event to the journal in this transaction.
-    pub fn emit(
+    /// Journals a domain event in this transaction.
+    pub fn emit(&mut self, event: &DomainEvent) -> Result<(), StoreError> {
+        self.append(event.entity(), event.entity_id(), event.kind(), event)
+    }
+
+    /// Appends a raw journal entry; [`Self::emit`] is the typed way in.
+    pub(crate) fn append(
         &mut self,
         entity: &str,
         entity_id: impl ToString,
