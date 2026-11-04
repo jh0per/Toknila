@@ -40,6 +40,7 @@ fn main() -> ExitCode {
 
 fn verify() -> Result<(), String> {
     cargo(&["fmt", "--all", "--check"])?;
+    cargo(&["fmt", "--manifest-path", &manifest, "--check"])?;
     cargo(&[
         "clippy",
         "--workspace",
