@@ -16,3 +16,8 @@ export type ErrorBody = Schemas["ErrorBody"];
 
 /// A journal entry; its payload is one domain event, read field by field where needed.
 export type EventRecord = Omit<Schemas["EventRecord"], "payload"> & { payload: unknown };
+export type Project = Schemas["Project"];
+export type TicketDetail = Schemas["TicketDetail"];
+export type Comment = Schemas["Comment"];
+export type Subtask = Schemas["Subtask"];
+export type TicketStatus = Schemas["TicketStatus"];

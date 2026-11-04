@@ -1,14 +1,22 @@
 # apps/web
 
-The read-only page the daemon serves on `127.0.0.1` (Vite + TypeScript + React). It shows every
-chain in dependency order: tickets with status colour, reason and time in status, milestones,
-where the chain stopped, a "needs a human" filter, and live updates over the WebSocket stream
-(`/v1/stream`). It reconnects by itself, also across a daemon restart, which keeps its address.
+The read-only page the daemon serves on `127.0.0.1` (Vite + TypeScript + React), laid out like an
+IDE. Left sidebar: projects, the chains of the selected project, the inbox (tickets that need a
+human, with a count), running agents, a settings placeholder. Main area: the chain canvas (cards
+linked left to right in dependency order, release milestones as their own nodes; `src/layout.ts`
+is the pure position function) above a panel for the selected card with tabs Details, Events
+(that ticket's journal, live) and placeholders Chat, Terminal, Threads, PR. Statuses are grouped
+for display in `src/store/groups.ts` (to do, in progress, blocked, done; cancelled apart). It
+updates live over the WebSocket stream (`/v1/stream`) and reconnects by itself, also across a
+daemon restart, which keeps its address. Styling is neutral on purpose (CSS variables, light and
+dark); a later ticket restyles it.
 
 It follows MVI (`docs/architecture.md`): `src/store/reduce.ts` is a pure
 `reduce(state, msg) -> [state, effects]` with Vitest tests next to it, `src/store/effects.ts` runs
 the effects (the only network code), and `src/views/` only renders state and dispatches intents.
-Routes live in the URL: `/`, `/chains/<name>`, `/inbox`.
+Routes live in the URL: `/projects/<key>`, `/projects/<key>/chains/<name>`,
+`/projects/<key>/chains/<name>/cards/<ticket key>`, `/inbox`, and the older `/` and
+`/chains/<name>`, which render in the same layout. The bottom panel's tab is state, not URL.
 
 API types are generated: `openapi.json` is the daemon's API document (pinned by a daemon test;
 refresh it with `TOKNILA_UPDATE_SNAPSHOTS=1 cargo test -p toknila-daemon openapi`), and
@@ -24,4 +32,4 @@ Without a build in `dist/` the daemon still compiles and serves a note saying ho
 page. For development, `TOKNILA_PORT=<port from daemon.json> npm run dev` proxies `/v1` to a running
 daemon; open the dev address with `?token=<token>`.
 
-Phase 1 grows it into the three-panel UI (chain graph, runner terminal, ticket details).
+Not built yet: editing from the UI, wildcard cards, threads, the terminal, agent limits.

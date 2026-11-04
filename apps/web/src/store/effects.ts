@@ -1,7 +1,7 @@
 // Runs the effects the reducer describes. The only place that touches the network or history.
 
 import { get, streamUrl } from "../api/http";
-import type { ChainDetail, ChainItem, EventRecord, TicketItem } from "../api/types";
+import type { ChainDetail, ChainItem, EventRecord, Project, TicketDetail, TicketItem } from "../api/types";
 import type { Effect, Msg } from "./msg";
 
 type Dispatch = (msg: Msg) => void;
@@ -29,10 +29,11 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     dispatch({ type: "loadFailed", error: String(e instanceof Error ? e.message : e) });
 
   const loadAll = async () => {
+    const projects = await get<Project[]>("/projects");
     const list = await get<ChainItem[]>("/chains");
     const chains = await Promise.all(list.map((c) => get<ChainDetail>(`/chains/${c.chain.id}`)));
     const tickets = await get<TicketItem[]>("/tickets");
-    dispatch({ type: "loaded", chains, tickets });
+    dispatch({ type: "loaded", projects, chains, tickets });
   };
 
   const connect = (since: number) => {
@@ -55,11 +56,27 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     switch (e.type) {
       case "fetchTail":
         get<EventRecord[]>("/events?since=0&limit=1000000")
-          .then((evs) => dispatch({ type: "journalTail", seq: evs.length ? evs[evs.length - 1].seq : 0 }))
-          .catch(() => dispatch({ type: "journalTail", seq: 0 }));
+          .then((events) =>
+            dispatch({ type: "journalTail", seq: events.length ? events[events.length - 1].seq : 0, events }),
+          )
+          .catch(() => dispatch({ type: "journalTail", seq: 0, events: [] }));
         return;
       case "loadAll":
         later("all", () => void loadAll().catch(failed), DEBOUNCE_MS);
+        return;
+      case "loadProjects":
+        later("projects", () => {
+          get<Project[]>("/projects")
+            .then((projects) => dispatch({ type: "projectsLoaded", projects }))
+            .catch(failed);
+        }, DEBOUNCE_MS);
+        return;
+      case "loadDetail":
+        later(`detail:${e.key}`, () => {
+          get<TicketDetail>(`/tickets/${encodeURIComponent(e.key)}`)
+            .then((detail) => dispatch({ type: "detailLoaded", detail }))
+            .catch(failed);
+        }, DEBOUNCE_MS);
         return;
       case "loadChain":
         later(`chain:${e.id}`, () => {

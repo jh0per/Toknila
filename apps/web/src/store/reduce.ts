@@ -2,8 +2,8 @@
 
 import type { EventRecord } from "../api/types";
 import type { Effect, Msg } from "./msg";
-import { routePath } from "./route";
-import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, chainOfTicket } from "./state";
+import { type Route, routePath } from "./route";
+import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, chainOfTicket, ticketOfEvent } from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
   switch (msg.type) {
@@ -11,7 +11,10 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [s, [{ type: "fetchTail" }]];
     case "journalTail":
       // The first load already has the state up to this event; the stream starts after it.
-      return [{ ...s, lastSeq: msg.seq }, [{ type: "connect", since: msg.seq, delayMs: 0 }]];
+      return [
+        { ...s, lastSeq: msg.seq, events: msg.events },
+        [{ type: "connect", since: msg.seq, delayMs: 0 }],
+      ];
     case "linkOpened":
       return [{ ...s, link: "live", retryMs: FIRST_RETRY_MS }, [{ type: "loadAll" }]];
     case "linkClosed":
@@ -21,9 +24,18 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       ];
     case "loaded": {
       const chains = Object.fromEntries(msg.chains.map((c) => [c.chain.id, c]));
-      const next = { ...s, chains, chainOrder: msg.chains.map((c) => c.chain.id), loaded: true, error: "" };
-      return [withTickets(next, msg.tickets), []];
+      const next = {
+        ...s,
+        projects: msg.projects,
+        chains,
+        chainOrder: msg.chains.map((c) => c.chain.id),
+        loaded: true,
+        error: "",
+      };
+      return [withTickets(next, msg.tickets), enter(next.route)];
     }
+    case "projectsLoaded":
+      return [{ ...s, projects: msg.projects }, []];
     case "chainLoaded": {
       const id = msg.chain.chain.id;
       const chainOrder = s.chainOrder.includes(id) ? s.chainOrder : [...s.chainOrder, id];
@@ -31,17 +43,35 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     }
     case "ticketsLoaded":
       return [withTickets(s, msg.tickets), []];
+    case "detailLoaded":
+      return [{ ...s, details: { ...s.details, [msg.detail.ticket.key]: msg.detail } }, []];
     case "loadFailed":
       return [{ ...s, error: msg.error }, []];
     case "event":
       return applyEvent(s, msg.event);
-    case "toggleNeedsHuman":
-      return [{ ...s, onlyHuman: msg.on }, []];
+    case "selectTab":
+      return [{ ...s, tab: msg.tab }, []];
     case "navigate":
-      return [{ ...s, route: msg.route }, [{ type: "pushUrl", path: routePath(msg.route) }]];
+      return go(s, msg.route);
+    case "selectProject":
+      return go(s, { name: "project", project: msg.project });
+    case "selectChain":
+      return go(s, { name: "projectChain", project: msg.project, chain: msg.chain });
+    case "selectCard":
+      return go(s, { name: "card", project: msg.project, chain: msg.chain, key: msg.key });
     case "urlChanged":
-      return [{ ...s, route: msg.route }, []];
+      return [{ ...s, route: msg.route }, enter(msg.route)];
   }
+}
+
+/// Moves to a route: the URL changes by an effect, never by the reducer itself.
+function go(s: State, route: Route): [State, Effect[]] {
+  return [{ ...s, route }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route)]];
+}
+
+/// What a screen needs fetched when it opens.
+function enter(route: Route): Effect[] {
+  return route.name === "card" ? [{ type: "loadDetail", key: route.key }] : [];
 }
 
 function withTickets(s: State, tickets: { ticket: { id: string }; needs_human: boolean }[]): State {
@@ -50,16 +80,20 @@ function withTickets(s: State, tickets: { ticket: { id: string }; needs_human: b
   return { ...s, needsHuman };
 }
 
-/// A journal event refreshes what it touches: its chain and the inbox. A gap in `seq` or an
-/// event the page cannot place reloads everything.
+/// A journal event refreshes what it touches: its chain, the inbox, and the open card. A gap in
+/// `seq` or an event the page cannot place reloads everything.
 function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq <= s.lastSeq) return [s, []];
-  const next = { ...s, lastSeq: e.seq };
+  const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
-  if (e.entity === "project") return [next, []];
+  if (e.entity === "project") return [next, [{ type: "loadProjects" }]];
   const chain = chainOf(s, e);
   if (!chain) return [next, [{ type: "loadAll" }]];
-  return [next, [{ type: "loadChain", id: chain }, { type: "loadTickets" }]];
+  const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadTickets" }];
+  const ticket = ticketOfEvent(e);
+  const open = s.route.name === "card" ? s.details[s.route.key]?.ticket : undefined;
+  if (open && ticket === open.id) fx.push({ type: "loadDetail", key: open.key });
+  return [next, fx];
 }
 
 function chainOf(s: State, e: EventRecord): string | undefined {
@@ -72,12 +106,9 @@ function chainOf(s: State, e: EventRecord): string | undefined {
       return str(p.ticket?.chain_id);
     case "release":
       return str(p.release?.chain_id);
-    case "comment": {
-      const ticket = str(p.comment?.ticket_id);
-      return ticket && chainOfTicket(s, ticket);
-    }
+    case "comment":
     case "subtask": {
-      const ticket = str(p.subtask?.ticket_id);
+      const ticket = ticketOfEvent(e);
       return ticket && chainOfTicket(s, ticket);
     }
     default:

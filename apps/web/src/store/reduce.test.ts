@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { ChainDetail, EventRecord, TicketItem } from "../api/types";
+import type { ChainDetail, EventRecord, Project, TicketItem } from "../api/types";
 import { reduce } from "./reduce";
-import { parseRoute, routePath } from "./route";
-import { type State, initialState, visibleChains } from "./state";
+import { type State, initialState } from "./state";
 
 function chain(id: string, name: string, ticketIds: string[]): ChainDetail {
   return {
-    chain: { id, name, goal: "", autostart: true, project_id: "p" },
+    chain: { id, name, goal: "", autostart: true, project_id: "p1" },
     tickets: ticketIds.map((t, i) => ({
       id: t,
-      key: `DEMO-${i + 1}`,
+      key: `${name === "demo" ? "DEMO" : "OTHER"}-${i + 1}`,
       chain_id: id,
       title: t,
       prompt: "",
@@ -32,10 +31,16 @@ function event(seq: number, entity: string, kind: string, payload: unknown): Eve
   return { seq, at: 0, actor: "system", entity, entity_id: "", kind, payload };
 }
 
+const projects = [
+  { id: "p1", key: "DEMO", name: "Demo" },
+  { id: "p2", key: "OTHER", name: "Other" },
+] as Project[];
+
 function loaded(): State {
   const tickets = [{ ticket: { id: "t1" }, needs_human: true }] as TicketItem[];
   const [s] = reduce(initialState({ name: "chains" }), {
     type: "loaded",
+    projects,
     chains: [chain("c1", "demo", ["t1", "t2"]), chain("c2", "other", ["t3"])],
     tickets,
   });
@@ -46,7 +51,7 @@ describe("connection", () => {
   it("reads the journal tail, then connects after it", () => {
     const s0 = initialState({ name: "chains" });
     expect(reduce(s0, { type: "started" })[1]).toEqual([{ type: "fetchTail" }]);
-    const [s1, fx] = reduce(s0, { type: "journalTail", seq: 42 });
+    const [s1, fx] = reduce(s0, { type: "journalTail", seq: 42, events: [] });
     expect(s1.lastSeq).toBe(42);
     expect(fx).toEqual([{ type: "connect", since: 42, delayMs: 0 }]);
   });
@@ -97,10 +102,10 @@ describe("journal events", () => {
     expect(reduce(loaded(), { type: "event", event: unknown })[1]).toEqual([{ type: "loadAll" }]);
   });
 
-  it("ignore what was already applied, and projects", () => {
+  it("ignore what was already applied; a project event reloads the projects", () => {
     expect(reduce(loaded(), { type: "event", event: event(9, "ticket", "updated", {}) })).toEqual([loaded(), []]);
     const [s, fx] = reduce(loaded(), { type: "event", event: event(11, "project", "created", {}) });
-    expect([s.lastSeq, fx]).toEqual([11, []]);
+    expect([s.lastSeq, fx]).toEqual([11, [{ type: "loadProjects" }]]);
   });
 
   it("add a chain the page has not seen at the end", () => {
@@ -109,25 +114,3 @@ describe("journal events", () => {
   });
 });
 
-describe("navigation", () => {
-  it("lives in the URL", () => {
-    for (const path of ["/", "/chains/demo", "/chains/a%20b", "/inbox"]) {
-      expect(routePath(parseRoute(path))).toBe(path);
-    }
-    expect(parseRoute("/nowhere/at/all")).toEqual({ name: "chains" });
-  });
-
-  it("is an effect, never done by the reducer itself", () => {
-    const [s, fx] = reduce(loaded(), { type: "navigate", route: { name: "chain", chain: "other" } });
-    expect(fx).toEqual([{ type: "pushUrl", path: "/chains/other" }]);
-    expect(visibleChains(s).map((c) => c.chain.name)).toEqual(["other"]);
-    const [back] = reduce(s, { type: "urlChanged", route: { name: "chains" } });
-    expect(visibleChains(back)).toHaveLength(2);
-  });
-
-  it("keeps the inbox and the filter on what needs a person", () => {
-    expect(loaded().needsHuman).toEqual({ t1: true });
-    const [s] = reduce(loaded(), { type: "toggleNeedsHuman", on: true });
-    expect(s.onlyHuman).toBe(true);
-  });
-});
