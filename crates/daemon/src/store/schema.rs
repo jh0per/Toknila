@@ -121,4 +121,9 @@ pub(super) const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX events_entity ON events(entity, entity_id, seq);
     "#,
+    // 2: wildcard cards (P1-01). The mark of a card nobody planned: where it came from, who
+    // proposed it, its pending dependencies and whether a person approved it (JSON).
+    r#"
+    ALTER TABLE tickets ADD COLUMN wildcard_json TEXT;
+    "#,
 ];

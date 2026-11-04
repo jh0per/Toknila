@@ -1,0 +1,38 @@
+{
+  "chain": "demo",
+  "comments": [],
+  "in_status_ms": 0,
+  "subtasks": [],
+  "ticket": {
+    "acceptance": [],
+    "branch": null,
+    "chain_id": "<id>",
+    "id": "<id>",
+    "key": "DEMO-4",
+    "needs_secrets": false,
+    "paused": false,
+    "profile": null,
+    "prompt": "",
+    "review_mode": null,
+    "status": "cancelled",
+    "status_reason": {
+      "status": "cancelled",
+      "text": "out of scope"
+    },
+    "status_since": 0,
+    "title": "Rename the page",
+    "tokens_used": 0,
+    "wildcard": {
+      "after": [],
+      "approved": false,
+      "before": [
+        {
+          "id": "<id>",
+          "kind": "ticket"
+        }
+      ],
+      "from": "DEMO-2",
+      "proposed_by": "human"
+    }
+  }
+}

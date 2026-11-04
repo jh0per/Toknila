@@ -205,6 +205,15 @@ pub fn ticket(d: &TicketDetail) {
         d.chain,
         t.profile.as_deref().unwrap_or("(project default)")
     );
+    if let Some(wc) = &t.wildcard {
+        let from = wc.from.as_ref().map(|k| format!(" during {k}"));
+        let approved = if wc.approved { ", approved" } else { "" };
+        println!(
+            "wildcard: proposed by {}{}{approved}",
+            w(&wc.proposed_by),
+            from.unwrap_or_default()
+        );
+    }
     if !t.prompt.is_empty() {
         println!("\n{}", t.prompt);
     }

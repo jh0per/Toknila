@@ -521,6 +521,139 @@ async fn events_journal_every_transition_in_order() {
 }
 
 #[tokio::test]
+async fn wildcard_cards_are_proposed_then_approved_or_rejected_by_a_person() {
+    let api = Api::new();
+    api.demo().await;
+    api.post("/v1/chains/demo/tickets", json!({ "title": "A" }))
+        .await;
+    api.post(
+        "/v1/chains/demo/tickets",
+        json!({ "title": "B", "after": ["DEMO-1"] }),
+    )
+    .await;
+
+    // A person proposes; the answer is the card, 201.
+    let body =
+        json!({ "title": "refresh", "after": ["DEMO-1"], "before": ["DEMO-2"], "from": "DEMO-1" });
+    let (s, card) = api
+        .call(Method::POST, "/v1/chains/demo/wildcards", Some(body))
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{card}");
+    assert_eq!(card["ticket"]["key"], "DEMO-3");
+    assert_eq!(card["ticket"]["status"], "proposed");
+    assert_eq!(card["ticket"]["wildcard"]["proposed_by"], "human");
+    assert_eq!(card["ticket"]["wildcard"]["from"], "DEMO-1");
+
+    // An agent proposes through its event; the answer is the new card, found during its ticket.
+    let agent = api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "propose", "title": "docs" }),
+        )
+        .await;
+    assert_eq!(agent["ticket"]["key"], "DEMO-4");
+    assert_eq!(agent["ticket"]["wildcard"]["proposed_by"], "agent");
+    assert_eq!(agent["ticket"]["wildcard"]["from"], "DEMO-1");
+
+    let human = api.get("/v1/tickets?needs_human=true").await;
+    let keys: Vec<&str> = human
+        .as_array()
+        .expect("array")
+        .iter()
+        .filter_map(|t| t["ticket"]["key"].as_str())
+        .collect();
+    assert_eq!(keys, ["DEMO-3", "DEMO-4"]);
+    let chain = api.get("/v1/chains/demo").await;
+    assert_eq!(
+        chain["summary"]["total"], 2,
+        "proposals are not in the plan"
+    );
+
+    // A person approves and rejects through the ticket actions.
+    let t = api
+        .post("/v1/tickets/DEMO-3/actions/approve", json!({}))
+        .await;
+    assert_eq!(t["ticket"]["status"], "backlog");
+    assert_eq!(t["ticket"]["wildcard"]["approved"], true);
+    let (s, e) = api
+        .call(
+            Method::POST,
+            "/v1/tickets/DEMO-4/actions/reject",
+            Some(json!({})),
+        )
+        .await;
+    assert_eq!(
+        (s, e["code"].as_str()),
+        (StatusCode::BAD_REQUEST, Some("bad_request"))
+    );
+    let t = api
+        .post(
+            "/v1/tickets/DEMO-4/actions/reject",
+            json!({ "text": "later" }),
+        )
+        .await;
+    assert_eq!(t["ticket"]["status"], "cancelled");
+    let (s, e) = api
+        .call(
+            Method::POST,
+            "/v1/tickets/DEMO-4/actions/approve",
+            Some(json!({})),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(e["error"], "cannot approve a ticket in Cancelled");
+
+    // Refused proposals change nothing.
+    let (s, _) = api
+        .call(
+            Method::POST,
+            "/v1/chains/demo/wildcards",
+            Some(json!({ "title": " " })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = api
+        .call(
+            Method::POST,
+            "/v1/chains/nope/wildcards",
+            Some(json!({ "title": "x" })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+
+    // The journal says who did what.
+    let events = api.get("/v1/events?since=0").await;
+    let decisions: Vec<String> = events
+        .as_array()
+        .expect("array")
+        .iter()
+        .filter(|e| {
+            matches!(
+                e["kind"].as_str(),
+                Some("proposed" | "approved" | "rejected")
+            )
+        })
+        .map(|e| {
+            format!(
+                "{} {} {}",
+                e["actor"].as_str().unwrap_or(""),
+                e["payload"]["ticket"]["key"].as_str().unwrap_or(""),
+                e["kind"].as_str().unwrap_or("")
+            )
+        })
+        .collect();
+    assert_eq!(
+        decisions,
+        [
+            "human DEMO-3 proposed",
+            "agent DEMO-4 proposed",
+            "human DEMO-3 approved",
+            "human DEMO-4 rejected"
+        ]
+    );
+}
+
+#[tokio::test]
 async fn openapi_describes_every_route() {
     let api = Api::new();
     let req = Request::builder()
@@ -547,6 +680,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/export",
             "/chains/{chain}/releases",
             "/chains/{chain}/tickets",
+            "/chains/{chain}/wildcards",
             "/events",
             "/projects",
             "/projects/{project}",
@@ -570,6 +704,9 @@ async fn openapi_describes_every_route() {
         "StatusReason",
         "ErrorBody",
         "EventRecord",
+        "Wildcard",
+        "NewWildcard",
+        "Proposal",
     ] {
         assert!(
             doc["components"]["schemas"][schema].is_object(),

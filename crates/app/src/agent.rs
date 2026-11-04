@@ -3,18 +3,25 @@
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::graph::ChainView;
 use toknila_core::machine::TicketEvent;
-use toknila_core::{Actor, BlockedReason, CommentBody, CommentKind, Release, Ticket, TicketStatus};
+use toknila_core::{
+    Actor, BlockedReason, CommentBody, CommentKind, Release, Ticket, TicketId, TicketStatus,
+};
 
 use crate::notes::{add_comment, body_from_text, update_subtask};
-use crate::{AppError, AppResult, UnitOfWork, with_chain};
+use crate::{AppError, AppResult, UnitOfWork, wildcards, with_chain};
 
-/// Applies one event an agent reported about `t`.
+/// Applies one event an agent reported about `t`. Returns the ticket the answer is about: `t`,
+/// or the new card for `propose`.
 pub fn ticket_event<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     t: &Ticket,
     event: AgentEvent,
-) -> AppResult<()> {
+) -> AppResult<TicketId> {
     match event {
+        AgentEvent::Propose(card) => {
+            let (chain, from) = (t.chain_id.to_string(), t.key.to_string());
+            return wildcards::propose(uow, &chain, card, Some(&from));
+        }
         AgentEvent::Started => with_chain(uow, t.chain_id, |ctx| {
             if t.status == TicketStatus::Ready {
                 ctx.ticket_event(t.id, TicketEvent::Start)?;
@@ -53,6 +60,7 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
             Ok(ctx.ticket_event(t.id, TicketEvent::Block { reason })?)
         }),
     }
+    .map(|()| t.id)
 }
 
 /// Applies one event a release agent reported about `r`.

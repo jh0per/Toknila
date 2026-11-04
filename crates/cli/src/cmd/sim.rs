@@ -6,7 +6,7 @@ use toknila_api_types::{AgentEvent, ReleaseEvent};
 use toknila_client::Client;
 use toknila_core::CommentBody;
 
-use super::emit;
+use super::{CardArgs, emit};
 use crate::output;
 
 #[derive(Debug, Subcommand)]
@@ -32,6 +32,11 @@ pub enum SimCmd {
     Finish { summary: Option<String> },
     /// The agent crashed (-> Blocked).
     Crash { detail: String },
+    /// The agent found work nobody planned: a wildcard card that waits for your approval.
+    Propose {
+        #[command(flatten)]
+        card: CardArgs,
+    },
 }
 
 pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> Result<()> {
@@ -46,6 +51,7 @@ pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> R
             },
         },
         SimCmd::Crash { detail } => AgentEvent::Crashed { detail },
+        SimCmd::Propose { card } => AgentEvent::Propose(card.into()),
         // A ticket first; if no ticket has this name, a release.
         SimCmd::Finish { summary } => match c.ticket(target) {
             Ok(_) => AgentEvent::Finished {

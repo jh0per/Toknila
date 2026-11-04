@@ -9,6 +9,8 @@ export function reasonText(r: StatusReason | null | undefined): string {
       return r.kind === "silent" ? "agent went silent" : `${r.kind}: ${r.text}`;
     case "cancelled":
       return `cancelled: ${r.text}`;
+    case "proposed":
+      return "awaiting approval";
     case "blocked": {
       const b = r.reason;
       switch (b.kind) {

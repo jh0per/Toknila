@@ -6,10 +6,10 @@ use toknila_app::{agent, resolve};
 use toknila_core::Actor;
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 
-use super::{ApiResult, chain_write, ticket_write};
+use super::{ApiResult, chain_write, load_ticket_detail};
 use crate::http::dto::{ChainDetail, EventQuery, TicketDetail};
 use crate::http::error::ErrorBody;
-use crate::server::AppState;
+use crate::server::{AppState, now};
 use crate::store::EventRecord;
 
 #[utoipa::path(get, path = "/events", tag = "events", params(EventQuery),
@@ -30,10 +30,17 @@ pub async fn agent_event(
     Path(ticket): Path<String>,
     Json(event): Json<AgentEvent>,
 ) -> ApiResult<Json<TicketDetail>> {
-    ticket_write(&state, ticket, Actor::Agent, move |tx, t| {
-        Ok(agent::ticket_event(tx, &t, event)?)
-    })
-    .await
+    let at = now();
+    let (detail, _) = state
+        .store
+        .write(Actor::Agent, at, move |tx| -> ApiResult<TicketDetail> {
+            let t = resolve::ticket(&*tx, &ticket)?;
+            // The ticket itself, or the card it proposed.
+            let answer = agent::ticket_event(tx, &t, event)?;
+            load_ticket_detail(&tx.repo(), answer, at)
+        })
+        .await?;
+    Ok(Json(detail))
 }
 
 #[utoipa::path(post, path = "/releases/{release}/events", tag = "agent", request_body = ReleaseEvent,

@@ -55,6 +55,19 @@ tok ls --needs-human                  # what waits on you
 tok watch --since 0                   # the whole journal, then live (Ctrl-C to stop)
 ```
 
+Work nobody planned does not change the chain by itself. While DEMO-1 runs (before
+`tok accept DEMO-1`), its agent can propose a wildcard card; it waits for you:
+
+```sh
+tok sim DEMO-1 propose "Token refresh endpoint" --after DEMO-1   # DEMO-5 proposed
+tok ls --needs-human                  # DEMO-5 awaits approval; chain progress does not count it
+tok approve DEMO-5                    # it joins the plan and starts once DEMO-1 is accepted
+tok reject DEMO-5 "not now"           # or turn it down instead: Cancelled with the reason
+```
+
+`--before KEY` makes planned work wait for the card; approval is refused if that work has already
+started. A person proposes a card with `tok propose demo "<title>" --after DEMO-1 --from DEMO-1`.
+
 Toknila's own next phase is a chain too: `tok project new TOK && tok chain import phase-1.toml
 --project TOK && tok chain show phase-1`.
 

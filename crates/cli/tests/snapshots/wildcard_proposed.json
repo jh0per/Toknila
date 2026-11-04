@@ -1,0 +1,44 @@
+{
+  "chain": "demo",
+  "comments": [],
+  "in_status_ms": 0,
+  "subtasks": [],
+  "ticket": {
+    "acceptance": [
+      "an expired token is refreshed"
+    ],
+    "branch": null,
+    "chain_id": "<id>",
+    "id": "<id>",
+    "key": "DEMO-3",
+    "needs_secrets": false,
+    "paused": false,
+    "profile": null,
+    "prompt": "Login needs a token refresh endpoint first",
+    "review_mode": null,
+    "status": "proposed",
+    "status_reason": {
+      "status": "proposed"
+    },
+    "status_since": 0,
+    "title": "Token refresh endpoint",
+    "tokens_used": 0,
+    "wildcard": {
+      "after": [
+        {
+          "id": "<id>",
+          "kind": "ticket"
+        }
+      ],
+      "approved": false,
+      "before": [
+        {
+          "id": "<id>",
+          "kind": "ticket"
+        }
+      ],
+      "from": "DEMO-1",
+      "proposed_by": "agent"
+    }
+  }
+}

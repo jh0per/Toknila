@@ -5,7 +5,8 @@ thin clients (CLI, web page, desktop shell) that talk to the daemon over HTTP an
 `127.0.0.1`. This page is the target shape of the code and the rules that keep it there. Where
 the code does not match it yet, the refactoring plan below says which step fixes it.
 
-Decision record: [ADR 0001](adr/0001-layered-architecture-and-mvi.md).
+Decision records: [ADR 0001](adr/0001-layered-architecture-and-mvi.md),
+[ADR 0002](adr/0002-wildcard-cards.md) (wildcard cards).
 
 ## Layers
 
@@ -24,8 +25,8 @@ ones above. `cargo xtask guards` checks the rules it can check mechanically.
 
 | Layer | Crate | Holds | Must not hold |
 |---|---|---|---|
-| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph, chain files, the comment template, typed domain events, the agent event mapping, entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
-| Application | `toknila-app` | Every use case (`projects`, `chains` with import and export, `tickets` with typed `TicketAction`, `releases` with `ReleaseAction`, comments and subtasks, agent events), the chain unit of work (`with_chain`: change, settle, save, journal, deliver), reference resolution, startup recovery, `AppError`, and the command inputs (`NewTicket`, `NewChain`, ...) the API accepts as request bodies. Ports: `Reader` and `UnitOfWork` (which carries the command's clock and actor); a `Runner` port arrives with real runners in phase 1 | `axum`, `rusqlite`, `tokio`, HTTP status codes |
+| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
+| Application | `toknila-app` | Every use case (`projects`, `chains` with import and export, `tickets` with typed `TicketAction`, `wildcards` (proposals), `releases` with `ReleaseAction`, comments and subtasks, agent events), the chain unit of work (`with_chain`: change, settle, save, journal, deliver), reference resolution, startup recovery, `AppError`, and the command inputs (`NewTicket`, `NewChain`, ...) the API accepts as request bodies. Ports: `Reader` and `UnitOfWork` (which carries the command's clock and actor); a `Runner` port arrives with real runners in phase 1 | `axum`, `rusqlite`, `tokio`, HTTP status codes |
 | Protocol | `toknila-api-types` | Read models (`ChainDetail::from_view`, `TicketDetail`, list items), `ErrorBody`, `EventRecord`, query and small request types; re-exports the command inputs of `toknila-app` and the agent events of core. OpenAPI is generated from them (feature `openapi`), TypeScript types from OpenAPI | Logic, transport |
 | Adapters | `toknila-daemon` | `http/` (`routes/*`: one module per resource, each handler parses, runs one use case, answers; one `ErrorBody` for every failure including 401), `server/` (router, auth, lifecycle, logging), `store/` (SQLite implementation of the ports), `stream`, `runner/` (sim now, PTY in phase 1), lifecycle (`daemon.json`, signals), paths, logging, embedded web assets | Business rules |
 | Client | `toknila-client` | Typed blocking HTTP client of the API: one method per route, `ClientError` carrying the daemon's `ErrorBody`, the stream address | Output formatting |

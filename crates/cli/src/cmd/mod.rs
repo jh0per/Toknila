@@ -7,6 +7,7 @@ mod release;
 mod sim;
 mod ticket;
 mod watch;
+mod wildcard;
 
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
@@ -19,6 +20,7 @@ pub use project::ProjectCmd;
 pub use release::ReleaseCmd;
 pub use sim::SimCmd;
 pub use ticket::{SubtaskCmd, TicketCmd};
+pub use wildcard::CardArgs;
 
 use crate::daemon_cmd;
 
@@ -68,6 +70,19 @@ pub enum Command {
     Reopen { ticket: String },
     /// Cancel a ticket (won't do), with a reason.
     Cancel { ticket: String, reason: String },
+    /// Propose a wildcard card: work nobody planned. It waits for a person's approval.
+    Propose {
+        chain: String,
+        #[command(flatten)]
+        card: CardArgs,
+        /// The ticket during which the work was found.
+        #[arg(long)]
+        from: Option<String>,
+    },
+    /// Approve a wildcard card: it joins the plan and its dependencies take effect.
+    Approve { ticket: String },
+    /// Reject a wildcard card, with a reason: it is cancelled.
+    Reject { ticket: String, reason: String },
     /// Release milestones.
     #[command(subcommand)]
     Release(ReleaseCmd),
@@ -154,6 +169,13 @@ pub fn run(cmd: Command, json_out: bool) -> Result<()> {
         Command::Reopen { ticket } => ticket::act(&c, &ticket, "reopen", None, json_out),
         Command::Cancel { ticket, reason } => {
             ticket::act(&c, &ticket, "cancel", Some(&reason), json_out)
+        }
+        Command::Propose { chain, card, from } => {
+            wildcard::propose(&c, &chain, card, from, json_out)
+        }
+        Command::Approve { ticket } => ticket::act(&c, &ticket, "approve", None, json_out),
+        Command::Reject { ticket, reason } => {
+            ticket::act(&c, &ticket, "reject", Some(&reason), json_out)
         }
         Command::Release(r) => release::run(&c, r, json_out),
         Command::Sim { target, action } => sim::run(&c, &target, action, json_out),

@@ -9,6 +9,8 @@ use super::TicketKey;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TicketStatus {
+    /// A wildcard card waiting for a person to approve it; not part of the plan yet.
+    Proposed,
     /// Exists, but has open dependencies or is paused.
     Backlog,
     /// All dependencies satisfied; autostart picks it up.
@@ -42,7 +44,8 @@ pub enum StatusCategory {
 
 impl TicketStatus {
     /// Every status, in lifecycle order.
-    pub const ALL: [TicketStatus; 9] = [
+    pub const ALL: [TicketStatus; 10] = [
+        Self::Proposed,
         Self::Backlog,
         Self::Ready,
         Self::Running,
@@ -57,7 +60,7 @@ impl TicketStatus {
     /// The board column for this status.
     pub fn category(self) -> StatusCategory {
         match self {
-            Self::Backlog | Self::Ready => StatusCategory::ToDo,
+            Self::Proposed | Self::Backlog | Self::Ready => StatusCategory::ToDo,
             Self::Running | Self::Waiting | Self::Blocked => StatusCategory::InProgress,
             Self::Review => StatusCategory::InReview,
             Self::Merged | Self::Released | Self::Cancelled => StatusCategory::Done,
@@ -71,7 +74,10 @@ impl TicketStatus {
 
     /// Statuses where the chain is waiting on a person (shown as "needs a human").
     pub fn needs_human(self) -> bool {
-        matches!(self, Self::Waiting | Self::Blocked | Self::Review)
+        matches!(
+            self,
+            Self::Proposed | Self::Waiting | Self::Blocked | Self::Review
+        )
     }
 }
 
@@ -122,6 +128,8 @@ pub enum StatusReason {
     Cancelled {
         text: String,
     },
+    /// A wildcard card waits for a person to approve or reject it.
+    Proposed,
 }
 
 impl fmt::Display for WaitingReason {
@@ -155,6 +163,7 @@ impl fmt::Display for StatusReason {
             Self::Waiting(w) => w.fmt(f),
             Self::Blocked { reason, .. } => reason.fmt(f),
             Self::Cancelled { text } => write!(f, "cancelled: {text}"),
+            Self::Proposed => f.write_str("awaiting approval"),
         }
     }
 }
@@ -167,7 +176,7 @@ mod tests {
     fn every_status_has_the_category_from_the_plan() {
         use StatusCategory::*;
         let expected = [
-            ToDo, ToDo, InProgress, InProgress, InProgress, InReview, Done, Done, Done,
+            ToDo, ToDo, ToDo, InProgress, InProgress, InProgress, InReview, Done, Done, Done,
         ];
         let actual: Vec<_> = TicketStatus::ALL.iter().map(|s| s.category()).collect();
         assert_eq!(actual, expected);
@@ -236,6 +245,7 @@ mod tests {
                 StatusReason::Cancelled { text: "dup".into() },
                 "cancelled: dup",
             ),
+            (StatusReason::Proposed, "awaiting approval"),
         ];
         for (reason, text) in cases {
             assert_eq!(reason.to_string(), text);
@@ -247,7 +257,28 @@ mod tests {
         let json = serde_json::to_string(&TicketStatus::ALL).expect("serialize");
         assert_eq!(
             json,
-            r#"["backlog","ready","running","waiting","blocked","review","merged","released","cancelled"]"#
+            r#"["proposed","backlog","ready","running","waiting","blocked","review","merged","released","cancelled"]"#
+        );
+        assert_eq!(
+            serde_json::to_string(&StatusReason::Proposed).expect("serialize"),
+            r#"{"status":"proposed"}"#
+        );
+    }
+
+    #[test]
+    fn a_proposed_card_needs_a_human() {
+        let human: Vec<_> = TicketStatus::ALL
+            .into_iter()
+            .filter(|s| s.needs_human())
+            .collect();
+        assert_eq!(
+            human,
+            [
+                TicketStatus::Proposed,
+                TicketStatus::Waiting,
+                TicketStatus::Blocked,
+                TicketStatus::Review
+            ]
         );
     }
 }

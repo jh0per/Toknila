@@ -6,8 +6,8 @@ use serde::de::DeserializeOwned;
 use toknila_core::graph::ChainView;
 use toknila_core::wire::wire_name;
 use toknila_core::{
-    Chain, ChainId, Comment, CommentId, Edge, NodeRef, Project, ProjectId, Release, ReleaseId,
-    Subtask, Ticket, TicketId, TicketKey, Timestamp,
+    Chain, ChainId, Edge, NodeRef, Project, ProjectId, Release, ReleaseId, Ticket, TicketId,
+    TicketKey, Timestamp,
 };
 
 use super::{EventRecord, StoreError};
@@ -18,30 +18,34 @@ pub(crate) fn enum_str<T: Serialize + std::fmt::Debug>(value: &T) -> Result<Stri
         .ok_or_else(|| StoreError::Corrupt(format!("expected a unit enum, got {value:?}")))
 }
 
-fn enum_from<T: DeserializeOwned>(s: &str) -> Result<T, StoreError> {
+pub(super) fn enum_from<T: DeserializeOwned>(s: &str) -> Result<T, StoreError> {
     Ok(serde_json::from_value(serde_json::Value::String(
         s.to_owned(),
     ))?)
 }
 
-fn json<T: Serialize>(v: &T) -> Result<String, StoreError> {
+pub(super) fn json<T: Serialize>(v: &T) -> Result<String, StoreError> {
     Ok(serde_json::to_string(v)?)
 }
 
-fn from_json<T: DeserializeOwned>(s: &str) -> Result<T, StoreError> {
+pub(super) fn from_json<T: DeserializeOwned>(s: &str) -> Result<T, StoreError> {
     Ok(serde_json::from_str(s)?)
 }
 
-fn parse<T: std::str::FromStr>(s: &str, what: &str) -> Result<T, StoreError> {
+pub(super) fn parse<T: std::str::FromStr>(s: &str, what: &str) -> Result<T, StoreError> {
     s.parse()
         .map_err(|_| StoreError::Corrupt(format!("bad {what}: {s:?}")))
 }
 
-fn opt_enum<T: Serialize + std::fmt::Debug>(v: &Option<T>) -> Result<Option<String>, StoreError> {
+pub(super) fn opt_enum<T: Serialize + std::fmt::Debug>(
+    v: &Option<T>,
+) -> Result<Option<String>, StoreError> {
     v.as_ref().map(enum_str).transpose()
 }
 
-fn opt_enum_from<T: DeserializeOwned>(v: Option<String>) -> Result<Option<T>, StoreError> {
+pub(super) fn opt_enum_from<T: DeserializeOwned>(
+    v: Option<String>,
+) -> Result<Option<T>, StoreError> {
     v.as_deref().map(enum_from).transpose()
 }
 
@@ -70,7 +74,7 @@ const PROJECT_COLS: &str =
     "id, key, name, repo_path, work_branch, release_branch, default_profile, default_review_mode";
 const CHAIN_COLS: &str = "id, project_id, name, goal, autostart, review_mode";
 const TICKET_COLS: &str = "id, chain_id, key, title, prompt, acceptance_json, status, status_reason_json, \
-     status_since, paused, profile, review_mode, branch, needs_secrets, tokens_used";
+     status_since, paused, profile, review_mode, branch, needs_secrets, tokens_used, wildcard_json";
 const RELEASE_COLS: &str =
     "id, chain_id, version, channel, start_mode, state, branch, cut_at, released_at";
 
@@ -284,12 +288,13 @@ impl<'c> Repo<'c> {
     pub fn upsert_ticket(&self, t: &Ticket) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) \
+                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) \
                  ON CONFLICT(id) DO UPDATE SET title = excluded.title, prompt = excluded.prompt, \
                  acceptance_json = excluded.acceptance_json, status = excluded.status, \
                  status_reason_json = excluded.status_reason_json, status_since = excluded.status_since, \
                  paused = excluded.paused, profile = excluded.profile, review_mode = excluded.review_mode, \
-                 branch = excluded.branch, needs_secrets = excluded.needs_secrets, tokens_used = excluded.tokens_used"
+                 branch = excluded.branch, needs_secrets = excluded.needs_secrets, tokens_used = excluded.tokens_used, \
+                 wildcard_json = excluded.wildcard_json"
             ),
             params![
                 t.id.to_string(),
@@ -307,6 +312,7 @@ impl<'c> Repo<'c> {
                 t.branch,
                 t.needs_secrets,
                 i64::try_from(t.tokens_used).unwrap_or(i64::MAX),
+                t.wildcard.as_ref().map(json).transpose()?,
             ],
         )?;
         Ok(())
@@ -329,6 +335,7 @@ impl<'c> Repo<'c> {
             Option<String>,
             bool,
             i64,
+            Option<String>,
         );
         let mut st = self
             .conn
@@ -350,6 +357,7 @@ impl<'c> Repo<'c> {
                 r.get(12)?,
                 r.get(13)?,
                 r.get(14)?,
+                r.get(15)?,
             ))
         })?;
         rows.map(|r| {
@@ -370,6 +378,7 @@ impl<'c> Repo<'c> {
                 branch: r.12,
                 needs_secrets: r.13,
                 tokens_used: u64::try_from(r.14).unwrap_or(0),
+                wildcard: r.15.as_deref().map(from_json).transpose()?,
             })
         })
         .collect()
@@ -571,96 +580,6 @@ impl<'c> Repo<'c> {
             )?;
         }
         Ok(())
-    }
-
-    // ---- subtasks ----
-
-    pub fn upsert_subtask(&self, s: &Subtask) -> Result<(), StoreError> {
-        self.conn.execute(
-            "INSERT INTO subtasks (id, ticket_id, position, text, done, done_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-             ON CONFLICT(id) DO UPDATE SET position = excluded.position, text = excluded.text, \
-             done = excluded.done, done_by = excluded.done_by",
-            params![s.id.to_string(), s.ticket_id.to_string(), s.position, s.text, s.done, opt_enum(&s.done_by)?],
-        )?;
-        Ok(())
-    }
-
-    pub fn subtasks(&self, ticket: TicketId) -> Result<Vec<Subtask>, StoreError> {
-        let mut st = self.conn.prepare(
-            "SELECT id, ticket_id, position, text, done, done_by FROM subtasks WHERE ticket_id = ?1 ORDER BY position",
-        )?;
-        let rows = st.query_map([ticket.to_string()], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, u32>(2)?,
-                r.get::<_, String>(3)?,
-                r.get::<_, bool>(4)?,
-                r.get::<_, Option<String>>(5)?,
-            ))
-        })?;
-        rows.map(|r| {
-            let r = r?;
-            Ok(Subtask {
-                id: parse(&r.0, "subtask id")?,
-                ticket_id: parse(&r.1, "ticket id")?,
-                position: r.2,
-                text: r.3,
-                done: r.4,
-                done_by: opt_enum_from(r.5)?,
-            })
-        })
-        .collect()
-    }
-
-    // ---- comments ----
-
-    pub fn upsert_comment(&self, c: &Comment) -> Result<(), StoreError> {
-        self.conn.execute(
-            "INSERT INTO comments (id, ticket_id, author_kind, kind, body_json, created_at, delivered_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT(id) DO UPDATE SET delivered_at = excluded.delivered_at",
-            params![
-                c.id.to_string(),
-                c.ticket_id.to_string(),
-                enum_str(&c.author)?,
-                enum_str(&c.kind)?,
-                json(&c.body)?,
-                c.created_at.0,
-                c.delivered_at.map(|t| t.0),
-            ],
-        )?;
-        Ok(())
-    }
-
-    pub fn comments(&self, ticket: TicketId) -> Result<Vec<Comment>, StoreError> {
-        let mut st = self.conn.prepare(
-            "SELECT id, ticket_id, author_kind, kind, body_json, created_at, delivered_at FROM comments \
-             WHERE ticket_id = ?1 ORDER BY created_at, rowid",
-        )?;
-        let rows = st.query_map([ticket.to_string()], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
-                r.get::<_, String>(4)?,
-                r.get::<_, i64>(5)?,
-                r.get::<_, Option<i64>>(6)?,
-            ))
-        })?;
-        rows.map(|r| {
-            let r = r?;
-            Ok(Comment {
-                id: parse::<CommentId>(&r.0, "comment id")?,
-                ticket_id: parse(&r.1, "ticket id")?,
-                author: enum_from(&r.2)?,
-                kind: enum_from(&r.3)?,
-                body: from_json(&r.4)?,
-                created_at: Timestamp(r.5),
-                delivered_at: r.6.map(Timestamp),
-            })
-        })
-        .collect()
     }
 
     // ---- events ----

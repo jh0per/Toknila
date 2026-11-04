@@ -97,6 +97,14 @@ impl ChainTx {
         self.view.tickets.push(t);
     }
 
+    /// Adds a wildcard card in Proposed; it stays outside the graph until a person approves it.
+    pub fn propose(&mut self, card: Ticket) -> Result<(), GraphError> {
+        self.view.propose(card.clone())?;
+        self.events
+            .push(DomainEvent::TicketProposed { ticket: card });
+        Ok(())
+    }
+
     /// Adds a new milestone to the chain.
     pub fn add_release(&mut self, r: Release) {
         self.events

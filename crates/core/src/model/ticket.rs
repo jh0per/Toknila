@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Actor, ChainId, ReviewMode, StatusReason, SubtaskId, TicketId, TicketKey, TicketStatus,
-    Timestamp,
+    Actor, ChainId, NodeRef, ReviewMode, StatusReason, SubtaskId, TicketId, TicketKey,
+    TicketStatus, Timestamp,
 };
 
 /// One unit of work for one ship.
@@ -32,6 +32,27 @@ pub struct Ticket {
     /// Copy depot secrets onto the ship at start.
     pub needs_secrets: bool,
     pub tokens_used: u64,
+    /// Set on a wildcard card (work nobody planned): where it came from and whether a person
+    /// approved it. It stays after the decision. Absent on planned tickets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wildcard: Option<Wildcard>,
+}
+
+/// The mark of a wildcard card: work found during the chain that waits for a person's approval
+/// before it joins the plan.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Wildcard {
+    /// The ticket during which the work was found.
+    pub from: Option<TicketKey>,
+    /// Who proposed it.
+    pub proposed_by: Actor,
+    /// Nodes it is to wait for; they become edges when it is approved.
+    pub after: Vec<NodeRef>,
+    /// Nodes that are to wait for it; they become edges when it is approved.
+    pub before: Vec<NodeRef>,
+    /// A person approved it, so it is part of the plan.
+    pub approved: bool,
 }
 
 /// What a person or a chain file gives for a new ticket; the rest is set by
@@ -72,7 +93,34 @@ impl Ticket {
             branch: None,
             needs_secrets: draft.needs_secrets,
             tokens_used: 0,
+            wildcard: None,
         }
+    }
+
+    /// A new wildcard card in Proposed: it waits for a person before it joins the plan.
+    pub fn new_proposed(
+        id: TicketId,
+        chain_id: ChainId,
+        key: TicketKey,
+        draft: TicketDraft,
+        wildcard: Wildcard,
+        now: Timestamp,
+    ) -> Self {
+        Self {
+            status: TicketStatus::Proposed,
+            status_reason: Some(StatusReason::Proposed),
+            wildcard: Some(Wildcard {
+                approved: false,
+                ..wildcard
+            }),
+            ..Self::new_backlog(id, chain_id, key, draft, now)
+        }
+    }
+
+    /// Part of the plan: a planned ticket, or a wildcard card a person approved. Only these
+    /// count in chain progress and go into chain files.
+    pub fn in_plan(&self) -> bool {
+        self.wildcard.as_ref().is_none_or(|w| w.approved)
     }
 }
 

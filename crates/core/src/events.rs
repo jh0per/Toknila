@@ -38,6 +38,21 @@ pub enum DomainEvent {
     TicketUpdated {
         ticket: Ticket,
     },
+    /// A wildcard card was proposed: a new ticket in Proposed, outside the plan.
+    TicketProposed {
+        ticket: Ticket,
+    },
+    /// A person let a wildcard card into the plan.
+    TicketApproved {
+        key: TicketKey,
+        ticket: Ticket,
+    },
+    /// A person turned a wildcard card down.
+    TicketRejected {
+        key: TicketKey,
+        reason: String,
+        ticket: Ticket,
+    },
     ReleaseCreated {
         release: Release,
     },
@@ -85,6 +100,25 @@ impl DomainEvent {
         }
     }
 
+    /// A person's decision on a wildcard card, when `before -> after` is one: it left Proposed.
+    pub fn wildcard_decided(before: &Ticket, after: &Ticket) -> Option<Self> {
+        if before.status != TicketStatus::Proposed || after.status == TicketStatus::Proposed {
+            return None;
+        }
+        let ticket = after.clone();
+        Some(match &after.status_reason {
+            Some(StatusReason::Cancelled { text }) => Self::TicketRejected {
+                key: after.key.clone(),
+                reason: text.clone(),
+                ticket,
+            },
+            _ => Self::TicketApproved {
+                key: after.key.clone(),
+                ticket,
+            },
+        })
+    }
+
     /// A milestone changed (its state, cut or release time).
     pub fn release_changed(before: &Release, after: &Release) -> Self {
         Self::ReleaseStateChanged {
@@ -105,7 +139,10 @@ impl DomainEvent {
             }
             Self::TicketCreated { .. }
             | Self::TicketStatusChanged { .. }
-            | Self::TicketUpdated { .. } => "ticket",
+            | Self::TicketUpdated { .. }
+            | Self::TicketProposed { .. }
+            | Self::TicketApproved { .. }
+            | Self::TicketRejected { .. } => "ticket",
             Self::ReleaseCreated { .. } | Self::ReleaseStateChanged { .. } => "release",
             Self::CommentAdded { .. } | Self::CommentDelivered { .. } => "comment",
             Self::SubtaskAdded { .. } | Self::SubtaskUpdated { .. } => "subtask",
@@ -120,7 +157,10 @@ impl DomainEvent {
             Self::EdgeAdded { edge } | Self::EdgeRemoved { edge } => edge.chain_id.to_string(),
             Self::TicketCreated { ticket }
             | Self::TicketStatusChanged { ticket, .. }
-            | Self::TicketUpdated { ticket } => ticket.id.to_string(),
+            | Self::TicketUpdated { ticket }
+            | Self::TicketProposed { ticket }
+            | Self::TicketApproved { ticket, .. }
+            | Self::TicketRejected { ticket, .. } => ticket.id.to_string(),
             Self::ReleaseCreated { release } | Self::ReleaseStateChanged { release, .. } => {
                 release.id.to_string()
             }
@@ -147,6 +187,9 @@ impl DomainEvent {
             Self::ReleaseStateChanged { .. } => "state_changed",
             Self::CommentAdded { .. } | Self::SubtaskAdded { .. } => "added",
             Self::CommentDelivered { .. } => "delivered",
+            Self::TicketProposed { .. } => "proposed",
+            Self::TicketApproved { .. } => "approved",
+            Self::TicketRejected { .. } => "rejected",
         }
     }
 }

@@ -7,6 +7,26 @@ use serde::{Deserialize, Serialize};
 
 use crate::{CommentBody, WaitingReason};
 
+/// A wildcard card as proposed: work nobody planned, found during a ticket. References are
+/// ticket keys, titles or release versions of the same chain.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Proposal {
+    pub title: String,
+    /// The task for whoever does it.
+    #[serde(default)]
+    pub prompt: String,
+    /// Acceptance criteria, one per entry.
+    #[serde(default)]
+    pub acceptance: Vec<String>,
+    /// Nodes the card waits for.
+    #[serde(default)]
+    pub after: Vec<String>,
+    /// Nodes that wait for the card; none of them may have started when it is approved.
+    #[serde(default)]
+    pub before: Vec<String>,
+}
+
 /// One report from the agent working on a ticket.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -28,6 +48,9 @@ pub enum AgentEvent {
     Finished { summary: String },
     /// The agent process died.
     Crashed { detail: String },
+    /// The agent found work nobody planned: a wildcard card on the ticket's chain, found during
+    /// this ticket, that waits for a person's approval. The answer is the new card.
+    Propose(Proposal),
 }
 
 impl AgentEvent {
@@ -94,6 +117,19 @@ mod tests {
                 },
                 r#"{"event":"crashed","detail":"exit 101"}"#,
             ),
+            (
+                AgentEvent::Propose(Proposal {
+                    title: "token refresh".into(),
+                    prompt: "add the endpoint".into(),
+                    acceptance: vec!["401 refreshes".into()],
+                    after: vec!["DEMO-1".into()],
+                    before: vec!["DEMO-2".into()],
+                }),
+                concat!(
+                    r#"{"event":"propose","title":"token refresh","prompt":"add the endpoint","#,
+                    r#""acceptance":["401 refreshes"],"after":["DEMO-1"],"before":["DEMO-2"]}"#
+                ),
+            ),
         ];
         for (event, json) in cases {
             assert_eq!(serde_json::to_string(&event).expect("serialize"), json);
@@ -111,6 +147,16 @@ mod tests {
                 permission: false
             },
             "permission defaults to false"
+        );
+        let propose: AgentEvent =
+            serde_json::from_str(r#"{"event":"propose","title":"x"}"#).expect("parse");
+        assert_eq!(
+            propose,
+            AgentEvent::Propose(Proposal {
+                title: "x".into(),
+                ..Proposal::default()
+            }),
+            "only the title is required"
         );
     }
 }
