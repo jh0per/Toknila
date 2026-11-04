@@ -147,11 +147,14 @@ pub struct ChainSummary {
     pub next_release: Option<NextRelease>,
 }
 
+mod journal;
 mod order;
 mod release;
 mod settle;
 mod summary;
 mod validate;
+
+pub use journal::Settled;
 
 impl ChainView {
     /// Human label of a node: ticket key or `release <version>`.

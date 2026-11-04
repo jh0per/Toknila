@@ -115,17 +115,19 @@ impl ChainView {
         Ok(())
     }
 
-    /// Applies [`Self::next_actions`] until there are none. Returns every applied step.
-    pub fn settle(&mut self, now: Timestamp) -> Result<Vec<Applied>, GraphError> {
-        let mut log = Vec::new();
+    /// Applies [`Self::next_actions`] until there are none. Returns every applied step and the
+    /// events each one caused.
+    pub fn settle(&mut self, now: Timestamp) -> Result<Settled, GraphError> {
+        let mut out = Settled::default();
         loop {
             let Some(action) = self.next_actions().into_iter().next() else {
-                return Ok(log);
+                return Ok(out);
             };
-            let effects = self.apply_action(&action, now)?;
-            log.push(Applied { action, effects });
-            if log.len() >= MAX_SETTLE_STEPS {
-                return Err(GraphError::NoFixpoint(log.len()));
+            let (effects, events) = self.record(|v| v.apply_action(&action, now))?;
+            out.events.extend(events);
+            out.applied.push(Applied { action, effects });
+            if out.applied.len() >= MAX_SETTLE_STEPS {
+                return Err(GraphError::NoFixpoint(out.applied.len()));
             }
         }
     }

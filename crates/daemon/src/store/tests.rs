@@ -114,7 +114,7 @@ async fn write_commits_state_and_events_together() {
     let ((), events) = store
         .write(Actor::Human, NOW, move |tx| -> Result<(), StoreError> {
             tx.repo().insert_project(&p)?;
-            tx.emit("project", p.id, "created", &p)?;
+            tx.emit(&toknila_core::events::DomainEvent::ProjectCreated { project: p.clone() })?;
             Ok(())
         })
         .await
@@ -135,7 +135,7 @@ async fn failed_command_leaves_no_half_changes() {
     let err = store
         .write(Actor::Human, NOW, move |tx| -> Result<(), StoreError> {
             tx.repo().insert_project(&p)?;
-            tx.emit("project", p.id, "created", &p)?;
+            tx.emit(&toknila_core::events::DomainEvent::ProjectCreated { project: p.clone() })?;
             Err(StoreError::Corrupt("refused halfway".into()))
         })
         .await;
@@ -177,7 +177,7 @@ async fn event_seq_is_increasing_and_resumable() {
     for i in 0..5 {
         store
             .write(Actor::System, Timestamp(i), move |tx| {
-                tx.emit("test", i, "tick", serde_json::json!({ "i": i }))
+                tx.append("test", i, "tick", serde_json::json!({ "i": i }))
             })
             .await
             .expect("write");
