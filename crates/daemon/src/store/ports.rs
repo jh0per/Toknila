@@ -1,0 +1,87 @@
+//! The SQLite store as the application's ports.
+
+use serde_json::Value;
+use toknila_app::{AppError, AppResult, Reader, UnitOfWork};
+use toknila_core::events::DomainEvent;
+use toknila_core::graph::ChainView;
+use toknila_core::{
+    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Subtask, Ticket,
+    TicketId, TicketKey, Timestamp,
+};
+
+use super::{Repo, StoreError, WriteTx};
+
+impl From<StoreError> for AppError {
+    fn from(e: StoreError) -> Self {
+        if let StoreError::Sqlite(rusqlite::Error::SqliteFailure(f, msg)) = &e
+            && f.code == rusqlite::ErrorCode::ConstraintViolation
+        {
+            return AppError::conflict(format!(
+                "already exists: {}",
+                msg.as_deref().unwrap_or("constraint violation")
+            ));
+        }
+        tracing::error!(error = %e, "store error");
+        AppError::internal(e.to_string())
+    }
+}
+
+/// Implements [`Reader`] for the repository and the write transaction from one method list.
+macro_rules! reader {
+    ($($name:ident($($arg:ident: $ty:ty),*) -> $out:ty;)*) => {
+        impl Reader for Repo<'_> {
+            $(fn $name(&self, $($arg: $ty),*) -> AppResult<$out> {
+                Ok(Repo::$name(self, $($arg),*)?)
+            })*
+        }
+
+        impl Reader for WriteTx<'_> {
+            $(fn $name(&self, $($arg: $ty),*) -> AppResult<$out> {
+                Ok(Repo::$name(&self.repo(), $($arg),*)?)
+            })*
+        }
+    };
+}
+
+reader! {
+    project(id: ProjectId) -> Option<Project>;
+    project_by_key(key: &str) -> Option<Project>;
+    chain(id: ChainId) -> Option<Chain>;
+    chains(project: Option<ProjectId>) -> Vec<Chain>;
+    chains_named(name: &str) -> Vec<Chain>;
+    ticket(id: TicketId) -> Option<Ticket>;
+    ticket_by_key(key: &TicketKey) -> Option<Ticket>;
+    tickets(chain: Option<ChainId>) -> Vec<Ticket>;
+    release(id: ReleaseId) -> Option<Release>;
+    releases_by_version(version: &str) -> Vec<Release>;
+    chain_view(chain: ChainId) -> Option<ChainView>;
+    subtasks(ticket: TicketId) -> Vec<Subtask>;
+    comments(ticket: TicketId) -> Vec<Comment>;
+    last_event_payload(entity: &str, entity_id: &str) -> Option<Value>;
+}
+
+impl UnitOfWork for WriteTx<'_> {
+    fn now(&self) -> Timestamp {
+        WriteTx::now(self)
+    }
+
+    fn actor(&self) -> Actor {
+        WriteTx::actor(self)
+    }
+
+    fn save_chain_view(&mut self, view: &ChainView) -> AppResult<()> {
+        Ok(self.repo().save_chain_view(view)?)
+    }
+
+    fn upsert_comment(&mut self, comment: &Comment) -> AppResult<()> {
+        Ok(self.repo().upsert_comment(comment)?)
+    }
+
+    fn upsert_subtask(&mut self, subtask: &Subtask) -> AppResult<()> {
+        Ok(self.repo().upsert_subtask(subtask)?)
+    }
+
+    fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {
+        Ok(WriteTx::emit(self, event)?)
+    }
+}

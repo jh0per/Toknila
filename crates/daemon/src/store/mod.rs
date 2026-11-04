@@ -5,6 +5,7 @@
 //! events are then published to subscribers (the WebSocket stream).
 
 mod codec;
+mod ports;
 mod schema;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};

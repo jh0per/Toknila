@@ -1,0 +1,20 @@
+[package]
+name = "toknila-app"
+description = "Toknila use cases over ports: the chain unit of work, reference resolution, agent events, recovery."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Guarded by `cargo xtask verify`: no storage, transport or async runtime here. Adapters
+# (the daemon) implement the ports in `ports.rs`.
+[dependencies]
+toknila-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
