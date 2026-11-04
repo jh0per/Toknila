@@ -8,12 +8,12 @@ use serde_json::json;
 use toknila_core::graph::ChainView;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    Actor, BlockedReason, Chain, ChainId, CommentKind, Edge, EdgeKind, Project, ProjectId, Release,
-    ReleaseChannel, ReleaseId, ReleaseState, ReviewMode, StartMode, Ticket, TicketId, TicketKey,
-    TicketStatus, Timestamp,
+    Actor, AgentProfile, BlockedReason, Chain, ChainId, CommentKind, Edge, EdgeKind, Project,
+    ProjectId, Release, ReleaseId, Ticket, TicketDraft, TicketId, TicketKey, TicketStatus,
+    Timestamp,
 };
 
-use super::commands::{self, SIM_PROFILE, with_chain};
+use super::commands::{self, with_chain};
 use super::dto::*;
 use super::error::{ApiError, ErrorBody};
 use crate::server::{AppState, now};
@@ -98,12 +98,16 @@ pub async fn create_project(
         name: input.name.unwrap_or_else(|| input.key.clone()),
         key,
         repo_path: input.repo_path,
-        work_branch: input.work_branch.unwrap_or_else(|| "develop".to_owned()),
-        release_branch: input.release_branch.unwrap_or_else(|| "main".to_owned()),
+        work_branch: input
+            .work_branch
+            .unwrap_or_else(|| Project::DEFAULT_WORK_BRANCH.to_owned()),
+        release_branch: input
+            .release_branch
+            .unwrap_or_else(|| Project::DEFAULT_RELEASE_BRANCH.to_owned()),
         default_profile: input
             .default_profile
-            .unwrap_or_else(|| SIM_PROFILE.to_owned()),
-        default_review_mode: input.default_review_mode.unwrap_or(ReviewMode::Human),
+            .unwrap_or_else(|| AgentProfile::SIM.to_owned()),
+        default_review_mode: input.default_review_mode.unwrap_or_default(),
     };
     let (p, _) = state
         .store
@@ -154,7 +158,7 @@ pub async fn create_chain(
                 project_id: p.id,
                 name: input.name.trim().to_owned(),
                 goal: input.goal.unwrap_or_default(),
-                autostart: input.autostart.unwrap_or(true),
+                autostart: input.autostart.unwrap_or(Chain::DEFAULT_AUTOSTART),
                 review_mode: input.review_mode,
             };
             tx.repo().insert_chain(&c)?;
@@ -357,17 +361,13 @@ pub async fn create_release(
                 input.version
             )));
         }
-        let r = Release {
-            id: ReleaseId::new(),
-            chain_id: ctx.view.chain.id,
-            version: input.version.trim().to_owned(),
-            channel: input.channel.unwrap_or(ReleaseChannel::TagOnly),
-            start_mode: input.start_mode.unwrap_or(StartMode::Manual),
-            state: ReleaseState::Planned,
-            branch: None,
-            cut_at: None,
-            released_at: None,
-        };
+        let r = Release::planned(
+            ReleaseId::new(),
+            ctx.view.chain.id,
+            input.version.trim().to_owned(),
+            input.channel.unwrap_or_default(),
+            input.start_mode.unwrap_or_default(),
+        );
         let node = toknila_core::NodeRef::Release(r.id);
         ctx.add_release(r);
         let chain_id = ctx.view.chain.id;
@@ -436,23 +436,16 @@ pub async fn create_ticket(
             let number = tx.repo().take_ticket_number(project.id)?;
             let key = TicketKey::new(project.key.clone(), number)
                 .map_err(|e| ApiError::bad_request(e.to_string()))?;
-            let t = Ticket {
-                id: TicketId::new(),
-                chain_id: c.id,
-                key,
+            let draft = TicketDraft {
                 title: input.title.trim().to_owned(),
                 prompt: input.prompt,
                 acceptance: input.acceptance,
-                status: TicketStatus::Backlog,
-                status_reason: None,
-                status_since: at,
                 paused: input.paused,
                 profile: input.profile,
                 review_mode: input.review_mode,
-                branch: None,
                 needs_secrets: input.needs_secrets,
-                tokens_used: 0,
             };
+            let t = Ticket::new_backlog(TicketId::new(), c.id, key, draft, at);
             let id = t.id;
             let after = input.after;
             let subtasks = input.subtasks;

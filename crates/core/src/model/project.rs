@@ -4,10 +4,11 @@ use super::{ProjectId, ProjectKey};
 
 /// Who reviews a finished ticket before it merges.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewMode {
-    /// A person reviews the diff.
+    /// A person reviews the diff. The default.
+    #[default]
     Human,
     /// A reviewer agent reviews the diff.
     Agent,
@@ -30,4 +31,11 @@ pub struct Project {
     pub release_branch: String,
     pub default_profile: String,
     pub default_review_mode: ReviewMode,
+}
+
+impl Project {
+    /// Work branch of a project that does not name one.
+    pub const DEFAULT_WORK_BRANCH: &str = "develop";
+    /// Release branch of a project that does not name one.
+    pub const DEFAULT_RELEASE_BRANCH: &str = "main";
 }

@@ -4,11 +4,13 @@
 //! The daemon owns persistence and transport; core owns meaning.
 
 pub mod agent;
+pub mod dag;
 pub mod graph;
 pub mod machine;
 pub mod model;
 pub mod plan;
 pub mod template;
+pub mod wire;
 
 pub use model::*;
 

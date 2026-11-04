@@ -12,6 +12,7 @@
 //! English; the Ukrainian labels from the project brief (`інструкція`, `**Що:**`, ...) are
 //! accepted on parse so hand-written comments work in either language.
 
+use crate::wire::wire_name;
 use crate::{CommentBody, CommentKind};
 
 /// Why a markdown comment could not be read. `line` is 1-based.
@@ -93,14 +94,6 @@ impl Field {
     }
 }
 
-fn kind_word(kind: CommentKind) -> &'static str {
-    match kind {
-        CommentKind::Instruction => "instruction",
-        CommentKind::Report => "report",
-        CommentKind::Decision => "decision",
-    }
-}
-
 fn kind_from_word(word: &str) -> Option<CommentKind> {
     match word.trim().to_lowercase().as_str() {
         "instruction" | "інструкція" => Some(CommentKind::Instruction),
@@ -137,7 +130,11 @@ fn clean_value(value: &str) -> String {
 /// Renders a comment as markdown in the template shape.
 pub fn render(kind: CommentKind, body: &CommentBody) -> String {
     let body = normalize(body);
-    let mut out = format!("# [{}] {}\n", kind_word(kind), body.gist);
+    let mut out = format!(
+        "# [{}] {}\n",
+        wire_name(&kind).unwrap_or_default(),
+        body.gist
+    );
     for field in Field::ALL {
         if let Some(value) = field.get(&body) {
             out.push('\n');

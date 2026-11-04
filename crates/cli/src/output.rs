@@ -1,6 +1,7 @@
 //! Human output: tables and one-line summaries. `--json` bypasses all of this.
 
 use serde_json::Value;
+use toknila_core::StatusReason;
 
 /// `90_000` ms -> `1m30s`.
 pub fn duration(ms: u64) -> String {
@@ -13,39 +14,11 @@ pub fn duration(ms: u64) -> String {
     }
 }
 
-/// Reason of a Waiting/Blocked/Cancelled status in a few words.
+/// Reason of a Waiting/Blocked/Cancelled status in a few words; empty when there is none.
 pub fn reason(r: &Value) -> String {
-    if r.is_null() {
-        return String::new();
-    }
-    let text = |v: &Value| {
-        v["text"]
-            .as_str()
-            .or(v["detail"].as_str())
-            .unwrap_or("")
-            .to_owned()
-    };
-    match r["status"].as_str() {
-        Some("waiting") => match r["kind"].as_str() {
-            Some("silent") => "silent".to_owned(),
-            Some(kind) => format!("{kind}: {}", text(r)),
-            None => String::new(),
-        },
-        Some("blocked") => {
-            let inner = &r["reason"];
-            match inner["kind"].as_str() {
-                Some("dependency_reopened") => format!(
-                    "dependency {} reopened",
-                    inner["dependency"].as_str().unwrap_or("?")
-                ),
-                Some("runner_lost") => "runner lost".to_owned(),
-                Some(kind) => format!("{kind}: {}", text(inner)),
-                None => String::new(),
-            }
-        }
-        Some("cancelled") => format!("cancelled: {}", text(r)),
-        _ => String::new(),
-    }
+    serde_json::from_value::<StatusReason>(r.clone())
+        .map(|r| r.to_string())
+        .unwrap_or_default()
 }
 
 /// Prints rows as left-aligned columns.

@@ -58,12 +58,10 @@ pub(crate) const MAX_LINES: usize = 400;
 /// Files over [`MAX_LINES`] when the guard was introduced, with their size then. Each may only
 /// shrink; once a file is at or under the limit its entry must go (the guard says so).
 const OVERSIZED: &[(&str, usize)] = &[
-    ("crates/daemon/src/api/handlers.rs", 835),
-    ("crates/daemon/src/store/codec.rs", 731),
-    ("crates/core/src/graph.rs", 654),
+    ("crates/daemon/src/api/handlers.rs", 828),
+    ("crates/daemon/src/store/codec.rs", 728),
     ("crates/cli/src/commands.rs", 602),
-    ("crates/core/src/plan.rs", 566),
-    ("crates/daemon/src/api/commands.rs", 492),
+    ("crates/daemon/src/api/commands.rs", 490),
 ];
 
 /// Source trees the size ratchet covers, relative to the repository root.

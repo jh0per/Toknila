@@ -1,0 +1,132 @@
+//! Driving the chain forward: next actions, applying them, settling to a fixpoint.
+
+use super::*;
+
+const MAX_SETTLE_STEPS: usize = 10_000;
+
+impl ChainView {
+    /// What should happen now, in graph order. Empty when the chain is settled.
+    pub fn next_actions(&self) -> Vec<Action> {
+        let mut actions = Vec::new();
+        for node in self.topo_order() {
+            match node {
+                NodeRef::Ticket(id) => {
+                    let Some(t) = self.ticket(id) else { continue };
+                    let deps_ok = self.unsatisfied_deps(node).is_empty();
+                    match t.status {
+                        TicketStatus::Backlog if deps_ok && !t.paused => {
+                            actions.push(Action::Ticket {
+                                ticket: id,
+                                event: TicketEvent::DepsSatisfied,
+                            })
+                        }
+                        TicketStatus::Ready if !deps_ok => actions.push(Action::Ticket {
+                            ticket: id,
+                            event: TicketEvent::DepsUnsatisfied,
+                        }),
+                        TicketStatus::Ready if self.chain.autostart => {
+                            actions.push(Action::Ticket {
+                                ticket: id,
+                                event: TicketEvent::Start,
+                            })
+                        }
+                        _ => {}
+                    }
+                }
+                NodeRef::Release(id) => {
+                    let Some(r) = self.release(id) else { continue };
+                    if r.state == ReleaseState::Planned
+                        && r.start_mode == StartMode::Auto
+                        && self.unsatisfied_deps(node).is_empty()
+                    {
+                        actions.push(Action::CutRelease { release: id });
+                    }
+                }
+            }
+        }
+        actions
+    }
+
+    /// Applies one action. Ticket events go through the state machine.
+    pub fn apply_action(
+        &mut self,
+        action: &Action,
+        now: Timestamp,
+    ) -> Result<Vec<Effect>, GraphError> {
+        match action {
+            Action::Ticket { ticket, event } => self.apply_ticket_event(*ticket, event, now),
+            Action::CutRelease { release } => {
+                self.cut_release(*release, now)?;
+                Ok(Vec::new())
+            }
+        }
+    }
+
+    /// Applies an event to one ticket and then lets the graph react to its effects
+    /// (a reopened dependency blocks running dependents and sends Ready ones back).
+    pub fn apply_ticket_event(
+        &mut self,
+        ticket: TicketId,
+        event: &TicketEvent,
+        now: Timestamp,
+    ) -> Result<Vec<Effect>, GraphError> {
+        let idx = self
+            .tickets
+            .iter()
+            .position(|t| t.id == ticket)
+            .ok_or(GraphError::UnknownTicket(ticket))?;
+        let tr = machine::apply(&self.tickets[idx], event, now)?;
+        let key = tr.ticket.key.clone();
+        self.tickets[idx] = tr.ticket;
+        if tr.effects.contains(&Effect::DependencyReopened) {
+            self.reopen_dependents(ticket, &key, now)?;
+        }
+        Ok(tr.effects)
+    }
+
+    fn reopen_dependents(
+        &mut self,
+        ticket: TicketId,
+        key: &TicketKey,
+        now: Timestamp,
+    ) -> Result<(), GraphError> {
+        let dependents: Vec<TicketId> = self
+            .edges
+            .iter()
+            .filter(|e| e.from == NodeRef::Ticket(ticket))
+            .filter_map(|e| match e.to {
+                NodeRef::Ticket(id) => Some(id),
+                NodeRef::Release(_) => None,
+            })
+            .collect();
+        for id in dependents {
+            let Some(t) = self.ticket(id) else { continue };
+            let event = match t.status {
+                TicketStatus::Running | TicketStatus::Waiting => TicketEvent::Block {
+                    reason: BlockedReason::DependencyReopened {
+                        dependency: key.clone(),
+                    },
+                },
+                TicketStatus::Ready => TicketEvent::DepsUnsatisfied,
+                _ => continue,
+            };
+            self.apply_ticket_event(id, &event, now)?;
+        }
+        Ok(())
+    }
+
+    /// Applies [`Self::next_actions`] until there are none. Returns every applied step.
+    pub fn settle(&mut self, now: Timestamp) -> Result<Vec<Applied>, GraphError> {
+        let mut log = Vec::new();
+        loop {
+            let Some(action) = self.next_actions().into_iter().next() else {
+                return Ok(log);
+            };
+            let effects = self.apply_action(&action, now)?;
+            log.push(Applied { action, effects });
+            if log.len() >= MAX_SETTLE_STEPS {
+                return Err(GraphError::NoFixpoint(log.len()));
+            }
+        }
+    }
+}

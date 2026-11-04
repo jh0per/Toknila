@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use super::TicketKey;
@@ -62,6 +64,11 @@ impl TicketStatus {
         }
     }
 
+    /// Done for its dependents: in the work branch (Merged, Released) or dropped (Cancelled).
+    pub fn is_done(self) -> bool {
+        matches!(self, Self::Merged | Self::Released | Self::Cancelled)
+    }
+
     /// Statuses where the chain is waiting on a person (shown as "needs a human").
     pub fn needs_human(self) -> bool {
         matches!(self, Self::Waiting | Self::Blocked | Self::Review)
@@ -117,6 +124,41 @@ pub enum StatusReason {
     },
 }
 
+impl fmt::Display for WaitingReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Question { text } => write!(f, "question: {text}"),
+            Self::Permission { text } => write!(f, "permission: {text}"),
+            Self::Silent => f.write_str("silent"),
+        }
+    }
+}
+
+impl fmt::Display for BlockedReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Manual { text } => write!(f, "manual: {text}"),
+            Self::Crashed { detail } => write!(f, "crashed: {detail}"),
+            Self::DependencyReopened { dependency } => {
+                write!(f, "dependency {dependency} reopened")
+            }
+            Self::MergeConflict { detail } => write!(f, "merge_conflict: {detail}"),
+            Self::RunnerLost => f.write_str("runner lost"),
+        }
+    }
+}
+
+/// The reason in a few words, as the CLI shows it (`question: which framework?`).
+impl fmt::Display for StatusReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Waiting(w) => w.fmt(f),
+            Self::Blocked { reason, .. } => reason.fmt(f),
+            Self::Cancelled { text } => write!(f, "cancelled: {text}"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,6 +171,75 @@ mod tests {
         ];
         let actual: Vec<_> = TicketStatus::ALL.iter().map(|s| s.category()).collect();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn done_means_merged_released_or_cancelled() {
+        let done: Vec<_> = TicketStatus::ALL
+            .into_iter()
+            .filter(|s| s.is_done())
+            .collect();
+        assert_eq!(
+            done,
+            [
+                TicketStatus::Merged,
+                TicketStatus::Released,
+                TicketStatus::Cancelled
+            ]
+        );
+    }
+
+    #[test]
+    fn reasons_read_in_a_few_words() {
+        let blocked = |reason| StatusReason::Blocked {
+            reason,
+            resume_to: TicketStatus::Running,
+            waiting: None,
+        };
+        let dep: TicketKey = "DEMO-2".parse().expect("key");
+        let cases = [
+            (
+                StatusReason::Waiting(WaitingReason::Question {
+                    text: "which?".into(),
+                }),
+                "question: which?",
+            ),
+            (
+                StatusReason::Waiting(WaitingReason::Permission { text: "rm".into() }),
+                "permission: rm",
+            ),
+            (StatusReason::Waiting(WaitingReason::Silent), "silent"),
+            (
+                blocked(BlockedReason::Manual {
+                    text: "wait".into(),
+                }),
+                "manual: wait",
+            ),
+            (
+                blocked(BlockedReason::Crashed {
+                    detail: "exit 1".into(),
+                }),
+                "crashed: exit 1",
+            ),
+            (
+                blocked(BlockedReason::DependencyReopened { dependency: dep }),
+                "dependency DEMO-2 reopened",
+            ),
+            (
+                blocked(BlockedReason::MergeConflict {
+                    detail: "a.rs".into(),
+                }),
+                "merge_conflict: a.rs",
+            ),
+            (blocked(BlockedReason::RunnerLost), "runner lost"),
+            (
+                StatusReason::Cancelled { text: "dup".into() },
+                "cancelled: dup",
+            ),
+        ];
+        for (reason, text) in cases {
+            assert_eq!(reason.to_string(), text);
+        }
     }
 
     #[test]
