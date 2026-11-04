@@ -1,7 +1,10 @@
 //! Human output: tables and one-line summaries. `--json` bypasses all of this.
 
+use serde::Serialize;
 use serde_json::Value;
-use toknila_core::StatusReason;
+use toknila_api_types::{ChainDetail, EventRecord, TicketDetail, TicketItem};
+use toknila_core::wire::wire_name;
+use toknila_core::{Actor, CommentKind, NodeRef, StatusReason};
 
 /// `90_000` ms -> `1m30s`.
 pub fn duration(ms: u64) -> String {
@@ -15,10 +18,21 @@ pub fn duration(ms: u64) -> String {
 }
 
 /// Reason of a Waiting/Blocked/Cancelled status in a few words; empty when there is none.
-pub fn reason(r: &Value) -> String {
-    serde_json::from_value::<StatusReason>(r.clone())
-        .map(|r| r.to_string())
-        .unwrap_or_default()
+pub fn reason(r: Option<&StatusReason>) -> String {
+    r.map(ToString::to_string).unwrap_or_default()
+}
+
+/// ` (reason)`, or nothing.
+fn in_parens(r: Option<&StatusReason>) -> String {
+    match reason(r) {
+        r if r.is_empty() => r,
+        r => format!(" ({r})"),
+    }
+}
+
+/// The wire name of an enum value (`running`, `tag_only`).
+pub fn w<T: Serialize>(v: &T) -> String {
+    wire_name(v).unwrap_or_default()
 }
 
 /// Prints rows as left-aligned columns.
@@ -31,7 +45,7 @@ pub fn table(header: &[&str], rows: &[Vec<String>]) {
             }
         }
     }
-    let line = |cells: Vec<String>| {
+    let line = |cells: &[String]| {
         let parts: Vec<String> = cells
             .iter()
             .enumerate()
@@ -45,31 +59,40 @@ pub fn table(header: &[&str], rows: &[Vec<String>]) {
             .collect();
         println!("{}", parts.join("  ").trim_end());
     };
-    line(header.iter().map(|h| (*h).to_owned()).collect());
+    line(&header.iter().map(|h| (*h).to_owned()).collect::<Vec<_>>());
     for row in rows {
-        line(row.clone());
+        line(row);
     }
 }
 
+/// `KEY status (reason)`: the answer of ticket actions and agent events.
+pub fn ticket_line(d: &TicketDetail) {
+    let t = &d.ticket;
+    println!(
+        "{} {}{}",
+        t.key,
+        w(&t.status),
+        in_parens(t.status_reason.as_ref())
+    );
+}
+
 /// `tok ls` rows from `GET /v1/tickets`.
-pub fn tickets(items: &Value) {
+pub fn tickets(items: &[TicketItem]) {
     let rows: Vec<Vec<String>> = items
-        .as_array()
-        .into_iter()
-        .flatten()
+        .iter()
         .map(|it| {
-            let t = &it["ticket"];
-            let mut status = t["status"].as_str().unwrap_or("").to_owned();
-            if t["paused"].as_bool() == Some(true) {
+            let t = &it.ticket;
+            let mut status = w(&t.status);
+            if t.paused {
                 status.push_str(" (paused)");
             }
             vec![
-                t["key"].as_str().unwrap_or("").to_owned(),
+                t.key.to_string(),
                 status,
-                duration(it["in_status_ms"].as_u64().unwrap_or(0)),
-                it["chain"].as_str().unwrap_or("").to_owned(),
-                t["title"].as_str().unwrap_or("").to_owned(),
-                reason(&t["status_reason"]),
+                duration(it.in_status_ms),
+                it.chain.clone(),
+                t.title.clone(),
+                reason(t.status_reason.as_ref()),
             ]
         })
         .collect();
@@ -77,245 +100,185 @@ pub fn tickets(items: &Value) {
 }
 
 /// `tok chain show` from `GET /v1/chains/{chain}`.
-pub fn chain(d: &Value) {
-    let c = &d["chain"];
-    let s = &d["summary"];
+pub fn chain(d: &ChainDetail) {
+    let s = &d.summary;
     println!(
         "{}  {}  done {}/{}  released {}{}",
-        c["name"].as_str().unwrap_or(""),
-        s["status"].as_str().unwrap_or(""),
-        s["done"],
-        s["total"],
-        s["released"],
-        if c["autostart"].as_bool() == Some(false) {
-            "  (autostart off)"
-        } else {
+        d.chain.name,
+        w(&s.status),
+        s.done,
+        s.total,
+        s.released,
+        if d.chain.autostart {
             ""
+        } else {
+            "  (autostart off)"
         }
     );
-    let stop = &s["stopped_at"];
-    if !stop.is_null() {
+    if let Some(stop) = &s.stopped_at {
+        let r = match reason(stop.reason.as_ref()) {
+            r if r.is_empty() => r,
+            r => format!(": {r}"),
+        };
         println!(
-            "stopped at {} ({} for {}{})",
-            stop["ticket"].as_str().unwrap_or(""),
-            stop["status"].as_str().unwrap_or(""),
-            duration(stop["waiting_ms"].as_u64().unwrap_or(0)),
-            match reason(&stop["reason"]) {
-                r if r.is_empty() => String::new(),
-                r => format!(": {r}"),
-            }
+            "stopped at {} ({} for {}{r})",
+            stop.ticket,
+            w(&stop.status),
+            duration(stop.waiting_ms),
         );
     }
-    let next = &s["next_release"];
-    if !next.is_null() {
+    if let Some(next) = &s.next_release {
         println!(
             "next release {} ({}, {})",
-            next["version"].as_str().unwrap_or(""),
-            next["state"].as_str().unwrap_or(""),
-            next["channel"].as_str().unwrap_or("")
+            next.version,
+            w(&next.state),
+            w(&next.channel)
         );
     }
-    let deps = |id: &Value| -> String {
-        d["edges"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|e| e["to"]["id"] == *id)
-            .map(|e| node_label(d, &e["from"]))
+    let deps = |n: NodeRef| -> String {
+        d.edges
+            .iter()
+            .filter(|e| e.to == n)
+            .map(|e| node_label(d, e.from))
             .collect::<Vec<_>>()
             .join(", ")
     };
-    let mut rows = Vec::new();
-    for n in d["order"].as_array().into_iter().flatten() {
-        let id = &n["id"];
-        match n["kind"].as_str() {
-            Some("ticket") => {
-                if let Some(t) = d["tickets"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .find(|t| t["id"] == *id)
-                {
-                    rows.push(vec![
-                        t["key"].as_str().unwrap_or("").to_owned(),
-                        t["status"].as_str().unwrap_or("").to_owned(),
-                        t["title"].as_str().unwrap_or("").to_owned(),
-                        deps(id),
-                        reason(&t["status_reason"]),
-                    ]);
-                }
-            }
-            Some("release") => {
-                if let Some(r) = d["releases"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .find(|r| r["id"] == *id)
-                {
-                    rows.push(vec![
-                        format!("<> {}", r["version"].as_str().unwrap_or("")),
-                        r["state"].as_str().unwrap_or("").to_owned(),
-                        format!(
-                            "release, {}, {}",
-                            r["channel"].as_str().unwrap_or(""),
-                            r["start_mode"].as_str().unwrap_or("")
-                        ),
-                        deps(id),
-                        String::new(),
-                    ]);
-                }
-            }
-            _ => {}
-        }
-    }
+    let rows: Vec<Vec<String>> = d
+        .order
+        .iter()
+        .filter_map(|&n| match n {
+            NodeRef::Ticket(id) => d.tickets.iter().find(|t| t.id == id).map(|t| {
+                vec![
+                    t.key.to_string(),
+                    w(&t.status),
+                    t.title.clone(),
+                    deps(n),
+                    reason(t.status_reason.as_ref()),
+                ]
+            }),
+            NodeRef::Release(id) => d.releases.iter().find(|r| r.id == id).map(|r| {
+                vec![
+                    format!("<> {}", r.version),
+                    w(&r.state),
+                    format!("release, {}, {}", w(&r.channel), w(&r.start_mode)),
+                    deps(n),
+                    String::new(),
+                ]
+            }),
+        })
+        .collect();
     table(&["NODE", "STATUS", "TITLE", "AFTER", "REASON"], &rows);
 }
 
-fn node_label(d: &Value, node: &Value) -> String {
-    let id = &node["id"];
-    match node["kind"].as_str() {
-        Some("ticket") => d["tickets"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|t| t["id"] == *id)
-            .and_then(|t| t["key"].as_str())
-            .unwrap_or("?")
-            .to_owned(),
-        _ => d["releases"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|r| r["id"] == *id)
-            .and_then(|r| r["version"].as_str())
-            .unwrap_or("?")
-            .to_owned(),
-    }
+fn node_label(d: &ChainDetail, node: NodeRef) -> String {
+    let label = match node {
+        NodeRef::Ticket(id) => d
+            .tickets
+            .iter()
+            .find(|t| t.id == id)
+            .map(|t| t.key.to_string()),
+        NodeRef::Release(id) => d
+            .releases
+            .iter()
+            .find(|r| r.id == id)
+            .map(|r| r.version.clone()),
+    };
+    label.unwrap_or_else(|| "?".to_owned())
 }
 
 /// `tok show` from `GET /v1/tickets/{ticket}`.
-pub fn ticket(d: &Value) {
-    let t = &d["ticket"];
+pub fn ticket(d: &TicketDetail) {
+    let t = &d.ticket;
     println!(
         "{}  {}  [{}] for {}",
-        t["key"].as_str().unwrap_or(""),
-        t["title"].as_str().unwrap_or(""),
-        t["status"].as_str().unwrap_or(""),
-        duration(d["in_status_ms"].as_u64().unwrap_or(0))
+        t.key,
+        t.title,
+        w(&t.status),
+        duration(d.in_status_ms)
     );
-    let r = reason(&t["status_reason"]);
+    let r = reason(t.status_reason.as_ref());
     if !r.is_empty() {
         println!("reason: {r}");
     }
     println!(
         "chain: {}  profile: {}",
-        d["chain"].as_str().unwrap_or(""),
-        t["profile"].as_str().unwrap_or("(project default)")
+        d.chain,
+        t.profile.as_deref().unwrap_or("(project default)")
     );
-    if let Some(p) = t["prompt"].as_str().filter(|p| !p.is_empty()) {
-        println!("\n{p}");
+    if !t.prompt.is_empty() {
+        println!("\n{}", t.prompt);
     }
-    let acc: Vec<&str> = t["acceptance"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .collect();
-    if !acc.is_empty() {
+    if !t.acceptance.is_empty() {
         println!("\nacceptance:");
-        for a in acc {
+        for a in &t.acceptance {
             println!("  - {a}");
         }
     }
-    let subs = d["subtasks"].as_array().cloned().unwrap_or_default();
-    if !subs.is_empty() {
+    if !d.subtasks.is_empty() {
         println!("\nsubtasks:");
-        for s in subs {
-            let by = s["done_by"]
-                .as_str()
-                .map(|b| format!(" (by {b})"))
+        for s in &d.subtasks {
+            let by = s
+                .done_by
+                .map(|b| format!(" (by {})", w(&b)))
                 .unwrap_or_default();
-            println!(
-                "  {}. [{}] {}{}",
-                s["position"],
-                if s["done"].as_bool() == Some(true) {
-                    "x"
-                } else {
-                    " "
-                },
-                s["text"].as_str().unwrap_or(""),
-                by
-            );
+            let mark = if s.done { "x" } else { " " };
+            println!("  {}. [{mark}] {}{by}", s.position, s.text);
         }
     }
-    let comments = d["comments"].as_array().cloned().unwrap_or_default();
-    if !comments.is_empty() {
+    if !d.comments.is_empty() {
         println!("\ncomments:");
-        for c in comments {
-            let delivered = if c["kind"] == "instruction" && c["author"] == "human" {
-                if c["delivered_at"].is_null() {
-                    " (pending)"
-                } else {
-                    " (delivered)"
-                }
-            } else {
-                ""
+        for c in &d.comments {
+            let delivered = match (c.kind, c.author, c.delivered_at) {
+                (CommentKind::Instruction, Actor::Human, None) => " (pending)",
+                (CommentKind::Instruction, Actor::Human, Some(_)) => " (delivered)",
+                _ => "",
             };
             println!(
-                "  [{}] {} by {}{}",
-                c["kind"].as_str().unwrap_or(""),
-                c["body"]["gist"].as_str().unwrap_or(""),
-                c["author"].as_str().unwrap_or(""),
-                delivered
+                "  [{}] {} by {}{delivered}",
+                w(&c.kind),
+                c.body.gist,
+                w(&c.author)
             );
         }
     }
 }
 
-/// One `tok watch` line for a journal event.
-pub fn event(e: &Value) -> String {
-    let p = &e["payload"];
-    let seq = e["seq"].as_i64().unwrap_or(0);
-    let what = match (e["entity"].as_str(), e["kind"].as_str()) {
-        (Some("ticket"), Some("status_changed")) => {
-            let r = reason(&p["reason"]);
-            format!(
-                "{} {} -> {}{}",
-                p["key"].as_str().unwrap_or(""),
-                p["from"].as_str().unwrap_or(""),
-                p["to"].as_str().unwrap_or(""),
-                if r.is_empty() {
-                    String::new()
-                } else {
-                    format!(" ({r})")
-                }
-            )
-        }
-        (Some("ticket"), Some(kind)) => {
-            format!("{} {kind}", p["ticket"]["key"].as_str().unwrap_or(""))
-        }
-        (Some("release"), Some("state_changed")) => format!(
+/// One `tok watch` line for a journal entry.
+pub fn event(e: &EventRecord) -> String {
+    let p = &e.payload;
+    let s = |v: &Value| v.as_str().unwrap_or("").to_owned();
+    let payload_reason = serde_json::from_value::<StatusReason>(p["reason"].clone()).ok();
+    let what = match (e.entity.as_str(), e.kind.as_str()) {
+        ("ticket", "status_changed") => format!(
+            "{} {} -> {}{}",
+            s(&p["key"]),
+            s(&p["from"]),
+            s(&p["to"]),
+            in_parens(payload_reason.as_ref())
+        ),
+        ("ticket", kind) => format!("{} {kind}", s(&p["ticket"]["key"])),
+        ("release", "state_changed") => format!(
             "release {} {} -> {}",
-            p["version"].as_str().unwrap_or(""),
-            p["from"].as_str().unwrap_or(""),
-            p["to"].as_str().unwrap_or("")
+            s(&p["version"]),
+            s(&p["from"]),
+            s(&p["to"])
         ),
-        (Some("comment"), Some(kind)) => format!(
+        ("comment", kind) => format!(
             "{} comment {kind}: [{}] {}",
-            p["ticket"].as_str().unwrap_or(""),
-            p["comment"]["kind"].as_str().unwrap_or(""),
-            p["comment"]["body"]["gist"].as_str().unwrap_or("")
+            s(&p["ticket"]),
+            s(&p["comment"]["kind"]),
+            s(&p["comment"]["body"]["gist"])
         ),
-        (Some(entity), Some(kind)) => format!("{entity} {kind}"),
-        _ => "?".to_owned(),
+        (entity, kind) => format!("{entity} {kind}"),
     };
-    format!("#{seq} {} {what}", e["actor"].as_str().unwrap_or(""))
+    format!("#{} {} {what}", e.seq, w(&e.actor))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    use toknila_core::{BlockedReason, TicketStatus, Timestamp, WaitingReason};
 
     #[test]
     fn durations() {
@@ -328,16 +291,32 @@ mod tests {
 
     #[test]
     fn reasons() {
-        assert_eq!(
-            reason(&json!({"status":"waiting","kind":"question","text":"?"})),
-            "question: ?"
-        );
-        assert_eq!(
-            reason(
-                &json!({"status":"blocked","reason":{"kind":"manual","text":"key"},"resume_to":"running"})
-            ),
-            "manual: key"
-        );
-        assert_eq!(reason(&Value::Null), "");
+        let waiting = StatusReason::Waiting(WaitingReason::Question {
+            text: "?".to_owned(),
+        });
+        assert_eq!(reason(Some(&waiting)), "question: ?");
+        let blocked = StatusReason::Blocked {
+            reason: BlockedReason::Manual {
+                text: "key".to_owned(),
+            },
+            resume_to: TicketStatus::Running,
+            waiting: None,
+        };
+        assert_eq!(reason(Some(&blocked)), "manual: key");
+        assert_eq!(reason(None), "");
+    }
+
+    #[test]
+    fn event_lines() {
+        let e = EventRecord {
+            seq: 4,
+            at: Timestamp(0),
+            actor: Actor::System,
+            entity: "ticket".to_owned(),
+            entity_id: String::new(),
+            kind: "status_changed".to_owned(),
+            payload: json!({"key": "DEMO-1", "from": "ready", "to": "running", "reason": null}),
+        };
+        assert_eq!(event(&e), "#4 system DEMO-1 ready -> running");
     }
 }

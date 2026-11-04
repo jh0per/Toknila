@@ -1544,11 +1544,24 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "toknila-api-types",
+ "toknila-client",
  "toknila-core",
  "toknila-daemon",
  "tungstenite 0.30.0",
  "ureq",
  "windows-sys",
+]
+
+[[package]]
+name = "toknila-api-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "toknila-app",
+ "toknila-core",
+ "utoipa",
 ]
 
 [[package]]
@@ -1560,6 +1573,18 @@ dependencies = [
  "thiserror",
  "toknila-core",
  "utoipa",
+]
+
+[[package]]
+name = "toknila-client"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "toknila-api-types",
+ "toknila-core",
+ "ureq",
 ]
 
 [[package]]
@@ -1589,6 +1614,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "toknila-api-types",
  "toknila-app",
  "toknila-core",
  "tower",

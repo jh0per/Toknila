@@ -53,8 +53,8 @@ const DEP_RULES: &[DepRule] = &[
     DepRule {
         package: "toknila",
         scope: Scope::Direct,
-        banned: &["rusqlite", "axum", "utoipa", "utoipa-axum", "tower"],
-        why: "the CLI is a thin client; storage and HTTP serving belong to the daemon",
+        banned: &["rusqlite", "axum", "utoipa", "utoipa-axum", "tower", "ureq"],
+        why: "the CLI is a thin client: storage and HTTP serving belong to the daemon, HTTP calls to toknila-client",
     },
 ];
 
@@ -63,10 +63,7 @@ pub(crate) const MAX_LINES: usize = 400;
 
 /// Files over [`MAX_LINES`] when the guard was introduced, with their size then. Each may only
 /// shrink; once a file is at or under the limit its entry must go (the guard says so).
-const OVERSIZED: &[(&str, usize)] = &[
-    ("crates/daemon/src/store/codec.rs", 728),
-    ("crates/cli/src/commands.rs", 602),
-];
+const OVERSIZED: &[(&str, usize)] = &[("crates/daemon/src/store/codec.rs", 728)];
 
 /// Source trees the size ratchet covers, relative to the repository root.
 const SOURCE_DIRS: &[&str] = &["crates", "xtask/src", "apps/web/src"];

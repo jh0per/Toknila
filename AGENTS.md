@@ -26,6 +26,8 @@ before moving code between crates. Summary of what holds today:
 - `crates/app` (`toknila-app`): use cases over ports (`Reader`, `UnitOfWork`): the chain unit of
   work, reference resolution, agent events, recovery, `AppError`. Same dependency ban as core;
   the daemon implements the ports over SQLite.
+- `crates/api-types` (`toknila-api-types`): what crosses the wire (read models, `ErrorBody`,
+  `EventRecord`); `crates/client` (`toknila-client`): the typed client of the API.
 - `crates/daemon` (`toknila-daemon`): owns persistence (SQLite, one writer task, every command is
   one transaction "state + events"), HTTP on `127.0.0.1` with a bearer token, WebSocket stream.
 - `crates/cli` (`toknila`, binaries `toknila` and `tok`): a thin client of the daemon API. No

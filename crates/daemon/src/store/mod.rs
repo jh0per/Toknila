@@ -12,12 +12,13 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use toknila_core::events::DomainEvent;
 use toknila_core::{Actor, Timestamp};
 
 pub use codec::Repo;
+pub use toknila_api_types::EventRecord;
 
 /// Store failures.
 #[derive(Debug, thiserror::Error)]
@@ -34,19 +35,6 @@ pub enum StoreError {
     Closed,
     #[error("{0}")]
     Corrupt(String),
-}
-
-/// One journal entry. `seq` is increasing; clients resume from it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct EventRecord {
-    pub seq: i64,
-    pub at: Timestamp,
-    pub actor: Actor,
-    pub entity: String,
-    pub entity_id: String,
-    pub kind: String,
-    #[schema(value_type = Object)]
-    pub payload: serde_json::Value,
 }
 
 /// A command's view of the database: its transaction plus the events it emits.

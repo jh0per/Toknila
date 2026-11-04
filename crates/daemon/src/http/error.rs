@@ -3,21 +3,13 @@
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde::Serialize;
 use toknila_app::{AppError, ErrorKind};
 use toknila_core::graph::GraphError;
 use toknila_core::machine::TransitionError;
 
-use crate::store::StoreError;
+pub use toknila_api_types::ErrorBody;
 
-/// Error body of every failed request.
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-pub struct ErrorBody {
-    /// Human-readable message.
-    pub error: String,
-    /// Stable machine code: not_found, bad_request, conflict, ambiguous, internal, unauthorized.
-    pub code: String,
-}
+use crate::store::StoreError;
 
 /// An application error on its way to an HTTP response.
 #[derive(Debug, Clone)]

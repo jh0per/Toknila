@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 toknila-core = { workspace = true, features = ["openapi"] }
 toknila-app = { workspace = true, features = ["openapi"] }
+toknila-api-types = { workspace = true, features = ["openapi"] }
 utoipa.workspace = true
 utoipa-axum.workspace = true
 rusqlite.workspace = true

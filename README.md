@@ -18,6 +18,8 @@ for a human, blocked, ready for review.
 |---|---|
 | `crates/core` | Domain model and pure rules: ticket state machine, chain graph. No I/O, no async runtime, no database. |
 | `crates/app` | Use cases over ports: the chain unit of work, reference resolution, agent events, recovery. No I/O; the daemon implements the ports. |
+| `crates/api-types` | Request and response bodies of the daemon API; the OpenAPI document is generated from them. |
+| `crates/client` | Typed client of the daemon API, used by the CLI. |
 | `crates/daemon` | Daemon: SQLite store (single writer), HTTP API and WebSocket event stream on `127.0.0.1`. |
 | `crates/cli` | `toknila` binary and its `tok` alias, a thin client of the daemon API. |
 | `apps/web` | Web UI served by the daemon (read-only page in phase 0). |

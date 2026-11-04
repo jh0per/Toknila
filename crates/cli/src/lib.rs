@@ -3,7 +3,7 @@
 //! `toknila daemon run` is the daemon itself. Business rules live in core, not here.
 
 mod client;
-mod commands;
+mod cmd;
 mod daemon_cmd;
 mod output;
 #[cfg(windows)]
@@ -13,7 +13,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-pub use commands::Command;
+pub use cmd::Command;
 
 /// Toknila: plan work as chains of tickets and let a fleet of coding agents execute them.
 #[derive(Debug, Parser)]
@@ -35,7 +35,7 @@ pub fn run() -> ExitCode {
         let _ = Cli::command().print_help();
         return ExitCode::SUCCESS;
     };
-    match commands::run(command, cli.json) {
+    match cmd::run(command, cli.json) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e:#}");

@@ -3,12 +3,18 @@
 //! and the comment template, so the three cannot drift.
 
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 /// The serde name of a unit enum variant; `None` for anything that is not a plain string.
 pub fn wire_name<T: Serialize>(value: &T) -> Option<String> {
     toml::Value::try_from(value)
         .ok()
         .and_then(|v| v.as_str().map(str::to_owned))
+}
+
+/// The unit enum variant with this serde name; `None` if there is none.
+pub fn from_wire_name<T: DeserializeOwned>(name: &str) -> Option<T> {
+    T::deserialize(toml::Value::String(name.to_owned())).ok()
 }
 
 #[cfg(test)]
@@ -30,6 +36,16 @@ mod tests {
             wire_name(&CommentKind::Decision).as_deref(),
             Some("decision")
         );
+    }
+
+    #[test]
+    fn names_parse_back_to_their_variants() {
+        assert_eq!(
+            from_wire_name("play_closed"),
+            Some(ReleaseChannel::PlayClosed)
+        );
+        assert_eq!(from_wire_name("decision"), Some(CommentKind::Decision));
+        assert_eq!(from_wire_name::<CommentKind>("shout"), None);
     }
 
     #[test]

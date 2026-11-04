@@ -8,40 +8,20 @@ pub mod releases;
 pub mod tickets;
 
 use axum::Json;
-use toknila_core::graph::ChainView;
 use toknila_core::{Actor, ChainId, Ticket, TicketId, Timestamp};
 
-use super::dto::{ChainDetail, ReleaseMember, TicketDetail};
+use super::dto::{ChainDetail, TicketDetail};
 use super::error::ApiError;
 use crate::server::{AppState, now};
 use crate::store::{Repo, WriteTx};
 
 type ApiResult<T> = Result<T, ApiError>;
 
-fn chain_detail(view: ChainView, at: Timestamp) -> ChainDetail {
-    let summary = view.summary(at);
-    let order = view.topo_order();
-    ChainDetail {
-        release_tickets: view
-            .release_tickets
-            .iter()
-            .copied()
-            .map(ReleaseMember::from)
-            .collect(),
-        chain: view.chain,
-        tickets: view.tickets,
-        releases: view.releases,
-        edges: view.edges,
-        summary,
-        order,
-    }
-}
-
 fn load_chain_detail(repo: &Repo<'_>, chain: ChainId, at: Timestamp) -> ApiResult<ChainDetail> {
     let view = repo
         .chain_view(chain)?
         .ok_or_else(|| ApiError::not_found(format!("chain {chain}")))?;
-    Ok(chain_detail(view, at))
+    Ok(ChainDetail::from_view(view, at))
 }
 
 fn load_ticket_detail(repo: &Repo<'_>, ticket: TicketId, at: Timestamp) -> ApiResult<TicketDetail> {
