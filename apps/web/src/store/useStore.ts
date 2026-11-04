@@ -1,0 +1,35 @@
+// Glue between the pure reducer, the effect runner and React.
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { effectRunner } from "./effects";
+import type { Effect, Intent, Msg } from "./msg";
+import { reduce } from "./reduce";
+import { parseRoute } from "./route";
+import { type State, initialState } from "./state";
+
+export function useStore(): [State, (intent: Intent) => void] {
+  const [state, setState] = useState(() => initialState(parseRoute(window.location.pathname)));
+  const current = useRef(state);
+  const runner = useRef<{ run: (e: Effect) => void; stop: () => void } | null>(null);
+
+  const dispatch = useCallback((msg: Msg) => {
+    const [next, effects] = reduce(current.current, msg);
+    current.current = next;
+    setState(next);
+    for (const e of effects) runner.current?.run(e);
+  }, []);
+
+  useEffect(() => {
+    runner.current = effectRunner(dispatch);
+    const onPop = () => dispatch({ type: "urlChanged", route: parseRoute(window.location.pathname) });
+    window.addEventListener("popstate", onPop);
+    dispatch({ type: "started" });
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      runner.current?.stop();
+      runner.current = null;
+    };
+  }, [dispatch]);
+
+  return [state, dispatch];
+}

@@ -67,8 +67,9 @@ State management:
 
 - One normalized client store per app (`tickets[id]`, `chains[id]`, `lastSeq`), feature selectors
   over it.
-- Stream events are applied incrementally (a `status_changed` event carries the whole ticket).
-  A full reload happens only after a gap in `seq` or an unknown event kind.
+- A stream event refreshes only what it touches: the chain it belongs to and the inbox (chain
+  status and "needs a human" stay computed by the daemon). A full reload happens only after a gap
+  in `seq` or an event the page cannot place.
 - No optimistic updates: the command answers with fresh state and the event confirms it. Rules
   stay on the server.
 
@@ -82,7 +83,16 @@ Navigation is state too, and it lives in the URL, so a deep link opens the right
 | `/inbox` | Everything waiting on a person, across chains |
 | `/settings` | Projects and agent profiles |
 
+Phase 0 serves `/`, `/chains/:chain` and `/inbox` (the daemon answers these paths with the page);
+the other routes arrive with their screens.
+
 A reducer never navigates by itself; it returns a `Navigate` effect.
+
+Types: the daemon's OpenAPI document is pinned in `apps/web/openapi.json` by a daemon test, and
+`npm run gen` turns it into `apps/web/src/gen/api.d.ts`; `cargo xtask web` fails when the two
+drift. The page has no hand-written copy of an API type. Layout of `apps/web/src`: `api/` (types,
+the only `fetch`), `store/` (state, msg, reduce, effects, route; `reduce.test.ts` runs under
+Vitest), `views/` (React components that read state and dispatch intents).
 
 ## Desktop
 

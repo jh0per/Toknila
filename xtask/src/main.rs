@@ -2,7 +2,8 @@
 //!
 //! - `verify`: fmt check, clippy with warnings denied, tests, architecture guards.
 //! - `guards`: architecture guards only (see [`guards`]).
-//! - `web`: install, type-check and build `apps/web` (needs Node), so the daemon embeds it.
+//! - `web`: install `apps/web`, check its generated API types, run its reducer tests, type-check
+//!   and build it (needs Node), so the daemon embeds it.
 //!   Run it before `verify` or a release build; CI does.
 //! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
 //!   With `CI` set it first installs Chromium; locally it uses an installed one.
@@ -61,6 +62,9 @@ fn web() -> Result<(), String> {
     // npm is a .cmd script on Windows; Command does not add the extension itself.
     let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
     run(npm, &["ci", "--no-audit", "--no-fund"], &dir)?;
+    // The TypeScript types must match the pinned API document (apps/web/openapi.json).
+    run(npm, &["run", "gen:check"], &dir)?;
+    run(npm, &["test"], &dir)?;
     run(npm, &["run", "build"], &dir)?;
     if !dir.join("dist/index.html").is_file() {
         return Err("apps/web/dist/index.html was not produced".to_owned());

@@ -825,6 +825,34 @@ async fn import_rejects_bad_files_and_leaves_nothing_behind() {
 }
 
 #[tokio::test]
+async fn page_routes_serve_the_page_and_nothing_else_does() {
+    let api = Api::new();
+    let status = |uri: &'static str| {
+        let app = api.app.clone();
+        async move {
+            let req = Request::builder()
+                .uri(uri)
+                .body(Body::empty())
+                .expect("request");
+            let resp = app.oneshot(req).await.expect("response");
+            let ct = resp
+                .headers()
+                .get("content-type")
+                .map(|v| v.to_str().unwrap_or("").to_owned())
+                .unwrap_or_default();
+            (resp.status(), ct)
+        }
+    };
+    let html = (StatusCode::OK, "text/html; charset=utf-8".to_owned());
+    assert_eq!(status("/chains/demo").await, html);
+    assert_eq!(status("/inbox").await, html);
+    assert_eq!(status("/chains/demo/extra").await.0, StatusCode::NOT_FOUND);
+    let (code, ct) = status("/v1/nowhere").await;
+    assert_eq!(code, StatusCode::NOT_FOUND);
+    assert!(!ct.starts_with("text/html"), "{ct}");
+}
+
+#[tokio::test]
 async fn web_page_is_served_without_a_token() {
     let api = Api::new();
     let get = |uri: &str| {
@@ -881,4 +909,24 @@ async fn web_page_is_served_without_a_token() {
         .await
         .expect("response");
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+/// The web page's TypeScript types are generated from this document (`npm run gen` in
+/// `apps/web`), so it is pinned: a change to the API shows up here first.
+#[test]
+fn openapi_document_matches_the_committed_copy() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/web/openapi.json");
+    let now = format!("{}\n", super::openapi_json());
+    if std::env::var_os("TOKNILA_UPDATE_SNAPSHOTS").is_some() {
+        std::fs::write(&path, &now).expect("write openapi.json");
+        return;
+    }
+    let committed = std::fs::read_to_string(&path)
+        .expect("apps/web/openapi.json is missing; run with TOKNILA_UPDATE_SNAPSHOTS=1")
+        .replace("\r\n", "\n");
+    assert!(
+        committed == now,
+        "the API document changed; if intended, rerun with TOKNILA_UPDATE_SNAPSHOTS=1 and run \
+         `npm run gen` in apps/web"
+    );
 }

@@ -74,6 +74,9 @@ pub fn router(state: AppState) -> Router {
         ));
     Router::new()
         .route("/", get(crate::web::index))
+        // The page's own routes, so a deep link opens the right screen (apps/web/src/store/route.ts).
+        .route("/chains/{chain}", get(crate::web::index))
+        .route("/inbox", get(crate::web::index))
         .route("/assets/{*path}", get(crate::web::asset))
         .route("/healthz", get(healthz))
         .route(

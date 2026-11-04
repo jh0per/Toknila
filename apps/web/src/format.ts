@@ -1,0 +1,34 @@
+// Text for people: status reasons and durations.
+
+import type { StatusReason } from "./api/types";
+
+export function reasonText(r: StatusReason | null | undefined): string {
+  if (!r) return "";
+  switch (r.status) {
+    case "waiting":
+      return r.kind === "silent" ? "agent went silent" : `${r.kind}: ${r.text}`;
+    case "cancelled":
+      return `cancelled: ${r.text}`;
+    case "blocked": {
+      const b = r.reason;
+      switch (b.kind) {
+        case "manual": return `blocked: ${b.text}`;
+        case "crashed": return `crashed: ${b.detail}`;
+        case "dependency_reopened": return `dependency reopened: ${b.dependency}`;
+        case "merge_conflict": return `merge conflict: ${b.detail}`;
+        case "runner_lost": return "runner lost";
+      }
+    }
+  }
+  return "";
+}
+
+export function duration(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ${m % 60}m`;
+  return `${Math.floor(h / 24)}d`;
+}

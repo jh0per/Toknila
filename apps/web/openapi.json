@@ -1,0 +1,2813 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Toknila daemon API",
+    "description": "Local API of the Toknila daemon. Every /v1 route needs `Authorization: Bearer <token>` from daemon.json.",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "/v1"
+    }
+  ],
+  "paths": {
+    "/chains": {
+      "get": {
+        "tags": [
+          "chains"
+        ],
+        "operationId": "list_chains",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "description": "Project id or key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChainItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}": {
+      "get": {
+        "tags": [
+          "chains"
+        ],
+        "operationId": "get_chain",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/edges": {
+      "post": {
+        "tags": [
+          "chains"
+        ],
+        "operationId": "add_edge",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdgeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chains"
+        ],
+        "operationId": "remove_edge",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Ticket key or release version.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Ticket key or release version.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/EdgeKind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/export": {
+      "get": {
+        "tags": [
+          "chains"
+        ],
+        "operationId": "export_chain",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainFile"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/releases": {
+      "post": {
+        "tags": [
+          "releases"
+        ],
+        "operationId": "create_release",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewRelease"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/tickets": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "operationId": "create_ticket",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTicket"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "operationId": "list_events",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Return events with seq greater than this.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "At most this many (default 1000).",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventRecord"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "operationId": "list_projects",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Project"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "operationId": "create_project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProject"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "operationId": "get_project",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/chains": {
+      "post": {
+        "tags": [
+          "chains"
+        ],
+        "operationId": "create_chain",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewChain"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/import": {
+      "post": {
+        "tags": [
+          "chains"
+        ],
+        "operationId": "import_chain",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChainFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/releases/{release}/actions/{action}": {
+      "post": {
+        "tags": [
+          "releases"
+        ],
+        "operationId": "release_action",
+        "parameters": [
+          {
+            "name": "release",
+            "in": "path",
+            "description": "Release id or version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "description": "start (cut) or complete (released)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/releases/{release}/events": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "operationId": "release_event",
+        "parameters": [
+          {
+            "name": "release",
+            "in": "path",
+            "description": "Release id or version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseEvent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets": {
+      "get": {
+        "tags": [
+          "tickets"
+        ],
+        "operationId": "list_tickets",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "description": "Chain id or name.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "needs_human",
+            "in": "query",
+            "description": "Only tickets waiting on a person (Waiting, Blocked, Review).",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TicketItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}": {
+      "get": {
+        "tags": [
+          "tickets"
+        ],
+        "operationId": "get_ticket",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "tickets"
+        ],
+        "operationId": "patch_ticket",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchTicket"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/actions/{action}": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "operationId": "ticket_action",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "description": "start, pause, resume, block, unblock, accept, return, reopen or cancel",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/comments": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "operationId": "add_comment",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewComment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/events": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "operationId": "agent_event",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentEvent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/subtasks": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "operationId": "add_subtask",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSubtask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/subtasks/{position}": {
+      "patch": {
+        "tags": [
+          "tickets"
+        ],
+        "operationId": "patch_subtask",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "position",
+            "in": "path",
+            "description": "1-based position",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchSubtask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActionInput": {
+        "type": "object",
+        "description": "Body of ticket actions. `text` is required by block, return and cancel.",
+        "properties": {
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Actor": {
+        "type": "string",
+        "description": "Who did something: a person, an agent, or the system (graph rules, autostart).",
+        "enum": [
+          "human",
+          "agent",
+          "system"
+        ]
+      },
+      "AgentEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The runner is up and the agent is working. Starts a Ready ticket; no-op if Running.",
+            "required": [
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "started"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The agent needs a person: a question, or permission for an action.",
+            "required": [
+              "text",
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "ask_human"
+                ]
+              },
+              "permission": {
+                "type": "boolean"
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The agent ticked a checklist item (1-based position).",
+            "required": [
+              "position",
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "subtask_done"
+                ]
+              },
+              "position": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A short progress report, stored as a report comment.",
+            "required": [
+              "body",
+              "event"
+            ],
+            "properties": {
+              "body": {
+                "$ref": "#/components/schemas/CommentBody"
+              },
+              "event": {
+                "type": "string",
+                "enum": [
+                  "note"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The agent is done; the summary becomes a report comment and the ticket goes to Review.",
+            "required": [
+              "summary",
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "finished"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The agent process died.",
+            "required": [
+              "detail",
+              "event"
+            ],
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string",
+                "enum": [
+                  "crashed"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "One report from the agent working on a ticket."
+      },
+      "BlockedReason": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A person blocked it by hand.",
+            "required": [
+              "text",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "manual"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The runner process crashed.",
+            "required": [
+              "detail",
+              "kind"
+            ],
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "crashed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A dependency was reopened after it had merged.",
+            "required": [
+              "dependency",
+              "kind"
+            ],
+            "properties": {
+              "dependency": {
+                "$ref": "#/components/schemas/TicketKey"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "dependency_reopened"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Merging into the work branch conflicted.",
+            "required": [
+              "detail",
+              "kind"
+            ],
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "merge_conflict"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The daemon restarted and the runner was gone.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "runner_lost"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Why a ticket is Blocked."
+      },
+      "Chain": {
+        "type": "object",
+        "description": "A flow of tickets with dependencies and release milestones between them. Its status,\nprogress and \"where it stopped\" are computed from tickets and releases, never stored.",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "goal",
+          "autostart"
+        ],
+        "properties": {
+          "autostart": {
+            "type": "boolean",
+            "description": "Start Ready tickets automatically (on by default)."
+          },
+          "goal": {
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ChainId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode",
+                "description": "Overrides the project's review mode for every ticket that does not set its own."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ChainDetail": {
+        "type": "object",
+        "description": "A chain with its graph and computed status.",
+        "required": [
+          "chain",
+          "tickets",
+          "releases",
+          "edges",
+          "release_tickets",
+          "summary",
+          "order"
+        ],
+        "properties": {
+          "chain": {
+            "$ref": "#/components/schemas/Chain"
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Edge"
+            }
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeRef"
+            },
+            "description": "Nodes in dependency order."
+          },
+          "release_tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseMember"
+            }
+          },
+          "releases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Release"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ChainSummary"
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Ticket"
+            }
+          }
+        }
+      },
+      "ChainFile": {
+        "type": "object",
+        "description": "A chain file: body of `POST /v1/projects/{project}/import`, answer of\n`GET /v1/chains/{chain}/export`.",
+        "required": [
+          "toml"
+        ],
+        "properties": {
+          "toml": {
+            "type": "string"
+          }
+        }
+      },
+      "ChainId": {
+        "type": "string",
+        "description": "Identifies a [`crate::Chain`]."
+      },
+      "ChainItem": {
+        "type": "object",
+        "description": "A chain in a list.",
+        "required": [
+          "chain",
+          "summary"
+        ],
+        "properties": {
+          "chain": {
+            "$ref": "#/components/schemas/Chain"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ChainSummary"
+          }
+        }
+      },
+      "ChainStatus": {
+        "type": "string",
+        "description": "Computed chain status (never stored).",
+        "enum": [
+          "empty",
+          "not_started",
+          "blocked",
+          "needs_human",
+          "running",
+          "idle",
+          "done"
+        ]
+      },
+      "ChainSummary": {
+        "type": "object",
+        "description": "What a product person sees at a glance.",
+        "required": [
+          "status",
+          "total",
+          "done",
+          "released"
+        ],
+        "properties": {
+          "done": {
+            "type": "integer",
+            "description": "Merged, Released or Cancelled (Definition of Done: in the work branch).",
+            "minimum": 0
+          },
+          "next_release": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NextRelease"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "released": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChainStatus"
+          },
+          "stopped_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StoppedAt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "description": "A permanent record in a ticket: an instruction from a person, an agent's report, or a decision.\nEverything said to an agent is stored here first and delivered after.",
+        "required": [
+          "id",
+          "ticket_id",
+          "author",
+          "kind",
+          "body",
+          "created_at"
+        ],
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "body": {
+            "$ref": "#/components/schemas/CommentBody"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "delivered_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the runner delivered it to the agent; `None` while pending."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/CommentId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CommentKind"
+          },
+          "ticket_id": {
+            "$ref": "#/components/schemas/TicketId"
+          }
+        }
+      },
+      "CommentBody": {
+        "type": "object",
+        "description": "Template fields of a comment. Empty fields are `None` and are omitted when rendered.",
+        "required": [
+          "gist"
+        ],
+        "properties": {
+          "alternatives": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "consequences": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gist": {
+            "type": "string",
+            "description": "One-line gist, the heading of the comment."
+          },
+          "how_to_verify": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "what": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "why": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CommentId": {
+        "type": "string",
+        "description": "Identifies a [`crate::Comment`]."
+      },
+      "CommentKind": {
+        "type": "string",
+        "description": "Comment type from the template; decisions later become ADRs.",
+        "enum": [
+          "instruction",
+          "report",
+          "decision"
+        ]
+      },
+      "Edge": {
+        "type": "object",
+        "description": "Dependency edge: `to` cannot start before `from` is done.",
+        "required": [
+          "chain_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "chain_id": {
+            "$ref": "#/components/schemas/ChainId"
+          },
+          "from": {
+            "$ref": "#/components/schemas/NodeRef"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EdgeKind"
+          },
+          "to": {
+            "$ref": "#/components/schemas/NodeRef"
+          }
+        }
+      },
+      "EdgeInput": {
+        "type": "object",
+        "description": "`POST /v1/chains/{chain}/edges` and the query of `DELETE`.",
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Ticket key or release version."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EdgeKind"
+          },
+          "to": {
+            "type": "string",
+            "description": "Ticket key or release version."
+          }
+        }
+      },
+      "EdgeKind": {
+        "type": "string",
+        "description": "How strictly `to` waits for `from`.",
+        "enum": [
+          "normal",
+          "after_release"
+        ]
+      },
+      "ErrorBody": {
+        "type": "object",
+        "description": "Error body of every failed request.",
+        "required": [
+          "error",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine code: not_found, bad_request, conflict, ambiguous, internal, unauthorized."
+          },
+          "error": {
+            "type": "string",
+            "description": "Human-readable message."
+          }
+        }
+      },
+      "EventRecord": {
+        "type": "object",
+        "description": "One journal entry. `seq` is increasing; clients resume from it.",
+        "required": [
+          "seq",
+          "at",
+          "actor",
+          "entity",
+          "entity_id",
+          "kind",
+          "payload"
+        ],
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "entity": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NewChain": {
+        "type": "object",
+        "description": "`POST /v1/projects/{project}/chains`.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "autostart": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Defaults to true."
+          },
+          "goal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "NewComment": {
+        "type": "object",
+        "description": "`POST /v1/tickets/{ticket}/comments`. Give `text` (first line is the gist, the rest becomes\n\"what\") or a full `body`.",
+        "properties": {
+          "body": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CommentBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CommentKind",
+                "description": "Defaults to instruction."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "NewProject": {
+        "type": "object",
+        "description": "`POST /v1/projects`: a new project; unset fields take the project defaults.",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "default_profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "type": "string",
+            "description": "Short uppercase key, prefix of ticket keys (`DEMO`)."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "release_branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "repo_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "work_branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "NewRelease": {
+        "type": "object",
+        "description": "`POST /v1/chains/{chain}/releases`.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Nodes the milestone waits for (ticket keys or versions)."
+          },
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Nodes that wait for the milestone."
+          },
+          "channel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseChannel",
+                "description": "Defaults to tag_only."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StartMode",
+                "description": "Defaults to manual."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "NewSubtask": {
+        "type": "object",
+        "description": "`POST /v1/tickets/{ticket}/subtasks`.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "NewTicket": {
+        "type": "object",
+        "description": "`POST /v1/chains/{chain}/tickets`.",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "acceptance": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Dependencies: ticket keys or release versions of the same chain."
+          },
+          "needs_secrets": {
+            "type": "boolean"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Checklist items."
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "NextRelease": {
+        "type": "object",
+        "description": "The next milestone on the graph.",
+        "required": [
+          "release",
+          "version",
+          "channel",
+          "state"
+        ],
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ReleaseChannel"
+          },
+          "release": {
+            "$ref": "#/components/schemas/ReleaseId"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReleaseState"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "NodeRef": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/TicketId"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ticket"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/ReleaseId"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "release"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "A node of the chain graph: a ticket or a release milestone."
+      },
+      "PatchSubtask": {
+        "type": "object",
+        "description": "`PATCH /v1/tickets/{ticket}/subtasks/{position}`.",
+        "properties": {
+          "done": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PatchTicket": {
+        "type": "object",
+        "description": "Fields a person may change on an existing ticket; `None` keeps the current value. Status is\nnot among them: it moves only through the state machine.",
+        "properties": {
+          "acceptance": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "needs_secrets": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "description": "One product: one monorepo, its chains, depot and settings.",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "work_branch",
+          "release_branch",
+          "default_profile",
+          "default_review_mode"
+        ],
+        "properties": {
+          "default_profile": {
+            "type": "string"
+          },
+          "default_review_mode": {
+            "$ref": "#/components/schemas/ReviewMode"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "key": {
+            "$ref": "#/components/schemas/ProjectKey"
+          },
+          "name": {
+            "type": "string"
+          },
+          "release_branch": {
+            "type": "string",
+            "description": "Branch that only receives tagged releases (`main`)."
+          },
+          "repo_path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Path to the repository on the host; empty until a repo is attached."
+          },
+          "work_branch": {
+            "type": "string",
+            "description": "Branch ships start from and merge into (`develop`)."
+          }
+        }
+      },
+      "ProjectId": {
+        "type": "string",
+        "description": "Identifies a [`crate::Project`]."
+      },
+      "ProjectKey": {
+        "type": "string",
+        "examples": [
+          "DEMO"
+        ],
+        "pattern": "^[A-Z][A-Z0-9]{1,9}$"
+      },
+      "Release": {
+        "type": "object",
+        "description": "A release milestone between tickets on the chain graph.",
+        "required": [
+          "id",
+          "chain_id",
+          "version",
+          "channel",
+          "start_mode",
+          "state"
+        ],
+        "properties": {
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`release/<version>`; empty in phase 0, where there are no branches."
+          },
+          "chain_id": {
+            "$ref": "#/components/schemas/ChainId"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/ReleaseChannel"
+          },
+          "cut_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/ReleaseId"
+          },
+          "released_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_mode": {
+            "$ref": "#/components/schemas/StartMode"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReleaseState"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "ReleaseChannel": {
+        "type": "string",
+        "description": "Where a release milestone ships.",
+        "enum": [
+          "tag_only",
+          "test_flight",
+          "play_internal",
+          "play_closed",
+          "play_production"
+        ]
+      },
+      "ReleaseEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "finished"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "What a release agent reports about its milestone."
+      },
+      "ReleaseId": {
+        "type": "string",
+        "description": "Identifies a [`crate::Release`] milestone."
+      },
+      "ReleaseMember": {
+        "type": "object",
+        "description": "One ticket that went into a release.",
+        "required": [
+          "release",
+          "ticket"
+        ],
+        "properties": {
+          "release": {
+            "$ref": "#/components/schemas/ReleaseId"
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/TicketId"
+          }
+        }
+      },
+      "ReleaseState": {
+        "type": "string",
+        "description": "Milestone lifecycle (gitflow): planned, then `release/<version>` is cut, then shipped.",
+        "enum": [
+          "planned",
+          "cut",
+          "released"
+        ]
+      },
+      "ReviewMode": {
+        "type": "string",
+        "description": "Who reviews a finished ticket before it merges.",
+        "enum": [
+          "human",
+          "agent",
+          "both"
+        ]
+      },
+      "StartMode": {
+        "type": "string",
+        "description": "Whether the milestone cuts itself or waits for a person.",
+        "enum": [
+          "auto",
+          "manual"
+        ]
+      },
+      "StatusReason": {
+        "oneOf": [
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WaitingReason"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "waiting"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "reason",
+              "resume_to",
+              "status"
+            ],
+            "properties": {
+              "reason": {
+                "$ref": "#/components/schemas/BlockedReason"
+              },
+              "resume_to": {
+                "$ref": "#/components/schemas/TicketStatus",
+                "description": "Status to return to on unblock."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "blocked"
+                ]
+              },
+              "waiting": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/WaitingReason",
+                    "description": "The open question when it was blocked from Waiting, restored on unblock."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "text",
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "cancelled"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "description": "The reason attached to the current status, if that status carries one."
+      },
+      "StoppedAt": {
+        "type": "object",
+        "description": "Where the chain stopped: the first ticket, in graph order, that waits on a person.",
+        "required": [
+          "ticket",
+          "status",
+          "since",
+          "waiting_ms"
+        ],
+        "properties": {
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StatusReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "since": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/TicketKey"
+          },
+          "waiting_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "Subtask": {
+        "type": "object",
+        "description": "A checklist item inside a ticket. Subtasks have no runners of their own.",
+        "required": [
+          "id",
+          "ticket_id",
+          "position",
+          "text",
+          "done"
+        ],
+        "properties": {
+          "done": {
+            "type": "boolean"
+          },
+          "done_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Actor",
+                "description": "Who ticked it, when done."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/SubtaskId"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1-based position in the checklist.",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string"
+          },
+          "ticket_id": {
+            "$ref": "#/components/schemas/TicketId"
+          }
+        }
+      },
+      "SubtaskId": {
+        "type": "string",
+        "description": "Identifies a [`crate::Subtask`]."
+      },
+      "Ticket": {
+        "type": "object",
+        "description": "One unit of work for one ship.",
+        "required": [
+          "id",
+          "chain_id",
+          "key",
+          "title",
+          "prompt",
+          "acceptance",
+          "status",
+          "status_since",
+          "paused",
+          "needs_secrets",
+          "tokens_used"
+        ],
+        "properties": {
+          "acceptance": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Acceptance criteria, one per entry."
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ship branch `ship/<chain>/<slug>`; empty until phase 1 creates ships."
+          },
+          "chain_id": {
+            "$ref": "#/components/schemas/ChainId"
+          },
+          "id": {
+            "$ref": "#/components/schemas/TicketId"
+          },
+          "key": {
+            "$ref": "#/components/schemas/TicketKey"
+          },
+          "needs_secrets": {
+            "type": "boolean",
+            "description": "Copy depot secrets onto the ship at start."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Paused tickets stay in Backlog and are skipped by autostart."
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Agent profile name; `None` means the project default."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The task given to the agent; the only source of what to do."
+          },
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode",
+                "description": "`None` means the chain's, then the project's review mode."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "status_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StatusReason",
+                "description": "Present exactly when the status carries a reason (Waiting, Blocked, Cancelled)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status_since": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tokens_used": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "TicketDetail": {
+        "type": "object",
+        "description": "A ticket with everything attached to it.",
+        "required": [
+          "ticket",
+          "chain",
+          "subtasks",
+          "comments",
+          "in_status_ms"
+        ],
+        "properties": {
+          "chain": {
+            "type": "string"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            }
+          },
+          "in_status_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Milliseconds in the current status.",
+            "minimum": 0
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subtask"
+            }
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/Ticket"
+          }
+        }
+      },
+      "TicketId": {
+        "type": "string",
+        "description": "Identifies a [`crate::Ticket`]."
+      },
+      "TicketItem": {
+        "type": "object",
+        "description": "A ticket in a list.",
+        "required": [
+          "ticket",
+          "chain",
+          "in_status_ms",
+          "needs_human"
+        ],
+        "properties": {
+          "chain": {
+            "type": "string"
+          },
+          "in_status_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "needs_human": {
+            "type": "boolean"
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/Ticket"
+          }
+        }
+      },
+      "TicketKey": {
+        "type": "string",
+        "examples": [
+          "DEMO-3"
+        ],
+        "pattern": "^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]*$"
+      },
+      "TicketStatus": {
+        "type": "string",
+        "description": "Ticket status. Transitions between them are owned by the state machine (P0-04).",
+        "enum": [
+          "backlog",
+          "ready",
+          "running",
+          "waiting",
+          "blocked",
+          "review",
+          "merged",
+          "released",
+          "cancelled"
+        ]
+      },
+      "Timestamp": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Milliseconds since the Unix epoch, UTC."
+      },
+      "WaitingReason": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The agent asked a question (`ask_human`).",
+            "required": [
+              "text",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "question"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The agent wants permission for an action.",
+            "required": [
+              "text",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "permission"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The agent stopped responding to nudges.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "silent"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Why a ticket is Waiting."
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ]
+}
