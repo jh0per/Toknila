@@ -40,7 +40,6 @@ fn main() -> ExitCode {
 
 fn verify() -> Result<(), String> {
     cargo(&["fmt", "--all", "--check"])?;
-    cargo(&["fmt", "--manifest-path", &manifest, "--check"])?;
     cargo(&[
         "clippy",
         "--workspace",
@@ -200,6 +199,7 @@ fn desktop() -> Result<(), String> {
         .map_err(|e| format!("copy sidecar to {}: {e}", sidecar.display()))?;
     let manifest = shell.join("Cargo.toml");
     let manifest = manifest.to_string_lossy();
+    cargo(&["fmt", "--manifest-path", &manifest, "--check"])?;
     cargo(&[
         "clippy",
         "--locked",
