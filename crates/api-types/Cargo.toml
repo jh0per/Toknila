@@ -1,0 +1,25 @@
+[package]
+name = "toknila-api-types"
+description = "Request and response bodies of the Toknila daemon API, shared by the daemon and its clients."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license-file.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Types only: no transport, no storage. The OpenAPI document (and the web page's TypeScript
+# types) are generated from them.
+[dependencies]
+toknila-core.workspace = true
+toknila-app.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+utoipa = { workspace = true, optional = true }
+
+[features]
+# Derives OpenAPI schemas; the daemon turns it on.
+openapi = ["dep:utoipa", "toknila-core/openapi", "toknila-app/openapi"]
+
+[lints]
+workspace = true

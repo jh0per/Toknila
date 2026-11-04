@@ -1,6 +1,6 @@
 //! The `/v1` command API and its OpenAPI description, generated from the route handlers.
 
-pub mod dto;
+pub use toknila_api_types as dto;
 pub mod error;
 pub mod routes;
 

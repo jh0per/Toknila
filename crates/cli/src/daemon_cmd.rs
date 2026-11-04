@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
 use serde::Serialize;
+use toknila_client::Client;
 use toknila_daemon::info::DaemonInfo;
 use toknila_daemon::paths::Paths;
 
@@ -98,10 +99,7 @@ pub fn running(paths: &Paths) -> Result<Option<DaemonInfo>> {
     let Some(info) = DaemonInfo::read(&paths.daemon_json())? else {
         return Ok(None);
     };
-    let healthy = ureq::get(&format!("{}/healthz", info.base_url()))
-        .timeout(Duration::from_secs(2))
-        .call()
-        .is_ok();
+    let healthy = Client::healthy(&info.base_url());
     Ok(healthy.then_some(info))
 }
 
@@ -147,10 +145,8 @@ pub fn stop(paths: &Paths) -> Result<bool> {
     let Some(info) = running(paths)? else {
         return Ok(false);
     };
-    ureq::post(&format!("{}/v1/shutdown", info.base_url()))
-        .set("Authorization", &format!("Bearer {}", info.token))
-        .timeout(Duration::from_secs(5))
-        .call()
+    Client::new(info.base_url(), info.token)
+        .shutdown()
         .context("shutdown request failed")?;
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {

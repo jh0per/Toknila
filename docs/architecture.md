@@ -26,9 +26,9 @@ ones above. `cargo xtask guards` checks the rules it can check mechanically.
 |---|---|---|---|
 | Domain | `toknila-core` | Entities, the ticket state machine, the chain graph, chain files, the comment template, typed domain events, the agent event mapping, entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
 | Application | `toknila-app` | Every use case (`projects`, `chains` with import and export, `tickets` with typed `TicketAction`, `releases` with `ReleaseAction`, comments and subtasks, agent events), the chain unit of work (`with_chain`: change, settle, save, journal, deliver), reference resolution, startup recovery, `AppError`, and the command inputs (`NewTicket`, `NewChain`, ...) the API accepts as request bodies. Ports: `Reader` and `UnitOfWork` (which carries the command's clock and actor); a `Runner` port arrives with real runners in phase 1 | `axum`, `rusqlite`, `tokio`, HTTP status codes |
-| Protocol | `toknila-api-types` (planned) | Request and response DTOs, `ErrorBody`, `EventRecord`, typed ticket and release actions. OpenAPI is generated from them, TypeScript types from OpenAPI | Logic |
+| Protocol | `toknila-api-types` | Read models (`ChainDetail::from_view`, `TicketDetail`, list items), `ErrorBody`, `EventRecord`, query and small request types; re-exports the command inputs of `toknila-app` and the agent events of core. OpenAPI is generated from them (feature `openapi`), TypeScript types from OpenAPI | Logic, transport |
 | Adapters | `toknila-daemon` | `http/` (`routes/*`: one module per resource, each handler parses, runs one use case, answers; one `ErrorBody` for every failure including 401), `server/` (router, auth, lifecycle, logging), `store/` (SQLite implementation of the ports), `stream`, `runner/` (sim now, PTY in phase 1), lifecycle (`daemon.json`, signals), paths, logging, embedded web assets | Business rules |
-| Client | `toknila-client` (planned) | Typed HTTP and WebSocket client of the API | Output formatting |
+| Client | `toknila-client` | Typed blocking HTTP client of the API: one method per route, `ClientError` carrying the daemon's `ErrorBody`, the stream address | Output formatting |
 | Presentation | `crates/cli`, `apps/web`, `apps/desktop` | Argument parsing and output (CLI); MVI screens (web); the Tauri 2 shell that starts or attaches to the daemon | Domain rules |
 
 A rule that two places need moves one layer down; it is never copied.
@@ -97,7 +97,7 @@ Windows and Linux use WebView2 and WebKitGTK with the same code.
 |---|---|
 | `deps toknila-core` | Core has no async runtime, storage or transport in its whole dependency tree |
 | `deps toknila-app` | The application layer has no async runtime, storage or transport in its dependency tree; it reaches them through ports |
-| `deps toknila` | The CLI depends directly on no storage or HTTP-serving crate |
+| `deps toknila` | The CLI depends directly on no storage, HTTP-serving or HTTP-client crate; it calls the daemon through `toknila-client` |
 | `file-size` | A production source file (Rust or TypeScript, inline tests excluded) has at most 400 lines. Files already over it are listed in `xtask/src/guards.rs` with their size and may only shrink; the guard asks to lower or drop an entry once a file shrinks |
 
 Each step of the plan adds the guards for what it introduces (for example, `toknila-app` without
@@ -115,6 +115,6 @@ at each step.
 | R-03 | Typed domain events and a single `settle` that returns them |
 | R-04 | `toknila-app`: ports, unit of work, reference resolution, comments and subtasks, agent events, recovery, `AppError`, tests over an in-memory port implementation |
 | R-05 | The daemon as thin adapters: the remaining use cases move to `toknila-app`, `http/routes/*`, `server.rs` split, typed ticket actions, one error body |
-| R-06 | `toknila-api-types` and `toknila-client`; the CLI on typed responses, split by command group |
+| R-06 | `toknila-api-types` and `toknila-client`; the CLI on typed responses, split by command group into `cmd/*` |
 | R-07 | The web page on generated TypeScript types with an MVI store, a router and reducer tests |
 | R-08 | Platform data directories on macOS with migration of `~/.toknila`; Tauri 2 skeleton with the daemon as a sidecar |
