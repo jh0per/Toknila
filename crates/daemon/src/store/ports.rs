@@ -44,6 +44,8 @@ macro_rules! reader {
 }
 
 reader! {
+    projects() -> Vec<Project>;
+    chain_by_name(project: ProjectId, name: &str) -> Option<Chain>;
     project(id: ProjectId) -> Option<Project>;
     project_by_key(key: &str) -> Option<Project>;
     chain(id: ChainId) -> Option<Chain>;
@@ -67,6 +69,18 @@ impl UnitOfWork for WriteTx<'_> {
 
     fn actor(&self) -> Actor {
         WriteTx::actor(self)
+    }
+
+    fn insert_project(&mut self, project: &Project) -> AppResult<()> {
+        Ok(self.repo().insert_project(project)?)
+    }
+
+    fn insert_chain(&mut self, chain: &Chain) -> AppResult<()> {
+        Ok(self.repo().insert_chain(chain)?)
+    }
+
+    fn take_ticket_number(&mut self, project: ProjectId) -> AppResult<u32> {
+        Ok(self.repo().take_ticket_number(project)?)
     }
 
     fn save_chain_view(&mut self, view: &ChainView) -> AppResult<()> {

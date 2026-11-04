@@ -15,6 +15,11 @@ toknila-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+utoipa = { workspace = true, optional = true }
+
+[features]
+# Derives OpenAPI schemas for the command inputs the daemon accepts as request bodies.
+openapi = ["dep:utoipa", "toknila-core/openapi"]
 
 [lints]
 workspace = true

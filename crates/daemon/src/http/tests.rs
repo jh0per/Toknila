@@ -103,6 +103,12 @@ async fn requests_without_token_are_rejected() {
         .expect("request");
     let resp = api.app.clone().oneshot(req).await.expect("response");
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    let bytes = resp.into_body().collect().await.expect("body").to_bytes();
+    // The same error shape as every other failure.
+    assert_eq!(
+        std::str::from_utf8(&bytes).expect("utf-8"),
+        r#"{"error":"missing or wrong bearer token","code":"unauthorized"}"#
+    );
 }
 
 #[tokio::test]

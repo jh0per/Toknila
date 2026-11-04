@@ -76,6 +76,43 @@ impl Ticket {
     }
 }
 
+/// Fields a person may change on an existing ticket; `None` keeps the current value. Status is
+/// not among them: it moves only through the state machine.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = PatchTicket))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TicketPatch {
+    pub title: Option<String>,
+    pub prompt: Option<String>,
+    pub acceptance: Option<Vec<String>>,
+    pub profile: Option<String>,
+    pub review_mode: Option<ReviewMode>,
+    pub needs_secrets: Option<bool>,
+}
+
+impl TicketPatch {
+    /// Writes the given fields into `t`.
+    pub fn apply(self, t: &mut Ticket) {
+        if let Some(v) = self.title {
+            t.title = v;
+        }
+        if let Some(v) = self.prompt {
+            t.prompt = v;
+        }
+        if let Some(v) = self.acceptance {
+            t.acceptance = v;
+        }
+        if let Some(v) = self.profile {
+            t.profile = Some(v);
+        }
+        if let Some(v) = self.review_mode {
+            t.review_mode = Some(v);
+        }
+        if let Some(v) = self.needs_secrets {
+            t.needs_secrets = v;
+        }
+    }
+}
+
 /// A checklist item inside a ticket. Subtasks have no runners of their own.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

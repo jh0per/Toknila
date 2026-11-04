@@ -1,6 +1,6 @@
 //! Toknila daemon: SQLite store, HTTP API on 127.0.0.1 and (next tickets) the event stream.
 
-pub mod api;
+pub mod http;
 pub mod info;
 pub mod paths;
 pub mod recovery;

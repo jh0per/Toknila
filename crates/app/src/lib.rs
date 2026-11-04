@@ -6,11 +6,15 @@
 
 pub mod agent;
 pub mod chain;
+pub mod chains;
 pub mod error;
 pub mod notes;
 pub mod ports;
+pub mod projects;
 pub mod recovery;
+pub mod releases;
 pub mod resolve;
+pub mod tickets;
 
 pub use chain::{ChainTx, with_chain};
 pub use error::{AppError, AppResult, ErrorKind};

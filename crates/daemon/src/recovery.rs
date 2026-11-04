@@ -8,7 +8,7 @@ use toknila_core::Actor;
 
 pub use toknila_app::recovery::Recovery;
 
-use crate::api::error::ApiError;
+use crate::http::error::ApiError;
 use crate::server::now;
 use crate::store::{Store, StoreError};
 

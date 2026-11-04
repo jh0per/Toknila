@@ -15,7 +15,7 @@ use crate::store::StoreError;
 pub struct ErrorBody {
     /// Human-readable message.
     pub error: String,
-    /// Stable machine code: not_found, bad_request, conflict, ambiguous, internal.
+    /// Stable machine code: not_found, bad_request, conflict, ambiguous, internal, unauthorized.
     pub code: String,
 }
 

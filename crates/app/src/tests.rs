@@ -12,7 +12,10 @@ use toknila_core::{
 
 use crate::notes::{add_comment, body_from_text};
 use crate::recovery::{Recovery, recover};
-use crate::{AppResult, ErrorKind, Reader, UnitOfWork, agent, resolve, with_chain};
+use crate::tickets::{NewTicket, TicketAction};
+use crate::{
+    AppResult, ErrorKind, Reader, UnitOfWork, agent, chains, resolve, tickets, with_chain,
+};
 
 #[derive(Debug)]
 struct Mem {
@@ -22,6 +25,7 @@ struct Mem {
     subtasks: Vec<Subtask>,
     events: Vec<DomainEvent>,
     now: Timestamp,
+    taken: u32,
 }
 
 impl Mem {
@@ -78,6 +82,7 @@ impl Mem {
             subtasks: vec![],
             events: vec![],
             now,
+            taken: 2,
         }
     }
 
@@ -94,6 +99,13 @@ impl Mem {
 }
 
 impl Reader for Mem {
+    fn projects(&self) -> AppResult<Vec<Project>> {
+        Ok(vec![self.project.clone()])
+    }
+    fn chain_by_name(&self, project: ProjectId, name: &str) -> AppResult<Option<Chain>> {
+        let c = &self.view.chain;
+        Ok((c.project_id == project && c.name == name).then(|| c.clone()))
+    }
     fn project(&self, id: ProjectId) -> AppResult<Option<Project>> {
         Ok((self.project.id == id).then(|| self.project.clone()))
     }
@@ -169,6 +181,24 @@ impl UnitOfWork for Mem {
     }
     fn actor(&self) -> Actor {
         Actor::Human
+    }
+    fn insert_project(&mut self, p: &Project) -> AppResult<()> {
+        self.project = p.clone();
+        Ok(())
+    }
+    fn insert_chain(&mut self, c: &Chain) -> AppResult<()> {
+        self.view = ChainView {
+            chain: c.clone(),
+            tickets: vec![],
+            releases: vec![],
+            edges: vec![],
+            release_tickets: vec![],
+        };
+        Ok(())
+    }
+    fn take_ticket_number(&mut self, _: ProjectId) -> AppResult<u32> {
+        self.taken += 1;
+        Ok(self.taken)
     }
     fn save_chain_view(&mut self, view: &ChainView) -> AppResult<()> {
         self.view = view.clone();
@@ -273,4 +303,62 @@ fn agent_events_are_checked_before_anything_changes() {
     let e = agent::ticket_event(&mut mem, &b, AgentEvent::Started).expect_err("backlog");
     assert_eq!(e.kind, ErrorKind::Conflict);
     assert_eq!(mem.events.len(), before);
+}
+
+#[test]
+fn new_ticket_waits_for_its_dependency_and_gets_its_checklist() {
+    let mut mem = Mem::demo();
+    recover(&mut mem).expect("settle");
+    let input = NewTicket {
+        title: " C ".to_owned(),
+        after: vec!["demo-2".to_owned()],
+        subtasks: vec!["write it".to_owned()],
+        ..NewTicket::default()
+    };
+    let id = tickets::create(&mut mem, "demo", input).expect("create");
+    let c = mem.ticket_by_title("C");
+    assert_eq!((c.id, c.key.to_string()), (id, "DEMO-3".to_owned()));
+    assert_eq!(c.status, TicketStatus::Backlog);
+    assert_eq!(mem.subtasks.len(), 1);
+    let edge = mem.view.edges.last().expect("edge");
+    let b = mem.ticket_by_title("B");
+    assert_eq!(
+        (edge.from, edge.to),
+        (NodeRef::Ticket(b.id), NodeRef::Ticket(id))
+    );
+    let e = tickets::create(&mut mem, "demo", NewTicket::default()).expect_err("no title");
+    assert_eq!(e.message, "ticket title is empty");
+}
+
+#[test]
+fn ticket_actions_parse_and_demand_their_text() {
+    let block: TicketAction = "block".parse().expect("known");
+    assert_eq!(
+        block
+            .event(Some("  ".to_owned()))
+            .expect_err("blank")
+            .message,
+        "block needs a text"
+    );
+    assert!(block.event(Some("waiting on CI".to_owned())).is_ok());
+    let e = "launch".parse::<TicketAction>().expect_err("unknown");
+    assert_eq!(
+        (e.kind, e.message.as_str()),
+        (ErrorKind::NotFound, "action launch not found")
+    );
+}
+
+#[test]
+fn export_then_import_conflicts_on_the_same_name() {
+    let mut mem = Mem::demo();
+    let toml = chains::export(&mem, "demo").expect("export");
+    assert!(
+        toml.contains("id = \"DEMO-2\"\ntitle = \"B\"\nafter = [\"DEMO-1\"]"),
+        "{toml}"
+    );
+    let e = chains::import(&mut mem, "DEMO", &toml).expect_err("same name");
+    assert_eq!(
+        (e.kind, e.message.as_str()),
+        (ErrorKind::Conflict, "chain demo already exists in DEMO")
+    );
 }
