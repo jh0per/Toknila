@@ -8,6 +8,8 @@
 //! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
 //!   With `CI` set it first installs Chromium; locally it uses an installed one.
 //! - `dist <target>`: release archive for one target triple in `dist/` (web page embedded).
+//! - `desktop`: build the Tauri shell in `apps/desktop` with `toknila` as its sidecar, and run
+//!   clippy on it (needs the platform web view; CI runs it on macOS).
 
 use std::process::{Command, ExitCode};
 
@@ -21,8 +23,9 @@ fn main() -> ExitCode {
         "web" => web(),
         "e2e-web" => e2e_web(),
         "dist" => dist(std::env::args().nth(2)),
+        "desktop" => desktop(),
         _ => {
-            eprintln!("usage: cargo xtask <verify|guards|web|e2e-web|dist <target>>");
+            eprintln!("usage: cargo xtask <verify|guards|web|e2e-web|desktop|dist <target>>");
             return ExitCode::from(2);
         }
     };
@@ -165,6 +168,49 @@ fn dist(target: Option<String>) -> Result<(), String> {
     args.extend([archive.as_str(), name.as_str()]);
     run("tar", &args, &out)?;
     eprintln!("xtask dist: PASS: dist/{archive}");
+    Ok(())
+}
+
+fn desktop() -> Result<(), String> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .canonicalize()
+        .map_err(|e| format!("repo root: {e}"))?;
+    // The window shows the page the daemon embeds.
+    web()?;
+    cargo(&["build", "--locked", "--bin", "toknila"])?;
+    // Tauri bundles a sidecar named after the host triple: binaries/toknila-<triple>.
+    let host = Command::new(std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_owned()))
+        .arg("-vV")
+        .output()
+        .map_err(|e| format!("cannot run rustc: {e}"))?;
+    let host = String::from_utf8_lossy(&host.stdout)
+        .lines()
+        .find_map(|l| l.strip_prefix("host: ").map(str::to_owned))
+        .ok_or("rustc -vV printed no host triple")?;
+    let exe = std::env::consts::EXE_SUFFIX;
+    let target = std::env::var_os("CARGO_TARGET_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| root.join("target"));
+    let shell = root.join("apps/desktop/src-tauri");
+    let sidecar = shell.join("binaries").join(format!("toknila-{host}{exe}"));
+    std::fs::create_dir_all(shell.join("binaries")).map_err(|e| format!("binaries/: {e}"))?;
+    std::fs::copy(target.join("debug").join(format!("toknila{exe}")), &sidecar)
+        .map_err(|e| format!("copy sidecar to {}: {e}", sidecar.display()))?;
+    let manifest = shell.join("Cargo.toml");
+    let manifest = manifest.to_string_lossy();
+    cargo(&["fmt", "--manifest-path", &manifest, "--check"])?;
+    cargo(&[
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        &manifest,
+        "--",
+        "-D",
+        "warnings",
+    ])?;
+    cargo(&["build", "--locked", "--manifest-path", &manifest])?;
+    eprintln!("xtask desktop: PASS");
     Ok(())
 }
 

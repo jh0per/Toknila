@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/core", "crates/app", "crates/api-types", "crates/client", "crates/daemon", "crates/cli", "xtask"]
+exclude = ["apps/desktop/src-tauri"]
 default-members = ["crates/core", "crates/app", "crates/api-types", "crates/client", "crates/daemon", "crates/cli"]
 
 [workspace.package]

@@ -31,7 +31,7 @@ Same archive layout: `toknila-<version>-linux-x86_64.tar.gz` and
 ## First run: the demo chain
 
 ```sh
-tok daemon start                      # background daemon on 127.0.0.1, data in ~/.toknila
+tok daemon start                      # background daemon on 127.0.0.1 (`tok daemon status` shows the data folder)
 tok project new DEMO
 tok chain import demo.toml --project DEMO
 tok chain show demo                   # A runs; B and D wait for A; C waits for release R1
@@ -62,7 +62,7 @@ Toknila's own next phase is a chain too: `tok project new TOK && tok chain impor
 
 | What | Where |
 |---|---|
-| Data, `daemon.json`, logs | `~/.toknila` on macOS and Linux, `%APPDATA%\toknila` on Windows; `TOKNILA_HOME` overrides |
+| Data, `daemon.json`, logs | `~/Library/Application Support/toknila` on macOS, `~/.toknila` on Linux, `%APPDATA%\toknila` on Windows; `TOKNILA_HOME` overrides. A macOS `~/.toknila` from an earlier version moves to the new place on the first start after the daemon was stopped |
 | Database | `toknila.db` (SQLite) in that folder |
 | Stop the daemon | `tok daemon stop` |
 | Start over | stop the daemon, delete the folder |

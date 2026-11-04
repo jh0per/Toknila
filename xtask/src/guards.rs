@@ -66,7 +66,12 @@ pub(crate) const MAX_LINES: usize = 400;
 const OVERSIZED: &[(&str, usize)] = &[("crates/daemon/src/store/codec.rs", 728)];
 
 /// Source trees the size ratchet covers, relative to the repository root.
-const SOURCE_DIRS: &[&str] = &["crates", "xtask/src", "apps/web/src"];
+const SOURCE_DIRS: &[&str] = &[
+    "crates",
+    "xtask/src",
+    "apps/web/src",
+    "apps/desktop/src-tauri/src",
+];
 
 /// Runs every guard; the first failure stops.
 pub fn run(root: &Path) -> Result<(), String> {
