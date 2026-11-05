@@ -7,8 +7,9 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_api_types::{
     ActionInput, AgentEvent, ChainDetail, ChainFile, ChainItem, EdgeInput, ErrorBody, EventRecord,
-    NewChain, NewComment, NewProject, NewRelease, NewSubtask, NewTicket, NewWildcard, PatchSubtask,
-    PatchTicket, ReleaseEvent, TicketDetail, TicketItem, TicketQuery,
+    NewChain, NewComment, NewMessage, NewProject, NewRelease, NewSubtask, NewThread, NewTicket,
+    NewVersion, NewWildcard, PatchSubtask, PatchTicket, ReleaseEvent, ThreadDetail, TicketDetail,
+    TicketItem, TicketQuery, TicketThreads,
 };
 use toknila_core::Project;
 
@@ -244,6 +245,54 @@ impl Client {
         )
     }
 
+    // ---- threads on a card ----
+
+    /// `GET /tickets/{ticket}/threads`.
+    pub fn threads(&self, ticket: &str) -> ClientResult<TicketThreads> {
+        self.call("GET", &format!("/tickets/{}/threads", enc(ticket)), NO_BODY)
+    }
+
+    /// `POST /tickets/{ticket}/threads`.
+    pub fn open_thread(&self, ticket: &str, t: &NewThread) -> ClientResult<ThreadDetail> {
+        let path = format!("/tickets/{}/threads", enc(ticket));
+        self.call("POST", &path, Some(t))
+    }
+
+    /// `POST /tickets/{ticket}/threads/{thread}/messages`.
+    pub fn post_thread_message(
+        &self,
+        ticket: &str,
+        thread: &str,
+        m: &NewMessage,
+    ) -> ClientResult<ThreadDetail> {
+        self.call("POST", &thread_path(ticket, thread, "messages"), Some(m))
+    }
+
+    /// `POST /tickets/{ticket}/threads/{thread}/versions`.
+    pub fn post_thread_version(
+        &self,
+        ticket: &str,
+        thread: &str,
+        v: &NewVersion,
+    ) -> ClientResult<ThreadDetail> {
+        self.call("POST", &thread_path(ticket, thread, "versions"), Some(v))
+    }
+
+    /// `POST /tickets/{ticket}/threads/{thread}/approve`.
+    pub fn approve_thread(&self, ticket: &str, thread: &str) -> ClientResult<ThreadDetail> {
+        self.call("POST", &thread_path(ticket, thread, "approve"), NO_BODY)
+    }
+
+    /// `POST /tickets/{ticket}/threads/{thread}/changes`.
+    pub fn request_thread_changes(
+        &self,
+        ticket: &str,
+        thread: &str,
+        m: &NewMessage,
+    ) -> ClientResult<ThreadDetail> {
+        self.call("POST", &thread_path(ticket, thread, "changes"), Some(m))
+    }
+
     /// `POST /tickets/{ticket}/subtasks`.
     pub fn add_subtask(&self, ticket: &str, text: &str) -> ClientResult<TicketDetail> {
         let body = NewSubtask {
@@ -289,6 +338,10 @@ impl Client {
         self.call::<serde_json::Value>("POST", "/shutdown", NO_BODY)
             .map(|_| ())
     }
+}
+
+fn thread_path(ticket: &str, thread: &str, tail: &str) -> String {
+    format!("/tickets/{}/threads/{}/{tail}", enc(ticket), enc(thread))
 }
 
 /// Percent-encodes a path segment or query value.

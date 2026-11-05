@@ -70,6 +70,19 @@ id_type!(
     ReleaseId
 );
 
+id_type!(
+    /// Identifies a [`crate::Thread`].
+    ThreadId
+);
+id_type!(
+    /// Identifies a [`crate::ThreadMessage`].
+    ThreadMessageId
+);
+id_type!(
+    /// Identifies a [`crate::ThreadVersion`].
+    ThreadVersionId
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;

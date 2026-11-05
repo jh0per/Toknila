@@ -2,6 +2,7 @@
 
 use toknila_core::graph::GraphError;
 use toknila_core::machine::TransitionError;
+use toknila_core::thread::ThreadError;
 
 /// What went wrong, independent of transport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +82,18 @@ impl From<TransitionError> for AppError {
     fn from(e: TransitionError) -> Self {
         match e {
             TransitionError::EmptyText(_) => AppError::bad_request(e.to_string()),
+            _ => AppError::conflict(e.to_string()),
+        }
+    }
+}
+
+impl From<ThreadError> for AppError {
+    fn from(e: ThreadError) -> Self {
+        match e {
+            ThreadError::EmptyTitle
+            | ThreadError::EmptyText(_)
+            | ThreadError::EmptyArtifact
+            | ThreadError::ArtifactTooLarge { .. } => AppError::bad_request(e.to_string()),
             _ => AppError::conflict(e.to_string()),
         }
     }

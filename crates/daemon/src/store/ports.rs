@@ -5,8 +5,8 @@ use toknila_app::{AppError, AppResult, Reader, UnitOfWork};
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
-    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Subtask, Ticket,
-    TicketId, TicketKey, Timestamp,
+    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Subtask, Thread,
+    ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey, Timestamp,
 };
 
 use super::{Repo, StoreError, WriteTx};
@@ -59,6 +59,9 @@ reader! {
     chain_view(chain: ChainId) -> Option<ChainView>;
     subtasks(ticket: TicketId) -> Vec<Subtask>;
     comments(ticket: TicketId) -> Vec<Comment>;
+    threads(ticket: TicketId) -> Vec<Thread>;
+    thread_messages(thread: ThreadId) -> Vec<ThreadMessage>;
+    thread_versions(thread: ThreadId) -> Vec<ThreadVersion>;
     last_event_payload(entity: &str, entity_id: &str) -> Option<Value>;
 }
 
@@ -93,6 +96,18 @@ impl UnitOfWork for WriteTx<'_> {
 
     fn upsert_subtask(&mut self, subtask: &Subtask) -> AppResult<()> {
         Ok(self.repo().upsert_subtask(subtask)?)
+    }
+
+    fn upsert_thread(&mut self, thread: &Thread) -> AppResult<()> {
+        Ok(self.repo().upsert_thread(thread)?)
+    }
+
+    fn insert_thread_message(&mut self, message: &ThreadMessage) -> AppResult<()> {
+        Ok(self.repo().insert_thread_message(message)?)
+    }
+
+    fn insert_thread_version(&mut self, version: &ThreadVersion) -> AppResult<()> {
+        Ok(self.repo().insert_thread_version(version)?)
     }
 
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {

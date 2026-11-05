@@ -11,6 +11,7 @@ pub mod machine;
 pub mod model;
 pub mod plan;
 pub mod template;
+pub mod thread;
 pub mod wire;
 
 pub use model::*;

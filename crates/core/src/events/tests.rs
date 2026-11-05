@@ -136,3 +136,83 @@ fn edge_events_belong_to_their_chain() {
     );
     assert_eq!(payload(&e)["edge"]["kind"], json!("normal"));
 }
+
+#[test]
+fn thread_events_pin_their_names_and_payloads() {
+    use crate::{Actor, ArtifactFormat, MessageKind, ThreadId, ThreadKind, ThreadMessageId};
+    use crate::{ThreadMessage, thread};
+
+    let id: ThreadId = "01JBQ7ZJ0000000000000000H1".parse().expect("id");
+    let key: TicketKey = "DEMO-1".parse().expect("key");
+    let t = thread::open(
+        id,
+        "01JBQ7ZJ0000000000000000T1".parse().expect("id"),
+        1,
+        ThreadKind::Design,
+        "List screen",
+        Actor::Agent,
+        Timestamp(5),
+    )
+    .expect("open");
+    let opened = DomainEvent::ThreadOpened {
+        ticket: key.clone(),
+        thread: t.clone(),
+    };
+    assert_eq!(
+        (opened.entity(), opened.kind(), opened.entity_id().as_str()),
+        ("thread", "opened", "01JBQ7ZJ0000000000000000H1")
+    );
+    assert_eq!(
+        payload(&opened),
+        json!({ "ticket": "DEMO-1", "thread": serde_json::to_value(&t).expect("t") })
+    );
+
+    let message = ThreadMessage {
+        id: ThreadMessageId::new(),
+        thread_id: id,
+        author: Actor::Human,
+        kind: MessageKind::ChangesRequested,
+        text: "add an error state".into(),
+        created_at: Timestamp(6),
+    };
+    let posted = DomainEvent::ThreadMessagePosted {
+        ticket: key.clone(),
+        message: message.clone(),
+    };
+    assert_eq!(
+        (posted.entity_id().as_str(), posted.kind()),
+        ("01JBQ7ZJ0000000000000000H1", "message_posted")
+    );
+    assert_eq!(
+        payload(&posted),
+        json!({ "ticket": "DEMO-1", "message": serde_json::to_value(&message).expect("m") })
+    );
+
+    let version = DomainEvent::ThreadVersionPosted {
+        ticket: key.clone(),
+        thread: id,
+        number: 2,
+        format: ArtifactFormat::Mermaid,
+        author: Actor::Agent,
+        bytes: 42,
+    };
+    assert_eq!(version.kind(), "version_posted");
+    assert_eq!(
+        payload(&version),
+        json!({ "ticket": "DEMO-1", "thread": "01JBQ7ZJ0000000000000000H1", "number": 2,
+                "format": "mermaid", "author": "agent", "bytes": 42 })
+    );
+
+    let approved = DomainEvent::ThreadApproved {
+        ticket: key.clone(),
+        thread: t.clone(),
+    };
+    let reopened = DomainEvent::ThreadReopened {
+        ticket: key,
+        thread: t,
+    };
+    assert_eq!(
+        (approved.kind(), reopened.kind(), reopened.entity()),
+        ("approved", "reopened", "thread")
+    );
+}

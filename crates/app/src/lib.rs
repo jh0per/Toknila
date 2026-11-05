@@ -14,6 +14,7 @@ pub mod projects;
 pub mod recovery;
 pub mod releases;
 pub mod resolve;
+pub mod threads;
 pub mod tickets;
 pub mod wildcards;
 

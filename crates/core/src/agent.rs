@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{CommentBody, WaitingReason};
+use crate::{ArtifactFormat, CommentBody, ThreadKind, WaitingReason};
 
 /// A wildcard card as proposed: work nobody planned, found during a ticket. References are
 /// ticket keys, titles or release versions of the same chain.
@@ -51,6 +51,17 @@ pub enum AgentEvent {
     /// The agent found work nobody planned: a wildcard card on the ticket's chain, found during
     /// this ticket, that waits for a person's approval. The answer is the new card.
     Propose(Proposal),
+    /// The agent opens a thread to settle a design, a flow or an architecture with the owner.
+    /// The hand-in is refused until every thread is approved.
+    OpenThread { kind: ThreadKind, title: String },
+    /// A message from the agent in a thread (`thread`: its number on this ticket, or its id).
+    ThreadMessage { thread: String, text: String },
+    /// A new artifact version from the agent. A new version reopens an approved thread.
+    ThreadVersion {
+        thread: String,
+        format: ArtifactFormat,
+        body: String,
+    },
 }
 
 impl AgentEvent {
@@ -129,6 +140,28 @@ mod tests {
                     r#"{"event":"propose","title":"token refresh","prompt":"add the endpoint","#,
                     r#""acceptance":["401 refreshes"],"after":["DEMO-1"],"before":["DEMO-2"]}"#
                 ),
+            ),
+            (
+                AgentEvent::OpenThread {
+                    kind: ThreadKind::Design,
+                    title: "List screen".into(),
+                },
+                r#"{"event":"open_thread","kind":"design","title":"List screen"}"#,
+            ),
+            (
+                AgentEvent::ThreadMessage {
+                    thread: "1".into(),
+                    text: "empty state?".into(),
+                },
+                r#"{"event":"thread_message","thread":"1","text":"empty state?"}"#,
+            ),
+            (
+                AgentEvent::ThreadVersion {
+                    thread: "1".into(),
+                    format: ArtifactFormat::Mermaid,
+                    body: "graph TD; A-->B".into(),
+                },
+                r#"{"event":"thread_version","thread":"1","format":"mermaid","body":"graph TD; A-->B"}"#,
             ),
         ];
         for (event, json) in cases {

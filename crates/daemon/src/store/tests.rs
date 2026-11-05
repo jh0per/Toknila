@@ -151,6 +151,101 @@ async fn a_phase_0_database_gains_wildcard_marks() {
 }
 
 #[tokio::test]
+async fn a_database_before_threads_gains_them_and_keeps_every_byte_of_an_artifact() {
+    use toknila_core::{
+        ArtifactFormat, MessageKind, ThreadId, ThreadKind, ThreadMessageId, ThreadVersionId, thread,
+    };
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("toknila.db");
+    let p = project();
+    let c = chain(p.id);
+    let t = ticket(c.id, 1);
+    {
+        let conn = Connection::open(&path).expect("raw open");
+        conn.execute_batch(schema::MIGRATIONS[0]).expect("schema 1");
+        conn.execute_batch(schema::MIGRATIONS[1]).expect("schema 2");
+        conn.pragma_update(None, "user_version", 2)
+            .expect("version");
+        let repo = Repo::new(&conn);
+        repo.insert_project(&p).expect("project");
+        repo.insert_chain(&c).expect("chain");
+        repo.upsert_ticket(&t).expect("ticket");
+    }
+    let store = Store::open(&path).expect("migrates");
+    let th = thread::open(
+        ThreadId::new(),
+        t.id,
+        1,
+        ThreadKind::Design,
+        "List",
+        Actor::Agent,
+        NOW,
+    )
+    .expect("thread");
+    let body = "ключ ✓ \"quoted\"\n<b>html</b>".to_owned();
+    let v = thread::version(
+        &th,
+        ThreadVersionId::new(),
+        1,
+        Actor::Agent,
+        ArtifactFormat::Html,
+        body,
+        NOW,
+    )
+    .expect("version");
+    let m = thread::message(
+        &th,
+        ThreadMessageId::new(),
+        Actor::Human,
+        MessageKind::ChangesRequested,
+        "more",
+        NOW,
+    )
+    .expect("message");
+    let (th2, v2, m2) = (th.clone(), v.clone(), m.clone());
+    store
+        .write(Actor::Agent, NOW, move |tx| -> Result<(), StoreError> {
+            let repo = tx.repo();
+            repo.upsert_thread(&th2)?;
+            repo.insert_thread_version(&v2)?;
+            repo.insert_thread_message(&m2)?;
+            Ok(())
+        })
+        .await
+        .expect("write");
+    let tid = t.id;
+    let (threads, versions, messages) = store
+        .read(move |repo| {
+            let threads = repo.threads(tid)?;
+            let id = threads[0].id;
+            Ok((
+                threads,
+                repo.thread_versions(id)?,
+                repo.thread_messages(id)?,
+            ))
+        })
+        .await
+        .expect("read");
+    assert_eq!(
+        (threads, versions, messages),
+        (vec![th.clone()], vec![v.clone()], vec![m])
+    );
+
+    // A version number and a thread number are unique; a second insert is refused.
+    let again = store
+        .write(Actor::Agent, NOW, move |tx| -> Result<(), StoreError> {
+            let dup = toknila_core::ThreadVersion {
+                id: ThreadVersionId::new(),
+                ..v
+            };
+            tx.repo().insert_thread_version(&dup)
+        })
+        .await;
+    assert!(again.is_err(), "version 1 already exists");
+}
+
+#[tokio::test]
 async fn newer_database_is_refused() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("toknila.db");

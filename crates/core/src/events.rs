@@ -5,8 +5,8 @@
 use serde::Serialize;
 
 use crate::{
-    Chain, Comment, Edge, Project, Release, ReleaseState, StatusReason, Subtask, Ticket, TicketKey,
-    TicketStatus,
+    Actor, ArtifactFormat, Chain, Comment, Edge, Project, Release, ReleaseState, StatusReason,
+    Subtask, Thread, ThreadId, ThreadMessage, Ticket, TicketKey, TicketStatus,
 };
 
 /// One change. Serialises as its payload: the variant's fields, without a tag.
@@ -80,6 +80,34 @@ pub enum DomainEvent {
         ticket: TicketKey,
         subtask: Subtask,
     },
+    /// A thread was opened on a ticket.
+    ThreadOpened {
+        ticket: TicketKey,
+        thread: Thread,
+    },
+    ThreadMessagePosted {
+        ticket: TicketKey,
+        message: ThreadMessage,
+    },
+    /// A new artifact version; the body stays in the database, the journal carries its size.
+    ThreadVersionPosted {
+        ticket: TicketKey,
+        thread: ThreadId,
+        number: u32,
+        format: ArtifactFormat,
+        author: Actor,
+        bytes: usize,
+    },
+    /// A person approved a thread.
+    ThreadApproved {
+        ticket: TicketKey,
+        thread: Thread,
+    },
+    /// An approved thread went back to open (a new version, or a request for changes).
+    ThreadReopened {
+        ticket: TicketKey,
+        thread: Thread,
+    },
 }
 
 impl DomainEvent {
@@ -130,7 +158,7 @@ impl DomainEvent {
     }
 
     /// Kind of entity the event is about: `project`, `chain`, `ticket`, `release`, `comment`,
-    /// `subtask`. Edge events belong to their chain.
+    /// `subtask`, `thread`. Edge events belong to their chain.
     pub fn entity(&self) -> &'static str {
         match self {
             Self::ProjectCreated { .. } => "project",
@@ -146,6 +174,11 @@ impl DomainEvent {
             Self::ReleaseCreated { .. } | Self::ReleaseStateChanged { .. } => "release",
             Self::CommentAdded { .. } | Self::CommentDelivered { .. } => "comment",
             Self::SubtaskAdded { .. } | Self::SubtaskUpdated { .. } => "subtask",
+            Self::ThreadOpened { .. }
+            | Self::ThreadMessagePosted { .. }
+            | Self::ThreadVersionPosted { .. }
+            | Self::ThreadApproved { .. }
+            | Self::ThreadReopened { .. } => "thread",
         }
     }
 
@@ -170,6 +203,11 @@ impl DomainEvent {
             Self::SubtaskAdded { subtask, .. } | Self::SubtaskUpdated { subtask, .. } => {
                 subtask.id.to_string()
             }
+            Self::ThreadOpened { thread, .. }
+            | Self::ThreadApproved { thread, .. }
+            | Self::ThreadReopened { thread, .. } => thread.id.to_string(),
+            Self::ThreadMessagePosted { message, .. } => message.thread_id.to_string(),
+            Self::ThreadVersionPosted { thread, .. } => thread.to_string(),
         }
     }
 
@@ -190,6 +228,11 @@ impl DomainEvent {
             Self::TicketProposed { .. } => "proposed",
             Self::TicketApproved { .. } => "approved",
             Self::TicketRejected { .. } => "rejected",
+            Self::ThreadOpened { .. } => "opened",
+            Self::ThreadMessagePosted { .. } => "message_posted",
+            Self::ThreadVersionPosted { .. } => "version_posted",
+            Self::ThreadApproved { .. } => "approved",
+            Self::ThreadReopened { .. } => "reopened",
         }
     }
 }

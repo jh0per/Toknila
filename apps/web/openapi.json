@@ -1254,6 +1254,365 @@
           }
         }
       }
+    },
+    "/tickets/{ticket}/threads": {
+      "get": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A ticket's threads with their messages and versions, and its phase.",
+        "operationId": "list_threads",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketThreads"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A person opens a thread on a ticket.",
+        "operationId": "open_thread",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewThread"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/threads/{thread}/approve": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A person approves a thread; its latest version is pinned.",
+        "operationId": "approve_thread",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "description": "Thread number on the ticket (1, 2, ...) or thread id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/threads/{thread}/changes": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A person asks for changes: a message that keeps the thread open, or reopens it.",
+        "operationId": "request_thread_changes",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "description": "Thread number on the ticket (1, 2, ...) or thread id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/threads/{thread}/messages": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A person posts a message in a thread.",
+        "operationId": "post_thread_message",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "description": "Thread number on the ticket (1, 2, ...) or thread id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/threads/{thread}/versions": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A person posts a new artifact version; an approved thread reopens.",
+        "operationId": "post_thread_version",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "description": "Thread number on the ticket (1, 2, ...) or thread id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1418,9 +1777,91 @@
               }
             ],
             "description": "The agent found work nobody planned: a wildcard card on the ticket's chain, found during\nthis ticket, that waits for a person's approval. The answer is the new card."
+          },
+          {
+            "type": "object",
+            "description": "The agent opens a thread to settle a design, a flow or an architecture with the owner.\nThe hand-in is refused until every thread is approved.",
+            "required": [
+              "kind",
+              "title",
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "open_thread"
+                ]
+              },
+              "kind": {
+                "$ref": "#/components/schemas/ThreadKind"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A message from the agent in a thread (`thread`: its number on this ticket, or its id).",
+            "required": [
+              "thread",
+              "text",
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "thread_message"
+                ]
+              },
+              "text": {
+                "type": "string"
+              },
+              "thread": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A new artifact version from the agent. A new version reopens an approved thread.",
+            "required": [
+              "thread",
+              "format",
+              "body",
+              "event"
+            ],
+            "properties": {
+              "body": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string",
+                "enum": [
+                  "thread_version"
+                ]
+              },
+              "format": {
+                "$ref": "#/components/schemas/ArtifactFormat"
+              },
+              "thread": {
+                "type": "string"
+              }
+            }
           }
         ],
         "description": "One report from the agent working on a ticket."
+      },
+      "ArtifactFormat": {
+        "type": "string",
+        "description": "How an artifact body is to be read.",
+        "enum": [
+          "mermaid",
+          "markdown",
+          "html"
+        ]
       },
       "BlockedReason": {
         "oneOf": [
@@ -1910,6 +2351,14 @@
           }
         }
       },
+      "MessageKind": {
+        "type": "string",
+        "description": "Plain message, or a person's request for changes.",
+        "enum": [
+          "message",
+          "changes_requested"
+        ]
+      },
       "NewChain": {
         "type": "object",
         "description": "`POST /v1/projects/{project}/chains`.",
@@ -1975,6 +2424,18 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "NewMessage": {
+        "type": "object",
+        "description": "Body of `.../messages` and `.../changes`.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
           }
         }
       },
@@ -2091,6 +2552,22 @@
           }
         }
       },
+      "NewThread": {
+        "type": "object",
+        "description": "`POST /v1/tickets/{ticket}/threads`.",
+        "required": [
+          "kind",
+          "title"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ThreadKind"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "NewTicket": {
         "type": "object",
         "description": "`POST /v1/chains/{chain}/tickets`.",
@@ -2145,6 +2622,22 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "NewVersion": {
+        "type": "object",
+        "description": "`POST /v1/tickets/{ticket}/threads/{thread}/versions`.",
+        "required": [
+          "format",
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ArtifactFormat"
           }
         }
       },
@@ -2299,6 +2792,14 @@
             ]
           }
         }
+      },
+      "Phase": {
+        "type": "string",
+        "description": "Where a ticket is: settling its design while any thread is open, implementing otherwise.\nComputed from the threads, never stored.",
+        "enum": [
+          "design",
+          "implement"
+        ]
       },
       "Project": {
         "type": "object",
@@ -2703,6 +3204,198 @@
         "type": "string",
         "description": "Identifies a [`crate::Subtask`]."
       },
+      "Thread": {
+        "type": "object",
+        "description": "A discussion on one ticket that ends in a person's approval.",
+        "required": [
+          "id",
+          "ticket_id",
+          "number",
+          "kind",
+          "title",
+          "state",
+          "opened_by",
+          "created_at"
+        ],
+        "properties": {
+          "approved_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When a person approved it; `None` while open."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approved_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Version number the approval pinned; `None` while open, or when approved without one.",
+            "minimum": 0
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ThreadId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ThreadKind"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1-based, per ticket; how people refer to it.",
+            "minimum": 0
+          },
+          "opened_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ThreadState"
+          },
+          "ticket_id": {
+            "$ref": "#/components/schemas/TicketId"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ThreadDetail": {
+        "type": "object",
+        "description": "A thread with its messages and artifact versions.",
+        "required": [
+          "thread",
+          "messages",
+          "versions"
+        ],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadMessage"
+            },
+            "description": "Oldest first."
+          },
+          "thread": {
+            "$ref": "#/components/schemas/Thread"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadVersion"
+            },
+            "description": "By number; immutable."
+          }
+        }
+      },
+      "ThreadId": {
+        "type": "string",
+        "description": "Identifies a [`crate::Thread`]."
+      },
+      "ThreadKind": {
+        "type": "string",
+        "description": "What a thread settles before the agent implements the card.",
+        "enum": [
+          "design",
+          "flow",
+          "architecture",
+          "other"
+        ]
+      },
+      "ThreadMessage": {
+        "type": "object",
+        "description": "One message in a thread.",
+        "required": [
+          "id",
+          "thread_id",
+          "author",
+          "kind",
+          "text",
+          "created_at"
+        ],
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ThreadMessageId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MessageKind"
+          },
+          "text": {
+            "type": "string"
+          },
+          "thread_id": {
+            "$ref": "#/components/schemas/ThreadId"
+          }
+        }
+      },
+      "ThreadMessageId": {
+        "type": "string",
+        "description": "Identifies a [`crate::ThreadMessage`]."
+      },
+      "ThreadState": {
+        "type": "string",
+        "description": "Whether the thread still needs a decision.",
+        "enum": [
+          "open",
+          "approved"
+        ]
+      },
+      "ThreadVersion": {
+        "type": "object",
+        "description": "An immutable, numbered version of the thread's artifact.",
+        "required": [
+          "id",
+          "thread_id",
+          "number",
+          "author",
+          "format",
+          "body",
+          "created_at"
+        ],
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ArtifactFormat"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ThreadVersionId"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1-based, per thread.",
+            "minimum": 0
+          },
+          "thread_id": {
+            "$ref": "#/components/schemas/ThreadId"
+          }
+        }
+      },
+      "ThreadVersionId": {
+        "type": "string",
+        "description": "Identifies a [`crate::ThreadVersion`]."
+      },
       "Ticket": {
         "type": "object",
         "description": "One unit of work for one ship.",
@@ -2819,7 +3512,8 @@
           "chain",
           "subtasks",
           "comments",
-          "in_status_ms"
+          "in_status_ms",
+          "phase"
         ],
         "properties": {
           "chain": {
@@ -2836,6 +3530,10 @@
             "format": "int64",
             "description": "Milliseconds in the current status.",
             "minimum": 0
+          },
+          "phase": {
+            "$ref": "#/components/schemas/Phase",
+            "description": "Computed from the ticket's threads: design while any is open, implement otherwise."
           },
           "subtasks": {
             "type": "array",
@@ -2900,6 +3598,30 @@
           "released",
           "cancelled"
         ]
+      },
+      "TicketThreads": {
+        "type": "object",
+        "description": "`GET /v1/tickets/{ticket}/threads`: every thread of a ticket and the ticket's phase.",
+        "required": [
+          "ticket",
+          "phase",
+          "threads"
+        ],
+        "properties": {
+          "phase": {
+            "$ref": "#/components/schemas/Phase"
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadDetail"
+            }
+          },
+          "ticket": {
+            "type": "string",
+            "description": "The ticket's key."
+          }
+        }
       },
       "Timestamp": {
         "type": "integer",

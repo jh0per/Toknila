@@ -341,6 +341,92 @@ export interface paths {
         patch: operations["patch_subtask"];
         trace?: never;
     };
+    "/tickets/{ticket}/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A ticket's threads with their messages and versions, and its phase. */
+        get: operations["list_threads"];
+        put?: never;
+        /** A person opens a thread on a ticket. */
+        post: operations["open_thread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/threads/{thread}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person approves a thread; its latest version is pinned. */
+        post: operations["approve_thread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/threads/{thread}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person asks for changes: a message that keeps the thread open, or reopens it. */
+        post: operations["request_thread_changes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/threads/{thread}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person posts a message in a thread. */
+        post: operations["post_thread_message"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/threads/{thread}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person posts a new artifact version; an approved thread reopens. */
+        post: operations["post_thread_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -383,7 +469,28 @@ export interface components {
         } | (components["schemas"]["Proposal"] & {
             /** @enum {string} */
             event: "propose";
-        });
+        }) | {
+            /** @enum {string} */
+            event: "open_thread";
+            kind: components["schemas"]["ThreadKind"];
+            title: string;
+        } | {
+            /** @enum {string} */
+            event: "thread_message";
+            text: string;
+            thread: string;
+        } | {
+            body: string;
+            /** @enum {string} */
+            event: "thread_version";
+            format: components["schemas"]["ArtifactFormat"];
+            thread: string;
+        };
+        /**
+         * @description How an artifact body is to be read.
+         * @enum {string}
+         */
+        ArtifactFormat: "mermaid" | "markdown" | "html";
         /** @description Why a ticket is Blocked. */
         BlockedReason: {
             /** @enum {string} */
@@ -528,6 +635,11 @@ export interface components {
             /** Format: int64 */
             seq: number;
         };
+        /**
+         * @description Plain message, or a person's request for changes.
+         * @enum {string}
+         */
+        MessageKind: "message" | "changes_requested";
         /** @description `POST /v1/projects/{project}/chains`. */
         NewChain: {
             /** @description Defaults to true. */
@@ -544,6 +656,10 @@ export interface components {
             body?: components["schemas"]["CommentBody"] | null;
             kind?: components["schemas"]["CommentKind"] | null;
             text?: string | null;
+        };
+        /** @description Body of `.../messages` and `.../changes`. */
+        NewMessage: {
+            text: string;
         };
         /** @description `POST /v1/projects`: a new project; unset fields take the project defaults. */
         NewProject: {
@@ -570,6 +686,11 @@ export interface components {
         NewSubtask: {
             text: string;
         };
+        /** @description `POST /v1/tickets/{ticket}/threads`. */
+        NewThread: {
+            kind: components["schemas"]["ThreadKind"];
+            title: string;
+        };
         /** @description `POST /v1/chains/{chain}/tickets`. */
         NewTicket: {
             acceptance?: string[];
@@ -583,6 +704,11 @@ export interface components {
             /** @description Checklist items. */
             subtasks?: string[];
             title: string;
+        };
+        /** @description `POST /v1/tickets/{ticket}/threads/{thread}/versions`. */
+        NewVersion: {
+            body: string;
+            format: components["schemas"]["ArtifactFormat"];
         };
         /** @description `POST /v1/chains/{chain}/wildcards`: a person proposes a card. */
         NewWildcard: components["schemas"]["Proposal"] & {
@@ -623,6 +749,12 @@ export interface components {
             review_mode?: components["schemas"]["ReviewMode"] | null;
             title?: string | null;
         };
+        /**
+         * @description Where a ticket is: settling its design while any thread is open, implementing otherwise.
+         *     Computed from the threads, never stored.
+         * @enum {string}
+         */
+        Phase: "design" | "implement";
         /** @description One product: one monorepo, its chains, depot and settings. */
         Project: {
             default_profile: string;
@@ -747,6 +879,74 @@ export interface components {
         };
         /** @description Identifies a [`crate::Subtask`]. */
         SubtaskId: string;
+        /** @description A discussion on one ticket that ends in a person's approval. */
+        Thread: {
+            approved_at?: components["schemas"]["Timestamp"] | null;
+            /**
+             * Format: int32
+             * @description Version number the approval pinned; `None` while open, or when approved without one.
+             */
+            approved_version?: number | null;
+            created_at: components["schemas"]["Timestamp"];
+            id: components["schemas"]["ThreadId"];
+            kind: components["schemas"]["ThreadKind"];
+            /**
+             * Format: int32
+             * @description 1-based, per ticket; how people refer to it.
+             */
+            number: number;
+            opened_by: components["schemas"]["Actor"];
+            state: components["schemas"]["ThreadState"];
+            ticket_id: components["schemas"]["TicketId"];
+            title: string;
+        };
+        /** @description A thread with its messages and artifact versions. */
+        ThreadDetail: {
+            /** @description Oldest first. */
+            messages: components["schemas"]["ThreadMessage"][];
+            thread: components["schemas"]["Thread"];
+            /** @description By number; immutable. */
+            versions: components["schemas"]["ThreadVersion"][];
+        };
+        /** @description Identifies a [`crate::Thread`]. */
+        ThreadId: string;
+        /**
+         * @description What a thread settles before the agent implements the card.
+         * @enum {string}
+         */
+        ThreadKind: "design" | "flow" | "architecture" | "other";
+        /** @description One message in a thread. */
+        ThreadMessage: {
+            author: components["schemas"]["Actor"];
+            created_at: components["schemas"]["Timestamp"];
+            id: components["schemas"]["ThreadMessageId"];
+            kind: components["schemas"]["MessageKind"];
+            text: string;
+            thread_id: components["schemas"]["ThreadId"];
+        };
+        /** @description Identifies a [`crate::ThreadMessage`]. */
+        ThreadMessageId: string;
+        /**
+         * @description Whether the thread still needs a decision.
+         * @enum {string}
+         */
+        ThreadState: "open" | "approved";
+        /** @description An immutable, numbered version of the thread's artifact. */
+        ThreadVersion: {
+            author: components["schemas"]["Actor"];
+            body: string;
+            created_at: components["schemas"]["Timestamp"];
+            format: components["schemas"]["ArtifactFormat"];
+            id: components["schemas"]["ThreadVersionId"];
+            /**
+             * Format: int32
+             * @description 1-based, per thread.
+             */
+            number: number;
+            thread_id: components["schemas"]["ThreadId"];
+        };
+        /** @description Identifies a [`crate::ThreadVersion`]. */
+        ThreadVersionId: string;
         /** @description One unit of work for one ship. */
         Ticket: {
             /** @description Acceptance criteria, one per entry. */
@@ -782,6 +982,8 @@ export interface components {
              * @description Milliseconds in the current status.
              */
             in_status_ms: number;
+            /** @description Computed from the ticket's threads: design while any is open, implement otherwise. */
+            phase: components["schemas"]["Phase"];
             subtasks: components["schemas"]["Subtask"][];
             ticket: components["schemas"]["Ticket"];
         };
@@ -802,6 +1004,13 @@ export interface components {
          * @enum {string}
          */
         TicketStatus: "proposed" | "backlog" | "ready" | "running" | "waiting" | "blocked" | "review" | "merged" | "released" | "cancelled";
+        /** @description `GET /v1/tickets/{ticket}/threads`: every thread of a ticket and the ticket's phase. */
+        TicketThreads: {
+            phase: components["schemas"]["Phase"];
+            threads: components["schemas"]["ThreadDetail"][];
+            /** @description The ticket's key. */
+            ticket: string;
+        };
         /**
          * Format: int64
          * @description Milliseconds since the Unix epoch, UTC.
@@ -1706,6 +1915,250 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_threads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketThreads"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    open_thread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewThread"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approve_thread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+                /** @description Thread number on the ticket (1, 2, ...) or thread id */
+                thread: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    request_thread_changes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+                /** @description Thread number on the ticket (1, 2, ...) or thread id */
+                thread: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewMessage"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    post_thread_message: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+                /** @description Thread number on the ticket (1, 2, ...) or thread id */
+                thread: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewMessage"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    post_thread_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+                /** @description Thread number on the ticket (1, 2, ...) or thread id */
+                thread: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewVersion"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {
