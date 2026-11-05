@@ -5,6 +5,7 @@
 //! events are then published to subscribers (the WebSocket stream).
 
 mod codec;
+mod notes;
 mod ports;
 mod schema;
 

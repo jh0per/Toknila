@@ -1,4 +1,4 @@
-//! `/chains/{chain}/tickets`, `/tickets`.
+//! `/chains/{chain}/tickets`, `/chains/{chain}/wildcards`, `/tickets`.
 
 use std::collections::HashMap;
 
@@ -6,13 +6,13 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_app::tickets::{self, TicketAction};
-use toknila_app::{notes, resolve};
+use toknila_app::{notes, resolve, wildcards};
 use toknila_core::{Actor, ChainId};
 
 use super::{ApiResult, load_ticket_detail, read, ticket_write};
 use crate::http::dto::{
-    ActionInput, NewComment, NewSubtask, NewTicket, PatchSubtask, PatchTicket, TicketDetail,
-    TicketItem, TicketQuery,
+    ActionInput, NewComment, NewSubtask, NewTicket, NewWildcard, PatchSubtask, PatchTicket,
+    TicketDetail, TicketItem, TicketQuery,
 };
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -30,6 +30,26 @@ pub async fn create_ticket(
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<TicketDetail> {
             let id = tickets::create(tx, &chain, input)?;
+            load_ticket_detail(&tx.repo(), id, at)
+        })
+        .await?;
+    Ok((StatusCode::CREATED, Json(detail)))
+}
+
+#[utoipa::path(post, path = "/chains/{chain}/wildcards", tag = "tickets", request_body = NewWildcard,
+    params(("chain" = String, Path, description = "Chain id or name")),
+    responses((status = 201, body = TicketDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// A person proposes a wildcard card: it waits in Proposed until a person approves or rejects it.
+pub async fn propose_wildcard(
+    State(state): State<AppState>,
+    Path(chain): Path<String>,
+    Json(input): Json<NewWildcard>,
+) -> ApiResult<(StatusCode, Json<TicketDetail>)> {
+    let at = now();
+    let (detail, _) = state
+        .store
+        .write(Actor::Human, at, move |tx| -> ApiResult<TicketDetail> {
+            let id = wildcards::propose(tx, &chain, input.card, input.from.as_deref())?;
             load_ticket_detail(&tx.repo(), id, at)
         })
         .await?;
@@ -104,7 +124,7 @@ pub async fn patch_ticket(
 #[utoipa::path(post, path = "/tickets/{ticket}/actions/{action}", tag = "tickets", request_body = ActionInput,
     params(
         ("ticket" = String, Path, description = "Ticket id or key"),
-        ("action" = String, Path, description = "start, pause, resume, block, unblock, accept, return, reopen or cancel"),
+        ("action" = String, Path, description = "start, pause, resume, block, unblock, accept, return, reopen, cancel, approve or reject"),
     ),
     responses((status = 200, body = TicketDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
 pub async fn ticket_action(
@@ -113,8 +133,9 @@ pub async fn ticket_action(
     body: Option<Json<ActionInput>>,
 ) -> ApiResult<Json<TicketDetail>> {
     let text = body.and_then(|Json(b)| b.text);
-    let event = action.parse::<TicketAction>()?.event(text)?;
-    ticket_write(&state, ticket, Actor::Human, move |tx, t| {
+    let by = Actor::Human;
+    let event = action.parse::<TicketAction>()?.event(text, by)?;
+    ticket_write(&state, ticket, by, move |tx, t| {
         Ok(tickets::act(tx, &t, event)?)
     })
     .await

@@ -95,6 +95,37 @@ fn export_then_import_gives_the_same_graph() {
 }
 
 #[test]
+fn cards_outside_the_plan_are_not_exported() {
+    let plan = parse(DEMO).expect("demo parses");
+    let (mut view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
+    let mark = crate::Wildcard {
+        from: None,
+        proposed_by: crate::Actor::Agent,
+        after: vec![],
+        before: vec![],
+        approved: false,
+    };
+    let draft = crate::TicketDraft {
+        title: "token refresh".into(),
+        ..crate::TicketDraft::default()
+    };
+    let key = "DEMO-9".parse().expect("key");
+    let card = crate::Ticket::new_proposed(
+        crate::TicketId::new(),
+        view.chain.id,
+        key,
+        draft,
+        mark,
+        Timestamp(0),
+    );
+    view.propose(card).expect("propose");
+    let text = export(&view, &HashMap::new());
+    assert!(!text.contains("token refresh"), "{text}");
+    let again = parse(&text).expect("reparses");
+    assert_eq!(again.tickets.len(), 4);
+}
+
+#[test]
 fn export_escapes_strings() {
     let mut plan = parse(DEMO).expect("demo parses");
     plan.tickets[0].title = "quote \" and\nnewline".into();

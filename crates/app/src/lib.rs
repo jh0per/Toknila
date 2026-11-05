@@ -15,6 +15,7 @@ pub mod recovery;
 pub mod releases;
 pub mod resolve;
 pub mod tickets;
+pub mod wildcards;
 
 pub use chain::{ChainTx, with_chain};
 pub use error::{AppError, AppResult, ErrorKind};

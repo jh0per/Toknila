@@ -1,7 +1,7 @@
 use proptest::prelude::*;
 
 use super::*;
-use crate::{ChainId, TicketId, TicketKey};
+use crate::{ChainId, TicketDraft, TicketId, TicketKey, Wildcard};
 
 const T0: Timestamp = Timestamp(1_000);
 const NOW: Timestamp = Timestamp(5_000);
@@ -20,8 +20,16 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         S::Cancelled => Some(StatusReason::Cancelled {
             text: "dup".to_owned(),
         }),
+        S::Proposed => Some(StatusReason::Proposed),
         _ => None,
     };
+    let wildcard = (status == S::Proposed).then(|| Wildcard {
+        from: Some("DEMO-9".parse().expect("key")),
+        proposed_by: Actor::Agent,
+        after: vec![NodeRef::Ticket(TicketId::new())],
+        before: vec![NodeRef::Ticket(TicketId::new())],
+        approved: false,
+    });
     Ticket {
         id: TicketId::new(),
         chain_id: ChainId::new(),
@@ -38,6 +46,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         branch: None,
         needs_secrets: false,
         tokens_used: 0,
+        wildcard,
     }
 }
 
@@ -351,6 +360,150 @@ fn cancel_from_anything_but_done() {
     }
 }
 
+// ---- wildcard cards ----
+
+#[test]
+fn a_proposed_card_carries_its_mark_and_is_not_in_the_plan() {
+    let mark = Wildcard {
+        from: Some("DEMO-1".parse().expect("key")),
+        proposed_by: Actor::Agent,
+        after: vec![],
+        before: vec![],
+        approved: true,
+    };
+    let draft = TicketDraft {
+        title: "token refresh".to_owned(),
+        ..TicketDraft::default()
+    };
+    let key = "DEMO-5".parse().expect("key");
+    let t = Ticket::new_proposed(TicketId::new(), ChainId::new(), key, draft, mark, T0);
+    assert_eq!(
+        (t.status, t.status_reason.clone()),
+        (TicketStatus::Proposed, Some(StatusReason::Proposed))
+    );
+    let w = t.wildcard.clone().expect("mark");
+    assert!(!w.approved, "a new card is never approved");
+    assert_eq!(w.from.map(|k| k.to_string()).as_deref(), Some("DEMO-1"));
+    assert!(!t.in_plan());
+    check_invariants(&t).expect("invariants");
+}
+
+#[test]
+fn approve_moves_a_card_to_backlog_and_hands_over_its_edges() {
+    let card = ticket_in(TicketStatus::Proposed);
+    let pending = card.wildcard.clone().expect("mark");
+    let tr = apply(&card, &TicketEvent::Approve { by: Actor::Human }, NOW).expect("approve");
+    check_invariants(&tr.ticket).expect("invariants");
+    assert_eq!(
+        (tr.ticket.status, tr.ticket.status_reason.clone()),
+        (TicketStatus::Backlog, None)
+    );
+    assert_eq!(
+        tr.effects,
+        [Effect::AddProposedEdges {
+            after: pending.after,
+            before: pending.before,
+        }]
+    );
+    let w = tr.ticket.wildcard.clone().expect("the mark stays");
+    assert!(w.approved && w.after.is_empty() && w.before.is_empty());
+    assert_eq!(w.from.map(|k| k.to_string()).as_deref(), Some("DEMO-9"));
+    assert!(tr.ticket.in_plan());
+    assert_eq!(tr.ticket.status_since, NOW);
+}
+
+#[test]
+fn reject_cancels_a_card_with_the_reason_and_keeps_it_out_of_the_plan() {
+    let tr = ok(
+        TicketStatus::Proposed,
+        TicketEvent::Reject {
+            reason: "not now".to_owned(),
+            by: Actor::Human,
+        },
+    );
+    assert_eq!(
+        (tr.ticket.status, tr.ticket.status_reason.clone()),
+        (
+            TicketStatus::Cancelled,
+            Some(StatusReason::Cancelled {
+                text: "not now".to_owned()
+            })
+        )
+    );
+    assert!(tr.effects.is_empty(), "nothing waits for a proposed card");
+    assert!(!tr.ticket.wildcard.as_ref().expect("mark").approved);
+    assert!(!tr.ticket.in_plan());
+    let blank = TicketEvent::Reject {
+        reason: " ".to_owned(),
+        by: Actor::Human,
+    };
+    assert_eq!(
+        apply(&ticket_in(TicketStatus::Proposed), &blank, NOW),
+        Err(TransitionError::EmptyText("reject"))
+    );
+}
+
+#[test]
+fn an_agent_cannot_approve_or_reject_a_card() {
+    let card = ticket_in(TicketStatus::Proposed);
+    for actor in [Actor::Agent, Actor::System] {
+        assert_eq!(
+            apply(&card, &TicketEvent::Approve { by: actor }, NOW),
+            Err(TransitionError::PersonOnly {
+                event: "approve",
+                actor
+            })
+        );
+        let reject = TicketEvent::Reject {
+            reason: "no".to_owned(),
+            by: actor,
+        };
+        assert_eq!(
+            apply(&card, &reject, NOW),
+            Err(TransitionError::PersonOnly {
+                event: "reject",
+                actor
+            })
+        );
+    }
+    assert_eq!(
+        TransitionError::PersonOnly {
+            event: "approve",
+            actor: Actor::Agent
+        }
+        .to_string(),
+        "only a person can approve a card; this came from Agent"
+    );
+}
+
+#[test]
+fn only_proposed_cards_can_be_approved() {
+    let r = apply(
+        &ticket_in(TicketStatus::Backlog),
+        &TicketEvent::Approve { by: Actor::Human },
+        NOW,
+    );
+    assert_eq!(
+        r.map_err(|e| e.to_string()),
+        Err("cannot approve a ticket in Backlog".to_owned())
+    );
+}
+
+#[test]
+fn a_proposed_card_without_its_mark_breaks_the_invariants() {
+    let mut t = ticket_in(TicketStatus::Proposed);
+    t.wildcard = None;
+    assert!(check_invariants(&t).is_err());
+    let mut t = ticket_in(TicketStatus::Proposed);
+    t.status_reason = None;
+    assert!(check_invariants(&t).is_err());
+    let mut t = ticket_in(TicketStatus::Proposed);
+    if let Some(w) = t.wildcard.as_mut() {
+        w.approved = true;
+    }
+    assert!(check_invariants(&t).is_err());
+}
+
 // ---- the whole matrix: exactly the table's pairs are allowed ----
 
 fn sample_events() -> Vec<TicketEvent> {
@@ -377,6 +530,11 @@ fn sample_events() -> Vec<TicketEvent> {
         TicketEvent::Cancel {
             reason: "r".to_owned(),
         },
+        TicketEvent::Approve { by: Actor::Human },
+        TicketEvent::Reject {
+            reason: "r".to_owned(),
+            by: Actor::Human,
+        },
     ]
 }
 
@@ -397,6 +555,8 @@ fn only_table_transitions_are_allowed() {
         (S::Review, "accept"),
         (S::Merged, "released"),
         (S::Merged, "reopen"),
+        (S::Proposed, "approve"),
+        (S::Proposed, "reject"),
     ];
     for status in TicketStatus::ALL {
         for event in sample_events() {
@@ -404,7 +564,8 @@ fn only_table_transitions_are_allowed() {
                 status,
                 S::Backlog | S::Ready | S::Running | S::Waiting | S::Blocked
             );
-            let cancellable = !matches!(status, S::Merged | S::Released | S::Cancelled);
+            let cancellable =
+                !matches!(status, S::Proposed | S::Merged | S::Released | S::Cancelled);
             let expected = allowed.contains(&(status, event.name()))
                 || (event.name() == "pause" && pausable)
                 || (event.name() == "cancel" && cancellable);
@@ -465,13 +626,22 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(TicketEvent::Cancel {
             reason: "r".to_owned()
         }),
+        Just(TicketEvent::Approve { by: Actor::Human }),
+        Just(TicketEvent::Approve { by: Actor::Agent }),
+        Just(TicketEvent::Reject {
+            reason: "r".to_owned(),
+            by: Actor::Human
+        }),
     ]
 }
 
 proptest! {
     #[test]
-    fn no_event_sequence_breaks_invariants(events in proptest::collection::vec(any_event(), 0..60)) {
-        let mut t = ticket_in(TicketStatus::Backlog);
+    fn no_event_sequence_breaks_invariants(
+        start in prop_oneof![Just(TicketStatus::Backlog), Just(TicketStatus::Proposed)],
+        events in proptest::collection::vec(any_event(), 0..60),
+    ) {
+        let mut t = ticket_in(start);
         let mut now = T0;
         for event in &events {
             now = Timestamp(now.0 + 1);

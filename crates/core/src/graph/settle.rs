@@ -62,8 +62,9 @@ impl ChainView {
         }
     }
 
-    /// Applies an event to one ticket and then lets the graph react to its effects
-    /// (a reopened dependency blocks running dependents and sends Ready ones back).
+    /// Applies an event to one ticket and then lets the graph react to its effects (a reopened
+    /// dependency blocks running dependents and sends Ready ones back; an approved wildcard card
+    /// gets its proposed edges). A refused reaction leaves the view unchanged.
     pub fn apply_ticket_event(
         &mut self,
         ticket: TicketId,
@@ -77,7 +78,15 @@ impl ChainView {
             .ok_or(GraphError::UnknownTicket(ticket))?;
         let tr = machine::apply(&self.tickets[idx], event, now)?;
         let key = tr.ticket.key.clone();
-        self.tickets[idx] = tr.ticket;
+        let previous = std::mem::replace(&mut self.tickets[idx], tr.ticket);
+        for effect in &tr.effects {
+            if let Effect::AddProposedEdges { after, before } = effect
+                && let Err(e) = self.link_proposed(ticket, after, before)
+            {
+                self.tickets[idx] = previous;
+                return Err(e);
+            }
+        }
         if tr.effects.contains(&Effect::DependencyReopened) {
             self.reopen_dependents(ticket, &key, now)?;
         }

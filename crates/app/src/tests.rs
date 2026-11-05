@@ -17,6 +17,8 @@ use crate::{
     AppResult, ErrorKind, Reader, UnitOfWork, agent, chains, resolve, tickets, with_chain,
 };
 
+mod wildcards;
+
 #[derive(Debug)]
 struct Mem {
     project: Project,
@@ -26,6 +28,8 @@ struct Mem {
     events: Vec<DomainEvent>,
     now: Timestamp,
     taken: u32,
+    /// Who issues the commands; a person unless a test says otherwise.
+    actor: Actor,
 }
 
 impl Mem {
@@ -83,11 +87,16 @@ impl Mem {
             events: vec![],
             now,
             taken: 2,
+            actor: Actor::Human,
         }
     }
 
     fn ticket_by_title(&self, title: &str) -> Ticket {
         resolve::ticket(self, title).expect("ticket")
+    }
+
+    fn ticket_by_id(&self, id: TicketId) -> Ticket {
+        self.ticket(id).expect("read").expect("ticket")
     }
 
     fn kinds(&self) -> Vec<String> {
@@ -180,7 +189,7 @@ impl UnitOfWork for Mem {
         self.now
     }
     fn actor(&self) -> Actor {
-        Actor::Human
+        self.actor
     }
     fn insert_project(&mut self, p: &Project) -> AppResult<()> {
         self.project = p.clone();
@@ -335,12 +344,16 @@ fn ticket_actions_parse_and_demand_their_text() {
     let block: TicketAction = "block".parse().expect("known");
     assert_eq!(
         block
-            .event(Some("  ".to_owned()))
+            .event(Some("  ".to_owned()), Actor::Human)
             .expect_err("blank")
             .message,
         "block needs a text"
     );
-    assert!(block.event(Some("waiting on CI".to_owned())).is_ok());
+    assert!(
+        block
+            .event(Some("waiting on CI".to_owned()), Actor::Human)
+            .is_ok()
+    );
     let e = "launch".parse::<TicketAction>().expect_err("unknown");
     assert_eq!(
         (e.kind, e.message.as_str()),

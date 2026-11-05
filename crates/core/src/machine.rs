@@ -17,14 +17,18 @@
 //! | Merged | Review | `Reopen` |
 //! | Backlog, Ready, Running, Waiting, Blocked | Backlog (paused) | `Pause` |
 //! | Backlog (paused) | Backlog | `Resume` |
-//! | any but Merged, Released, Cancelled | Cancelled | `Cancel` |
+//! | any but Proposed, Merged, Released, Cancelled | Cancelled | `Cancel` |
+//! | Proposed | Backlog | `Approve` (a person only; the proposed edges follow) |
+//! | Proposed | Cancelled | `Reject` (a person only, with a reason) |
 //!
 //! Pause is a flag, not a status: a paused ticket sits in Backlog. Graph-wide consequences
 //! (dependents becoming Ready, Blocked or Backlog) come back as [`Effect`]s for the chain graph.
 
 use serde::{Deserialize, Serialize};
 
-use crate::{BlockedReason, StatusReason, Ticket, TicketStatus, Timestamp, WaitingReason};
+use crate::{
+    Actor, BlockedReason, NodeRef, StatusReason, Ticket, TicketStatus, Timestamp, WaitingReason,
+};
 
 /// Something that happened to a ticket.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -61,6 +65,10 @@ pub enum TicketEvent {
     Resume,
     /// `tok cancel <reason>`.
     Cancel { reason: String },
+    /// `tok approve`: a person lets a wildcard card into the plan.
+    Approve { by: Actor },
+    /// `tok reject <reason>`: a person turns a wildcard card down.
+    Reject { reason: String, by: Actor },
 }
 
 impl TicketEvent {
@@ -82,6 +90,8 @@ impl TicketEvent {
             Self::Pause => "pause",
             Self::Resume => "resume",
             Self::Cancel { .. } => "cancel",
+            Self::Approve { .. } => "approve",
+            Self::Reject { .. } => "reject",
         }
     }
 }
@@ -105,6 +115,11 @@ pub enum Effect {
     DependencyReopened,
     /// The ticket may have become startable (resumed): recompute its readiness.
     RecheckReadiness,
+    /// A wildcard card was approved: add the dependencies proposed with it to the graph.
+    AddProposedEdges {
+        after: Vec<NodeRef>,
+        before: Vec<NodeRef>,
+    },
 }
 
 /// The ticket after the event, and what must happen because of it.
@@ -128,6 +143,8 @@ pub enum TransitionError {
     NotPaused,
     #[error("{0} needs a non-empty text")]
     EmptyText(&'static str),
+    #[error("only a person can {event} a card; this came from {actor:?}")]
+    PersonOnly { event: &'static str, actor: Actor },
 }
 
 /// Applies `event` to `ticket` at time `now`. Pure: same input, same output.
@@ -234,13 +251,35 @@ pub fn apply(
             effects.push(Effect::RecheckReadiness);
             (from, ticket.status_reason.clone())
         }
-        (s, TicketEvent::Cancel { reason }) if !s.is_done() => {
+        (s, TicketEvent::Cancel { reason }) if !s.is_done() && s != S::Proposed => {
             non_empty(reason, "cancel")?;
             if matches!(s, S::Running | S::Waiting | S::Blocked | S::Review) {
                 effects.push(Effect::StopRunner);
             }
             effects.push(Effect::DependencySatisfied);
             next.paused = false;
+            (
+                S::Cancelled,
+                Some(StatusReason::Cancelled {
+                    text: reason.clone(),
+                }),
+            )
+        }
+        (S::Proposed, TicketEvent::Approve { by }) => {
+            person_only(*by, "approve")?;
+            let (after, before) = match next.wildcard.as_mut() {
+                Some(w) => {
+                    w.approved = true;
+                    (std::mem::take(&mut w.after), std::mem::take(&mut w.before))
+                }
+                None => (Vec::new(), Vec::new()),
+            };
+            effects.push(Effect::AddProposedEdges { after, before });
+            (S::Backlog, None)
+        }
+        (S::Proposed, TicketEvent::Reject { reason, by }) => {
+            person_only(*by, "reject")?;
+            non_empty(reason, "reject")?;
             (
                 S::Cancelled,
                 Some(StatusReason::Cancelled {
@@ -289,6 +328,15 @@ fn block(
     ))
 }
 
+/// Wildcard decisions belong to a person; an agent or the system cannot make them.
+fn person_only(by: Actor, event: &'static str) -> Result<(), TransitionError> {
+    if by == Actor::Human {
+        Ok(())
+    } else {
+        Err(TransitionError::PersonOnly { event, actor: by })
+    }
+}
+
 fn non_empty(text: &str, what: &'static str) -> Result<(), TransitionError> {
     if text.trim().is_empty() {
         Err(TransitionError::EmptyText(what))
@@ -318,7 +366,8 @@ pub fn check_invariants(ticket: &Ticket) -> Result<(), String> {
             }
         }
         (S::Cancelled, Some(StatusReason::Cancelled { .. })) => {}
-        (S::Waiting | S::Blocked | S::Cancelled, r) => {
+        (S::Proposed, Some(StatusReason::Proposed)) => {}
+        (S::Waiting | S::Blocked | S::Cancelled | S::Proposed, r) => {
             return Err(format!("{:?} with reason {r:?}", ticket.status));
         }
         (_, None) => {}
@@ -326,6 +375,9 @@ pub fn check_invariants(ticket: &Ticket) -> Result<(), String> {
     }
     if ticket.paused && ticket.status != S::Backlog {
         return Err(format!("paused ticket in {:?}", ticket.status));
+    }
+    if ticket.status == S::Proposed && ticket.wildcard.as_ref().is_none_or(|w| w.approved) {
+        return Err(format!("proposed ticket with mark {:?}", ticket.wildcard));
     }
     Ok(())
 }

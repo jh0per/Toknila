@@ -100,6 +100,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chains/{chain}/wildcards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person proposes a wildcard card: it waits in Proposed until a person approves or rejects it. */
+        post: operations["propose_wildcard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -363,7 +380,10 @@ export interface components {
             detail: string;
             /** @enum {string} */
             event: "crashed";
-        };
+        } | (components["schemas"]["Proposal"] & {
+            /** @enum {string} */
+            event: "propose";
+        });
         /** @description Why a ticket is Blocked. */
         BlockedReason: {
             /** @enum {string} */
@@ -424,18 +444,20 @@ export interface components {
             summary: components["schemas"]["ChainSummary"];
         };
         /**
-         * @description Computed chain status (never stored).
+         * @description Computed chain status (never stored). Proposed wildcard cards are not part of the plan: they
+         *     do not count in `total` or `done`, but a pending decision makes the chain need a human.
          * @enum {string}
          */
         ChainStatus: "empty" | "not_started" | "blocked" | "needs_human" | "running" | "idle" | "done";
         /** @description What a product person sees at a glance. */
         ChainSummary: {
-            /** @description Merged, Released or Cancelled (Definition of Done: in the work branch). */
+            /** @description Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`. */
             done: number;
             next_release?: components["schemas"]["NextRelease"] | null;
             released: number;
             status: components["schemas"]["ChainStatus"];
             stopped_at?: components["schemas"]["StoppedAt"] | null;
+            /** @description Tickets in the plan: wildcard cards count only once approved. */
             total: number;
         };
         /**
@@ -562,6 +584,11 @@ export interface components {
             subtasks?: string[];
             title: string;
         };
+        /** @description `POST /v1/chains/{chain}/wildcards`: a person proposes a card. */
+        NewWildcard: components["schemas"]["Proposal"] & {
+            /** @description The ticket during which the work was found: key, id or title. */
+            from?: string | null;
+        };
         /** @description The next milestone on the graph. */
         NextRelease: {
             channel: components["schemas"]["ReleaseChannel"];
@@ -614,6 +641,21 @@ export interface components {
         ProjectId: string;
         /** @example DEMO */
         ProjectKey: string;
+        /**
+         * @description A wildcard card as proposed: work nobody planned, found during a ticket. References are
+         *     ticket keys, titles or release versions of the same chain.
+         */
+        Proposal: {
+            /** @description Acceptance criteria, one per entry. */
+            acceptance?: string[];
+            /** @description Nodes the card waits for. */
+            after?: string[];
+            /** @description Nodes that wait for the card; none of them may have started when it is approved. */
+            before?: string[];
+            /** @description The task for whoever does it. */
+            prompt?: string;
+            title: string;
+        };
         /** @description A release milestone between tickets on the chain graph. */
         Release: {
             /** @description `release/<version>`; empty in phase 0, where there are no branches. */
@@ -674,8 +716,14 @@ export interface components {
             /** @enum {string} */
             status: "cancelled";
             text: string;
+        } | {
+            /** @enum {string} */
+            status: "proposed";
         };
-        /** @description Where the chain stopped: the first ticket, in graph order, that waits on a person. */
+        /**
+         * @description Where the chain stopped: the first ticket, in graph order, that waits on a person (Waiting or
+         *     Blocked first, then Review, then a card to approve).
+         */
         StoppedAt: {
             reason?: components["schemas"]["StatusReason"] | null;
             since: components["schemas"]["Timestamp"];
@@ -723,6 +771,7 @@ export interface components {
             title: string;
             /** Format: int64 */
             tokens_used: number;
+            wildcard?: components["schemas"]["Wildcard"] | null;
         };
         /** @description A ticket with everything attached to it. */
         TicketDetail: {
@@ -752,7 +801,7 @@ export interface components {
          * @description Ticket status. Transitions between them are owned by the state machine (P0-04).
          * @enum {string}
          */
-        TicketStatus: "backlog" | "ready" | "running" | "waiting" | "blocked" | "review" | "merged" | "released" | "cancelled";
+        TicketStatus: "proposed" | "backlog" | "ready" | "running" | "waiting" | "blocked" | "review" | "merged" | "released" | "cancelled";
         /**
          * Format: int64
          * @description Milliseconds since the Unix epoch, UTC.
@@ -770,6 +819,21 @@ export interface components {
         } | {
             /** @enum {string} */
             kind: "silent";
+        };
+        /**
+         * @description The mark of a wildcard card: work found during the chain that waits for a person's approval
+         *     before it joins the plan.
+         */
+        Wildcard: {
+            /** @description Nodes it is to wait for; they become edges when it is approved. */
+            after: components["schemas"]["NodeRef"][];
+            /** @description A person approved it, so it is part of the plan. */
+            approved: boolean;
+            /** @description Nodes that are to wait for it; they become edges when it is approved. */
+            before: components["schemas"]["NodeRef"][];
+            from?: components["schemas"]["TicketKey"] | null;
+            /** @description Who proposed it. */
+            proposed_by: components["schemas"]["Actor"];
         };
     };
     responses: never;
@@ -1015,6 +1079,48 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    propose_wildcard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewWildcard"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1315,7 +1421,7 @@ export interface operations {
             query?: {
                 /** @description Chain id or name. */
                 chain?: string | null;
-                /** @description Only tickets waiting on a person (Waiting, Blocked, Review). */
+                /** @description Only tickets waiting on a person (Proposed, Waiting, Blocked, Review). */
                 needs_human?: boolean;
             };
             header?: never;
@@ -1405,7 +1511,7 @@ export interface operations {
             path: {
                 /** @description Ticket id or key */
                 ticket: string;
-                /** @description start, pause, resume, block, unblock, accept, return, reopen or cancel */
+                /** @description start, pause, resume, block, unblock, accept, return, reopen, cancel, approve or reject */
                 action: string;
             };
             cookie?: never;

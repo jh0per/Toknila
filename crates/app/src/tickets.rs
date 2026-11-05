@@ -109,6 +109,10 @@ pub enum TicketAction {
     Return,
     Reopen,
     Cancel,
+    /// Let a wildcard card into the plan.
+    Approve,
+    /// Turn a wildcard card down, with a reason.
+    Reject,
 }
 
 impl FromStr for TicketAction {
@@ -125,14 +129,17 @@ impl FromStr for TicketAction {
             "return" => Self::Return,
             "reopen" => Self::Reopen,
             "cancel" => Self::Cancel,
+            "approve" => Self::Approve,
+            "reject" => Self::Reject,
             other => return Err(AppError::not_found(format!("action {other}"))),
         })
     }
 }
 
 impl TicketAction {
-    /// The state-machine event for this action; block, return and cancel need a text.
-    pub fn event(self, text: Option<String>) -> AppResult<TicketEvent> {
+    /// The state-machine event for this action, issued `by` the command's actor; block, return,
+    /// cancel and reject need a text.
+    pub fn event(self, text: Option<String>, by: Actor) -> AppResult<TicketEvent> {
         let text = |name: &str| {
             text.filter(|t| !t.trim().is_empty())
                 .ok_or_else(|| AppError::bad_request(format!("{name} needs a text")))
@@ -154,6 +161,11 @@ impl TicketAction {
             Self::Reopen => TicketEvent::Reopen,
             Self::Cancel => TicketEvent::Cancel {
                 reason: text("cancel")?,
+            },
+            Self::Approve => TicketEvent::Approve { by },
+            Self::Reject => TicketEvent::Reject {
+                reason: text("reject")?,
+                by,
             },
         })
     }

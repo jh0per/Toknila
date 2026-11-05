@@ -7,8 +7,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_api_types::{
     ActionInput, AgentEvent, ChainDetail, ChainFile, ChainItem, EdgeInput, ErrorBody, EventRecord,
-    NewChain, NewComment, NewProject, NewRelease, NewSubtask, NewTicket, PatchSubtask, PatchTicket,
-    ReleaseEvent, TicketDetail, TicketItem, TicketQuery,
+    NewChain, NewComment, NewProject, NewRelease, NewSubtask, NewTicket, NewWildcard, PatchSubtask,
+    PatchTicket, ReleaseEvent, TicketDetail, TicketItem, TicketQuery,
 };
 use toknila_core::Project;
 
@@ -195,6 +195,13 @@ impl Client {
         self.call("POST", &format!("/chains/{}/tickets", enc(chain)), Some(t))
     }
 
+    /// `POST /chains/{chain}/wildcards`: a person proposes a wildcard card. Approve or reject it
+    /// with [`Self::ticket_action`] (`approve`, `reject`).
+    pub fn propose_wildcard(&self, chain: &str, w: &NewWildcard) -> ClientResult<TicketDetail> {
+        let path = format!("/chains/{}/wildcards", enc(chain));
+        self.call("POST", &path, Some(w))
+    }
+
     /// `GET /tickets`.
     pub fn tickets(&self, q: &TicketQuery) -> ClientResult<Vec<TicketItem>> {
         let mut path = format!("/tickets?needs_human={}", q.needs_human);
@@ -260,7 +267,8 @@ impl Client {
         self.call("PATCH", &path, Some(p))
     }
 
-    /// `POST /tickets/{ticket}/events`: what a ticket's agent reports.
+    /// `POST /tickets/{ticket}/events`: what a ticket's agent reports. The answer is the ticket,
+    /// or the new card for `propose`.
     pub fn agent_event(&self, ticket: &str, e: &AgentEvent) -> ClientResult<TicketDetail> {
         self.call("POST", &format!("/tickets/{}/events", enc(ticket)), Some(e))
     }

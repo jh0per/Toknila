@@ -14,8 +14,9 @@ pub use toknila_app::chains::NewChain;
 pub use toknila_app::projects::NewProject;
 pub use toknila_app::releases::NewRelease;
 pub use toknila_app::tickets::{NewComment, NewTicket};
+pub use toknila_app::wildcards::NewWildcard;
 pub use toknila_core::TicketPatch as PatchTicket;
-pub use toknila_core::agent::{AgentEvent, ReleaseEvent};
+pub use toknila_core::agent::{AgentEvent, Proposal, ReleaseEvent};
 
 /// A chain with its graph and computed status.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -75,7 +76,7 @@ pub struct TicketItem {
 pub struct TicketQuery {
     /// Chain id or name.
     pub chain: Option<String>,
-    /// Only tickets waiting on a person (Waiting, Blocked, Review).
+    /// Only tickets waiting on a person (Proposed, Waiting, Blocked, Review).
     #[serde(default)]
     pub needs_human: bool,
 }

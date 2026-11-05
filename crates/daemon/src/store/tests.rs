@@ -3,6 +3,7 @@ use toknila_core::{
     Actor, Chain, ChainId, Comment, CommentBody, CommentId, CommentKind, Edge, EdgeKind, NodeRef,
     Project, ProjectId, Release, ReleaseChannel, ReleaseId, ReleaseState, ReviewMode, StartMode,
     StatusReason, Subtask, SubtaskId, Ticket, TicketId, TicketStatus, Timestamp, WaitingReason,
+    Wildcard,
 };
 
 use super::*;
@@ -50,6 +51,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         branch: None,
         needs_secrets: false,
         tokens_used: 0,
+        wildcard: None,
     }
 }
 
@@ -92,6 +94,60 @@ async fn migrations_from_zero_and_reopen_are_idempotent() {
         );
         drop(store);
     }
+}
+
+#[tokio::test]
+async fn a_phase_0_database_gains_wildcard_marks() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("toknila.db");
+    // A database written by phase 0: the first migration only, one ticket.
+    let p = project();
+    let c = chain(p.id);
+    let old = ticket(c.id, 1);
+    {
+        let conn = Connection::open(&path).expect("raw open");
+        conn.execute_batch(schema::MIGRATIONS[0])
+            .expect("phase-0 schema");
+        conn.pragma_update(None, "user_version", 1)
+            .expect("version");
+        let repo = Repo::new(&conn);
+        repo.insert_project(&p).expect("project");
+        repo.insert_chain(&c).expect("chain");
+        conn.execute(
+            "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
+             status_since, paused, needs_secrets, tokens_used) \
+             VALUES (?1, ?2, 'DEMO-1', ?3, ?4, '[\"green\"]', 'backlog', 1, 0, 0, 0)",
+            params![old.id.to_string(), c.id.to_string(), old.title, old.prompt],
+        )
+        .expect("phase-0 ticket");
+    }
+    let store = Store::open(&path).expect("migrates");
+    let id = old.id;
+    let loaded = store.read(move |repo| repo.ticket(id)).await.expect("read");
+    assert_eq!(loaded.as_ref().map(|t| &t.wildcard), Some(&None));
+    assert_eq!(loaded.map(|t| t.title), Some(old.title.clone()));
+
+    let mut card = ticket(c.id, 2);
+    card.status = TicketStatus::Proposed;
+    card.status_reason = Some(StatusReason::Proposed);
+    card.wildcard = Some(Wildcard {
+        from: Some("DEMO-1".parse().expect("key")),
+        proposed_by: Actor::Agent,
+        after: vec![NodeRef::Ticket(id)],
+        before: vec![],
+        approved: false,
+    });
+    let saved = card.clone();
+    store
+        .write(Actor::Agent, NOW, move |tx| tx.repo().upsert_ticket(&saved))
+        .await
+        .expect("save card");
+    let card_id = card.id;
+    let back = store
+        .read(move |repo| repo.ticket(card_id))
+        .await
+        .expect("read card");
+    assert_eq!(back, Some(card));
 }
 
 #[tokio::test]

@@ -1,6 +1,8 @@
 use super::*;
 use crate::{ChainId, ProjectId, WaitingReason};
 
+mod wildcard;
+
 const T: Timestamp = Timestamp(1_000);
 
 struct Builder {
@@ -45,6 +47,7 @@ impl Builder {
             branch: None,
             needs_secrets: false,
             tokens_used: 0,
+            wildcard: None,
         };
         self.next += 1;
         let id = t.id;

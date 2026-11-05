@@ -362,6 +362,65 @@
         }
       }
     },
+    "/chains/{chain}/wildcards": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "A person proposes a wildcard card: it waits in Proposed until a person approves or rejects it.",
+        "operationId": "propose_wildcard",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewWildcard"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/events": {
       "get": {
         "tags": [
@@ -777,7 +836,7 @@
           {
             "name": "needs_human",
             "in": "query",
-            "description": "Only tickets waiting on a person (Waiting, Blocked, Review).",
+            "description": "Only tickets waiting on a person (Proposed, Waiting, Blocked, Review).",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -905,7 +964,7 @@
           {
             "name": "action",
             "in": "path",
-            "description": "start, pause, resume, block, unblock, accept, return, reopen or cancel",
+            "description": "start, pause, resume, block, unblock, accept, return, reopen, cancel, approve or reject",
             "required": true,
             "schema": {
               "type": "string"
@@ -1336,6 +1395,29 @@
                 ]
               }
             }
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Proposal",
+                "description": "The agent found work nobody planned: a wildcard card on the ticket's chain, found during\nthis ticket, that waits for a person's approval. The answer is the new card."
+              },
+              {
+                "type": "object",
+                "required": [
+                  "event"
+                ],
+                "properties": {
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "propose"
+                    ]
+                  }
+                }
+              }
+            ],
+            "description": "The agent found work nobody planned: a wildcard card on the ticket's chain, found during\nthis ticket, that waits for a person's approval. The answer is the new card."
           }
         ],
         "description": "One report from the agent working on a ticket."
@@ -1562,7 +1644,7 @@
       },
       "ChainStatus": {
         "type": "string",
-        "description": "Computed chain status (never stored).",
+        "description": "Computed chain status (never stored). Proposed wildcard cards are not part of the plan: they\ndo not count in `total` or `done`, but a pending decision makes the chain need a human.",
         "enum": [
           "empty",
           "not_started",
@@ -1585,7 +1667,7 @@
         "properties": {
           "done": {
             "type": "integer",
-            "description": "Merged, Released or Cancelled (Definition of Done: in the work branch).",
+            "description": "Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`.",
             "minimum": 0
           },
           "next_release": {
@@ -1617,6 +1699,7 @@
           },
           "total": {
             "type": "integer",
+            "description": "Tickets in the plan: wildcard cards count only once approved.",
             "minimum": 0
           }
         }
@@ -2065,6 +2148,26 @@
           }
         }
       },
+      "NewWildcard": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Proposal"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The ticket during which the work was found: key, id or title."
+              }
+            }
+          }
+        ],
+        "description": "`POST /v1/chains/{chain}/wildcards`: a person proposes a card."
+      },
       "NextRelease": {
         "type": "object",
         "description": "The next milestone on the graph.",
@@ -2252,6 +2355,43 @@
           "DEMO"
         ],
         "pattern": "^[A-Z][A-Z0-9]{1,9}$"
+      },
+      "Proposal": {
+        "type": "object",
+        "description": "A wildcard card as proposed: work nobody planned, found during a ticket. References are\nticket keys, titles or release versions of the same chain.",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "acceptance": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Acceptance criteria, one per entry."
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Nodes the card waits for."
+          },
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Nodes that wait for the card; none of them may have started when it is approved."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The task for whoever does it."
+          },
+          "title": {
+            "type": "string"
+          }
+        }
       },
       "Release": {
         "type": "object",
@@ -2462,13 +2602,28 @@
                 "type": "string"
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "A wildcard card waits for a person to approve or reject it.",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "proposed"
+                ]
+              }
+            }
           }
         ],
         "description": "The reason attached to the current status, if that status carries one."
       },
       "StoppedAt": {
         "type": "object",
-        "description": "Where the chain stopped: the first ticket, in graph order, that waits on a person.",
+        "description": "Where the chain stopped: the first ticket, in graph order, that waits on a person (Waiting or\nBlocked first, then Review, then a card to approve).",
         "required": [
           "ticket",
           "status",
@@ -2642,6 +2797,17 @@
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          },
+          "wildcard": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Wildcard",
+                "description": "Set on a wildcard card (work nobody planned): where it came from and whether a person\napproved it. It stays after the decision. Absent on planned tickets."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -2723,6 +2889,7 @@
         "type": "string",
         "description": "Ticket status. Transitions between them are owned by the state machine (P0-04).",
         "enum": [
+          "proposed",
           "backlog",
           "ready",
           "running",
@@ -2796,6 +2963,51 @@
           }
         ],
         "description": "Why a ticket is Waiting."
+      },
+      "Wildcard": {
+        "type": "object",
+        "description": "The mark of a wildcard card: work found during the chain that waits for a person's approval\nbefore it joins the plan.",
+        "required": [
+          "proposed_by",
+          "after",
+          "before",
+          "approved"
+        ],
+        "properties": {
+          "after": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeRef"
+            },
+            "description": "Nodes it is to wait for; they become edges when it is approved."
+          },
+          "approved": {
+            "type": "boolean",
+            "description": "A person approved it, so it is part of the plan."
+          },
+          "before": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeRef"
+            },
+            "description": "Nodes that are to wait for it; they become edges when it is approved."
+          },
+          "from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TicketKey",
+                "description": "The ticket during which the work was found."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposed_by": {
+            "$ref": "#/components/schemas/Actor",
+            "description": "Who proposed it."
+          }
+        }
       }
     },
     "securitySchemes": {

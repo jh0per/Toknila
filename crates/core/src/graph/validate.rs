@@ -5,7 +5,8 @@ use crate::dag::{self, EdgeCheck, EdgeProblem};
 
 impl ChainView {
     /// Checks edges: known nodes, no self-loops or duplicates, `after_release` only from a
-    /// milestone, and no cycles (the error names the cycle).
+    /// milestone, no edge to or from a card still proposed, and no cycles (the error names the
+    /// cycle).
     pub fn validate(&self) -> Result<(), GraphError> {
         let nodes = self.nodes();
         let mut check = EdgeCheck::default();
@@ -21,6 +22,9 @@ impl ChainView {
             })?;
             if e.kind == EdgeKind::AfterRelease && matches!(e.from, NodeRef::Ticket(_)) {
                 return Err(GraphError::AfterReleaseFromTicket(e.from));
+            }
+            if let Some(card) = self.first_proposed([e.from, e.to]) {
+                return Err(GraphError::StillProposed(card));
             }
         }
         if let Some(cycle) = self.find_cycle() {

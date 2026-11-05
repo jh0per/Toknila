@@ -45,6 +45,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(add_edge, remove_edge))
         .routes(routes!(create_release))
         .routes(routes!(create_ticket))
+        .routes(routes!(propose_wildcard))
         .routes(routes!(list_tickets))
         .routes(routes!(get_ticket, patch_ticket))
         .routes(routes!(ticket_action))

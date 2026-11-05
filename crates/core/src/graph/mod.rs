@@ -51,6 +51,12 @@ pub enum GraphError {
     Transition(#[from] TransitionError),
     #[error("graph did not settle after {0} steps")]
     NoFixpoint(usize),
+    #[error("{0} is a proposed card; approve or reject it first")]
+    StillProposed(String),
+    #[error("{node} is already {state}; a card can only go before work that has not started")]
+    BeforeStarted { node: String, state: String },
+    #[error("{0} is not a proposed card")]
+    NotProposed(String),
 }
 
 fn format_cycle(path: &[String]) -> String {
@@ -91,7 +97,8 @@ pub struct ChainView {
     pub release_tickets: Vec<(ReleaseId, TicketId)>,
 }
 
-/// Computed chain status (never stored).
+/// Computed chain status (never stored). Proposed wildcard cards are not part of the plan: they
+/// do not count in `total` or `done`, but a pending decision makes the chain need a human.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -102,18 +109,19 @@ pub enum ChainStatus {
     NotStarted,
     /// Some ticket is Blocked.
     Blocked,
-    /// Some ticket waits on a person (Waiting or Review).
+    /// Some ticket waits on a person (Waiting, Review, or a wildcard card to approve).
     NeedsHuman,
     /// Agents are working.
     Running,
     /// Nothing runs and nothing waits on a person, but work remains (paused or waiting on a
     /// manual milestone).
     Idle,
-    /// Every ticket is done and every milestone released.
+    /// Every ticket is done, every milestone released, and no card waits for approval.
     Done,
 }
 
-/// Where the chain stopped: the first ticket, in graph order, that waits on a person.
+/// Where the chain stopped: the first ticket, in graph order, that waits on a person (Waiting or
+/// Blocked first, then Review, then a card to approve).
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StoppedAt {
@@ -139,8 +147,9 @@ pub struct NextRelease {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainSummary {
     pub status: ChainStatus,
+    /// Tickets in the plan: wildcard cards count only once approved.
     pub total: usize,
-    /// Merged, Released or Cancelled (Definition of Done: in the work branch).
+    /// Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`.
     pub done: usize,
     pub released: usize,
     pub stopped_at: Option<StoppedAt>,
@@ -153,6 +162,7 @@ mod release;
 mod settle;
 mod summary;
 mod validate;
+mod wildcard;
 
 pub use journal::Settled;
 

@@ -59,6 +59,46 @@ fn same_status_is_an_update() {
 }
 
 #[test]
+fn wildcard_decisions_name_the_card_and_carry_it() {
+    let mut proposed = ticket(TicketStatus::Proposed);
+    proposed.status_reason = Some(StatusReason::Proposed);
+    let e = DomainEvent::TicketProposed {
+        ticket: proposed.clone(),
+    };
+    assert_eq!(
+        (e.entity(), e.kind(), e.entity_id().as_str()),
+        ("ticket", "proposed", "01JBQ7ZJ0000000000000000T1")
+    );
+    assert_eq!(
+        payload(&e),
+        json!({ "ticket": serde_json::to_value(&proposed).expect("t") })
+    );
+
+    let approved = ticket(TicketStatus::Backlog);
+    let e = DomainEvent::wildcard_decided(&proposed, &approved).expect("a decision");
+    assert_eq!((e.entity(), e.kind()), ("ticket", "approved"));
+    assert_eq!(
+        payload(&e),
+        json!({ "key": "DEMO-1", "ticket": serde_json::to_value(&approved).expect("t") })
+    );
+
+    let mut rejected = ticket(TicketStatus::Cancelled);
+    rejected.status_reason = Some(StatusReason::Cancelled {
+        text: "later".into(),
+    });
+    let e = DomainEvent::wildcard_decided(&proposed, &rejected).expect("a decision");
+    assert_eq!((e.entity(), e.kind()), ("ticket", "rejected"));
+    let p = payload(&e);
+    assert_eq!(
+        (&p["key"], &p["reason"]),
+        (&json!("DEMO-1"), &json!("later"))
+    );
+
+    let ready = ticket(TicketStatus::Ready);
+    assert_eq!(DomainEvent::wildcard_decided(&approved, &ready), None);
+}
+
+#[test]
 fn release_change_names_version_and_states() {
     let before = Release::planned(
         "01JBQ7ZJ0000000000000000R1"

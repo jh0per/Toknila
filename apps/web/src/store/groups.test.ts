@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { TicketStatus } from "../api/types";
-import { groupBy, statusGroup } from "./groups";
+import { GROUP_LABEL, GROUP_ORDER, groupBy, statusGroup } from "./groups";
 
 describe("statusGroup", () => {
   it("maps every status to its display group", () => {
     const expected: Record<TicketStatus, string> = {
+      proposed: "awaiting_approval",
       backlog: "todo",
       ready: "todo",
       running: "in_progress",
@@ -18,6 +19,14 @@ describe("statusGroup", () => {
     for (const [status, group] of Object.entries(expected)) {
       expect(statusGroup(status as TicketStatus)).toBe(group);
     }
+  });
+
+  it("keeps a proposed card out of todo, with its own label", () => {
+    const g = groupBy([{ s: "proposed" }, { s: "backlog" }] as { s: TicketStatus }[], (i) => i.s);
+    expect(g.awaiting_approval).toHaveLength(1);
+    expect(g.todo).toHaveLength(1);
+    expect(GROUP_LABEL.awaiting_approval).toBe("awaiting approval");
+    expect(GROUP_ORDER[0]).toBe("awaiting_approval");
   });
 
   it("splits a list, keeping order and showing cancelled apart", () => {

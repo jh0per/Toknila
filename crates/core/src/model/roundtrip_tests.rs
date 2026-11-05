@@ -38,6 +38,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         branch: None,
         needs_secrets: true,
         tokens_used: 12_345,
+        wildcard: None,
     }
 }
 
@@ -137,10 +138,36 @@ fn tickets_roundtrip_in_every_status_and_reason() {
         StatusReason::Cancelled {
             text: "won't do".to_owned(),
         },
+        StatusReason::Proposed,
     ];
     for reason in reasons {
         roundtrip(&ticket(TicketStatus::Waiting, Some(reason)));
     }
+}
+
+#[test]
+fn a_wildcard_card_roundtrips_and_a_planned_ticket_has_no_mark() {
+    let mut t = ticket(TicketStatus::Proposed, Some(StatusReason::Proposed));
+    t.wildcard = Some(Wildcard {
+        from: Some(key("DEMO-1")),
+        proposed_by: Actor::Agent,
+        after: vec![NodeRef::Ticket(TicketId::new())],
+        before: vec![],
+        approved: false,
+    });
+    roundtrip(&t);
+    let json = serde_json::to_value(&t).expect("serialize");
+    assert_eq!(json["wildcard"]["from"], "DEMO-1");
+    assert_eq!(json["wildcard"]["proposed_by"], "agent");
+    assert_eq!(
+        json["status_reason"],
+        serde_json::json!({"status": "proposed"})
+    );
+    let planned = serde_json::to_value(ticket(TicketStatus::Backlog, None)).expect("json");
+    assert!(
+        planned.get("wildcard").is_none(),
+        "planned tickets keep their old shape: {planned}"
+    );
 }
 
 #[test]

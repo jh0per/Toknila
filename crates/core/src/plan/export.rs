@@ -9,13 +9,15 @@ use crate::{EdgeKind, NodeRef, Release, Ticket, TicketId};
 
 /// Writes a chain as a file that [`super::parse`] reads back into the same graph. Ticket keys
 /// and release versions become the local ids. `subtasks` maps ticket ids to checklist texts.
+/// Wildcard cards that are not in the plan (proposed or rejected) are left out; no edge touches
+/// them, so the file stays whole.
 pub fn export(view: &ChainView, subtasks: &HashMap<TicketId, Vec<String>>) -> String {
     let mut out = Lines::default();
     chain_section(view, &mut out);
     for node in view.topo_order() {
         match node {
             NodeRef::Ticket(id) => {
-                if let Some(t) = view.tickets.iter().find(|t| t.id == id) {
+                if let Some(t) = view.tickets.iter().find(|t| t.id == id && t.in_plan()) {
                     ticket_section(view, t, subtasks.get(&t.id), &mut out);
                 }
             }
