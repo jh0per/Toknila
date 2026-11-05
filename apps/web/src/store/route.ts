@@ -1,22 +1,43 @@
 // Navigation is state that lives in the URL, so a deep link opens the right screen.
+// `chains` (`/`) and `chain` (`/chains/:chain`) are the phase 0 paths; they still render, inside
+// the same layout, with the project taken from the chain.
 
 export type Route =
   | { name: "chains" }
   | { name: "chain"; chain: string }
-  | { name: "inbox" };
+  | { name: "inbox" }
+  | { name: "project"; project: string }
+  | { name: "projectChain"; project: string; chain: string }
+  | { name: "card"; project: string; chain: string; key: string };
 
-/// The route of a path; anything unknown is the chain list.
+/// The bottom panel's tab; part of the page state, not of the URL.
+export type Tab = "details" | "events" | "chat" | "terminal" | "threads" | "pr";
+
+export const TABS: Tab[] = ["details", "events", "chat", "terminal", "threads", "pr"];
+
+/// The route of a path; anything unknown is the home page.
 export function parseRoute(pathname: string): Route {
-  const parts = pathname.split("/").filter(Boolean).map(decodeURIComponent);
-  if (parts[0] === "chains" && parts.length === 2) return { name: "chain", chain: parts[1] };
-  if (parts[0] === "inbox" && parts.length === 1) return { name: "inbox" };
+  const p = pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  if (p[0] === "chains" && p.length === 2) return { name: "chain", chain: p[1] };
+  if (p[0] === "inbox" && p.length === 1) return { name: "inbox" };
+  if (p[0] === "projects") {
+    if (p.length === 2) return { name: "project", project: p[1] };
+    if (p.length === 4 && p[2] === "chains") return { name: "projectChain", project: p[1], chain: p[3] };
+    if (p.length === 6 && p[2] === "chains" && p[4] === "cards") {
+      return { name: "card", project: p[1], chain: p[3], key: p[5] };
+    }
+  }
   return { name: "chains" };
 }
 
 export function routePath(route: Route): string {
+  const e = encodeURIComponent;
   switch (route.name) {
     case "chains": return "/";
-    case "chain": return `/chains/${encodeURIComponent(route.chain)}`;
+    case "chain": return `/chains/${e(route.chain)}`;
     case "inbox": return "/inbox";
+    case "project": return `/projects/${e(route.project)}`;
+    case "projectChain": return `/projects/${e(route.project)}/chains/${e(route.chain)}`;
+    case "card": return `/projects/${e(route.project)}/chains/${e(route.chain)}/cards/${e(route.key)}`;
   }
 }

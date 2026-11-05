@@ -846,7 +846,17 @@ async fn page_routes_serve_the_page_and_nothing_else_does() {
     let html = (StatusCode::OK, "text/html; charset=utf-8".to_owned());
     assert_eq!(status("/chains/demo").await, html);
     assert_eq!(status("/inbox").await, html);
+    assert_eq!(status("/projects/DEMO").await, html);
+    assert_eq!(status("/projects/DEMO/chains/demo").await, html);
+    assert_eq!(
+        status("/projects/DEMO/chains/demo/cards/DEMO-1").await,
+        html
+    );
     assert_eq!(status("/chains/demo/extra").await.0, StatusCode::NOT_FOUND);
+    assert_eq!(
+        status("/projects/DEMO/chains/demo/extra").await.0,
+        StatusCode::NOT_FOUND
+    );
     let (code, ct) = status("/v1/nowhere").await;
     assert_eq!(code, StatusCode::NOT_FOUND);
     assert!(!ct.starts_with("text/html"), "{ct}");

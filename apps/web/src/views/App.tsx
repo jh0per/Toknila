@@ -1,66 +1,42 @@
-import { useEffect, useState } from "react";
 import { token } from "../api/http";
-import { humanOnly, visibleChains } from "../store/state";
+import { currentChain } from "../store/state";
 import { useStore } from "../store/useStore";
-import { ChainCard } from "./ChainCard";
-
-function useNow(ms: number): number {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(t);
-  }, [ms]);
-  return now;
-}
+import { Canvas } from "./Canvas";
+import { Inbox } from "./Inbox";
+import { Panel } from "./Panel";
+import { Sidebar } from "./Sidebar";
 
 export function App() {
   const [state, dispatch] = useStore();
-  const now = useNow(1000);
   if (!token()) {
     return <main><p className="error">Open the address that <code>tok open</code> prints; it carries the access token.</p></main>;
   }
-  const chains = visibleChains(state);
-  const onlyHuman = humanOnly(state);
+  const chain = currentChain(state);
   return (
-    <main>
-      <header className="top">
-        <h1>
-          <a
-            href={`/${window.location.search}`}
-            onClick={(e) => {
-              e.preventDefault();
-              dispatch({ type: "navigate", route: { name: "chains" } });
-            }}
-          >
-            Toknila
-          </a>
-        </h1>
-        <span className={`link l-${state.link}`} data-testid="link">{state.link}</span>
-        <label>
-          <input
-            type="checkbox"
-            checked={onlyHuman}
-            disabled={state.route.name === "inbox"}
-            onChange={(e) => dispatch({ type: "toggleNeedsHuman", on: e.target.checked })}
-          />
-          needs a human
-        </label>
-      </header>
-      {state.error && <p className="error">{state.error}</p>}
-      {!state.loaded ? <p>Loading…</p> : chains.length === 0 ? (
-        <p className="empty">No chains yet. Try <code>tok chain import examples/demo.toml</code>.</p>
-      ) : (
-        chains.map((c) => (
-          <ChainCard
-            key={c.chain.id}
-            c={c}
-            now={now}
-            needsHuman={state.needsHuman}
-            onlyHuman={onlyHuman}
-            open={(route) => dispatch({ type: "navigate", route })}
-          />
-        ))
-      )}
-    </main>
+    <div className="ide">
+      <Sidebar state={state} dispatch={dispatch} />
+      <main>
+        {state.error && <p className="error">{state.error}</p>}
+        {!state.loaded ? <p className="muted">Loading…</p> : state.route.name === "inbox" ? (
+          <Inbox state={state} dispatch={dispatch} />
+        ) : chain ? (
+          <>
+            <header className="chain-head">
+              <h2>{chain.chain.name}</h2>
+              <span data-testid="chain-status">{chain.summary.status.replace(/_/g, " ")}</span>
+              <span className="muted">{chain.summary.done}/{chain.summary.total} done · {chain.summary.released} released</span>
+            </header>
+            <Canvas chain={chain} state={state} dispatch={dispatch} />
+            <Panel state={state} dispatch={dispatch} />
+          </>
+        ) : (
+          <p className="muted empty">
+            {state.projects.length === 0
+              ? <>No projects yet. Try <code>tok chain import examples/demo.toml</code>.</>
+              : "Pick a chain in the sidebar."}
+          </p>
+        )}
+      </main>
+    </div>
   );
 }
