@@ -40,8 +40,9 @@ that approves, and core refuses `Approve` from any actor but a person.
   stream; the event carries number, format, author and size, the body is one read away.
 
 **Consequences / risks:** One migration (three tables). `TicketDetail` gains `phase` (every
-snapshot of a ticket shows it). The hand-in check is in the app use case, so a new path that moves
-Running to Review must call it. A person who approves a thread that the agent keeps editing sees
+snapshot of a ticket shows it). The hand-in gate is core's: the `Finished` event carries the ticket's
+open threads and `apply` refuses it unless the list is empty, so no path from Running to Review
+can skip the check; the app only loads the threads. A person who approves a thread that the agent keeps editing sees
 it reopen on every new version; that is intended. The thread routes run as a person: phase 1,
 where agents call the API with their own credentials, must keep agents off them (the agent events
 are the agent's route). Opening a thread on a finished ticket is allowed and has no effect on its

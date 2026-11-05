@@ -12,9 +12,10 @@
 
 use std::fmt;
 
+use crate::machine::TransitionError;
 use crate::{
     Actor, ArtifactFormat, MessageKind, Phase, Thread, ThreadId, ThreadKind, ThreadMessage,
-    ThreadMessageId, ThreadState, ThreadVersion, ThreadVersionId, TicketId, Timestamp,
+    ThreadMessageId, ThreadState, ThreadVersion, ThreadVersionId, TicketId, TicketKey, Timestamp,
 };
 
 /// Largest artifact body, in bytes (512 KiB).
@@ -53,7 +54,7 @@ pub enum ThreadError {
 
 pub(crate) fn list(threads: &[OpenThread]) -> String {
     let parts: Vec<String> = threads.iter().map(ToString::to_string).collect();
-    parts.join(", ")
+    format!("{} open: {}", threads.len(), parts.join(", "))
 }
 
 /// Something that happens to a thread's state.
@@ -210,6 +211,14 @@ pub fn phase(threads: &[Thread]) -> Phase {
     } else {
         Phase::Implement
     }
+}
+
+/// The hand-in gate: refused, naming them, while any thread is open.
+pub fn require_none_open(ticket: &TicketKey, open: &[OpenThread]) -> Result<(), TransitionError> {
+    if open.is_empty() {
+        return Ok(());
+    }
+    Err(TransitionError::OpenThreads(ticket.clone(), open.to_vec()))
 }
 
 /// The ticket's threads that are still open. The agent's hand-in carries this list and the

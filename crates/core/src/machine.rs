@@ -49,8 +49,7 @@ pub enum TicketEvent {
     /// Agent: done, a diff is ready. The summary becomes a report comment.
     Finished {
         summary: String,
-        /// Threads of the ticket that are still open. The hand-in is refused unless this is
-        /// empty, so the caller has to look them up to build the event.
+        /// Still-open threads of the ticket; the hand-in is refused unless this is empty.
         #[serde(skip)]
         open_threads: Vec<OpenThread>,
     },
@@ -150,11 +149,8 @@ pub enum TransitionError {
     NotPaused,
     #[error("{0} needs a non-empty text")]
     EmptyText(&'static str),
-    #[error("cannot hand in {ticket}: {} open: {}", .threads.len(), crate::thread::list(.threads))]
-    OpenThreads {
-        ticket: TicketKey,
-        threads: Vec<OpenThread>,
-    },
+    #[error("cannot hand in {0}: {open}", open = crate::thread::list(.1))]
+    OpenThreads(TicketKey, Vec<OpenThread>),
     #[error("only a person can {event} a card; this came from {actor:?}")]
     PersonOnly { event: &'static str, actor: Actor },
 }
@@ -198,12 +194,7 @@ pub fn apply(
                 open_threads,
             },
         ) => {
-            if !open_threads.is_empty() {
-                return Err(TransitionError::OpenThreads {
-                    ticket: ticket.key.clone(),
-                    threads: open_threads.clone(),
-                });
-            }
+            crate::thread::require_none_open(&ticket.key, open_threads)?;
             effects.push(Effect::RecordReport {
                 summary: summary.clone(),
             });

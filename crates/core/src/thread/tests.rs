@@ -228,7 +228,7 @@ fn hand_in_is_refused_while_a_thread_is_open_and_names_it() {
     let first = approve(&first, Actor::Human, None).expect("approve");
     let err = hand_in(&[first.clone(), second.clone()]).expect_err("one open");
     assert!(
-        matches!(&err, TransitionError::OpenThreads { threads, .. } if threads.len() == 1 && threads[0].number == 2),
+        matches!(&err, TransitionError::OpenThreads(_, threads) if threads.len() == 1 && threads[0].number == 2),
         "{err}"
     );
     let second = approve(&second, Actor::Human, None).expect("approve");
