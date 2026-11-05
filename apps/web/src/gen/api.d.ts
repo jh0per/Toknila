@@ -709,6 +709,8 @@ export interface components {
         NewVersion: {
             body: string;
             format: components["schemas"]["ArtifactFormat"];
+            /** @description A message posted with the version, in the same transaction. */
+            message?: string | null;
         };
         /** @description `POST /v1/chains/{chain}/wildcards`: a person proposes a card. */
         NewWildcard: components["schemas"]["Proposal"] & {
