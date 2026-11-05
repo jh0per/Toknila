@@ -1,6 +1,6 @@
 //! Threads on a card: settle the design with the owner before implementation. A person or the
 //! ticket's agent opens a thread and posts messages and artifact versions; only a person approves
-//! or requests changes (core refuses anyone else). The hand-in gate is [`check_hand_in`].
+//! or requests changes (core refuses anyone else). The hand-in gate is core's (`TicketEvent::Finished`).
 
 use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
@@ -33,6 +33,9 @@ pub struct NewMessage {
 pub struct NewVersion {
     pub format: ArtifactFormat,
     pub body: String,
+    /// A message posted with the version, in the same transaction.
+    #[serde(default)]
+    pub message: Option<String>,
 }
 
 /// Opens a thread on a ticket, by the command's actor.
@@ -119,6 +122,20 @@ pub fn post_version<U: UnitOfWork + ?Sized>(
         now,
     )?;
     let (next, change) = thread::apply(th, ThreadEvent::NewVersion, now)?;
+    // Checked before anything is written, so a blank message refuses the whole post.
+    let note = input
+        .message
+        .map(|text| {
+            thread::message(
+                th,
+                ThreadMessageId::new(),
+                by,
+                MessageKind::Message,
+                &text,
+                now,
+            )
+        })
+        .transpose()?;
     uow.insert_thread_version(&v)?;
     uow.emit(&DomainEvent::ThreadVersionPosted {
         ticket: t.key.clone(),
@@ -128,6 +145,13 @@ pub fn post_version<U: UnitOfWork + ?Sized>(
         author: by,
         bytes: v.body.len(),
     })?;
+    if let Some(m) = note {
+        uow.insert_thread_message(&m)?;
+        uow.emit(&DomainEvent::ThreadMessagePosted {
+            ticket: t.key.clone(),
+            message: m,
+        })?;
+    }
     save(uow, t, &next, change)?;
     Ok(v)
 }
@@ -143,9 +167,13 @@ pub fn approve<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, th: &Thread) -> 
     Ok(next)
 }
 
-/// Refuses the agent's hand-in while any thread of the ticket is open.
-pub fn check_hand_in<R: crate::Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<()> {
-    Ok(thread::check_hand_in(&t.key, &r.threads(t.id)?)?)
+/// The ticket's open threads, for the hand-in event; the state machine refuses the hand-in
+/// while there are any.
+pub fn open_threads<R: crate::Reader + ?Sized>(
+    r: &R,
+    t: &Ticket,
+) -> AppResult<Vec<thread::OpenThread>> {
+    Ok(thread::open_threads(&r.threads(t.id)?))
 }
 
 fn message<U: UnitOfWork + ?Sized>(

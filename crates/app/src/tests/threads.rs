@@ -35,6 +35,7 @@ fn version(body: &str) -> NewVersion {
     NewVersion {
         format: ArtifactFormat::Mermaid,
         body: body.to_owned(),
+        message: None,
     }
 }
 
@@ -234,4 +235,32 @@ fn the_agent_posts_through_its_events_by_number() {
     };
     let e = agent::ticket_event(&mut mem, &a, unknown).expect_err("unknown");
     assert_eq!(e.kind, ErrorKind::NotFound);
+}
+
+#[test]
+fn a_version_can_carry_a_message_and_a_blank_one_refuses_both() {
+    let mut mem = running_demo();
+    let th = open_design(&mut mem);
+    let a = mem.ticket_by_title("A");
+    let mut input = version("v1");
+    input.message = Some("first sketch".to_owned());
+    threads::post_version(&mut mem, &a, &th, input).expect("both");
+    assert_eq!((mem.versions.len(), mem.messages.len()), (1, 1));
+    assert_eq!(
+        mem.kinds(),
+        [
+            "thread.opened",
+            "thread.version_posted",
+            "thread.message_posted"
+        ]
+    );
+    let mut blank = version("v2");
+    blank.message = Some("  ".to_owned());
+    let e = threads::post_version(&mut mem, &a, &th, blank).expect_err("blank");
+    assert_eq!(e.message, "message needs a text");
+    assert_eq!(
+        (mem.versions.len(), mem.messages.len()),
+        (1, 1),
+        "nothing stored"
+    );
 }

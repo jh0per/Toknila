@@ -122,6 +122,7 @@ fn finish_and_accept(v: &mut ChainView, n: NodeRef) {
         n,
         TicketEvent::Finished {
             summary: "done".to_owned(),
+            open_threads: vec![],
         },
     );
     event(v, n, TicketEvent::Accept);
@@ -294,6 +295,7 @@ fn gate_chain_with_manual_release() {
         a,
         TicketEvent::Finished {
             summary: "зроблено X".to_owned(),
+            open_threads: vec![],
         },
     );
     event(

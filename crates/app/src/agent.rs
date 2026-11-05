@@ -36,7 +36,11 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
             body,
         } => {
             let th = threads::find(uow, t, &thread)?;
-            let input = threads::NewVersion { format, body };
+            let input = threads::NewVersion {
+                format,
+                body,
+                message: None,
+            };
             threads::post_version(uow, t, &th, input).map(|_| ())
         }
         AgentEvent::Started => with_chain(uow, t.chain_id, |ctx| {
@@ -68,9 +72,13 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
             if summary.trim().is_empty() {
                 return Err(AppError::bad_request("finished needs a summary"));
             }
-            threads::check_hand_in(uow, t)?;
+            let open_threads = threads::open_threads(uow, t)?;
             with_chain(uow, t.chain_id, |ctx| {
-                Ok(ctx.ticket_event(t.id, TicketEvent::Finished { summary })?)
+                let event = TicketEvent::Finished {
+                    summary,
+                    open_threads,
+                };
+                Ok(ctx.ticket_event(t.id, event)?)
             })
         }
         AgentEvent::Crashed { detail } => with_chain(uow, t.chain_id, |ctx| {

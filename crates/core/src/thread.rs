@@ -1,6 +1,6 @@
 //! Threads on a card: the rules. A thread is opened by a person or the ticket's agent, holds
 //! messages and numbered immutable artifact versions, and ends in a person's approval. While a
-//! ticket has an open thread, the agent's hand-in is refused ([`check_hand_in`]).
+//! ticket has an open thread, the agent's hand-in is refused (see `TicketEvent::Finished`).
 //!
 //! | From | To | Event |
 //! |---|---|---|
@@ -14,7 +14,7 @@ use std::fmt;
 
 use crate::{
     Actor, ArtifactFormat, MessageKind, Phase, Thread, ThreadId, ThreadKind, ThreadMessage,
-    ThreadMessageId, ThreadState, ThreadVersion, ThreadVersionId, TicketId, TicketKey, Timestamp,
+    ThreadMessageId, ThreadState, ThreadVersion, ThreadVersionId, TicketId, Timestamp,
 };
 
 /// Largest artifact body, in bytes (512 KiB).
@@ -49,14 +49,9 @@ pub enum ThreadError {
     PersonOnly { action: &'static str, actor: Actor },
     #[error("thread is already approved")]
     AlreadyApproved,
-    #[error("cannot hand in {ticket}: {} open: {}", .threads.len(), list(.threads))]
-    OpenThreads {
-        ticket: TicketKey,
-        threads: Vec<OpenThread>,
-    },
 }
 
-fn list(threads: &[OpenThread]) -> String {
+pub(crate) fn list(threads: &[OpenThread]) -> String {
     let parts: Vec<String> = threads.iter().map(ToString::to_string).collect();
     parts.join(", ")
 }
@@ -217,10 +212,10 @@ pub fn phase(threads: &[Thread]) -> Phase {
     }
 }
 
-/// The agent may hand in only when every thread is approved; otherwise the error names the open
-/// ones.
-pub fn check_hand_in(ticket: &TicketKey, threads: &[Thread]) -> Result<(), ThreadError> {
-    let open: Vec<OpenThread> = threads
+/// The ticket's threads that are still open. The agent's hand-in carries this list and the
+/// state machine refuses it unless it is empty.
+pub fn open_threads(threads: &[Thread]) -> Vec<OpenThread> {
+    threads
         .iter()
         .filter(|t| t.state == ThreadState::Open)
         .map(|t| OpenThread {
@@ -228,15 +223,7 @@ pub fn check_hand_in(ticket: &TicketKey, threads: &[Thread]) -> Result<(), Threa
             kind: t.kind,
             title: t.title.clone(),
         })
-        .collect();
-    if open.is_empty() {
-        Ok(())
-    } else {
-        Err(ThreadError::OpenThreads {
-            ticket: ticket.clone(),
-            threads: open,
-        })
-    }
+        .collect()
 }
 
 #[cfg(test)]

@@ -2638,6 +2638,13 @@
           },
           "format": {
             "$ref": "#/components/schemas/ArtifactFormat"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A message posted with the version, in the same transaction."
           }
         }
       },

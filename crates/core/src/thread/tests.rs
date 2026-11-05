@@ -196,26 +196,43 @@ fn artifact_size_is_limited_to_512_kib() {
 
 #[test]
 fn hand_in_is_refused_while_a_thread_is_open_and_names_it() {
-    let key: TicketKey = "DEMO-1".parse().expect("key");
+    use crate::machine::{TicketEvent, TransitionError, apply as step};
+    use crate::{TicketDraft, TicketStatus};
+
+    let mut running = crate::Ticket::new_backlog(
+        TicketId::new(),
+        crate::ChainId::new(),
+        "DEMO-1".parse().expect("key"),
+        TicketDraft::default(),
+        NOW,
+    );
+    running.status = TicketStatus::Running;
+    let hand_in = |threads: &[Thread]| {
+        let event = TicketEvent::Finished {
+            summary: "done".to_owned(),
+            open_threads: open_threads(threads),
+        };
+        step(&running, &event, NOW).map(|t| t.ticket.status)
+    };
     let first = thread();
     let mut second = thread();
     second.number = 2;
     second.title = "Flow".to_owned();
     second.kind = ThreadKind::Flow;
-    assert_eq!(check_hand_in(&key, &[]), Ok(()));
-    let err = check_hand_in(&key, &[first.clone(), second.clone()]).expect_err("open");
+    assert_eq!(hand_in(&[]), Ok(TicketStatus::Review));
+    let err = hand_in(&[first.clone(), second.clone()]).expect_err("open");
     assert_eq!(
         err.to_string(),
         "cannot hand in DEMO-1: 2 open: #1 \"List screen\" (Design), #2 \"Flow\" (Flow)"
     );
     let first = approve(&first, Actor::Human, None).expect("approve");
-    let err = check_hand_in(&key, &[first.clone(), second.clone()]).expect_err("one open");
+    let err = hand_in(&[first.clone(), second.clone()]).expect_err("one open");
     assert!(
-        matches!(&err, ThreadError::OpenThreads { threads, .. } if threads.len() == 1 && threads[0].number == 2),
+        matches!(&err, TransitionError::OpenThreads { threads, .. } if threads.len() == 1 && threads[0].number == 2),
         "{err}"
     );
     let second = approve(&second, Actor::Human, None).expect("approve");
-    assert_eq!(check_hand_in(&key, &[first, second]), Ok(()));
+    assert_eq!(hand_in(&[first, second]), Ok(TicketStatus::Review));
 }
 
 #[test]

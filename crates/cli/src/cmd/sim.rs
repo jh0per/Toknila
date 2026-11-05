@@ -69,14 +69,13 @@ pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> R
             SimThreadCmd::Post { post } => {
                 let p = post.read()?;
                 let thread = post.thread;
+                let note = p.message.or_else(|| p.version.as_ref()?.message.clone());
                 let version = p.version.map(|v| AgentEvent::ThreadVersion {
                     thread: thread.clone(),
                     format: v.format,
                     body: v.body,
                 });
-                let message = p
-                    .message
-                    .map(|text| AgentEvent::ThreadMessage { thread, text });
+                let message = note.map(|text| AgentEvent::ThreadMessage { thread, text });
                 version.into_iter().chain(message).collect()
             }
         };

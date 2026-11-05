@@ -31,7 +31,8 @@ pub struct PostArgs {
     pub format: Option<String>,
 }
 
-/// The two things a post can hold, checked and read.
+/// What a post holds, checked and read: an artifact version (which carries the message, if any)
+/// or a message alone.
 #[derive(Debug)]
 pub struct Post {
     pub message: Option<String>,
@@ -46,16 +47,15 @@ impl PostArgs {
                 format: format_of(format)?,
                 body: std::fs::read_to_string(path)
                     .with_context(|| format!("cannot read {}", path.display()))?,
+                message: self.message.clone(),
             }),
             _ => None,
         };
         if self.message.is_none() && version.is_none() {
             bail!("give --message, --artifact with --format, or both");
         }
-        Ok(Post {
-            message: self.message.clone(),
-            version,
-        })
+        let message = self.message.clone().filter(|_| version.is_none());
+        Ok(Post { message, version })
     }
 }
 
@@ -103,17 +103,16 @@ pub(super) fn run(c: &Client, cmd: ThreadCmd, json_out: bool) -> Result<()> {
         }
         ThreadCmd::Post { ticket, post } => {
             let p = post.read()?;
-            let mut last = None;
-            if let Some(v) = &p.version {
-                last = Some(c.post_thread_version(&ticket, &post.thread, v)?);
-            }
-            if let Some(text) = p.message {
-                let m = NewMessage { text };
-                last = Some(c.post_thread_message(&ticket, &post.thread, &m)?);
-            }
-            if let Some(detail) = last {
-                emit(json_out, &detail, line);
-            }
+            // One call, one transaction: the message rides with the version.
+            let detail = match (&p.version, p.message) {
+                (Some(v), _) => c.post_thread_version(&ticket, &post.thread, v)?,
+                (None, Some(text)) => {
+                    let m = NewMessage { text };
+                    c.post_thread_message(&ticket, &post.thread, &m)?
+                }
+                (None, None) => bail!("nothing to post"),
+            };
+            emit(json_out, &detail, line);
         }
         ThreadCmd::Approve { ticket, thread } => {
             emit(json_out, &c.approve_thread(&ticket, &thread)?, line);

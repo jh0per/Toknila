@@ -205,11 +205,31 @@ fn a_person_opens_a_thread_and_approves_it_in_words() {
     );
     let nothing = tok.fails(&["thread", "post", "DEMO-1", "1"]);
     assert!(nothing.contains("--message"), "{nothing}");
-    let approved = tok.run(&["thread", "approve", "DEMO-1", "1"]);
+    // A message and an artifact go in one call.
+    let file = dir.path().join("flow.md");
+    std::fs::write(&file, "# Sign-in\n").expect("write");
+    let posted = tok.run(&[
+        "thread",
+        "post",
+        "DEMO-1",
+        "1",
+        "--artifact",
+        file.to_str().expect("utf-8"),
+        "--format",
+        "markdown",
+        "--message",
+        "first sketch",
+    ]);
     assert_eq!(
-        approved["thread"]["approved_version"],
-        serde_json::Value::Null
+        (
+            posted["versions"].as_array().map(Vec::len),
+            posted["messages"].as_array().map(Vec::len),
+            &posted["messages"][0]["text"]
+        ),
+        (Some(1), Some(1), &"first sketch".into())
     );
+    let approved = tok.run(&["thread", "approve", "DEMO-1", "1"]);
+    assert_eq!(approved["thread"]["approved_version"], 1);
     assert_eq!(
         tok.run(&["sim", "DEMO-1", "finish", "ok"])["ticket"]["status"],
         "review"
