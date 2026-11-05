@@ -7,6 +7,7 @@ mod project;
 mod release;
 mod sim;
 mod thread;
+mod spec;
 mod ticket;
 mod watch;
 mod wildcard;

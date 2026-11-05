@@ -46,6 +46,12 @@ pub(super) struct RawTicket {
     pub(super) needs_secrets: bool,
     #[serde(default)]
     pub(super) paused: bool,
+    /// Import the ticket as Merged (through the state machine, once its dependencies are).
+    #[serde(default)]
+    pub(super) done: bool,
+    /// 1-based positions of the subtasks that are already ticked.
+    #[serde(default)]
+    pub(super) done_subtasks: Vec<u32>,
 }
 
 #[derive(Debug, Deserialize)]

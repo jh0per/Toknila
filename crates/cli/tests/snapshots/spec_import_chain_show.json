@@ -1,0 +1,236 @@
+{
+  "chain": {
+    "autostart": false,
+    "goal": "Sample Feature\n\nDocuments:\n- spec.md\n- plan.md\n- contracts/\n- tasks.md",
+    "id": "<id>",
+    "name": "001-sample-feature",
+    "project_id": "<id>",
+    "review_mode": null
+  },
+  "edges": [
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    },
+    {
+      "chain_id": "<id>",
+      "from": {
+        "id": "<id>",
+        "kind": "ticket"
+      },
+      "kind": "normal",
+      "to": {
+        "id": "<id>",
+        "kind": "ticket"
+      }
+    }
+  ],
+  "order": [
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    },
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    },
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    },
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    },
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    },
+    {
+      "id": "<id>",
+      "kind": "ticket"
+    }
+  ],
+  "release_tickets": [],
+  "releases": [],
+  "summary": {
+    "done": 2,
+    "next_release": null,
+    "released": 0,
+    "status": "idle",
+    "stopped_at": null,
+    "total": 6
+  },
+  "tickets": [
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "SPEC-1",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": null,
+      "prompt": "",
+      "review_mode": null,
+      "status": "merged",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "Setup",
+      "tokens_used": 0
+    },
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "SPEC-2",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": null,
+      "prompt": "",
+      "review_mode": null,
+      "status": "merged",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "Foundational State",
+      "tokens_used": 0
+    },
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "SPEC-3",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": null,
+      "prompt": "**Goal**: A person picks how to start.\n**Independent Test**: Open the home page and see the choices.",
+      "review_mode": null,
+      "status": "ready",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "US1: Choose a creation path",
+      "tokens_used": 0
+    },
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "SPEC-4",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": null,
+      "prompt": "**Goal**: A person continues where they stopped.",
+      "review_mode": null,
+      "status": "ready",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "US2: Resume a draft",
+      "tokens_used": 0
+    },
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "SPEC-5",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": null,
+      "prompt": "",
+      "review_mode": null,
+      "status": "ready",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "US3: Share a result",
+      "tokens_used": 0
+    },
+    {
+      "acceptance": [],
+      "branch": null,
+      "chain_id": "<id>",
+      "id": "<id>",
+      "key": "SPEC-6",
+      "needs_secrets": false,
+      "paused": false,
+      "profile": null,
+      "prompt": "",
+      "review_mode": null,
+      "status": "backlog",
+      "status_reason": null,
+      "status_since": 0,
+      "title": "Polish, Integration, and Release Evidence",
+      "tokens_used": 0
+    }
+  ]
+}

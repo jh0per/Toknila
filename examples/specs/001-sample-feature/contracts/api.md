@@ -1,0 +1,3 @@
+# Contract
+
+A synthetic contract.
