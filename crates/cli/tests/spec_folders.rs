@@ -237,6 +237,37 @@ fn spec_folder_round_trip() {
     // Exporting twice gives no further change; the originals of the repo are untouched.
     tok.ok(&["chain", "export", FOLDER, "--spec", copy_arg]);
     assert_eq!(std::fs::read(copy.join("tasks.md")).expect("read"), patched);
+
+    // A proposed wildcard card is not written; once approved it is appended, numbered after the
+    // highest T-id, and the original bytes before it stay.
+    tok.ok(&[
+        "sim",
+        "SPEC-3",
+        "propose",
+        "Token refresh",
+        "--after",
+        "SPEC-3",
+    ]);
+    tok.ok(&["subtask", "add", "SPEC-7", "write the endpoint"]);
+    tok.ok(&["chain", "export", FOLDER, "--spec", copy_arg]);
+    assert_eq!(std::fs::read(copy.join("tasks.md")).expect("read"), patched);
+    tok.ok(&["approve", "SPEC-7"]);
+    tok.ok(&["chain", "export", FOLDER, "--spec", copy_arg]);
+    let appended = std::fs::read(copy.join("tasks.md")).expect("read");
+    assert!(appended.starts_with(&patched));
+    assert_eq!(
+        String::from_utf8_lossy(&appended[patched.len()..]),
+        "\n## Phase 7: Token refresh\n\n- [ ] T012 write the endpoint\n"
+    );
+    tok.ok(&["chain", "export", FOLDER, "--spec", copy_arg]);
+    assert_eq!(
+        std::fs::read(copy.join("tasks.md")).expect("read"),
+        appended
+    );
+    assert_eq!(
+        std::fs::read(specs.join(FOLDER).join("tasks.md")).expect("read"),
+        original
+    );
     assert_eq!(
         std::fs::read(specs.join(FOLDER).join("tasks.md")).expect("read"),
         original

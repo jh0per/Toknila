@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
 use toknila_client::Client;
-use toknila_core::NodeRef;
 use toknila_core::spec::{self, ExportCard, ExportSubtask};
+use toknila_core::{NodeRef, TicketStatus};
 
 use super::{default_project, emit};
 
@@ -135,6 +135,10 @@ pub(super) fn export(c: &Client, chain: &str, dir: &Path) -> Result<()> {
         let Some(t) = detail.tickets.iter().find(|t| t.id == *id) else {
             continue;
         };
+        // A card still awaiting approval is not part of the plan yet; a rejected one never was.
+        if matches!(t.status, TicketStatus::Proposed | TicketStatus::Cancelled) {
+            continue;
+        }
         let mut subtasks = c.ticket(&t.key.to_string())?.subtasks;
         subtasks.sort_by_key(|s| s.position);
         cards.push(ExportCard {
