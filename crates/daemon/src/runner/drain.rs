@@ -8,8 +8,6 @@
 //! terminal delivers it after everything the process printed, so the reader seeing it knows the
 //! output is complete, with no pause to guess with.
 
-use std::path::Path;
-
 /// Written after the process has ended; never part of the output.
 pub(super) const MARK: &[u8] = b"\0toknila-drained\0";
 
@@ -50,24 +48,25 @@ impl MarkFilter {
 pub(super) struct Slave(Option<std::fs::File>);
 
 impl Slave {
-    /// Opens the slave end at `path`. Never blocks and never becomes the daemon's own terminal.
+    /// Opens a slave end of `master`'s terminal. Never blocks and never becomes the daemon's own
+    /// terminal.
     #[cfg(unix)]
-    pub fn open(path: Option<&Path>) -> Slave {
+    pub fn open(master: &dyn portable_pty::MasterPty) -> Slave {
         use std::os::unix::fs::OpenOptionsExt;
         let flags = nix::fcntl::OFlag::O_NOCTTY | nix::fcntl::OFlag::O_NONBLOCK;
-        let file = path.and_then(|p| {
+        let file = master.tty_name().and_then(|p| {
             std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
                 .custom_flags(flags.bits())
-                .open(p)
+                .open(&p)
                 .ok()
         });
         Slave(file)
     }
 
     #[cfg(not(unix))]
-    pub fn open(_: Option<&Path>) -> Slave {
+    pub fn open(_: &dyn portable_pty::MasterPty) -> Slave {
         Slave(None)
     }
 

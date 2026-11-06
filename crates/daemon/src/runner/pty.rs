@@ -59,7 +59,7 @@ pub(super) fn spawn(
         cmd.env(k, v);
     }
     // Opened before the child starts, so a slave end is open from the first byte it prints.
-    let slave = Slave::open(pair.master.tty_name().as_deref());
+    let slave = Slave::open(pair.master.as_ref());
     let child = pair.slave.spawn_command(cmd).map_err(spawn_error)?;
     drop(pair.slave);
     Ok(Spawned {
