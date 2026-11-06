@@ -2,12 +2,15 @@
 # Import: tok project new TOK && tok chain import plans/phase-1.toml --project TOK
 # Then:   tok chain show phase-1
 #
-# Gate 1 (the release at the end): a real Claude Code agent takes a ticket from Ready to
-# Merged in develop on a ship, through MCP events, with a human or agent review.
+# One target, "move-in": the owner develops Toknila in Toknila.app on macOS, starting with
+# Toknila itself. There is no intermediate release; distribution to other people comes later.
+# The gate: Claude Code agents run on ships, two in parallel, report through MCP, go through
+# review with return-with-comment rounds, and merge through a GitHub PR with green CI.
+# Data survives upgrades.
 
 [chain]
 name = "phase-1"
-goal = "An agent really moves a ticket: Ready -> Running -> Review -> Merged in develop"
+goal = "Move-in: the owner develops Toknila in Toknila.app on macOS; Claude Code agents run on ships, two in parallel, report through MCP, go through review with return rounds and merge through a GitHub PR with green CI; data survives upgrades"
 # Planned work, not a demo: nothing starts by itself until a person resumes it.
 autostart = false
 
@@ -100,16 +103,77 @@ acceptance = [
 after = ["pty"]
 
 [[ticket]]
+id = "parallel"
+title = "Parallel agent limit and queue"
+prompt = "Per-project limit of running agents (default 2). A card started beyond the limit waits in a queue ordered by chain position; a finished or blocked run frees a slot and starts the next one."
+acceptance = [
+  "Unit tests with sim and fake agents cover the limit, queue order by chain position, and a freed slot starting the next card",
+]
+after = ["pty"]
+
+[[ticket]]
+id = "github"
+title = "GitHub PR mode for merges"
+prompt = "A project setting merge = local | github. In github mode Accept pushes the ship branch and opens a PR using the person's gh auth; it merges when checks are green. Failing checks block the card as ci_failed with the link."
+acceptance = [
+  "In github mode Accept pushes the branch, opens a PR and merges it when checks are green",
+  "Failing checks make the ticket Blocked(ci_failed) with the PR link",
+  "Local mode behaves as before",
+]
+after = ["automerge"]
+
+[[ticket]]
+id = "settings"
+title = "Settings and onboarding in the window"
+prompt = "Add a project from a folder (repo, base branch) and check that git, claude and gh are installed. Pick the default profile, the parallel limit, the review mode and the merge mode."
+acceptance = [
+  "Playwright test: add a project from a folder and see the git, claude and gh checks",
+  "The default profile, parallel limit, review mode and merge mode can be set and are persisted",
+]
+after = ["ui"]
+
+[[ticket]]
+id = "inbox"
+title = "Inbox in the window"
+prompt = "Show wildcard approvals, agent questions (ask_human) with a reply box, and blocked cards with reasons. For leftovers of cards imported as done out of order offer three actions: move the open tasks into a new card at the end of the chain, close them, or leave them."
+acceptance = [
+  "Playwright test: answer an agent question and see it delivered",
+  "Blocked cards are listed with their reasons",
+  "Each of the three leftover actions works and is covered by a test",
+]
+after = ["ui", "mcp"]
+
+[[ticket]]
+id = "safety"
+title = "Data safety: backups and log caps"
+prompt = "Back up the database before every schema migration, keeping the last few. Cap and rotate runner logs."
+acceptance = [
+  "A migration test finds a fresh backup and old ones pruned to the configured count",
+  "Runner logs are capped and rotated, covered by a test",
+]
+
+[[ticket]]
 id = "claude-code"
 title = "Claude Code profile end to end"
-prompt = "The built-in claude-code profile: launch, CLAUDE.md, MCP and hooks wired, worker and reviewer roles. Run one real ticket through it."
+prompt = "The built-in claude-code profile: launch, CLAUDE.md, MCP and hooks wired, worker and reviewer roles. Run real tickets through it."
 acceptance = [
-  "A manual run on macOS moves a real ticket Ready -> Merged with an agent review; recorded in the PR",
+  "A manual run on macOS where two cards with Claude Code agents run in parallel, go through review with a return round, and merge through GitHub PRs; recorded in the PR",
 ]
-after = ["nudge", "claude-md", "automerge", "ui"]
+after = ["nudge", "claude-md", "automerge", "ui", "parallel", "github", "settings", "inbox", "safety"]
 
+[[ticket]]
+id = "package"
+title = "Version and macOS package"
+prompt = "Bump the version everywhere and build a .dmg in CI on a tag."
+acceptance = [
+  "All version fields agree, checked by a test or xtask guard",
+  "Pushing a tag makes CI build and attach a .dmg",
+]
+after = ["claude-code"]
+
+# The move-in release: v0.2.0 is simply the next version.
 [[release]]
 id = "v0.2.0"
 channel = "tag_only"
 start = "manual"
-after = ["claude-code"]
+after = ["package"]
