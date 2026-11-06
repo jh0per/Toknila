@@ -80,10 +80,10 @@ A new agent is a new file, not new code.
 
 A ship is the git worktree and branch a ticket works in. Core decides: `machine::apply` emits
 `PrepareShip` (with `EnsureRunner`, on Start, Unblock into Running and Return) and `RemoveShip`
-(on Accept), and `ShipSpec::for_ticket` names the branch `ship/<chain>/<slug>` (slug: the ticket
+(when the merge landed, see [Merging](#merging)), and `ShipSpec::for_ticket` names the branch `ship/<chain>/<slug>` (slug: the ticket
 key and title, path-safe). The daemon implements the `Shipyard` port (`toknila-app`) with `git`
-(`shipyard.rs`: `std::process::Command` with an argument list, no shell; a missing `git` is
-`ShipError::GitMissing`).
+(`shipyard.rs`: `std::process::Command` with an argument list, no shell, through the small `git.rs`
+runner that the merger shares; a missing `git` is `ShipError::GitMissing`).
 
 **After-commit effects.** Nothing external runs inside a unit of work. The use case queues an
 `ExternalEffect` (`UnitOfWork::defer`); the store commits the command, runs the queue on a
@@ -102,7 +102,7 @@ is the committed state, so the ship shows up in the next read and on the stream.
   the journal has `ticket.ship_created`, `ticket.ship_removed` and `ticket.ship_remove_failed`.
 - Idempotent: an existing worktree is reused, an existing branch is checked out as it is, a
   worktree deleted by hand is pruned and made again.
-- Merged removes the worktree after the commit (forced; the work is accepted) and keeps the
+- Merged removes the worktree after the commit (forced; the work is merged) and keeps the
   branch. A removal that fails does not undo the accept: the journal gets `ticket.ship_remove_failed`
   and the path stays recorded.
 - Cancelled leaves worktree and branch alone: nothing a person may still want is destroyed;
@@ -110,10 +110,54 @@ is the committed state, so the ship shows up in the next read and on the stream.
 - A ship that cannot be made moves the ticket to Blocked with `ship_failed` (details from git)
   through the machine; `tok unblock` retries.
 
+## Merging
+
+Accept does not move a card straight to Merged: the work has to land in the project's base branch
+(`work_branch`, default `develop`) first.
+
+- **State.** There is no new status. Accept (a person's, or the reviewer agent's approving
+  verdict in `agent` mode) records the round and leaves the card in Review with
+  `review.turn = merging` and emits the `Merge` effect. A merging card takes no second `accept`
+  and no `return` (the table refuses them, so `allowed_actions` hides them; `cancel` still
+  works). The worker's runner stays alive until the merge lands, so whoever has to fix a
+  conflict can do it on the ship.
+- **Effect and outcome.** `app::merges` queues `ExternalEffect::Merge` (a `MergeSpec` from
+  core: repo, base, the ship's branch, and the message `Merge <branch>: <KEY> <title>`). After the
+  commit the host runs it through the `Merger` port (`toknila-app`; the daemon's `GitMerger`
+  implements it, a pull-request mode can implement the same port) and the outcome returns
+  through the machine: `MergeDone` makes the card Merged (and then `RemoveShip` removes the
+  worktree and keeps the branch, `StopRunner`, and dependents become ready); anything else is
+  `Block` from Review with a typed reason. A card without a ship (no repository) has nothing to
+  merge and the host answers at once. The accept's HTTP answer is the committed state (merging);
+  the outcome follows on the stream.
+- **Reasons.** `merge_conflict` (details name the conflicting files), `base_checkout_dirty`
+  (names the path of the checkout and what to do) and `merge_failed` (git missing or older than
+  2.38, a branch missing, the base kept moving). **Unblock retries the merge**; the person or the
+  agent resolves a conflict on the ship first (merge the base branch into it, fix, commit).
+  A daemon restart while a card is merging queues the merge again (`merges_resumed` in the
+  recovery report); repeating a merge that landed is harmless (`UpToDate`).
+- **The person's checkout is never disturbed.** `GitMerger` needs `git >= 2.38` and works
+  without a working tree: `git merge-tree --write-tree --name-only -z <base> <ship>` gives the
+  merged tree or the conflicting files, `git commit-tree -p <base> -p <ship>` writes the merge
+  commit (two parents, so history shows the card; a machine without a git identity gets a
+  fallback one for this commit only). Then the base moves, safely:
+  - the base branch is checked out in some worktree (`git worktree list --porcelain`; usually
+    the person's own): if tracked files there have local changes the merge stops with
+    `base_checkout_dirty` and nothing changes; otherwise `git -C <it> merge --ff-only <new>`
+    moves branch and files together (git itself refuses, changing nothing, if an untracked file
+    is in the way, which is reported the same way);
+  - checked out nowhere: `git update-ref refs/heads/<base> <new> <old>`, a compare-and-swap.
+  - If the base moved after the merge was computed (the fast-forward is no longer one, or the
+    compare-and-swap fails), the merge is **computed again** from the new tip, up to 3 attempts,
+    then `merge_failed` (unblock tries again). It is cheap and nothing was changed meanwhile.
+- **Dependents** start after the merge landed, and a ship is made with `git worktree add -b
+  <branch> <path> <base>`, so it branches from the new base tip.
+- Limit: a `cancel` that races a running merge cannot stop git; the merge may still land.
+
 ## Runners
 
 A runner is the agent's process, started in a pseudo-terminal in the ticket's ship. Core decides
-when (`EnsureRunner` on Start, Unblock into Running and Return; `StopRunner` on Accept, Cancel,
+when (`EnsureRunner` on Start, Unblock into Running and Return; `StopRunner` when the merge lands, on Cancel,
 Pause and every block that ends the agent; `StartReviewer` and `StopReviewer` for the reviewer,
 see "Review"). The application queues `StartRunner`, `StartReviewer`, `StopRunner` and
 `StopReviewer` as external effects; the daemon implements the `Runner` port (`toknila-app`) in
@@ -183,14 +227,15 @@ the agent hands in and passes it to the machine in the `Finished` event.
 
 | Mode | The card waits for | Then |
 |---|---|---|
-| `human` | a person | `accept` merges; `return` sends the comment back |
-| `agent` | the reviewer agent | its `approve` merges, its `request_changes` returns the card with its remarks as the instruction |
+| `human` | a person | `accept` merges (see [Merging](#merging)); `return` sends the comment back |
+| `agent` | the reviewer agent | its `approve` merges (same), its `request_changes` returns the card with its remarks as the instruction |
 | `both` | the reviewer agent, then a person | the agent's verdict only records a round; the person then decides with its remarks in view |
 
 - **Rounds.** `ticket.review.rounds` is one flat list, one entry per verdict, numbered from 1
   (`{number, reviewer: human|agent, verdict: approve|request_changes, comment, decided_at}`), so in
   `both` mode the agent's verdict and the person's are two rounds. `ticket.review.turn` says
-  whose verdict the card waits for (`person`, or `agent` with `decides`), `null` outside Review.
+  whose verdict the card waits for (`person`, or `agent` with `decides`; `merging` once accepted
+  and the merge is running), `null` outside Review.
   `TicketDetail.review` adds the resolved `mode` and `reviewer` profile; `TicketDetail.allowed_actions`
   lists what a person may do now. Core computes it (`TicketAction::allowed`: each action tried
   against the transition table), so no client keeps a copy of the rules.
@@ -210,7 +255,8 @@ the agent hands in and passes it to the machine in the `Finished` event.
   context: a `return` (a person's, or the reviewer's remarks) goes to that same session (the
   runner is kept, and the comment is an instruction comment like any other: it is typed to the idle session or claimed by its Stop hook, and marked delivered once, see `app::instructions`; the reviewer's remarks take the same path). If the
   worker's process has exited meanwhile (which changes nothing in Review), the return starts a new
-  worker run on the same ship. `accept` and `cancel` stop every runner of the ticket.
+  worker run on the same ship. `cancel` stops every runner of the ticket at once; `accept` does so
+when the merge lands.
 - **Parallel limit.** Slots are counted over runners, not tickets. `schedule::plan` stays pure in
   core and takes the live runners as input (`Reader::live_runners`, which the store fills from
   `Runner::live_runners` when a read or command begins): a card holds a slot while it is Running

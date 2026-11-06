@@ -72,8 +72,8 @@ pub(super) fn agent_decides(
     next.review.turn = None;
     Ok(match verdict {
         Verdict::Approve => {
-            merge(effects);
-            (TicketStatus::Merged, None)
+            start_merge(next, effects);
+            (TicketStatus::Review, None)
         }
         Verdict::RequestChanges => {
             effects.push(Effect::RecordRemarks {
@@ -105,8 +105,31 @@ pub(super) fn agent_failed(
     Ok((TicketStatus::Review, None))
 }
 
-/// What accepting does to the host and the graph.
-pub(super) fn merge(effects: &mut Vec<Effect>) {
+/// The work was accepted: the host merges the ship's branch into the base branch, and the card
+/// stays in Review (merging) until the outcome comes back. The worker's runner stays alive, so
+/// whoever has to fix a conflict can do it on the ship.
+pub(super) fn start_merge(next: &mut Ticket, effects: &mut Vec<Effect>) {
+    next.review.turn = Some(ReviewTurn::Merging);
+    effects.push(Effect::Merge);
+}
+
+/// A card whose merge is running takes no verdict and no return.
+pub(super) fn not_merging(
+    ticket: &Ticket,
+    event: &super::TicketEvent,
+) -> Result<(), TransitionError> {
+    if ticket.review.turn == Some(ReviewTurn::Merging) {
+        Err(TransitionError::NotAllowed {
+            event: event.name(),
+            from: ticket.status,
+        })
+    } else {
+        Ok(())
+    }
+}
+
+/// The merge landed: what that does to the host and the graph.
+pub(super) fn merged(effects: &mut Vec<Effect>) {
     effects.push(Effect::RemoveShip);
     effects.push(Effect::StopRunner);
     effects.push(Effect::DependencySatisfied);

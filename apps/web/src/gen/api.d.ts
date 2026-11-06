@@ -760,6 +760,14 @@ export interface components {
             kind: "merge_conflict";
         } | {
             /** @enum {string} */
+            kind: "base_checkout_dirty";
+            path: string;
+        } | {
+            detail: string;
+            /** @enum {string} */
+            kind: "merge_failed";
+        } | {
+            /** @enum {string} */
             kind: "runner_lost";
         } | {
             detail: string;
@@ -1391,6 +1399,9 @@ export interface components {
         } | {
             /** @enum {string} */
             by: "person";
+        } | {
+            /** @enum {string} */
+            by: "merging";
         };
         /** @description How a ticket is reviewed now, and what has been decided so far. */
         ReviewView: {

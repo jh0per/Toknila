@@ -1,7 +1,7 @@
 use proptest::prelude::*;
 
 use super::*;
-use crate::{ChainId, NodeRef, TicketDraft, TicketId, TicketKey, Wildcard};
+use crate::{BlockedReason, ChainId, NodeRef, TicketDraft, TicketId, TicketKey, Wildcard};
 
 const T0: Timestamp = Timestamp(1_000);
 const NOW: Timestamp = Timestamp(5_000);
@@ -349,20 +349,6 @@ fn review_back_to_running_on_return_with_comment() {
 }
 
 #[test]
-fn review_to_merged_on_accept_satisfies_dependents() {
-    let tr = ok(TicketStatus::Review, TicketEvent::Accept { comment: None });
-    assert_eq!(tr.ticket.status, TicketStatus::Merged);
-    assert_eq!(
-        tr.effects,
-        vec![
-            Effect::RemoveShip,
-            Effect::StopRunner,
-            Effect::DependencySatisfied
-        ]
-    );
-}
-
-#[test]
 fn unblock_to_running_prepares_the_ship_again() {
     let blocked = ok(
         TicketStatus::Running,
@@ -664,6 +650,7 @@ fn sample_events() -> Vec<TicketEvent> {
             comment: "c".to_owned(),
         },
         TicketEvent::Accept { comment: None },
+        TicketEvent::MergeDone,
         TicketEvent::Released,
         TicketEvent::Reopen,
         TicketEvent::Pause,
@@ -736,6 +723,12 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(BlockedReason::MergeConflict {
             detail: "m".to_owned()
         }),
+        Just(BlockedReason::BaseCheckoutDirty {
+            path: "p".to_owned()
+        }),
+        Just(BlockedReason::MergeFailed {
+            detail: "f".to_owned()
+        }),
         Just(BlockedReason::DependencyReopened {
             dependency: "DEMO-9".parse().expect("key")
         }),
@@ -785,6 +778,7 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
             comment: String::new()
         }),
         Just(TicketEvent::Accept { comment: None }),
+        Just(TicketEvent::MergeDone),
         Just(TicketEvent::Released),
         Just(TicketEvent::Reopen),
         Just(TicketEvent::Pause),
@@ -828,5 +822,6 @@ proptest! {
     }
 }
 
+mod merge;
 mod out_of_order;
 mod review;

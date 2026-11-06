@@ -49,25 +49,18 @@ fn a_finished_card_waits_for_whoever_the_mode_says() {
 }
 
 #[test]
-fn in_agent_mode_an_approval_merges_the_card_and_is_a_round() {
+fn in_agent_mode_an_approval_starts_the_merge_and_is_a_round() {
     let t = in_review(ReviewTurn::Agent { decides: true });
     let tr = step(&t, &verdict(Verdict::Approve, "looks right"));
-    assert_eq!(tr.ticket.status, TicketStatus::Merged);
-    assert_eq!(tr.ticket.review.turn, None);
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Merging));
     let round = &tr.ticket.review.rounds[0];
     assert_eq!(
         (round.number, round.reviewer, round.verdict),
         (1, Actor::Agent, Verdict::Approve)
     );
     assert_eq!(round.comment, "looks right");
-    assert_eq!(
-        tr.effects,
-        [
-            Effect::RemoveShip,
-            Effect::StopRunner,
-            Effect::DependencySatisfied
-        ]
-    );
+    assert_eq!(tr.effects, [Effect::Merge]);
 }
 
 #[test]
@@ -172,7 +165,7 @@ fn a_person_can_decide_while_the_reviewer_is_still_looking() {
             comment: Some("fine".to_owned()),
         },
     );
-    assert_eq!(accepted.ticket.status, TicketStatus::Merged);
+    assert_eq!(accepted.ticket.review.turn, Some(ReviewTurn::Merging));
     assert!(accepted.effects.contains(&Effect::StopReviewer));
     let round = &accepted.ticket.review.rounds[0];
     assert_eq!(
@@ -233,7 +226,7 @@ fn leaving_review_any_other_way_clears_whose_turn_it_is() {
     assert!(blocked.effects.contains(&Effect::StopReviewer));
     let back = step(&blocked.ticket, &TicketEvent::Unblock);
     assert_eq!(back.ticket.status, TicketStatus::Review);
-    assert_eq!(back.ticket.review.turn, Some(ReviewTurn::Person));
+    assert_eq!(back.ticket.review.turn, Some(ReviewTurn::Merging));
 
     let cancelled = step(
         &t,

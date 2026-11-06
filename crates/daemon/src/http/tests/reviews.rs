@@ -59,6 +59,9 @@ async fn human_mode_the_card_waits_for_a_person_who_accepts_with_remarks() {
             json!({ "text": "good" }),
         )
         .await;
+    // The answer is the committed state: the merge is still running.
+    assert_eq!(done["review"]["awaiting"], json!({ "by": "merging" }));
+    let done = api.get("/v1/tickets/DEMO-1").await;
     assert_eq!(done["ticket"]["status"], "merged");
     assert_eq!(
         rounds(&done),
@@ -176,6 +179,7 @@ async fn agent_mode_an_approval_merges_the_card() {
         )
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
+    let body = api.get("/v1/tickets/DEMO-1").await;
     assert_eq!(body["ticket"]["status"], "merged");
     assert_eq!(
         rounds(&body),

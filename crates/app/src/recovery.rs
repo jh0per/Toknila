@@ -14,7 +14,7 @@ use serde::Serialize;
 use serde_json::Value;
 use toknila_core::TicketStatus;
 
-use crate::{AppError, AppResult, UnitOfWork, reviews, runs, with_chain};
+use crate::{AppError, AppResult, UnitOfWork, merges, reviews, runs, with_chain};
 
 /// What startup recovery checked and found.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -26,6 +26,8 @@ pub struct Recovery {
     pub lost: Vec<String>,
     /// Keys of the cards whose reviewer the restart lost; a person has them now.
     pub reviews_lost: Vec<String>,
+    /// Keys of the cards whose merge was running; it is queued again.
+    pub merges_resumed: Vec<String>,
     /// Entities whose stored state differs from their last journal snapshot. The database stays
     /// the source of truth; drift is reported, never "fixed" from the journal.
     pub drift: Vec<String>,
@@ -39,6 +41,8 @@ pub fn recover<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Recovery> {
     report.lost = lost.iter().map(ToString::to_string).collect();
     let reviews = reviews::mark_lost(uow, &HashSet::new())?;
     report.reviews_lost = reviews.iter().map(ToString::to_string).collect();
+    let resumed = merges::resume(uow)?;
+    report.merges_resumed = resumed.iter().map(ToString::to_string).collect();
     let chains = uow.chains(None)?;
     report.chains = chains.len();
     for c in &chains {

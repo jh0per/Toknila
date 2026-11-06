@@ -105,12 +105,29 @@ pub enum BlockedReason {
     Crashed { detail: String },
     /// A dependency was reopened after it had merged.
     DependencyReopened { dependency: TicketKey },
-    /// Merging into the work branch conflicted.
+    /// Merging into the base branch conflicted; `detail` names the files.
     MergeConflict { detail: String },
+    /// The base branch is checked out with local changes, so the merge would have to touch the
+    /// person's files. Nothing was changed.
+    BaseCheckoutDirty { path: String },
+    /// The merge could not run or finish (the VCS is missing or too old, a branch is gone, the
+    /// base kept moving); `detail` says why.
+    MergeFailed { detail: String },
     /// The daemon restarted and the runner was gone.
     RunnerLost,
     /// The ship (worktree and branch) could not be prepared.
     ShipFailed { detail: String },
+}
+
+impl BlockedReason {
+    /// True for the reasons a merge ends with: a card in Review can be blocked by these only, and
+    /// unblocking one tries the merge again.
+    pub fn is_merge(&self) -> bool {
+        matches!(
+            self,
+            Self::MergeConflict { .. } | Self::BaseCheckoutDirty { .. } | Self::MergeFailed { .. }
+        )
+    }
 }
 
 /// The reason attached to the current status, if that status carries one.
@@ -153,6 +170,13 @@ impl fmt::Display for BlockedReason {
                 write!(f, "dependency {dependency} reopened")
             }
             Self::MergeConflict { detail } => write!(f, "merge_conflict: {detail}"),
+            Self::BaseCheckoutDirty { path } => {
+                write!(
+                    f,
+                    "base_checkout_dirty: {path} has local changes; commit or stash them, then unblock"
+                )
+            }
+            Self::MergeFailed { detail } => write!(f, "merge_failed: {detail}"),
             Self::RunnerLost => f.write_str("runner lost"),
             Self::ShipFailed { detail } => write!(f, "ship_failed: {detail}"),
         }
@@ -242,6 +266,18 @@ mod tests {
                     detail: "a.rs".into(),
                 }),
                 "merge_conflict: a.rs",
+            ),
+            (
+                blocked(BlockedReason::BaseCheckoutDirty {
+                    path: "/repo".into(),
+                }),
+                "base_checkout_dirty: /repo has local changes; commit or stash them, then unblock",
+            ),
+            (
+                blocked(BlockedReason::MergeFailed {
+                    detail: "too old".into(),
+                }),
+                "merge_failed: too old",
             ),
             (blocked(BlockedReason::RunnerLost), "runner lost"),
             (

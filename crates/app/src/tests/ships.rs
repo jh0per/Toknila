@@ -8,7 +8,8 @@ use toknila_core::machine::TicketEvent;
 use toknila_core::{BlockedReason, Ship, ShipSpec, StatusReason, TicketStatus};
 
 use super::Mem;
-use crate::external::{self, ExternalEffect, Host};
+use super::runs::settle as settle_ships;
+use crate::external::ExternalEffect;
 use crate::recovery::recover;
 use crate::{AppResult, ShipError, Shipyard, agent, tickets};
 
@@ -16,7 +17,7 @@ use crate::{AppResult, ShipError, Shipyard, agent, tickets};
 #[derive(Debug, Default)]
 pub(super) struct FakeYard {
     prepared: RefCell<Vec<ShipSpec>>,
-    removed: RefCell<Vec<Ship>>,
+    pub(super) removed: RefCell<Vec<Ship>>,
     pub(super) fail_prepare: RefCell<Option<ShipError>>,
     fail_remove: RefCell<Option<ShipError>>,
 }
@@ -47,19 +48,6 @@ fn with_repo() -> Mem {
     let mut mem = Mem::demo();
     mem.project.repo_path = Some("/repo".to_owned());
     mem
-}
-
-/// What the adapter does after a command commits: run what was queued, record the outcomes.
-fn settle_ships(mem: &mut Mem) {
-    while !mem.deferred.is_empty() {
-        let queued = std::mem::take(&mut mem.deferred);
-        let host = Host {
-            yard: &mem.yard,
-            runner: &mem.runner,
-        };
-        let outcomes = external::execute(host, queued);
-        external::apply(mem, outcomes).expect("apply outcomes");
-    }
 }
 
 fn finish_a(mem: &mut Mem) -> AppResult<()> {
@@ -122,15 +110,14 @@ fn merged_queues_the_removal_and_the_outcome_forgets_the_path_but_keeps_the_bran
     settle_ships(&mut mem);
     finish_a(&mut mem).expect("finished");
     act_on_a(&mut mem, TicketEvent::Accept { comment: None }).expect("accept");
-    assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Merged);
     assert!(
-        mem.deferred
+        !mem.deferred
             .iter()
-            .any(|e| matches!(e, ExternalEffect::RemoveShip { .. }))
+            .any(|e| matches!(e, ExternalEffect::RemoveShip { .. })),
+        "the ship goes only after the merge landed"
     );
-    assert!(mem.yard.removed.borrow().is_empty(), "not yet");
-
     settle_ships(&mut mem);
+    assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Merged);
     assert_eq!(mem.yard.removed.borrow().len(), 1);
     assert!(mem.ships.iter().all(|s| s.key.to_string() != "DEMO-1"));
     assert_eq!(count(&mem, "ticket.ship_removed"), 1);

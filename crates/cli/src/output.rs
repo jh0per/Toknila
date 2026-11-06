@@ -200,6 +200,7 @@ fn review(d: &TicketDetail) {
     let turn = match r.awaiting {
         Some(toknila_core::ReviewTurn::Person) => ", waiting for a person".to_owned(),
         Some(toknila_core::ReviewTurn::Agent { .. }) => ", waiting for the reviewer".to_owned(),
+        Some(toknila_core::ReviewTurn::Merging) => ", merging".to_owned(),
         None => String::new(),
     };
     println!("review: {}  reviewer: {}{turn}", w(&r.mode), r.reviewer);

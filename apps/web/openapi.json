@@ -2611,7 +2611,7 @@
           },
           {
             "type": "object",
-            "description": "Merging into the work branch conflicted.",
+            "description": "Merging into the base branch conflicted; `detail` names the files.",
             "required": [
               "detail",
               "kind"
@@ -2624,6 +2624,44 @@
                 "type": "string",
                 "enum": [
                   "merge_conflict"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The base branch is checked out with local changes, so the merge would have to touch the\nperson's files. Nothing was changed.",
+            "required": [
+              "path",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "base_checkout_dirty"
+                ]
+              },
+              "path": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The merge could not run or finish (the VCS is missing or too old, a branch is gone, the\nbase kept moving); `detail` says why.",
+            "required": [
+              "detail",
+              "kind"
+            ],
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "merge_failed"
                 ]
               }
             }
@@ -4444,6 +4482,21 @@
                 "type": "string",
                 "enum": [
                   "person"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The work was accepted and its merge into the base branch is running on the host. Nobody\nis awaited; the outcome arrives as an event (`MergeDone`, or a block with the reason).",
+            "required": [
+              "by"
+            ],
+            "properties": {
+              "by": {
+                "type": "string",
+                "enum": [
+                  "merging"
                 ]
               }
             }

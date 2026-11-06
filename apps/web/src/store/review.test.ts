@@ -19,6 +19,7 @@ describe("awaitingText", () => {
     expect(awaitingText(view({ by: "person" }))).toBe("waiting for you");
     expect(awaitingText(view({ by: "agent", decides: true }))).toBe("waiting for the reviewer agent");
     expect(awaitingText(view({ by: "agent", decides: false }))).toBe("waiting for the reviewer agent, then you");
+    expect(awaitingText(view({ by: "merging" }))).toBe("merging into the base branch");
     expect(awaitingText(view(null))).toBe("");
   });
 });

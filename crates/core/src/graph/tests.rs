@@ -144,7 +144,7 @@ fn event(v: &mut ChainView, n: NodeRef, e: TicketEvent) {
     settle(v);
 }
 
-/// Running -> Review -> Merged, then let the graph react.
+/// Running -> Review -> merging -> Merged, then let the graph react.
 fn finish_and_accept(v: &mut ChainView, n: NodeRef) {
     event(
         v,
@@ -156,6 +156,7 @@ fn finish_and_accept(v: &mut ChainView, n: NodeRef) {
         },
     );
     event(v, n, TicketEvent::Accept { comment: None });
+    event(v, n, TicketEvent::MergeDone);
 }
 
 #[test]

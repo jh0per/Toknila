@@ -19,6 +19,7 @@ use crate::{
 
 mod import_done;
 mod leftovers;
+mod merges;
 mod nudge;
 mod parallel;
 mod resume;
@@ -40,6 +41,7 @@ struct Mem {
     versions: Vec<ThreadVersion>,
     ships: Vec<Ship>,
     yard: ships::FakeYard,
+    merger: merges::FakeMerger,
     runner: runs::FakeRunner,
     /// Work queued for after the command, as the daemon collects it.
     deferred: Vec<crate::external::ExternalEffect>,
@@ -110,6 +112,7 @@ impl Mem {
             versions: vec![],
             ships: vec![],
             yard: ships::FakeYard::default(),
+            merger: merges::FakeMerger::default(),
             runner: runs::FakeRunner::default(),
             deferred: vec![],
             events: vec![],
@@ -316,6 +319,7 @@ fn recovery_settles_and_reports_drift_without_a_journal() {
             running: 0,
             lost: vec![],
             reviews_lost: vec![],
+            merges_resumed: vec![],
             drift: vec!["DEMO-1".to_owned(), "DEMO-2".to_owned()],
         }
     );

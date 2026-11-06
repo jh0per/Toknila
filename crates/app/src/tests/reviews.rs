@@ -58,6 +58,8 @@ fn human_mode_waits_for_a_person_who_accepts_with_remarks() {
         comment: Some("good".to_owned()),
     };
     act(&mut mem, event);
+    assert_eq!(a(&mem).review.turn, Some(ReviewTurn::Merging));
+    settle(&mut mem);
     let t = a(&mem);
     assert_eq!(t.status, TicketStatus::Merged);
     assert_eq!(
@@ -90,6 +92,7 @@ fn agent_mode_the_reviewers_approval_merges_and_its_remarks_return_the_card() {
 
     finish(&mut mem, "fixed".to_owned());
     verdict(&mut mem, Verdict::Approve, "now fine").expect("verdict");
+    settle(&mut mem);
     let t = a(&mem);
     assert_eq!(t.status, TicketStatus::Merged);
     assert_eq!(
@@ -520,6 +523,7 @@ fn a_card_in_review_with_worker_and_reviewer_alive_holds_two_slots() {
     let one = card(&mem, 1);
     tickets::act(&mut mem, &one, TicketEvent::Accept { comment: None }).expect("accept");
     settle(&mut mem);
+    assert_eq!(card(&mem, 1).status, TicketStatus::Merged);
     assert_eq!(card(&mem, 3).status, TicketStatus::Running);
 }
 

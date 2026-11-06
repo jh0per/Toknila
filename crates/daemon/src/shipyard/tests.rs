@@ -1,28 +1,11 @@
 //! The git shipyard against real temporary repositories (a `develop` branch with one commit).
 
 use std::path::Path;
-use std::process::Command;
 
 use toknila_core::TicketId;
 
 use super::*;
-
-fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@example.com"])
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .output()
-        .expect("git runs");
-    assert!(
-        out.status.success(),
-        "git {args:?}: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8_lossy(&out.stdout).trim().to_owned()
-}
+use crate::git::testing::git;
 
 /// A repository whose only branch is `develop`, with one commit.
 fn repo(dir: &Path) -> String {
