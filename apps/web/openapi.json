@@ -5033,9 +5033,14 @@
         "required": [
           "thread",
           "messages",
-          "versions"
+          "versions",
+          "changes_requested"
         ],
         "properties": {
+          "changes_requested": {
+            "type": "boolean",
+            "description": "The thread is open and a person's request for changes has no newer version yet."
+          },
           "messages": {
             "type": "array",
             "items": {

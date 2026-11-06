@@ -2,6 +2,7 @@
   "phase": "design",
   "threads": [
     {
+      "changes_requested": false,
       "messages": [
         {
           "author": "agent",

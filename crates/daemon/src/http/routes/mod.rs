@@ -52,9 +52,12 @@ fn load_ticket_detail(repo: &Repo<'_>, ticket: TicketId, at: Timestamp) -> ApiRe
 }
 
 fn load_thread_detail(repo: &Repo<'_>, thread: Thread) -> ApiResult<ThreadDetail> {
+    let messages = repo.thread_messages(thread.id)?;
+    let versions = repo.thread_versions(thread.id)?;
     Ok(ThreadDetail {
-        messages: repo.thread_messages(thread.id)?,
-        versions: repo.thread_versions(thread.id)?,
+        changes_requested: toknila_core::thread::changes_requested(&thread, &versions, &messages),
+        messages,
+        versions,
         thread,
     })
 }
