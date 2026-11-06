@@ -8,10 +8,10 @@
 // terminal says the run ended.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, launch } from "./helpers.mjs";
+import { checks, cleanup, launch } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -123,15 +123,5 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  try {
-    tok("daemon", "stop");
-  } catch {
-    /* already stopped */
-  }
-  // Best effort: the daemon may still be closing files of the ship it removed.
-  try {
-    rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    /* a temp folder left behind is not a failure of the test */
-  }
+  await cleanup(tok, home);
 }

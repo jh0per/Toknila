@@ -45,7 +45,7 @@ portable-pty = "0.9"
 terminal_size = "0.4"
 # Exact pins: process listing (live children of an agent) and the Unix process-group signal.
 sysinfo = { version = "=0.40.1", default-features = false, features = ["system"] }
-nix = { version = "=0.28.0", default-features = false, features = ["signal"] }
+nix = { version = "=0.28.0", default-features = false, features = ["signal", "fs"] }
 ureq = { version = "2.12", default-features = false, features = ["json"] }
 
 [workspace.lints.rust]

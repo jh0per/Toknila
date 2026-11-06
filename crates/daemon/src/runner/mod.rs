@@ -11,6 +11,7 @@
 //! command committed. `portable-pty` lives in `pty` and nowhere else.
 
 mod active;
+mod drain;
 mod logs;
 mod pty;
 mod scrollback;

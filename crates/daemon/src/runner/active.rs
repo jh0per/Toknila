@@ -15,6 +15,7 @@ use toknila_core::instructions::terminal::Size;
 use toknila_core::{ProcessExit, Run, TicketId};
 
 use super::Chunk;
+use super::drain::MarkFilter;
 use super::logs::RunLog;
 use super::pty::{self, Spawned};
 use super::scrollback::Scrollback;
@@ -94,6 +95,8 @@ impl Active {
             killer,
             mut child,
             master,
+            #[cfg_attr(windows, allow(unused_mut, unused_variables))]
+            mut slave,
         } = process;
         let active = Arc::new(Active {
             run,
@@ -132,15 +135,18 @@ impl Active {
                         },
                         |s| pty::exit_of(&s),
                     );
-                    // The reader ends when the terminal closes. On Unix output the process left
-                    // behind stays readable until then, so read it first. ConPTY flushes late and
-                    // reports the end only once its console is closed, so close it after a pause.
+                    // On Unix the reader ends at the mark written through our slave end, after
+                    // everything the process printed (see `drain`); close the terminal after that.
+                    // ConPTY flushes late and reports the end only once its console is closed, so
+                    // close it after a pause.
                     if cfg!(windows) {
                         std::thread::sleep(Duration::from_millis(200));
                         drop(lock(&a.master).take());
                         let _ = drained.recv_timeout(DRAIN);
                     } else {
+                        slave.mark();
                         let _ = drained.recv_timeout(DRAIN);
+                        drop(slave);
                         drop(lock(&a.master).take());
                     }
                     // The run is over: its token stops working before anyone hears about the end.
@@ -166,9 +172,25 @@ impl Active {
         let mut log_failed = false;
         let mut answered_cursor = !cfg!(windows);
         let mut tail: Vec<u8> = Vec::new();
+        let mut marks = MarkFilter::default();
+        let mut keep = |bytes: &[u8]| {
+            if bytes.is_empty() {
+                return;
+            }
+            // The log first: whatever a subscriber is told is already on disk.
+            if let Err(e) = log.write(bytes)
+                && !log_failed
+            {
+                log_failed = true;
+                tracing::warn!(run = %self.run.id, error = %e, "cannot write the run log");
+            }
+            *lock(&self.last_output) = Instant::now();
+            lock(&self.state).scrollback.push(bytes);
+            let _ = wake.send(self.run.ticket_id);
+        };
         loop {
             let n = match reader.read(&mut buf) {
-                Ok(0) | Err(_) => return,
+                Ok(0) | Err(_) => return keep(&marks.rest()),
                 Ok(n) => n,
             };
             if !answered_cursor {
@@ -182,16 +204,11 @@ impl Active {
                     tail.drain(..tail.len().saturating_sub(pty::QUERY_OVERLAP));
                 }
             }
-            // The log first: whatever a subscriber is told is already on disk.
-            if let Err(e) = log.write(&buf[..n])
-                && !log_failed
-            {
-                log_failed = true;
-                tracing::warn!(run = %self.run.id, error = %e, "cannot write the run log");
+            let (output, complete) = marks.feed(&buf[..n]);
+            keep(&output);
+            if complete {
+                return;
             }
-            *lock(&self.last_output) = Instant::now();
-            lock(&self.state).scrollback.push(&buf[..n]);
-            let _ = wake.send(self.run.ticket_id);
         }
     }
 

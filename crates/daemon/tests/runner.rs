@@ -125,6 +125,35 @@ fn output_streams_into_the_scrollback_with_the_ship_as_working_directory() {
     assert!(!end.stopped);
 }
 
+/// A process that prints and exits at once must not lose its output (on macOS the kernel drops
+/// what is undelivered when the last slave end closes): the reader has to have it before the end
+/// is reported.
+#[test]
+fn the_output_of_a_process_that_prints_and_exits_at_once_is_never_lost() {
+    // Several at once: the loss needs the reader to be scheduled late.
+    std::thread::scope(|s| {
+        for lane in 0..8 {
+            s.spawn(move || {
+                for i in 0..10 {
+                    let mut rig = Rig::new();
+                    rig.profile("fake", &["print", "quick words", "exit", "0"], "");
+                    let started = rig.start("fake");
+                    rig.wait_end();
+                    let kept = rig.output();
+                    assert!(kept.contains("quick words"), "{lane}/{i}: {kept:?}");
+                    assert!(!kept.contains("toknila-drained"), "mark leaked: {kept:?}");
+                    let log = log_of(rig.dir.path(), rig.ticket, &started.run.id.to_string());
+                    let on_disk = std::fs::read_to_string(log).expect("log");
+                    assert!(
+                        on_disk.contains("quick words"),
+                        "{lane}/{i}: log {on_disk:?}"
+                    );
+                }
+            });
+        }
+    });
+}
+
 #[test]
 fn a_failing_exit_code_is_reported_as_it_is() {
     let mut rig = Rig::new();
