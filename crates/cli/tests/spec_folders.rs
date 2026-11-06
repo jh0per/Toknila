@@ -273,3 +273,45 @@ fn spec_folder_round_trip() {
         original
     );
 }
+
+#[test]
+fn a_gap_and_early_tasks_import_and_export_unchanged() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tok = Tok {
+        home: dir.path().join("home"),
+    };
+    let folder = dir.path().join("specs/010-gap");
+    std::fs::create_dir_all(&folder).expect("mkdir");
+    std::fs::write(folder.join("spec.md"), "# Gap Feature\n\nWords.\n").expect("spec");
+    let tasks = "- [x] T001 early one\n- [x] T002 early two\n\n## Phase 1: Middle\n\n- [x] T003 a\n- [ ] T004 b\n\n## Phase 2: Last\n\n- [x] T005 c\n";
+    std::fs::write(folder.join("tasks.md"), tasks).expect("tasks");
+    tok.json(&["project", "new", "SPEC", "--name", "Spec"]);
+
+    let text = tok.raw(&["chain", "import", folder.to_str().expect("path")]);
+    assert!(text.status.success());
+    let out = String::from_utf8_lossy(&text.stdout).into_owned();
+    assert!(
+        out.contains("\n  phase-2 done out of order: phase-1 has 1 open subtask (T004)\n"),
+        "{out}"
+    );
+    // The early tasks are one card named after the spec, first, with no phase number.
+    assert_eq!(
+        tok.statuses(),
+        ["SPEC-1 merged", "SPEC-2 ready", "SPEC-3 merged"]
+    );
+    let early = tok.json(&["show", "SPEC-1"]);
+    assert_eq!(early["ticket"]["title"], "Gap Feature");
+    assert_eq!(early["ticket"].get("done_out_of_order"), None);
+    // The mark is part of the ticket detail, with the key of the open card.
+    let last = tok.json(&["show", "SPEC-3"]);
+    assert_eq!(last["ticket"]["done_out_of_order"]["behind"][0], "SPEC-2");
+
+    let copy = dir.path().join("copy");
+    copy_dir(&folder, &copy);
+    let copy_arg = copy.to_str().expect("path");
+    tok.ok(&["chain", "export", "010-gap", "--spec", copy_arg]);
+    assert_eq!(
+        std::fs::read_to_string(copy.join("tasks.md")).expect("read"),
+        tasks
+    );
+}

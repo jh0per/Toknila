@@ -39,6 +39,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         needs_secrets: true,
         tokens_used: 12_345,
         wildcard: None,
+        done_out_of_order: None,
     }
 }
 

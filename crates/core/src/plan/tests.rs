@@ -213,3 +213,5 @@ fn the_phase_1_plan_is_a_valid_chain() {
     let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
     view.validate().expect("valid graph");
 }
+
+mod order;

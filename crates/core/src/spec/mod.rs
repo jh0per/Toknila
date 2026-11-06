@@ -5,18 +5,22 @@
 //! Mapping: one folder is one chain; one `## Phase N: ...` section with tasks is one ticket; one
 //! `- [ ] T005 ...` line is one subtask whose text (T-id included) is kept verbatim. Phases that
 //! name a user story run in parallel, each after the last other phase before them; any other
-//! phase waits for everything since the previous one. Import goes through a chain file
+//! phase waits for everything since the previous one. Tasks before the first `##` heading are one
+//! card titled after the spec. A card whose tasks are all checked but which sits behind a card
+//! that is not is imported as done out of order (see [`OutOfOrderCard`]). Import goes through a chain file
 //! ([`import`]); export only flips checkboxes and appends missing phases ([`patch`]).
 
 mod deps;
 mod import;
 mod parse;
 mod patch;
+mod report;
 
 pub use deps::phase_deps;
-pub use import::{SpecImport, import};
+pub use import::{SpecImport, import, markdown_title};
 pub use parse::{SpecPhase, SpecTask, SpecTasks, parse};
 pub use patch::{ExportCard, ExportSubtask, patch};
+pub use report::{OpenBefore, OutOfOrderCard};
 
 /// What is wrong with a `tasks.md`.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -24,7 +28,7 @@ pub enum SpecErrorKind {
     /// A checkbox line that is not `- [ ] text` or `- [x] text`.
     #[error("malformed task line: expected `- [ ] text` or `- [x] text`")]
     MalformedTask,
-    /// A task line before any `## Phase` heading, or under a section that is not a phase.
+    /// A task line under a `#` heading that comes after the phases.
     #[error("task outside any phase")]
     TaskOutsidePhase,
     /// No phase in the file has a task.

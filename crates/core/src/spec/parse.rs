@@ -11,7 +11,8 @@ pub struct SpecTasks {
     pub phases: Vec<SpecPhase>,
 }
 
-/// One `## Phase N: ...` section.
+/// One `## Phase N: ...` section, or the tasks before the first `##` heading (no number, empty
+/// title; the importer names it).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpecPhase {
     /// Line of the heading, 1-based.
@@ -39,7 +40,7 @@ pub struct SpecTask {
     pub done: bool,
 }
 
-/// Parses a `tasks.md`. A task line outside a phase or a malformed one is a typed error.
+/// Parses a `tasks.md`. A task line under a later `#` heading or a malformed one is a typed error.
 pub fn parse(text: &str) -> Result<SpecTasks, SpecError> {
     let mut spec = SpecTasks {
         title: None,
@@ -98,6 +99,11 @@ pub fn parse(text: &str) -> Result<SpecTasks, SpecError> {
         }
         match task_line(trimmed) {
             Ok(Some((mark, done, body))) => {
+                // Tasks before the first `##` heading form a card of their own, named later.
+                if spec.phases.is_empty() {
+                    spec.phases.push(preamble(line_no));
+                    in_phase = true;
+                }
                 let Some(phase) = spec.phases.last_mut().filter(|_| in_phase) else {
                     return Err(SpecError::at(line_no, SpecErrorKind::TaskOutsidePhase));
                 };
@@ -118,6 +124,18 @@ pub fn parse(text: &str) -> Result<SpecTasks, SpecError> {
     }
     finish_prompt(&mut spec, in_phase, &mut prompt);
     Ok(spec)
+}
+
+/// The card for tasks that come before any `##` heading: no number, no title yet.
+fn preamble(line: usize) -> SpecPhase {
+    SpecPhase {
+        line,
+        number: None,
+        title: String::new(),
+        story: false,
+        prompt: String::new(),
+        tasks: Vec::new(),
+    }
 }
 
 /// Prompt lines are only kept before the first task of the current phase.

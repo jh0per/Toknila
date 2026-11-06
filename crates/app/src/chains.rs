@@ -87,6 +87,7 @@ pub fn import<U: UnitOfWork + ?Sized>(
         Ok(())
     })?;
     let mut done = Vec::new();
+    let mut late = Vec::new();
     for list in subtasks {
         let ticket = uow
             .ticket(list.ticket)?
@@ -97,17 +98,35 @@ pub fn import<U: UnitOfWork + ?Sized>(
                 update_subtask(uow, &ticket, s.position, Some(true), None)?;
             }
         }
-        if list.done {
-            done.push(list.ticket);
+        match (list.done, list.behind.is_empty()) {
+            (true, true) => done.push(list.ticket),
+            (true, false) => late.push((list.ticket, list.behind)),
+            (false, _) => {}
         }
     }
+    merge_late(uow, chain_id, late)?;
     merge_done(uow, chain_id, &done)?;
     Ok(chain_id)
 }
 
+/// Takes the tickets a file marked done behind open tickets to Merged with the state machine's
+/// out-of-order event; the ticket keeps the keys of the open tickets as its mark.
+fn merge_late<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: ChainId,
+    late: Vec<(TicketId, Vec<TicketKey>)>,
+) -> AppResult<()> {
+    with_chain(uow, chain, move |ctx| -> AppResult<()> {
+        for (id, behind) in late {
+            ctx.ticket_event(id, TicketEvent::DoneOutOfOrder { behind })?;
+        }
+        Ok(())
+    })
+}
+
 /// Takes the tickets a file marked done through Ready, Running and Review to Merged, with the
 /// ordinary events, in dependency order: each round merges what is Ready, and settling then
-/// readies its dependents. A done ticket behind a ticket that is not done stays where it is.
+/// readies its dependents. Done tickets behind open tickets were merged before, out of order.
 fn merge_done<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     chain: ChainId,
@@ -137,6 +156,7 @@ fn next_merge_event(ctx: &ChainTx, id: TicketId) -> Option<TicketEvent> {
         TicketStatus::Ready => Some(TicketEvent::Start),
         TicketStatus::Running => Some(TicketEvent::Finished {
             summary: "Imported as done: every task was already checked.".to_owned(),
+            open_threads: Vec::new(),
         }),
         TicketStatus::Review => Some(TicketEvent::Accept),
         _ => None,

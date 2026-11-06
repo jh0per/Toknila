@@ -23,6 +23,9 @@ struct Outcome {
     tasks: usize,
     /// Cards imported as Merged because every task was checked.
     done_cards: usize,
+    /// Done cards that sit behind a card with open subtasks, one line each.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    out_of_order: Vec<String>,
     /// The reason, for `skipped` and `failed`.
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
@@ -36,6 +39,7 @@ impl Outcome {
             cards: 0,
             tasks: 0,
             done_cards: 0,
+            out_of_order: Vec::new(),
             error: None,
         }
     }
@@ -43,10 +47,15 @@ impl Outcome {
     fn line(&self) -> String {
         match (&self.error, self.result) {
             (Some(e), r) => format!("{}: {r}: {e}", self.folder),
-            (None, _) => format!(
-                "{}: imported, {} cards ({} done), {} tasks",
-                self.folder, self.cards, self.done_cards, self.tasks
-            ),
+            (None, _) => {
+                let head = format!(
+                    "{}: imported, {} cards ({} done), {} tasks",
+                    self.folder, self.cards, self.done_cards, self.tasks
+                );
+                self.out_of_order
+                    .iter()
+                    .fold(head, |out, l| format!("{out}\n  {l}"))
+            }
         }
     }
 }
@@ -109,7 +118,10 @@ fn import_folder(c: &Client, dir: &Path, project: &str) -> Outcome {
         Ok(t) => t,
         Err(e) => return fail(format!("{}: {e}", tasks.display())),
     };
-    let imp = match spec::import(&text, &folder_name(dir), &documents(dir)) {
+    let title = std::fs::read_to_string(dir.join("spec.md"))
+        .ok()
+        .and_then(|t| spec::markdown_title(&t));
+    let imp = match spec::import(&text, &folder_name(dir), title.as_deref(), &documents(dir)) {
         Ok(i) => i,
         Err(e) => return fail(format!("{}:{}: {}", tasks.display(), e.line, e.kind)),
     };
@@ -118,6 +130,7 @@ fn import_folder(c: &Client, dir: &Path, project: &str) -> Outcome {
     }
     let mut o = Outcome::new(dir, "imported");
     (o.cards, o.tasks, o.done_cards) = (imp.cards, imp.tasks, imp.done_cards);
+    o.out_of_order = imp.out_of_order.iter().map(ToString::to_string).collect();
     o
 }
 

@@ -162,4 +162,9 @@ pub(super) const MIGRATIONS: &[&str] = &[
         UNIQUE (thread_id, number)
     );
     "#,
+    // 4: cards imported as done behind open cards (P1-04): the earlier cards that were open
+    // (JSON), kept for good so a view can say "done out of order".
+    r#"
+    ALTER TABLE tickets ADD COLUMN done_out_of_order_json TEXT;
+    "#,
 ];

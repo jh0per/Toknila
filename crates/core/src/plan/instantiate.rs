@@ -14,6 +14,8 @@ pub struct Checklist {
     pub subtasks: Vec<(String, bool)>,
     /// The file asks for the ticket to be imported as Merged.
     pub done: bool,
+    /// Done, but these earlier tickets are not: it is taken to Merged out of order.
+    pub behind: Vec<TicketKey>,
 }
 
 fn position(index: usize) -> u32 {
@@ -64,10 +66,12 @@ impl Plan {
                 kind: e.kind,
             })
             .collect();
+        let open_before = self.out_of_order();
         let subtasks = tickets
             .iter()
             .zip(&self.tickets)
-            .map(|(t, p)| Checklist {
+            .zip(&open_before)
+            .map(|((t, p), open)| Checklist {
                 ticket: t.id,
                 subtasks: p
                     .subtasks
@@ -76,6 +80,7 @@ impl Plan {
                     .map(|(i, text)| (text.clone(), p.done_subtasks.contains(&position(i))))
                     .collect(),
                 done: p.done,
+                behind: open.iter().map(|i| tickets[*i].key.clone()).collect(),
             })
             .collect();
         let view = ChainView {

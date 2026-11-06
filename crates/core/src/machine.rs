@@ -13,6 +13,7 @@
 //! | Blocked | previous status | `Unblock` |
 //! | Review | Running | `Return` |
 //! | Review | Merged | `Accept` |
+//! | Backlog, Ready | Merged | `DoneOutOfOrder` (import only: work finished behind open cards) |
 //! | Merged | Released | `Released` |
 //! | Merged | Review | `Reopen` |
 //! | Backlog, Ready, Running, Waiting, Blocked | Backlog (paused) | `Pause` |
@@ -27,8 +28,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Actor, BlockedReason, NodeRef, StatusReason, Ticket, TicketKey, TicketStatus, Timestamp,
-    WaitingReason, thread::OpenThread,
+    Actor, BlockedReason, NodeRef, OutOfOrder, StatusReason, Ticket, TicketKey, TicketStatus,
+    Timestamp, WaitingReason, thread::OpenThread,
 };
 
 /// Something that happened to a ticket.
@@ -61,6 +62,9 @@ pub enum TicketEvent {
     Return { comment: String },
     /// `tok accept`.
     Accept,
+    /// Import: the work was already done although cards before this one are still open. The
+    /// card is Merged and keeps the keys of those cards as its mark.
+    DoneOutOfOrder { behind: Vec<TicketKey> },
     /// Graph: the milestone this ticket belongs to was released.
     Released,
     /// `tok reopen`.
@@ -91,6 +95,7 @@ impl TicketEvent {
             Self::Unblock => "unblock",
             Self::Return { .. } => "return",
             Self::Accept => "accept",
+            Self::DoneOutOfOrder { .. } => "done_out_of_order",
             Self::Released => "released",
             Self::Reopen => "reopen",
             Self::Pause => "pause",
@@ -151,6 +156,8 @@ pub enum TransitionError {
     EmptyText(&'static str),
     #[error("cannot hand in {0}: {open}", open = crate::thread::list(.1))]
     OpenThreads(TicketKey, Vec<OpenThread>),
+    #[error("a card is done out of order only when a card before it is still open")]
+    NothingBehind,
     #[error("only a person can {event} a card; this came from {actor:?}")]
     PersonOnly { event: &'static str, actor: Actor },
 }
@@ -240,6 +247,17 @@ pub fn apply(
         }
         (S::Review, TicketEvent::Accept) => {
             effects.push(Effect::StopRunner);
+            effects.push(Effect::DependencySatisfied);
+            (S::Merged, None)
+        }
+        (S::Backlog | S::Ready, TicketEvent::DoneOutOfOrder { behind }) => {
+            if behind.is_empty() {
+                return Err(TransitionError::NothingBehind);
+            }
+            next.paused = false;
+            next.done_out_of_order = Some(OutOfOrder {
+                behind: behind.clone(),
+            });
             effects.push(Effect::DependencySatisfied);
             (S::Merged, None)
         }
@@ -360,42 +378,9 @@ fn non_empty(text: &str, what: &'static str) -> Result<(), TransitionError> {
     }
 }
 
-/// Invariants every ticket must satisfy. Returns the first violation.
-pub fn check_invariants(ticket: &Ticket) -> Result<(), String> {
-    use TicketStatus as S;
-    match (ticket.status, &ticket.status_reason) {
-        (S::Waiting, Some(StatusReason::Waiting(_))) => {}
-        (
-            S::Blocked,
-            Some(StatusReason::Blocked {
-                resume_to, waiting, ..
-            }),
-        ) => {
-            if !matches!(resume_to, S::Running | S::Waiting | S::Review) {
-                return Err(format!("blocked ticket resumes to {resume_to:?}"));
-            }
-            if waiting.is_some() != (*resume_to == S::Waiting) {
-                return Err(format!(
-                    "blocked ticket resumes to {resume_to:?} with {waiting:?}"
-                ));
-            }
-        }
-        (S::Cancelled, Some(StatusReason::Cancelled { .. })) => {}
-        (S::Proposed, Some(StatusReason::Proposed)) => {}
-        (S::Waiting | S::Blocked | S::Cancelled | S::Proposed, r) => {
-            return Err(format!("{:?} with reason {r:?}", ticket.status));
-        }
-        (_, None) => {}
-        (s, Some(r)) => return Err(format!("{s:?} must not carry a reason, has {r:?}")),
-    }
-    if ticket.paused && ticket.status != S::Backlog {
-        return Err(format!("paused ticket in {:?}", ticket.status));
-    }
-    if ticket.status == S::Proposed && ticket.wildcard.as_ref().is_none_or(|w| w.approved) {
-        return Err(format!("proposed ticket with mark {:?}", ticket.wildcard));
-    }
-    Ok(())
-}
+mod invariants;
+
+pub use invariants::check_invariants;
 
 #[cfg(test)]
 mod tests;

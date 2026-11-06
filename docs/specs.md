@@ -19,6 +19,7 @@ tok chain export 232-some-feature --spec specs/232-some-feature
 | `## Phase N: Name` (or any other `##` section that holds tasks) | One card; the text between the heading and the first task is its prompt |
 | `## Phase N: User Story K - Title` | A card titled `USK: Title`, so the story label stays visible |
 | `- [ ] T005 [P] [US1] text` | One subtask whose text is kept verbatim, T-id included; ticked when `[x]` |
+| Tasks before the first `##` heading | One card, first in the chain, with no phase number, titled after the `# Tasks:` title, else the `# ` title of `spec.md`, else the folder name |
 | Sections without tasks (Dependencies, Parallel Opportunities, ...) | Not cards |
 
 Order: cards follow the file. Story phases run in parallel, each after the last non-story phase
@@ -27,13 +28,20 @@ that phase when there are none (so Polish waits for all stories).
 
 An imported chain never starts by itself (autostart is off). A card whose tasks are all checked
 is imported as Merged through the ordinary state machine (Ready, Running, Review, Merged), so its
-dependents become Ready as usual. A done card behind a card that is not done stays in Backlog with
-its subtasks ticked.
+dependents become Ready as usual.
+
+A card whose tasks are all checked but which sits behind a card that still has open tasks (work
+done in another order than the file lists it) is imported as Merged too, marked "done out of
+order". The state machine takes it there with its own event (`done_out_of_order`), the journal
+records it, and the ticket keeps the keys of the earlier open cards (`done_out_of_order.behind`
+in the ticket detail), so a view can show it. Stories that run in parallel are not behind each
+other. The import report lists each such card, for example
+`phase-3 done out of order: phase-2 has 1 open subtask (T011)`.
 
 Import reports each folder (`imported`, `skipped` when there is no `tasks.md`, or `failed`) and
 goes on after a failure; the command exits non-zero if any folder failed. Importing a folder whose
-chain already exists is refused. A task line before the first `##` heading or a malformed one
-(`- [y] ...`, `- [ ]` without text) is an error naming the file and line.
+chain already exists is refused. A malformed task line (`- [y] ...`, `- [ ]` without text) or a
+task under a later `#` heading is an error naming the file and line.
 
 ## Export
 

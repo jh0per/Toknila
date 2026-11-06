@@ -99,8 +99,6 @@ fn a_malformed_task_line_names_its_line() {
 
 #[test]
 fn a_task_outside_a_phase_is_an_error() {
-    let e = err("# Tasks: X\n\n- [ ] T001 early\n");
-    assert_eq!((e.line, e.kind), (3, SpecErrorKind::TaskOutsidePhase));
     let e = err("## Phase 1: A\n- [ ] T001 ok\n\n# Notes\n\n- [ ] T002 stray\n");
     assert_eq!((e.line, e.kind), (6, SpecErrorKind::TaskOutsidePhase));
 }
@@ -123,7 +121,7 @@ fn another_section_with_tasks_is_a_card_and_sub_headings_stay_in_their_phase() {
         ]
     );
     assert_eq!(spec.phases[1].prompt, "### Tests first");
-    let imp = import(text, "x", &[]).expect("imports");
+    let imp = import(text, "x", None, &[]).expect("imports");
     assert_eq!((imp.cards, imp.tasks), (2, 3));
 }
 
@@ -180,7 +178,7 @@ fn dependency_rule() {
 
 #[test]
 fn import_builds_a_chain_file_the_chain_parser_accepts() {
-    let imp = import(SAMPLE, "001-sample-feature", &docs()).expect("imports");
+    let imp = import(SAMPLE, "001-sample-feature", None, &docs()).expect("imports");
     assert_eq!((imp.cards, imp.tasks, imp.done_cards), (6, 11, 2));
     let plan = plan::parse(&imp.toml).expect("a valid chain file");
     assert_eq!(plan.chain.name, "001-sample-feature");
@@ -212,16 +210,16 @@ fn import_builds_a_chain_file_the_chain_parser_accepts() {
 #[test]
 fn import_errors_are_typed() {
     assert_eq!(
-        import("# Tasks: X\n## Notes\ntext\n", "x", &[])
+        import("# Tasks: X\n## Notes\ntext\n", "x", None, &[])
             .expect_err("no tasks")
             .kind,
         SpecErrorKind::NoTasks
     );
     assert_eq!(
-        import(SAMPLE, " ", &[]).expect_err("name").kind,
+        import(SAMPLE, " ", None, &[]).expect_err("name").kind,
         SpecErrorKind::EmptyName
     );
-    let e = import("## Phase 1: A\n- [q] T1\n", "x", &[]).expect_err("bad");
+    let e = import("## Phase 1: A\n- [q] T1\n", "x", None, &[]).expect_err("bad");
     assert_eq!((e.line, e.kind), (2, SpecErrorKind::MalformedTask));
 }
 
@@ -229,7 +227,7 @@ fn import_errors_are_typed() {
 fn a_phase_without_tasks_is_not_a_card() {
     let text =
         "## Phase 1: A\n- [ ] T001 a\n## Phase 2: Empty\nonly words\n## Phase 3: B\n- [ ] T002 b\n";
-    let imp = import(text, "x", &[]).expect("imports");
+    let imp = import(text, "x", None, &[]).expect("imports");
     assert_eq!(imp.cards, 2);
     let plan = plan::parse(&imp.toml).expect("valid");
     assert_eq!(plan.edges.len(), 1);
@@ -389,3 +387,6 @@ fn tasks_without_ids_match_by_text() {
         "## Phase 1: A\n- [x] write docs\n- [ ] write docs\n"
     );
 }
+
+mod out_of_order;
+mod preamble;

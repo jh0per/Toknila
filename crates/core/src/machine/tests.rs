@@ -47,6 +47,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         needs_secrets: false,
         tokens_used: 0,
         wildcard,
+        done_out_of_order: None,
     }
 }
 
@@ -664,3 +665,5 @@ proptest! {
         }
     }
 }
+
+mod out_of_order;

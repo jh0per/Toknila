@@ -2904,6 +2904,21 @@
         },
         "additionalProperties": false
       },
+      "OutOfOrder": {
+        "type": "object",
+        "description": "The mark of a card that was done out of order: the earlier cards that were still open.",
+        "required": [
+          "behind"
+        ],
+        "properties": {
+          "behind": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketKey"
+            }
+          }
+        }
+      },
       "OutputRules": {
         "type": "object",
         "description": "How the terminal output of an agent is kept and shown.",
@@ -3681,6 +3696,17 @@
           },
           "chain_id": {
             "$ref": "#/components/schemas/ChainId"
+          },
+          "done_out_of_order": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OutOfOrder",
+                "description": "Set when the card was taken to Merged while cards before it were still open (a spec\nfolder whose work was done in another order). It stays after the card moves on."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "$ref": "#/components/schemas/TicketId"
