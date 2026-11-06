@@ -5,6 +5,8 @@
 // No console window next to the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod path;
+
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_shell::ShellExt;
 
@@ -43,12 +45,14 @@ async fn open(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Runs the bundled `toknila` binary and returns its standard output.
+/// Runs the bundled `toknila` binary and returns its standard output. A daemon it starts gets the
+/// person's `PATH`, so it finds `claude`, `git` and `gh` although Finder gave the app a bare one.
 async fn toknila(app: &AppHandle, args: &[&str]) -> Result<String, String> {
     let out = app
         .shell()
         .sidecar("toknila")
         .map_err(|e| e.to_string())?
+        .env("PATH", path::for_daemon())
         .args(args)
         .output()
         .await

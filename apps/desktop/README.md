@@ -13,5 +13,10 @@ cargo xtask desktop   # builds the web page and toknila, copies the sidecar, cli
 
 `src-tauri` is a separate Cargo workspace: it needs the platform web view (WebKit on macOS, the
 first target; WebView2 on Windows; `libwebkit2gtk-4.1-dev` and `libgtk-3-dev` on Linux), which the
-main workspace does not assume. CI builds it on macOS. Bundles (`.app`, `.dmg`, installers) come
-with the release work of phase 2; `cargo tauri build` produces them from this folder.
+main workspace does not assume. CI builds it on macOS.
+
+`cargo xtask app` builds the local Mac bundle (`Toknila.app` and a `.dmg`, ad-hoc signed; see
+[docs/install.md](../../docs/install.md)). It bundles two sidecars next to the shell: `toknila` (the
+daemon) and `tok` (the command). The shell starts the daemon with the `PATH` of the login shell
+(`src/path.rs`), because Finder gives apps a bare one. Installers for other people (Developer ID,
+notarisation, other platforms) come later.

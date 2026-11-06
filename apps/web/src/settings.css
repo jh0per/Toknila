@@ -18,3 +18,4 @@
 .branches { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); font-size: var(--fs-s); }
 .row { display: flex; align-items: center; gap: var(--s3); }
 .saved { color: var(--done); font-size: var(--fs-s); }
+.card-block .hint { margin: 0; color: var(--block); font-size: var(--fs-s); }

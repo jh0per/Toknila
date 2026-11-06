@@ -367,3 +367,40 @@ fn inherited_claude_code_variables_are_dropped_unless_the_profile_sets_them() {
     let w = prepare_with(&profile, &cx, cx_names).expect("prepare");
     assert_eq!(w.env_remove, ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"]);
 }
+
+/// The app lives under `/Applications/Toknila.app` or in a folder with spaces: the hook and the
+/// status line commands are run by a shell, so they must still reach the binary with their
+/// arguments intact, and the MCP config names it as one `command` string.
+#[cfg(unix)]
+#[test]
+fn a_binary_path_with_spaces_works_in_hooks_status_line_and_mcp_config() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut rig = Rig::new();
+    let bin_dir = rig.dir.path().join("My Apps/Toknila.app/Contents/MacOS");
+    std::fs::create_dir_all(&bin_dir).expect("bin dir");
+    rig.bin = bin_dir.join("toknila");
+    std::fs::write(&rig.bin, "#!/bin/sh\nprintf '%s|' \"$@\"\n").expect("script");
+    std::fs::set_permissions(&rig.bin, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    rig.prepare(&AgentProfile::claude_code());
+    let (_, text) = rig.file("settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    let run = |command: &str| {
+        let out = std::process::Command::new("sh")
+            .args(["-c", command])
+            .output()
+            .expect("sh");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    let hook = v["hooks"]["Stop"][0]["hooks"][0]["command"]
+        .as_str()
+        .expect("stop hook");
+    assert_eq!(run(hook), "hook|stop|");
+    let status = v["statusLine"]["command"].as_str().expect("status line");
+    assert_eq!(run(status), "statusline|");
+    let (_, mcp) = rig.file("mcp.json");
+    let m: Value = serde_json::from_str(&mcp).expect("mcp json");
+    assert_eq!(
+        m["mcpServers"]["toknila"]["command"].as_str(),
+        Some(rig.bin.to_str().expect("utf8"))
+    );
+}

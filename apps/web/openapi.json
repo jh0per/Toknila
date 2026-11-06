@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "servers": [
     {
@@ -1048,6 +1048,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SystemChecks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/cli": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "The Toknila version, the `tok` that ships next to the daemon and whether `~/.local/bin/tok`\nlinks to it.",
+        "operationId": "cli_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CliLink"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/cli/install": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Links `~/.local/bin/tok` to the bundled `tok`. Only the person's home is written, never with\nelevated rights.",
+        "operationId": "cli_install",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CliLink"
                 }
               }
             }
@@ -3338,6 +3378,43 @@
           "not_logged_in",
           "failed"
         ]
+      },
+      "CliLink": {
+        "type": "object",
+        "description": "`GET /v1/system/cli` and `POST /v1/system/cli/install`: the version of Toknila, the `tok`\ncommand that ships next to the daemon and whether it is linked into `~/.local/bin`.",
+        "required": [
+          "version",
+          "installed",
+          "on_path"
+        ],
+        "properties": {
+          "bundled": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `tok` binary next to the daemon, when there is one."
+          },
+          "installed": {
+            "type": "boolean",
+            "description": "The link exists and points at the bundled `tok`."
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the link goes (`~/.local/bin/tok`), when the home folder is known."
+          },
+          "on_path": {
+            "type": "boolean",
+            "description": "The link's folder is on the daemon's `PATH`."
+          },
+          "version": {
+            "type": "string",
+            "description": "Version of the running daemon."
+          }
+        }
       },
       "Comment": {
         "type": "object",

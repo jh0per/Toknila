@@ -1,5 +1,6 @@
 import type { Intent } from "../store/msg";
 import { type State, currentProject } from "../store/state";
+import { About } from "./About";
 import { AddProject } from "./AddProject";
 import { Checks } from "./Checks";
 import { ImportChain } from "./ImportChain";
@@ -21,6 +22,7 @@ export function Settings({ state, dispatch }: { state: State; dispatch: (i: Inte
       {project && <ProjectSettings key={stamp} project={project} state={state} dispatch={dispatch} />}
       {project && <ImportChain project={project} state={state} dispatch={dispatch} />}
       <AddProject state={state} dispatch={dispatch} />
+      <About state={state} dispatch={dispatch} />
     </div>
   );
 }

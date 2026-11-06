@@ -2,7 +2,7 @@
 // changing its settings. The daemon judges every input; this only keeps what it answered so the
 // views can show it next to the field it is about.
 
-import type { ListedProfile, PatchProject, Project, RepoProblem, SystemChecks } from "../api/types";
+import type { CliLink, ListedProfile, PatchProject, Project, RepoProblem, SystemChecks } from "../api/types";
 import type { Effect } from "./msg";
 import type { State } from "./state";
 
@@ -16,6 +16,10 @@ export interface ProjectDraft {
 
 export interface SettingsState {
   checks: SystemChecks | undefined;
+  /// The `tok` command that ships with the app and whether it is linked into the home folder.
+  cli: CliLink | undefined;
+  /// Why the last "install the tok command" was refused.
+  cliError: string | undefined;
   profiles: ListedProfile[];
   /// Why the last "add project" was refused, per field, and the branches to pick from.
   problems: RepoProblem[];
@@ -30,6 +34,8 @@ export interface SettingsState {
 
 export const initialSettings: SettingsState = {
   checks: undefined,
+  cli: undefined,
+  cliError: undefined,
   profiles: [],
   problems: [],
   branches: [],
@@ -42,6 +48,7 @@ export const initialSettings: SettingsState = {
 /// What the person did on these screens.
 export type SettingsIntent =
   | { type: "recheck" }
+  | { type: "installCli" }
   | { type: "addProject"; draft: ProjectDraft }
   | { type: "saveProject"; project: string; patch: PatchProject }
   | { type: "importChain"; project: string; toml: string };
@@ -49,6 +56,8 @@ export type SettingsIntent =
 /// What the daemon answered.
 export type SettingsResult =
   | { type: "checksLoaded"; checks: SystemChecks }
+  | { type: "cliLoaded"; cli: CliLink }
+  | { type: "cliRejected"; message: string }
   | { type: "profilesLoaded"; profiles: ListedProfile[] }
   | { type: "addRejected"; problems: RepoProblem[]; branches: string[] }
   | { type: "projectAdded"; project: Project }
@@ -62,6 +71,8 @@ export type SettingsMsg = SettingsIntent | SettingsResult;
 export type SettingsEffect =
   | { type: "loadChecks" }
   | { type: "loadProfiles" }
+  | { type: "loadCli" }
+  | { type: "installCli" }
   | Extract<SettingsIntent, { type: "addProject" | "saveProject" | "importChain" }>;
 
 /// What the screens need fetched when they open.
@@ -96,6 +107,12 @@ export function reduceSettings(s: State, msg: SettingsMsg): [State, Effect[]] {
     case "saveProject":
     case "importChain":
       return [{ ...s, settings: start(s) }, [msg]];
+    case "installCli":
+      return [set({ cliError: undefined }), [msg]];
+    case "cliLoaded":
+      return [set({ cli: msg.cli, cliError: undefined }), []];
+    case "cliRejected":
+      return [set({ cliError: msg.message }), []];
     case "checksLoaded":
       return [set({ checks: msg.checks }), []];
     case "profilesLoaded":

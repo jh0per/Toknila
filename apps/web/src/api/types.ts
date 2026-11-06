@@ -38,6 +38,7 @@ export type ReviewRound = Schemas["ReviewRound"];
 export type ProjectAgents = Schemas["ProjectAgents"];
 export type SystemChecks = Schemas["SystemChecks"];
 export type Check = Schemas["Check"];
+export type CliLink = Schemas["CliLink"];
 export type RepoCheck = Schemas["RepoCheck"];
 export type RepoProblem = Schemas["RepoProblem"];
 export type ListedProfile = Schemas["ListedProfile"];

@@ -6,10 +6,11 @@ dependencies and release milestones; each ticket runs on its own **ship** (a git
 agent runner), and the ticket's status moves by itself from the agent's events: running, waiting
 for a human, blocked, ready for review.
 
-> Status: phase 0 (v0.1.0). Nothing runs agents yet. Phase 0 proves the model with a simulated
-> agent profile driven from the CLI, a daemon that survives `kill -9`, and a live read-only page.
+> Status: v0.2.0, the first version to live in day to day: the daemon, the CLI, the web page and a
+> Mac app, with real agents next to the simulated one.
 >
-> Install and first run: [docs/install.md](docs/install.md). Binaries for macOS (Apple silicon and
+> Install and first run: [docs/install.md](docs/install.md) (`cargo xtask app` builds the Mac
+> app). Binaries for macOS (Apple silicon and
 > Intel), Linux and Windows are on the [releases page](https://github.com/jh0per/Toknila/releases).
 
 ## Layout
@@ -23,7 +24,7 @@ for a human, blocked, ready for review.
 | `crates/daemon` | Daemon: SQLite store (single writer), HTTP API and WebSocket event stream on `127.0.0.1`. |
 | `crates/cli` | `toknila` binary and its `tok` alias, a thin client of the daemon API. |
 | `apps/web` | Web UI served by the daemon (read-only page in phase 0). |
-| `apps/desktop` | Tauri 2 shell (later). |
+| `apps/desktop` | Tauri 2 shell: the window of the Mac app. |
 | `xtask` | Repository tasks; `cargo xtask verify` is the one gate for local runs and CI. |
 | `docs` | [Architecture](docs/architecture.md), decision records, install guide, agent event contract. |
 
@@ -37,6 +38,7 @@ cargo xtask verify          # fmt check, clippy -D warnings, tests, architecture
 cargo xtask e2e-web         # browser smoke test of the page (Playwright)
 cargo run --bin tok -- --version
 cargo xtask dist aarch64-apple-darwin   # release archive in dist/
+cargo xtask app             # macOS: Toknila.app and a .dmg for this Mac, ad-hoc signed (dist/app)
 ```
 
 CI runs the same tasks on Ubuntu, Windows and macOS. Pushing a `v*` tag builds the release.
