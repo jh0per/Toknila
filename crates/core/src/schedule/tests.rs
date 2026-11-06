@@ -24,6 +24,7 @@ impl World {
             goal: String::new(),
             autostart,
             review_mode: None,
+            reviewer: None,
         };
         self.chains.push(ChainView {
             chain,
@@ -66,7 +67,7 @@ impl World {
     }
 
     fn plan(&self, limit: u32) -> Plan {
-        plan(&self.chains, limit)
+        plan(&self.chains, limit, &[])
     }
 }
 
@@ -188,4 +189,30 @@ fn limits_outside_the_range_are_refused() {
     assert_eq!(check_limit(MAX_LIMIT), Ok(MAX_LIMIT));
     assert_eq!(check_limit(0), Err(LimitError(0)));
     assert_eq!(check_limit(MAX_LIMIT + 1), Err(LimitError(MAX_LIMIT + 1)));
+}
+
+#[test]
+fn a_live_worker_and_reviewer_of_a_card_in_review_each_hold_a_slot() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let reviewed = w.card(c, TicketStatus::Review, false);
+    let running = w.card(c, TicketStatus::Running, false);
+    let third = w.card(c, TicketStatus::Ready, true);
+    // Without runners a card in review holds nothing: one slot used, the third starts.
+    let none = plan(&w.chains, 2, &[]);
+    assert_eq!((none.used, none.start.clone()), (1, vec![third]));
+    // With its worker and its reviewer alive the card holds two; with the running card the
+    // limit of 2 is passed and the third stays queued.
+    let live = [
+        (reviewed, AgentRole::Worker),
+        (reviewed, AgentRole::Reviewer),
+    ];
+    let p = plan(&w.chains, 2, &live);
+    assert_eq!((p.used, p.start, p.queue), (3, vec![], vec![third]));
+    // A running card's live worker is the same slot, counted once; a stranger's runner is not ours.
+    let same = [
+        (running, AgentRole::Worker),
+        (TicketId::new(), AgentRole::Worker),
+    ];
+    assert_eq!(plan(&w.chains, 5, &same).used, 1);
 }

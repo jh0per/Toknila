@@ -3,7 +3,7 @@
 
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
-use toknila_core::{RunId, TicketId};
+use toknila_core::{AgentRole, RunId, TicketId};
 
 use super::Api;
 use crate::runner::Grant;
@@ -11,7 +11,12 @@ use crate::server::{AGENT_ROUTES, now};
 
 impl Api {
     /// A token for the agent of `key`, as the runner issues it when a run starts.
-    async fn agent_token(&self, key: &str) -> (String, Grant) {
+    pub(super) async fn agent_token(&self, key: &str) -> (String, Grant) {
+        self.agent_token_as(key, AgentRole::Worker).await
+    }
+
+    /// A token for the `role` run of `key`.
+    pub(super) async fn agent_token_as(&self, key: &str, role: AgentRole) -> (String, Grant) {
         let id = self.get(&format!("/v1/tickets/{key}")).await["ticket"]["id"]
             .as_str()
             .and_then(|s| s.parse::<TicketId>().ok())
@@ -19,12 +24,13 @@ impl Api {
         let grant = Grant {
             ticket: id,
             run: RunId::new(),
+            role,
         };
         let token = self.runners.tokens().issue(grant, now()).expect("token");
         (token, grant)
     }
 
-    async fn demo_with(&self, tickets: &[&str]) {
+    pub(super) async fn demo_with(&self, tickets: &[&str]) {
         self.demo().await;
         for title in tickets {
             self.post(

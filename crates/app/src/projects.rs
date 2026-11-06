@@ -18,6 +18,8 @@ pub struct NewProject {
     pub release_branch: Option<String>,
     pub default_profile: Option<String>,
     pub default_review_mode: Option<ReviewMode>,
+    /// Reviewer agent profile; unset means `<worker profile>-reviewer`.
+    pub default_reviewer: Option<String>,
     /// Most agents working at once; default 2.
     pub max_parallel: Option<u32>,
 }
@@ -28,6 +30,10 @@ pub struct NewProject {
 pub struct PatchProject {
     /// Most agents working at once (1 to 64).
     pub max_parallel: Option<u32>,
+    /// Who reviews finished cards of the project unless a chain or ticket says.
+    pub review_mode: Option<ReviewMode>,
+    /// Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`.
+    pub reviewer: Option<String>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -51,6 +57,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             .default_profile
             .unwrap_or_else(|| AgentProfile::SIM.to_owned()),
         default_review_mode: draft.default_review_mode.unwrap_or_default(),
+        default_reviewer: draft.default_reviewer.filter(|r| !r.trim().is_empty()),
         max_parallel: draft
             .max_parallel
             .map_or(Ok(schedule::DEFAULT_LIMIT), schedule::check_limit)
@@ -72,6 +79,12 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     if let Some(n) = patch.max_parallel {
         p.max_parallel =
             schedule::check_limit(n).map_err(|e| AppError::bad_request(e.to_string()))?;
+    }
+    if let Some(m) = patch.review_mode {
+        p.default_review_mode = m;
+    }
+    if let Some(r) = patch.reviewer {
+        p.default_reviewer = Some(r.trim().to_owned()).filter(|r| !r.is_empty());
     }
     uow.update_project(&p)?;
     uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;

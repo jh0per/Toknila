@@ -53,6 +53,7 @@ fn finish(mem: &mut Mem, n: usize) {
     let event = TicketEvent::Finished {
         summary: "done".to_owned(),
         open_threads: Vec::new(),
+        mode: toknila_core::ReviewMode::Human,
     };
     act(mem, n, event);
 }
@@ -129,6 +130,7 @@ fn a_higher_limit_starts_queued_cards_at_once() {
     let mut mem = started_three();
     let patch = PatchProject {
         max_parallel: Some(3),
+        ..PatchProject::default()
     };
     let p = projects::patch(&mut mem, "demo", patch).expect("patch");
     assert_eq!(p.max_parallel, 3);
@@ -140,6 +142,7 @@ fn a_lower_limit_never_stops_a_running_agent() {
     let mut mem = started_three();
     let patch = PatchProject {
         max_parallel: Some(1),
+        ..PatchProject::default()
     };
     projects::patch(&mut mem, "demo", patch).expect("patch");
     assert_eq!(status(&mem, 1), TicketStatus::Running);
@@ -163,6 +166,7 @@ fn a_limit_outside_the_range_is_refused() {
     for bad in [0, 65] {
         let patch = PatchProject {
             max_parallel: Some(bad),
+            ..PatchProject::default()
         };
         let err = projects::patch(&mut mem, "DEMO", patch).expect_err("refused");
         assert_eq!(err.kind, ErrorKind::BadRequest);

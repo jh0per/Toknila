@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ArtifactFormat, CommentBody, ThreadKind, WaitingReason};
+use crate::{ArtifactFormat, CommentBody, ThreadKind, Verdict, WaitingReason};
 
 /// A wildcard card as proposed: work nobody planned, found during a ticket. References are
 /// ticket keys, titles or release versions of the same chain.
@@ -48,6 +48,13 @@ pub enum AgentEvent {
     Finished { summary: String },
     /// The agent process died.
     Crashed { detail: String },
+    /// Only the reviewer agent's token may send this: its decision about the diff. The comment
+    /// says what to change and is required with `request_changes`.
+    ReviewVerdict {
+        verdict: Verdict,
+        #[serde(default)]
+        comment: String,
+    },
     /// The agent found work nobody planned: a wildcard card on the ticket's chain, found during
     /// this ticket, that waits for a person's approval. The answer is the new card.
     Propose(Proposal),
@@ -65,6 +72,11 @@ pub enum AgentEvent {
 }
 
 impl AgentEvent {
+    /// Whether this is the reviewer's verdict: only a reviewer sends it, and sends nothing else.
+    pub fn is_review_verdict(&self) -> bool {
+        matches!(self, Self::ReviewVerdict { .. })
+    }
+
     /// The question as a Waiting reason, for `AskHuman`.
     pub fn waiting_reason(text: &str, permission: bool) -> WaitingReason {
         if permission {
@@ -127,6 +139,13 @@ mod tests {
                     detail: "exit 101".into(),
                 },
                 r#"{"event":"crashed","detail":"exit 101"}"#,
+            ),
+            (
+                AgentEvent::ReviewVerdict {
+                    verdict: Verdict::RequestChanges,
+                    comment: "handle the empty list".into(),
+                },
+                r#"{"event":"review_verdict","verdict":"request_changes","comment":"handle the empty list"}"#,
             ),
             (
                 AgentEvent::Propose(Proposal {

@@ -5,7 +5,8 @@
 //! compared with the snapshot in its newest journal event, then every chain settles once
 //! (autostart that a crash interrupted between commands). Simulated tickets have no process to
 //! lose, so Running stays Running. A ticket whose agent is a process lost it with the daemon:
-//! it goes to Blocked(`runner_lost`) before anything settles, so a restart is never silent.
+//! it goes to Blocked(`runner_lost`) before anything settles, so a restart is never silent. A card
+//! waiting for a reviewer process that is gone goes to a person.
 
 use std::collections::HashSet;
 
@@ -13,7 +14,7 @@ use serde::Serialize;
 use serde_json::Value;
 use toknila_core::TicketStatus;
 
-use crate::{AppError, AppResult, UnitOfWork, runs, with_chain};
+use crate::{AppError, AppResult, UnitOfWork, reviews, runs, with_chain};
 
 /// What startup recovery checked and found.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -23,6 +24,8 @@ pub struct Recovery {
     pub running: usize,
     /// Keys of the tickets whose runner the restart lost; they are Blocked now.
     pub lost: Vec<String>,
+    /// Keys of the cards whose reviewer the restart lost; a person has them now.
+    pub reviews_lost: Vec<String>,
     /// Entities whose stored state differs from their last journal snapshot. The database stays
     /// the source of truth; drift is reported, never "fixed" from the journal.
     pub drift: Vec<String>,
@@ -34,6 +37,8 @@ pub fn recover<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Recovery> {
     // No process outlives the daemon that started it, so at startup none is live.
     let lost = runs::mark_lost(uow, &HashSet::new())?;
     report.lost = lost.iter().map(ToString::to_string).collect();
+    let reviews = reviews::mark_lost(uow, &HashSet::new())?;
+    report.reviews_lost = reviews.iter().map(ToString::to_string).collect();
     let chains = uow.chains(None)?;
     report.chains = chains.len();
     for c in &chains {

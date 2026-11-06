@@ -5,11 +5,11 @@ use std::collections::HashMap;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use toknila_app::{chains, resolve};
+use toknila_app::{chains, resolve, reviews};
 use toknila_core::Actor;
 
 use super::{ApiResult, chain_write, load_chain_detail, read};
-use crate::http::dto::{ChainDetail, ChainFile, ChainItem, EdgeInput, NewChain};
+use crate::http::dto::{ChainDetail, ChainFile, ChainItem, EdgeInput, NewChain, ReviewSettings};
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
 
@@ -97,6 +97,23 @@ pub async fn get_chain(
         })
         .await?,
     ))
+}
+
+#[utoipa::path(patch, path = "/chains/{chain}", tag = "chains", request_body = ReviewSettings,
+    params(("chain" = String, Path, description = "Chain id or name")),
+    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody)))]
+/// Sets how the chain's tickets are reviewed: the mode and the reviewer agent profile. A ticket
+/// that sets its own keeps it; a field left out is kept.
+pub async fn patch_chain(
+    State(state): State<AppState>,
+    Path(chain): Path<String>,
+    Json(settings): Json<ReviewSettings>,
+) -> ApiResult<Json<ChainDetail>> {
+    let detail = chain_write(&state, Actor::Human, move |tx| {
+        Ok(reviews::set_chain(tx, &chain, settings)?)
+    })
+    .await?;
+    Ok(Json(detail))
 }
 
 #[utoipa::path(post, path = "/chains/{chain}/edges", tag = "chains", request_body = EdgeInput,

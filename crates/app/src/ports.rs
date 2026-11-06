@@ -4,8 +4,9 @@ use serde_json::Value;
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
-    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship, Subtask, Thread,
-    ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey, Timestamp,
+    Actor, AgentRole, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship,
+    Subtask, Thread, ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey,
+    Timestamp,
 };
 
 use crate::AppResult;
@@ -50,6 +51,12 @@ pub trait Reader {
     fn thread_versions(&self, thread: ThreadId) -> AppResult<Vec<ThreadVersion>>;
     /// The ship a ticket has now, if any.
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>>;
+    /// The runner processes that are alive now, by ticket and role, as the host reported them
+    /// when this read began. The parallel limit counts them: a worker kept alive through review
+    /// and the reviewer next to it each hold a slot. A host without runners has none.
+    fn live_runners(&self) -> AppResult<Vec<(TicketId, AgentRole)>> {
+        Ok(Vec::new())
+    }
     /// Payload of the newest journal event about one entity.
     fn last_event_payload(&self, entity: &str, entity_id: &str) -> AppResult<Option<Value>>;
 }

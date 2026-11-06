@@ -5,8 +5,9 @@ use toknila_app::{AppError, AppResult, Reader, UnitOfWork};
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
-    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship, Subtask, Thread,
-    ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey, Timestamp,
+    Actor, AgentRole, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship,
+    Subtask, Thread, ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey,
+    Timestamp,
 };
 
 use super::{Repo, StoreError, WriteTx};
@@ -64,6 +65,7 @@ reader! {
     thread_versions(thread: ThreadId) -> Vec<ThreadVersion>;
     ship(ticket: TicketId) -> Option<Ship>;
     last_event_payload(entity: &str, entity_id: &str) -> Option<Value>;
+    live_runners() -> Vec<(TicketId, AgentRole)>;
 }
 
 impl UnitOfWork for WriteTx<'_> {

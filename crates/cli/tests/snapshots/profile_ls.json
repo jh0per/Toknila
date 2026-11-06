@@ -70,6 +70,66 @@
       }
     },
     {
+      "file": null,
+      "profile": {
+        "command": [],
+        "env": {},
+        "hooks": {
+          "enabled": false,
+          "settings_flag": null
+        },
+        "instructions_file": null,
+        "instructions_flag": null,
+        "mcp": {
+          "config_flag": null,
+          "enabled": false
+        },
+        "name": "sim-reviewer",
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        },
+        "output": {
+          "max_log_bytes": 20971520,
+          "scrollback_lines": 10000,
+          "strip_ansi": true
+        },
+        "role": "reviewer"
+      }
+    },
+    {
+      "file": null,
+      "profile": {
+        "command": [
+          "claude"
+        ],
+        "env": {},
+        "hooks": {
+          "enabled": true,
+          "settings_flag": "--settings"
+        },
+        "instructions_file": "CLAUDE.md",
+        "instructions_flag": "--append-system-prompt-file",
+        "mcp": {
+          "config_flag": "--mcp-config",
+          "enabled": true
+        },
+        "name": "claude-code-reviewer",
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        },
+        "output": {
+          "max_log_bytes": 20971520,
+          "scrollback_lines": 10000,
+          "strip_ansi": true
+        },
+        "role": "reviewer"
+      }
+    },
+    {
       "file": "my-agent.toml",
       "profile": {
         "command": [

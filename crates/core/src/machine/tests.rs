@@ -1,7 +1,7 @@
 use proptest::prelude::*;
 
 use super::*;
-use crate::{ChainId, TicketDraft, TicketId, TicketKey, Wildcard};
+use crate::{ChainId, NodeRef, TicketDraft, TicketId, TicketKey, Wildcard};
 
 const T0: Timestamp = Timestamp(1_000);
 const NOW: Timestamp = Timestamp(5_000);
@@ -44,11 +44,13 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         queued: false,
         profile: None,
         review_mode: None,
+        reviewer: None,
         branch: None,
         needs_secrets: false,
         tokens_used: 0,
         wildcard,
         done_out_of_order: None,
+        review: crate::Review::default(),
     }
 }
 
@@ -180,6 +182,7 @@ fn running_to_review_on_finished_records_report() {
         TicketEvent::Finished {
             summary: "зроблено X".to_owned(),
             open_threads: vec![],
+            mode: crate::ReviewMode::Human,
         },
     );
     assert_eq!(tr.ticket.status, TicketStatus::Review);
@@ -323,7 +326,7 @@ fn review_back_to_running_on_return_with_comment() {
 
 #[test]
 fn review_to_merged_on_accept_satisfies_dependents() {
-    let tr = ok(TicketStatus::Review, TicketEvent::Accept);
+    let tr = ok(TicketStatus::Review, TicketEvent::Accept { comment: None });
     assert_eq!(tr.ticket.status, TicketStatus::Merged);
     assert_eq!(
         tr.effects,
@@ -628,13 +631,14 @@ fn sample_events() -> Vec<TicketEvent> {
         TicketEvent::Finished {
             summary: "s".to_owned(),
             open_threads: vec![],
+            mode: crate::ReviewMode::Human,
         },
         TicketEvent::Block { reason: manual() },
         TicketEvent::Unblock,
         TicketEvent::Return {
             comment: "c".to_owned(),
         },
-        TicketEvent::Accept,
+        TicketEvent::Accept { comment: None },
         TicketEvent::Released,
         TicketEvent::Reopen,
         TicketEvent::Pause,
@@ -725,9 +729,25 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
             reason: WaitingReason::Silent
         }),
         Just(TicketEvent::InstructionDelivered),
-        Just(TicketEvent::Finished {
+        any::<u8>().prop_map(|n| TicketEvent::Finished {
             summary: "s".to_owned(),
             open_threads: vec![],
+            mode: [
+                crate::ReviewMode::Human,
+                crate::ReviewMode::Agent,
+                crate::ReviewMode::Both
+            ][usize::from(n) % 3],
+        }),
+        (any::<bool>(), "[a-z]{0,2}").prop_map(|(approve, comment)| TicketEvent::ReviewVerdict {
+            verdict: if approve {
+                crate::Verdict::Approve
+            } else {
+                crate::Verdict::RequestChanges
+            },
+            comment,
+        }),
+        Just(TicketEvent::ReviewerFailed {
+            detail: "d".to_owned()
         }),
         reason.prop_map(|reason| TicketEvent::Block { reason }),
         Just(TicketEvent::Unblock),
@@ -737,7 +757,7 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(TicketEvent::Return {
             comment: String::new()
         }),
-        Just(TicketEvent::Accept),
+        Just(TicketEvent::Accept { comment: None }),
         Just(TicketEvent::Released),
         Just(TicketEvent::Reopen),
         Just(TicketEvent::Pause),
@@ -782,3 +802,4 @@ proptest! {
 }
 
 mod out_of_order;
+mod review;

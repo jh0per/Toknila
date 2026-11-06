@@ -86,6 +86,7 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
                 goal,
                 autostart: Some(!no_autostart),
                 review_mode: None,
+                reviewer: None,
             };
             emit(json_out, &c.create_chain(&p, &input)?, output::chain);
         }

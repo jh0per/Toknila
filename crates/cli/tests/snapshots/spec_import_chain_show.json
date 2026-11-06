@@ -141,6 +141,17 @@
       "profile": null,
       "prompt": "",
       "queued": false,
+      "review": {
+        "rounds": [
+          {
+            "comment": "",
+            "decided_at": 0,
+            "number": 1,
+            "reviewer": "human",
+            "verdict": "approve"
+          }
+        ]
+      },
       "review_mode": null,
       "status": "merged",
       "status_reason": null,
@@ -159,6 +170,17 @@
       "profile": null,
       "prompt": "",
       "queued": false,
+      "review": {
+        "rounds": [
+          {
+            "comment": "",
+            "decided_at": 0,
+            "number": 1,
+            "reviewer": "human",
+            "verdict": "approve"
+          }
+        ]
+      },
       "review_mode": null,
       "status": "merged",
       "status_reason": null,

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{BlockedReason, RunId, TicketId, TicketKey};
+use super::{AgentRole, BlockedReason, RunId, TicketId, TicketKey};
 
 /// One process the daemon ran for a ticket: its runner, from start to exit.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -13,6 +13,18 @@ pub struct Run {
     pub profile: String,
     /// Directory the process started in: the ticket's ship.
     pub dir: String,
+    /// What the process is for: the ticket's worker, or the reviewer next to it. The worker is
+    /// the default and is not written out.
+    #[serde(default = "worker_role", skip_serializing_if = "is_worker")]
+    pub role: AgentRole,
+}
+
+fn worker_role() -> AgentRole {
+    AgentRole::Worker
+}
+
+fn is_worker(role: &AgentRole) -> bool {
+    *role == AgentRole::Worker
 }
 
 /// How a runner's process ended.

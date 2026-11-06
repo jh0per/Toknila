@@ -14,11 +14,12 @@ use crate::notes::{add_comment, body_from_text};
 use crate::recovery::{Recovery, recover};
 use crate::tickets::{NewTicket, TicketAction};
 use crate::{
-    AppResult, ErrorKind, Reader, UnitOfWork, agent, chains, resolve, tickets, with_chain,
+    AppError, AppResult, ErrorKind, Reader, UnitOfWork, agent, chains, resolve, tickets, with_chain,
 };
 
 mod import_done;
 mod parallel;
+mod reviews;
 mod runs;
 mod ships;
 mod threads;
@@ -57,6 +58,7 @@ impl Mem {
             release_branch: Project::DEFAULT_RELEASE_BRANCH.to_owned(),
             default_profile: AgentProfile::SIM.to_owned(),
             default_review_mode: ReviewMode::Human,
+            default_reviewer: None,
             max_parallel: 2,
         };
         let chain = Chain {
@@ -66,6 +68,7 @@ impl Mem {
             goal: String::new(),
             autostart: true,
             review_mode: None,
+            reviewer: None,
         };
         let now = Timestamp(1_000);
         let tickets: Vec<Ticket> = ["A", "B"]
@@ -210,6 +213,9 @@ impl Reader for Mem {
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>> {
         Ok(self.ships.iter().find(|s| s.ticket_id == ticket).cloned())
     }
+    fn live_runners(&self) -> AppResult<Vec<(TicketId, toknila_core::AgentRole)>> {
+        Ok(crate::Runner::live_runners(&self.runner))
+    }
     fn last_event_payload(&self, entity: &str, id: &str) -> AppResult<Option<Value>> {
         let last = self
             .events
@@ -305,6 +311,7 @@ fn recovery_settles_and_reports_drift_without_a_journal() {
             tickets: 2,
             running: 0,
             lost: vec![],
+            reviews_lost: vec![],
             drift: vec!["DEMO-1".to_owned(), "DEMO-2".to_owned()],
         }
     );
@@ -409,10 +416,12 @@ fn new_ticket_waits_for_its_dependency_and_gets_its_checklist() {
 fn ticket_actions_parse_and_demand_their_text() {
     let block: TicketAction = "block".parse().expect("known");
     assert_eq!(
-        block
-            .event(Some("  ".to_owned()), Actor::Human)
-            .expect_err("blank")
-            .message,
+        AppError::from(
+            block
+                .event(Some("  ".to_owned()), Actor::Human)
+                .expect_err("blank")
+        )
+        .message,
         "block needs a text"
     );
     assert!(
@@ -420,7 +429,7 @@ fn ticket_actions_parse_and_demand_their_text() {
             .event(Some("waiting on CI".to_owned()), Actor::Human)
             .is_ok()
     );
-    let e = "launch".parse::<TicketAction>().expect_err("unknown");
+    let e = AppError::from("launch".parse::<TicketAction>().expect_err("unknown"));
     assert_eq!(
         (e.kind, e.message.as_str()),
         (ErrorKind::NotFound, "action launch not found")

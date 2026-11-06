@@ -1,9 +1,19 @@
 {
+  "allowed_actions": [
+    "pause",
+    "cancel"
+  ],
   "chain": "demo",
   "comments": [],
   "in_status_ms": 0,
   "phase": "implement",
   "queue_position": null,
+  "review": {
+    "awaiting": null,
+    "mode": "human",
+    "reviewer": "sim-reviewer",
+    "rounds": []
+  },
   "ship": null,
   "subtasks": [],
   "ticket": {

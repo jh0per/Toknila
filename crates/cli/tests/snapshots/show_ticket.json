@@ -1,4 +1,7 @@
 {
+  "allowed_actions": [
+    "reopen"
+  ],
   "chain": "demo",
   "comments": [
     {
@@ -38,6 +41,20 @@
   "in_status_ms": 0,
   "phase": "implement",
   "queue_position": null,
+  "review": {
+    "awaiting": null,
+    "mode": "human",
+    "reviewer": "sim-reviewer",
+    "rounds": [
+      {
+        "comment": "",
+        "decided_at": 0,
+        "number": 1,
+        "reviewer": "human",
+        "verdict": "approve"
+      }
+    ]
+  },
   "ship": null,
   "subtasks": [],
   "ticket": {
@@ -51,6 +68,17 @@
     "profile": "sim",
     "prompt": "",
     "queued": false,
+    "review": {
+      "rounds": [
+        {
+          "comment": "",
+          "decided_at": 0,
+          "number": 1,
+          "reviewer": "human",
+          "verdict": "approve"
+        }
+      ]
+    },
     "review_mode": null,
     "status": "merged",
     "status_reason": null,

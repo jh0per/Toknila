@@ -3,13 +3,13 @@
 
 use axum::Json;
 use axum::body::Bytes;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use toknila_api_types::TerminalSize;
-use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
+use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN, RunnerQuery};
 use toknila_app::{resolve, runs};
-use toknila_core::Actor;
+use toknila_core::{Actor, AgentRole};
 
 use super::ApiResult;
 use crate::http::error::{ApiError, ErrorBody};
@@ -21,20 +21,22 @@ fn header(name: &'static str, value: impl ToString) -> (HeaderName, HeaderValue)
 }
 
 #[utoipa::path(get, path = "/tickets/{ticket}/runner/scrollback", tag = "runner",
-    params(("ticket" = String, Path, description = "Ticket id or key")),
+    params(("ticket" = String, Path, description = "Ticket id or key"), RunnerQuery),
     responses(
-        (status = 200, description = "Raw terminal output of the newest run, last lines only (ANSI kept). Headers x-toknila-run, x-toknila-offset (of the first byte) and x-toknila-end (after the last; continue the stream from here).", body = Vec<u8>, content_type = "application/octet-stream"),
+        (status = 200, description = "Raw terminal output of the newest run of the worker (or, with role=reviewer, of the reviewer), last lines only (ANSI kept). Headers x-toknila-run, x-toknila-offset (of the first byte) and x-toknila-end (after the last; continue the stream from here).", body = Vec<u8>, content_type = "application/octet-stream"),
         (status = 404, body = ErrorBody)))]
 pub async fn scrollback(
     State(state): State<AppState>,
     Path(ticket): Path<String>,
+    Query(q): Query<RunnerQuery>,
 ) -> ApiResult<Response> {
+    let role = q.role.unwrap_or(AgentRole::Worker);
     let t = state
         .store
         .read(move |repo| Ok(resolve::ticket(repo, &ticket)))
         .await??;
     let runners = state.runners.clone();
-    let chunk = tokio::task::spawn_blocking(move || runners.read(t.id, None))
+    let chunk = tokio::task::spawn_blocking(move || runners.read(t.id, role, None))
         .await
         .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))?
         .ok_or_else(|| ApiError::not_found(format!("output of {}", t.key)))?;

@@ -23,6 +23,10 @@ pub enum DomainEvent {
     ChainCreated {
         chain: Chain,
     },
+    /// A chain's settings changed (its review mode or reviewer).
+    ChainUpdated {
+        chain: Chain,
+    },
     EdgeAdded {
         edge: Edge,
     },
@@ -188,9 +192,10 @@ impl DomainEvent {
     pub fn entity(&self) -> &'static str {
         match self {
             Self::ProjectCreated { .. } | Self::ProjectUpdated { .. } => "project",
-            Self::ChainCreated { .. } | Self::EdgeAdded { .. } | Self::EdgeRemoved { .. } => {
-                "chain"
-            }
+            Self::ChainCreated { .. }
+            | Self::ChainUpdated { .. }
+            | Self::EdgeAdded { .. }
+            | Self::EdgeRemoved { .. } => "chain",
             Self::TicketCreated { .. }
             | Self::TicketStatusChanged { .. }
             | Self::TicketUpdated { .. }
@@ -219,7 +224,7 @@ impl DomainEvent {
             Self::ProjectCreated { project } | Self::ProjectUpdated { project } => {
                 project.id.to_string()
             }
-            Self::ChainCreated { chain } => chain.id.to_string(),
+            Self::ChainCreated { chain } | Self::ChainUpdated { chain } => chain.id.to_string(),
             Self::EdgeAdded { edge } | Self::EdgeRemoved { edge } => edge.chain_id.to_string(),
             Self::TicketCreated { ticket }
             | Self::TicketStatusChanged { ticket, .. }
@@ -262,6 +267,7 @@ impl DomainEvent {
             Self::TicketStatusChanged { .. } => "status_changed",
             Self::TicketUpdated { .. }
             | Self::SubtaskUpdated { .. }
+            | Self::ChainUpdated { .. }
             | Self::ProjectUpdated { .. } => "updated",
             Self::ReleaseStateChanged { .. } => "state_changed",
             Self::CommentAdded { .. } | Self::SubtaskAdded { .. } => "added",

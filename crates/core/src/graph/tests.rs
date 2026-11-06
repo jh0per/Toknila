@@ -13,7 +13,7 @@ fn settle(v: &mut ChainView) -> Settled {
         let step = v.settle(T).expect("settle");
         all.applied.extend(step.applied);
         all.events.extend(step.events);
-        let start = crate::schedule::plan(std::slice::from_ref(v), u32::MAX).start;
+        let start = crate::schedule::plan(std::slice::from_ref(v), u32::MAX, &[]).start;
         if start.is_empty() {
             return all;
         }
@@ -43,6 +43,7 @@ impl Builder {
             goal: String::new(),
             autostart,
             review_mode: None,
+            reviewer: None,
         };
         let view = ChainView {
             chain,
@@ -69,11 +70,13 @@ impl Builder {
             queued: false,
             profile: Some("sim".to_owned()),
             review_mode: None,
+            reviewer: None,
             branch: None,
             needs_secrets: false,
             tokens_used: 0,
             wildcard: None,
             done_out_of_order: None,
+            review: crate::Review::default(),
         };
         self.next += 1;
         let id = t.id;
@@ -149,9 +152,10 @@ fn finish_and_accept(v: &mut ChainView, n: NodeRef) {
         TicketEvent::Finished {
             summary: "done".to_owned(),
             open_threads: vec![],
+            mode: crate::ReviewMode::Human,
         },
     );
-    event(v, n, TicketEvent::Accept);
+    event(v, n, TicketEvent::Accept { comment: None });
 }
 
 #[test]
@@ -322,6 +326,7 @@ fn gate_chain_with_manual_release() {
         TicketEvent::Finished {
             summary: "зроблено X".to_owned(),
             open_threads: vec![],
+            mode: crate::ReviewMode::Human,
         },
     );
     event(

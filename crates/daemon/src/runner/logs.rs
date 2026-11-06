@@ -1,6 +1,7 @@
-//! Run logs: `<runs>/<ticket id>/<run id>.log`, the raw bytes of one run's terminal. The newest
-//! one (run ids sort by time) is what a client sees of a ticket whose runner this daemon did
-//! not start, after a restart.
+//! Run logs: `<runs>/<ticket id>/<run id>.log`, the raw bytes of one run's terminal; a reviewer's
+//! are in `<runs>/<ticket id>/reviewer/`, so the ticket's own output stays the worker's. The
+//! newest one (run ids sort by time) is what a client sees of a ticket whose runner this daemon
+//! did not start, after a restart.
 //!
 //! A log is capped: when the next write would pass the cap the file is renamed to `<run>.log.1`
 //! (replacing an earlier one) and a new `<run>.log` starts, so a run keeps its last one to two
@@ -12,16 +13,25 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use toknila_core::{RunId, TicketId};
+use toknila_core::{AgentRole, RunId, TicketId};
 
 use super::scrollback::Scrollback;
 
 /// How many runs of a ticket keep their logs.
 pub(super) const KEEP_RUNS: usize = 20;
 
+/// The folder of the logs of `role`'s runs of `ticket`.
+fn folder(root: &Path, ticket: TicketId, role: AgentRole) -> PathBuf {
+    let dir = root.join(ticket.to_string());
+    match role {
+        AgentRole::Reviewer => dir.join("reviewer"),
+        _ => dir,
+    }
+}
+
 /// Where the output of `run` of `ticket` is kept.
-pub(super) fn path(root: &Path, ticket: TicketId, run: RunId) -> PathBuf {
-    root.join(ticket.to_string()).join(format!("{run}.log"))
+pub(super) fn path(root: &Path, ticket: TicketId, role: AgentRole, run: RunId) -> PathBuf {
+    folder(root, ticket, role).join(format!("{run}.log"))
 }
 
 fn rotated(log: &Path) -> PathBuf {
@@ -47,8 +57,14 @@ pub(super) struct RunLog {
 impl RunLog {
     /// Creates the log of a new run (and its folder) and drops the logs of the runs the ticket
     /// no longer keeps.
-    pub fn create(root: &Path, ticket: TicketId, run: RunId, cap: u64) -> std::io::Result<RunLog> {
-        let path = path(root, ticket, run);
+    pub fn create(
+        root: &Path,
+        ticket: TicketId,
+        role: AgentRole,
+        run: RunId,
+        cap: u64,
+    ) -> std::io::Result<RunLog> {
+        let path = path(root, ticket, role, run);
         let dir = path.parent().unwrap_or(root);
         std::fs::create_dir_all(dir)?;
         let file = File::create(&path)?;
@@ -115,9 +131,9 @@ fn log_run(path: &Path) -> Option<(RunId, PathBuf)> {
     (path.extension()? == "log").then(|| (run, path.to_owned()))
 }
 
-/// The newest run of `ticket` that has a log.
-pub(super) fn latest(root: &Path, ticket: TicketId) -> Option<(RunId, PathBuf)> {
-    std::fs::read_dir(root.join(ticket.to_string()))
+/// The newest run of `ticket` in `role` that has a log.
+pub(super) fn latest(root: &Path, ticket: TicketId, role: AgentRole) -> Option<(RunId, PathBuf)> {
+    std::fs::read_dir(folder(root, ticket, role))
         .ok()?
         .filter_map(Result::ok)
         .filter_map(|e| log_run(&e.path()))
@@ -164,11 +180,16 @@ mod tests {
         std::fs::write(path_in(&dir, ticket, old), "old\n").expect("old");
         std::fs::write(path_in(&dir, ticket, new), "new\n").expect("new");
         std::fs::write(dir.path().join(ticket.to_string()).join("notes.txt"), "x").expect("x");
-        let (run, file) = latest(dir.path(), ticket).expect("a run");
+        // A reviewer's log never counts as the ticket's own output.
+        let rev: RunId = "01JBQ7ZK0000000000000000R3".parse().expect("id");
+        RunLog::create(dir.path(), ticket, AgentRole::Reviewer, rev, u64::MAX).expect("reviewer");
+        let (rev_run, _) = latest(dir.path(), ticket, AgentRole::Reviewer).expect("reviewer");
+        assert_eq!(rev_run, rev);
+        let (run, file) = latest(dir.path(), ticket, AgentRole::Worker).expect("a run");
         assert_eq!(run, new);
         let kept = load(&file, 10).expect("load");
         assert_eq!(kept.from(0), (0, b"new\n".as_slice()));
-        assert!(latest(dir.path(), TicketId::new()).is_none());
+        assert!(latest(dir.path(), TicketId::new(), AgentRole::Worker).is_none());
     }
 
     fn run_id(n: u32) -> RunId {
@@ -179,11 +200,12 @@ mod tests {
     fn a_log_rotates_once_at_its_cap_and_load_restores_the_offsets() {
         let dir = tempfile::tempdir().expect("dir");
         let (ticket, run) = (TicketId::new(), run_id(1));
-        let mut log = RunLog::create(dir.path(), ticket, run, 10).expect("create");
+        let mut log =
+            RunLog::create(dir.path(), ticket, AgentRole::Worker, run, 10).expect("create");
         for line in ["aaaa\n", "bbbb\n", "cccc\n", "dddd\n", "eeee\n"] {
             log.write(line.as_bytes()).expect("write");
         }
-        let file = path(dir.path(), ticket, run);
+        let file = path(dir.path(), ticket, AgentRole::Worker, run);
         let rotated = rotated(&file);
         assert_eq!(std::fs::read_to_string(&file).expect("log"), "eeee\n");
         assert_eq!(
@@ -199,9 +221,10 @@ mod tests {
     fn one_chunk_larger_than_the_cap_is_split_across_the_rotation() {
         let dir = tempfile::tempdir().expect("dir");
         let (ticket, run) = (TicketId::new(), run_id(1));
-        let mut log = RunLog::create(dir.path(), ticket, run, 4).expect("create");
+        let mut log =
+            RunLog::create(dir.path(), ticket, AgentRole::Worker, run, 4).expect("create");
         log.write(b"abcdefghij").expect("write");
-        let file = path(dir.path(), ticket, run);
+        let file = path(dir.path(), ticket, AgentRole::Worker, run);
         assert_eq!(std::fs::read(&file).expect("log"), b"ij");
         assert_eq!(std::fs::read(rotated(&file)).expect("rotated"), b"efgh");
         assert_eq!(
@@ -214,9 +237,10 @@ mod tests {
     fn a_log_that_never_passes_its_cap_does_not_rotate() {
         let dir = tempfile::tempdir().expect("dir");
         let (ticket, run) = (TicketId::new(), run_id(1));
-        let mut log = RunLog::create(dir.path(), ticket, run, 1000).expect("create");
+        let mut log =
+            RunLog::create(dir.path(), ticket, AgentRole::Worker, run, 1000).expect("create");
         log.write(b"hello\n").expect("write");
-        assert!(!rotated(&path(dir.path(), ticket, run)).exists());
+        assert!(!rotated(&path(dir.path(), ticket, AgentRole::Worker, run)).exists());
     }
 
     #[test]
@@ -225,11 +249,12 @@ mod tests {
         let ticket = TicketId::new();
         let other = TicketId::new();
         for n in 1..=22 {
-            let mut log = RunLog::create(dir.path(), ticket, run_id(n), 4).expect("create");
+            let mut log = RunLog::create(dir.path(), ticket, AgentRole::Worker, run_id(n), 4)
+                .expect("create");
             log.write(b"aaa\n").expect("write");
             log.write(b"bbb\n").expect("rotate");
         }
-        RunLog::create(dir.path(), other, run_id(1), 4).expect("other");
+        RunLog::create(dir.path(), other, AgentRole::Worker, run_id(1), 4).expect("other");
         let mut kept: Vec<String> = std::fs::read_dir(dir.path().join(ticket.to_string()))
             .expect("dir")
             .map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
@@ -247,11 +272,11 @@ mod tests {
             20 * 3,
             "rotated logs and offset marks go with their run"
         );
-        assert!(latest(dir.path(), other).is_some());
+        assert!(latest(dir.path(), other, AgentRole::Worker).is_some());
     }
 
     fn path_in(dir: &tempfile::TempDir, ticket: TicketId, run: RunId) -> PathBuf {
-        RunLog::create(dir.path(), ticket, run, u64::MAX).expect("create");
-        path(dir.path(), ticket, run)
+        RunLog::create(dir.path(), ticket, AgentRole::Worker, run, u64::MAX).expect("create");
+        path(dir.path(), ticket, AgentRole::Worker, run)
     }
 }

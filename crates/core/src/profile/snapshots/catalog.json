@@ -62,6 +62,66 @@
     },
     {
       "profile": {
+        "name": "sim-reviewer",
+        "role": "reviewer",
+        "command": [],
+        "env": {},
+        "instructions_file": null,
+        "instructions_flag": null,
+        "mcp": {
+          "enabled": false,
+          "config_flag": null
+        },
+        "hooks": {
+          "enabled": false,
+          "settings_flag": null
+        },
+        "output": {
+          "strip_ansi": true,
+          "scrollback_lines": 10000,
+          "max_log_bytes": 20971520
+        },
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        }
+      },
+      "file": null
+    },
+    {
+      "profile": {
+        "name": "claude-code-reviewer",
+        "role": "reviewer",
+        "command": [
+          "claude"
+        ],
+        "env": {},
+        "instructions_file": "CLAUDE.md",
+        "instructions_flag": "--append-system-prompt-file",
+        "mcp": {
+          "enabled": true,
+          "config_flag": "--mcp-config"
+        },
+        "hooks": {
+          "enabled": true,
+          "settings_flag": "--settings"
+        },
+        "output": {
+          "strip_ansi": true,
+          "scrollback_lines": 10000,
+          "max_log_bytes": 20971520
+        },
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        }
+      },
+      "file": null
+    },
+    {
+      "profile": {
         "name": "my-agent",
         "role": "reviewer",
         "command": [

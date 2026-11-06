@@ -14,7 +14,7 @@ use toknila_app::RunnerError;
 use toknila_app::runner::RunBrief;
 use toknila_core::hook::HOOKS;
 use toknila_core::instructions;
-use toknila_core::{AgentProfile, RunId, TicketKey};
+use toknila_core::{AgentProfile, AgentRole, RunId, TicketKey};
 
 /// Name of the MCP server in the agent's config.
 const SERVER: &str = "toknila";
@@ -24,6 +24,7 @@ pub(super) struct Context<'a> {
     /// `runs/<ticket id>`: where generated files go.
     pub dir: &'a Path,
     pub key: &'a TicketKey,
+    pub role: AgentRole,
     pub run: RunId,
     pub token: &'a str,
     /// The daemon's address, once it listens.
@@ -48,10 +49,15 @@ fn reference(name: &str) -> String {
 
 /// The MCP config: one stdio server, `toknila mcp`, whose environment is taken from the agent's.
 fn mcp_config(bin: &Path) -> Value {
-    let env: serde_json::Map<String, Value> = [agent_env::URL, agent_env::TOKEN, agent_env::TICKET]
-        .into_iter()
-        .map(|name| (name.to_owned(), Value::String(reference(name))))
-        .collect();
+    let env: serde_json::Map<String, Value> = [
+        agent_env::URL,
+        agent_env::TOKEN,
+        agent_env::TICKET,
+        agent_env::ROLE,
+    ]
+    .into_iter()
+    .map(|name| (name.to_owned(), Value::String(reference(name))))
+    .collect();
     json!({ "mcpServers": { SERVER: {
         "type": "stdio",
         "command": bin.display().to_string(),
@@ -92,6 +98,14 @@ pub(super) fn prepare(profile: &AgentProfile, cx: &Context<'_>) -> Result<Wiring
         (agent_env::TOKEN.to_owned(), cx.token.to_owned()),
         (agent_env::TICKET.to_owned(), cx.key.to_string()),
         (agent_env::RUN.to_owned(), cx.run.to_string()),
+        (
+            agent_env::ROLE.to_owned(),
+            match cx.role {
+                AgentRole::Reviewer => "reviewer",
+                _ => "worker",
+            }
+            .to_owned(),
+        ),
     ]);
     let files = [
         (
@@ -119,12 +133,16 @@ pub(super) fn prepare(profile: &AgentProfile, cx: &Context<'_>) -> Result<Wiring
         wiring.args.push(path.display().to_string());
     }
     if let Some(flag) = profile.instructions_flag.as_deref() {
-        let text = instructions::generate(&instructions::RunBrief {
+        let brief = instructions::RunBrief {
             key: &cx.key.to_string(),
             title: &cx.brief.title,
             prompt: &cx.brief.prompt,
             acceptance: &cx.brief.acceptance,
-        });
+        };
+        let text = match cx.role {
+            AgentRole::Reviewer => instructions::generate_review(&brief),
+            _ => instructions::generate(&brief),
+        };
         std::fs::create_dir_all(cx.dir)
             .map_err(|e| RunnerError::Spawn(format!("cannot create {}: {e}", cx.dir.display())))?;
         let path = cx.dir.join("instructions.md");

@@ -58,6 +58,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
         ProjectCmd::Set { key, parallel } => {
             let patch = PatchProject {
                 max_parallel: parallel,
+                ..PatchProject::default()
             };
             let p = c.patch_project(&key, &patch)?;
             emit(json_out, &p, |p| {

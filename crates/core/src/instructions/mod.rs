@@ -5,6 +5,7 @@
 //!   writes it under the data home and passes it by a flag; the project's own `CLAUDE.md` and
 //!   `AGENTS.md` are never touched. [`protocol`] is the part that does not depend on the ticket;
 //!   the MCP server sends it as its `instructions`.
+//! - [`generate_review`]: the same for the reviewer agent, whose one tool is its verdict.
 //! - [`route`]: how a person's pending instruction reaches a live agent.
 //! - [`typed`] and [`for_hook`]: the text of that delivery.
 //! - [`terminal`]: the bounds of a terminal size.
@@ -49,6 +50,33 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
     }
     out.push('\n');
     out.push_str(protocol::PROTOCOL);
+    out
+}
+
+/// The part of the reviewer's instructions that is the same for every ticket.
+pub fn review_protocol() -> &'static str {
+    protocol::REVIEW_PROTOCOL
+}
+
+/// The instructions file of a review run: what to check, and how to give the verdict.
+pub fn generate_review(brief: &RunBrief<'_>) -> String {
+    let mut out = format!(
+        "# Toknila: review of ticket {key}, {title}\n\n\
+         You review the finished work on ticket {key} for Toknila. You do not change the code. \
+         The repository's own `CLAUDE.md` and `AGENTS.md` still apply to what good work is.\n\n\
+         ## The task that was given\n\n{prompt}\n",
+        key = brief.key,
+        title = brief.title,
+        prompt = brief.prompt.trim(),
+    );
+    if !brief.acceptance.is_empty() {
+        out.push_str("\n## Acceptance\n\nCheck that every item holds, with evidence:\n\n");
+        for item in brief.acceptance {
+            out.push_str(&format!("- [ ] {}\n", item.trim()));
+        }
+    }
+    out.push('\n');
+    out.push_str(protocol::REVIEW_PROTOCOL);
     out
 }
 

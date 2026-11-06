@@ -256,6 +256,7 @@ fn runner_events_belong_to_the_ticket_and_carry_the_run() {
         key: "DEMO-1".parse().expect("key"),
         profile: "claude-code".into(),
         dir: "/h/ships/demo/demo/demo-1-a".into(),
+        role: crate::AgentRole::Worker,
     };
     let started = DomainEvent::RunnerStarted { run: run.clone() };
     let exited = DomainEvent::RunnerExited {

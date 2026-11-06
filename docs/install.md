@@ -68,6 +68,24 @@ tok reject DEMO-5 "not now"           # or turn it down instead: Cancelled with 
 `--before KEY` makes planned work wait for the card; approval is refused if that work has already
 started. A person proposes a card with `tok propose demo "<title>" --after DEMO-1 --from DEMO-1`.
 
+Who reviews a finished card is a setting: a person (`human`, the default), a reviewer agent
+(`agent`), or the agent first and then you with its remarks in view (`both`). Set it on a project,
+a chain or one ticket; the ticket's wins, then the chain's, then the project's:
+
+```sh
+tok review-mode both --project DEMO   # every card of the project, unless a chain or ticket says
+tok review-mode agent --chain demo    # one chain
+tok review-mode human --ticket DEMO-1 # one card
+tok sim DEMO-1 finish "A is done"     # hand-in; the simulated reviewer waits for its verdict
+tok sim DEMO-1 review request-changes "handle the empty list"   # agent mode: back to the agent
+tok accept DEMO-1 "good"              # or, in human and both mode, your verdict; remarks optional
+tok show DEMO-1                       # the review rounds so far and whose turn it is
+```
+
+The reviewer agent of profile `x` is `x-reviewer` (`claude-code-reviewer` for `claude-code`);
+`tok review-mode --reviewer <profile>` picks another. It runs next to the worker, not instead of
+it: `tok logs DEMO-1 --reviewer` reads its terminal.
+
 Toknila's own next phase is a chain too: `tok project new TOK && tok chain import phase-1.toml
 --project TOK && tok chain show phase-1`.
 

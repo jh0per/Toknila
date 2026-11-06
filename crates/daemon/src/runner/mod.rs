@@ -3,6 +3,10 @@
 //! full log file under `<home>/runs/<ticket>/<run>.log`), wakes stream subscribers, and reports
 //! the process's end so the application can move the ticket (`supervise`).
 //!
+//! A ticket has one runner per role: its worker, and while the card is in review a reviewer next
+//! to it, on the same ship. The worker's output is what the ticket's routes mean; the reviewer's
+//! is read through the `reviewer` role selector and cannot be written to.
+//!
 //! No database here and nothing runs inside a transaction: the store calls [`Runners`] after a
 //! command committed. `portable-pty` lives in `pty` and nowhere else.
 
@@ -22,7 +26,7 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use tokio::sync::{broadcast, mpsc};
 use toknila_app::runner::{RunEnded, RunRequest, Runner, RunnerError, RunnerState, Started};
 use toknila_core::instructions::terminal::Size;
-use toknila_core::{AgentProfile, OutputRules, ProcessExit, Run, RunId, TicketId};
+use toknila_core::{AgentProfile, AgentRole, OutputRules, ProcessExit, Run, RunId, TicketId};
 
 use active::Active;
 pub use supervise::supervise;
@@ -50,7 +54,7 @@ pub struct Runners {
     root: PathBuf,
     /// The profiles folder, read when a runner starts so an edit applies at once.
     profiles: PathBuf,
-    active: Mutex<HashMap<TicketId, Arc<Active>>>,
+    active: Mutex<HashMap<(TicketId, AgentRole), Arc<Active>>>,
     /// Pings with the ticket whose output or state changed.
     wake: broadcast::Sender<TicketId>,
     ended: mpsc::UnboundedSender<RunEnded>,
@@ -112,23 +116,29 @@ impl Runners {
         self.wake.subscribe()
     }
 
-    fn active(&self) -> std::sync::MutexGuard<'_, HashMap<TicketId, Arc<Active>>> {
+    fn active(&self) -> std::sync::MutexGuard<'_, HashMap<(TicketId, AgentRole), Arc<Active>>> {
         self.active.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Tickets with a live process.
+    /// Tickets with a live worker process.
     pub fn live(&self) -> Vec<TicketId> {
+        self.live_in(AgentRole::Worker)
+    }
+
+    /// Tickets with a live process of `role`.
+    pub fn live_in(&self, role: AgentRole) -> Vec<TicketId> {
         self.active()
             .iter()
-            .filter(|(_, a)| !a.is_over())
-            .map(|(t, _)| *t)
+            .filter(|((_, r), a)| *r == role && !a.is_over())
+            .map(|((t, _), _)| *t)
             .collect()
     }
 
     /// Kills every live process, for a daemon that is shutting down.
     pub fn stop_all(&self) {
-        for ticket in self.live() {
-            self.stop(ticket);
+        let all: Vec<Arc<Active>> = self.active().values().cloned().collect();
+        for a in all {
+            a.kill();
         }
     }
 
@@ -141,15 +151,20 @@ impl Runners {
             .ok_or_else(|| RunnerError::UnknownProfile(name.to_owned()))
     }
 
-    /// The scrollback of the ticket's newest run from `cursor` on (the same run, at an offset)
-    /// or from its first retained byte. A ticket this daemon has not run is read from its newest
-    /// log. `None` when the ticket never ran.
-    pub fn read(&self, ticket: TicketId, cursor: Option<(RunId, u64)>) -> Option<Chunk> {
-        let active = self.active().get(&ticket).cloned();
+    /// The scrollback of the ticket's newest run of `role` from `cursor` on (the same run, at an
+    /// offset) or from its first retained byte. A ticket this daemon has not run is read from its
+    /// newest log. `None` when the ticket never ran in that role.
+    pub fn read(
+        &self,
+        ticket: TicketId,
+        role: AgentRole,
+        cursor: Option<(RunId, u64)>,
+    ) -> Option<Chunk> {
+        let active = self.active().get(&(ticket, role)).cloned();
         if let Some(a) = active {
             return Some(a.read(cursor));
         }
-        let (run, path) = logs::latest(&self.root, ticket)?;
+        let (run, path) = logs::latest(&self.root, ticket, role)?;
         let kept = logs::load(
             &path,
             usize::try_from(OutputRules::default().scrollback_lines).unwrap_or(usize::MAX),
@@ -182,6 +197,7 @@ impl Runners {
         let cx = wiring::Context {
             dir: &dir,
             key: &req.key,
+            role: req.role,
             run: run.id,
             token,
             url: self.url.get().map(String::as_str),
@@ -190,9 +206,14 @@ impl Runners {
         };
         let wiring = wiring::prepare(profile, &cx)?;
         let process = pty::spawn(profile, Path::new(&req.dir), &wiring)?;
-        let log =
-            logs::RunLog::create(&self.root, req.ticket, run.id, profile.output.max_log_bytes)
-                .map_err(|e| RunnerError::Spawn(format!("cannot create the run log: {e}")))?;
+        let log = logs::RunLog::create(
+            &self.root,
+            req.ticket,
+            req.role,
+            run.id,
+            profile.output.max_log_bytes,
+        )
+        .map_err(|e| RunnerError::Spawn(format!("cannot create the run log: {e}")))?;
         let lines = usize::try_from(profile.output.scrollback_lines).unwrap_or(usize::MAX);
         Active::launch(
             run.clone(),
@@ -213,7 +234,7 @@ impl Runner for Runners {
     fn start(&self, req: &RunRequest) -> Result<Started, RunnerError> {
         let profile = self.profile(&req.profile)?;
         let mut map = self.active();
-        if let Some(a) = map.get(&req.ticket).filter(|a| !a.is_over()) {
+        if let Some(a) = map.get(&(req.ticket, req.role)).filter(|a| !a.is_over()) {
             return Ok(Started {
                 run: a.run().clone(),
                 reused: true,
@@ -225,10 +246,12 @@ impl Runner for Runners {
             key: req.key.clone(),
             profile: profile.name.clone(),
             dir: req.dir.clone(),
+            role: req.role,
         };
         let grant = Grant {
             ticket: req.ticket,
             run: run.id,
+            role: req.role,
         };
         let token = self
             .tokens
@@ -237,19 +260,33 @@ impl Runner for Runners {
         let active = self
             .launch(&profile, req, &run, &token)
             .inspect_err(|_| self.tokens.revoke(run.id))?;
-        map.insert(req.ticket, active);
+        map.insert((req.ticket, req.role), active);
         Ok(Started { run, reused: false })
     }
 
     fn stop(&self, ticket: TicketId) {
-        let active = self.active().get(&ticket).cloned();
+        for role in [AgentRole::Worker, AgentRole::Reviewer] {
+            self.stop_role(ticket, role);
+        }
+    }
+
+    fn live_runners(&self) -> Vec<(TicketId, AgentRole)> {
+        self.active()
+            .iter()
+            .filter(|(_, a)| !a.is_over())
+            .map(|(key, _)| *key)
+            .collect()
+    }
+
+    fn stop_role(&self, ticket: TicketId, role: AgentRole) {
+        let active = self.active().get(&(ticket, role)).cloned();
         if let Some(a) = active {
             a.kill();
         }
     }
 
     fn write(&self, ticket: TicketId, bytes: &[u8]) -> Result<(), RunnerError> {
-        let active = self.active().get(&ticket).cloned();
+        let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
         match active.filter(|a| !a.is_over()) {
             Some(a) => a.write(bytes),
             None => Err(RunnerError::NotRunning),
@@ -257,12 +294,12 @@ impl Runner for Runners {
     }
 
     fn state(&self, ticket: TicketId) -> Option<RunnerState> {
-        let active = self.active().get(&ticket).cloned();
+        let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
         active?.state()
     }
 
     fn resize(&self, ticket: TicketId, size: Size) -> Result<(), RunnerError> {
-        let active = self.active().get(&ticket).cloned();
+        let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
         match active.filter(|a| !a.is_over()) {
             Some(a) => a.resize(size),
             None => Err(RunnerError::NotRunning),

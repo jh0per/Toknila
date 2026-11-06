@@ -5,15 +5,17 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use toknila_core::{RunId, TicketId, Timestamp};
+use toknila_core::{AgentRole, RunId, TicketId, Timestamp};
 
 use crate::server::constant_time_eq;
 
-/// What an agent token allows: acting as the agent of this ticket, in this run.
+/// What an agent token allows: acting as the agent of this ticket, in this run. A worker reports
+/// the work; a reviewer only gives its verdict on it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Grant {
     pub ticket: TicketId,
     pub run: RunId,
+    pub role: AgentRole,
 }
 
 /// The last sign of life of a ticket's agent.
@@ -46,13 +48,16 @@ impl AgentTokens {
         let token = crate::info::new_token()?;
         let mut inner = self.inner();
         inner.grants.push((token.clone(), grant));
-        inner.activity.insert(
-            grant.ticket,
-            Activity {
-                at,
-                signal: "start".to_owned(),
-            },
-        );
+        // The activity is the worker's: a reviewer next to it is not the worker working.
+        if grant.role == AgentRole::Worker {
+            inner.activity.insert(
+                grant.ticket,
+                Activity {
+                    at,
+                    signal: "start".to_owned(),
+                },
+            );
+        }
         Ok(token)
     }
 
@@ -95,6 +100,7 @@ mod tests {
         Grant {
             ticket: TicketId::new(),
             run: RunId::new(),
+            role: AgentRole::Worker,
         }
     }
 

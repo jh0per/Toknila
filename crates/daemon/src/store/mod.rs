@@ -5,6 +5,7 @@
 //! events are then published to subscribers (the WebSocket stream).
 
 mod backup;
+mod chains;
 mod codec;
 mod error;
 mod external;
@@ -27,7 +28,7 @@ use toknila_app::Shipyard;
 use toknila_app::external::ExternalEffect;
 use toknila_app::runner::{NoRunner, Runner};
 use toknila_core::events::DomainEvent;
-use toknila_core::{Actor, Timestamp};
+use toknila_core::{Actor, AgentRole, TicketId, Timestamp};
 
 pub use codec::Repo;
 pub use error::StoreError;
@@ -40,6 +41,8 @@ pub struct WriteTx<'c> {
     now: Timestamp,
     events: Vec<EventRecord>,
     deferred: Vec<ExternalEffect>,
+    /// The runner processes alive when the command began.
+    live: Vec<(TicketId, AgentRole)>,
 }
 
 /// Where a command's ships are made; shared by every command of the store.
@@ -75,7 +78,7 @@ impl<'c> WriteTx<'c> {
 
     /// Typed repository over this transaction.
     pub fn repo(&self) -> Repo<'_> {
-        Repo::new(&self.tx)
+        Repo::with_live(&self.tx, self.live.clone())
     }
 
     /// Journals a domain event in this transaction.
@@ -212,6 +215,7 @@ impl Store {
         F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
     {
         let events = self.events.clone();
+        let live = self.runner.live_runners();
         let outcome = self
             .run(move |conn| {
                 let tx = match conn.transaction() {
@@ -224,6 +228,7 @@ impl Store {
                     now,
                     events: Vec::new(),
                     deferred: Vec::new(),
+                    live,
                 };
                 let value = match catch_unwind(AssertUnwindSafe(|| f(&mut w))) {
                     Ok(Ok(v)) => v,
@@ -258,9 +263,10 @@ impl Store {
         T: Send + 'static,
         F: FnOnce(&Repo<'_>) -> Result<T, StoreError> + Send + 'static,
     {
+        let live = self.runner.live_runners();
         self.run(move |conn| {
             let tx = conn.transaction()?;
-            let out = match catch_unwind(AssertUnwindSafe(|| f(&Repo::new(&tx)))) {
+            let out = match catch_unwind(AssertUnwindSafe(|| f(&Repo::with_live(&tx, live)))) {
                 Ok(r) => r,
                 Err(p) => Err(StoreError::Panicked(panic_message(&p))),
             };

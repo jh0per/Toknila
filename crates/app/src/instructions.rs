@@ -11,9 +11,7 @@ use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::instructions;
 use toknila_core::machine::TicketEvent;
-use toknila_core::{
-    Actor, AgentProfile, Comment, CommentId, CommentKind, NodeRef, Ticket, TicketId,
-};
+use toknila_core::{AgentProfile, Comment, CommentId, CommentKind, NodeRef, Ticket, TicketId};
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
@@ -24,11 +22,7 @@ fn pending<U: UnitOfWork + ?Sized>(uow: &U, ticket: TicketId) -> AppResult<Vec<C
     Ok(uow
         .comments(ticket)?
         .into_iter()
-        .filter(|c| {
-            c.author == Actor::Human
-                && c.kind == CommentKind::Instruction
-                && c.delivered_at.is_none()
-        })
+        .filter(|c| c.kind == CommentKind::Instruction && c.delivered_at.is_none())
         .collect())
 }
 
@@ -40,7 +34,9 @@ pub(crate) fn queue<U: UnitOfWork + ?Sized>(
     view: &ChainView,
     comment: &Comment,
 ) -> AppResult<()> {
-    if comment.author != Actor::Human || comment.kind != CommentKind::Instruction {
+    // A person's instruction, a Return's comment, or the reviewer agent's remarks: every
+    // instruction comment is for the worker, whoever wrote it.
+    if comment.kind != CommentKind::Instruction {
         return Ok(());
     }
     let Some(ticket) = view.tickets.iter().find(|t| t.id == comment.ticket_id) else {

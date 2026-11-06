@@ -173,4 +173,12 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE projects ADD COLUMN max_parallel INTEGER NOT NULL DEFAULT 2;
     ALTER TABLE tickets ADD COLUMN queued INTEGER NOT NULL DEFAULT 0;
     "#,
+    // 6: review (P1-14). A ticket's review state (whose turn, the rounds so far; JSON) and the
+    // reviewer agent profile that may be set on a ticket, a chain and a project.
+    r#"
+    ALTER TABLE tickets ADD COLUMN review_json TEXT;
+    ALTER TABLE tickets ADD COLUMN reviewer TEXT;
+    ALTER TABLE chains ADD COLUMN reviewer TEXT;
+    ALTER TABLE projects ADD COLUMN default_reviewer TEXT;
+    "#,
 ];

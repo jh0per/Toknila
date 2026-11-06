@@ -88,6 +88,7 @@ mod tests {
             release_branch: "main".into(),
             default_profile: AgentProfile::SIM.into(),
             default_review_mode: ReviewMode::Human,
+            default_reviewer: None,
             max_parallel: 2,
         };
         let chain = Chain {
@@ -97,6 +98,7 @@ mod tests {
             goal: String::new(),
             autostart: true,
             review_mode: None,
+            reviewer: None,
         };
         let draft = TicketDraft {
             title: "Add login: OAuth".into(),

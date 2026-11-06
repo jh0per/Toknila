@@ -41,8 +41,13 @@ pub struct Catalog {
     pub problems: Vec<ProfileProblem>,
 }
 
-fn builtin() -> [AgentProfile; 2] {
-    [AgentProfile::sim(), AgentProfile::claude_code()]
+fn builtin() -> [AgentProfile; 4] {
+    [
+        AgentProfile::sim(),
+        AgentProfile::claude_code(),
+        AgentProfile::sim_reviewer(),
+        AgentProfile::claude_code_reviewer(),
+    ]
 }
 
 /// Built-in profiles first, then the valid files by name. Files that do not end in `.toml` are

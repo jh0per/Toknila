@@ -15,6 +15,7 @@ use toknila_api_types::{
 use toknila_core::Project;
 
 mod runner;
+mod settings;
 
 pub use runner::Scrollback;
 

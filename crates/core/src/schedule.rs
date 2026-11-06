@@ -2,8 +2,10 @@
 //!
 //! **Slots.** A project has `max_parallel` slots (default [`DEFAULT_LIMIT`]). A card holds one
 //! while it is Running or Waiting (its agent is alive; a simulated agent counts the same).
-//! Review, Blocked, Merged, Released, Cancelled and Backlog hold none: the agent is done, stopped
-//! or has not begun.
+//! Review, Blocked, Merged, Released, Cancelled and Backlog hold none by their status alone: the
+//! agent is done, stopped or has not begun. A **live runner** holds one whatever the status: a
+//! worker kept alive through review, and the reviewer next to it, each take a slot. The host knows
+//! which runners are alive; the application passes them in and this module stays pure.
 //!
 //! **Queued is a flag, not a status.** A card a person started while every slot was taken stays
 //! Ready with `Ticket::queued` set. A new status would touch the transition table, board
@@ -20,7 +22,9 @@
 //! nothing and stops nothing: running agents keep their slots until they leave Running/Waiting.
 
 use crate::graph::ChainView;
-use crate::{Ticket, TicketId, TicketStatus};
+use std::collections::HashSet;
+
+use crate::{AgentRole, Ticket, TicketId, TicketStatus};
 
 /// Slots of a project that does not say.
 pub const DEFAULT_LIMIT: u32 = 2;
@@ -66,14 +70,40 @@ impl Plan {
     }
 }
 
-/// Which wanted cards of the project's `chains` (in chain order) start now with `limit` slots.
-pub fn plan(chains: &[ChainView], limit: u32) -> Plan {
-    let used = chains
-        .iter()
-        .flat_map(|c| &c.tickets)
+/// A runner process that is alive, by the ticket it works for and its role.
+pub type LiveRunner = (TicketId, AgentRole);
+
+/// Slots held in `chains`: each working or waiting card (its worker), and each live runner of a
+/// card of these chains, counted once.
+pub fn slots_used(chains: &[ChainView], live: &[LiveRunner]) -> u32 {
+    let tickets = || chains.iter().flat_map(|c| &c.tickets);
+    let mut held: HashSet<LiveRunner> = tickets()
         .filter(|t| holds_slot(t))
-        .count();
-    let used = u32::try_from(used).unwrap_or(u32::MAX);
+        .map(|t| (t.id, AgentRole::Worker))
+        .collect();
+    // A runner counts while its card is working or in review. A card that was merged,
+    // cancelled or blocked has its runners stopped right after the command that moved it, so
+    // they already free their slots for the cards this command starts.
+    held.extend(
+        live.iter()
+            .filter(|(id, _)| {
+                tickets().any(|t| {
+                    t.id == *id
+                        && matches!(
+                            t.status,
+                            TicketStatus::Running | TicketStatus::Waiting | TicketStatus::Review
+                        )
+                })
+            })
+            .copied(),
+    );
+    u32::try_from(held.len()).unwrap_or(u32::MAX)
+}
+
+/// Which wanted cards of the project's `chains` (in chain order) start now with `limit` slots,
+/// given the runners that are alive.
+pub fn plan(chains: &[ChainView], limit: u32, live: &[LiveRunner]) -> Plan {
+    let used = slots_used(chains, live);
     let mut wanted: Vec<TicketId> = chains.iter().flat_map(ChainView::start_requests).collect();
     let free = usize::try_from(limit.saturating_sub(used)).unwrap_or(usize::MAX);
     let queue = wanted.split_off(free.min(wanted.len()));

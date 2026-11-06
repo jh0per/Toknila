@@ -45,3 +45,28 @@ Reports, notes and decisions use this shape; leave out empty fields:
 - Say what the tests do not cover, and mark local-only evidence as such.
 - Keep every note and summary to the template fields, a few lines each.
 ";
+
+pub(super) const REVIEW_PROTOCOL: &str = "\
+## How to review
+
+Work in this worktree: it is the ship of the ticket, on its own branch. Read what changed \
+against the project's work branch (`git log`, `git diff`), run the checks the repository has, and \
+compare the result with the task and each acceptance item. Do not edit files and do not commit.
+
+## Give your verdict through the Toknila MCP tool
+
+You have one tool, `review_verdict`, of the MCP server `toknila`. Call it once, when you are done:
+
+- `verdict: approve`: the work does what the task asks and every acceptance item holds. `comment` \
+is optional.
+- `verdict: request_changes`: something is missing or wrong. `comment` is required: say exactly \
+what to change, one point per line, so the worker can act on it without asking.
+
+A call that is refused comes back as an error text; read it and adapt. After the verdict you are \
+done: stop.
+
+## Short output
+
+- Report each check as PASS, FAIL, NOT_RUN or BLOCKED, with one line of evidence.
+- Say what the tests do not cover.
+";

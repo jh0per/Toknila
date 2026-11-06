@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Actor, ChainId, NodeRef, ReviewMode, StatusReason, SubtaskId, TicketId, TicketKey,
+    Actor, ChainId, NodeRef, Review, ReviewMode, StatusReason, SubtaskId, TicketId, TicketKey,
     TicketStatus, Timestamp,
 };
 
@@ -31,6 +31,10 @@ pub struct Ticket {
     pub profile: Option<String>,
     /// `None` means the chain's, then the project's review mode.
     pub review_mode: Option<ReviewMode>,
+    /// Reviewer agent profile; `None` means the chain's, then the project's, then
+    /// `<worker profile>-reviewer`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer: Option<String>,
     /// Ship branch `ship/<chain>/<slug>`; empty until phase 1 creates ships.
     pub branch: Option<String>,
     /// Copy depot secrets onto the ship at start.
@@ -44,6 +48,9 @@ pub struct Ticket {
     /// folder whose work was done in another order). It stays after the card moves on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done_out_of_order: Option<OutOfOrder>,
+    /// Whose verdict the card waits for in Review, and the rounds held so far.
+    #[serde(default, skip_serializing_if = "Review::is_empty")]
+    pub review: Review,
 }
 
 /// The mark of a card that was done out of order: the earlier cards that were still open.
@@ -80,6 +87,7 @@ pub struct TicketDraft {
     pub paused: bool,
     pub profile: Option<String>,
     pub review_mode: Option<ReviewMode>,
+    pub reviewer: Option<String>,
     pub needs_secrets: bool,
 }
 
@@ -106,11 +114,13 @@ impl Ticket {
             queued: false,
             profile: draft.profile,
             review_mode: draft.review_mode,
+            reviewer: draft.reviewer,
             branch: None,
             needs_secrets: draft.needs_secrets,
             tokens_used: 0,
             wildcard: None,
             done_out_of_order: None,
+            review: Review::default(),
         }
     }
 
@@ -151,6 +161,7 @@ pub struct TicketPatch {
     pub acceptance: Option<Vec<String>>,
     pub profile: Option<String>,
     pub review_mode: Option<ReviewMode>,
+    pub reviewer: Option<String>,
     pub needs_secrets: Option<bool>,
 }
 
@@ -171,6 +182,9 @@ impl TicketPatch {
         }
         if let Some(v) = self.review_mode {
             t.review_mode = Some(v);
+        }
+        if let Some(v) = self.reviewer {
+            t.reviewer = Some(v).filter(|v| !v.trim().is_empty());
         }
         if let Some(v) = self.needs_secrets {
             t.needs_secrets = v;

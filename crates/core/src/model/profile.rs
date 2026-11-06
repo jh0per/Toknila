@@ -111,6 +111,10 @@ impl AgentProfile {
     pub const SIM: &str = "sim";
     /// Name of the built-in Claude Code profile.
     pub const CLAUDE_CODE: &str = "claude-code";
+    /// Name of the built-in simulated reviewer profile.
+    pub const SIM_REVIEWER: &str = "sim-reviewer";
+    /// Name of the built-in Claude Code reviewer profile.
+    pub const CLAUDE_CODE_REVIEWER: &str = "claude-code-reviewer";
 
     /// A profile that runs `command`, with defaults everywhere else.
     pub fn new(name: &str, role: AgentRole, command: Vec<String>) -> Self {
@@ -131,6 +135,21 @@ impl AgentProfile {
     /// The built-in simulated profile.
     pub fn sim() -> Self {
         Self::new(Self::SIM, AgentRole::Worker, Vec::new())
+    }
+
+    /// The built-in simulated reviewer: starts no process, a person sends its verdict.
+    pub fn sim_reviewer() -> Self {
+        Self::new(Self::SIM_REVIEWER, AgentRole::Reviewer, Vec::new())
+    }
+
+    /// The built-in reviewer that launches Claude Code like the worker profile does, in the
+    /// reviewer role.
+    pub fn claude_code_reviewer() -> Self {
+        Self {
+            name: Self::CLAUDE_CODE_REVIEWER.to_owned(),
+            role: AgentRole::Reviewer,
+            ..Self::claude_code()
+        }
     }
 
     /// The built-in profile that launches Claude Code, with the MCP server and the hooks wired in

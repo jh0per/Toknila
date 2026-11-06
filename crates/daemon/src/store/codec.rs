@@ -1,11 +1,11 @@
 //! Row <-> domain mapping. Enums are stored as their serde names; nested values as JSON.
 
-use rusqlite::{Connection, OptionalExtension, Row, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_core::graph::ChainView;
 use toknila_core::wire::wire_name;
-use toknila_core::{Chain, ChainId, Edge, NodeRef, ProjectId, Release, ReleaseId, Timestamp};
+use toknila_core::{AgentRole, ChainId, Edge, NodeRef, Release, ReleaseId, TicketId, Timestamp};
 
 use super::{EventRecord, StoreError};
 
@@ -65,121 +65,22 @@ fn node_from(kind: &str, id: &str) -> Result<NodeRef, StoreError> {
 #[derive(Debug)]
 pub struct Repo<'c> {
     pub(crate) conn: &'c Connection,
+    /// The runner processes alive when this repository was opened (see `Reader::live_runners`).
+    live: Vec<(TicketId, AgentRole)>,
 }
 
-const CHAIN_COLS: &str = "id, project_id, name, goal, autostart, review_mode";
 const RELEASE_COLS: &str =
     "id, chain_id, version, channel, start_mode, state, branch, cut_at, released_at";
 
 impl<'c> Repo<'c> {
-    pub(crate) fn new(conn: &'c Connection) -> Self {
-        Self { conn }
+    /// A repository that knows which runners are alive.
+    pub(crate) fn with_live(conn: &'c Connection, live: Vec<(TicketId, AgentRole)>) -> Self {
+        Self { conn, live }
     }
 
-    /// Reserves the next ticket number of a project.
-    pub fn take_ticket_number(&self, project: ProjectId) -> Result<u32, StoreError> {
-        let n: u32 = self.conn.query_row(
-            "UPDATE projects SET next_ticket_number = next_ticket_number + 1 WHERE id = ?1 RETURNING next_ticket_number - 1",
-            [project.to_string()],
-            |r| r.get(0),
-        )?;
-        Ok(n)
-    }
-
-    // ---- chains ----
-
-    pub fn insert_chain(&self, c: &Chain) -> Result<(), StoreError> {
-        self.conn.execute(
-            &format!("INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"),
-            params![
-                c.id.to_string(),
-                c.project_id.to_string(),
-                c.name,
-                c.goal,
-                c.autostart,
-                opt_enum(&c.review_mode)?
-            ],
-        )?;
-        Ok(())
-    }
-
-    pub fn update_chain(&self, c: &Chain) -> Result<(), StoreError> {
-        self.conn.execute(
-            "UPDATE chains SET name = ?2, goal = ?3, autostart = ?4, review_mode = ?5 WHERE id = ?1",
-            params![c.id.to_string(), c.name, c.goal, c.autostart, opt_enum(&c.review_mode)?],
-        )?;
-        Ok(())
-    }
-
-    fn chain_from(
-        r: &Row<'_>,
-    ) -> rusqlite::Result<(String, String, String, String, bool, Option<String>)> {
-        Ok((
-            r.get(0)?,
-            r.get(1)?,
-            r.get(2)?,
-            r.get(3)?,
-            r.get(4)?,
-            r.get(5)?,
-        ))
-    }
-
-    fn chain_build(
-        t: (String, String, String, String, bool, Option<String>),
-    ) -> Result<Chain, StoreError> {
-        Ok(Chain {
-            id: parse(&t.0, "chain id")?,
-            project_id: parse(&t.1, "project id")?,
-            name: t.2,
-            goal: t.3,
-            autostart: t.4,
-            review_mode: opt_enum_from(t.5)?,
-        })
-    }
-
-    pub fn chain(&self, id: ChainId) -> Result<Option<Chain>, StoreError> {
-        self.conn
-            .query_row(
-                &format!("SELECT {CHAIN_COLS} FROM chains WHERE id = ?1"),
-                [id.to_string()],
-                Self::chain_from,
-            )
-            .optional()?
-            .map(Self::chain_build)
-            .transpose()
-    }
-
-    pub fn chain_by_name(
-        &self,
-        project: ProjectId,
-        name: &str,
-    ) -> Result<Option<Chain>, StoreError> {
-        self.conn
-            .query_row(
-                &format!("SELECT {CHAIN_COLS} FROM chains WHERE project_id = ?1 AND name = ?2"),
-                params![project.to_string(), name],
-                Self::chain_from,
-            )
-            .optional()?
-            .map(Self::chain_build)
-            .transpose()
-    }
-
-    pub fn chains(&self, project: Option<ProjectId>) -> Result<Vec<Chain>, StoreError> {
-        let mut st = self.conn.prepare(&format!(
-            "SELECT {CHAIN_COLS} FROM chains WHERE ?1 IS NULL OR project_id = ?1 ORDER BY rowid"
-        ))?;
-        let rows = st.query_map([project.map(|p| p.to_string())], Self::chain_from)?;
-        rows.map(|r| Self::chain_build(r?)).collect()
-    }
-
-    /// Chains with this name, across projects.
-    pub fn chains_named(&self, name: &str) -> Result<Vec<Chain>, StoreError> {
-        let mut st = self.conn.prepare(&format!(
-            "SELECT {CHAIN_COLS} FROM chains WHERE name = ?1 ORDER BY rowid"
-        ))?;
-        let rows = st.query_map([name], Self::chain_from)?;
-        rows.map(|r| Self::chain_build(r?)).collect()
+    /// The runner processes that were alive when this repository was opened.
+    pub fn live_runners(&self) -> Result<Vec<(TicketId, AgentRole)>, StoreError> {
+        Ok(self.live.clone())
     }
 
     // ---- releases, edges ----

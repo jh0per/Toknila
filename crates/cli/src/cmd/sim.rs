@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use toknila_api_types::{AgentEvent, ReleaseEvent};
 use toknila_client::Client;
-use toknila_core::CommentBody;
+use toknila_core::{CommentBody, Verdict};
 
 use super::thread::{PostArgs, kind_of};
 use super::{CardArgs, emit};
@@ -33,6 +33,13 @@ pub enum SimCmd {
     Finish { summary: Option<String> },
     /// The agent crashed (-> Blocked).
     Crash { detail: String },
+    /// The simulated reviewer gives its verdict on a card in Review.
+    Review {
+        #[arg(value_parser = ["approve", "request-changes"])]
+        verdict: String,
+        /// What to change; required with request-changes.
+        comment: Option<String>,
+    },
     /// The agent found work nobody planned: a wildcard card that waits for your approval.
     Propose {
         #[command(flatten)]
@@ -100,6 +107,14 @@ pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> R
             },
         },
         SimCmd::Crash { detail } => AgentEvent::Crashed { detail },
+        SimCmd::Review { verdict, comment } => AgentEvent::ReviewVerdict {
+            verdict: if verdict == "approve" {
+                Verdict::Approve
+            } else {
+                Verdict::RequestChanges
+            },
+            comment: comment.unwrap_or_default(),
+        },
         SimCmd::Propose { card } => AgentEvent::Propose(card.into()),
         SimCmd::Thread(_) => unreachable!("handled above"),
         // A ticket first; if no ticket has this name, a release.

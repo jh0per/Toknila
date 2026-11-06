@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use toknila_app::{AppError, ErrorKind};
 use toknila_core::graph::GraphError;
-use toknila_core::machine::TransitionError;
+use toknila_core::machine::{TransitionError, UnknownAction};
 
 pub use toknila_api_types::ErrorBody;
 
@@ -71,6 +71,12 @@ impl From<StoreError> for ApiError {
 
 impl From<TransitionError> for ApiError {
     fn from(e: TransitionError) -> Self {
+        Self(e.into())
+    }
+}
+
+impl From<UnknownAction> for ApiError {
+    fn from(e: UnknownAction) -> Self {
         Self(e.into())
     }
 }

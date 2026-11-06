@@ -60,7 +60,11 @@ rules and `nudge` thresholds. The working directory is not in it: the ship suppl
 A new agent is a new file, not new code.
 
 - Built in: `sim` (starts no process; a person sends its events with `tok sim`) and `claude-code`
-  (launches `claude` with the MCP server and the hooks wired in, see "Agent access" below).
+  (launches `claude` with the MCP server and the hooks wired in, see "Agent access" below), and
+  their reviewers `sim-reviewer` (no process; a person sends its verdict with
+  `tok sim <ticket> review`) and `claude-code-reviewer` (the same launch, role `reviewer`).
+  The reviewer of a worker profile `x` is named `x-reviewer` by convention, unless a review
+  setting names another (see "Review" below).
 - Files: `<name>.toml` in the `profiles` folder of the data home (`Paths::profiles()`):
   `~/Library/Application Support/toknila/profiles` on macOS, `%APPDATA%\toknila\profiles` on
   Windows, `~/.toknila/profiles` on Linux, or `$TOKNILA_HOME/profiles`. The file name is the
@@ -110,9 +114,16 @@ is the committed state, so the ship shows up in the next read and on the stream.
 
 A runner is the agent's process, started in a pseudo-terminal in the ticket's ship. Core decides
 when (`EnsureRunner` on Start, Unblock into Running and Return; `StopRunner` on Accept, Cancel,
-Pause and every block that ends the agent). The application queues `StartRunner` and `StopRunner`
-as external effects; the daemon implements the `Runner` port (`toknila-app`) in `runner/` with
-`portable-pty` (Unix ptys, Windows ConPTY), which no other crate depends on.
+Pause and every block that ends the agent; `StartReviewer` and `StopReviewer` for the reviewer,
+see "Review"). The application queues `StartRunner`, `StartReviewer`, `StopRunner` and
+`StopReviewer` as external effects; the daemon implements the `Runner` port (`toknila-app`) in
+`runner/` with `portable-pty` (Unix ptys, Windows ConPTY), which no other crate depends on.
+
+A ticket has at most one live runner **per role**: its worker, and during review a reviewer next
+to it on the same ship. `Runners` keys them by ticket and role; `start` keeps the live runner of
+the same role, `stop` ends every runner of the ticket, `stop_role` one. The reviewer's token, log
+(`runs/<ticket>/reviewer/<run>.log`) and output are its own. The ticket's routes below mean the
+worker; the reviewer's output is read, never written, with `?role=reviewer`.
 
 - **Profile.** The ticket's own `profile`, else the project's `default_profile` (`Project::profile_for`;
   `tok project new --profile`, `tok ticket new --profile`). `sim` has no command and starts no
@@ -153,14 +164,59 @@ as external effects; the daemon implements the `Runner` port (`toknila-app`) in 
 
 | Route | What |
 |---|---|
-| `GET /v1/tickets/{ticket}/runner/scrollback` | The scrollback of the newest run as `application/octet-stream`, with headers `x-toknila-run`, `x-toknila-offset` (of its first byte) and `x-toknila-end` (after its last byte). `404` if the ticket never ran |
-| `GET /v1/tickets/{ticket}/runner/stream?run=<id>&from=<offset>` | WebSocket (token as `?token=`). Binary frames: 26 ASCII characters of the run id, the 8-byte big-endian offset of the payload, the raw bytes (at most 64 KiB). Text frame `{"type":"ended","run":"...","exit":{"code":0,"signal":null}}` once the run's output is complete (`exit` absent for a run found on disk after a restart). Without `run` and `from` it starts at the first retained byte, so a late client sees history first; with them it continues after the bytes the client has (scrollback `end`). A new run of the same ticket shows up as frames with another run id |
+| `GET /v1/tickets/{ticket}/runner/scrollback[?role=reviewer]` | The scrollback of the newest run (the worker's, or the reviewer's with `role=reviewer`) as `application/octet-stream`, with headers `x-toknila-run`, `x-toknila-offset` (of its first byte) and `x-toknila-end` (after its last byte). `404` if the ticket never ran |
+| `GET /v1/tickets/{ticket}/runner/stream?run=<id>&from=<offset>[&role=reviewer]` | WebSocket (token as `?token=`). Binary frames: 26 ASCII characters of the run id, the 8-byte big-endian offset of the payload, the raw bytes (at most 64 KiB). Text frame `{"type":"ended","run":"...","exit":{"code":0,"signal":null}}` once the run's output is complete (`exit` absent for a run found on disk after a restart). Without `run` and `from` it starts at the first retained byte, so a late client sees history first; with them it continues after the bytes the client has (scrollback `end`). A new run of the same ticket shows up as frames with another run id |
 | `POST /v1/tickets/{ticket}/runner/size` | Body `{"cols": n, "rows": n}`: the size of the panel showing the terminal; the agent's terminal follows it (window-size signal), within 20x5 and 500x200 (`toknila_core::instructions::terminal::clamp`; a terminal starts at 160x40). A person's action; `409` when no runner is live. The web terminal sends it after the panel has been still for 150 ms, and again when the stream goes live |
 | `POST /v1/tickets/{ticket}/runner/input` | Body: bytes typed into the terminal as they are (`\r` is Enter on every platform). A person's action: the route acts as a person, and `toknila_app::runs::send_input` refuses any other actor. `409` when no runner is live |
 
 The frame format is `toknila_api_types::runner`; `/v1/stream` stays journal-only.
-`tok logs <ticket> [--follow]` prints the scrollback and, with `--follow`, continues on the
-stream until the run ends.
+`tok logs <ticket> [--follow] [--reviewer]` prints the scrollback and, with `--follow`, continues
+on the stream until the run ends.
+
+## Review
+
+A card handed in (`finished`) goes to Review and waits for a verdict. Who gives it is the review
+**mode**, resolved ticket, then chain, then project (`toknila_core::resolve_review_mode`; default
+`human`). Set it with `tok review-mode <human|agent|both> [--ticket K | --chain C | --project P]`
+(`PATCH /v1/tickets/{t}`, `/v1/chains/{c}`, `/v1/projects/{p}`); the application resolves it when
+the agent hands in and passes it to the machine in the `Finished` event.
+
+| Mode | The card waits for | Then |
+|---|---|---|
+| `human` | a person | `accept` merges; `return` sends the comment back |
+| `agent` | the reviewer agent | its `approve` merges, its `request_changes` returns the card with its remarks as the instruction |
+| `both` | the reviewer agent, then a person | the agent's verdict only records a round; the person then decides with its remarks in view |
+
+- **Rounds.** `ticket.review.rounds` is one flat list, one entry per verdict, numbered from 1
+  (`{number, reviewer: human|agent, verdict: approve|request_changes, comment, decided_at}`), so in
+  `both` mode the agent's verdict and the person's are two rounds. `ticket.review.turn` says
+  whose verdict the card waits for (`person`, or `agent` with `decides`), `null` outside Review.
+  `TicketDetail.review` adds the resolved `mode` and `reviewer` profile; `TicketDetail.allowed_actions`
+  lists what a person may do now. Core computes it (`TicketAction::allowed`: each action tried
+  against the transition table), so no client keeps a copy of the rules.
+- **A person may always decide**, also while the reviewer is still running: `accept` or `return`
+  stops the reviewer (`StopReviewer`) and records the person's round. `accept` takes optional
+  remarks (`tok accept <ticket> [comment]`).
+- **The reviewer** is a runner of role `reviewer` next to the worker's, started when the card
+  enters Review in `agent` and `both` mode (`StartReviewer`), in the worker's ship. Its profile is
+  the first of the ticket's, the chain's and the project's `reviewer` setting (`tok review-mode
+  --reviewer <profile>`; blank clears it), else `<worker profile>-reviewer`. It is one-shot: its
+  token (role `reviewer`) may send only `review_verdict`, then it exits. A reviewer that cannot
+  start, or ends while the card still waits for it (no verdict), or is lost with a daemon restart,
+  hands the card to a person (`ReviewerFailed`; a report comment says why). The simulated
+  reviewer (`sim-reviewer`) has no process: a person sends `tok sim <ticket> review
+  approve|request-changes [comment]`.
+- **The worker is not replaced.** A worker session that is still alive in Review keeps its
+  context: a `return` (a person's, or the reviewer's remarks) goes to that same session (the
+  runner is kept, and the comment is an instruction comment like any other: it is typed to the idle session or claimed by its Stop hook, and marked delivered once, see `app::instructions`; the reviewer's remarks take the same path). If the
+  worker's process has exited meanwhile (which changes nothing in Review), the return starts a new
+  worker run on the same ship. `accept` and `cancel` stop every runner of the ticket.
+- **Parallel limit.** Slots are counted over runners, not tickets. `schedule::plan` stays pure in
+  core and takes the live runners as input (`Reader::live_runners`, which the store fills from
+  `Runner::live_runners` when a read or command begins): a card holds a slot while it is Running
+  or Waiting, and each live runner of a card in Running, Waiting or Review holds one too, counted
+  once. A card in review with its worker and its reviewer alive uses two. A merged, cancelled or
+  blocked card's runners are being stopped by the same command, so they already count as free.
 
 ## Agent access
 
@@ -170,8 +226,10 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
 - **Tokens.** `runner/tokens.rs` (`AgentTokens`, owned by `Runners`): `Runners::start` issues one
   token per run, scoped to the run's ticket; the watcher thread revokes it when the process ends.
   The token reaches the agent only through its environment (`TOKNILA_URL`, `TOKNILA_RUN_TOKEN`,
-  `TOKNILA_TICKET`, `TOKNILA_RUN`, in `toknila_api_types::runner::agent_env`); the person's token
-  is not known to `Runners` at all.
+  `TOKNILA_TICKET`, `TOKNILA_RUN`, `TOKNILA_ROLE`, in `toknila_api_types::runner::agent_env`); the
+  person's token is not known to `Runners` at all. A token carries its run's role: a worker's may
+  send every event but `review_verdict`, a reviewer's only `review_verdict`
+  (`Principal::may_send`, `403` otherwise).
 - **Who is calling.** `server/auth.rs` turns the bearer token into a `Principal` (`Person` or
   `Agent(grant)`) for the handlers. An agent may call only `AGENT_ROUTES` (events, activity and
   the instruction claim of its own ticket); everything else is `403`. The ownership rule is `toknila_app::agent::ensure_granted`
@@ -298,7 +356,9 @@ State management:
   status and "needs a human" stay computed by the daemon). A full reload happens only after a gap
   in `seq` or an event the page cannot place.
 - No optimistic updates: the command answers with fresh state and the event confirms it. Rules
-  stay on the server.
+  stay on the server: which actions a card allows is `TicketDetail.allowed_actions` and its review
+  rounds are `TicketDetail.review.rounds`, both computed by the daemon; the page keeps no table of
+  statuses and no history parsing, only the words and styles of the buttons.
 
 Navigation is state too, and it lives in the URL, so a deep link opens the right screen:
 

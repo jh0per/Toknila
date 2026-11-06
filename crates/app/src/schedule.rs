@@ -23,9 +23,11 @@ fn views<R: Reader + ?Sized>(r: &R, project: ProjectId) -> AppResult<Vec<ChainVi
     Ok(out)
 }
 
-/// Who starts and who waits in a project, with its current limit.
+/// Who starts and who waits in a project, with its current limit. The runners that are alive
+/// count (the reader knows them): workers and reviewers each hold a slot.
 pub fn plan_of<R: Reader + ?Sized>(r: &R, project: &Project) -> AppResult<Plan> {
-    Ok(plan(&views(r, project.id)?, project.max_parallel))
+    let live = r.live_runners()?;
+    Ok(plan(&views(r, project.id)?, project.max_parallel, &live))
 }
 
 /// Every project with its plan, in project order.
@@ -55,7 +57,8 @@ pub(crate) fn run<U: UnitOfWork + ?Sized>(uow: &mut U, project: ProjectId) -> Ap
         return Ok(());
     };
     let chains = views(uow, project)?;
-    for id in plan(&chains, p.max_parallel).start {
+    let live = uow.live_runners()?;
+    for id in plan(&chains, p.max_parallel, &live).start {
         let Some(chain) = chains
             .iter()
             .find(|c| c.tickets.iter().any(|t| t.id == id))

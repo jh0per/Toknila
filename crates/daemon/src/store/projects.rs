@@ -7,7 +7,7 @@ use super::StoreError;
 use super::codec::{Repo, enum_from, enum_str, parse};
 
 const PROJECT_COLS: &str = "id, key, name, repo_path, work_branch, release_branch, default_profile, \
-     default_review_mode, max_parallel";
+     default_review_mode, max_parallel, default_reviewer";
 
 type RawProject = (
     String,
@@ -19,6 +19,7 @@ type RawProject = (
     String,
     String,
     i64,
+    Option<String>,
 );
 
 fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
@@ -32,11 +33,23 @@ fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
         r.get(6)?,
         r.get(7)?,
         r.get(8)?,
+        r.get(9)?,
     ))
 }
 
 fn project_from(c: RawProject) -> Result<Project, StoreError> {
-    let (id, key, name, repo_path, work_branch, release_branch, default_profile, review, max) = c;
+    let (
+        id,
+        key,
+        name,
+        repo_path,
+        work_branch,
+        release_branch,
+        default_profile,
+        review,
+        max,
+        reviewer,
+    ) = c;
     Ok(Project {
         id: parse(&id, "project id")?,
         key: parse(&key, "project key")?,
@@ -48,6 +61,7 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         default_review_mode: enum_from(&review)?,
         max_parallel: u32::try_from(max)
             .map_err(|_| StoreError::Corrupt(format!("bad max_parallel {max}")))?,
+        default_reviewer: reviewer,
     })
 }
 
@@ -55,7 +69,7 @@ impl Repo<'_> {
     pub fn insert_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
             ),
             params![
                 p.id.to_string(),
@@ -67,6 +81,7 @@ impl Repo<'_> {
                 p.default_profile,
                 enum_str(&p.default_review_mode)?,
                 p.max_parallel,
+                p.default_reviewer,
             ],
         )?;
         Ok(())
@@ -76,7 +91,8 @@ impl Repo<'_> {
     pub fn update_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             "UPDATE projects SET name = ?2, repo_path = ?3, work_branch = ?4, release_branch = ?5, \
-             default_profile = ?6, default_review_mode = ?7, max_parallel = ?8 WHERE id = ?1",
+             default_profile = ?6, default_review_mode = ?7, max_parallel = ?8, default_reviewer = ?9 \
+             WHERE id = ?1",
             params![
                 p.id.to_string(),
                 p.name,
@@ -86,6 +102,7 @@ impl Repo<'_> {
                 p.default_profile,
                 enum_str(&p.default_review_mode)?,
                 p.max_parallel,
+                p.default_reviewer,
             ],
         )?;
         Ok(())

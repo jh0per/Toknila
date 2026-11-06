@@ -112,7 +112,8 @@ pub fn update_subtask<U: UnitOfWork + ?Sized>(
     Ok(s)
 }
 
-/// Simulated agents read instructions instantly: pending human comments on a Running or Waiting
+/// Simulated agents read instructions instantly: pending instructions (a person's, or the
+/// reviewer's remarks) on a Running or Waiting
 /// sim ticket are marked delivered, and a Waiting ticket goes back to Running.
 /// Returns whether anything changed.
 pub(crate) fn deliver_to_sim<U: UnitOfWork + ?Sized>(
@@ -140,11 +141,7 @@ pub(crate) fn deliver_to_sim<U: UnitOfWork + ?Sized>(
         let pending: Vec<Comment> = uow
             .comments(ticket)?
             .into_iter()
-            .filter(|c| {
-                c.author == Actor::Human
-                    && c.kind == CommentKind::Instruction
-                    && c.delivered_at.is_none()
-            })
+            .filter(|c| c.kind == CommentKind::Instruction && c.delivered_at.is_none())
             .collect();
         if pending.is_empty() {
             continue;

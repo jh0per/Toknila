@@ -6,11 +6,12 @@
 use std::collections::{HashMap, HashSet};
 
 use toknila_core::instructions::{self, Route};
-use toknila_core::{Comment, CommentId, Run, Ship, ShipSpec, TicketId, TicketKey};
+use toknila_core::{AgentRole, Comment, CommentId, Run, Ship, ShipSpec, TicketId, TicketKey};
 
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError};
 use crate::{
-    AppResult, ShipError, Shipyard, UnitOfWork, instructions as deliver_instructions, runs, ships,
+    AppResult, ShipError, Shipyard, UnitOfWork, instructions as deliver_instructions, reviews,
+    runs, ships,
 };
 
 /// Something to do on the host once the command that asked for it has committed.
@@ -28,8 +29,20 @@ pub enum ExternalEffect {
         /// What the agent is told: the ticket's title, task and acceptance.
         brief: RunBrief,
     },
-    /// Stop the ticket's runner.
+    /// Stop every runner of the ticket (worker and reviewer).
     StopRunner { ticket: TicketId },
+    /// Run the reviewer profile's command in the ticket's ship, next to the worker's runner.
+    /// `dir` is the ship's path; `None` when the ticket has no ship.
+    StartReviewer {
+        ticket: TicketId,
+        key: TicketKey,
+        profile: String,
+        dir: Option<String>,
+        /// What the reviewer is told about the ticket under review.
+        brief: RunBrief,
+    },
+    /// Stop the reviewer's runner only.
+    StopReviewer { ticket: TicketId },
     /// Get a person's instruction to the ticket's live agent (see [`crate::instructions`]).
     DeliverInstruction { ticket: TicketId, comment: Comment },
 }
@@ -57,6 +70,11 @@ pub enum ExternalOutcome {
         run: Run,
     },
     RunnerFailed {
+        ticket: TicketId,
+        error: RunnerError,
+    },
+    /// The reviewer's runner could not start.
+    ReviewerFailed {
         ticket: TicketId,
         error: RunnerError,
     },
@@ -122,6 +140,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                         host.runner.start(&RunRequest {
                             ticket,
                             key,
+                            role: AgentRole::Worker,
                             profile,
                             dir,
                             brief,
@@ -136,6 +155,34 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 }
             }
             ExternalEffect::StopRunner { ticket } => host.runner.stop(ticket),
+            ExternalEffect::StartReviewer {
+                ticket,
+                key,
+                profile,
+                dir,
+                brief,
+            } => {
+                let result = dir.ok_or(RunnerError::NoWorkingDir).and_then(|dir| {
+                    host.runner.start(&RunRequest {
+                        ticket,
+                        key,
+                        role: AgentRole::Reviewer,
+                        profile,
+                        dir,
+                        brief,
+                    })
+                });
+                match result {
+                    Ok(started) if !started.reused => {
+                        outcomes.push(ExternalOutcome::RunnerStarted { run: started.run });
+                    }
+                    Ok(_) => {}
+                    Err(error) => outcomes.push(ExternalOutcome::ReviewerFailed { ticket, error }),
+                }
+            }
+            ExternalEffect::StopReviewer { ticket } => {
+                host.runner.stop_role(ticket, AgentRole::Reviewer);
+            }
             ExternalEffect::DeliverInstruction { .. } => {}
         }
     }
@@ -187,6 +234,9 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             ExternalOutcome::RunnerStarted { run } => runs::started(uow, run)?,
             ExternalOutcome::RunnerFailed { ticket, error } => {
                 runs::start_failed(uow, ticket, &error)?;
+            }
+            ExternalOutcome::ReviewerFailed { ticket, error } => {
+                reviews::start_failed(uow, ticket, &error)?;
             }
             ExternalOutcome::InstructionTyped { ticket, comment } => {
                 deliver_instructions::typed(uow, ticket, comment)?;

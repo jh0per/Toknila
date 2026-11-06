@@ -1,7 +1,8 @@
 //! `GET /v1/tickets/{ticket}/runner/stream?run=<id>&from=<offset>`: the ticket's terminal output
 //! as it is written. Binary frames carry raw bytes, a text frame says the run ended (the formats
 //! are in `toknila_api_types::runner`). Without `run` and `from` it starts at the first byte the
-//! scrollback still holds; with them, right after the bytes a client already has.
+//! scrollback still holds; with them, right after the bytes a client already has. `role=reviewer`
+//! follows the reviewer's terminal instead of the worker's; both are read-only here.
 
 use std::sync::Arc;
 
@@ -12,7 +13,7 @@ use serde::Deserialize;
 use tokio::sync::broadcast::error::RecvError;
 use toknila_api_types::runner::{RunnerControl, encode_frame};
 use toknila_app::resolve;
-use toknila_core::{RunId, TicketId};
+use toknila_core::{AgentRole, RunId, TicketId};
 
 use super::{Chunk, Runners};
 use crate::http::error::ApiError;
@@ -27,6 +28,8 @@ pub struct StreamQuery {
     /// The run the client already has output of, with `from` the offset after its last byte.
     pub run: Option<RunId>,
     pub from: Option<u64>,
+    /// `worker` (the default) or `reviewer`.
+    pub role: Option<AgentRole>,
 }
 
 /// Upgrades to the runner stream of one ticket.
@@ -42,8 +45,9 @@ pub async fn stream(
         .await??
         .id;
     let cursor = q.run.zip(q.from);
+    let role = q.role.unwrap_or(AgentRole::Worker);
     Ok(ws.on_upgrade(move |socket| async move {
-        if let Err(e) = serve(socket, state.runners, ticket, cursor).await {
+        if let Err(e) = serve(socket, state.runners, (ticket, role), cursor).await {
             tracing::debug!(error = %e, "runner stream closed");
         }
     }))
@@ -55,11 +59,11 @@ async fn send(socket: &mut WebSocket, message: Message) -> Result<(), String> {
 
 async fn read(
     runners: &Arc<Runners>,
-    ticket: TicketId,
+    (ticket, role): (TicketId, AgentRole),
     cursor: Option<(RunId, u64)>,
 ) -> Option<Chunk> {
     let runners = runners.clone();
-    tokio::task::spawn_blocking(move || runners.read(ticket, cursor))
+    tokio::task::spawn_blocking(move || runners.read(ticket, role, cursor))
         .await
         .ok()
         .flatten()
@@ -68,14 +72,15 @@ async fn read(
 async fn serve(
     mut socket: WebSocket,
     runners: Arc<Runners>,
-    ticket: TicketId,
+    which: (TicketId, AgentRole),
     mut cursor: Option<(RunId, u64)>,
 ) -> Result<(), String> {
+    let ticket = which.0;
     // Subscribe before reading, so output written in between wakes the loop again.
     let mut wake = runners.subscribe();
     let mut told_ended: Option<RunId> = None;
     loop {
-        if let Some(chunk) = read(&runners, ticket, cursor).await {
+        if let Some(chunk) = read(&runners, which, cursor).await {
             let mut at = chunk.offset;
             for part in chunk.bytes.chunks(FRAME) {
                 send(

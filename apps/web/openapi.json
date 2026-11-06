@@ -107,6 +107,54 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "chains"
+        ],
+        "summary": "Sets how the chain's tickets are reviewed: the mode and the reviewer agent profile. A ticket\nthat sets its own keeps it; a field left out is kept.",
+        "operationId": "patch_chain",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/chains/{chain}/edges": {
@@ -1438,11 +1486,27 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "description": "`worker` (the default) or `reviewer`. The reviewer's terminal is read-only.",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AgentRole"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Raw terminal output of the newest run, last lines only (ANSI kept). Headers x-toknila-run, x-toknila-offset (of the first byte) and x-toknila-end (after the last; continue the stream from here).",
+            "description": "Raw terminal output of the newest run of the worker (or, with role=reviewer, of the reviewer), last lines only (ANSI kept). Headers x-toknila-run, x-toknila-offset (of the first byte) and x-toknila-end (after the last; continue the stream from here).",
             "content": {
               "application/octet-stream": {
                 "schema": {
@@ -2131,6 +2195,28 @@
             }
           },
           {
+            "type": "object",
+            "description": "Only the reviewer agent's token may send this: its decision about the diff. The comment\nsays what to change and is required with `request_changes`.",
+            "required": [
+              "verdict",
+              "event"
+            ],
+            "properties": {
+              "comment": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string",
+                "enum": [
+                  "review_verdict"
+                ]
+              },
+              "verdict": {
+                "$ref": "#/components/schemas/Verdict"
+              }
+            }
+          },
+          {
             "allOf": [
               {
                 "$ref": "#/components/schemas/Proposal",
@@ -2464,6 +2550,13 @@
                 "type": "null"
               }
             ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Overrides the project's reviewer profile for every ticket that does not set its own."
           }
         }
       },
@@ -2950,6 +3043,13 @@
                 "type": "null"
               }
             ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile for the chain's tickets."
           }
         }
       },
@@ -3020,6 +3120,13 @@
                 "type": "null"
               }
             ]
+          },
+          "default_reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile; unset means `<worker profile>-reviewer`."
           },
           "key": {
             "type": "string",
@@ -3180,6 +3287,13 @@
                 "type": "null"
               }
             ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile for this ticket."
           },
           "subtasks": {
             "type": "array",
@@ -3380,6 +3494,24 @@
             "format": "int32",
             "description": "Most agents working at once (1 to 64).",
             "minimum": 0
+          },
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode",
+                "description": "Who reviews finished cards of the project unless a chain or ticket says."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
           }
         }
       },
@@ -3440,6 +3572,12 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
             ]
           },
           "title": {
@@ -3532,6 +3670,13 @@
           },
           "default_review_mode": {
             "$ref": "#/components/schemas/ReviewMode"
+          },
+          "default_reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile for tickets that name none; `None` derives it from the worker's\nprofile (`<worker>-reviewer`)."
           },
           "id": {
             "$ref": "#/components/schemas/ProjectId"
@@ -3784,6 +3929,30 @@
           "released"
         ]
       },
+      "Review": {
+        "type": "object",
+        "description": "A ticket's review state: whose turn it is while in Review, and every round so far.",
+        "properties": {
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewRound"
+            },
+            "description": "Oldest first."
+          },
+          "turn": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewTurn",
+                "description": "`None` outside Review."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "ReviewMode": {
         "type": "string",
         "description": "Who reviews a finished ticket before it merges.",
@@ -3792,6 +3961,137 @@
           "agent",
           "both"
         ]
+      },
+      "ReviewRound": {
+        "type": "object",
+        "description": "One verdict on a ticket. Numbers count from 1 over every verdict, a person's and the\nreviewer agent's, in the order they were given.",
+        "required": [
+          "number",
+          "reviewer",
+          "verdict",
+          "comment",
+          "decided_at"
+        ],
+        "properties": {
+          "comment": {
+            "type": "string",
+            "description": "The remarks; empty when the reviewer had none."
+          },
+          "decided_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reviewer": {
+            "$ref": "#/components/schemas/Actor",
+            "description": "A person (`human`) or the reviewer agent (`agent`)."
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          }
+        }
+      },
+      "ReviewSettings": {
+        "type": "object",
+        "description": "What a person may set about review on a chain (a project takes the same two fields in\n[`crate::projects::PatchProject`]). A field left out is kept.",
+        "properties": {
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
+          }
+        }
+      },
+      "ReviewTurn": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The reviewer agent is looking at it. With `decides` its verdict moves the card (agent\nmode); without, the card then waits for a person (both mode).",
+            "required": [
+              "decides",
+              "by"
+            ],
+            "properties": {
+              "by": {
+                "type": "string",
+                "enum": [
+                  "agent"
+                ]
+              },
+              "decides": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A person.",
+            "required": [
+              "by"
+            ],
+            "properties": {
+              "by": {
+                "type": "string",
+                "enum": [
+                  "person"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Whose verdict a card in Review waits for."
+      },
+      "ReviewView": {
+        "type": "object",
+        "description": "How a ticket is reviewed now, and what has been decided so far.",
+        "required": [
+          "mode",
+          "reviewer",
+          "rounds"
+        ],
+        "properties": {
+          "awaiting": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewTurn",
+                "description": "Whose verdict the card waits for; `None` outside Review."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ReviewMode",
+            "description": "The review mode that applies: the ticket's, the chain's or the project's."
+          },
+          "reviewer": {
+            "type": "string",
+            "description": "The reviewer agent profile that applies."
+          },
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewRound"
+            },
+            "description": "Every verdict so far, oldest first."
+          }
+        }
       },
       "Ship": {
         "type": "object",
@@ -4288,6 +4588,10 @@
             "type": "boolean",
             "description": "A person asked to start this Ready card; it runs as soon as a slot is free (see\n`schedule`). Only a Ready card has it. Its place in the queue is computed, never stored."
           },
+          "review": {
+            "$ref": "#/components/schemas/Review",
+            "description": "Whose verdict the card waits for in Review, and the rounds held so far."
+          },
           "review_mode": {
             "oneOf": [
               {
@@ -4298,6 +4602,13 @@
                 "type": "null"
               }
             ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile; `None` means the chain's, then the project's, then\n`<worker profile>-reviewer`."
           },
           "status": {
             "$ref": "#/components/schemas/TicketStatus"
@@ -4337,6 +4648,23 @@
           }
         }
       },
+      "TicketAction": {
+        "type": "string",
+        "description": "What a person can do with a ticket.",
+        "enum": [
+          "start",
+          "pause",
+          "resume",
+          "block",
+          "unblock",
+          "accept",
+          "return",
+          "reopen",
+          "cancel",
+          "approve",
+          "reject"
+        ]
+      },
       "TicketDetail": {
         "type": "object",
         "description": "A ticket with everything attached to it.",
@@ -4346,9 +4674,18 @@
           "subtasks",
           "comments",
           "in_status_ms",
-          "phase"
+          "phase",
+          "review",
+          "allowed_actions"
         ],
         "properties": {
+          "allowed_actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketAction"
+            },
+            "description": "What a person can do with the ticket now, computed by the state machine."
+          },
           "chain": {
             "type": "string"
           },
@@ -4376,6 +4713,10 @@
             "format": "int32",
             "description": "Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.",
             "minimum": 0
+          },
+          "review": {
+            "$ref": "#/components/schemas/ReviewView",
+            "description": "How the card is reviewed (mode, reviewer, whose turn) and the rounds so far."
           },
           "ship": {
             "oneOf": [
@@ -4489,6 +4830,14 @@
         "type": "integer",
         "format": "int64",
         "description": "Milliseconds since the Unix epoch, UTC."
+      },
+      "Verdict": {
+        "type": "string",
+        "description": "A reviewer's decision about the work.",
+        "enum": [
+          "approve",
+          "request_changes"
+        ]
       },
       "WaitingReason": {
         "oneOf": [

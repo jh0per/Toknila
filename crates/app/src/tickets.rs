@@ -1,12 +1,11 @@
 //! Tickets: create and edit them, apply a person's actions, comment on them.
 
-use std::str::FromStr;
-
 use serde::{Deserialize, Serialize};
+pub use toknila_core::machine::TicketAction;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    Actor, BlockedReason, CommentBody, CommentKind, Edge, EdgeKind, NodeRef, ReviewMode, Ticket,
-    TicketDraft, TicketId, TicketKey, TicketPatch,
+    Actor, CommentBody, CommentKind, Edge, EdgeKind, NodeRef, ReviewMode, Ticket, TicketDraft,
+    TicketId, TicketKey, TicketPatch,
 };
 
 use crate::notes::{add_comment, add_subtask, body_from_text};
@@ -29,6 +28,8 @@ pub struct NewTicket {
     pub subtasks: Vec<String>,
     pub profile: Option<String>,
     pub review_mode: Option<ReviewMode>,
+    /// Reviewer agent profile for this ticket.
+    pub reviewer: Option<String>,
     #[serde(default)]
     pub needs_secrets: bool,
     #[serde(default)]
@@ -60,6 +61,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         paused: input.paused,
         profile: input.profile,
         review_mode: input.review_mode,
+        reviewer: input.reviewer.filter(|r| !r.trim().is_empty()),
         needs_secrets: input.needs_secrets,
     };
     let t = Ticket::new_backlog(TicketId::new(), c.id, key, draft, uow.now());
@@ -95,80 +97,6 @@ pub fn edit<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, patch: TicketPatch)
     with_chain(uow, t.chain_id, |ctx| {
         Ok(ctx.edit_ticket(t.id, |t| patch.apply(t))?)
     })
-}
-
-/// What a person can do with a ticket.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TicketAction {
-    Start,
-    Pause,
-    Resume,
-    Block,
-    Unblock,
-    Accept,
-    Return,
-    Reopen,
-    Cancel,
-    /// Let a wildcard card into the plan.
-    Approve,
-    /// Turn a wildcard card down, with a reason.
-    Reject,
-}
-
-impl FromStr for TicketAction {
-    type Err = AppError;
-
-    fn from_str(s: &str) -> AppResult<Self> {
-        Ok(match s {
-            "start" => Self::Start,
-            "pause" => Self::Pause,
-            "resume" => Self::Resume,
-            "block" => Self::Block,
-            "unblock" => Self::Unblock,
-            "accept" => Self::Accept,
-            "return" => Self::Return,
-            "reopen" => Self::Reopen,
-            "cancel" => Self::Cancel,
-            "approve" => Self::Approve,
-            "reject" => Self::Reject,
-            other => return Err(AppError::not_found(format!("action {other}"))),
-        })
-    }
-}
-
-impl TicketAction {
-    /// The state-machine event for this action, issued `by` the command's actor; block, return,
-    /// cancel and reject need a text.
-    pub fn event(self, text: Option<String>, by: Actor) -> AppResult<TicketEvent> {
-        let text = |name: &str| {
-            text.filter(|t| !t.trim().is_empty())
-                .ok_or_else(|| AppError::bad_request(format!("{name} needs a text")))
-        };
-        Ok(match self {
-            Self::Start => TicketEvent::Request,
-            Self::Pause => TicketEvent::Pause,
-            Self::Resume => TicketEvent::Resume,
-            Self::Block => TicketEvent::Block {
-                reason: BlockedReason::Manual {
-                    text: text("block")?,
-                },
-            },
-            Self::Unblock => TicketEvent::Unblock,
-            Self::Accept => TicketEvent::Accept,
-            Self::Return => TicketEvent::Return {
-                comment: text("return")?,
-            },
-            Self::Reopen => TicketEvent::Reopen,
-            Self::Cancel => TicketEvent::Cancel {
-                reason: text("cancel")?,
-            },
-            Self::Approve => TicketEvent::Approve { by },
-            Self::Reject => TicketEvent::Reject {
-                reason: text("reject")?,
-                by,
-            },
-        })
-    }
 }
 
 /// Applies a state-machine event to a ticket.

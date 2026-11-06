@@ -8,8 +8,7 @@ use super::codec::{Repo, enum_from, enum_str, from_json, json, opt_enum, opt_enu
 
 const TICKET_COLS: &str = "id, chain_id, key, title, prompt, acceptance_json, status, status_reason_json, \
      status_since, paused, profile, review_mode, branch, needs_secrets, tokens_used, wildcard_json, \
-     done_out_of_order_json, queued";
-
+     done_out_of_order_json, queued, review_json, reviewer";
 impl Repo<'_> {
     /// All tickets, optionally of one chain, in key order.
     pub fn tickets(&self, chain: Option<ChainId>) -> Result<Vec<Ticket>, StoreError> {
@@ -26,14 +25,15 @@ impl Repo<'_> {
     pub fn upsert_ticket(&self, t: &Ticket) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18) \
+                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20) \
                  ON CONFLICT(id) DO UPDATE SET title = excluded.title, prompt = excluded.prompt, \
                  acceptance_json = excluded.acceptance_json, status = excluded.status, \
                  status_reason_json = excluded.status_reason_json, status_since = excluded.status_since, \
                  paused = excluded.paused, profile = excluded.profile, review_mode = excluded.review_mode, \
                  branch = excluded.branch, needs_secrets = excluded.needs_secrets, tokens_used = excluded.tokens_used, \
                  wildcard_json = excluded.wildcard_json, \
-                 done_out_of_order_json = excluded.done_out_of_order_json, queued = excluded.queued"
+                 done_out_of_order_json = excluded.done_out_of_order_json, queued = excluded.queued, \
+                 review_json = excluded.review_json, reviewer = excluded.reviewer"
             ),
             params![
                 t.id.to_string(),
@@ -54,6 +54,8 @@ impl Repo<'_> {
                 t.wildcard.as_ref().map(json).transpose()?,
                 t.done_out_of_order.as_ref().map(json).transpose()?,
                 t.queued,
+                (!t.review.is_empty()).then(|| json(&t.review)).transpose()?,
+                t.reviewer,
             ],
         )?;
         Ok(())
@@ -83,6 +85,8 @@ impl Repo<'_> {
             Option<String>,
             Option<String>,
             bool,
+            Option<String>,
+            Option<String>,
         );
         let mut st = self
             .conn
@@ -107,6 +111,8 @@ impl Repo<'_> {
                 r.get(15)?,
                 r.get(16)?,
                 r.get(17)?,
+                r.get(18)?,
+                r.get(19)?,
             ))
         })?;
         rows.map(|r| {
@@ -130,6 +136,13 @@ impl Repo<'_> {
                 tokens_used: u64::try_from(r.14).unwrap_or(0),
                 wildcard: r.15.as_deref().map(from_json).transpose()?,
                 done_out_of_order: r.16.as_deref().map(from_json).transpose()?,
+                review: r
+                    .18
+                    .as_deref()
+                    .map(from_json)
+                    .transpose()?
+                    .unwrap_or_default(),
+                reviewer: r.19,
             })
         })
         .collect()
