@@ -84,9 +84,10 @@
           "max_log_bytes": 20971520
         },
         "nudge": {
-          "idle_secs": 300,
+          "idle_secs": 120,
           "max_nudges": 3,
-          "message": "Continue, or report with the finished event."
+          "window_secs": 900,
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done."
         }
       },
       "file": null
@@ -115,9 +116,10 @@
           "max_log_bytes": 20971520
         },
         "nudge": {
-          "idle_secs": 300,
+          "idle_secs": 120,
           "max_nudges": 3,
-          "message": "Continue, or report with the finished event."
+          "window_secs": 900,
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done."
         }
       },
       "file": null

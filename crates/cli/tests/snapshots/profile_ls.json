@@ -88,9 +88,10 @@
         },
         "name": "sim-reviewer",
         "nudge": {
-          "idle_secs": 300,
+          "idle_secs": 120,
           "max_nudges": 3,
-          "message": "Continue, or report with the finished event."
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done.",
+          "window_secs": 900
         },
         "output": {
           "max_log_bytes": 20971520,
@@ -119,9 +120,10 @@
         },
         "name": "claude-code-reviewer",
         "nudge": {
-          "idle_secs": 300,
+          "idle_secs": 120,
           "max_nudges": 3,
-          "message": "Continue, or report with the finished event."
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done.",
+          "window_secs": 900
         },
         "output": {
           "max_log_bytes": 20971520,
