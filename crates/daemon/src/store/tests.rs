@@ -21,6 +21,7 @@ fn project() -> Project {
         default_profile: "sim".to_owned(),
         default_review_mode: ReviewMode::Human,
         default_reviewer: None,
+        max_parallel: 2,
     }
 }
 
@@ -48,6 +49,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         status_reason: None,
         status_since: Timestamp(1),
         paused: false,
+        queued: false,
         profile: Some("sim".to_owned()),
         review_mode: None,
         reviewer: None,
@@ -144,7 +146,14 @@ async fn a_phase_0_database_gains_wildcard_marks() {
     }
     let store = Store::open(&path).expect("migrates");
     let id = old.id;
+    let pid = p.id;
+    let migrated = store
+        .read(move |repo| repo.project(pid))
+        .await
+        .expect("read");
+    assert_eq!(migrated.map(|p| p.max_parallel), Some(2));
     let loaded = store.read(move |repo| repo.ticket(id)).await.expect("read");
+    assert_eq!(loaded.as_ref().map(|t| t.queued), Some(false));
     assert_eq!(loaded.as_ref().map(|t| &t.wildcard), Some(&None));
     assert_eq!(loaded.map(|t| t.title), Some(old.title.clone()));
 
@@ -216,12 +225,12 @@ async fn review_state_and_reviewer_settings_are_stored_and_old_rows_have_none() 
     let c = chain(p.id);
     let old = ticket(c.id, 1);
     {
-        // A database from before review: the first four migrations, one ticket in Review.
+        // A database from before review: the first five migrations, one ticket in Review.
         let conn = Connection::open(&path).expect("raw open");
-        for m in &schema::MIGRATIONS[..4] {
+        for m in &schema::MIGRATIONS[..5] {
             conn.execute_batch(m).expect("schema");
         }
-        conn.pragma_update(None, "user_version", 4)
+        conn.pragma_update(None, "user_version", 5)
             .expect("version");
         insert_phase_0_rows(&conn, &p, &c);
         conn.execute(

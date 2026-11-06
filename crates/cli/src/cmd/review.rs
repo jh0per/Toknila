@@ -1,7 +1,7 @@
 //! `tok review-mode`: who reviews finished cards, set on a project, a chain or one ticket.
 
 use anyhow::{Result, bail};
-use toknila_api_types::{PatchTicket, ReviewSettings};
+use toknila_api_types::{PatchProject, PatchTicket, ReviewSettings};
 use toknila_client::Client;
 use toknila_core::wire::from_wire_name;
 
@@ -68,11 +68,12 @@ pub(super) fn run(
         }
         Target::Project(project) => {
             let key = default_project(c, project)?;
-            let settings = ReviewSettings {
+            let patch = PatchProject {
                 review_mode,
                 reviewer,
+                ..PatchProject::default()
             };
-            emit(json_out, &c.patch_project(&key, &settings)?, |p| {
+            emit(json_out, &c.patch_project(&key, &patch)?, |p| {
                 println!(
                     "{}  review mode: {}  reviewer: {}",
                     p.key,

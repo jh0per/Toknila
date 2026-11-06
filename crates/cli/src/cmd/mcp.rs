@@ -63,6 +63,10 @@ fn handle(role: AgentRole, message: &Value, forward: &Forward<'_>) -> Option<Val
             "protocolVersion": params["protocolVersion"].as_str().unwrap_or(PROTOCOL),
             "capabilities": { "tools": {} },
             "serverInfo": { "name": "toknila", "version": toknila_core::VERSION },
+            "instructions": match role {
+                AgentRole::Reviewer => toknila_core::instructions::review_protocol(),
+                _ => toknila_core::instructions::protocol(),
+            },
         })),
         "ping" => Ok(json!({})),
         "tools/list" => Ok(json!({ "tools": mcp_tools::list(role) })),
@@ -167,6 +171,10 @@ mod tests {
         assert_eq!(answers[0]["result"]["protocolVersion"], "2024-11-05");
         assert_eq!(answers[0]["result"]["serverInfo"]["name"], "toknila");
         assert!(answers[0]["result"]["capabilities"]["tools"].is_object());
+        assert_eq!(
+            answers[0]["result"]["instructions"],
+            toknila_core::instructions::protocol()
+        );
         let tools = answers[1]["result"]["tools"].as_array().expect("tools");
         assert_eq!(tools.len(), 10);
         assert_eq!(answers[2]["result"], json!({}));

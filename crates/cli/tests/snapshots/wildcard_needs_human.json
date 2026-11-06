@@ -3,6 +3,7 @@
     "chain": "demo",
     "in_status_ms": 0,
     "needs_human": true,
+    "queue_position": null,
     "ticket": {
       "acceptance": [
         "an expired token is refreshed"
@@ -15,6 +16,7 @@
       "paused": false,
       "profile": null,
       "prompt": "Login needs a token refresh endpoint first",
+      "queued": false,
       "review_mode": null,
       "status": "proposed",
       "status_reason": {

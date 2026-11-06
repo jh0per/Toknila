@@ -14,7 +14,7 @@ use toknila_core::{
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
-use crate::runner::{RunEnded, Runner, RunnerError};
+use crate::runner::{RunBrief, RunEnded, Runner, RunnerError};
 use crate::{AppError, AppResult, ChainTx, ErrorKind, UnitOfWork, reviews, with_chain};
 
 /// Whether the ticket's agent is a process. The simulated profile starts none.
@@ -40,6 +40,11 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
             ticket,
             key: t.key.clone(),
             profile: project.profile_for(t).to_owned(),
+            brief: RunBrief {
+                title: t.title.clone(),
+                prompt: t.prompt.clone(),
+                acceptance: t.acceptance.clone(),
+            },
         });
     }
     Ok(())
@@ -146,6 +151,25 @@ pub fn send_input(
         return Err(AppError::bad_request("nothing to write"));
     }
     runner.write(ticket.id, bytes).map_err(|e| {
+        let kind = match e {
+            RunnerError::NotRunning => ErrorKind::Conflict,
+            _ => ErrorKind::Internal,
+        };
+        AppError::new(kind, e.to_string())
+    })
+}
+
+/// A person's panel changed size: the ticket's terminal follows it, within the bounds core sets.
+pub fn resize(
+    runner: &dyn Runner,
+    actor: Actor,
+    ticket: &Ticket,
+    cols: u32,
+    rows: u32,
+) -> AppResult<()> {
+    person_only(actor, "resize the agent's terminal")?;
+    let size = toknila_core::instructions::terminal::clamp(cols, rows);
+    runner.resize(ticket.id, size).map_err(|e| {
         let kind = match e {
             RunnerError::NotRunning => ErrorKind::Conflict,
             _ => ErrorKind::Internal,

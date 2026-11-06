@@ -14,6 +14,29 @@
     }
   ],
   "paths": {
+    "/agents": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "The agent slots of every project and the cards waiting for one, as core's schedule computes\nthem.",
+        "operationId": "list_agents",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectAgents"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains": {
       "get": {
         "tags": [
@@ -644,7 +667,7 @@
         "tags": [
           "projects"
         ],
-        "summary": "Sets how the project's tickets are reviewed by default: the mode and the reviewer agent\nprofile. A chain or ticket that sets its own keeps it; a field left out is kept.",
+        "summary": "Changes project settings. A higher parallel limit starts waiting cards at once; a lower one\nnever stops a running agent.",
         "operationId": "patch_project",
         "parameters": [
           {
@@ -661,7 +684,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReviewSettings"
+                "$ref": "#/components/schemas/PatchProject"
               }
             }
           },
@@ -673,6 +696,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -1323,6 +1355,55 @@
         }
       }
     },
+    "/tickets/{ticket}/instructions/claim": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "The ticket's agent asks, from its Stop hook, for what a person told it while it worked. Each\ninstruction is handed out once: it is marked delivered as it is claimed.",
+        "operationId": "claim_instructions",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstructionClaim"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/runner/input": {
       "post": {
         "tags": [
@@ -1440,6 +1521,59 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/runner/size": {
+      "post": {
+        "tags": [
+          "runner"
+        ],
+        "summary": "The size of the panel that shows the agent's terminal. The agent is a full-screen terminal\nprogram, so its terminal follows the panel.",
+        "operationId": "runner_size",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalSize"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Resized; sizes outside 20x5..500x200 are brought into that range"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -2222,6 +2356,13 @@
             ],
             "description": "Instructions file the agent reads, relative to its working directory."
           },
+          "instructions_flag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Flag of the agent's command that takes the path of the generated per-run instructions\n(under the data home; the project's own instructions file is never written)."
+          },
           "mcp": {
             "$ref": "#/components/schemas/McpWiring"
           },
@@ -2791,6 +2932,25 @@
         },
         "additionalProperties": false
       },
+      "InstructionClaim": {
+        "type": "object",
+        "description": "Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it\nworked, now handed over and marked delivered.",
+        "required": [
+          "count",
+          "reason"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "How many instructions were handed over; 0 when nothing was pending.",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "description": "The instructions as one text for the agent, in the comment template; empty when none."
+          }
+        }
+      },
       "ListedProfile": {
         "type": "object",
         "description": "A profile and where it comes from.",
@@ -2971,6 +3131,15 @@
           "key": {
             "type": "string",
             "description": "Short uppercase key, prefix of ticket keys (`DEMO`)."
+          },
+          "max_parallel": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Most agents working at once; default 2.",
+            "minimum": 0
           },
           "name": {
             "type": [
@@ -3313,6 +3482,39 @@
         },
         "additionalProperties": false
       },
+      "PatchProject": {
+        "type": "object",
+        "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
+        "properties": {
+          "max_parallel": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Most agents working at once (1 to 64).",
+            "minimum": 0
+          },
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode",
+                "description": "Who reviews finished cards of the project unless a chain or ticket says."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
+          }
+        }
+      },
       "PatchSubtask": {
         "type": "object",
         "description": "`PATCH /v1/tickets/{ticket}/subtasks/{position}`.",
@@ -3459,7 +3661,8 @@
           "work_branch",
           "release_branch",
           "default_profile",
-          "default_review_mode"
+          "default_review_mode",
+          "max_parallel"
         ],
         "properties": {
           "default_profile": {
@@ -3481,6 +3684,12 @@
           "key": {
             "$ref": "#/components/schemas/ProjectKey"
           },
+          "max_parallel": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Most agents of this project that work at once (`schedule`); a card that starts beyond it\nis queued.",
+            "minimum": 0
+          },
           "name": {
             "type": "string"
           },
@@ -3498,6 +3707,40 @@
           "work_branch": {
             "type": "string",
             "description": "Branch ships start from and merge into (`develop`)."
+          }
+        }
+      },
+      "ProjectAgents": {
+        "type": "object",
+        "description": "`GET /v1/agents`: one project's agent slots and the cards waiting for one.",
+        "required": [
+          "project",
+          "limit",
+          "used",
+          "queued"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Agents that may work at once.",
+            "minimum": 0
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "queued": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueuedCard"
+            },
+            "description": "Waiting cards, first in line first."
+          },
+          "used": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.",
+            "minimum": 0
           }
         }
       },
@@ -3546,6 +3789,25 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "QueuedCard": {
+        "type": "object",
+        "description": "A card waiting for an agent slot.",
+        "required": [
+          "ticket",
+          "position"
+        ],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1 is next.",
+            "minimum": 0
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/TicketId"
           }
         }
       },
@@ -3734,7 +3996,7 @@
       },
       "ReviewSettings": {
         "type": "object",
-        "description": "What a person may set about review on a chain or a project. A field left out is kept.",
+        "description": "What a person may set about review on a chain (a project takes the same two fields in\n[`crate::projects::PatchProject`]). A field left out is kept.",
         "properties": {
           "review_mode": {
             "oneOf": [
@@ -4040,6 +4302,26 @@
         "type": "string",
         "description": "Identifies a [`crate::Subtask`]."
       },
+      "TerminalSize": {
+        "type": "object",
+        "description": "Body of `POST /v1/tickets/{ticket}/runner/size`: the size of the panel showing the terminal.",
+        "required": [
+          "cols",
+          "rows"
+        ],
+        "properties": {
+          "cols": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "Thread": {
         "type": "object",
         "description": "A discussion on one ticket that ends in a person's approval.",
@@ -4302,6 +4584,10 @@
             "type": "string",
             "description": "The task given to the agent; the only source of what to do."
           },
+          "queued": {
+            "type": "boolean",
+            "description": "A person asked to start this Ready card; it runs as soon as a slot is free (see\n`schedule`). Only a Ready card has it. Its place in the queue is computed, never stored."
+          },
           "review": {
             "$ref": "#/components/schemas/Review",
             "description": "Whose verdict the card waits for in Review, and the rounds held so far."
@@ -4419,6 +4705,15 @@
             "$ref": "#/components/schemas/Phase",
             "description": "Computed from the ticket's threads: design while any is open, implement otherwise."
           },
+          "queue_position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.",
+            "minimum": 0
+          },
           "review": {
             "$ref": "#/components/schemas/ReviewView",
             "description": "How the card is reviewed (mode, reviewer, whose turn) and the rounds so far."
@@ -4469,6 +4764,15 @@
           },
           "needs_human": {
             "type": "boolean"
+          },
+          "queue_position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.",
+            "minimum": 0
           },
           "ticket": {
             "$ref": "#/components/schemas/Ticket"

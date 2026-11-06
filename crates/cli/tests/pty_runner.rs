@@ -263,3 +263,110 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
     );
     assert_eq!(tok.status("DEMO-1"), "cancelled", "nothing else moved");
 }
+
+#[test]
+fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the_panel() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tok = Tok {
+        home: dir.path().join("home"),
+    };
+    let repo = repo(dir.path());
+    // No hooks are wired, so the way in is the terminal.
+    profile(
+        &tok,
+        "listener",
+        &["print", "ready", "echo", "size", "sleep", "30000"],
+    );
+    tok.run(&[
+        "project",
+        "new",
+        "DEMO",
+        "--repo",
+        &repo.to_string_lossy(),
+        "--profile",
+        "listener",
+    ]);
+    tok.run(&["chain", "new", "demo"]);
+    tok.run(&["ticket", "new", "demo", "Alpha"]);
+    wait_until(&tok, "the agent to be ready", || {
+        logs(&tok.home, "DEMO-1").contains("ready")
+    });
+
+    let info = DaemonInfo::read(&tok.home.join("daemon.json"))
+        .expect("daemon.json")
+        .expect("daemon runs");
+    let client = Client::new(info.base_url(), info.token.clone());
+    client
+        .runner_size(
+            "DEMO-1",
+            &toknila_api_types::TerminalSize { cols: 90, rows: 30 },
+        )
+        .expect("resize");
+
+    tok.run(&["comment", "DEMO-1", "use rustls"]);
+    wait_until(&tok, "the instruction to reach the agent", || {
+        logs(&tok.home, "DEMO-1").contains("got:# [instruction] use rustls")
+    });
+    wait_until(&tok, "the terminal to have the panel's size", || {
+        logs(&tok.home, "DEMO-1").contains("size=90x30")
+    });
+    wait_until(&tok, "the delivered mark", || {
+        let shown = tok.run(&["show", "DEMO-1"]);
+        let comments = shown["comments"].as_array().cloned().unwrap_or_default();
+        comments.len() == 1 && !comments[0]["delivered_at"].is_null()
+    });
+    tok.run(&["cancel", "DEMO-1", "done"]);
+}
+
+#[test]
+fn a_return_goes_to_the_same_live_agent_session_and_is_delivered_once() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tok = Tok {
+        home: dir.path().join("home"),
+    };
+    let repo = repo(dir.path());
+    // The agent stays alive after its hand-in and reads one line, as a session would.
+    profile(
+        &tok,
+        "listener",
+        &["print", "ready", "echo", "sleep", "30000"],
+    );
+    tok.run(&[
+        "project",
+        "new",
+        "DEMO",
+        "--repo",
+        &repo.to_string_lossy(),
+        "--profile",
+        "listener",
+    ]);
+    tok.run(&["chain", "new", "demo"]);
+    tok.run(&["ticket", "new", "demo", "Alpha"]);
+    wait_until(&tok, "the agent to be ready", || {
+        logs(&tok.home, "DEMO-1").contains("ready")
+    });
+    let first_run = tok.run(&["show", "DEMO-1"])["ship"]["path"].clone();
+
+    tok.run(&["sim", "DEMO-1", "finish", "first try"]);
+    assert_eq!(tok.status("DEMO-1"), "review");
+    tok.run(&["return", "DEMO-1", "fix the look"]);
+    wait_until(&tok, "the comment to reach the same session", || {
+        logs(&tok.home, "DEMO-1").contains("got:# [instruction] fix the look")
+    });
+    wait_until(&tok, "the delivered mark", || {
+        let shown = tok.run(&["show", "DEMO-1"]);
+        let comments = shown["comments"].as_array().cloned().unwrap_or_default();
+        comments
+            .iter()
+            .filter(|c| c["kind"] == "instruction")
+            .all(|c| !c["delivered_at"].is_null())
+            && comments.iter().any(|c| c["kind"] == "instruction")
+    });
+    assert_eq!(tok.status("DEMO-1"), "running");
+    assert_eq!(
+        tok.run(&["show", "DEMO-1"])["ship"]["path"],
+        first_run,
+        "the same ship"
+    );
+    tok.run(&["cancel", "DEMO-1", "done"]);
+}

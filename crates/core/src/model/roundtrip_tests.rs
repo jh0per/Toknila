@@ -33,6 +33,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         status_reason: reason,
         status_since: Timestamp(1_793_487_815_000),
         paused: false,
+        queued: false,
         profile: Some("sim".to_owned()),
         review_mode: Some(ReviewMode::Both),
         reviewer: None,
@@ -57,6 +58,7 @@ fn project_roundtrips() {
         default_profile: "sim".to_owned(),
         default_review_mode: ReviewMode::Human,
         default_reviewer: None,
+        max_parallel: 2,
     });
 }
 
@@ -296,7 +298,7 @@ fn pinned_ticket_json_shape() {
             r#""key":"DEMO-3","title":"Додати тест","prompt":"Write the test first.\nThen the code.","#,
             r#""acceptance":["cargo test green","no unwrap"],"status":"blocked","#,
             r#""status_reason":{"status":"blocked","reason":{"kind":"manual","text":"key"},"resume_to":"running"},"#,
-            r#""status_since":1793487815000,"paused":false,"profile":"sim","review_mode":"both","#,
+            r#""status_since":1793487815000,"paused":false,"queued":false,"profile":"sim","review_mode":"both","#,
             r#""branch":null,"needs_secrets":true,"tokens_used":12345}"#
         )
     );

@@ -40,6 +40,7 @@
   ],
   "in_status_ms": 0,
   "phase": "implement",
+  "queue_position": null,
   "review": {
     "awaiting": null,
     "mode": "human",
@@ -66,6 +67,7 @@
     "paused": false,
     "profile": "sim",
     "prompt": "",
+    "queued": false,
     "review": {
       "rounds": [
         {

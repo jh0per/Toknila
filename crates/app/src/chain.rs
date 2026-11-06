@@ -4,12 +4,12 @@ use toknila_core::events::DomainEvent;
 use toknila_core::graph::{Action, Applied, ChainView, GraphError};
 use toknila_core::machine::{Effect, TicketEvent};
 use toknila_core::{
-    Actor, Chain, ChainId, CommentKind, Edge, NodeRef, Release, ReleaseId, Ticket, TicketId,
-    Timestamp,
+    Actor, Chain, ChainId, CommentKind, Edge, NodeRef, ProjectId, Release, ReleaseId, Ticket,
+    TicketId, Timestamp,
 };
 
 use crate::notes::{add_comment, body_from_text, deliver_to_sim};
-use crate::{AppError, AppResult, ErrorKind, UnitOfWork, reviews, runs, ships};
+use crate::{AppError, AppResult, ErrorKind, UnitOfWork, reviews, runs, schedule, ships};
 
 /// A chain being changed by one command. Every step is journaled by the graph
 /// ([`ChainView::record`]) so each transition, including intermediate ones
@@ -149,7 +149,8 @@ impl ChainTx {
 }
 
 /// Loads a chain, runs `f`, lets the graph settle, delivers instructions to simulated agents,
-/// saves everything and journals each change.
+/// saves everything and journals each change, then gives free slots of the chain's project to
+/// the cards waiting for one ([`crate::schedule`]).
 pub fn with_chain<U, R, E>(
     uow: &mut U,
     chain: ChainId,
@@ -159,14 +160,42 @@ where
     U: UnitOfWork + ?Sized,
     E: From<AppError>,
 {
+    let (out, project) = run_chain_in(uow, chain, f)?;
+    schedule::run(uow, project)?;
+    Ok(out)
+}
+
+/// [`with_chain`] without the scheduling step: the scheduler's own way to change a chain.
+pub(crate) fn run_chain<U, R, E>(
+    uow: &mut U,
+    chain: ChainId,
+    f: impl FnOnce(&mut ChainTx) -> Result<R, E>,
+) -> Result<R, E>
+where
+    U: UnitOfWork + ?Sized,
+    E: From<AppError>,
+{
+    run_chain_in(uow, chain, f).map(|(out, _)| out)
+}
+
+fn run_chain_in<U, R, E>(
+    uow: &mut U,
+    chain: ChainId,
+    f: impl FnOnce(&mut ChainTx) -> Result<R, E>,
+) -> Result<(R, ProjectId), E>
+where
+    U: UnitOfWork + ?Sized,
+    E: From<AppError>,
+{
     let view = uow
         .chain_view(chain)?
         .ok_or_else(|| AppError::not_found(format!("chain {chain}")))?;
+    let project = view.chain.project_id;
     let mut ctx = ChainTx::new(view, uow.now());
     let out = f(&mut ctx)?;
     for _ in 0..MAX_ROUNDS {
         if !round(uow, &mut ctx)? {
-            return Ok(out);
+            return Ok((out, project));
         }
     }
     Err(AppError::from(GraphError::NoFixpoint(MAX_ROUNDS)).into())

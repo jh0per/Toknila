@@ -3,6 +3,7 @@
     "chain": "demo",
     "in_status_ms": 0,
     "needs_human": false,
+    "queue_position": null,
     "ticket": {
       "acceptance": [
         "A is done"
@@ -15,6 +16,7 @@
       "paused": false,
       "profile": "sim",
       "prompt": "First step.",
+      "queued": false,
       "review": {
         "rounds": [
           {
@@ -45,6 +47,7 @@
     "chain": "demo",
     "in_status_ms": 0,
     "needs_human": false,
+    "queue_position": null,
     "ticket": {
       "acceptance": [],
       "branch": null,
@@ -55,6 +58,7 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "queued": false,
       "review": {
         "rounds": [
           {
@@ -78,6 +82,7 @@
     "chain": "demo",
     "in_status_ms": 0,
     "needs_human": false,
+    "queue_position": null,
     "ticket": {
       "acceptance": [],
       "branch": null,
@@ -88,6 +93,7 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "queued": false,
       "review": {
         "rounds": [
           {
@@ -111,6 +117,7 @@
     "chain": "demo",
     "in_status_ms": 0,
     "needs_human": false,
+    "queue_position": null,
     "ticket": {
       "acceptance": [],
       "branch": null,
@@ -121,6 +128,7 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "queued": false,
       "review": {
         "rounds": [
           {

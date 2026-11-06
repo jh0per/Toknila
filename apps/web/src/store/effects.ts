@@ -1,7 +1,9 @@
 // Runs the effects the reducer describes. The only place that touches the network or history.
 
 import { get, post, streamUrl } from "../api/http";
-import type { ChainDetail, ChainItem, EventRecord, Project, TicketDetail, TicketItem, TicketThreads } from "../api/types";
+import type {
+  ChainDetail, ChainItem, EventRecord, Project, ProjectAgents, TicketDetail, TicketItem, TicketThreads,
+} from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 
 type Dispatch = (msg: Msg) => void;
@@ -49,6 +51,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     const chains = await Promise.all(list.map((c) => get<ChainDetail>(`/chains/${c.chain.id}`)));
     const tickets = await get<TicketItem[]>("/tickets");
     dispatch({ type: "loaded", projects, chains, tickets });
+    dispatch({ type: "agentsLoaded", agents: await get<ProjectAgents[]>("/agents") });
   };
 
   const loadThreads = async (key: string) => {
@@ -88,6 +91,13 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         later("projects", () => {
           get<Project[]>("/projects")
             .then((projects) => dispatch({ type: "projectsLoaded", projects }))
+            .catch(failed);
+        }, DEBOUNCE_MS);
+        return;
+      case "loadAgents":
+        later("agents", () => {
+          get<ProjectAgents[]>("/agents")
+            .then((agents) => dispatch({ type: "agentsLoaded", agents }))
             .catch(failed);
         }, DEBOUNCE_MS);
         return;

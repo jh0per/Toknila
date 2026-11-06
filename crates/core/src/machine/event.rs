@@ -17,7 +17,10 @@ pub enum TicketEvent {
     DepsSatisfied,
     /// Graph: a dependency is no longer satisfied (it was reopened).
     DepsUnsatisfied,
-    /// Autostart or `tok start`; the runner confirmed it started.
+    /// A person started the card (`tok start`): it wants a runner. It runs once the schedule has
+    /// a free slot, and waits in line until then (`Ticket::queued`).
+    Request,
+    /// The schedule gave the card a slot: its runner starts.
     Start,
     /// Agent: asked a question, wants permission, or went silent.
     AskHuman { reason: WaitingReason },
@@ -74,6 +77,7 @@ impl TicketEvent {
         match self {
             Self::DepsSatisfied => "deps_satisfied",
             Self::DepsUnsatisfied => "deps_unsatisfied",
+            Self::Request => "start",
             Self::Start => "start",
             Self::AskHuman { .. } => "ask_human",
             Self::InstructionDelivered => "instruction_delivered",

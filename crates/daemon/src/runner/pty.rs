@@ -6,14 +6,15 @@ use std::path::Path;
 
 use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use toknila_app::RunnerError;
+use toknila_core::instructions::terminal;
 use toknila_core::{AgentProfile, ProcessExit};
 
 use super::wiring::Wiring;
 
-/// Terminal size an agent sees. Fixed for now; resizing arrives with the web terminal.
+/// The size a terminal starts with, until a client fits it to its panel.
 const SIZE: PtySize = PtySize {
-    rows: 40,
-    cols: 160,
+    rows: terminal::DEFAULT.rows,
+    cols: terminal::DEFAULT.cols,
     pixel_width: 0,
     pixel_height: 0,
 };

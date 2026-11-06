@@ -13,6 +13,7 @@ use crate::server::{AppState, router};
 use crate::store::Store;
 
 mod agent_tokens;
+mod parallel;
 mod profiles;
 mod reviews;
 mod ships;
@@ -705,6 +706,7 @@ async fn openapi_describes_every_route() {
     assert_eq!(
         paths,
         [
+            "/agents",
             "/chains",
             "/chains/{chain}",
             "/chains/{chain}/edges",
@@ -726,8 +728,10 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/activity",
             "/tickets/{ticket}/comments",
             "/tickets/{ticket}/events",
+            "/tickets/{ticket}/instructions/claim",
             "/tickets/{ticket}/runner/input",
             "/tickets/{ticket}/runner/scrollback",
+            "/tickets/{ticket}/runner/size",
             "/tickets/{ticket}/subtasks",
             "/tickets/{ticket}/subtasks/{position}",
             "/tickets/{ticket}/threads",

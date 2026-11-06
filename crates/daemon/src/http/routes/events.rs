@@ -3,12 +3,12 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
-use toknila_app::{agent, resolve};
+use toknila_app::{agent, instructions, resolve};
 use toknila_core::Actor;
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 
 use super::{ApiResult, chain_write, load_ticket_detail};
-use crate::http::dto::{ChainDetail, EventQuery, NewActivity, TicketDetail};
+use crate::http::dto::{ChainDetail, EventQuery, InstructionClaim, NewActivity, TicketDetail};
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, Principal, now};
 use crate::store::EventRecord;
@@ -69,6 +69,35 @@ pub async fn ticket_activity(
         state.runners.tokens().touch(t.id, now(), &input.signal);
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(post, path = "/tickets/{ticket}/instructions/claim", tag = "agent",
+    params(("ticket" = String, Path, description = "Ticket id or key")),
+    responses((status = 200, body = InstructionClaim), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// The ticket's agent asks, from its Stop hook, for what a person told it while it worked. Each
+/// instruction is handed out once: it is marked delivered as it is claimed.
+pub async fn claim_instructions(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Path(ticket): Path<String>,
+) -> ApiResult<Json<InstructionClaim>> {
+    let at = now();
+    let (claimed, _) = state
+        .store
+        .write(
+            Actor::Agent,
+            at,
+            move |tx| -> ApiResult<instructions::Claimed> {
+                let t = resolve::ticket(&*tx, &ticket)?;
+                principal.owns(&t)?;
+                Ok(instructions::claim(tx, &t)?)
+            },
+        )
+        .await?;
+    Ok(Json(InstructionClaim {
+        count: claimed.count,
+        reason: claimed.reason,
+    }))
 }
 
 #[utoipa::path(post, path = "/releases/{release}/events", tag = "agent", request_body = ReleaseEvent,

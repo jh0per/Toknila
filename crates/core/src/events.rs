@@ -16,16 +16,16 @@ pub enum DomainEvent {
     ProjectCreated {
         project: Project,
     },
+    /// A project setting changed (the parallel agent limit).
+    ProjectUpdated {
+        project: Project,
+    },
     ChainCreated {
         chain: Chain,
     },
     /// A chain's settings changed (its review mode or reviewer).
     ChainUpdated {
         chain: Chain,
-    },
-    /// A project's settings changed (its review mode or reviewer).
-    ProjectUpdated {
-        project: Project,
     },
     EdgeAdded {
         edge: Edge,

@@ -167,7 +167,13 @@ pub(super) const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE tickets ADD COLUMN done_out_of_order_json TEXT;
     "#,
-    // 5: review (P1-14). A ticket's review state (whose turn, the rounds so far; JSON) and the
+    // 5: parallel agents. The project's limit of agents working at once, and the flag of a
+    // Ready card a person started that waits for a free slot (its place in line is computed).
+    r#"
+    ALTER TABLE projects ADD COLUMN max_parallel INTEGER NOT NULL DEFAULT 2;
+    ALTER TABLE tickets ADD COLUMN queued INTEGER NOT NULL DEFAULT 0;
+    "#,
+    // 6: review (P1-14). A ticket's review state (whose turn, the rounds so far; JSON) and the
     // reviewer agent profile that may be set on a ticket, a chain and a project.
     r#"
     ALTER TABLE tickets ADD COLUMN review_json TEXT;

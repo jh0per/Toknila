@@ -32,3 +32,4 @@ export type Phase = Schemas["Phase"];
 export type TicketAction = Schemas["TicketAction"];
 export type ReviewView = Schemas["ReviewView"];
 export type ReviewRound = Schemas["ReviewRound"];
+export type ProjectAgents = Schemas["ProjectAgents"];

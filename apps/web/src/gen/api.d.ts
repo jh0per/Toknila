@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The agent slots of every project and the cards waiting for one, as core's schedule computes
+         *     them.
+         */
+        get: operations["list_agents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chains": {
         parameters: {
             query?: never;
@@ -183,8 +203,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Sets how the project's tickets are reviewed by default: the mode and the reviewer agent
-         *     profile. A chain or ticket that sets its own keeps it; a field left out is kept.
+         * Changes project settings. A higher parallel limit starts waiting cards at once; a lower one
+         *     never stops a running agent.
          */
         patch: operations["patch_project"];
         trace?: never;
@@ -353,6 +373,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tickets/{ticket}/instructions/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The ticket's agent asks, from its Stop hook, for what a person told it while it worked. Each
+         *     instruction is handed out once: it is marked delivered as it is claimed.
+         */
+        post: operations["claim_instructions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets/{ticket}/runner/input": {
         parameters: {
             query?: never;
@@ -379,6 +419,26 @@ export interface paths {
         get: operations["scrollback"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/runner/size": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The size of the panel that shows the agent's terminal. The agent is a full-screen terminal
+         *     program, so its terminal follows the panel.
+         */
+        post: operations["runner_size"];
         delete?: never;
         options?: never;
         head?: never;
@@ -584,6 +644,11 @@ export interface components {
             hooks: components["schemas"]["HookWiring"];
             /** @description Instructions file the agent reads, relative to its working directory. */
             instructions_file?: string | null;
+            /**
+             * @description Flag of the agent's command that takes the path of the generated per-run instructions
+             *     (under the data home; the project's own instructions file is never written).
+             */
+            instructions_flag?: string | null;
             mcp: components["schemas"]["McpWiring"];
             name: string;
             nudge: components["schemas"]["Nudge"];
@@ -766,6 +831,16 @@ export interface components {
              */
             settings_flag: string | null;
         };
+        /**
+         * @description Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
+         *     worked, now handed over and marked delivered.
+         */
+        InstructionClaim: {
+            /** @description How many instructions were handed over; 0 when nothing was pending. */
+            count: number;
+            /** @description The instructions as one text for the agent, in the comment template; empty when none. */
+            reason: string;
+        };
         /** @description A profile and where it comes from. */
         ListedProfile: {
             /** @description File name in the profiles folder; `None` for a built-in profile. */
@@ -829,6 +904,11 @@ export interface components {
             default_reviewer?: string | null;
             /** @description Short uppercase key, prefix of ticket keys (`DEMO`). */
             key: string;
+            /**
+             * Format: int32
+             * @description Most agents working at once; default 2.
+             */
+            max_parallel?: number | null;
             name?: string | null;
             release_branch?: string | null;
             repo_path?: string | null;
@@ -942,6 +1022,17 @@ export interface components {
              */
             strip_ansi: boolean;
         };
+        /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
+        PatchProject: {
+            /**
+             * Format: int32
+             * @description Most agents working at once (1 to 64).
+             */
+            max_parallel?: number | null;
+            review_mode?: components["schemas"]["ReviewMode"] | null;
+            /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
+            reviewer?: string | null;
+        };
         /** @description `PATCH /v1/tickets/{ticket}/subtasks/{position}`. */
         PatchSubtask: {
             done?: boolean | null;
@@ -993,6 +1084,12 @@ export interface components {
             default_reviewer?: string | null;
             id: components["schemas"]["ProjectId"];
             key: components["schemas"]["ProjectKey"];
+            /**
+             * Format: int32
+             * @description Most agents of this project that work at once (`schedule`); a card that starts beyond it
+             *     is queued.
+             */
+            max_parallel: number;
             name: string;
             /** @description Branch that only receives tagged releases (`main`). */
             release_branch: string;
@@ -1000,6 +1097,22 @@ export interface components {
             repo_path?: string | null;
             /** @description Branch ships start from and merge into (`develop`). */
             work_branch: string;
+        };
+        /** @description `GET /v1/agents`: one project's agent slots and the cards waiting for one. */
+        ProjectAgents: {
+            /**
+             * Format: int32
+             * @description Agents that may work at once.
+             */
+            limit: number;
+            project: components["schemas"]["ProjectId"];
+            /** @description Waiting cards, first in line first. */
+            queued: components["schemas"]["QueuedCard"][];
+            /**
+             * Format: int32
+             * @description Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
+             */
+            used: number;
         };
         /** @description Identifies a [`crate::Project`]. */
         ProjectId: string;
@@ -1019,6 +1132,15 @@ export interface components {
             /** @description The task for whoever does it. */
             prompt?: string;
             title: string;
+        };
+        /** @description A card waiting for an agent slot. */
+        QueuedCard: {
+            /**
+             * Format: int32
+             * @description 1 is next.
+             */
+            position: number;
+            ticket: components["schemas"]["TicketId"];
         };
         /** @description A release milestone between tickets on the chain graph. */
         Release: {
@@ -1080,7 +1202,10 @@ export interface components {
             reviewer: components["schemas"]["Actor"];
             verdict: components["schemas"]["Verdict"];
         };
-        /** @description What a person may set about review on a chain or a project. A field left out is kept. */
+        /**
+         * @description What a person may set about review on a chain (a project takes the same two fields in
+         *     [`crate::projects::PatchProject`]). A field left out is kept.
+         */
         ReviewSettings: {
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
@@ -1165,6 +1290,13 @@ export interface components {
         };
         /** @description Identifies a [`crate::Subtask`]. */
         SubtaskId: string;
+        /** @description Body of `POST /v1/tickets/{ticket}/runner/size`: the size of the panel showing the terminal. */
+        TerminalSize: {
+            /** Format: int32 */
+            cols: number;
+            /** Format: int32 */
+            rows: number;
+        };
         /** @description A discussion on one ticket that ends in a person's approval. */
         Thread: {
             approved_at?: components["schemas"]["Timestamp"] | null;
@@ -1251,6 +1383,11 @@ export interface components {
             profile?: string | null;
             /** @description The task given to the agent; the only source of what to do. */
             prompt: string;
+            /**
+             * @description A person asked to start this Ready card; it runs as soon as a slot is free (see
+             *     `schedule`). Only a Ready card has it. Its place in the queue is computed, never stored.
+             */
+            queued?: boolean;
             /** @description Whose verdict the card waits for in Review, and the rounds held so far. */
             review?: components["schemas"]["Review"];
             review_mode?: components["schemas"]["ReviewMode"] | null;
@@ -1285,6 +1422,11 @@ export interface components {
             in_status_ms: number;
             /** @description Computed from the ticket's threads: design while any is open, implement otherwise. */
             phase: components["schemas"]["Phase"];
+            /**
+             * Format: int32
+             * @description Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
+             */
+            queue_position?: number | null;
             /** @description How the card is reviewed (mode, reviewer, whose turn) and the rounds so far. */
             review: components["schemas"]["ReviewView"];
             ship?: components["schemas"]["Ship"] | null;
@@ -1299,6 +1441,11 @@ export interface components {
             /** Format: int64 */
             in_status_ms: number;
             needs_human: boolean;
+            /**
+             * Format: int32
+             * @description Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
+             */
+            queue_position?: number | null;
             ticket: components["schemas"]["Ticket"];
         };
         /** @example DEMO-3 */
@@ -1362,6 +1509,25 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectAgents"][];
+                };
+            };
+        };
+    };
     list_chains: {
         parameters: {
             query?: {
@@ -1825,7 +1991,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReviewSettings"];
+                "application/json": components["schemas"]["PatchProject"];
             };
         };
         responses: {
@@ -1835,6 +2001,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {
@@ -2302,6 +2476,44 @@ export interface operations {
             };
         };
     };
+    claim_instructions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructionClaim"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     runner_input: {
         parameters: {
             query?: never;
@@ -2377,6 +2589,47 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    runner_size: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminalSize"];
+            };
+        };
+        responses: {
+            /** @description Resized; sizes outside 20x5..500x200 are brought into that range */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

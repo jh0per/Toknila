@@ -24,7 +24,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use tokio::sync::{broadcast, mpsc};
-use toknila_app::runner::{RunEnded, RunRequest, Runner, RunnerError, Started};
+use toknila_app::runner::{RunEnded, RunRequest, Runner, RunnerError, RunnerState, Started};
+use toknila_core::instructions::terminal::Size;
 use toknila_core::{AgentProfile, AgentRole, OutputRules, ProcessExit, Run, RunId, TicketId};
 
 use active::Active;
@@ -201,6 +202,7 @@ impl Runners {
             token,
             url: self.url.get().map(String::as_str),
             bin: &bin,
+            brief: &req.brief,
         };
         let wiring = wiring::prepare(profile, &cx)?;
         let process = pty::spawn(profile, Path::new(&req.dir), &wiring)?;
@@ -218,6 +220,7 @@ impl Runners {
             process,
             log,
             lines,
+            profile.hooks.enabled && profile.hooks.settings_flag.is_some(),
             active::Channels {
                 wake: self.wake.clone(),
                 ended: self.ended.clone(),
@@ -267,6 +270,14 @@ impl Runner for Runners {
         }
     }
 
+    fn live_runners(&self) -> Vec<(TicketId, AgentRole)> {
+        self.active()
+            .iter()
+            .filter(|(_, a)| !a.is_over())
+            .map(|(key, _)| *key)
+            .collect()
+    }
+
     fn stop_role(&self, ticket: TicketId, role: AgentRole) {
         let active = self.active().get(&(ticket, role)).cloned();
         if let Some(a) = active {
@@ -278,6 +289,19 @@ impl Runner for Runners {
         let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
         match active.filter(|a| !a.is_over()) {
             Some(a) => a.write(bytes),
+            None => Err(RunnerError::NotRunning),
+        }
+    }
+
+    fn state(&self, ticket: TicketId) -> Option<RunnerState> {
+        let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
+        active?.state()
+    }
+
+    fn resize(&self, ticket: TicketId, size: Size) -> Result<(), RunnerError> {
+        let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
+        match active.filter(|a| !a.is_over()) {
+            Some(a) => a.resize(size),
             None => Err(RunnerError::NotRunning),
         }
     }

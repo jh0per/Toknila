@@ -88,7 +88,7 @@ impl TicketAction {
         let text = text.filter(|t| !t.trim().is_empty());
         let required = |what: &'static str| text.clone().ok_or(TransitionError::EmptyText(what));
         Ok(match self {
-            Self::Start => TicketEvent::Start,
+            Self::Start => TicketEvent::Request,
             Self::Pause => TicketEvent::Pause,
             Self::Resume => TicketEvent::Resume,
             Self::Block => TicketEvent::Block {

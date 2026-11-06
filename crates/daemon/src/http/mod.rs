@@ -34,13 +34,14 @@ impl Modify for BearerAuth {
 /// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
-        chains::*, events::*, profiles::*, projects::*, releases::*, runner::*, threads::*,
-        tickets::*,
+        agents::*, chains::*, events::*, profiles::*, projects::*, releases::*, runner::*,
+        threads::*, tickets::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
         .routes(routes!(list_projects, create_project))
         .routes(routes!(get_project, patch_project))
+        .routes(routes!(list_agents))
         .routes(routes!(create_chain))
         .routes(routes!(import_chain))
         .routes(routes!(export_chain))
@@ -63,10 +64,12 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(request_thread_changes))
         .routes(routes!(scrollback))
         .routes(routes!(runner_input))
+        .routes(routes!(runner_size))
         .routes(routes!(release_action))
         .routes(routes!(list_events))
         .routes(routes!(agent_event))
         .routes(routes!(ticket_activity))
+        .routes(routes!(claim_instructions))
         .routes(routes!(release_event))
         .split_for_parts();
     // Routes are nested under /v1; say so in the document.

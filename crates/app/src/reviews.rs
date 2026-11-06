@@ -9,7 +9,6 @@
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
-use toknila_core::events::DomainEvent;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
     AgentProfile, Chain, Project, ReviewMode, ReviewRound, ReviewTurn, Ticket, TicketId, TicketKey,
@@ -18,7 +17,7 @@ use toknila_core::{
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
-use crate::runner::RunnerError;
+use crate::runner::{RunBrief, RunnerError};
 use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork, resolve, with_chain};
 
 /// How a ticket is reviewed now, and what has been decided so far.
@@ -85,6 +84,11 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
         key: t.key.clone(),
         profile,
         dir,
+        brief: RunBrief {
+            title: t.title.clone(),
+            prompt: t.prompt.clone(),
+            acceptance: t.acceptance.clone(),
+        },
     });
     Ok(())
 }
@@ -147,7 +151,8 @@ pub fn mark_lost<U: UnitOfWork + ?Sized>(
     Ok(moved)
 }
 
-/// What a person may set about review on a chain or a project. A field left out is kept.
+/// What a person may set about review on a chain (a project takes the same two fields in
+/// [`crate::projects::PatchProject`]). A field left out is kept.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ReviewSettings {
@@ -179,22 +184,4 @@ pub fn set_chain<U: UnitOfWork + ?Sized>(
         Ok(())
     })?;
     Ok(c.id)
-}
-
-/// Sets how a project's tickets are reviewed by default.
-pub fn set_project<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    project: &str,
-    settings: ReviewSettings,
-) -> AppResult<Project> {
-    let mut p = resolve::project(uow, project)?;
-    if let Some(m) = settings.review_mode {
-        p.default_review_mode = m;
-    }
-    if let Some(r) = settings.reviewer {
-        p.default_reviewer = clean(r);
-    }
-    uow.save_project(&p)?;
-    uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;
-    Ok(p)
 }

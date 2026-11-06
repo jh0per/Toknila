@@ -35,6 +35,9 @@ pub struct Project {
     /// profile (`<worker>-reviewer`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_reviewer: Option<String>,
+    /// Most agents of this project that work at once (`schedule`); a card that starts beyond it
+    /// is queued.
+    pub max_parallel: u32,
 }
 
 impl Project {
@@ -66,6 +69,7 @@ mod tests {
             default_profile: AgentProfile::SIM.into(),
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
+            max_parallel: crate::schedule::DEFAULT_LIMIT,
         };
         let mut t = Ticket::new_backlog(
             TicketId::new(),

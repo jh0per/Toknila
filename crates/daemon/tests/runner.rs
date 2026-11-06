@@ -63,6 +63,7 @@ impl Rig {
             role,
             profile: profile.to_owned(),
             dir: self.ship().display().to_string(),
+            brief: Default::default(),
         }
     }
 
@@ -149,6 +150,52 @@ fn input_reaches_the_process_and_its_answer_comes_back() {
         .expect("write input");
     rig.wait_for("got:ping");
     assert_eq!(rig.wait_end().exit.code, Some(0));
+}
+
+#[test]
+fn the_terminal_starts_at_the_default_size_and_follows_a_resize() {
+    use toknila_core::instructions::terminal::{self, Size};
+    let mut rig = Rig::new();
+    rig.profile(
+        "fake",
+        &["print", "ready", "size", "echo", "size", "exit", "0"],
+        "",
+    );
+    rig.start("fake");
+    let first = rig.wait_for("size=");
+    let d = terminal::DEFAULT;
+    assert!(
+        first.contains(&format!("size={}x{}", d.cols, d.rows)),
+        "{first:?}"
+    );
+    rig.runners
+        .resize(rig.ticket, Size { cols: 90, rows: 30 })
+        .expect("resize");
+    rig.runners.write(rig.ticket, b"go\r").expect("write");
+    rig.wait_for("size=90x30");
+    assert_eq!(rig.wait_end().exit.code, Some(0));
+    let err = rig
+        .runners
+        .resize(rig.ticket, Size { cols: 90, rows: 30 })
+        .expect_err("over");
+    assert_eq!(err, RunnerError::NotRunning);
+}
+
+#[test]
+fn a_run_is_idle_after_a_quiet_while_and_reports_whether_it_has_hooks() {
+    let rig = Rig::new();
+    rig.profile("fake", &["print", "up", "hold"], "");
+    rig.start("fake");
+    rig.wait_for("up");
+    let state = rig.runners.state(rig.ticket).expect("live");
+    assert!(!state.hooks, "the profile wires no hooks");
+    assert!(!state.idle, "it has just printed");
+    let until = Instant::now() + WAIT;
+    while !rig.runners.state(rig.ticket).is_some_and(|s| s.idle) {
+        assert!(Instant::now() < until, "never idle");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    rig.runners.stop_all();
 }
 
 #[test]

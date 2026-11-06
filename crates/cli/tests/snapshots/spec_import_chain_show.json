@@ -140,6 +140,7 @@
       "paused": false,
       "profile": null,
       "prompt": "",
+      "queued": false,
       "review": {
         "rounds": [
           {
@@ -168,6 +169,7 @@
       "paused": false,
       "profile": null,
       "prompt": "",
+      "queued": false,
       "review": {
         "rounds": [
           {
@@ -196,6 +198,7 @@
       "paused": false,
       "profile": null,
       "prompt": "**Goal**: A person picks how to start.\n**Independent Test**: Open the home page and see the choices.",
+      "queued": false,
       "review_mode": null,
       "status": "ready",
       "status_reason": null,
@@ -213,6 +216,7 @@
       "paused": false,
       "profile": null,
       "prompt": "**Goal**: A person continues where they stopped.",
+      "queued": false,
       "review_mode": null,
       "status": "ready",
       "status_reason": null,
@@ -230,6 +234,7 @@
       "paused": false,
       "profile": null,
       "prompt": "",
+      "queued": false,
       "review_mode": null,
       "status": "ready",
       "status_reason": null,
@@ -247,6 +252,7 @@
       "paused": false,
       "profile": null,
       "prompt": "",
+      "queued": false,
       "review_mode": null,
       "status": "backlog",
       "status_reason": null,

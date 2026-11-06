@@ -41,6 +41,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         status_reason,
         status_since: T0,
         paused: false,
+        queued: false,
         profile: None,
         review_mode: None,
         reviewer: None,
@@ -101,6 +102,55 @@ fn ready_to_running_on_start() {
     let tr = ok(TicketStatus::Ready, TicketEvent::Start);
     assert_eq!(tr.ticket.status, TicketStatus::Running);
     assert_eq!(tr.effects, vec![Effect::PrepareShip, Effect::EnsureRunner]);
+}
+
+#[test]
+fn a_request_queues_a_ready_card_without_moving_it() {
+    let tr = ok(TicketStatus::Ready, TicketEvent::Request);
+    assert_eq!(tr.ticket.status, TicketStatus::Ready);
+    assert!(tr.ticket.queued);
+    assert_eq!(tr.ticket.status_since, T0);
+    assert!(tr.effects.is_empty());
+}
+
+#[test]
+fn a_second_request_is_refused() {
+    let mut t = ticket_in(TicketStatus::Ready);
+    t.queued = true;
+    assert_eq!(
+        apply(&t, &TicketEvent::Request, NOW),
+        Err(TransitionError::AlreadyQueued)
+    );
+}
+
+#[test]
+fn only_a_ready_card_can_be_requested() {
+    let err = apply(
+        &ticket_in(TicketStatus::Running),
+        &TicketEvent::Request,
+        NOW,
+    );
+    assert_eq!(
+        err.map_err(|e| e.to_string()),
+        Err("cannot start a ticket in Running".to_owned())
+    );
+}
+
+#[test]
+fn leaving_ready_clears_the_queued_flag() {
+    for event in [
+        TicketEvent::Start,
+        TicketEvent::DepsUnsatisfied,
+        TicketEvent::Pause,
+        TicketEvent::Cancel {
+            reason: "r".to_owned(),
+        },
+    ] {
+        let mut t = ticket_in(TicketStatus::Ready);
+        t.queued = true;
+        let tr = apply(&t, &event, NOW).unwrap_or_else(|e| panic!("{event:?}: {e}"));
+        assert!(!tr.ticket.queued, "{event:?} kept the flag");
+    }
 }
 
 #[test]
@@ -670,6 +720,7 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
     prop_oneof![
         Just(TicketEvent::DepsSatisfied),
         Just(TicketEvent::DepsUnsatisfied),
+        Just(TicketEvent::Request),
         Just(TicketEvent::Start),
         Just(TicketEvent::ShipReady {
             branch: "b".to_owned()

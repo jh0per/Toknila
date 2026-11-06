@@ -5,7 +5,8 @@
 //! The worker's runner is never replaced by the reviewer's: the reviewer runs next to it on its
 //! own runner, so a `Return` goes back to a worker session that still has its context.
 
-use super::{Effect, TransitionError, non_empty, run_on_ship};
+use super::checks::{non_empty, run_on_ship};
+use super::{Effect, TransitionError};
 use crate::{
     Actor, ReviewMode, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp, Verdict,
 };

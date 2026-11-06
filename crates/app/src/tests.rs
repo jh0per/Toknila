@@ -18,6 +18,7 @@ use crate::{
 };
 
 mod import_done;
+mod parallel;
 mod reviews;
 mod runs;
 mod ships;
@@ -58,6 +59,7 @@ impl Mem {
             default_profile: AgentProfile::SIM.to_owned(),
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
+            max_parallel: 2,
         };
         let chain = Chain {
             id: ChainId::new(),
@@ -211,6 +213,9 @@ impl Reader for Mem {
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>> {
         Ok(self.ships.iter().find(|s| s.ticket_id == ticket).cloned())
     }
+    fn live_runners(&self) -> AppResult<Vec<(TicketId, toknila_core::AgentRole)>> {
+        Ok(crate::Runner::live_runners(&self.runner))
+    }
     fn last_event_payload(&self, entity: &str, id: &str) -> AppResult<Option<Value>> {
         let last = self
             .events
@@ -232,7 +237,7 @@ impl UnitOfWork for Mem {
         self.project = p.clone();
         Ok(())
     }
-    fn save_project(&mut self, p: &Project) -> AppResult<()> {
+    fn update_project(&mut self, p: &Project) -> AppResult<()> {
         self.project = p.clone();
         Ok(())
     }

@@ -139,6 +139,7 @@
       "paused": false,
       "profile": "sim",
       "prompt": "First step.",
+      "queued": false,
       "review": {
         "rounds": [
           {
@@ -174,6 +175,7 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "queued": false,
       "review": {
         "rounds": [
           {
@@ -202,6 +204,7 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "queued": false,
       "review": {
         "rounds": [
           {
@@ -230,6 +233,7 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "queued": false,
       "review": {
         "rounds": [
           {

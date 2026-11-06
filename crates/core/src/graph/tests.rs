@@ -5,6 +5,30 @@ mod wildcard;
 
 const T: Timestamp = Timestamp(1_000);
 
+/// Settles the graph and starts every card that wants to run (no slot limit), as the
+/// application does after each command; returns every step and event in order.
+fn settle(v: &mut ChainView) -> Settled {
+    let mut all = Settled::default();
+    loop {
+        let step = v.settle(T).expect("settle");
+        all.applied.extend(step.applied);
+        all.events.extend(step.events);
+        let start = crate::schedule::plan(std::slice::from_ref(v), u32::MAX, &[]).start;
+        if start.is_empty() {
+            return all;
+        }
+        for ticket in start {
+            let event = TicketEvent::Start;
+            let (effects, events) = v
+                .record(|v| v.apply_ticket_event(ticket, &event, T))
+                .expect("start");
+            let action = Action::Ticket { ticket, event };
+            all.applied.push(Applied { action, effects });
+            all.events.extend(events);
+        }
+    }
+}
+
 struct Builder {
     view: ChainView,
     next: u32,
@@ -43,6 +67,7 @@ impl Builder {
             status_reason: None,
             status_since: Timestamp(0),
             paused: false,
+            queued: false,
             profile: Some("sim".to_owned()),
             review_mode: None,
             reviewer: None,
@@ -116,7 +141,7 @@ fn rstate(v: &ChainView, n: NodeRef) -> ReleaseState {
 fn event(v: &mut ChainView, n: NodeRef, e: TicketEvent) {
     v.apply_ticket_event(tid(n), &e, T)
         .unwrap_or_else(|err| panic!("{e:?}: {err}"));
-    v.settle(T).expect("settle");
+    settle(v);
 }
 
 /// Running -> Review -> Merged, then let the graph react.
@@ -140,7 +165,7 @@ fn linear_chain_runs_one_after_another() {
     b.edge(a, bb);
     b.edge(bb, c);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     assert_eq!(
         [status(&v, a), status(&v, bb), status(&v, c)],
         [
@@ -165,7 +190,7 @@ fn parallel_roots_start_together() {
     let mut b = Builder::new(true);
     let (a, c) = (b.ticket(), b.ticket());
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     assert_eq!(
         [status(&v, a), status(&v, c)],
         [TicketStatus::Running, TicketStatus::Running]
@@ -181,7 +206,7 @@ fn diamond_waits_for_both_branches() {
     b.edge(l, d);
     b.edge(r, d);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     finish_and_accept(&mut v, a);
     assert_eq!(
         [status(&v, l), status(&v, r)],
@@ -198,7 +223,7 @@ fn autostart_off_stops_at_ready() {
     let mut b = Builder::new(false);
     let a = b.ticket();
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     assert_eq!(status(&v, a), TicketStatus::Ready);
     event(&mut v, a, TicketEvent::Start);
     assert_eq!(status(&v, a), TicketStatus::Running);
@@ -277,7 +302,7 @@ fn gate_chain_with_manual_release() {
     b.edge(a, d);
     b.edge(d, r1);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     assert_eq!(status(&v, a), TicketStatus::Running);
     assert_eq!(v.summary(T).status, ChainStatus::Running);
 
@@ -359,7 +384,7 @@ fn gate_chain_with_manual_release() {
 
     // Cut: C starts right away; the release does not hold development.
     v.cut_release(rid(r1), T).expect("cut");
-    v.settle(T).expect("settle");
+    settle(&mut v);
     assert_eq!(rstate(&v, r1), ReleaseState::Cut);
     assert_eq!(status(&v, c), TicketStatus::Running);
 
@@ -383,7 +408,7 @@ fn auto_release_cuts_itself() {
     b.edge(a, r);
     b.edge(r, c);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     finish_and_accept(&mut v, a);
     assert_eq!(rstate(&v, r), ReleaseState::Cut);
     assert_eq!(status(&v, c), TicketStatus::Running);
@@ -399,7 +424,7 @@ fn after_release_edge_waits_for_released() {
     b.edge(a, r);
     b.edge_kind(r, c, EdgeKind::AfterRelease);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     finish_and_accept(&mut v, a);
     assert_eq!(rstate(&v, r), ReleaseState::Cut);
     assert_eq!(
@@ -408,7 +433,7 @@ fn after_release_edge_waits_for_released() {
         "after_release waits for the store"
     );
     v.complete_release(rid(r), T).expect("release");
-    v.settle(T).expect("settle");
+    settle(&mut v);
     assert_eq!(status(&v, c), TicketStatus::Running);
 }
 
@@ -422,7 +447,7 @@ fn second_release_takes_only_new_tickets() {
     b.edge(r1, c);
     b.edge(c, r2);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     finish_and_accept(&mut v, a);
     finish_and_accept(&mut v, c);
     assert_eq!(
@@ -438,7 +463,7 @@ fn reopen_blocks_running_dependents_and_unreadies_ready_ones() {
     b.edge(a, run);
     b.edge(a, rdy);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     event(&mut v, a, TicketEvent::Start);
     finish_and_accept(&mut v, a);
     event(&mut v, run, TicketEvent::Start);
@@ -465,7 +490,7 @@ fn cancelled_dependency_counts_as_satisfied() {
     let (a, c) = (b.ticket(), b.ticket());
     b.edge(a, c);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     event(
         &mut v,
         a,
@@ -516,7 +541,7 @@ fn settle_journals_every_intermediate_transition() {
     let (a, c) = (b.ticket(), b.ticket());
     b.edge(a, c);
     let mut v = b.view;
-    let settled = v.settle(T).expect("settle");
+    let settled = settle(&mut v);
     let moves: Vec<(String, TicketStatus, TicketStatus)> = settled
         .events
         .iter()

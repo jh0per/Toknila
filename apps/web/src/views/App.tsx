@@ -1,5 +1,5 @@
 import { token } from "../api/http";
-import { currentChain, currentProject, runningAgents } from "../store/state";
+import { currentChain, currentProject, runningAgents, slotsOf } from "../store/state";
 import { useStore } from "../store/useStore";
 import { Canvas } from "./Canvas";
 import { Inbox } from "./Inbox";
@@ -14,6 +14,7 @@ export function App() {
   const chain = currentChain(state);
   const showChain = Boolean(chain) && state.loaded && state.route.name !== "inbox";
   const running = runningAgents(state).length;
+  const slots = slotsOf(state);
   return (
     <div className="ide">
       <Sidebar state={state} dispatch={dispatch} />
@@ -31,7 +32,10 @@ export function App() {
               <span className="muted">{chain.summary.done}/{chain.summary.total} done · {chain.summary.released} released</span>
               {state.error && <span className="error">{state.error}</span>}
               <span className="grow" />
-              <span className="pill"><span className={`dot${running ? " pulse" : ""}`} />{running} running</span>
+              <span className="pill" data-testid="slots" title="Agents working now / agents allowed at once">
+                <span className={`dot${running ? " pulse" : ""}`} />
+                {slots ? `${slots.used}/${slots.limit} agents` : `${running} running`}
+              </span>
             </header>
             <Canvas chain={chain} state={state} dispatch={dispatch} />
             <Panel state={state} dispatch={dispatch} />

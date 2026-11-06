@@ -4,6 +4,7 @@
   "comments": [],
   "in_status_ms": 0,
   "phase": "implement",
+  "queue_position": null,
   "review": {
     "awaiting": null,
     "mode": "human",
@@ -22,6 +23,7 @@
     "paused": false,
     "profile": null,
     "prompt": "",
+    "queued": false,
     "review_mode": null,
     "status": "cancelled",
     "status_reason": {

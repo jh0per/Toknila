@@ -1,12 +1,14 @@
 // The page's one normalized store and the selectors the views read.
 
-import type { ChainDetail, EventRecord, Project, Ticket, TicketDetail, TicketThreads } from "../api/types";
+import type { ChainDetail, EventRecord, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads } from "../api/types";
 import { type Route, type Tab, routePath } from "./route";
 
 export type Link = "connecting" | "live" | "offline";
 
 export interface State {
   projects: Project[];
+  /// Agent slots and queue per project, as the daemon computes them.
+  agents: ProjectAgents[];
   /// Chains by id, in the order the daemon lists them.
   chains: Record<string, ChainDetail>;
   chainOrder: string[];
@@ -37,6 +39,7 @@ export const MAX_RETRY_MS = 10_000;
 export function initialState(route: Route): State {
   return {
     projects: [],
+    agents: [],
     chains: {},
     chainOrder: [],
     needsHuman: {},
@@ -67,6 +70,21 @@ export function currentProject(s: State): Project | undefined {
     return s.projects.find((p) => p.id === c?.chain.project_id);
   }
   return s.projects[0];
+}
+
+/// Slots of the project in focus: agents working now and how many may.
+export function slotsOf(s: State): { used: number; limit: number } | undefined {
+  const a = s.agents.find((x) => x.project === currentProject(s)?.id);
+  return a && { used: a.used, limit: a.limit };
+}
+
+/// Place in line (1 is next) of a card waiting for an agent slot.
+export function queuePosition(s: State, ticketId: string): number | undefined {
+  for (const a of s.agents) {
+    const q = a.queued.find((c) => c.ticket === ticketId);
+    if (q) return q.position;
+  }
+  return undefined;
 }
 
 /// Chains of a project, in the daemon's order.

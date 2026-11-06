@@ -1,7 +1,8 @@
 // Everything that changes the state: what the person did (intents), API answers, the stream.
 
 import type {
-  ChainDetail, CommentKind, EventRecord, Project, TicketAction, TicketDetail, TicketItem, TicketThreads,
+  ChainDetail, CommentKind, EventRecord, Project, ProjectAgents, TicketAction, TicketDetail, TicketItem,
+  TicketThreads,
 } from "../api/types";
 import type { Route, Tab } from "./route";
 
@@ -37,6 +38,7 @@ export type Msg =
   | { type: "journalTail"; seq: number; events: EventRecord[] }
   | { type: "loaded"; projects: Project[]; chains: ChainDetail[]; tickets: TicketItem[] }
   | { type: "projectsLoaded"; projects: Project[] }
+  | { type: "agentsLoaded"; agents: ProjectAgents[] }
   | { type: "chainLoaded"; chain: ChainDetail }
   | { type: "ticketsLoaded"; tickets: TicketItem[] }
   | { type: "detailLoaded"; detail: TicketDetail }
@@ -52,6 +54,7 @@ export type Effect =
   | { type: "fetchTail" }
   | { type: "loadAll" }
   | { type: "loadProjects" }
+  | { type: "loadAgents" }
   | { type: "loadChain"; id: string }
   | { type: "loadTickets" }
   | { type: "loadDetail"; key: string }

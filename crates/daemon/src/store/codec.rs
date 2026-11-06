@@ -5,7 +5,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_core::graph::ChainView;
 use toknila_core::wire::wire_name;
-use toknila_core::{ChainId, Edge, NodeRef, Release, ReleaseId, Timestamp};
+use toknila_core::{AgentRole, ChainId, Edge, NodeRef, Release, ReleaseId, TicketId, Timestamp};
 
 use super::{EventRecord, StoreError};
 
@@ -65,14 +65,22 @@ fn node_from(kind: &str, id: &str) -> Result<NodeRef, StoreError> {
 #[derive(Debug)]
 pub struct Repo<'c> {
     pub(crate) conn: &'c Connection,
+    /// The runner processes alive when this repository was opened (see `Reader::live_runners`).
+    live: Vec<(TicketId, AgentRole)>,
 }
 
 const RELEASE_COLS: &str =
     "id, chain_id, version, channel, start_mode, state, branch, cut_at, released_at";
 
 impl<'c> Repo<'c> {
-    pub(crate) fn new(conn: &'c Connection) -> Self {
-        Self { conn }
+    /// A repository that knows which runners are alive.
+    pub(crate) fn with_live(conn: &'c Connection, live: Vec<(TicketId, AgentRole)>) -> Self {
+        Self { conn, live }
+    }
+
+    /// The runner processes that were alive when this repository was opened.
+    pub fn live_runners(&self) -> Result<Vec<(TicketId, AgentRole)>, StoreError> {
+        Ok(self.live.clone())
     }
 
     // ---- releases, edges ----

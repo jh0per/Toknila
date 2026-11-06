@@ -30,7 +30,7 @@ impl Builder {
 
 fn approve(v: &mut ChainView, n: NodeRef) -> Result<Vec<Effect>, GraphError> {
     let effects = v.apply_ticket_event(tid(n), &TicketEvent::Approve { by: Actor::Human }, T)?;
-    v.settle(T).expect("settle");
+    settle(v);
     Ok(effects)
 }
 
@@ -43,7 +43,7 @@ fn a_then_b() -> (Builder, NodeRef, NodeRef) {
     let mut b = Builder::new(true);
     let (a, bb) = (b.ticket(), b.ticket());
     b.edge(a, bb);
-    b.view.settle(T).expect("settle");
+    settle(&mut b.view);
     (b, a, bb)
 }
 
@@ -52,7 +52,7 @@ fn a_proposed_card_never_starts_and_changes_no_readiness() {
     let (mut b, a, bb) = a_then_b();
     let p = b.card(&[], &[bb]);
     let mut v = b.view;
-    v.settle(T).expect("settle");
+    settle(&mut v);
     assert_eq!(
         status(&v, p),
         TicketStatus::Proposed,
@@ -162,7 +162,7 @@ fn an_approved_card_without_dependencies_autostarts() {
 fn a_ready_target_goes_back_to_backlog_when_a_card_goes_before_it() {
     let mut b = Builder::new(false);
     let a = b.ticket();
-    b.view.settle(T).expect("settle");
+    settle(&mut b.view);
     assert_eq!(status(&b.view, a), TicketStatus::Ready);
     let p = b.card(&[], &[a]);
     let mut v = b.view;
@@ -179,7 +179,7 @@ fn approval_with_a_cycle_fails_and_the_card_stays_proposed() {
     let (a, bb, c) = (b.ticket(), b.ticket(), b.ticket());
     b.edge(a, bb);
     b.edge(bb, c);
-    b.view.settle(T).expect("settle");
+    settle(&mut b.view);
     let p = b.card(&[c], &[bb]);
     let mut v = b.view;
     let before = v.clone();

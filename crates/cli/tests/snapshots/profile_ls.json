@@ -19,6 +19,7 @@
           "settings_flag": null
         },
         "instructions_file": null,
+        "instructions_flag": null,
         "mcp": {
           "config_flag": null,
           "enabled": false
@@ -49,6 +50,7 @@
           "settings_flag": "--settings"
         },
         "instructions_file": "CLAUDE.md",
+        "instructions_flag": "--append-system-prompt-file",
         "mcp": {
           "config_flag": "--mcp-config",
           "enabled": true
@@ -77,6 +79,7 @@
           "settings_flag": null
         },
         "instructions_file": null,
+        "instructions_flag": null,
         "mcp": {
           "config_flag": null,
           "enabled": false
@@ -107,6 +110,7 @@
           "settings_flag": "--settings"
         },
         "instructions_file": "CLAUDE.md",
+        "instructions_flag": "--append-system-prompt-file",
         "mcp": {
           "config_flag": "--mcp-config",
           "enabled": true
@@ -138,6 +142,7 @@
           "settings_flag": null
         },
         "instructions_file": null,
+        "instructions_flag": null,
         "mcp": {
           "config_flag": null,
           "enabled": false

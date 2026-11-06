@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { ChainDetail, EventRecord, Project } from "../api/types";
 import { reduce } from "./reduce";
 import { parseRoute, routePath } from "./route";
-import { type State, currentCard, currentChain, currentProject, initialState, ticketEvents } from "./state";
+import {
+  type State, currentCard, currentChain, currentProject, initialState, queuePosition, slotsOf, ticketEvents,
+} from "./state";
 
 const projects = [
   { id: "p1", key: "DEMO", name: "Demo" },
@@ -103,11 +105,12 @@ describe("stream events", () => {
     const [s] = reduce(open, { type: "detailLoaded", detail });
     const other = event(11, "ticket", "updated", { ticket: { id: "t3", chain_id: "c2" } });
     expect(reduce(s, { type: "event", event: other })[1]).toEqual([
-      { type: "loadChain", id: "c2" }, { type: "loadTickets" },
+      { type: "loadChain", id: "c2" }, { type: "loadTickets" }, { type: "loadAgents" },
     ]);
     const mine = event(11, "ticket", "status_changed", { ticket: { id: "t1", chain_id: "c1" } });
     expect(reduce(s, { type: "event", event: mine })[1]).toEqual([
-      { type: "loadChain", id: "c1" }, { type: "loadTickets" }, { type: "loadDetail", key: "DEMO-1" },
+      { type: "loadChain", id: "c1" }, { type: "loadTickets" }, { type: "loadAgents" },
+      { type: "loadDetail", key: "DEMO-1" },
     ]);
   });
 
@@ -124,5 +127,29 @@ describe("stream events", () => {
     const tickets = [{ ticket: { id: "t1" }, needs_human: true }] as never;
     const [s] = reduce(loaded(), { type: "ticketsLoaded", tickets });
     expect(s.needsHuman).toEqual({ t1: true });
+  });
+});
+
+describe("agent slots", () => {
+  const agents = [
+    { project: "p1", limit: 2, used: 2, queued: [{ ticket: "t2", position: 1 }, { ticket: "t3", position: 2 }] },
+    { project: "p2", limit: 4, used: 0, queued: [] },
+  ];
+
+  it("show the slots of the project in focus and the place of each waiting card", () => {
+    const [s] = reduce(loaded(), { type: "agentsLoaded", agents });
+    expect(slotsOf(s)).toEqual({ used: 2, limit: 2 });
+    const [inDemo] = reduce(s, { type: "selectProject", project: "DEMO" });
+    expect(slotsOf(inDemo)).toEqual({ used: 2, limit: 2 });
+    const [inOther] = reduce(s, { type: "selectProject", project: "OTHER" });
+    expect(slotsOf(inOther)).toEqual({ used: 0, limit: 4 });
+    expect([queuePosition(s, "t2"), queuePosition(s, "t3"), queuePosition(s, "t1")]).toEqual([1, 2, undefined]);
+  });
+
+  it("are refreshed by a journal event and by a project change", () => {
+    const project = event(11, "project", "updated", { project: { id: "p1" } });
+    expect(reduce(loaded(), { type: "event", event: project })[1]).toEqual([
+      { type: "loadProjects" }, { type: "loadAgents" },
+    ]);
   });
 });

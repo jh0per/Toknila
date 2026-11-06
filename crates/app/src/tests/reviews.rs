@@ -11,6 +11,7 @@ use toknila_core::{
 use super::Mem;
 use super::runs::{FakeRunner, a, act, finish, run_of, settle, with_agents};
 use crate::external::ExternalEffect;
+use crate::projects::{self, PatchProject};
 use crate::recovery::recover;
 use crate::runner::{RunEnded, RunRequest};
 use crate::{agent, reviews, runs, tickets};
@@ -178,14 +179,19 @@ fn settings_on_a_chain_and_a_project_are_kept_and_journaled() {
     reviews::set_chain(&mut mem, "demo", settings.clone()).expect("chain");
     assert_eq!(mem.view.chain.review_mode, Some(ReviewMode::Both));
     assert_eq!(mem.view.chain.reviewer.as_deref(), Some("qa"));
-    let p = reviews::set_project(&mut mem, "DEMO", settings).expect("project");
+    let patch = PatchProject {
+        review_mode: Some(ReviewMode::Both),
+        reviewer: Some(" qa ".to_owned()),
+        ..PatchProject::default()
+    };
+    let p = projects::patch(&mut mem, "DEMO", patch).expect("project");
     assert_eq!(p.default_review_mode, ReviewMode::Both);
     assert_eq!(p.default_reviewer.as_deref(), Some("qa"));
-    let clear = reviews::ReviewSettings {
-        review_mode: None,
+    let clear = PatchProject {
         reviewer: Some(String::new()),
+        ..PatchProject::default()
     };
-    reviews::set_project(&mut mem, "DEMO", clear).expect("project");
+    projects::patch(&mut mem, "DEMO", clear).expect("project");
     assert_eq!(mem.project.default_reviewer, None);
     assert_eq!(mem.project.default_review_mode, ReviewMode::Both, "kept");
     let kinds = mem.kinds();
@@ -231,6 +237,7 @@ fn ended(mem: &Mem, role: AgentRole, code: i32, stopped: bool) -> RunEnded {
             role,
             profile: "fake".to_owned(),
             dir: "/ships/demo/demo/demo-1-a".to_owned(),
+            brief: crate::runner::RunBrief::default(),
         }),
         exit: ProcessExit {
             code: Some(code),
@@ -441,4 +448,121 @@ fn a_simulated_reviewer_is_not_lost_by_a_restart() {
             .iter()
             .all(|e| !matches!(e, ExternalEffect::StartReviewer { .. }))
     );
+}
+
+// ---- slots and delivery ----
+
+/// Project DEMO with process agents and a limit of 2, review by the agent, and three
+/// independent cards (card 1..3) nobody has started.
+fn three_cards() -> Mem {
+    let mut mem = with_agents();
+    mem.project.default_review_mode = ReviewMode::Agent;
+    mem.project.max_parallel = 2;
+    mem.view.chain.autostart = false;
+    mem.view.edges.clear();
+    mem.view.tickets.clear();
+    for i in 1..=3 {
+        let key = format!("DEMO-{i}").parse().expect("key");
+        let draft = toknila_core::TicketDraft {
+            title: format!("card {i}"),
+            ..toknila_core::TicketDraft::default()
+        };
+        let t = Ticket::new_backlog(
+            toknila_core::TicketId::new(),
+            mem.view.chain.id,
+            key,
+            draft,
+            mem.now,
+        );
+        mem.view.tickets.push(t);
+    }
+    let chain = mem.view.chain.id;
+    crate::with_chain(&mut mem, chain, |_| Ok::<_, crate::AppError>(())).expect("settle");
+    mem
+}
+
+fn card(mem: &Mem, n: usize) -> Ticket {
+    mem.ticket_by_title(&format!("card {n}"))
+}
+
+#[test]
+fn a_card_in_review_with_worker_and_reviewer_alive_holds_two_slots() {
+    let mut mem = three_cards();
+    for n in 1..=2 {
+        let t = card(&mem, n);
+        tickets::act(&mut mem, &t, TicketEvent::Request).expect("request");
+    }
+    settle(&mut mem);
+    let one = card(&mem, 1);
+    let event = AgentEvent::Finished {
+        summary: "done".to_owned(),
+    };
+    agent::ticket_event(&mut mem, &one, event).expect("finished");
+    settle(&mut mem);
+    assert_eq!(card(&mem, 1).status, TicketStatus::Review);
+    assert_eq!(
+        live(&mem.runner).len(),
+        3,
+        "worker and reviewer of 1, worker of 2"
+    );
+
+    // Limit 2: the review card's two runners and the running card pass it, so a third card
+    // that a person starts stays queued.
+    let three = card(&mem, 3);
+    tickets::act(&mut mem, &three, TicketEvent::Request).expect("request");
+    settle(&mut mem);
+    let three = card(&mem, 3);
+    assert_eq!((three.status, three.queued), (TicketStatus::Ready, true));
+    let positions = crate::schedule::queue_positions(&mem).expect("positions");
+    assert_eq!(positions.get(&three.id), Some(&1));
+
+    // Accepting card 1 stops both of its runners and frees the slots: card 3 starts.
+    let one = card(&mem, 1);
+    tickets::act(&mut mem, &one, TicketEvent::Accept { comment: None }).expect("accept");
+    settle(&mut mem);
+    assert_eq!(card(&mem, 3).status, TicketStatus::Running);
+}
+
+#[test]
+fn a_returns_comment_is_typed_to_the_live_worker_and_marked_delivered_once() {
+    let mut mem = process_review(ReviewMode::Human);
+    mem.runner.reach.set(crate::runner::RunnerState {
+        hooks: true,
+        idle: true,
+    });
+    let comment = "fix the look".to_owned();
+    act(&mut mem, TicketEvent::Return { comment });
+    settle(&mut mem);
+    assert_eq!(a(&mem).status, TicketStatus::Running);
+    let written = mem.runner.written.borrow().clone();
+    assert_eq!(written[0], b"# [instruction] fix the look");
+    assert_eq!(written[1], b"\r");
+    let delivered = mem
+        .kinds()
+        .iter()
+        .filter(|k| *k == "comment.delivered")
+        .count();
+    assert_eq!(delivered, 1);
+    let t = a(&mem);
+    let claimed = crate::instructions::claim(&mut mem, &t).expect("claim");
+    assert_eq!(claimed.count, 0, "nothing is left for the Stop hook");
+}
+
+#[test]
+fn the_reviewers_remarks_wait_for_the_stop_hook_of_a_working_worker() {
+    let mut mem = process_review(ReviewMode::Agent);
+    mem.runner.reach.set(crate::runner::RunnerState {
+        hooks: true,
+        idle: false,
+    });
+    verdict(&mut mem, Verdict::RequestChanges, "handle the empty list").expect("verdict");
+    settle(&mut mem);
+    assert!(
+        mem.runner.written.borrow().is_empty(),
+        "nothing typed mid-turn"
+    );
+    let t = a(&mem);
+    let claimed = crate::instructions::claim(&mut mem, &t).expect("claim");
+    assert_eq!(claimed.count, 1);
+    assert!(claimed.reason.contains("handle the empty list"));
 }
