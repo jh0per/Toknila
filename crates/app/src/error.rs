@@ -1,6 +1,7 @@
 //! Application errors: a kind that adapters map to their protocol, and a message for humans.
 
 use toknila_core::graph::GraphError;
+use toknila_core::inbox::leftovers::LeftoverError;
 use toknila_core::machine::{TransitionError, UnknownAction};
 use toknila_core::thread::ThreadError;
 
@@ -98,6 +99,12 @@ impl From<TransitionError> for AppError {
 impl From<UnknownAction> for AppError {
     fn from(e: UnknownAction) -> Self {
         AppError::not_found(e.to_string())
+    }
+}
+
+impl From<LeftoverError> for AppError {
+    fn from(e: LeftoverError) -> Self {
+        AppError::conflict(e.to_string())
     }
 }
 

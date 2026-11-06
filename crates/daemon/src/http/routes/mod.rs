@@ -4,6 +4,7 @@
 pub mod agents;
 pub mod chains;
 pub mod events;
+pub mod inbox;
 pub mod profiles;
 pub mod projects;
 pub mod releases;

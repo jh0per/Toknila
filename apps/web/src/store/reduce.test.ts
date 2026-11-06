@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ChainDetail, EventRecord, Project, TicketItem } from "../api/types";
+import type { ChainDetail, EventRecord, Project } from "../api/types";
 import { reduce } from "./reduce";
 import { type State, initialState } from "./state";
 
@@ -37,12 +37,10 @@ const projects = [
 ] as Project[];
 
 function loaded(): State {
-  const tickets = [{ ticket: { id: "t1" }, needs_human: true }] as TicketItem[];
   const [s] = reduce(initialState({ name: "chains" }), {
     type: "loaded",
     projects,
     chains: [chain("c1", "demo", ["t1", "t2"]), chain("c2", "other", ["t3"])],
-    tickets,
   });
   return { ...s, lastSeq: 10 };
 }
@@ -84,7 +82,7 @@ describe("journal events", () => {
     const e = event(11, "ticket", "status_changed", { ticket: { chain_id: "c2" } });
     const [s, fx] = reduce(loaded(), { type: "event", event: e });
     expect(s.lastSeq).toBe(11);
-    expect(fx).toEqual([{ type: "loadChain", id: "c2" }, { type: "loadTickets" }, { type: "loadAgents" }]);
+    expect(fx).toEqual([{ type: "loadChain", id: "c2" }, { type: "loadInbox" }, { type: "loadAgents" }]);
   });
 
   it("place comments and subtasks by their ticket", () => {

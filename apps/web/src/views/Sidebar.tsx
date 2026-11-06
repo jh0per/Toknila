@@ -1,11 +1,12 @@
+import { KIND_TITLE, itemKey, itemRoute } from "../store/inbox";
 import type { Intent } from "../store/msg";
-import { type State, cardRoute, chainsOf, currentChain, currentProject, inbox, runningAgents } from "../store/state";
+import { type State, cardRoute, chainsOf, currentChain, currentProject, runningAgents } from "../store/state";
 import { NavLink } from "./Link";
 
 export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const project = currentProject(state);
   const chain = currentChain(state);
-  const waiting = inbox(state);
+  const waiting = state.inbox;
   const running = runningAgents(state);
   return (
     <nav className="sidebar" aria-label="Sidebar">
@@ -56,15 +57,20 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
           <span className={`badge${waiting.length === 0 ? " zero" : ""}`} data-testid="inbox-count">{waiting.length}</span>
         </h2>
         <ul>
-          {waiting.map(({ ticket, chain: c }) => (
-            <li key={ticket.id}>
-              <NavLink route={cardRoute(state, c, ticket)} dispatch={dispatch} className="item">
-                <span className="dot" style={{ background: "var(--block)" }} />
-                <span className="key">{ticket.key}</span>
-                <span className="t">{ticket.status}</span>
-              </NavLink>
-            </li>
-          ))}
+          {waiting.map((item) => {
+            const route = itemRoute(state, item);
+            return (
+              <li key={itemKey(item)}>
+                {route && (
+                  <NavLink route={route} dispatch={dispatch} className="item">
+                    <span className="dot" style={{ background: "var(--block)" }} />
+                    <span className="key">{item.ticket}</span>
+                    <span className="t">{KIND_TITLE[item.kind]}</span>
+                  </NavLink>
+                )}
+              </li>
+            );
+          })}
         </ul>
         {waiting.length === 0 && <p className="muted side-note">Nothing waiting.</p>}
       </section>

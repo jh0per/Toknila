@@ -16,10 +16,7 @@ fn done_out_of_order_merges_a_waiting_card_and_keeps_the_mark() {
         .expect("allowed");
         assert_eq!(t.ticket.status, TicketStatus::Merged);
         assert_eq!(t.ticket.status_since, NOW);
-        assert_eq!(
-            t.ticket.done_out_of_order,
-            Some(OutOfOrder { behind: behind() })
-        );
+        assert_eq!(t.ticket.done_out_of_order, Some(OutOfOrder::new(behind())));
         assert_eq!(t.effects, [Effect::DependencySatisfied]);
         assert_eq!(check_invariants(&t.ticket), Ok(()));
     }

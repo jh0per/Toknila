@@ -1,7 +1,7 @@
 // Everything that changes the state: what the person did (intents), API answers, the stream.
 
 import type {
-  ChainDetail, CommentKind, EventRecord, Project, ProjectAgents, TicketAction, TicketDetail, TicketItem,
+  ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, TicketAction, TicketDetail,
   TicketThreads,
 } from "../api/types";
 import type { Route, Tab } from "./route";
@@ -19,10 +19,14 @@ export type Intent =
   | ThreadAction
   | SettingsIntent;
 
+/// What a person decides about the open subtasks left behind a card done out of order.
+export type LeftoverAction = "move" | "close" | "leave";
+
 /// What a person does to a card: an action of its status (a return carries the comment), or a
 /// comment of the template's kinds.
 export type CardCommand =
   | { type: "ticketAction"; key: string; action: TicketAction; text?: string }
+  | { type: "leftovers"; key: string; action: LeftoverAction }
   | { type: "addComment"; key: string; kind: CommentKind; text: string };
 
 /// What a person does in a thread; `text` is the message or the comment of a request for changes.
@@ -38,11 +42,11 @@ export type Msg =
   | Intent
   | { type: "started" }
   | { type: "journalTail"; seq: number; events: EventRecord[] }
-  | { type: "loaded"; projects: Project[]; chains: ChainDetail[]; tickets: TicketItem[] }
+  | { type: "loaded"; projects: Project[]; chains: ChainDetail[] }
   | { type: "projectsLoaded"; projects: Project[] }
   | { type: "agentsLoaded"; agents: ProjectAgents[] }
   | { type: "chainLoaded"; chain: ChainDetail }
-  | { type: "ticketsLoaded"; tickets: TicketItem[] }
+  | { type: "inboxLoaded"; items: InboxItem[] }
   | { type: "detailLoaded"; detail: TicketDetail }
   | { type: "threadsLoaded"; threads: TicketThreads }
   | { type: "loadFailed"; error: string }
@@ -59,7 +63,7 @@ export type Effect =
   | { type: "loadProjects" }
   | { type: "loadAgents" }
   | { type: "loadChain"; id: string }
-  | { type: "loadTickets" }
+  | { type: "loadInbox" }
   | { type: "loadDetail"; key: string }
   | { type: "loadThreads"; key: string }
   | CardCommand

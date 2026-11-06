@@ -1,6 +1,8 @@
 // The page's one normalized store and the selectors the views read.
 
-import type { ChainDetail, EventRecord, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads } from "../api/types";
+import type {
+  ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads,
+} from "../api/types";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
 
@@ -13,8 +15,8 @@ export interface State {
   /// Chains by id, in the order the daemon lists them.
   chains: Record<string, ChainDetail>;
   chainOrder: string[];
-  /// Ids of tickets waiting on a person, as the daemon computes it.
-  needsHuman: Record<string, true>;
+  /// Everything waiting on a person, as the daemon computes it (newest first).
+  inbox: InboxItem[];
   /// Ticket details (subtasks, comments) by ticket key, for cards that were opened.
   details: Record<string, TicketDetail>;
   /// Threads (and the phase) by ticket key, for cards that were opened.
@@ -45,7 +47,7 @@ export function initialState(route: Route): State {
     agents: [],
     chains: {},
     chainOrder: [],
-    needsHuman: {},
+    inbox: [],
     details: {},
     threads: {},
     versionPick: {},
@@ -114,11 +116,6 @@ export function currentCard(s: State): Ticket | undefined {
 /// Every ticket the store knows, with its chain name, in chain order.
 export function allTickets(s: State): { ticket: Ticket; chain: ChainDetail }[] {
   return allChains(s).flatMap((chain) => chain.tickets.map((ticket) => ({ ticket, chain })));
-}
-
-/// Tickets waiting on a person, across chains.
-export function inbox(s: State): { ticket: Ticket; chain: ChainDetail }[] {
-  return allTickets(s).filter((x) => s.needsHuman[x.ticket.id]);
 }
 
 /// Tickets with a running agent (running state, until real runners exist).

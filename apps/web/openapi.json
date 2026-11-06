@@ -847,6 +847,49 @@
         }
       }
     },
+    "/projects/{project}/inbox": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Everything in the project that waits on a person, newest first, as core computes it.",
+        "operationId": "get_inbox",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InboxItem"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/releases/{release}/actions/{action}": {
       "post": {
         "tags": [
@@ -1444,6 +1487,64 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/leftovers/{action}": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "A person's decision about the open subtasks left behind a card done out of order.",
+        "operationId": "resolve_leftovers",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "The earlier card that holds the open subtasks (id or key)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "description": "move (into a new card at the end of the chain), close or leave",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3034,6 +3135,87 @@
         },
         "additionalProperties": false
       },
+      "InboxItem": {
+        "type": "object",
+        "description": "One entry of the inbox.",
+        "required": [
+          "kind",
+          "ticket",
+          "chain",
+          "title",
+          "since",
+          "text",
+          "subtasks",
+          "done_cards",
+          "allowed_actions"
+        ],
+        "properties": {
+          "allowed_actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketAction"
+            },
+            "description": "What a person may do to the card now, as the state machine allows it; the window offers\nno other card action."
+          },
+          "chain": {
+            "$ref": "#/components/schemas/ChainId"
+          },
+          "done_cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketKey"
+            },
+            "description": "The cards done out of order that these subtasks are behind (`leftovers` items)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/InboxKind"
+          },
+          "since": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "Since when it waits; items are sorted by this, newest first."
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The open subtasks, verbatim (`leftovers` items)."
+          },
+          "text": {
+            "type": "string",
+            "description": "The question, the blocking reason, or the thread's title; empty otherwise."
+          },
+          "thread": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The thread's number on the card (`thread` items).",
+            "minimum": 0
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/TicketKey",
+            "description": "The card to open and act on; for `leftovers` the earlier card that holds the subtasks."
+          },
+          "title": {
+            "type": "string",
+            "description": "The card's title."
+          }
+        }
+      },
+      "InboxKind": {
+        "type": "string",
+        "description": "What kind of thing waits on the person; the order is the order clients group them in.",
+        "enum": [
+          "proposal",
+          "question",
+          "blocked",
+          "review",
+          "thread",
+          "leftovers"
+        ]
+      },
       "InstructionClaim": {
         "type": "object",
         "description": "Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it\nworked, now handed over and marked delivered.",
@@ -3562,6 +3744,13 @@
             "items": {
               "$ref": "#/components/schemas/TicketKey"
             }
+          },
+          "dismissed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketKey"
+            },
+            "description": "Earlier cards whose leftovers a person chose to leave as they are."
           }
         }
       },

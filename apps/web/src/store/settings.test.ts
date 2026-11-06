@@ -10,18 +10,18 @@ const project = (over: Partial<Project> = {}) =>
 const draft = { key: "DEMO", name: "", repo_path: "/work/demo", work_branch: "develop" };
 
 function ready(projects: Project[]): State {
-  const [s] = reduce(initialState({ name: "chains" }), { type: "loaded", projects, chains: [], tickets: [] });
+  const [s] = reduce(initialState({ name: "chains" }), { type: "loaded", projects, chains: [] });
   return s;
 }
 
 describe("first run", () => {
   it("loads the checks and the profiles when there is no project", () => {
-    const [, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: [], chains: [], tickets: [] });
+    const [, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: [], chains: [] });
     expect(fx).toEqual([{ type: "loadChecks" }, { type: "loadProfiles" }]);
   });
 
   it("loads nothing extra at home once there are projects", () => {
-    const [, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: [project()], chains: [], tickets: [] });
+    const [, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: [project()], chains: [] });
     expect(fx).toEqual([]);
   });
 
