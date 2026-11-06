@@ -836,6 +836,10 @@ export interface components {
              */
             message: string;
         };
+        /** @description The mark of a card that was done out of order: the earlier cards that were still open. */
+        OutOfOrder: {
+            behind: components["schemas"]["TicketKey"][];
+        };
         /** @description How the terminal output of an agent is kept and shown. */
         OutputRules: {
             /**
@@ -1088,6 +1092,7 @@ export interface components {
             /** @description Ship branch `ship/<chain>/<slug>`; empty until phase 1 creates ships. */
             branch?: string | null;
             chain_id: components["schemas"]["ChainId"];
+            done_out_of_order?: components["schemas"]["OutOfOrder"] | null;
             id: components["schemas"]["TicketId"];
             key: components["schemas"]["TicketKey"];
             /** @description Copy depot secrets onto the ship at start. */

@@ -25,6 +25,11 @@ fn shape(view: &ChainView) -> Vec<(String, String, EdgeKind)> {
     e
 }
 
+fn texts(lists: Vec<Checklist>) -> HashMap<crate::TicketId, Vec<String>> {
+    let text = |c: Checklist| c.subtasks.into_iter().map(|s| s.0).collect();
+    lists.into_iter().map(|c| (c.ticket, text(c))).collect()
+}
+
 fn err(text: &str) -> PlanError {
     parse(text).expect_err("should be rejected")
 }
@@ -61,7 +66,7 @@ fn demo_parses_into_the_gate_graph() {
 fn export_then_import_gives_the_same_graph() {
     let plan = parse(DEMO).expect("demo parses");
     let (view, subtasks) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
-    let subtasks: HashMap<_, _> = subtasks.into_iter().collect();
+    let subtasks = texts(subtasks);
     let text = export(&view, &subtasks);
     let again = parse(&text).unwrap_or_else(|e| panic!("{e}\n{text}"));
     let (view2, subtasks2) = again.instantiate(ProjectId::new(), Timestamp(0), keys());
@@ -87,7 +92,7 @@ fn export_then_import_gives_the_same_graph() {
     assert_eq!(shape(&view), shape(&view2));
     assert_eq!(view.releases[0].version, view2.releases[0].version);
     assert_eq!(view.releases[0].start_mode, view2.releases[0].start_mode);
-    let st2: HashMap<_, _> = subtasks2.into_iter().collect();
+    let st2 = texts(subtasks2);
     let a2 = view2.tickets.iter().find(|t| t.title == "A").expect("A");
     assert_eq!(st2[&a2.id], ["write the test", "make it pass"]);
     // A second export is byte-identical: the format is stable.
@@ -208,3 +213,5 @@ fn the_phase_1_plan_is_a_valid_chain() {
     let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
     view.validate().expect("valid graph");
 }
+
+mod order;

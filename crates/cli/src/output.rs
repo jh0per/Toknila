@@ -214,6 +214,10 @@ pub fn ticket(d: &TicketDetail) {
             from.unwrap_or_default()
         );
     }
+    if let Some(o) = &t.done_out_of_order {
+        let behind: Vec<String> = o.behind.iter().map(ToString::to_string).collect();
+        println!("done out of order: {} was still open", behind.join(", "));
+    }
     if !t.prompt.is_empty() {
         println!("\n{}", t.prompt);
     }

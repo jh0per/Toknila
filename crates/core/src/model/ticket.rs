@@ -36,6 +36,17 @@ pub struct Ticket {
     /// approved it. It stays after the decision. Absent on planned tickets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wildcard: Option<Wildcard>,
+    /// Set when the card was taken to Merged while cards before it were still open (a spec
+    /// folder whose work was done in another order). It stays after the card moves on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_out_of_order: Option<OutOfOrder>,
+}
+
+/// The mark of a card that was done out of order: the earlier cards that were still open.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutOfOrder {
+    pub behind: Vec<TicketKey>,
 }
 
 /// The mark of a wildcard card: work found during the chain that waits for a person's approval
@@ -94,6 +105,7 @@ impl Ticket {
             needs_secrets: draft.needs_secrets,
             tokens_used: 0,
             wildcard: None,
+            done_out_of_order: None,
         }
     }
 

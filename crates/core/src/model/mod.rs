@@ -27,7 +27,7 @@ pub use thread::{
     ArtifactFormat, MessageKind, Phase, Thread, ThreadKind, ThreadMessage, ThreadState,
     ThreadVersion,
 };
-pub use ticket::{Subtask, Ticket, TicketDraft, TicketPatch, Wildcard};
+pub use ticket::{OutOfOrder, Subtask, Ticket, TicketDraft, TicketPatch, Wildcard};
 pub use time::Timestamp;
 
 #[cfg(test)]

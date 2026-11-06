@@ -12,6 +12,8 @@
 //! id = "A"
 //! title = "A"
 //! subtasks = ["write the test"]
+//! done_subtasks = [1]   # optional: positions already ticked
+//! done = true           # optional: import as Merged
 //!
 //! [[ticket]]
 //! id = "B"
@@ -30,10 +32,13 @@ use crate::{EdgeKind, ReleaseChannel, ReviewMode, StartMode};
 
 mod export;
 mod instantiate;
+mod order;
 mod parse;
 mod raw;
 
 pub use export::export;
+pub use instantiate::Checklist;
+pub use order::out_of_order;
 pub use parse::parse;
 
 /// A problem in a chain file. `line` is 1-based.
@@ -65,6 +70,10 @@ pub struct PlanTicket {
     pub review_mode: Option<ReviewMode>,
     pub needs_secrets: bool,
     pub paused: bool,
+    /// Import as Merged: the ticket goes through the state machine once its dependencies are.
+    pub done: bool,
+    /// 1-based positions of subtasks that start ticked.
+    pub done_subtasks: Vec<u32>,
 }
 
 /// One milestone from a file.

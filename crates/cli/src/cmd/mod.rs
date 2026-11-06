@@ -6,6 +6,7 @@ mod profile;
 mod project;
 mod release;
 mod sim;
+mod spec;
 mod thread;
 mod ticket;
 mod watch;

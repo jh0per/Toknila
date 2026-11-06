@@ -22,16 +22,21 @@ pub enum ChainCmd {
         #[arg(long)]
         project: Option<String>,
     },
-    /// Create a chain with tickets, dependencies and milestones from a TOML file.
+    /// Create a chain from a TOML file, or from a spec folder (with tasks.md); a folder of spec
+    /// folders imports each one as its own chain.
     Import {
         file: std::path::PathBuf,
         #[arg(long)]
         project: Option<String>,
     },
-    /// Write a chain as TOML (to stdout, or a file).
+    /// Write a chain as TOML (to stdout, or a file), or patch a spec folder's tasks.md with
+    /// `--spec`: checkboxes follow the subtasks, new cards are appended, nothing is deleted.
     Export {
         chain: String,
         file: Option<std::path::PathBuf>,
+        /// The spec folder whose tasks.md to patch.
+        #[arg(long, conflicts_with = "file")]
+        spec: Option<std::path::PathBuf>,
     },
     /// Show a chain as a graph in dependency order with its status.
     Show { chain: String },
@@ -84,13 +89,21 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
             };
             emit(json_out, &c.create_chain(&p, &input)?, output::chain);
         }
+        ChainCmd::Import { file, project } if file.is_dir() => {
+            return super::spec::import(c, &file, project, json_out);
+        }
         ChainCmd::Import { file, project } => {
             let text = std::fs::read_to_string(&file)
                 .with_context(|| format!("read {}", file.display()))?;
             let p = default_project(c, project)?;
             emit(json_out, &c.import_chain(&p, text)?, output::chain);
         }
-        ChainCmd::Export { chain, file } => {
+        ChainCmd::Export {
+            chain,
+            spec: Some(dir),
+            ..
+        } => return super::spec::export(c, &chain, &dir),
+        ChainCmd::Export { chain, file, .. } => {
             let toml = c.export_chain(&chain)?;
             match file {
                 Some(f) => {

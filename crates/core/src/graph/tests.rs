@@ -48,6 +48,7 @@ impl Builder {
             needs_secrets: false,
             tokens_used: 0,
             wildcard: None,
+            done_out_of_order: None,
         };
         self.next += 1;
         let id = t.id;

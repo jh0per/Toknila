@@ -7,15 +7,30 @@ use crate::{
     TicketKey, Timestamp,
 };
 
+/// The subtasks of an imported ticket: text and whether it starts ticked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Checklist {
+    pub ticket: TicketId,
+    pub subtasks: Vec<(String, bool)>,
+    /// The file asks for the ticket to be imported as Merged.
+    pub done: bool,
+    /// Done, but these earlier tickets are not: it is taken to Merged out of order.
+    pub behind: Vec<TicketKey>,
+}
+
+fn position(index: usize) -> u32 {
+    u32::try_from(index + 1).unwrap_or(u32::MAX)
+}
+
 impl Plan {
     /// Turns the plan into a new chain of `project`. `key` hands out ticket keys in file order.
-    /// Returns the view and the subtask texts of each ticket.
+    /// Returns the view and the checklist of each ticket.
     pub fn instantiate(
         &self,
         project: ProjectId,
         now: Timestamp,
         mut key: impl FnMut() -> TicketKey,
-    ) -> (ChainView, Vec<(TicketId, Vec<String>)>) {
+    ) -> (ChainView, Vec<Checklist>) {
         let chain = Chain {
             id: ChainId::new(),
             project_id: project,
@@ -51,10 +66,22 @@ impl Plan {
                 kind: e.kind,
             })
             .collect();
+        let open_before = self.out_of_order();
         let subtasks = tickets
             .iter()
             .zip(&self.tickets)
-            .map(|(t, p)| (t.id, p.subtasks.clone()))
+            .zip(&open_before)
+            .map(|((t, p), open)| Checklist {
+                ticket: t.id,
+                subtasks: p
+                    .subtasks
+                    .iter()
+                    .enumerate()
+                    .map(|(i, text)| (text.clone(), p.done_subtasks.contains(&position(i))))
+                    .collect(),
+                done: p.done,
+                behind: open.iter().map(|i| tickets[*i].key.clone()).collect(),
+            })
             .collect();
         let view = ChainView {
             chain,

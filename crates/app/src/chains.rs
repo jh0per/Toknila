@@ -4,9 +4,10 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
-use toknila_core::{Chain, ChainId, Edge, EdgeKind, ReviewMode, TicketKey};
+use toknila_core::machine::TicketEvent;
+use toknila_core::{Chain, ChainId, Edge, EdgeKind, ReviewMode, TicketId, TicketKey, TicketStatus};
 
-use crate::notes::add_subtask;
+use crate::notes::{add_subtask, update_subtask};
 use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork, resolve, with_chain};
 
 /// `POST /v1/projects/{project}/chains`.
@@ -85,15 +86,81 @@ pub fn import<U: UnitOfWork + ?Sized>(
         }
         Ok(())
     })?;
-    for (id, texts) in subtasks {
+    let mut done = Vec::new();
+    let mut late = Vec::new();
+    for list in subtasks {
         let ticket = uow
-            .ticket(id)?
+            .ticket(list.ticket)?
             .ok_or_else(|| AppError::not_found("ticket"))?;
-        for s in &texts {
-            add_subtask(uow, &ticket, s)?;
+        for (text, ticked) in &list.subtasks {
+            let s = add_subtask(uow, &ticket, text)?;
+            if *ticked {
+                update_subtask(uow, &ticket, s.position, Some(true), None)?;
+            }
+        }
+        match (list.done, list.behind.is_empty()) {
+            (true, true) => done.push(list.ticket),
+            (true, false) => late.push((list.ticket, list.behind)),
+            (false, _) => {}
         }
     }
+    merge_late(uow, chain_id, late)?;
+    merge_done(uow, chain_id, &done)?;
     Ok(chain_id)
+}
+
+/// Takes the tickets a file marked done behind open tickets to Merged with the state machine's
+/// out-of-order event; the ticket keeps the keys of the open tickets as its mark.
+fn merge_late<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: ChainId,
+    late: Vec<(TicketId, Vec<TicketKey>)>,
+) -> AppResult<()> {
+    with_chain(uow, chain, move |ctx| -> AppResult<()> {
+        for (id, behind) in late {
+            ctx.ticket_event(id, TicketEvent::DoneOutOfOrder { behind })?;
+        }
+        Ok(())
+    })
+}
+
+/// Takes the tickets a file marked done through Ready, Running and Review to Merged, with the
+/// ordinary events, in dependency order: each round merges what is Ready, and settling then
+/// readies its dependents. Done tickets behind open tickets were merged before, out of order.
+fn merge_done<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: ChainId,
+    done: &[TicketId],
+) -> AppResult<()> {
+    for _ in 0..=done.len() {
+        let moved = with_chain(uow, chain, |ctx| -> AppResult<bool> {
+            let mut moved = false;
+            for id in done {
+                while let Some(event) = next_merge_event(ctx, *id) {
+                    ctx.ticket_event(*id, event)?;
+                    moved = true;
+                }
+            }
+            Ok(moved)
+        })?;
+        if !moved {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn next_merge_event(ctx: &ChainTx, id: TicketId) -> Option<TicketEvent> {
+    let t = ctx.view.tickets.iter().find(|t| t.id == id)?;
+    match t.status {
+        TicketStatus::Ready => Some(TicketEvent::Start),
+        TicketStatus::Running => Some(TicketEvent::Finished {
+            summary: "Imported as done: every task was already checked.".to_owned(),
+            open_threads: Vec::new(),
+        }),
+        TicketStatus::Review => Some(TicketEvent::Accept),
+        _ => None,
+    }
 }
 
 /// A chain as a chain file.

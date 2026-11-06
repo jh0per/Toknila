@@ -1,0 +1,179 @@
+{
+  "chain": {
+    "name": "001-sample-feature",
+    "goal": "Sample Feature\n\nDocuments:\n- spec.md\n- plan.md\n- contracts/\n- tasks.md",
+    "autostart": false,
+    "review_mode": null
+  },
+  "tickets": [
+    {
+      "local_id": "p1",
+      "title": "Setup",
+      "prompt": "",
+      "acceptance": [],
+      "subtasks": [
+        "T001 Confirm the accepted scope in `specs/001-sample-feature/spec.md`",
+        "T002 [P] Record the design procedures in `docs/design.md`"
+      ],
+      "profile": null,
+      "review_mode": null,
+      "needs_secrets": false,
+      "paused": false,
+      "done": true,
+      "done_subtasks": [
+        1,
+        2
+      ]
+    },
+    {
+      "local_id": "p2",
+      "title": "Foundational State",
+      "prompt": "",
+      "acceptance": [],
+      "subtasks": [
+        "T003 Implement independent loading, error, retry states in `src/state.rs`",
+        "T004 Add the store module"
+      ],
+      "profile": null,
+      "review_mode": null,
+      "needs_secrets": false,
+      "paused": false,
+      "done": true,
+      "done_subtasks": [
+        1,
+        2
+      ]
+    },
+    {
+      "local_id": "p3",
+      "title": "US1: Choose a creation path",
+      "prompt": "**Goal**: A person picks how to start.\n**Independent Test**: Open the home page and see the choices.",
+      "acceptance": [],
+      "subtasks": [
+        "T005 [US1] Build the navigation and hero in `src/home.rs`",
+        "T006 [P] [US1] Implement the hero wall in `src/wall.rs`"
+      ],
+      "profile": null,
+      "review_mode": null,
+      "needs_secrets": false,
+      "paused": false,
+      "done": false,
+      "done_subtasks": [
+        1
+      ]
+    },
+    {
+      "local_id": "p4",
+      "title": "US2: Resume a draft",
+      "prompt": "**Goal**: A person continues where they stopped.",
+      "acceptance": [],
+      "subtasks": [
+        "T007 [US2] Load the last draft in `src/draft.rs`",
+        "T008 [P] [US2] Show the draft badge in `src/badge.rs`"
+      ],
+      "profile": null,
+      "review_mode": null,
+      "needs_secrets": false,
+      "paused": false,
+      "done": false,
+      "done_subtasks": []
+    },
+    {
+      "local_id": "p5",
+      "title": "US3: Share a result",
+      "prompt": "",
+      "acceptance": [],
+      "subtasks": [
+        "T009 [US3] Add the share sheet"
+      ],
+      "profile": null,
+      "review_mode": null,
+      "needs_secrets": false,
+      "paused": false,
+      "done": false,
+      "done_subtasks": []
+    },
+    {
+      "local_id": "p6",
+      "title": "Polish, Integration, and Release Evidence",
+      "prompt": "",
+      "acceptance": [],
+      "subtasks": [
+        "T010 Record the release evidence",
+        "T011 [P] Update the docs"
+      ],
+      "profile": null,
+      "review_mode": null,
+      "needs_secrets": false,
+      "paused": false,
+      "done": false,
+      "done_subtasks": []
+    }
+  ],
+  "releases": [],
+  "edges": [
+    {
+      "from": {
+        "Ticket": 0
+      },
+      "to": {
+        "Ticket": 1
+      },
+      "kind": "normal"
+    },
+    {
+      "from": {
+        "Ticket": 1
+      },
+      "to": {
+        "Ticket": 2
+      },
+      "kind": "normal"
+    },
+    {
+      "from": {
+        "Ticket": 1
+      },
+      "to": {
+        "Ticket": 3
+      },
+      "kind": "normal"
+    },
+    {
+      "from": {
+        "Ticket": 1
+      },
+      "to": {
+        "Ticket": 4
+      },
+      "kind": "normal"
+    },
+    {
+      "from": {
+        "Ticket": 2
+      },
+      "to": {
+        "Ticket": 5
+      },
+      "kind": "normal"
+    },
+    {
+      "from": {
+        "Ticket": 3
+      },
+      "to": {
+        "Ticket": 5
+      },
+      "kind": "normal"
+    },
+    {
+      "from": {
+        "Ticket": 4
+      },
+      "to": {
+        "Ticket": 5
+      },
+      "kind": "normal"
+    }
+  ]
+}

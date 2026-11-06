@@ -9,6 +9,7 @@ mod notes;
 mod ports;
 mod schema;
 mod threads;
+mod tickets;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};

@@ -52,6 +52,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         needs_secrets: false,
         tokens_used: 0,
         wildcard: None,
+        done_out_of_order: None,
     }
 }
 
@@ -151,6 +152,41 @@ async fn a_phase_0_database_gains_wildcard_marks() {
 }
 
 #[tokio::test]
+async fn the_out_of_order_mark_is_stored_and_old_rows_have_none() {
+    let (_dir, store) = open_temp();
+    let p = project();
+    let c = chain(p.id);
+    let (pc, cc) = (p.clone(), c.clone());
+    store
+        .write(Actor::Human, NOW, move |tx| {
+            tx.repo().insert_project(&pc)?;
+            tx.repo().insert_chain(&cc)
+        })
+        .await
+        .expect("setup");
+    let plain = ticket(c.id, 1);
+    let mut marked = ticket(c.id, 2);
+    marked.status = TicketStatus::Merged;
+    marked.done_out_of_order = Some(toknila_core::OutOfOrder {
+        behind: vec![plain.key.clone()],
+    });
+    let (a, b) = (plain.clone(), marked.clone());
+    store
+        .write(Actor::Human, NOW, move |tx| {
+            tx.repo().upsert_ticket(&a)?;
+            tx.repo().upsert_ticket(&b)
+        })
+        .await
+        .expect("save");
+    let (ia, ib) = (plain.id, marked.id);
+    let back = store
+        .read(move |repo| Ok((repo.ticket(ia)?, repo.ticket(ib)?)))
+        .await
+        .expect("read");
+    assert_eq!(back, (Some(plain), Some(marked)));
+}
+
+#[tokio::test]
 async fn a_database_before_threads_gains_them_and_keeps_every_byte_of_an_artifact() {
     use toknila_core::{
         ArtifactFormat, MessageKind, ThreadId, ThreadKind, ThreadMessageId, ThreadVersionId, thread,
@@ -170,7 +206,13 @@ async fn a_database_before_threads_gains_them_and_keeps_every_byte_of_an_artifac
         let repo = Repo::new(&conn);
         repo.insert_project(&p).expect("project");
         repo.insert_chain(&c).expect("chain");
-        repo.upsert_ticket(&t).expect("ticket");
+        conn.execute(
+            "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
+             status_since, paused, needs_secrets, tokens_used) \
+             VALUES (?1, ?2, 'DEMO-1', ?3, ?4, '[]', 'backlog', 1, 0, 0, 0)",
+            params![t.id.to_string(), c.id.to_string(), t.title, t.prompt],
+        )
+        .expect("ticket");
     }
     let store = Store::open(&path).expect("migrates");
     let th = thread::open(

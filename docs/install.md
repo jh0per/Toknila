@@ -71,6 +71,9 @@ started. A person proposes a card with `tok propose demo "<title>" --after DEMO-
 Toknila's own next phase is a chain too: `tok project new TOK && tok chain import phase-1.toml
 --project TOK && tok chain show phase-1`.
 
+Spec-driven projects (`specs/<n>-<name>/tasks.md`) import and export the same way; see
+[specs.md](specs.md).
+
 ## Where things live
 
 | What | Where |

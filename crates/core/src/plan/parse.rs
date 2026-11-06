@@ -19,6 +19,7 @@ pub fn parse(text: &str) -> Result<Plan, PlanError> {
     })?;
     let file = Source { text, raw: &raw };
     let ids = file.ids()?;
+    file.check_done_subtasks()?;
     let edges = file.edges(&ids)?;
     file.check_edges(&edges)?;
     Ok(build(raw, edges))
@@ -61,6 +62,22 @@ impl Source<'_> {
             }
         }
         Ok(ids)
+    }
+
+    /// `done_subtasks` positions must point at existing subtasks.
+    fn check_done_subtasks(&self) -> Result<(), PlanError> {
+        for t in &self.raw.ticket {
+            let len = t.subtasks.len();
+            let bad = t
+                .done_subtasks
+                .iter()
+                .find(|n| **n == 0 || **n as usize > len);
+            if let Some(bad) = bad {
+                let message = format!("done_subtasks {bad} is not one of {len} subtasks");
+                return Err(self.error(t.id.span(), message));
+            }
+        }
+        Ok(())
     }
 
     fn node(&self, ids: &Ids, s: &Spanned<String>) -> Result<PlanNode, PlanError> {
@@ -170,6 +187,8 @@ fn build(raw: RawFile, edges: Vec<PlanEdge>) -> Plan {
         review_mode: t.review_mode,
         needs_secrets: t.needs_secrets,
         paused: t.paused,
+        done: t.done,
+        done_subtasks: t.done_subtasks,
     });
     let releases = raw.release.into_iter().map(|r| PlanRelease {
         version: r.version.unwrap_or_else(|| r.id.get_ref().clone()),
