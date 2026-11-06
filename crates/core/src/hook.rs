@@ -26,6 +26,10 @@ pub struct HookInput {
     pub notification_type: Option<String>,
     /// The notification's text.
     pub message: Option<String>,
+    /// Claude Code's id of the session the hook fired in.
+    pub session_id: Option<String>,
+    /// The session's transcript file.
+    pub transcript_path: Option<String>,
 }
 
 /// Whether `name` is a hook Toknila subscribes to.
@@ -56,6 +60,7 @@ mod tests {
         HookInput {
             notification_type: kind.map(str::to_owned),
             message: message.map(str::to_owned),
+            ..HookInput::default()
         }
     }
 
@@ -120,12 +125,31 @@ mod tests {
     }
 
     #[test]
+    fn hook_json_names_the_session_and_its_transcript() {
+        let i: HookInput = serde_json::from_str(
+            r#"{"hook_event_name":"Stop","session_id":"abc","transcript_path":"/h/.claude/projects/p/abc.jsonl"}"#,
+        )
+        .expect("parse");
+        assert_eq!(i.session_id.as_deref(), Some("abc"));
+        assert_eq!(
+            i.transcript_path.as_deref(),
+            Some("/h/.claude/projects/p/abc.jsonl")
+        );
+    }
+
+    #[test]
     fn hook_json_is_read_leniently() {
         let i: HookInput = serde_json::from_str(
             r#"{"hook_event_name":"Notification","session_id":"s","notification_type":"permission_prompt","message":"m"}"#,
         )
         .expect("parse");
-        assert_eq!(i, input(Some("permission_prompt"), Some("m")));
+        assert_eq!(
+            i,
+            HookInput {
+                session_id: Some("s".to_owned()),
+                ..input(Some("permission_prompt"), Some("m"))
+            }
+        );
         let empty: HookInput = serde_json::from_str("{}").expect("parse");
         assert_eq!(empty, HookInput::default());
     }

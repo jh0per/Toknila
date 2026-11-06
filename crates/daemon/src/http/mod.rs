@@ -35,7 +35,7 @@ impl Modify for BearerAuth {
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
         agents::*, chains::*, events::*, inbox::*, profiles::*, projects::*, releases::*,
-        runner::*, system::*, threads::*, tickets::*,
+        runner::*, system::*, threads::*, tickets::*, usage::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -44,6 +44,9 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(system_checks))
         .routes(routes!(repos_check))
         .routes(routes!(list_agents))
+        .routes(routes!(get_usage))
+        .routes(routes!(put_usage_settings))
+        .routes(routes!(post_usage_quota))
         .routes(routes!(get_inbox))
         .routes(routes!(resolve_leftovers))
         .routes(routes!(create_chain))

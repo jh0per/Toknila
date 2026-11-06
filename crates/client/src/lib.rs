@@ -16,6 +16,7 @@ use toknila_core::Project;
 
 mod runner;
 mod settings;
+mod usage;
 
 pub use runner::Scrollback;
 

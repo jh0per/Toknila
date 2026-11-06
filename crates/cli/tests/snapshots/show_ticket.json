@@ -85,5 +85,19 @@
     "status_since": 0,
     "title": "B",
     "tokens_used": 0
+  },
+  "usage": {
+    "cache_savings_usd": 0.0,
+    "cached_share": 0.0,
+    "cost_usd": 0.0,
+    "messages": 0,
+    "processed": 0,
+    "tokens": {
+      "cache_read": 0,
+      "cache_write": 0,
+      "input": 0,
+      "output": 0
+    },
+    "uncached_input": 0
   }
 }

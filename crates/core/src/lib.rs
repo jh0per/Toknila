@@ -22,6 +22,7 @@ pub mod spec;
 pub mod system;
 pub mod template;
 pub mod thread;
+pub mod usage;
 pub mod wire;
 
 pub use model::*;

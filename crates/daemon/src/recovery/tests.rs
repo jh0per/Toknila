@@ -36,6 +36,7 @@ async fn seeded() -> (tempfile::TempDir, Store) {
         profiles: PathBuf::new(),
         runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
         tools: std::sync::Arc::new(crate::tools::SystemTools),
+        usage: Arc::new(crate::usage::Usage::disabled()),
     });
     post(&app, "/v1/projects", json!({ "key": "DEMO" })).await;
     let toml = include_str!("../../../../examples/demo.toml");

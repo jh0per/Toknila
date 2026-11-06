@@ -2204,6 +2204,114 @@
           }
         }
       }
+    },
+    "/usage": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Tokens and estimated API cost over the last 7, 30 or 90 days: totals, a series per UTC day and\nbreakdowns by model, project, chain, card and workspace. Costs are estimates at API list\nprices; on a subscription the real cost differs.",
+        "operationId": "get_usage",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "description": "The window in days: 7 (default), 30 or 90.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage/quota": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "The plan limits an agent's status line received from Claude Code (`rate_limits`); the page\nshows them as the remaining quota until the windows reset.",
+        "operationId": "post_usage_quota",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage/settings": {
+      "put": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Counts every Claude Code session on this machine (the default), or only Toknila's runs.",
+        "operationId": "put_usage_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsageSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSettings"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2859,6 +2967,16 @@
             "items": {
               "$ref": "#/components/schemas/Ticket"
             }
+          },
+          "usage": {
+            "type": "object",
+            "description": "Estimated token usage per card, by ticket key; cards that used none are absent.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/UsageFigures"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           }
         }
       },
@@ -3123,6 +3241,23 @@
           "report",
           "decision"
         ]
+      },
+      "DayUsage": {
+        "type": "object",
+        "description": "One UTC day of the series.",
+        "required": [
+          "day",
+          "figures"
+        ],
+        "properties": {
+          "day": {
+            "type": "string",
+            "description": "`YYYY-MM-DD`, UTC."
+          },
+          "figures": {
+            "$ref": "#/components/schemas/UsageFigures"
+          }
+        }
       },
       "Edge": {
         "type": "object",
@@ -3457,9 +3592,23 @@
           "signal"
         ],
         "properties": {
+          "session_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Claude Code's session id, from the hook's input."
+          },
           "signal": {
             "type": "string",
             "description": "What fired, for example `hook:stop`."
+          },
+          "transcript_path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The session's transcript file, from the hook's input."
           }
         }
       },
@@ -4105,6 +4254,39 @@
           "implement"
         ]
       },
+      "PriceInfo": {
+        "type": "object",
+        "description": "Where the cost estimate's prices come from.",
+        "required": [
+          "source",
+          "retrieved",
+          "overridden"
+        ],
+        "properties": {
+          "overridden": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Models whose price the person overrode in `usage-prices.toml`."
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why `usage-prices.toml` was not used, when it could not be read."
+          },
+          "retrieved": {
+            "type": "string",
+            "description": "The day they were taken (`YYYY-MM-DD`)."
+          },
+          "source": {
+            "type": "string",
+            "description": "The page the shipped prices were taken from."
+          }
+        }
+      },
       "ProfileList": {
         "type": "object",
         "description": "The profiles folder, the usable profiles and the files that were not.",
@@ -4348,6 +4530,80 @@
           },
           "ticket": {
             "$ref": "#/components/schemas/TicketId"
+          }
+        }
+      },
+      "QuotaReport": {
+        "type": "object",
+        "description": "Body of `POST /v1/usage/quota`: the rate-limit windows an agent's status line received.",
+        "required": [
+          "windows"
+        ],
+        "properties": {
+          "windows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuotaWindow"
+            }
+          }
+        }
+      },
+      "QuotaView": {
+        "type": "object",
+        "description": "What the Usage page shows about the quota.",
+        "required": [
+          "available",
+          "reason",
+          "windows"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why there is nothing to show, or where the numbers come from."
+          },
+          "seen_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuotaWindow"
+            }
+          }
+        }
+      },
+      "QuotaWindow": {
+        "type": "object",
+        "description": "One rate-limit window.",
+        "required": [
+          "name",
+          "used_percentage",
+          "resets_at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "`five_hour` or `seven_day`."
+          },
+          "resets_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix epoch seconds when the window resets."
+          },
+          "used_percentage": {
+            "type": "number",
+            "format": "double",
+            "description": "0 to 100 (above 100 once exceeded)."
           }
         }
       },
@@ -5410,6 +5666,10 @@
           },
           "ticket": {
             "$ref": "#/components/schemas/Ticket"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageFigures",
+            "description": "Tokens the card's agents used and their estimated cost at API list prices; all zero\nbefore any run reported a transcript."
           }
         }
       },
@@ -5504,6 +5764,41 @@
         "format": "int64",
         "description": "Milliseconds since the Unix epoch, UTC."
       },
+      "TokenCounts": {
+        "type": "object",
+        "description": "The four token counts a model call reports.",
+        "required": [
+          "input",
+          "cache_write",
+          "cache_read",
+          "output"
+        ],
+        "properties": {
+          "cache_read": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Input tokens served from the cache.",
+            "minimum": 0
+          },
+          "cache_write": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Input tokens written to the cache.",
+            "minimum": 0
+          },
+          "input": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Input tokens that were neither read from nor written to the cache.",
+            "minimum": 0
+          },
+          "output": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "Tool": {
         "type": "string",
         "description": "Which tool a check is about.",
@@ -5512,6 +5807,182 @@
           "claude",
           "gh"
         ]
+      },
+      "UsageFigures": {
+        "type": "object",
+        "description": "The numbers of one group of calls.",
+        "required": [
+          "tokens",
+          "processed",
+          "uncached_input",
+          "cached_share",
+          "cost_usd",
+          "cache_savings_usd",
+          "messages"
+        ],
+        "properties": {
+          "cache_savings_usd": {
+            "type": "number",
+            "format": "double",
+            "description": "What the cache saved at those prices, USD."
+          },
+          "cached_share": {
+            "type": "number",
+            "format": "double",
+            "description": "The share of input tokens served from the cache, 0 to 1."
+          },
+          "cost_usd": {
+            "type": "number",
+            "format": "double",
+            "description": "Estimated cost at API list prices, USD."
+          },
+          "messages": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Model calls counted.",
+            "minimum": 0
+          },
+          "processed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Every token processed: input, cache and output.",
+            "minimum": 0
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/TokenCounts"
+          },
+          "uncached_input": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Input tokens not served from the cache.",
+            "minimum": 0
+          }
+        }
+      },
+      "UsageItem": {
+        "type": "object",
+        "description": "One line of a breakdown.",
+        "required": [
+          "label",
+          "figures"
+        ],
+        "properties": {
+          "figures": {
+            "$ref": "#/components/schemas/UsageFigures"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "UsageSettings": {
+        "type": "object",
+        "description": "Body of `PUT /v1/usage/settings`.",
+        "required": [
+          "machine_scan"
+        ],
+        "properties": {
+          "machine_scan": {
+            "type": "boolean",
+            "description": "Count every Claude Code session under the user's `~/.claude/projects`, not only\nToknila's runs. Local only; on by default."
+          }
+        }
+      },
+      "UsageSummary": {
+        "type": "object",
+        "description": "Usage over the last `days` days.",
+        "required": [
+          "days",
+          "totals",
+          "series",
+          "by_model",
+          "by_project",
+          "by_chain",
+          "by_card",
+          "by_workspace",
+          "unpriced_models"
+        ],
+        "properties": {
+          "by_card": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageItem"
+            }
+          },
+          "by_chain": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageItem"
+            }
+          },
+          "by_model": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageItem"
+            }
+          },
+          "by_project": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageItem"
+            },
+            "description": "Toknila runs only, as are the next two."
+          },
+          "by_workspace": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageItem"
+            }
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DayUsage"
+            },
+            "description": "One entry per day, oldest first, empty days included."
+          },
+          "totals": {
+            "$ref": "#/components/schemas/UsageFigures"
+          },
+          "unpriced_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Models seen without a price: counted in tokens, not in cost."
+          }
+        }
+      },
+      "UsageView": {
+        "type": "object",
+        "description": "`GET /v1/usage`: the usage page in one answer. Every cost in it is an estimate at API list\nprices; on a subscription the real cost differs.",
+        "required": [
+          "summary",
+          "machine_scan",
+          "prices",
+          "quota"
+        ],
+        "properties": {
+          "machine_scan": {
+            "type": "boolean",
+            "description": "Whether every Claude Code session on this machine is counted, not only Toknila's runs."
+          },
+          "prices": {
+            "$ref": "#/components/schemas/PriceInfo"
+          },
+          "quota": {
+            "$ref": "#/components/schemas/QuotaView",
+            "description": "The remaining plan quota, when Claude Code reported one."
+          },
+          "summary": {
+            "$ref": "#/components/schemas/UsageSummary"
+          }
+        }
       },
       "Verdict": {
         "type": "string",

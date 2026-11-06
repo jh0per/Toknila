@@ -22,6 +22,7 @@ mod reviews;
 mod settings;
 mod ships;
 mod threads;
+mod usage;
 
 const TOKEN: &str = "test-token";
 
@@ -71,6 +72,14 @@ impl Api {
             profiles: dir.path().join("profiles"),
             runners: runners.clone(),
             tools,
+            // Agent transcripts live in the test's own folder, never in the real home.
+            usage: Arc::new(crate::usage::Usage::with_sources(
+                dir.path(),
+                vec![crate::usage::Source {
+                    format: Arc::new(toknila_core::usage::ClaudeCode),
+                    roots: vec![dir.path().join("claude").join("projects")],
+                }],
+            )),
         };
         Self {
             _dir: dir,
@@ -774,6 +783,9 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/threads/{thread}/changes",
             "/tickets/{ticket}/threads/{thread}/messages",
             "/tickets/{ticket}/threads/{thread}/versions",
+            "/usage",
+            "/usage/quota",
+            "/usage/settings",
         ]
     );
     for schema in [

@@ -13,11 +13,17 @@ use toknila_core::hook::{self, HookInput};
 
 use super::agent::AgentEnv;
 
-/// What a hook says, from its name and its stdin: the activity signal, and the event if any.
-fn signals(name: &str, stdin: &str) -> (String, Option<AgentEvent>) {
+/// What a hook says, from its name and its stdin: the activity signal (with the session it fired
+/// in, for the usage), and the event if any.
+fn signals(name: &str, stdin: &str) -> (NewActivity, Option<AgentEvent>) {
     // A hook payload this version does not understand is still a sign of life.
     let input: HookInput = serde_json::from_str(stdin).unwrap_or_default();
-    (format!("hook:{name}"), hook::event_for(name, &input))
+    let activity = NewActivity {
+        signal: format!("hook:{name}"),
+        session_id: input.session_id.clone(),
+        transcript_path: input.transcript_path.clone(),
+    };
+    (activity, hook::event_for(name, &input))
 }
 
 /// What a Stop hook prints to keep the agent working: the instructions a person left, as Claude
@@ -40,10 +46,10 @@ pub(super) fn run(name: &str) -> Result<()> {
     };
     let mut stdin = String::new();
     let _ = std::io::stdin().take(1 << 20).read_to_string(&mut stdin);
-    let (signal, event) = signals(name, &stdin);
+    let (activity, event) = signals(name, &stdin);
     let sent = agent
         .client
-        .activity(&agent.ticket, &NewActivity { signal })
+        .activity(&agent.ticket, &activity)
         .map_err(|e| e.to_string())
         .and_then(|()| match event {
             Some(e) => agent
@@ -93,8 +99,8 @@ mod tests {
     #[test]
     fn a_permission_prompt_is_activity_and_ask_human() {
         let json = r#"{"hook_event_name":"Notification","notification_type":"permission_prompt","message":"Allow Bash?"}"#;
-        let (signal, event) = signals("notification", json);
-        assert_eq!(signal, "hook:notification");
+        let (activity, event) = signals("notification", json);
+        assert_eq!(activity.signal, "hook:notification");
         assert_eq!(
             event,
             Some(AgentEvent::AskHuman {
@@ -106,15 +112,30 @@ mod tests {
 
     #[test]
     fn stop_and_garbage_are_activity_only() {
-        assert_eq!(
-            signals("stop", r#"{"hook_event_name":"Stop"}"#),
-            ("hook:stop".to_owned(), None)
-        );
+        let only = |signal: &str| NewActivity {
+            signal: signal.to_owned(),
+            session_id: None,
+            transcript_path: None,
+        };
+        let stop = r#"{"hook_event_name":"Stop"}"#;
+        assert_eq!(signals("stop", stop), (only("hook:stop"), None));
         assert_eq!(
             signals("notification", "not json"),
-            ("hook:notification".to_owned(), None)
+            (only("hook:notification"), None)
         );
-        assert_eq!(signals("stop", ""), ("hook:stop".to_owned(), None));
+        assert_eq!(signals("stop", ""), (only("hook:stop"), None));
+    }
+
+    #[test]
+    fn the_session_and_its_transcript_travel_with_the_activity() {
+        let json = r#"{"hook_event_name":"Stop","session_id":"abc","transcript_path":"/h/.claude/projects/p/abc.jsonl"}"#;
+        let (activity, event) = signals("stop", json);
+        assert_eq!(activity.session_id.as_deref(), Some("abc"));
+        assert_eq!(
+            activity.transcript_path.as_deref(),
+            Some("/h/.claude/projects/p/abc.jsonl")
+        );
+        assert_eq!(event, None);
     }
 
     #[test]

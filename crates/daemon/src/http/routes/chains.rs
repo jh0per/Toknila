@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use toknila_app::{chains, resolve, reviews};
 use toknila_core::Actor;
 
-use super::{ApiResult, chain_write, load_chain_detail, read};
+use super::{ApiResult, chain_write, load_chain_detail, read, stamp};
 use crate::http::dto::{ChainDetail, ChainFile, ChainItem, EdgeInput, NewChain, ReviewSettings};
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -89,11 +89,11 @@ pub async fn get_chain(
     State(state): State<AppState>,
     Path(chain): Path<String>,
 ) -> ApiResult<Json<ChainDetail>> {
-    let at = now();
+    let (at, prices) = stamp(&state);
     Ok(Json(
         read(&state, move |repo| {
             let c = resolve::chain(repo, &chain)?;
-            load_chain_detail(repo, c.id, at)
+            load_chain_detail(repo, c.id, at, &prices)
         })
         .await?,
     ))

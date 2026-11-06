@@ -36,6 +36,8 @@ pub struct AppState {
     pub runners: Arc<crate::runner::Runners>,
     /// How the system checks and the repository checks run `git`, `claude` and `gh`.
     pub tools: Arc<dyn crate::tools::Tools>,
+    /// Token usage: transcripts, prices and the page's numbers.
+    pub usage: Arc<crate::usage::Usage>,
 }
 
 /// Current wall-clock time.

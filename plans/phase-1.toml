@@ -54,6 +54,17 @@ acceptance = [
 after = ["pty"]
 
 [[ticket]]
+id = "usage"
+title = "Token usage and cost per card"
+prompt = "Attribute Claude Code sessions to runs through hook input (session_id, transcript_path), read their transcripts incrementally, and show tokens and estimated API cost per card, chain, project, model and day, plus the whole machine's sessions when enabled. Show the remaining plan quota only if Claude Code documents a source for it."
+acceptance = [
+  "Core tests on synthetic transcripts cover sums per model, deduplication, an incremental read and the cost and cache savings math",
+  "A hook with session_id and transcript_path ties the transcript to the run and the usage shows on the card",
+  "Playwright test: the Usage page renders totals and a breakdown from seeded data",
+]
+after = ["mcp"]
+
+[[ticket]]
 id = "nudge"
 title = "Silence detector and nudge loop"
 prompt = "Detect silence: MCP first, hooks second, output silence as the fallback. Nudge after 120 s of silence with no child process, up to 3 times in 15 min, then Waiting(silent). Thresholds come from the profile."
@@ -159,7 +170,7 @@ prompt = "The built-in claude-code profile: launch, CLAUDE.md, MCP and hooks wir
 acceptance = [
   "A manual run on macOS where two cards with Claude Code agents run in parallel, go through review with a return round, and merge through GitHub PRs; recorded in the PR",
 ]
-after = ["nudge", "claude-md", "automerge", "ui", "parallel", "github", "settings", "inbox", "safety"]
+after = ["nudge", "usage", "claude-md", "automerge", "ui", "parallel", "github", "settings", "inbox", "safety"]
 
 [[ticket]]
 id = "package"

@@ -59,6 +59,8 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
     crate::runner::supervise(store.clone(), ended);
     crate::runner::watch_silence(store.clone(), runners.clone());
     crate::pr_watch::watch(store.clone());
+    let usage = Arc::new(crate::usage::Usage::new(&paths.home));
+    crate::usage::watch(store.clone(), usage.clone());
     let recovery = crate::recovery::recover(&store)
         .await
         .map_err(|e| RunError::Other(format!("startup recovery: {e}")))?;
@@ -80,6 +82,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         profiles: paths.profiles(),
         runners: runners.clone(),
         tools: Arc::new(crate::tools::SystemTools),
+        usage,
     };
 
     let listener = match reuse.as_ref().map(|i| i.port).filter(|p| *p != 0) {

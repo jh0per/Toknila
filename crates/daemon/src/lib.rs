@@ -16,6 +16,7 @@ pub mod shipyard;
 pub mod store;
 pub mod stream;
 pub mod tools;
+pub mod usage;
 pub mod web;
 
 /// Name the daemon reports about itself.

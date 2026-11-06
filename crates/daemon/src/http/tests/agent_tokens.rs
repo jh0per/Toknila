@@ -72,7 +72,7 @@ fn is_agent_route(method: &str, uri: &str) -> bool {
 }
 
 #[tokio::test]
-async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_three() {
+async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_four() {
     let api = Api::new();
     api.demo_with(&["A"]).await;
     let (token, _) = api.agent_token("DEMO-1").await;
@@ -96,7 +96,7 @@ async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_three() {
         assert_eq!(body["code"], "forbidden", "{method} {uri}");
     }
 
-    // The two routes an agent has are open to it (the control: the probe can say yes).
+    // The routes an agent has are open to it (the control: the probe can say yes).
     let (status, _) = api
         .call_with(
             &token,
@@ -125,9 +125,18 @@ async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_three() {
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body, json!({ "count": 0, "reason": "" }));
+    let (status, body) = api
+        .call_with(
+            &token,
+            Method::POST,
+            "/v1/usage/quota",
+            Some(json!({ "windows": [] })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
     assert_eq!(
         routes.iter().filter(|(m, u)| is_agent_route(m, u)).count(),
-        3
+        4
     );
 }
 

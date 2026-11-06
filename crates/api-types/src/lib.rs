@@ -4,6 +4,9 @@
 //! entries.
 
 pub mod runner;
+mod usage;
+
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use toknila_core::graph::{ChainSummary, ChainView};
@@ -24,6 +27,8 @@ pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;
 pub use toknila_core::TicketPatch as PatchTicket;
 pub use toknila_core::agent::{AgentEvent, Proposal, ReleaseEvent};
+pub use toknila_core::usage::UsageFigures;
+pub use usage::{PriceInfo, QuotaReport, UsageSettings, UsageView};
 
 /// The profiles folder, the usable profiles and the files that were not.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -58,6 +63,9 @@ pub struct ChainDetail {
     pub summary: ChainSummary,
     /// Nodes in dependency order.
     pub order: Vec<NodeRef>,
+    /// Estimated token usage per card, by ticket key; cards that used none are absent.
+    #[serde(default)]
+    pub usage: BTreeMap<String, UsageFigures>,
 }
 
 /// One ticket that went into a release.
@@ -97,6 +105,10 @@ pub struct TicketDetail {
     pub allowed_actions: Vec<TicketAction>,
     /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
     pub queue_position: Option<u32>,
+    /// Tokens the card's agents used and their estimated cost at API list prices; all zero
+    /// before any run reported a transcript.
+    #[serde(default)]
+    pub usage: UsageFigures,
 }
 
 /// A card waiting for an agent slot.
@@ -238,6 +250,12 @@ pub struct EventQuery {
 pub struct NewActivity {
     /// What fired, for example `hook:stop`.
     pub signal: String,
+    /// Claude Code's session id, from the hook's input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// The session's transcript file, from the hook's input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcript_path: Option<String>,
 }
 
 /// Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
@@ -291,6 +309,7 @@ impl ChainDetail {
             edges: view.edges,
             summary,
             order,
+            usage: BTreeMap::new(),
         }
     }
 }

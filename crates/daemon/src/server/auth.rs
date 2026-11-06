@@ -19,12 +19,13 @@ use crate::http::error::ErrorBody;
 use crate::runner::Grant;
 
 /// The only routes an agent token may call (all `POST`): the agent event contract, the activity
-/// signal of hooks and the claim of pending instructions (the Stop hook). The ticket in the path
-/// must be the token's own.
-pub const AGENT_ROUTES: [&str; 3] = [
+/// signal of hooks, the claim of pending instructions (the Stop hook) and the plan quota a status
+/// line saw (account-wide, so it names no ticket). The ticket in a path must be the token's own.
+pub const AGENT_ROUTES: [&str; 4] = [
     "/v1/tickets/{ticket}/events",
     "/v1/tickets/{ticket}/activity",
     "/v1/tickets/{ticket}/instructions/claim",
+    "/v1/usage/quota",
 ];
 
 /// Who is calling, as the token says. Handlers of agent routes check [`Principal::owns`] and, for
