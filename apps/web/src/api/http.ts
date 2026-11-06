@@ -21,6 +21,17 @@ async function refusal(r: Response): Promise<Refusal> {
   return new Refusal(body.error ?? `${r.status} ${r.statusText}`, body.code ?? "", body.field ?? undefined);
 }
 
+/// A setting: PUT a JSON body, answer with the daemon's reply.
+export async function put<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(`/v1${path}`, {
+    method: "PUT",
+    headers: { ...auth(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw await refusal(r);
+  return r.json() as Promise<T>;
+}
+
 export async function get<T>(path: string): Promise<T> {
   const r = await fetch(`/v1${path}`, { headers: auth() });
   if (!r.ok) throw await refusal(r);

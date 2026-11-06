@@ -12,32 +12,60 @@ pub mod runner;
 pub mod system;
 pub mod threads;
 pub mod tickets;
+pub mod usage;
 
 use axum::Json;
 use toknila_app::schedule;
+use toknila_core::usage::{PriceTable, figures, figures_per_card};
 use toknila_core::{Actor, ChainId, Thread, Ticket, TicketId, Timestamp};
 
 use super::dto::{ChainDetail, ThreadDetail, TicketDetail};
 use super::error::ApiError;
 use crate::server::{AppState, now};
-use crate::store::{Repo, WriteTx};
+use crate::store::{Repo, RowFilter, WriteTx};
 
 type ApiResult<T> = Result<T, ApiError>;
 
-fn load_chain_detail(repo: &Repo<'_>, chain: ChainId, at: Timestamp) -> ApiResult<ChainDetail> {
+/// The time of a command, and the prices its answer is costed with.
+fn stamp(state: &AppState) -> (Timestamp, PriceTable) {
+    (now(), state.usage.prices().0)
+}
+
+fn load_chain_detail(
+    repo: &Repo<'_>,
+    chain: ChainId,
+    at: Timestamp,
+    prices: &PriceTable,
+) -> ApiResult<ChainDetail> {
     let view = repo
         .chain_view(chain)?
         .ok_or_else(|| ApiError::not_found(format!("chain {chain}")))?;
-    Ok(ChainDetail::from_view(view, at))
+    let rows = repo.usage_rows(RowFilter {
+        chain: Some(chain),
+        ..RowFilter::default()
+    })?;
+    let mut detail = ChainDetail::from_view(view, at);
+    detail.usage = figures_per_card(&rows, prices);
+    Ok(detail)
 }
 
-fn load_ticket_detail(repo: &Repo<'_>, ticket: TicketId, at: Timestamp) -> ApiResult<TicketDetail> {
+fn load_ticket_detail(
+    repo: &Repo<'_>,
+    ticket: TicketId,
+    at: Timestamp,
+    prices: &PriceTable,
+) -> ApiResult<TicketDetail> {
     let t = repo
         .ticket(ticket)?
         .ok_or_else(|| ApiError::not_found(format!("ticket {ticket}")))?;
     let chain = repo.chain(t.chain_id)?.map(|c| c.name).unwrap_or_default();
     let review = toknila_app::reviews::view(repo, &t)?;
+    let rows = repo.usage_rows(RowFilter {
+        ticket: Some(t.id),
+        ..RowFilter::default()
+    })?;
     Ok(TicketDetail {
+        usage: figures(&rows, prices),
         review,
         allowed_actions: toknila_core::machine::TicketAction::allowed(&t),
         subtasks: repo.subtasks(t.id)?,
@@ -77,12 +105,12 @@ async fn chain_write(
     actor: Actor,
     f: impl FnOnce(&mut WriteTx<'_>) -> ApiResult<ChainId> + Send + 'static,
 ) -> ApiResult<ChainDetail> {
-    let at = now();
+    let (at, prices) = stamp(state);
     let (detail, _) = state
         .store
         .write(actor, at, move |tx| -> ApiResult<ChainDetail> {
             let chain = f(tx)?;
-            load_chain_detail(&tx.repo(), chain, at)
+            load_chain_detail(&tx.repo(), chain, at, &prices)
         })
         .await?;
     Ok(detail)
@@ -95,14 +123,14 @@ async fn ticket_write(
     actor: Actor,
     f: impl FnOnce(&mut WriteTx<'_>, Ticket) -> ApiResult<()> + Send + 'static,
 ) -> ApiResult<Json<TicketDetail>> {
-    let at = now();
+    let (at, prices) = stamp(state);
     let (detail, _) = state
         .store
         .write(actor, at, move |tx| -> ApiResult<TicketDetail> {
             let t = toknila_app::resolve::ticket(&*tx, &ticket)?;
             let id = t.id;
             f(tx, t)?;
-            load_ticket_detail(&tx.repo(), id, at)
+            load_ticket_detail(&tx.repo(), id, at, &prices)
         })
         .await?;
     Ok(Json(detail))

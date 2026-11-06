@@ -9,7 +9,7 @@ use toknila_app::tickets::{self, TicketAction};
 use toknila_app::{notes, resolve, schedule, wildcards};
 use toknila_core::{Actor, ChainId};
 
-use super::{ApiResult, load_ticket_detail, read, ticket_write};
+use super::{ApiResult, load_ticket_detail, read, stamp, ticket_write};
 use crate::http::dto::{
     ActionInput, NewComment, NewSubtask, NewTicket, NewWildcard, PatchSubtask, PatchTicket,
     TicketDetail, TicketItem, TicketQuery,
@@ -25,12 +25,12 @@ pub async fn create_ticket(
     Path(chain): Path<String>,
     Json(input): Json<NewTicket>,
 ) -> ApiResult<(StatusCode, Json<TicketDetail>)> {
-    let at = now();
+    let (at, prices) = stamp(&state);
     let (detail, _) = state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<TicketDetail> {
             let id = tickets::create(tx, &chain, input)?;
-            load_ticket_detail(&tx.repo(), id, at)
+            load_ticket_detail(&tx.repo(), id, at, &prices)
         })
         .await?;
     Ok((StatusCode::CREATED, Json(detail)))
@@ -45,12 +45,12 @@ pub async fn propose_wildcard(
     Path(chain): Path<String>,
     Json(input): Json<NewWildcard>,
 ) -> ApiResult<(StatusCode, Json<TicketDetail>)> {
-    let at = now();
+    let (at, prices) = stamp(&state);
     let (detail, _) = state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<TicketDetail> {
             let id = wildcards::propose(tx, &chain, input.card, input.from.as_deref())?;
-            load_ticket_detail(&tx.repo(), id, at)
+            load_ticket_detail(&tx.repo(), id, at, &prices)
         })
         .await?;
     Ok((StatusCode::CREATED, Json(detail)))
@@ -99,11 +99,11 @@ pub async fn get_ticket(
     State(state): State<AppState>,
     Path(ticket): Path<String>,
 ) -> ApiResult<Json<TicketDetail>> {
-    let at = now();
+    let (at, prices) = stamp(&state);
     Ok(Json(
         read(&state, move |repo| {
             let t = resolve::ticket(repo, &ticket)?;
-            load_ticket_detail(repo, t.id, at)
+            load_ticket_detail(repo, t.id, at, &prices)
         })
         .await?,
     ))

@@ -78,7 +78,7 @@ Claude Code hooks are a second source, conservative on purpose. The runner subsc
 | `PostToolUse` | `post_tool_use` | yes | none |
 
 Every hook is an activity signal: `POST /v1/tickets/{ticket}/activity` with `{"signal":
-"hook:stop"}` (`204`, no journal entry, nothing about the ticket changes). The daemon keeps the
+"hook:stop"}` (`204`, no journal entry, nothing about the ticket changes). The hook's `session_id` and `transcript_path`, when it has them, ride along as `session_id` and `transcript_path`: the daemon ties the Claude Code session to the run and reads its transcript for the token usage (see "Usage" in `architecture.md`). The daemon keeps the
 last signal of each ticket's agent in memory (`AgentTokens::last_activity`: its time and what it
 was); any other call made with the run's token counts as activity `api`. The silence detector
 consumes this (see "Silence and nudges" in `architecture.md`). `post_tool_use` and
@@ -104,9 +104,10 @@ ends (before the end is journaled); a revoked or made-up token is `401`. The per
 config and hook settings name `${TOKNILA_RUN_TOKEN}` and the agent expands it from its own
 environment.
 
-An agent token may call exactly two routes, both `POST`, both for its own ticket:
+An agent token may call only the routes in `AGENT_ROUTES`, all `POST`: for its own ticket
 `/v1/tickets/{ticket}/events` (every agent event, including the agent's thread posts and
-`propose`) and `/v1/tickets/{ticket}/activity`. Everything else answers `403` with code
+`propose`), `/v1/tickets/{ticket}/activity` and the instruction claim, and `/v1/usage/quota` (the
+plan limits a status line saw; account-wide, no ticket). Everything else answers `403` with code
 `forbidden`: approve and reject of wildcards, approve and request changes on threads, accept,
 return, cancel, runner input, comments, edits, the stream, release events, shutdown. The rule is
 an allowlist (`AGENT_ROUTES` in `crates/daemon/src/server/auth.rs`), so a route added later is

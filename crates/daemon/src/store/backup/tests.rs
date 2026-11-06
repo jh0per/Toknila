@@ -165,7 +165,7 @@ fn a_damaged_database_is_refused_naming_the_newest_backup() {
     std::fs::write(backups.join("toknila-v3-20250202T000000Z.sqlite"), "x").expect("new");
     let mut bytes = std::fs::read(&db).expect("read");
     let len = bytes.len();
-    for b in &mut bytes[len / 2..len / 2 + 4096] {
+    for b in &mut bytes[len * 3 / 4..len * 3 / 4 + 4096] {
         *b = 0xFF;
     }
     std::fs::write(&db, bytes).expect("damage");

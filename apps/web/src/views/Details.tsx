@@ -5,6 +5,7 @@ import { type State, queuePosition } from "../store/state";
 import { Comments } from "./Comments";
 import { DetailsMeta } from "./DetailsMeta";
 import { Rounds } from "./Rounds";
+import { UsageChip } from "./UsageChip";
 
 /// Prompt, acceptance, subtasks, ship and comments of a card.
 export function Details({ state, card, dispatch }: { state: State; card: Ticket; dispatch: (i: Intent) => void }) {
@@ -14,6 +15,7 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
       <div className="details-head">
         <span className="key">{card.key}</span>
         <h3>{card.title}</h3>
+        <UsageChip figures={detail?.usage} testId="details-usage" />
       </div>
       <p className="muted">
         {card.status}

@@ -22,6 +22,7 @@ async fn spawn_test_server() -> (
         profiles: PathBuf::new(),
         runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
         tools: std::sync::Arc::new(crate::tools::SystemTools),
+        usage: Arc::new(crate::usage::Usage::disabled()),
     };
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await

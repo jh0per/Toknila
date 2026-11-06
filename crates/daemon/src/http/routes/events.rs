@@ -7,7 +7,7 @@ use toknila_app::{agent, instructions, resolve};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::{Actor, TicketStatus, nudge};
 
-use super::{ApiResult, chain_write, load_ticket_detail};
+use super::{ApiResult, chain_write, load_ticket_detail, stamp};
 use crate::http::dto::{ChainDetail, EventQuery, InstructionClaim, NewActivity, TicketDetail};
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, Principal, now};
@@ -32,7 +32,7 @@ pub async fn agent_event(
     Path(ticket): Path<String>,
     Json(event): Json<AgentEvent>,
 ) -> ApiResult<Json<TicketDetail>> {
-    let at = now();
+    let (at, prices) = stamp(&state);
     let (detail, _) = state
         .store
         .write(Actor::Agent, at, move |tx| -> ApiResult<TicketDetail> {
@@ -42,7 +42,7 @@ pub async fn agent_event(
             principal.may_send(&event)?;
             // The ticket itself, or the card it proposed.
             let answer = agent::ticket_event(tx, &t, event)?;
-            load_ticket_detail(&tx.repo(), answer, at)
+            load_ticket_detail(&tx.repo(), answer, at, &prices)
         })
         .await?;
     Ok(Json(detail))
@@ -64,6 +64,21 @@ pub async fn ticket_activity(
         .read(move |repo| Ok(resolve::ticket(repo, &ticket)))
         .await??;
     principal.owns(&t)?;
+    // Which Claude Code session this run is, whoever the agent: worker or reviewer.
+    if let (Some(session), Some(transcript)) = (&input.session_id, &input.transcript_path) {
+        let run = match principal {
+            Principal::Agent(g) => Some((g.run, g.role)),
+            Principal::Person => None,
+        };
+        let signal = &input.signal;
+        if let Err(error) = state
+            .usage
+            .attribute(&state.store, t.id, run, (session, transcript), signal)
+            .await
+        {
+            tracing::warn!(%error, ticket = %t.key, "could not read the session's usage");
+        }
+    }
     // Only the worker's signs of life count: a reviewer beside it is not the worker working, and
     // never brings a waiting worker back to Running.
     if !matches!(principal, Principal::Agent(g) if g.role != toknila_core::AgentRole::Worker) {

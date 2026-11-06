@@ -36,6 +36,8 @@ pub struct AppState {
     pub runners: Arc<crate::runner::Runners>,
     /// How the system checks and the repository checks run `git`, `claude` and `gh`.
     pub tools: Arc<dyn crate::tools::Tools>,
+    /// Token usage: transcripts, prices and the page's numbers.
+    pub usage: Arc<crate::usage::Usage>,
 }
 
 /// Current wall-clock time.
@@ -89,6 +91,7 @@ pub fn router(state: AppState) -> Router {
         .route("/chains/{chain}", get(crate::web::index))
         .route("/inbox", get(crate::web::index))
         .route("/settings", get(crate::web::index))
+        .route("/usage", get(crate::web::index))
         .route("/projects/{project}/settings", get(crate::web::index))
         .route("/projects/{project}", get(crate::web::index))
         .route("/projects/{project}/chains/{chain}", get(crate::web::index))

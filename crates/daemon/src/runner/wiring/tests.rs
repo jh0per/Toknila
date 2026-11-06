@@ -146,6 +146,19 @@ fn the_hook_settings_run_tok_hook_for_each_subscribed_hook_and_never_finish() {
 }
 
 #[test]
+fn the_settings_also_name_a_status_line_that_reports_the_plan_limits() {
+    let rig = Rig::new();
+    rig.prepare(&AgentProfile::claude_code());
+    let (_, text) = rig.file("settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    assert_eq!(v["statusLine"]["type"], "command");
+    assert_eq!(
+        v["statusLine"]["command"],
+        "\"/opt/toknila/bin/toknila\" statusline"
+    );
+}
+
+#[test]
 fn the_environment_carries_the_daemon_address_the_token_the_ticket_and_the_run() {
     let rig = Rig::new();
     let w = rig.prepare(&AgentProfile::claude_code());

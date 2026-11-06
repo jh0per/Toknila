@@ -639,6 +639,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tokens and estimated API cost over the last 7, 30 or 90 days: totals, a series per UTC day and
+         *     breakdowns by model, project, chain, card and workspace. Costs are estimates at API list
+         *     prices; on a subscription the real cost differs.
+         */
+        get: operations["get_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/usage/quota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The plan limits an agent's status line received from Claude Code (`rate_limits`); the page
+         *     shows them as the remaining quota until the windows reset.
+         */
+        post: operations["post_usage_quota"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/usage/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Counts every Claude Code session on this machine (the default), or only Toknila's runs. */
+        put: operations["put_usage_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -811,6 +869,10 @@ export interface components {
             releases: components["schemas"]["Release"][];
             summary: components["schemas"]["ChainSummary"];
             tickets: components["schemas"]["Ticket"][];
+            /** @description Estimated token usage per card, by ticket key; cards that used none are absent. */
+            usage?: {
+                [key: string]: components["schemas"]["UsageFigures"];
+            };
         };
         /**
          * @description A chain file: body of `POST /v1/projects/{project}/import`, answer of
@@ -899,6 +961,12 @@ export interface components {
          * @enum {string}
          */
         CommentKind: "instruction" | "report" | "decision";
+        /** @description One UTC day of the series. */
+        DayUsage: {
+            /** @description `YYYY-MM-DD`, UTC. */
+            day: string;
+            figures: components["schemas"]["UsageFigures"];
+        };
         /** @description Dependency edge: `to` cannot start before `from` is done. */
         Edge: {
             chain_id: components["schemas"]["ChainId"];
@@ -1051,8 +1119,12 @@ export interface components {
         MessageKind: "message" | "changes_requested";
         /** @description Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook. */
         NewActivity: {
+            /** @description Claude Code's session id, from the hook's input. */
+            session_id?: string | null;
             /** @description What fired, for example `hook:stop`. */
             signal: string;
+            /** @description The session's transcript file, from the hook's input. */
+            transcript_path?: string | null;
         };
         /** @description `POST /v1/projects/{project}/chains`. */
         NewChain: {
@@ -1254,6 +1326,17 @@ export interface components {
          * @enum {string}
          */
         Phase: "design" | "implement";
+        /** @description Where the cost estimate's prices come from. */
+        PriceInfo: {
+            /** @description Models whose price the person overrode in `usage-prices.toml`. */
+            overridden: string[];
+            /** @description Why `usage-prices.toml` was not used, when it could not be read. */
+            problem?: string | null;
+            /** @description The day they were taken (`YYYY-MM-DD`). */
+            retrieved: string;
+            /** @description The page the shipped prices were taken from. */
+            source: string;
+        };
         /** @description The profiles folder, the usable profiles and the files that were not. */
         ProfileList: {
             /** @description Where profile files go. */
@@ -1348,6 +1431,33 @@ export interface components {
              */
             position: number;
             ticket: components["schemas"]["TicketId"];
+        };
+        /** @description Body of `POST /v1/usage/quota`: the rate-limit windows an agent's status line received. */
+        QuotaReport: {
+            windows: components["schemas"]["QuotaWindow"][];
+        };
+        /** @description What the Usage page shows about the quota. */
+        QuotaView: {
+            available: boolean;
+            /** @description Why there is nothing to show, or where the numbers come from. */
+            reason: string;
+            seen_at?: components["schemas"]["Timestamp"] | null;
+            windows: components["schemas"]["QuotaWindow"][];
+        };
+        /** @description One rate-limit window. */
+        QuotaWindow: {
+            /** @description `five_hour` or `seven_day`. */
+            name: string;
+            /**
+             * Format: int64
+             * @description Unix epoch seconds when the window resets.
+             */
+            resets_at: number;
+            /**
+             * Format: double
+             * @description 0 to 100 (above 100 once exceeded).
+             */
+            used_percentage: number;
         };
         /** @description A release milestone between tickets on the chain graph. */
         Release: {
@@ -1681,6 +1791,11 @@ export interface components {
             ship?: components["schemas"]["Ship"] | null;
             subtasks: components["schemas"]["Subtask"][];
             ticket: components["schemas"]["Ticket"];
+            /**
+             * @description Tokens the card's agents used and their estimated cost at API list prices; all zero
+             *     before any run reported a transcript.
+             */
+            usage?: components["schemas"]["UsageFigures"];
         };
         /** @description Identifies a [`crate::Ticket`]. */
         TicketId: string;
@@ -1716,11 +1831,106 @@ export interface components {
          * @description Milliseconds since the Unix epoch, UTC.
          */
         Timestamp: number;
+        /** @description The four token counts a model call reports. */
+        TokenCounts: {
+            /**
+             * Format: int64
+             * @description Input tokens served from the cache.
+             */
+            cache_read: number;
+            /**
+             * Format: int64
+             * @description Input tokens written to the cache.
+             */
+            cache_write: number;
+            /**
+             * Format: int64
+             * @description Input tokens that were neither read from nor written to the cache.
+             */
+            input: number;
+            /** Format: int64 */
+            output: number;
+        };
         /**
          * @description Which tool a check is about.
          * @enum {string}
          */
         Tool: "git" | "claude" | "gh";
+        /** @description The numbers of one group of calls. */
+        UsageFigures: {
+            /**
+             * Format: double
+             * @description What the cache saved at those prices, USD.
+             */
+            cache_savings_usd: number;
+            /**
+             * Format: double
+             * @description The share of input tokens served from the cache, 0 to 1.
+             */
+            cached_share: number;
+            /**
+             * Format: double
+             * @description Estimated cost at API list prices, USD.
+             */
+            cost_usd: number;
+            /**
+             * Format: int64
+             * @description Model calls counted.
+             */
+            messages: number;
+            /**
+             * Format: int64
+             * @description Every token processed: input, cache and output.
+             */
+            processed: number;
+            tokens: components["schemas"]["TokenCounts"];
+            /**
+             * Format: int64
+             * @description Input tokens not served from the cache.
+             */
+            uncached_input: number;
+        };
+        /** @description One line of a breakdown. */
+        UsageItem: {
+            figures: components["schemas"]["UsageFigures"];
+            label: string;
+        };
+        /** @description Body of `PUT /v1/usage/settings`. */
+        UsageSettings: {
+            /**
+             * @description Count every Claude Code session under the user's `~/.claude/projects`, not only
+             *     Toknila's runs. Local only; on by default.
+             */
+            machine_scan: boolean;
+        };
+        /** @description Usage over the last `days` days. */
+        UsageSummary: {
+            by_card: components["schemas"]["UsageItem"][];
+            by_chain: components["schemas"]["UsageItem"][];
+            by_model: components["schemas"]["UsageItem"][];
+            /** @description Toknila runs only, as are the next two. */
+            by_project: components["schemas"]["UsageItem"][];
+            by_workspace: components["schemas"]["UsageItem"][];
+            /** Format: int32 */
+            days: number;
+            /** @description One entry per day, oldest first, empty days included. */
+            series: components["schemas"]["DayUsage"][];
+            totals: components["schemas"]["UsageFigures"];
+            /** @description Models seen without a price: counted in tokens, not in cost. */
+            unpriced_models: string[];
+        };
+        /**
+         * @description `GET /v1/usage`: the usage page in one answer. Every cost in it is an estimate at API list
+         *     prices; on a subscription the real cost differs.
+         */
+        UsageView: {
+            /** @description Whether every Claude Code session on this machine is counted, not only Toknila's runs. */
+            machine_scan: boolean;
+            prices: components["schemas"]["PriceInfo"];
+            /** @description The remaining plan quota, when Claude Code reported one. */
+            quota: components["schemas"]["QuotaView"];
+            summary: components["schemas"]["UsageSummary"];
+        };
         /**
          * @description A reviewer's decision about the work.
          * @enum {string}
@@ -3315,6 +3525,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_usage: {
+        parameters: {
+            query?: {
+                /** @description The window in days: 7 (default), 30 or 90. */
+                days?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    post_usage_quota: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaReport"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    put_usage_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsageSettings"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSettings"];
                 };
             };
         };

@@ -13,6 +13,7 @@ mod release;
 mod review;
 mod sim;
 mod spec;
+mod statusline;
 mod thread;
 mod ticket;
 mod watch;
@@ -169,6 +170,9 @@ pub enum Command {
         /// The hook: notification, stop, subagent_stop, user_prompt_submit or post_tool_use.
         name: String,
     },
+    /// Status line command of an agent: passes the plan limits Claude Code reports to the daemon
+    /// (the runner wires it in; needs the runner's environment).
+    Statusline,
 }
 
 /// Prints `v` as JSON (keys sorted, as before typed answers), or with the human formatter.
@@ -205,6 +209,7 @@ pub fn run(cmd: Command, json_out: bool) -> Result<()> {
     match cmd {
         Command::Mcp => mcp::run(),
         Command::Hook { name } => hook::run(&name),
+        Command::Statusline => statusline::run(),
         cmd => run_on_home(cmd, json_out),
     }
 }
@@ -213,7 +218,9 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
     let paths = Paths::resolve().map_err(anyhow::Error::msg)?;
     let c = crate::client::connect(&paths)?;
     match cmd {
-        Command::Daemon(_) | Command::Mcp | Command::Hook { .. } => unreachable!("handled above"),
+        Command::Daemon(_) | Command::Mcp | Command::Hook { .. } | Command::Statusline => {
+            unreachable!("handled above")
+        }
         Command::Project(p) => project::run(&c, p, json_out),
         Command::Profile(p) => profile::run(&c, p, json_out),
         Command::Chain(ch) => chain::run(&c, ch, json_out),

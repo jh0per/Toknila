@@ -66,8 +66,10 @@ fn mcp_config(bin: &Path) -> Value {
     }}})
 }
 
-/// The hook settings: every subscribed hook runs `toknila hook <name>`. Forward slashes, so the
-/// command reads the same under a Unix shell and Git Bash on Windows.
+/// The hook settings: every subscribed hook runs `toknila hook <name>`, and the status line runs
+/// `toknila statusline`, which passes on the plan limits Claude Code documents there (they feed
+/// the Usage page; the line itself stays empty). Forward slashes, so the command reads the same
+/// under a Unix shell and Git Bash on Windows.
 fn hook_settings(bin: &Path) -> Value {
     let program = bin.display().to_string().replace('\\', "/");
     let hooks: serde_json::Map<String, Value> = HOOKS
@@ -78,7 +80,8 @@ fn hook_settings(bin: &Path) -> Value {
             ((*claude).to_owned(), entry)
         })
         .collect();
-    json!({ "hooks": hooks })
+    let status_line = json!({ "type": "command", "command": format!("\"{program}\" statusline") });
+    json!({ "hooks": hooks, "statusLine": status_line })
 }
 
 fn write_json(path: &Path, value: &Value) -> Result<(), RunnerError> {

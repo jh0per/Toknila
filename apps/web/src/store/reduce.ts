@@ -4,6 +4,7 @@ import type { EventRecord } from "../api/types";
 import type { Effect, Msg } from "./msg";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
+import { loadUsage, reduceUsage } from "./usage";
 import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, chainOfTicket, ticketOfEvent } from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
@@ -34,7 +35,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
         error: "",
       };
       // First run: no project yet, so the window offers the checks and a form to add one.
-      return [next, [...enter(next.route), ...(msg.projects.length ? [] : setupLoads)]];
+      return [next, [...enter(next.route, next), ...(msg.projects.length ? [] : setupLoads)]];
     }
     case "projectsLoaded":
       return [{ ...s, projects: msg.projects }, []];
@@ -60,8 +61,11 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [s, [msg]];
     case "loadFailed":
       return [{ ...s, error: msg.error }, []];
-    case "event":
-      return applyEvent(s, msg.event);
+    case "event": {
+      const [next, fx] = applyEvent(s, msg.event);
+      // Transcripts are not in the journal, but any activity may have moved the numbers.
+      return [next, s.route.name === "usage" ? [...fx, loadUsage(next)] : fx];
+    }
     case "selectTab":
       return [{ ...s, tab: msg.tab }, []];
     case "navigate":
@@ -73,7 +77,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "selectCard":
       return go(s, { name: "card", project: msg.project, chain: msg.chain, key: msg.key });
     case "urlChanged":
-      return [{ ...s, route: msg.route }, enter(msg.route)];
+      return [{ ...s, route: msg.route }, enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
       const [moved, more] = go(added, { name: "settings", project: msg.project.key });
@@ -90,17 +94,24 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "chainImported":
     case "settingsRejected":
       return reduceSettings(s, msg);
+    case "setUsageDays":
+    case "setUsageMetric":
+    case "setMachineScan":
+    case "usageLoaded":
+    case "usageFailed":
+      return reduceUsage(s, msg);
   }
 }
 
 /// Moves to a route: the URL changes by an effect, never by the reducer itself.
 function go(s: State, route: Route): [State, Effect[]] {
-  return [{ ...s, route }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route)]];
+  return [{ ...s, route }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
 }
 
 /// What a screen needs fetched when it opens.
-function enter(route: Route): Effect[] {
+function enter(route: Route, s: State): Effect[] {
   if (route.name === "settings") return setupLoads;
+  if (route.name === "usage") return [loadUsage(s)];
   return route.name === "card"
     ? [{ type: "loadDetail", key: route.key }, { type: "loadThreads", key: route.key }]
     : [];

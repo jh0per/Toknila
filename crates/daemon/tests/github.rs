@@ -105,6 +105,7 @@ impl Rig {
             profiles: tmp.path().join("p"),
             runners,
             tools: Arc::new(toknila_daemon::tools::SystemTools),
+            usage: Arc::new(toknila_daemon::usage::Usage::disabled()),
         });
         let rig = Rig {
             _tmp: tmp,

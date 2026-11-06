@@ -7,6 +7,7 @@ import { Onboarding } from "./Onboarding";
 import { Panel } from "./Panel";
 import { Settings } from "./Settings";
 import { Sidebar } from "./Sidebar";
+import { Usage } from "./Usage";
 
 export function App() {
   const [state, dispatch] = useStore();
@@ -14,7 +15,7 @@ export function App() {
     return <main><p className="error">Open the address that <code>tok open</code> prints; it carries the access token.</p></main>;
   }
   const chain = currentChain(state);
-  const showChain = Boolean(chain) && state.loaded && state.route.name !== "inbox" && state.route.name !== "settings";
+  const showChain = Boolean(chain) && state.loaded && state.route.name !== "inbox" && state.route.name !== "settings" && state.route.name !== "usage";
   const running = runningAgents(state).length;
   const slots = slotsOf(state);
   return (
@@ -26,6 +27,8 @@ export function App() {
           <Settings state={state} dispatch={dispatch} />
         ) : state.projects.length === 0 ? (
           <Onboarding state={state} dispatch={dispatch} />
+        ) : state.route.name === "usage" ? (
+          <Usage state={state} dispatch={dispatch} />
         ) : state.route.name === "inbox" ? (
           <Inbox state={state} dispatch={dispatch} />
         ) : chain ? (

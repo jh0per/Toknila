@@ -16,6 +16,7 @@ mod schema;
 mod ships;
 mod threads;
 mod tickets;
+mod usage;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
@@ -33,6 +34,7 @@ use toknila_core::{Actor, AgentRole, TicketId, Timestamp};
 pub use codec::Repo;
 pub use error::StoreError;
 pub use toknila_api_types::EventRecord;
+pub use usage::{FileState, RowFilter};
 
 /// A command's view of the database: its transaction plus the events it emits.
 pub struct WriteTx<'c> {
