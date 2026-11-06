@@ -1,5 +1,5 @@
 import { token } from "../api/http";
-import { currentChain } from "../store/state";
+import { currentChain, currentProject, runningAgents } from "../store/state";
 import { useStore } from "../store/useStore";
 import { Canvas } from "./Canvas";
 import { Inbox } from "./Inbox";
@@ -12,19 +12,26 @@ export function App() {
     return <main><p className="error">Open the address that <code>tok open</code> prints; it carries the access token.</p></main>;
   }
   const chain = currentChain(state);
+  const showChain = Boolean(chain) && state.loaded && state.route.name !== "inbox";
+  const running = runningAgents(state).length;
   return (
     <div className="ide">
       <Sidebar state={state} dispatch={dispatch} />
-      <main>
-        {state.error && <p className="error">{state.error}</p>}
+      <main className={showChain ? "" : "plain"}>
+        {state.error && !showChain && <p className="error">{state.error}</p>}
         {!state.loaded ? <p className="muted">Loading…</p> : state.route.name === "inbox" ? (
           <Inbox state={state} dispatch={dispatch} />
         ) : chain ? (
           <>
-            <header className="chain-head">
-              <h2>{chain.chain.name}</h2>
-              <span data-testid="chain-status">{chain.summary.status.replace(/_/g, " ")}</span>
+            <header className="top">
+              <div className="crumb">
+                <b>{currentProject(state)?.key ?? ""}</b><i>/</i><b>{chain.chain.name}</b>
+              </div>
+              <span className="pill" data-testid="chain-status">{chain.summary.status.replace(/_/g, " ")}</span>
               <span className="muted">{chain.summary.done}/{chain.summary.total} done · {chain.summary.released} released</span>
+              {state.error && <span className="error">{state.error}</span>}
+              <span className="grow" />
+              <span className="pill"><span className={`dot${running ? " pulse" : ""}`} />{running} running</span>
             </header>
             <Canvas chain={chain} state={state} dispatch={dispatch} />
             <Panel state={state} dispatch={dispatch} />

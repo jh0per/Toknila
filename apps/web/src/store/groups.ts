@@ -44,3 +44,19 @@ export function groupBy<T>(items: T[], status: (item: T) => TicketStatus): Recor
   for (const i of items) out[statusGroup(status(i))].push(i);
   return out;
 }
+
+const GROUP_WORD: Record<StatusGroup, string> = {
+  awaiting_approval: "awaiting approval",
+  todo: "todo",
+  in_progress: "in progress",
+  blocked: "blocked",
+  done: "done",
+  cancelled: "cancelled",
+};
+
+/// The one line a card shows for its status: the group, then the finer status when it adds
+/// something. A waiting card is in progress, not blocked: it is waiting for a person.
+export function statusText(status: TicketStatus): string {
+  const group = GROUP_WORD[statusGroup(status)];
+  return group === status ? group : `${group} · ${status}`;
+}

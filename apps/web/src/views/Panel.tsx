@@ -1,5 +1,6 @@
 import type { Intent } from "../store/msg";
 import { type Tab, TABS } from "../store/route";
+import { statusText } from "../store/groups";
 import { type State, currentCard } from "../store/state";
 import { Details } from "./Details";
 import { EventsTab } from "./EventsTab";
@@ -11,7 +12,7 @@ const LABEL: Record<Tab, string> = {
 
 const PLACEHOLDER: Record<"chat" | "terminal" | "pr", string> = {
   chat: "Talk to this card's agent here. Not available yet.",
-  terminal: "The agent's terminal will be shown here once ships run real agents.",
+  terminal: "No runner yet. The live terminal comes with the next UI ticket.",
   pr: "The pull request of this card, with its checks and review state, will be shown here.",
 };
 
@@ -35,12 +36,18 @@ export function Panel({ state, dispatch }: { state: State; dispatch: (i: Intent)
             {LABEL[t]}
           </button>
         ))}
+        <span className="who">
+          <span className="key">{card.key}</span> {card.title} <span className="muted">{statusText(card.status)}</span>
+        </span>
       </div>
       <div role="tabpanel" className="tabpanel" data-tab={state.tab}>
         {state.tab === "details" && <Details state={state} card={card} />}
         {state.tab === "events" && <EventsTab state={state} card={card} />}
         {state.tab === "threads" && <ThreadsTab state={state} card={card} dispatch={dispatch} />}
-        {(state.tab === "chat" || state.tab === "terminal" || state.tab === "pr") && (
+        {state.tab === "terminal" && (
+          <pre className="term" data-testid="placeholder"><span className="dim">{PLACEHOLDER.terminal}</span></pre>
+        )}
+        {(state.tab === "chat" || state.tab === "pr") && (
           <p className="muted" data-testid="placeholder">{PLACEHOLDER[state.tab]}</p>
         )}
       </div>

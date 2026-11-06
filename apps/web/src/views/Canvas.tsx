@@ -1,11 +1,12 @@
 import type { ChainDetail } from "../api/types";
 import { layoutChain, nodeKey } from "../layout";
-import { GROUP_LABEL, statusGroup } from "../store/groups";
+import { outOfOrderText } from "../format";
+import { statusGroup, statusText } from "../store/groups";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf } from "../store/state";
 
-const W = 190;
-const H = 64;
+const W = 196;
+const H = 84;
 const GAP_X = 44;
 const GAP_Y = 20;
 const PAD = 16;
@@ -51,7 +52,7 @@ export function Canvas({ chain, state, dispatch }: {
               <div key={nodeKey(n)} className="node release" data-version={r.version} style={style}>
                 <b className="key">◆ {r.version}</b>
                 <span className="muted">{r.channel} · {r.start_mode}</span>
-                <small data-testid="release-state">{r.state}</small>
+                <small className="muted" data-testid="release-state">{r.state}</small>
               </div>
             );
           }
@@ -70,11 +71,17 @@ export function Canvas({ chain, state, dispatch }: {
                 dispatch({ type: "selectCard", project: route.project, chain: route.chain, key: t.key });
               }}
             >
-              <b className="key">{t.key}</b>
-              <span className="title">{t.title}</span>
-              <span className="muted">
-                {GROUP_LABEL[statusGroup(t.status)]} · <small data-testid="status">{t.status}</small>
+              <span className="row">
+                <span className="title">{t.title}</span>
+                {t.profile && <span className="runner">{t.profile}</span>}
               </span>
+              <span className="row">
+                <span className="st" data-testid="status">{statusText(t.status)}</span>
+                <span className="key">{t.key}</span>
+              </span>
+              {t.done_out_of_order && (
+                <span className="mark" title={outOfOrderText(t.done_out_of_order)}>out of order</span>
+              )}
             </a>
           );
         })}

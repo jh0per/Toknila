@@ -1,0 +1,20 @@
+/* The chain of linked cards: dotted canvas, cards with a status stripe, edges. */
+.canvas { overflow: auto; position: relative; min-height: 0; background: radial-gradient(circle, var(--line) 1px, transparent 1px) 0 0 / 18px 18px, var(--bg); }
+.canvas-inner { position: relative; }
+.canvas svg { position: absolute; inset: 0; fill: none; stroke: var(--muted); stroke-width: 1.5; pointer-events: none; }
+.node { position: absolute; display: flex; flex-direction: column; gap: 3px; padding: var(--s2) 10px; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--todo); border-radius: var(--r-m); }
+a.node:hover { border-color: var(--muted); }
+.node.sel { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.node .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0; }
+.node .title { font-weight: 600; font-size: var(--fs-m); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .key { font-size: var(--fs-xs); color: var(--muted); }
+.node .st { font-size: 11px; color: var(--muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .mark { font-size: var(--fs-xs); color: var(--block); border: 1px solid var(--block); border-radius: 3px; padding: 0 4px; white-space: nowrap; width: fit-content; }
+.runner { font-family: var(--mono); font-size: 10px; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; color: var(--muted); white-space: nowrap; flex: none; }
+.g-todo { border-top-color: var(--todo); } .g-in_progress { border-top-color: var(--prog); }
+.g-blocked { border-top-color: var(--block); } .g-done { border-top-color: var(--done); }
+.g-cancelled { border-top-color: var(--cancel); opacity: 0.6; }
+.g-awaiting_approval { border: 1.5px dashed var(--block); background: var(--block-soft); }
+.node.release { border-top-color: var(--done); border-style: dashed; }
+.node.release .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

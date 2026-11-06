@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TicketStatus } from "../api/types";
-import { GROUP_LABEL, GROUP_ORDER, groupBy, statusGroup } from "./groups";
+import { GROUP_LABEL, GROUP_ORDER, groupBy, statusGroup, statusText } from "./groups";
 
 describe("statusGroup", () => {
   it("maps every status to its display group", () => {
@@ -41,5 +41,15 @@ describe("statusGroup", () => {
     expect(g.cancelled.map((i) => i.k)).toEqual([2]);
     expect(g.done.map((i) => i.k)).toEqual([4]);
     expect(g.blocked).toEqual([]);
+  });
+});
+
+describe("statusText", () => {
+  it("shows a waiting card as in progress, never as blocked", () => {
+    expect(statusText("waiting")).toBe("in progress · waiting");
+    expect(statusText("running")).toBe("in progress · running");
+    expect(statusText("blocked")).toBe("blocked");
+    expect(statusText("backlog")).toBe("todo · backlog");
+    expect(statusText("merged")).toBe("done · merged");
   });
 });

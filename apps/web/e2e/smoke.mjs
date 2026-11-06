@@ -7,7 +7,7 @@
 // links and the title link navigate, and the page reconnects by itself after the daemon restarts.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
@@ -19,6 +19,10 @@ if (!tokBin) {
 }
 const home = mkdtempSync(join(tmpdir(), "toknila-web-"));
 const demo = resolve(import.meta.dirname, "../../../examples/demo.toml");
+// Screenshots of the main screens, kept as run artifacts (never committed): SHOTS_DIR, default
+// apps/web/e2e-artifacts/<SHOTS_LABEL>; light and dark, for the chain, the card and the threads.
+const shotsDir = process.env.SHOTS_DIR ?? resolve(import.meta.dirname, "../e2e-artifacts", process.env.SHOTS_LABEL ?? "run");
+mkdirSync(shotsDir, { recursive: true });
 const tok = (...args) =>
   execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 
@@ -41,6 +45,14 @@ try {
   });
   await page.goto(url);
   const status = (key) => page.locator(`a[data-key="${key}"] [data-testid=status]`);
+  const shot = async (name) => {
+    for (const scheme of ["light", "dark"]) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.screenshot({ path: join(shotsDir, `${name}-${scheme}.png`) });
+    }
+    await page.emulateMedia({ colorScheme: "light" });
+    console.log(`PASS screenshot ${name}`);
+  };
   const expectText = async (loc, text, what) => {
     await loc.filter({ hasText: text }).first().waitFor({ timeout: 10_000 }).catch(async () => {
       throw new Error(`${what}: expected "${text}", got "${await loc.first().textContent().catch(() => "?")}"`);
@@ -63,22 +75,27 @@ try {
   await expectText(page.locator("[data-testid=projects]"), "DEMO", "project listed");
   await openChain();
   await expectText(status("DEMO-1"), "running", "DEMO-1 autostarted");
-  await expectText(status("DEMO-2"), "backlog", "DEMO-2 waits for DEMO-1");
+  await expectText(status("DEMO-2"), "todo · backlog", "DEMO-2 waits for DEMO-1");
+  const keyWraps = await page.locator(".node .key").evaluateAll((els) => els.filter((e) => e.getClientRects().length > 1 || e.scrollWidth > e.clientWidth).length);
+  if (keyWraps) throw new Error("a card key wraps or is clipped");
+  console.log("PASS card keys do not wrap");
   await expectText(page.locator('[data-version="R1"]'), "planned", "milestone R1 is a node");
   await expectText(page.locator("[data-testid=running]"), "DEMO-1", "running agents list");
   const nodes = await page.locator(".canvas .node").count();
   if (nodes !== 5) throw new Error(`canvas: expected 5 nodes, got ${nodes}`);
   console.log("PASS canvas: 4 cards and 1 milestone");
+  await shot("chain");
 
   // Open a card: the Details tab shows the ticket.
   await page.locator('a[data-key="DEMO-1"]').click();
   await expectPath("/projects/DEMO/chains/demo/cards/DEMO-1", "card route");
   await expectText(page.locator("[data-testid=details]"), "First step.", "Details tab shows the prompt");
   await expectText(page.locator("[data-testid=details]"), "write the test", "Details tab shows subtasks");
+  await shot("card-detail");
 
   // A change made from the CLI shows live, in the canvas, the inbox and the Details tab.
   tok("sim", "DEMO-1", "ask", "which way?");
-  await expectText(status("DEMO-1"), "waiting", "live update from the CLI");
+  await expectText(status("DEMO-1"), "in progress · waiting", "a waiting card is in progress, not blocked");
   await expectText(page.locator("[data-testid=details]"), "question: which way?", "reason shown");
   await expectText(page.locator("[data-testid=chain-status]"), "needs human", "chain needs a human");
   await expectText(page.locator("[data-testid=inbox-count]"), "1", "inbox count");
@@ -95,7 +112,7 @@ try {
   );
   console.log("PASS Events tab: a new event arrived live");
   await page.getByRole("tab", { name: "Terminal" }).click();
-  await expectText(page.locator("[data-testid=placeholder]"), "terminal", "Terminal tab is a placeholder");
+  await expectText(page.locator("[data-testid=placeholder]"), "no runner yet", "Terminal tab is a placeholder");
 
   // The comment answered the question, so the card runs again; ask once more for the inbox.
   await page.getByRole("tab", { name: "Details" }).click();
@@ -131,6 +148,7 @@ try {
   await page.getByRole("button", { name: "v1" }).click();
   await page.locator("[data-testid=mermaid] svg").waitFor({ timeout: 20_000 });
   console.log("PASS Mermaid version renders as an svg diagram");
+  await shot("threads");
   await page.getByLabel("Message in thread 1").fill("show the error state larger");
   await page.getByRole("button", { name: "Request changes" }).click();
   await expectText(threads.locator("[data-testid=thread-state]"), "changes requested", "changes requested");
