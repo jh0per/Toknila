@@ -1,7 +1,6 @@
 //! One run: a process in a terminal, its output on its way to the log, the scrollback and the
 //! stream, and the watcher that reports how it ended.
 
-use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
@@ -14,6 +13,7 @@ use toknila_app::runner::{RunEnded, RunnerError};
 use toknila_core::{ProcessExit, Run, TicketId};
 
 use super::Chunk;
+use super::logs::RunLog;
 use super::pty::{self, Spawned};
 use super::scrollback::Scrollback;
 use super::tokens::AgentTokens;
@@ -60,7 +60,7 @@ impl Active {
     pub fn launch(
         run: Run,
         process: Spawned,
-        log: File,
+        log: RunLog,
         lines: usize,
         channels: Channels,
     ) -> Result<Arc<Active>, RunnerError> {
@@ -135,7 +135,7 @@ impl Active {
     fn pump(
         &self,
         mut reader: Box<dyn Read + Send>,
-        mut log: File,
+        mut log: RunLog,
         wake: &broadcast::Sender<TicketId>,
     ) {
         let mut buf = vec![0; 8192];
@@ -159,7 +159,7 @@ impl Active {
                 }
             }
             // The log first: whatever a subscriber is told is already on disk.
-            if let Err(e) = log.write_all(&buf[..n]).and_then(|()| log.flush())
+            if let Err(e) = log.write(&buf[..n])
                 && !log_failed
             {
                 log_failed = true;
