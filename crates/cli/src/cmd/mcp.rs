@@ -10,6 +10,7 @@ use std::io::{BufRead, Write};
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
 use toknila_api_types::{AgentEvent, TicketDetail};
+use toknila_core::AgentRole;
 
 use super::agent::AgentEnv;
 use super::mcp_tools::{self, ToolError};
@@ -37,9 +38,13 @@ fn tool_result(text: &str, is_error: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": text }], "isError": is_error })
 }
 
-fn call_tool(params: &Value, forward: &Forward<'_>) -> Result<Value, (i64, String)> {
+fn call_tool(
+    role: AgentRole,
+    params: &Value,
+    forward: &Forward<'_>,
+) -> Result<Value, (i64, String)> {
     let name = params["name"].as_str().unwrap_or_default();
-    match mcp_tools::event(name, &params["arguments"]) {
+    match mcp_tools::event(role, name, &params["arguments"]) {
         Err(ToolError::Unknown) => Err((INVALID_PARAMS, format!("unknown tool {name:?}"))),
         Err(ToolError::BadArguments(e)) => Ok(tool_result(&format!("{name}: {e}"), true)),
         Ok(event) => Ok(match forward(&event) {
@@ -50,7 +55,7 @@ fn call_tool(params: &Value, forward: &Forward<'_>) -> Result<Value, (i64, Strin
 }
 
 /// The answer to one message, or none for a notification.
-fn handle(message: &Value, forward: &Forward<'_>) -> Option<Value> {
+fn handle(role: AgentRole, message: &Value, forward: &Forward<'_>) -> Option<Value> {
     let id = message.get("id")?;
     let params = &message["params"];
     let outcome = match message["method"].as_str().unwrap_or_default() {
@@ -60,8 +65,8 @@ fn handle(message: &Value, forward: &Forward<'_>) -> Option<Value> {
             "serverInfo": { "name": "toknila", "version": toknila_core::VERSION },
         })),
         "ping" => Ok(json!({})),
-        "tools/list" => Ok(json!({ "tools": mcp_tools::list() })),
-        "tools/call" => call_tool(params, forward),
+        "tools/list" => Ok(json!({ "tools": mcp_tools::list(role) })),
+        "tools/call" => call_tool(role, params, forward),
         other => Err((
             METHOD_NOT_FOUND,
             format!("method {other:?} is not supported"),
@@ -74,14 +79,19 @@ fn handle(message: &Value, forward: &Forward<'_>) -> Option<Value> {
 }
 
 /// Reads messages from `input` until it ends and writes the answers to `output`.
-fn serve(input: impl BufRead, mut output: impl Write, forward: &Forward<'_>) -> Result<()> {
+fn serve(
+    role: AgentRole,
+    input: impl BufRead,
+    mut output: impl Write,
+    forward: &Forward<'_>,
+) -> Result<()> {
     for line in input.lines() {
         let line = line.context("reading stdin")?;
         if line.trim().is_empty() {
             continue;
         }
         let answer = match serde_json::from_str::<Value>(&line) {
-            Ok(message) => handle(&message, forward),
+            Ok(message) => handle(role, &message, forward),
             Err(e) => Some(failure(
                 &Value::Null,
                 PARSE_ERROR,
@@ -114,7 +124,12 @@ pub(super) fn run() -> Result<()> {
             .map(|d| stands(&d))
             .map_err(|e| e.to_string())
     };
-    serve(std::io::stdin().lock(), std::io::stdout().lock(), &forward)
+    serve(
+        agent.role,
+        std::io::stdin().lock(),
+        std::io::stdout().lock(),
+        &forward,
+    )
 }
 
 #[cfg(test)]
@@ -124,7 +139,7 @@ mod tests {
     fn exchange(lines: &[Value], forward: &Forward<'_>) -> Vec<Value> {
         let input: String = lines.iter().map(|l| format!("{l}\n")).collect();
         let mut out = Vec::new();
-        serve(input.as_bytes(), &mut out, forward).expect("serve");
+        serve(AgentRole::Worker, input.as_bytes(), &mut out, forward).expect("serve");
         String::from_utf8(out)
             .expect("utf-8")
             .lines()
@@ -212,7 +227,7 @@ mod tests {
     fn garbage_gets_a_parse_error_and_the_server_keeps_going() {
         let mut out = Vec::new();
         let input = "not json\n\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}\n";
-        serve(input.as_bytes(), &mut out, &ok).expect("serve");
+        serve(AgentRole::Worker, input.as_bytes(), &mut out, &ok).expect("serve");
         let lines: Vec<Value> = String::from_utf8(out)
             .expect("utf-8")
             .lines()

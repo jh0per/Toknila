@@ -4,11 +4,12 @@ use toknila_core::events::DomainEvent;
 use toknila_core::graph::{Action, Applied, ChainView, GraphError};
 use toknila_core::machine::{Effect, TicketEvent};
 use toknila_core::{
-    Actor, ChainId, CommentKind, Edge, NodeRef, Release, ReleaseId, Ticket, TicketId, Timestamp,
+    Actor, Chain, ChainId, CommentKind, Edge, NodeRef, Release, ReleaseId, Ticket, TicketId,
+    Timestamp,
 };
 
 use crate::notes::{add_comment, body_from_text, deliver_to_sim};
-use crate::{AppError, AppResult, ErrorKind, UnitOfWork, runs, ships};
+use crate::{AppError, AppResult, ErrorKind, UnitOfWork, reviews, runs, ships};
 
 /// A chain being changed by one command. Every step is journaled by the graph
 /// ([`ChainView::record`]) so each transition, including intermediate ones
@@ -59,6 +60,14 @@ impl ChainTx {
         self.effects
             .extend(effects.into_iter().map(|e| (ticket, e)));
         Ok(())
+    }
+
+    /// Changes the chain's own settings and journals it.
+    pub fn edit_chain(&mut self, f: impl FnOnce(&mut Chain)) {
+        f(&mut self.view.chain);
+        self.events.push(DomainEvent::ChainUpdated {
+            chain: self.view.chain.clone(),
+        });
     }
 
     /// Changes a ticket's plain fields (not its status).
@@ -214,6 +223,15 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
                 runs::queue_stop(uow, ticket);
                 continue;
             }
+            Effect::StartReviewer => {
+                reviews::queue_start(uow, ctx, ticket)?;
+                continue;
+            }
+            Effect::StopReviewer => {
+                reviews::queue_stop(uow, ticket);
+                continue;
+            }
+            Effect::RecordRemarks { text } => (Actor::Agent, CommentKind::Instruction, text),
             _ => continue,
         };
         add_comment(uow, &ctx.view, ticket, author, kind, body_from_text(&text))?;

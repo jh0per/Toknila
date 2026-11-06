@@ -32,7 +32,10 @@ fn load_ticket_detail(repo: &Repo<'_>, ticket: TicketId, at: Timestamp) -> ApiRe
         .ticket(ticket)?
         .ok_or_else(|| ApiError::not_found(format!("ticket {ticket}")))?;
     let chain = repo.chain(t.chain_id)?.map(|c| c.name).unwrap_or_default();
+    let review = toknila_app::reviews::view(repo, &t)?;
     Ok(TicketDetail {
+        review,
+        allowed_actions: toknila_core::machine::TicketAction::allowed(&t),
         subtasks: repo.subtasks(t.id)?,
         comments: repo.comments(t.id)?,
         in_status_ms: at.millis_since(t.status_since),

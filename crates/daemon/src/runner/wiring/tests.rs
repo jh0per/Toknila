@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 use toknila_core::hook::HOOKS;
-use toknila_core::{AgentProfile, RunId};
+use toknila_core::{AgentProfile, AgentRole, RunId};
 
 use super::*;
 
@@ -26,9 +26,14 @@ impl Rig {
     }
 
     fn prepare(&self, profile: &AgentProfile) -> Wiring {
+        self.prepare_as(profile, AgentRole::Worker)
+    }
+
+    fn prepare_as(&self, profile: &AgentProfile, role: AgentRole) -> Wiring {
         let cx = Context {
             dir: &self.dir.path().join("runs").join("t1"),
             key: &self.key,
+            role,
             run: self.run,
             token: TOKEN,
             url: Some("http://127.0.0.1:4242"),
@@ -72,6 +77,7 @@ fn the_mcp_config_runs_tok_mcp_and_names_variables_not_the_token() {
     assert_eq!(server["env"][agent_env::TOKEN], "${TOKNILA_RUN_TOKEN}");
     assert_eq!(server["env"][agent_env::URL], "${TOKNILA_URL}");
     assert_eq!(server["env"][agent_env::TICKET], "${TOKNILA_TICKET}");
+    assert_eq!(server["env"][agent_env::ROLE], "${TOKNILA_ROLE}");
 }
 
 #[test]
@@ -104,6 +110,10 @@ fn the_environment_carries_the_daemon_address_the_token_the_ticket_and_the_run()
     assert_eq!(env("TOKNILA_RUN_TOKEN"), Some(TOKEN));
     assert_eq!(env("TOKNILA_TICKET"), Some("DEMO-1"));
     assert_eq!(env("TOKNILA_RUN"), Some(rig.run.to_string().as_str()));
+    assert_eq!(env("TOKNILA_ROLE"), Some("worker"));
+    let reviewer = rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    let role = reviewer.env.iter().find(|(k, _)| k == "TOKNILA_ROLE");
+    assert_eq!(role.map(|(_, v)| v.as_str()), Some("reviewer"));
 }
 
 #[test]

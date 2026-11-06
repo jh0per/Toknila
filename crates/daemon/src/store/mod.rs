@@ -8,6 +8,7 @@ mod codec;
 mod external;
 mod notes;
 mod ports;
+mod projects;
 mod schema;
 mod ships;
 mod threads;

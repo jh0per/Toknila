@@ -18,6 +18,8 @@ pub struct NewProject {
     pub release_branch: Option<String>,
     pub default_profile: Option<String>,
     pub default_review_mode: Option<ReviewMode>,
+    /// Reviewer agent profile; unset means `<worker profile>-reviewer`.
+    pub default_reviewer: Option<String>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -41,6 +43,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             .default_profile
             .unwrap_or_else(|| AgentProfile::SIM.to_owned()),
         default_review_mode: draft.default_review_mode.unwrap_or_default(),
+        default_reviewer: draft.default_reviewer.filter(|r| !r.trim().is_empty()),
     };
     uow.insert_project(&p)?;
     uow.emit(&DomainEvent::ProjectCreated { project: p.clone() })?;

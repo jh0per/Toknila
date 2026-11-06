@@ -37,8 +37,9 @@ pub async fn agent_event(
         .store
         .write(Actor::Agent, at, move |tx| -> ApiResult<TicketDetail> {
             let t = resolve::ticket(&*tx, &ticket)?;
-            // An agent token acts on its own ticket only.
+            // An agent token acts on its own ticket only, and says what its role may.
             principal.owns(&t)?;
+            principal.may_send(&event)?;
             // The ticket itself, or the card it proposed.
             let answer = agent::ticket_event(tx, &t, event)?;
             load_ticket_detail(&tx.repo(), answer, at)
@@ -63,7 +64,10 @@ pub async fn ticket_activity(
         .read(move |repo| Ok(resolve::ticket(repo, &ticket)))
         .await??;
     principal.owns(&t)?;
-    state.runners.tokens().touch(t.id, now(), &input.signal);
+    // Only the worker's signs of life count: a reviewer beside it is not the worker working.
+    if !matches!(principal, Principal::Agent(g) if g.role != toknila_core::AgentRole::Worker) {
+        state.runners.tokens().touch(t.id, now(), &input.signal);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

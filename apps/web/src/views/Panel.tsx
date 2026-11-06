@@ -41,7 +41,7 @@ export function Panel({ state, dispatch }: { state: State; dispatch: (i: Intent)
           <span className="key">{card.key}</span> {card.title} <span className="muted">{statusText(card.status)}</span>
         </span>
       </div>
-      <ActionBar key={card.key} card={card} dispatch={dispatch} />
+      <ActionBar key={card.key} card={card} detail={state.details[card.key]} dispatch={dispatch} />
       <div role="tabpanel" className="tabpanel" data-tab={state.tab}>
         {state.tab === "details" && <Details state={state} card={card} dispatch={dispatch} />}
         {state.tab === "events" && <EventsTab state={state} card={card} />}

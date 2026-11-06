@@ -7,7 +7,8 @@ use std::collections::HashSet;
 use toknila_core::agent::AgentEvent;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    Actor, BlockedReason, ProcessExit, Run, RunId, StatusReason, Ticket, TicketId, TicketStatus,
+    Actor, AgentRole, BlockedReason, ProcessExit, Run, RunId, StatusReason, Ticket, TicketId,
+    TicketStatus,
 };
 
 use super::Mem;
@@ -19,11 +20,12 @@ use crate::{ErrorKind, agent, runs, tickets};
 /// A runner that remembers what it was asked and can be told to refuse.
 #[derive(Debug, Default)]
 pub(super) struct FakeRunner {
-    started: RefCell<Vec<RunRequest>>,
-    stopped: RefCell<Vec<TicketId>>,
+    pub(super) started: RefCell<Vec<RunRequest>>,
+    pub(super) stopped: RefCell<Vec<TicketId>>,
+    pub(super) stopped_roles: RefCell<Vec<(TicketId, AgentRole)>>,
     written: RefCell<Vec<Vec<u8>>>,
-    live: RefCell<HashSet<TicketId>>,
-    refuse: RefCell<Option<RunnerError>>,
+    pub(super) live: RefCell<HashSet<(TicketId, AgentRole)>>,
+    pub(super) refuse: RefCell<Option<RunnerError>>,
 }
 
 impl Runner for FakeRunner {
@@ -31,7 +33,7 @@ impl Runner for FakeRunner {
         if let Some(e) = self.refuse.borrow().clone() {
             return Err(e);
         }
-        let reused = !self.live.borrow_mut().insert(req.ticket);
+        let reused = !self.live.borrow_mut().insert((req.ticket, req.role));
         if !reused {
             self.started.borrow_mut().push(req.clone());
         }
@@ -42,12 +44,17 @@ impl Runner for FakeRunner {
     }
 
     fn stop(&self, ticket: TicketId) {
-        self.live.borrow_mut().remove(&ticket);
+        self.live.borrow_mut().retain(|(t, _)| *t != ticket);
         self.stopped.borrow_mut().push(ticket);
     }
 
+    fn stop_role(&self, ticket: TicketId, role: AgentRole) {
+        self.live.borrow_mut().remove(&(ticket, role));
+        self.stopped_roles.borrow_mut().push((ticket, role));
+    }
+
     fn write(&self, ticket: TicketId, bytes: &[u8]) -> Result<(), RunnerError> {
-        if !self.live.borrow().contains(&ticket) {
+        if !self.live.borrow().contains(&(ticket, AgentRole::Worker)) {
             return Err(RunnerError::NotRunning);
         }
         self.written.borrow_mut().push(bytes.to_vec());
@@ -55,25 +62,26 @@ impl Runner for FakeRunner {
     }
 }
 
-fn run_of(req: &RunRequest) -> Run {
+pub(super) fn run_of(req: &RunRequest) -> Run {
     Run {
         id: RunId::new(),
         ticket_id: req.ticket,
         key: req.key.clone(),
         profile: req.profile.clone(),
         dir: req.dir.clone(),
+        role: req.role,
     }
 }
 
 /// Project DEMO with a repository whose agents are processes (profile `fake`).
-fn with_agents() -> Mem {
+pub(super) fn with_agents() -> Mem {
     let mut mem = Mem::demo();
     mem.project.repo_path = Some("/repo".to_owned());
     mem.project.default_profile = "fake".to_owned();
     mem
 }
 
-fn settle(mem: &mut Mem) {
+pub(super) fn settle(mem: &mut Mem) {
     while !mem.deferred.is_empty() {
         let queued = std::mem::take(&mut mem.deferred);
         let host = Host {
@@ -85,7 +93,7 @@ fn settle(mem: &mut Mem) {
     }
 }
 
-fn a(mem: &Mem) -> Ticket {
+pub(super) fn a(mem: &Mem) -> Ticket {
     mem.ticket_by_title("A")
 }
 
@@ -96,12 +104,12 @@ fn blocked_reason(t: &Ticket) -> BlockedReason {
     reason
 }
 
-fn act(mem: &mut Mem, event: TicketEvent) {
+pub(super) fn act(mem: &mut Mem, event: TicketEvent) {
     let t = a(mem);
     tickets::act(mem, &t, event).expect("act");
 }
 
-fn finish(mem: &mut Mem, summary: String) {
+pub(super) fn finish(mem: &mut Mem, summary: String) {
     let t = a(mem);
     agent::ticket_event(mem, &t, AgentEvent::Finished { summary }).expect("finished");
 }
@@ -118,6 +126,7 @@ fn ended(mem: &Mem, code: Option<i32>, stopped: bool) -> RunEnded {
         run: run_of(&RunRequest {
             ticket: t.id,
             key: t.key.clone(),
+            role: AgentRole::Worker,
             profile: "fake".to_owned(),
             dir: "/ships/x".to_owned(),
         }),

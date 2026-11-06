@@ -15,6 +15,7 @@ pub mod projects;
 pub mod recovery;
 pub mod releases;
 pub mod resolve;
+pub mod reviews;
 pub mod runner;
 pub mod runs;
 pub mod ships;

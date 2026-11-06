@@ -43,7 +43,7 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
           )}
         </section>
       </div>
-      <Rounds state={state} card={card} />
+      <Rounds detail={detail} />
       <Comments key={card.key} card={card} detail={detail} dispatch={dispatch} />
     </div>
   );

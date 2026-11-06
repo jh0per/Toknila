@@ -38,6 +38,7 @@ impl Plan {
             goal: self.chain.goal.clone(),
             autostart: self.chain.autostart,
             review_mode: self.chain.review_mode,
+            reviewer: None,
         };
         let tickets: Vec<Ticket> = self
             .tickets
@@ -103,6 +104,7 @@ impl PlanTicket {
             paused: self.paused,
             profile: self.profile.clone(),
             review_mode: self.review_mode,
+            reviewer: None,
             needs_secrets: self.needs_secrets,
         }
     }

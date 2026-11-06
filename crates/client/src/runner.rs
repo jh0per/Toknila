@@ -5,7 +5,7 @@
 use std::io::Read;
 
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
-use toknila_core::RunId;
+use toknila_core::{AgentRole, RunId};
 
 use crate::{Client, ClientError, ClientResult, enc, transport_error};
 
@@ -22,9 +22,19 @@ pub struct Scrollback {
 }
 
 impl Client {
-    /// `GET /tickets/{ticket}/runner/scrollback`.
+    /// `GET /tickets/{ticket}/runner/scrollback`: the worker's output.
     pub fn runner_scrollback(&self, ticket: &str) -> ClientResult<Scrollback> {
-        let url = format!("{}/v1/tickets/{}/runner/scrollback", self.base, enc(ticket));
+        self.runner_scrollback_of(ticket, AgentRole::Worker)
+    }
+
+    /// The scrollback of the ticket's runner of `role`; the reviewer's is read-only.
+    pub fn runner_scrollback_of(&self, ticket: &str, role: AgentRole) -> ClientResult<Scrollback> {
+        let url = format!(
+            "{}/v1/tickets/{}/runner/scrollback{}",
+            self.base,
+            enc(ticket),
+            role_query(role, '?')
+        );
         let resp = self
             .agent
             .get(&url)
@@ -72,13 +82,32 @@ impl Client {
     /// The WebSocket address of a ticket's live terminal output, continuing after `cursor` (a run
     /// and the offset after the last byte of it that the caller has).
     pub fn runner_stream_url(&self, ticket: &str, cursor: Option<(RunId, u64)>) -> String {
+        self.runner_stream_url_of(ticket, AgentRole::Worker, cursor)
+    }
+
+    /// The same for the ticket's runner of `role`.
+    pub fn runner_stream_url_of(
+        &self,
+        ticket: &str,
+        role: AgentRole,
+        cursor: Option<(RunId, u64)>,
+    ) -> String {
         let ws = self.base.replacen("http://", "ws://", 1);
         let from = cursor.map_or_else(String::new, |(run, at)| format!("&run={run}&from={at}"));
         format!(
-            "{ws}/v1/tickets/{}/runner/stream?token={}{from}",
+            "{ws}/v1/tickets/{}/runner/stream?token={}{from}{}",
             enc(ticket),
-            self.token
+            self.token,
+            role_query(role, '&')
         )
+    }
+}
+
+/// The `role` query parameter; the worker is the default and is not written out.
+fn role_query(role: AgentRole, sep: char) -> String {
+    match role {
+        AgentRole::Reviewer => format!("{sep}role=reviewer"),
+        _ => String::new(),
     }
 }
 
@@ -97,6 +126,10 @@ mod tests {
         assert_eq!(
             c.runner_stream_url("DEMO-1", Some((run, 42))),
             "ws://127.0.0.1:4100/v1/tickets/DEMO-1/runner/stream?token=t0k&run=01JBQ7ZJ0000000000000000R1&from=42"
+        );
+        assert_eq!(
+            c.runner_stream_url_of("DEMO-1", AgentRole::Reviewer, None),
+            "ws://127.0.0.1:4100/v1/tickets/DEMO-1/runner/stream?token=t0k&role=reviewer"
         );
     }
 }

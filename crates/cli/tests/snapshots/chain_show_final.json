@@ -139,6 +139,24 @@
       "paused": false,
       "profile": "sim",
       "prompt": "First step.",
+      "review": {
+        "rounds": [
+          {
+            "comment": "add a test",
+            "decided_at": 0,
+            "number": 1,
+            "reviewer": "human",
+            "verdict": "request_changes"
+          },
+          {
+            "comment": "",
+            "decided_at": 0,
+            "number": 2,
+            "reviewer": "human",
+            "verdict": "approve"
+          }
+        ]
+      },
       "review_mode": null,
       "status": "released",
       "status_reason": null,
@@ -156,6 +174,17 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "review": {
+        "rounds": [
+          {
+            "comment": "",
+            "decided_at": 0,
+            "number": 1,
+            "reviewer": "human",
+            "verdict": "approve"
+          }
+        ]
+      },
       "review_mode": null,
       "status": "released",
       "status_reason": null,
@@ -173,6 +202,17 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "review": {
+        "rounds": [
+          {
+            "comment": "",
+            "decided_at": 0,
+            "number": 1,
+            "reviewer": "human",
+            "verdict": "approve"
+          }
+        ]
+      },
       "review_mode": null,
       "status": "released",
       "status_reason": null,
@@ -190,6 +230,17 @@
       "paused": false,
       "profile": "sim",
       "prompt": "",
+      "review": {
+        "rounds": [
+          {
+            "comment": "",
+            "decided_at": 0,
+            "number": 1,
+            "reviewer": "human",
+            "verdict": "approve"
+          }
+        ]
+      },
       "review_mode": null,
       "status": "merged",
       "status_reason": null,

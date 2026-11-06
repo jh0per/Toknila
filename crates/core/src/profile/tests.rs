@@ -120,6 +120,8 @@ fn the_catalog_lists_built_ins_then_files_by_name_and_skips_other_files() {
         [
             ("sim", None),
             ("claude-code", None),
+            ("sim-reviewer", None),
+            ("claude-code-reviewer", None),
             ("alpha", Some("alpha.toml")),
             ("zeta", Some("zeta.toml")),
         ]
@@ -138,7 +140,7 @@ fn the_catalog_reports_bad_files_and_still_lists_the_good_ones() {
         },
         file("good.toml", "command = [\"g\"]"),
     ]);
-    assert_eq!(c.profiles.len(), 3, "sim, claude-code and good");
+    assert_eq!(c.profiles.len(), 5, "four built-ins and good");
     assert_eq!(c.profiles[1].profile.command, ["claude"], "no override");
     let got: Vec<(&str, u32, u32)> = c
         .problems

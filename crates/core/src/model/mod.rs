@@ -7,6 +7,7 @@ mod keys;
 mod profile;
 mod project;
 mod release;
+mod review;
 mod run;
 mod ship;
 mod status;
@@ -24,6 +25,10 @@ pub use keys::{KeyError, ProjectKey, TicketKey};
 pub use profile::{AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules};
 pub use project::{Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
+pub use review::{
+    Review, ReviewRound, ReviewTurn, Verdict, resolve_mode as resolve_review_mode,
+    resolve_reviewer, reviewer_profile,
+};
 pub use run::{ProcessExit, Run};
 pub use ship::{Ship, ShipSpec, slugify};
 pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};

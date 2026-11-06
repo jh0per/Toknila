@@ -14,6 +14,7 @@ use crate::store::Store;
 
 mod agent_tokens;
 mod profiles;
+mod reviews;
 mod ships;
 mod threads;
 

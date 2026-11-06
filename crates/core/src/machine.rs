@@ -11,8 +11,10 @@
 //! | Running | Review | `Finished` |
 //! | Running, Waiting | Blocked | `Block` (Review too, for a merge conflict) |
 //! | Blocked | previous status | `Unblock` |
-//! | Review | Running | `Return` |
+//! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
 //! | Review | Merged | `Accept` (removes the ship's worktree, keeps its branch) |
+//! | Review | Running / Merged / same | `ReviewVerdict` (the reviewer agent; see [`review`]) |
+//! | Review | same | `ReviewerFailed` (the card then waits for a person) |
 //! | Backlog, Ready | Merged | `DoneOutOfOrder` (import only: work finished behind open cards) |
 //! | Merged | Released | `Released` |
 //! | Merged | Review | `Reopen` |
@@ -26,120 +28,15 @@
 //! Pause is a flag, not a status: a paused ticket sits in Backlog. Graph-wide consequences
 //! (dependents becoming Ready, Blocked or Backlog) come back as [`Effect`]s for the chain graph.
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
-    Actor, BlockedReason, NodeRef, OutOfOrder, StatusReason, Ticket, TicketKey, TicketStatus,
-    Timestamp, WaitingReason, thread::OpenThread,
+    Actor, BlockedReason, OutOfOrder, ReviewTurn, StatusReason, Ticket, TicketKey, TicketStatus,
+    Timestamp, Verdict, WaitingReason, thread::OpenThread,
 };
 
-/// Something that happened to a ticket.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "event", rename_all = "snake_case")]
-pub enum TicketEvent {
-    /// Graph: every dependency is satisfied.
-    DepsSatisfied,
-    /// Graph: a dependency is no longer satisfied (it was reopened).
-    DepsUnsatisfied,
-    /// Autostart or `tok start`; the runner confirmed it started.
-    Start,
-    /// Agent: asked a question, wants permission, or went silent.
-    AskHuman { reason: WaitingReason },
-    /// A person's new comment reached the agent.
-    InstructionDelivered,
-    /// Agent: done, a diff is ready. The summary becomes a report comment.
-    Finished {
-        summary: String,
-        /// Still-open threads of the ticket; the hand-in is refused unless this is empty.
-        #[serde(skip)]
-        open_threads: Vec<OpenThread>,
-    },
-    /// Agent crash, runner loss, dependency reopened, merge conflict, or `tok block`.
-    Block { reason: BlockedReason },
-    /// `tok unblock`.
-    Unblock,
-    /// `tok return` with a comment for the agent.
-    Return { comment: String },
-    /// `tok accept`.
-    Accept,
-    /// Import: the work was already done although cards before this one are still open. The
-    /// card is Merged and keeps the keys of those cards as its mark.
-    DoneOutOfOrder { behind: Vec<TicketKey> },
-    /// Shipyard: the ticket's ship exists; the ticket learns its branch. No status change.
-    ShipReady { branch: String },
-    /// Graph: the milestone this ticket belongs to was released.
-    Released,
-    /// `tok reopen`.
-    Reopen,
-    /// `tok pause`.
-    Pause,
-    /// `tok resume`.
-    Resume,
-    /// `tok cancel <reason>`.
-    Cancel { reason: String },
-    /// `tok approve`: a person lets a wildcard card into the plan.
-    Approve { by: Actor },
-    /// `tok reject <reason>`: a person turns a wildcard card down.
-    Reject { reason: String, by: Actor },
-}
-
-impl TicketEvent {
-    /// Short event name for errors and logs.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::DepsSatisfied => "deps_satisfied",
-            Self::DepsUnsatisfied => "deps_unsatisfied",
-            Self::Start => "start",
-            Self::AskHuman { .. } => "ask_human",
-            Self::InstructionDelivered => "instruction_delivered",
-            Self::Finished { .. } => "finished",
-            Self::Block { .. } => "block",
-            Self::Unblock => "unblock",
-            Self::Return { .. } => "return",
-            Self::Accept => "accept",
-            Self::DoneOutOfOrder { .. } => "done_out_of_order",
-            Self::ShipReady { .. } => "ship_ready",
-            Self::Released => "released",
-            Self::Reopen => "reopen",
-            Self::Pause => "pause",
-            Self::Resume => "resume",
-            Self::Cancel { .. } => "cancel",
-            Self::Approve { .. } => "approve",
-            Self::Reject { .. } => "reject",
-        }
-    }
-}
-
-/// Work the caller must do after a transition. Core decides; the daemon and graph execute.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "effect", rename_all = "snake_case")]
-pub enum Effect {
-    /// Make sure a runner is working on the ticket (start or restart it).
-    EnsureRunner,
-    /// Make sure the ticket has its ship (worktree and branch); reuse it if it exists.
-    PrepareShip,
-    /// Take the ticket's worktree away; the branch stays.
-    RemoveShip,
-    /// Stop the ticket's runner, if any.
-    StopRunner,
-    /// Store the agent's summary as a report comment.
-    RecordReport { summary: String },
-    /// Store a person's text as an instruction comment for the agent.
-    RecordInstruction { text: String },
-    /// The ticket now counts as done for its dependents (Merged or Cancelled): recompute Ready.
-    DependencySatisfied,
-    /// The ticket left Merged: dependents in Running go Blocked, in Ready go back to Backlog.
-    DependencyReopened,
-    /// The ticket may have become startable (resumed): recompute its readiness.
-    RecheckReadiness,
-    /// A wildcard card was approved: add the dependencies proposed with it to the graph.
-    AddProposedEdges {
-        after: Vec<NodeRef>,
-        before: Vec<NodeRef>,
-    },
-}
+mod action;
+mod event;
+pub use action::{TicketAction, UnknownAction};
+pub use event::{Effect, TicketEvent};
 
 /// The ticket after the event, and what must happen because of it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,7 +57,7 @@ pub enum TransitionError {
     Paused,
     #[error("ticket is not paused")]
     NotPaused,
-    #[error("{0} needs a non-empty text")]
+    #[error("{0} needs a text")]
     EmptyText(&'static str),
     #[error("cannot hand in {0}: {open}", open = crate::thread::list(.1))]
     OpenThreads(TicketKey, Vec<OpenThread>),
@@ -207,12 +104,14 @@ pub fn apply(
             TicketEvent::Finished {
                 summary,
                 open_threads,
+                mode,
             },
         ) => {
             crate::thread::require_none_open(&ticket.key, open_threads)?;
             effects.push(Effect::RecordReport {
                 summary: summary.clone(),
             });
+            review::enter(&mut next, *mode, &mut effects);
             (S::Review, None)
         }
         (S::Running | S::Waiting, TicketEvent::Block { reason }) => {
@@ -223,7 +122,10 @@ pub fn apply(
             TicketEvent::Block {
                 reason: reason @ BlockedReason::MergeConflict { .. },
             },
-        ) => block(reason, ticket, &mut effects)?,
+        ) => {
+            review::leave(&mut next, &mut effects);
+            block(reason, ticket, &mut effects)?
+        }
         (S::Blocked, TicketEvent::Unblock) => {
             let (resume_to, waiting) = match &ticket.status_reason {
                 Some(StatusReason::Blocked {
@@ -242,22 +144,39 @@ pub fn apply(
                     run_on_ship(&mut effects);
                     (S::Running, None)
                 }
+                (S::Review, _) => {
+                    next.review.turn = Some(ReviewTurn::Person);
+                    (S::Review, None)
+                }
                 (other, _) => (other, None),
             }
         }
         (S::Review, TicketEvent::Return { comment }) => {
             non_empty(comment, "return")?;
+            review::person_decides(
+                &mut next,
+                Verdict::RequestChanges,
+                comment,
+                now,
+                &mut effects,
+            );
             effects.push(Effect::RecordInstruction {
                 text: comment.clone(),
             });
             run_on_ship(&mut effects);
             (S::Running, None)
         }
-        (S::Review, TicketEvent::Accept) => {
-            effects.push(Effect::RemoveShip);
-            effects.push(Effect::StopRunner);
-            effects.push(Effect::DependencySatisfied);
+        (S::Review, TicketEvent::Accept { comment }) => {
+            let remarks = comment.as_deref().unwrap_or_default();
+            review::person_decides(&mut next, Verdict::Approve, remarks, now, &mut effects);
+            review::merge(&mut effects);
             (S::Merged, None)
+        }
+        (S::Review, TicketEvent::ReviewVerdict { verdict, comment }) => {
+            review::agent_decides(&mut next, *verdict, comment, now, &mut effects)?
+        }
+        (S::Review, TicketEvent::ReviewerFailed { detail }) => {
+            review::agent_failed(&mut next, detail, &mut effects)?
         }
         (S::Backlog | S::Ready, TicketEvent::DoneOutOfOrder { behind }) => {
             if behind.is_empty() {
@@ -273,6 +192,7 @@ pub fn apply(
         (S::Merged, TicketEvent::Released) => (S::Released, None),
         (S::Merged, TicketEvent::Reopen) => {
             effects.push(Effect::DependencyReopened);
+            next.review.turn = Some(ReviewTurn::Person);
             (S::Review, None)
         }
         (S::Backlog | S::Ready | S::Running | S::Waiting | S::Blocked, TicketEvent::Pause) => {
@@ -304,6 +224,7 @@ pub fn apply(
             }
             effects.push(Effect::DependencySatisfied);
             next.paused = false;
+            next.review.turn = None;
             (
                 S::Cancelled,
                 Some(StatusReason::Cancelled {
@@ -383,6 +304,7 @@ fn run_on_ship(effects: &mut Vec<Effect>) {
 }
 
 mod checks;
+mod review;
 use checks::non_empty;
 pub use checks::person_only;
 mod invariants;

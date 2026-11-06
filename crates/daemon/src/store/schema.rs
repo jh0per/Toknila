@@ -167,4 +167,12 @@ pub(super) const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE tickets ADD COLUMN done_out_of_order_json TEXT;
     "#,
+    // 5: review (P1-14). A ticket's review state (whose turn, the rounds so far; JSON) and the
+    // reviewer agent profile that may be set on a ticket, a chain and a project.
+    r#"
+    ALTER TABLE tickets ADD COLUMN review_json TEXT;
+    ALTER TABLE tickets ADD COLUMN reviewer TEXT;
+    ALTER TABLE chains ADD COLUMN reviewer TEXT;
+    ALTER TABLE projects ADD COLUMN default_reviewer TEXT;
+    "#,
 ];

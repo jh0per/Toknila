@@ -33,7 +33,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Sets how the chain's tickets are reviewed: the mode and the reviewer agent profile. A ticket
+         *     that sets its own keeps it; a field left out is kept.
+         */
+        patch: operations["patch_chain"];
         trace?: never;
     };
     "/chains/{chain}/edges": {
@@ -178,7 +182,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Sets how the project's tickets are reviewed by default: the mode and the reviewer agent
+         *     profile. A chain or ticket that sets its own keeps it; a field left out is kept.
+         */
+        patch: operations["patch_project"];
         trace?: never;
     };
     "/projects/{project}/chains": {
@@ -534,6 +542,11 @@ export interface components {
             detail: string;
             /** @enum {string} */
             event: "crashed";
+        } | {
+            comment?: string;
+            /** @enum {string} */
+            event: "review_verdict";
+            verdict: components["schemas"]["Verdict"];
         } | (components["schemas"]["Proposal"] & {
             /** @enum {string} */
             event: "propose";
@@ -624,6 +637,8 @@ export interface components {
             name: string;
             project_id: components["schemas"]["ProjectId"];
             review_mode?: components["schemas"]["ReviewMode"] | null;
+            /** @description Overrides the project's reviewer profile for every ticket that does not set its own. */
+            reviewer?: string | null;
         };
         /** @description A chain with its graph and computed status. */
         ChainDetail: {
@@ -790,6 +805,8 @@ export interface components {
             goal?: string | null;
             name: string;
             review_mode?: components["schemas"]["ReviewMode"] | null;
+            /** @description Reviewer agent profile for the chain's tickets. */
+            reviewer?: string | null;
         };
         /**
          * @description `POST /v1/tickets/{ticket}/comments`. Give `text` (first line is the gist, the rest becomes
@@ -808,6 +825,8 @@ export interface components {
         NewProject: {
             default_profile?: string | null;
             default_review_mode?: components["schemas"]["ReviewMode"] | null;
+            /** @description Reviewer agent profile; unset means `<worker profile>-reviewer`. */
+            default_reviewer?: string | null;
             /** @description Short uppercase key, prefix of ticket keys (`DEMO`). */
             key: string;
             name?: string | null;
@@ -844,6 +863,8 @@ export interface components {
             profile?: string | null;
             prompt?: string;
             review_mode?: components["schemas"]["ReviewMode"] | null;
+            /** @description Reviewer agent profile for this ticket. */
+            reviewer?: string | null;
             /** @description Checklist items. */
             subtasks?: string[];
             title: string;
@@ -930,6 +951,7 @@ export interface components {
             profile?: string | null;
             prompt?: string | null;
             review_mode?: components["schemas"]["ReviewMode"] | null;
+            reviewer?: string | null;
             title?: string | null;
         };
         /**
@@ -958,6 +980,11 @@ export interface components {
         Project: {
             default_profile: string;
             default_review_mode: components["schemas"]["ReviewMode"];
+            /**
+             * @description Reviewer agent profile for tickets that name none; `None` derives it from the worker's
+             *     profile (`<worker>-reviewer`).
+             */
+            default_reviewer?: string | null;
             id: components["schemas"]["ProjectId"];
             key: components["schemas"]["ProjectKey"];
             name: string;
@@ -1022,11 +1049,56 @@ export interface components {
          * @enum {string}
          */
         ReleaseState: "planned" | "cut" | "released";
+        /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
+        Review: {
+            /** @description Oldest first. */
+            rounds?: components["schemas"]["ReviewRound"][];
+            turn?: components["schemas"]["ReviewTurn"] | null;
+        };
         /**
          * @description Who reviews a finished ticket before it merges.
          * @enum {string}
          */
         ReviewMode: "human" | "agent" | "both";
+        /**
+         * @description One verdict on a ticket. Numbers count from 1 over every verdict, a person's and the
+         *     reviewer agent's, in the order they were given.
+         */
+        ReviewRound: {
+            /** @description The remarks; empty when the reviewer had none. */
+            comment: string;
+            decided_at: components["schemas"]["Timestamp"];
+            /** Format: int32 */
+            number: number;
+            /** @description A person (`human`) or the reviewer agent (`agent`). */
+            reviewer: components["schemas"]["Actor"];
+            verdict: components["schemas"]["Verdict"];
+        };
+        /** @description What a person may set about review on a chain or a project. A field left out is kept. */
+        ReviewSettings: {
+            review_mode?: components["schemas"]["ReviewMode"] | null;
+            /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
+            reviewer?: string | null;
+        };
+        /** @description Whose verdict a card in Review waits for. */
+        ReviewTurn: {
+            /** @enum {string} */
+            by: "agent";
+            decides: boolean;
+        } | {
+            /** @enum {string} */
+            by: "person";
+        };
+        /** @description How a ticket is reviewed now, and what has been decided so far. */
+        ReviewView: {
+            awaiting?: components["schemas"]["ReviewTurn"] | null;
+            /** @description The review mode that applies: the ticket's, the chain's or the project's. */
+            mode: components["schemas"]["ReviewMode"];
+            /** @description The reviewer agent profile that applies. */
+            reviewer: string;
+            /** @description Every verdict so far, oldest first. */
+            rounds: components["schemas"]["ReviewRound"][];
+        };
         /** @description The worktree and branch a ticket works in, once the shipyard has made them. */
         Ship: {
             /** @description `ship/<chain>/<slug>`. */
@@ -1173,7 +1245,14 @@ export interface components {
             profile?: string | null;
             /** @description The task given to the agent; the only source of what to do. */
             prompt: string;
+            /** @description Whose verdict the card waits for in Review, and the rounds held so far. */
+            review?: components["schemas"]["Review"];
             review_mode?: components["schemas"]["ReviewMode"] | null;
+            /**
+             * @description Reviewer agent profile; `None` means the chain's, then the project's, then
+             *     `<worker profile>-reviewer`.
+             */
+            reviewer?: string | null;
             status: components["schemas"]["TicketStatus"];
             status_reason?: components["schemas"]["StatusReason"] | null;
             status_since: components["schemas"]["Timestamp"];
@@ -1182,8 +1261,15 @@ export interface components {
             tokens_used: number;
             wildcard?: components["schemas"]["Wildcard"] | null;
         };
+        /**
+         * @description What a person can do with a ticket.
+         * @enum {string}
+         */
+        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject";
         /** @description A ticket with everything attached to it. */
         TicketDetail: {
+            /** @description What a person can do with the ticket now, computed by the state machine. */
+            allowed_actions: components["schemas"]["TicketAction"][];
             chain: string;
             comments: components["schemas"]["Comment"][];
             /**
@@ -1193,6 +1279,8 @@ export interface components {
             in_status_ms: number;
             /** @description Computed from the ticket's threads: design while any is open, implement otherwise. */
             phase: components["schemas"]["Phase"];
+            /** @description How the card is reviewed (mode, reviewer, whose turn) and the rounds so far. */
+            review: components["schemas"]["ReviewView"];
             ship?: components["schemas"]["Ship"] | null;
             subtasks: components["schemas"]["Subtask"][];
             ticket: components["schemas"]["Ticket"];
@@ -1226,6 +1314,11 @@ export interface components {
          * @description Milliseconds since the Unix epoch, UTC.
          */
         Timestamp: number;
+        /**
+         * @description A reviewer's decision about the work.
+         * @enum {string}
+         */
+        Verdict: "approve" | "request_changes";
         /** @description Why a ticket is Waiting. */
         WaitingReason: {
             /** @enum {string} */
@@ -1296,6 +1389,40 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    patch_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewSettings"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -1661,6 +1788,40 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    patch_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewSettings"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -2187,7 +2348,10 @@ export interface operations {
     };
     scrollback: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `worker` (the default) or `reviewer`. The reviewer's terminal is read-only. */
+                role?: components["schemas"]["AgentRole"] | null;
+            };
             header?: never;
             path: {
                 /** @description Ticket id or key */
@@ -2197,7 +2361,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Raw terminal output of the newest run, last lines only (ANSI kept). Headers x-toknila-run, x-toknila-offset (of the first byte) and x-toknila-end (after the last; continue the stream from here). */
+            /** @description Raw terminal output of the newest run of the worker (or, with role=reviewer, of the reviewer), last lines only (ANSI kept). Headers x-toknila-run, x-toknila-offset (of the first byte) and x-toknila-end (after the last; continue the stream from here). */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -187,6 +187,33 @@ fn node_label(d: &ChainDetail, node: NodeRef) -> String {
 }
 
 /// `tok show` from `GET /v1/tickets/{ticket}`.
+/// How the card is reviewed, whose turn it is, and the rounds so far.
+fn review(d: &TicketDetail) {
+    let r = &d.review;
+    let turn = match r.awaiting {
+        Some(toknila_core::ReviewTurn::Person) => ", waiting for a person".to_owned(),
+        Some(toknila_core::ReviewTurn::Agent { .. }) => ", waiting for the reviewer".to_owned(),
+        None => String::new(),
+    };
+    println!("review: {}  reviewer: {}{turn}", w(&r.mode), r.reviewer);
+    for round in &r.rounds {
+        let verdict = match round.verdict {
+            toknila_core::Verdict::Approve => "approved",
+            toknila_core::Verdict::RequestChanges => "asked for changes",
+        };
+        let who = match round.reviewer {
+            Actor::Human => "person",
+            _ => "reviewer agent",
+        };
+        let said = if round.comment.is_empty() {
+            String::new()
+        } else {
+            format!(": {}", round.comment)
+        };
+        println!("  round {}: the {who} {verdict}{said}", round.number);
+    }
+}
+
 pub fn ticket(d: &TicketDetail) {
     let t = &d.ticket;
     println!(
@@ -208,6 +235,7 @@ pub fn ticket(d: &TicketDetail) {
     if let Some(s) = &d.ship {
         println!("ship: {}  ({})", s.path, s.branch);
     }
+    review(d);
     if let Some(wc) = &t.wildcard {
         let from = wc.from.as_ref().map(|k| format!(" during {k}"));
         let approved = if wc.approved { ", approved" } else { "" };

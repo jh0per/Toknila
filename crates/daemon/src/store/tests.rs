@@ -20,6 +20,7 @@ fn project() -> Project {
         release_branch: "main".to_owned(),
         default_profile: "sim".to_owned(),
         default_review_mode: ReviewMode::Human,
+        default_reviewer: None,
     }
 }
 
@@ -31,6 +32,7 @@ fn chain(project: ProjectId) -> Chain {
         goal: "gate".to_owned(),
         autostart: true,
         review_mode: Some(ReviewMode::Both),
+        reviewer: None,
     }
 }
 
@@ -48,12 +50,32 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         paused: false,
         profile: Some("sim".to_owned()),
         review_mode: None,
+        reviewer: None,
         branch: None,
         needs_secrets: false,
         tokens_used: 0,
         wildcard: None,
         done_out_of_order: None,
+        review: toknila_core::Review::default(),
     }
+}
+
+/// Writes a project and a chain the way the first migration's columns hold them, as a database
+/// from before later columns existed has them.
+fn insert_phase_0_rows(conn: &Connection, p: &Project, c: &Chain) {
+    conn.execute(
+        "INSERT INTO projects (id, key, name, repo_path, work_branch, release_branch, \
+         default_profile, default_review_mode) VALUES (?1, 'DEMO', 'Demo', NULL, 'develop', 'main', \
+         'sim', 'human')",
+        params![p.id.to_string()],
+    )
+    .expect("phase-0 project");
+    conn.execute(
+        "INSERT INTO chains (id, project_id, name, goal, autostart, review_mode) \
+         VALUES (?1, ?2, 'demo', 'gate', 1, 'both')",
+        params![c.id.to_string(), p.id.to_string()],
+    )
+    .expect("phase-0 chain");
 }
 
 fn open_temp() -> (tempfile::TempDir, Store) {
@@ -111,9 +133,7 @@ async fn a_phase_0_database_gains_wildcard_marks() {
             .expect("phase-0 schema");
         conn.pragma_update(None, "user_version", 1)
             .expect("version");
-        let repo = Repo::new(&conn);
-        repo.insert_project(&p).expect("project");
-        repo.insert_chain(&c).expect("chain");
+        insert_phase_0_rows(&conn, &p, &c);
         conn.execute(
             "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
              status_since, paused, needs_secrets, tokens_used) \
@@ -187,6 +207,69 @@ async fn the_out_of_order_mark_is_stored_and_old_rows_have_none() {
 }
 
 #[tokio::test]
+async fn review_state_and_reviewer_settings_are_stored_and_old_rows_have_none() {
+    use toknila_core::{ReviewTurn, Verdict};
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("toknila.db");
+    let p = project();
+    let c = chain(p.id);
+    let old = ticket(c.id, 1);
+    {
+        // A database from before review: the first four migrations, one ticket in Review.
+        let conn = Connection::open(&path).expect("raw open");
+        for m in &schema::MIGRATIONS[..4] {
+            conn.execute_batch(m).expect("schema");
+        }
+        conn.pragma_update(None, "user_version", 4)
+            .expect("version");
+        insert_phase_0_rows(&conn, &p, &c);
+        conn.execute(
+            "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
+             status_since, paused, needs_secrets, tokens_used) \
+             VALUES (?1, ?2, 'DEMO-1', ?3, ?4, '[]', 'review', 1, 0, 0, 0)",
+            params![old.id.to_string(), c.id.to_string(), old.title, old.prompt],
+        )
+        .expect("old ticket");
+    }
+    let store = Store::open(&path).expect("migrates");
+    let id = old.id;
+    let loaded = store
+        .read(move |repo| repo.ticket(id))
+        .await
+        .expect("read")
+        .expect("ticket");
+    assert!(loaded.review.is_empty());
+    assert_eq!(loaded.reviewer, None);
+
+    let mut reviewed = ticket(c.id, 2);
+    reviewed.status = TicketStatus::Review;
+    reviewed.reviewer = Some("strict".to_owned());
+    reviewed.review.turn = Some(ReviewTurn::Agent { decides: false });
+    reviewed
+        .review
+        .record(Actor::Agent, Verdict::RequestChanges, "rename it", NOW);
+    let (mut p2, mut c2) = (p.clone(), c.clone());
+    p2.default_reviewer = Some("p-reviewer".to_owned());
+    c2.reviewer = Some("c-reviewer".to_owned());
+    let (saved, pp, cc) = (reviewed.clone(), p2.clone(), c2.clone());
+    store
+        .write(Actor::Human, NOW, move |tx| {
+            tx.repo().update_project(&pp)?;
+            tx.repo().update_chain(&cc)?;
+            tx.repo().upsert_ticket(&saved)
+        })
+        .await
+        .expect("save");
+    let (tid, pid, cid) = (reviewed.id, p.id, c.id);
+    let back = store
+        .read(move |repo| Ok((repo.ticket(tid)?, repo.project(pid)?, repo.chain(cid)?)))
+        .await
+        .expect("read");
+    assert_eq!(back, (Some(reviewed), Some(p2), Some(c2)));
+}
+
+#[tokio::test]
 async fn a_database_before_threads_gains_them_and_keeps_every_byte_of_an_artifact() {
     use toknila_core::{
         ArtifactFormat, MessageKind, ThreadId, ThreadKind, ThreadMessageId, ThreadVersionId, thread,
@@ -203,9 +286,7 @@ async fn a_database_before_threads_gains_them_and_keeps_every_byte_of_an_artifac
         conn.execute_batch(schema::MIGRATIONS[1]).expect("schema 2");
         conn.pragma_update(None, "user_version", 2)
             .expect("version");
-        let repo = Repo::new(&conn);
-        repo.insert_project(&p).expect("project");
-        repo.insert_chain(&c).expect("chain");
+        insert_phase_0_rows(&conn, &p, &c);
         conn.execute(
             "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
              status_since, paused, needs_secrets, tokens_used) \

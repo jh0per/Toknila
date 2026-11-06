@@ -8,13 +8,14 @@ use std::collections::HashSet;
 use toknila_core::events::DomainEvent;
 use toknila_core::machine::{TicketEvent, person_only};
 use toknila_core::{
-    Actor, AgentProfile, BlockedReason, Project, Run, Ticket, TicketId, TicketKey, TicketStatus,
+    Actor, AgentProfile, AgentRole, BlockedReason, Project, Run, Ticket, TicketId, TicketKey,
+    TicketStatus,
 };
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
 use crate::runner::{RunEnded, Runner, RunnerError};
-use crate::{AppError, AppResult, ChainTx, ErrorKind, UnitOfWork, with_chain};
+use crate::{AppError, AppResult, ChainTx, ErrorKind, UnitOfWork, reviews, with_chain};
 
 /// Whether the ticket's agent is a process. The simulated profile starts none.
 fn runs_process(project: &Project, ticket: &Ticket) -> bool {
@@ -73,10 +74,27 @@ pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
 pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<()> {
     let RunEnded { run, exit, stopped } = ended;
     let ticket = run.ticket_id;
+    let role = run.role;
     let reason = exit.block_reason();
-    uow.emit(&DomainEvent::RunnerExited { run, exit })?;
+    uow.emit(&DomainEvent::RunnerExited {
+        run,
+        exit: exit.clone(),
+    })?;
     if stopped {
         return Ok(());
+    }
+    if role == AgentRole::Reviewer {
+        // A reviewer reports its verdict first and exits after; one that ends while the card
+        // still waits for it gave none, and a person decides. Once the card has moved on, the
+        // machine refuses this and nothing changes.
+        let detail = match reason {
+            BlockedReason::Crashed { .. } if exit.code == Some(0) && exit.signal.is_none() => {
+                "it exited without a verdict".to_owned()
+            }
+            BlockedReason::Crashed { detail } => format!("it ended: {detail}"),
+            other => other.to_string(),
+        };
+        return reviews::failed(uow, ticket, detail);
     }
     tell_ticket(uow, ticket, TicketEvent::Block { reason })
 }

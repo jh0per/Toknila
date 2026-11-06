@@ -15,6 +15,9 @@ pub struct Chain {
     pub autostart: bool,
     /// Overrides the project's review mode for every ticket that does not set its own.
     pub review_mode: Option<ReviewMode>,
+    /// Overrides the project's reviewer profile for every ticket that does not set its own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer: Option<String>,
 }
 
 impl Chain {

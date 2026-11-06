@@ -140,6 +140,17 @@
       "paused": false,
       "profile": null,
       "prompt": "",
+      "review": {
+        "rounds": [
+          {
+            "comment": "",
+            "decided_at": 0,
+            "number": 1,
+            "reviewer": "human",
+            "verdict": "approve"
+          }
+        ]
+      },
       "review_mode": null,
       "status": "merged",
       "status_reason": null,
@@ -157,6 +168,17 @@
       "paused": false,
       "profile": null,
       "prompt": "",
+      "review": {
+        "rounds": [
+          {
+            "comment": "",
+            "decided_at": 0,
+            "number": 1,
+            "reviewer": "human",
+            "verdict": "approve"
+          }
+        ]
+      },
       "review_mode": null,
       "status": "merged",
       "status_reason": null,

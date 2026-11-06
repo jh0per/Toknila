@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc::UnboundedReceiver;
 use toknila_app::runner::{RunEnded, RunRequest, Runner, RunnerError};
-use toknila_core::TicketId;
+use toknila_core::{AgentRole, TicketId};
 use toknila_daemon::runner::Runners;
 
 const AGENT: &str = env!("CARGO_BIN_EXE_fake-agent");
@@ -53,9 +53,14 @@ impl Rig {
     }
 
     fn request(&self, profile: &str) -> RunRequest {
+        self.request_as(profile, AgentRole::Worker)
+    }
+
+    fn request_as(&self, profile: &str, role: AgentRole) -> RunRequest {
         RunRequest {
             ticket: self.ticket,
             key: "DEMO-1".parse().expect("key"),
+            role,
             profile: profile.to_owned(),
             dir: self.ship().display().to_string(),
         }
@@ -65,10 +70,14 @@ impl Rig {
         self.runners.start(&self.request(profile)).expect("start")
     }
 
-    /// The output so far, as text.
+    /// The output so far of the worker, as text.
     fn output(&self) -> String {
+        self.output_of(AgentRole::Worker)
+    }
+
+    fn output_of(&self, role: AgentRole) -> String {
         self.runners
-            .read(self.ticket, None)
+            .read(self.ticket, role, None)
             .map(|c| String::from_utf8_lossy(&c.bytes).into_owned())
             .unwrap_or_default()
     }
@@ -161,6 +170,85 @@ fn stop_kills_a_running_process_and_says_it_was_asked_to() {
 }
 
 #[test]
+fn a_reviewer_runs_next_to_the_worker_with_its_own_output_token_and_stop() {
+    let mut rig = Rig::new();
+    rig.profile(
+        "fake",
+        &["print", "worker up", "echo", "print", "worker done", "hold"],
+        "",
+    );
+    rig.profile(
+        "fake-reviewer",
+        &[
+            "env",
+            "TOKNILA_ROLE",
+            "env",
+            "TOKNILA_RUN_TOKEN",
+            "print",
+            "reviewer up",
+            "hold",
+        ],
+        "",
+    );
+    let worker = rig.start("fake");
+    let reviewer = rig
+        .runners
+        .start(&rig.request_as("fake-reviewer", AgentRole::Reviewer))
+        .expect("start the reviewer");
+    assert!(
+        !reviewer.reused,
+        "the live worker did not count as a reviewer"
+    );
+    assert_ne!(worker.run.id, reviewer.run.id);
+    assert_eq!(reviewer.run.role, AgentRole::Reviewer);
+    assert_eq!(worker.run.role, AgentRole::Worker);
+
+    // Each role has its own terminal: the ticket's output is still the worker's.
+    let rev_out = {
+        let until = Instant::now() + WAIT;
+        loop {
+            let out = rig.output_of(AgentRole::Reviewer);
+            if out.contains("reviewer up") {
+                break out;
+            }
+            assert!(Instant::now() < until, "no reviewer output in {out:?}");
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    };
+    assert!(rev_out.contains("TOKNILA_ROLE=reviewer"), "{rev_out:?}");
+    let out = rig.wait_for("worker up");
+    assert!(!out.contains("reviewer up"), "{out:?}");
+
+    // Its token is a reviewer's; the worker's is the worker's.
+    let token = printed_env(&rev_out, "TOKNILA_RUN_TOKEN");
+    let grant = rig.runners.tokens().lookup(&token).expect("a live token");
+    assert_eq!(
+        (grant.ticket, grant.run, grant.role),
+        (rig.ticket, reviewer.run.id, AgentRole::Reviewer)
+    );
+    assert_eq!(rig.runners.live_in(AgentRole::Reviewer), vec![rig.ticket]);
+    assert_eq!(rig.runners.live(), vec![rig.ticket]);
+
+    // Typing goes to the worker only.
+    rig.runners.write(rig.ticket, b"hello\r").expect("write");
+    rig.wait_for("worker done");
+    assert!(!rig.output_of(AgentRole::Reviewer).contains("got:hello"));
+
+    // Stopping the reviewer leaves the worker alone, and its token dies with it.
+    rig.runners.stop_role(rig.ticket, AgentRole::Reviewer);
+    let end = rig.wait_end();
+    assert_eq!((end.run.role, end.stopped), (AgentRole::Reviewer, true));
+    assert_eq!(rig.runners.tokens().lookup(&token), None);
+    assert!(rig.runners.live_in(AgentRole::Reviewer).is_empty());
+    assert_eq!(rig.runners.live(), vec![rig.ticket], "the worker lives on");
+
+    // A stop of the whole ticket ends what is left.
+    rig.runners.stop(rig.ticket);
+    let end = rig.wait_end();
+    assert_eq!((end.run.role, end.stopped), (AgentRole::Worker, true));
+}
+
+#[test]
 fn a_live_runner_is_kept_not_started_twice() {
     let rig = Rig::new();
     rig.profile("fake", &["hold"], "");
@@ -202,11 +290,21 @@ fn after_a_restart_the_newest_log_is_the_scrollback_and_how_it_ended_is_unknown(
     let started = rig.start("fake");
     rig.wait_end();
     let (fresh, _rx) = Runners::new(rig.dir.path().join("runs"), rig.dir.path().join("profiles"));
-    let chunk = fresh.read(rig.ticket, None).expect("log on disk");
+    let chunk = fresh
+        .read(rig.ticket, AgentRole::Worker, None)
+        .expect("log on disk");
     assert_eq!(chunk.run, started.run.id);
     assert!(String::from_utf8_lossy(&chunk.bytes).contains("from before"));
     assert!(chunk.ended && chunk.exit.is_none());
-    assert!(fresh.read(TicketId::new(), None).is_none());
+    assert!(
+        fresh
+            .read(TicketId::new(), AgentRole::Worker, None)
+            .is_none()
+    );
+    assert!(
+        fresh.read(rig.ticket, AgentRole::Reviewer, None).is_none(),
+        "the worker's log is not the reviewer's"
+    );
 }
 
 #[test]

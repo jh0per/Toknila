@@ -4,6 +4,7 @@
 
 use serde_json::{Map, Value, json};
 use toknila_api_types::AgentEvent;
+use toknila_core::AgentRole;
 
 /// Why a tool call is not an event.
 #[derive(Debug, PartialEq, Eq)]
@@ -34,8 +35,27 @@ fn list_of_text(description: &str) -> Value {
     json!({ "type": "array", "items": { "type": "string" }, "description": description })
 }
 
-/// What `tools/list` answers.
-pub(super) fn list() -> Vec<Value> {
+/// What `tools/list` answers: a worker's tools report its work; a reviewer has one, its verdict.
+pub(super) fn list(role: AgentRole) -> Vec<Value> {
+    match role {
+        AgentRole::Reviewer => vec![review_verdict()],
+        _ => worker_tools(),
+    }
+}
+
+fn review_verdict() -> Value {
+    tool(
+        "review_verdict",
+        "Give your verdict on the finished work and end your review. Approve it, or request changes with a comment saying exactly what to change. Call it once, when you have read the diff.",
+        json!({
+            "verdict": { "type": "string", "enum": ["approve", "request_changes"] },
+            "comment": text("What to change (required with request_changes); optional remarks otherwise"),
+        }),
+        &["verdict"],
+    )
+}
+
+fn worker_tools() -> Vec<Value> {
     let thread = text("The thread's number on this ticket (1, 2, ...), or its id");
     vec![
         tool(
@@ -128,8 +148,12 @@ pub(super) fn list() -> Vec<Value> {
 }
 
 /// The event a tool call means: the tool's name is the event's tag, its arguments the fields.
-pub(super) fn event(name: &str, arguments: &Value) -> Result<AgentEvent, ToolError> {
-    let known = list().iter().any(|t| t["name"] == name);
+pub(super) fn event(
+    role: AgentRole,
+    name: &str,
+    arguments: &Value,
+) -> Result<AgentEvent, ToolError> {
+    let known = list(role).iter().any(|t| t["name"] == name);
     if !known {
         return Err(ToolError::Unknown);
     }
@@ -168,11 +192,15 @@ mod tests {
                 json!({ "thread": "1", "format": "mermaid", "body": "graph TD" }),
             ),
         ];
-        let names: Vec<_> = list().iter().map(|t| t["name"].clone()).collect();
+        let names: Vec<_> = list(AgentRole::Worker)
+            .iter()
+            .map(|t| t["name"].clone())
+            .collect();
         assert_eq!(names.len(), cases.len());
         for (name, args) in cases {
             assert!(names.contains(&json!(name)), "{name} is listed");
-            let e = event(name, &args).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            let e =
+                event(AgentRole::Worker, name, &args).unwrap_or_else(|e| panic!("{name}: {e:?}"));
             let wire = serde_json::to_value(&e).expect("json");
             assert_eq!(wire["event"], name);
             for (k, v) in args.as_object().expect("object") {
@@ -182,23 +210,53 @@ mod tests {
     }
 
     #[test]
+    fn a_reviewer_has_its_verdict_and_nothing_else_and_a_worker_cannot_give_it() {
+        let reviewer = list(AgentRole::Reviewer);
+        let names: Vec<_> = reviewer.iter().map(|t| t["name"].clone()).collect();
+        assert_eq!(names, [json!("review_verdict")]);
+        let args = json!({ "verdict": "request_changes", "comment": "rename it" });
+        let e = event(AgentRole::Reviewer, "review_verdict", &args).expect("event");
+        assert_eq!(
+            serde_json::to_value(&e).expect("json"),
+            json!({ "event": "review_verdict", "verdict": "request_changes", "comment": "rename it" })
+        );
+        assert_eq!(
+            event(AgentRole::Reviewer, "finished", &json!({ "summary": "x" })),
+            Err(ToolError::Unknown)
+        );
+        assert_eq!(
+            event(AgentRole::Worker, "review_verdict", &args),
+            Err(ToolError::Unknown)
+        );
+        assert!(matches!(
+            event(
+                AgentRole::Reviewer,
+                "review_verdict",
+                &json!({ "verdict": "maybe" })
+            ),
+            Err(ToolError::BadArguments(_))
+        ));
+    }
+
+    #[test]
     fn unknown_tools_and_bad_arguments_are_told_apart() {
-        assert_eq!(event("approve", &json!({})), Err(ToolError::Unknown));
-        assert_eq!(event("hook", &json!({})), Err(ToolError::Unknown));
+        let worker = |name: &str, args: Value| event(AgentRole::Worker, name, &args);
+        assert_eq!(worker("approve", json!({})), Err(ToolError::Unknown));
+        assert_eq!(worker("hook", json!({})), Err(ToolError::Unknown));
         assert!(matches!(
-            event("finished", &json!({})),
+            worker("finished", json!({})),
             Err(ToolError::BadArguments(_))
         ));
         assert!(matches!(
-            event("subtask_done", &json!({ "position": "one" })),
+            worker("subtask_done", json!({ "position": "one" })),
             Err(ToolError::BadArguments(_))
         ));
         assert!(matches!(
-            event("started", &json!([1])),
+            worker("started", json!([1])),
             Err(ToolError::BadArguments(_))
         ));
         // The `event` field of the arguments cannot pick another event than the tool's name.
-        let e = event("started", &json!({ "event": "finished", "summary": "x" })).expect("event");
+        let e = worker("started", json!({ "event": "finished", "summary": "x" })).expect("event");
         assert_eq!(e, AgentEvent::Started);
     }
 }

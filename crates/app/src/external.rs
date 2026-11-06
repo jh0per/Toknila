@@ -5,10 +5,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use toknila_core::{Run, Ship, ShipSpec, TicketId, TicketKey};
+use toknila_core::{AgentRole, Run, Ship, ShipSpec, TicketId, TicketKey};
 
 use crate::runner::{RunRequest, Runner, RunnerError};
-use crate::{AppResult, ShipError, Shipyard, UnitOfWork, runs, ships};
+use crate::{AppResult, ShipError, Shipyard, UnitOfWork, reviews, runs, ships};
 
 /// Something to do on the host once the command that asked for it has committed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,8 +23,18 @@ pub enum ExternalEffect {
         key: TicketKey,
         profile: String,
     },
-    /// Stop the ticket's runner.
+    /// Stop every runner of the ticket (worker and reviewer).
     StopRunner { ticket: TicketId },
+    /// Run the reviewer profile's command in the ticket's ship, next to the worker's runner.
+    /// `dir` is the ship's path; `None` when the ticket has no ship.
+    StartReviewer {
+        ticket: TicketId,
+        key: TicketKey,
+        profile: String,
+        dir: Option<String>,
+    },
+    /// Stop the reviewer's runner only.
+    StopReviewer { ticket: TicketId },
 }
 
 /// What happened on the host.
@@ -50,6 +60,11 @@ pub enum ExternalOutcome {
         run: Run,
     },
     RunnerFailed {
+        ticket: TicketId,
+        error: RunnerError,
+    },
+    /// The reviewer's runner could not start.
+    ReviewerFailed {
         ticket: TicketId,
         error: RunnerError,
     },
@@ -104,6 +119,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                         host.runner.start(&RunRequest {
                             ticket,
                             key,
+                            role: AgentRole::Worker,
                             profile,
                             dir,
                         })
@@ -117,6 +133,32 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 }
             }
             ExternalEffect::StopRunner { ticket } => host.runner.stop(ticket),
+            ExternalEffect::StartReviewer {
+                ticket,
+                key,
+                profile,
+                dir,
+            } => {
+                let result = dir.ok_or(RunnerError::NoWorkingDir).and_then(|dir| {
+                    host.runner.start(&RunRequest {
+                        ticket,
+                        key,
+                        role: AgentRole::Reviewer,
+                        profile,
+                        dir,
+                    })
+                });
+                match result {
+                    Ok(started) if !started.reused => {
+                        outcomes.push(ExternalOutcome::RunnerStarted { run: started.run });
+                    }
+                    Ok(_) => {}
+                    Err(error) => outcomes.push(ExternalOutcome::ReviewerFailed { ticket, error }),
+                }
+            }
+            ExternalEffect::StopReviewer { ticket } => {
+                host.runner.stop_role(ticket, AgentRole::Reviewer);
+            }
         }
     }
     outcomes
@@ -135,6 +177,9 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             ExternalOutcome::RunnerStarted { run } => runs::started(uow, run)?,
             ExternalOutcome::RunnerFailed { ticket, error } => {
                 runs::start_failed(uow, ticket, &error)?;
+            }
+            ExternalOutcome::ReviewerFailed { ticket, error } => {
+                reviews::start_failed(uow, ticket, &error)?;
             }
         }
     }

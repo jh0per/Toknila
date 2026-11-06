@@ -4,6 +4,7 @@
 
 use toknila_api_types::runner::agent_env;
 use toknila_client::Client;
+use toknila_core::AgentRole;
 
 /// The daemon and the ticket this agent works on, with the run's own token.
 #[derive(Debug)]
@@ -11,6 +12,8 @@ pub(super) struct AgentEnv {
     pub client: Client,
     /// Key of the ticket the run belongs to.
     pub ticket: String,
+    /// What the run is: the ticket's worker, or the reviewer next to it.
+    pub role: AgentRole,
 }
 
 impl AgentEnv {
@@ -27,6 +30,11 @@ impl AgentEnv {
         Ok(AgentEnv {
             client: Client::new(var(agent_env::URL)?, var(agent_env::TOKEN)?),
             ticket: var(agent_env::TICKET)?,
+            // Without a role the run is a worker's: the runners before review set none.
+            role: match std::env::var(agent_env::ROLE).as_deref() {
+                Ok("reviewer") => AgentRole::Reviewer,
+                _ => AgentRole::Worker,
+            },
         })
     }
 }

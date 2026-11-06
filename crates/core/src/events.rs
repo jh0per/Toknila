@@ -19,6 +19,14 @@ pub enum DomainEvent {
     ChainCreated {
         chain: Chain,
     },
+    /// A chain's settings changed (its review mode or reviewer).
+    ChainUpdated {
+        chain: Chain,
+    },
+    /// A project's settings changed (its review mode or reviewer).
+    ProjectUpdated {
+        project: Project,
+    },
     EdgeAdded {
         edge: Edge,
     },
@@ -183,10 +191,11 @@ impl DomainEvent {
     /// `subtask`, `thread`. Edge events belong to their chain.
     pub fn entity(&self) -> &'static str {
         match self {
-            Self::ProjectCreated { .. } => "project",
-            Self::ChainCreated { .. } | Self::EdgeAdded { .. } | Self::EdgeRemoved { .. } => {
-                "chain"
-            }
+            Self::ProjectCreated { .. } | Self::ProjectUpdated { .. } => "project",
+            Self::ChainCreated { .. }
+            | Self::ChainUpdated { .. }
+            | Self::EdgeAdded { .. }
+            | Self::EdgeRemoved { .. } => "chain",
             Self::TicketCreated { .. }
             | Self::TicketStatusChanged { .. }
             | Self::TicketUpdated { .. }
@@ -212,8 +221,10 @@ impl DomainEvent {
     /// Id of the entity the event is about.
     pub fn entity_id(&self) -> String {
         match self {
-            Self::ProjectCreated { project } => project.id.to_string(),
-            Self::ChainCreated { chain } => chain.id.to_string(),
+            Self::ProjectCreated { project } | Self::ProjectUpdated { project } => {
+                project.id.to_string()
+            }
+            Self::ChainCreated { chain } | Self::ChainUpdated { chain } => chain.id.to_string(),
             Self::EdgeAdded { edge } | Self::EdgeRemoved { edge } => edge.chain_id.to_string(),
             Self::TicketCreated { ticket }
             | Self::TicketStatusChanged { ticket, .. }
@@ -254,7 +265,10 @@ impl DomainEvent {
             Self::EdgeAdded { .. } => "edge_added",
             Self::EdgeRemoved { .. } => "edge_removed",
             Self::TicketStatusChanged { .. } => "status_changed",
-            Self::TicketUpdated { .. } | Self::SubtaskUpdated { .. } => "updated",
+            Self::TicketUpdated { .. }
+            | Self::SubtaskUpdated { .. }
+            | Self::ChainUpdated { .. }
+            | Self::ProjectUpdated { .. } => "updated",
             Self::ReleaseStateChanged { .. } => "state_changed",
             Self::CommentAdded { .. } | Self::SubtaskAdded { .. } => "added",
             Self::CommentDelivered { .. } => "delivered",

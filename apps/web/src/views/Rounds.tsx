@@ -1,17 +1,19 @@
-import { reviewRounds } from "../store/rounds";
-import { type State, ticketEvents } from "../store/state";
-import type { Ticket } from "../api/types";
+import type { TicketDetail } from "../api/types";
+import { awaitingText, roundText } from "../store/review";
 
-/// "Round 2: returned — comment" for each time the person sent the card back from review.
-export function Rounds({ state, card }: { state: State; card: Ticket }) {
-  const rounds = reviewRounds(ticketEvents(state, card.id), card.id);
-  if (rounds.length === 0) return null;
+/// The card's review: who reviews it, whose verdict it waits for, and each round so far, as the
+/// daemon holds them.
+export function Rounds({ detail }: { detail?: TicketDetail }) {
+  const review = detail?.review;
+  if (!review || (review.rounds.length === 0 && !review.awaiting)) return null;
+  const waiting = awaitingText(review);
   return (
     <section className="rounds" data-testid="rounds">
-      <h4>Review rounds</h4>
+      <h4>Review</h4>
+      {waiting && <p className="muted" data-testid="awaiting">{waiting}</p>}
       <ul>
-        {rounds.map((r) => (
-          <li key={r.seq}>Round {r.round}: returned{r.comment ? ` — ${r.comment}` : ""}</li>
+        {review.rounds.map((r) => (
+          <li key={r.number}>{roundText(r)}</li>
         ))}
       </ul>
     </section>

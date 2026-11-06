@@ -3,7 +3,7 @@
 //! and stops (the `EnsureRunner` and `StopRunner` effects); [`crate::runs`] queues that work and
 //! records what came of it, and [`crate::external`] calls this port after the command committed.
 
-use toknila_core::{ProcessExit, Run, TicketId, TicketKey};
+use toknila_core::{AgentRole, ProcessExit, Run, TicketId, TicketKey};
 
 /// Why a runner could not start, or could not be written to. The text lands in the ticket's
 /// blocked reason.
@@ -37,6 +37,9 @@ pub enum RunnerError {
 pub struct RunRequest {
     pub ticket: TicketId,
     pub key: TicketKey,
+    /// Worker or reviewer. A ticket has at most one live runner per role: the reviewer runs
+    /// next to the worker and never replaces it.
+    pub role: AgentRole,
     /// Name of the agent profile whose command runs.
     pub profile: String,
     /// The ship's path.
@@ -62,11 +65,14 @@ pub struct RunEnded {
 
 /// Runs agents on the host.
 pub trait Runner: std::fmt::Debug {
-    /// Starts the profile's command in `req.dir`, or keeps the ticket's live runner.
+    /// Starts the profile's command in `req.dir`, or keeps the ticket's live runner of the same
+    /// role.
     fn start(&self, req: &RunRequest) -> Result<Started, RunnerError>;
-    /// Stops the ticket's runner; none is fine.
+    /// Stops every runner of the ticket (worker and reviewer); none is fine.
     fn stop(&self, ticket: TicketId);
-    /// Writes bytes to the ticket's terminal.
+    /// Stops the ticket's runner of one role; the other keeps running.
+    fn stop_role(&self, ticket: TicketId, role: AgentRole);
+    /// Writes bytes to the ticket's worker terminal. The reviewer's terminal is read-only.
     fn write(&self, ticket: TicketId, bytes: &[u8]) -> Result<(), RunnerError>;
 }
 
@@ -80,6 +86,8 @@ impl Runner for NoRunner {
     }
 
     fn stop(&self, _: TicketId) {}
+
+    fn stop_role(&self, _: TicketId, _: AgentRole) {}
 
     fn write(&self, _: TicketId, _: &[u8]) -> Result<(), RunnerError> {
         Err(RunnerError::Unavailable)

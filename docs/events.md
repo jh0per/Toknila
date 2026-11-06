@@ -18,6 +18,7 @@ for `propose` it is the new card.
 | `note` | `body` (comment template fields: `gist`, `what`, `why`, `how_to_verify`, `alternatives`, `consequences`) | stores an agent report comment | any |
 | `finished` | `summary` | -> Review; summary stored as an agent report comment. Refused with `409` while the ticket has an open thread | Running |
 | `crashed` | `detail` | -> Blocked (reason `crashed`, resumes to the previous status on unblock) | Running, Waiting |
+| `review_verdict` | `verdict` (`approve`, `request_changes`), `comment` (required with `request_changes`) | the reviewer agent's decision, recorded as a review round. In `agent` mode `approve` merges the card and `request_changes` returns it to the worker with the comment; in `both` mode the card then waits for a person. **Only a reviewer's token may send it, and a reviewer's token may send nothing else** (`403`) | Review, while it waits for the agent (else `409`) |
 
 The runner sends `crashed` itself when the agent's process ends while the ticket is Running or
 Waiting and nobody asked it to stop: a non-zero exit code or a signal, and also a zero exit
@@ -35,6 +36,7 @@ without a `finished` event (the detail says which: `exit 101`, `killed by signal
 {"event":"note","body":{"gist":"half way","what":"parser done"}}
 {"event":"finished","summary":"did X"}
 {"event":"crashed","detail":"exit 101"}
+{"event":"review_verdict","verdict":"request_changes","comment":"handle the empty list"}
 {"event":"propose","title":"token refresh endpoint","before":["DEMO-2"]}
 {"event":"open_thread","kind":"design","title":"List screen"}
 {"event":"thread_version","thread":"1","format":"mermaid","body":"flowchart TD\n  A --> B"}
@@ -51,10 +53,11 @@ A refused transition answers `409 {"error": "...", "code": "conflict"}` and chan
 `tok mcp` is a stdio MCP server (newline-delimited JSON-RPC 2.0: `initialize`, `ping`,
 `tools/list`, `tools/call`). It reads the daemon address and the run's token from the environment
 the runner gives the agent (`TOKNILA_URL`, `TOKNILA_RUN_TOKEN`, `TOKNILA_TICKET`; `TOKNILA_RUN`
-names the run), never from the data home, and forwards each call to
+names the run, `TOKNILA_ROLE` is `worker` or `reviewer`), never from the data home, and forwards each call to
 `POST /v1/tickets/{ticket}/events`. There is one tool per event, named like it, taking the
 event's fields: `started`, `ask_human`, `subtask_done`, `note`, `finished`, `crashed`, `propose`,
-`open_thread`, `thread_message`, `thread_version`. A call the daemon refuses (a `409` such as an
+`open_thread`, `thread_message`, `thread_version`. A reviewer run (`TOKNILA_ROLE=reviewer`) is
+offered one tool instead: `review_verdict`. A call the daemon refuses (a `409` such as an
 open thread blocking `finished`, or a `403`) comes back as a tool result with `isError: true` and
 the daemon's message; the agent reads it and adapts. No tool approves, rejects, accepts or
 cancels anything: those are a person's.
@@ -85,7 +88,7 @@ hook reports that on stderr and carries on.
 
 ## Agent tokens
 
-Each run has its own token, scoped to its ticket. The runner creates it when the run starts,
+Each run has its own token, scoped to its ticket and to its role (worker or reviewer). The runner creates it when the run starts,
 puts it in the agent's environment only (`TOKNILA_RUN_TOKEN`) and revokes it when the process
 ends (before the end is journaled); a revoked or made-up token is `401`. The person's token
 (`daemon.json`) is never put in any runner environment or generated file: the generated MCP
@@ -99,7 +102,9 @@ An agent token may call exactly two routes, both `POST`, both for its own ticket
 return, cancel, runner input, comments, edits, the stream, release events, shutdown. The rule is
 an allowlist (`AGENT_ROUTES` in `crates/daemon/src/server/auth.rs`), so a route added later is
 refused to agents until it is listed on purpose; a test walks every route of the API. Events for
-a ticket the token does not own answer `403` and change nothing.
+a ticket the token does not own answer `403` and change nothing. Within the events route the role
+decides: a worker's token may send everything but `review_verdict`, a reviewer's only
+`review_verdict`; `accept` and `return` stay a person's.
 
 Residual risk: an agent runs as the same OS user as the daemon and could read the person's token
 from `daemon.json` (mode 600, same user) and use it. The scoping stops a cooperating or confused
@@ -147,6 +152,17 @@ open thread open or reopens an approved one. While any thread is open, `finished
 and the ticket stays Running. The ticket's `phase` in `TicketDetail` is `design` while any thread
 is open and `implement` otherwise; it is computed, never stored.
 
+## Review
+
+A card in Review waits for a verdict from a person, from the reviewer agent, or from both in turn,
+by review mode (`docs/architecture.md`, "Review"). A person decides with the ticket actions
+`accept` (optional `text`: remarks) and `return` (`text` required), which also stop a reviewer that
+is still looking. Both are recorded as rounds on the ticket (`review.rounds`) with the agent's
+`review_verdict` rounds. `PATCH /v1/projects/{p}` and `PATCH /v1/chains/{c}` take
+`{"review_mode": "human|agent|both", "reviewer": "<profile>"}` (either may be left out; a blank
+`reviewer` clears it); `PATCH /v1/tickets/{t}` takes the same two fields. `TicketDetail` carries
+`review` (`mode`, `reviewer`, `awaiting`, `rounds`) and `allowed_actions`.
+
 ## Instructions back to the agent
 
 Everything a person tells an agent is a ticket comment first (`POST /v1/tickets/{ticket}/comments`,
@@ -171,4 +187,5 @@ kinds `proposed` (`{"ticket"}`), `approved` (`{"key","ticket"}`) and `rejected`
 approval adds come as chain `edge_added`. Threads use the entity `thread` (id: the thread's) with
 the kinds `opened` (`{"ticket","thread"}`), `message_posted` (`{"ticket","message"}`),
 `version_posted` (`{"ticket","thread","number","format","author","bytes"}`; the body is not
-journaled), `approved` and `reopened` (`{"ticket","thread"}`).
+journaled), `approved` and `reopened` (`{"ticket","thread"}`). A change of review settings is
+`project`/`chain` kind `updated` (`{"project"}` / `{"chain"}`).

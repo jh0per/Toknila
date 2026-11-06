@@ -19,6 +19,8 @@ pub struct NewChain {
     /// Defaults to true.
     pub autostart: Option<bool>,
     pub review_mode: Option<ReviewMode>,
+    /// Reviewer agent profile for the chain's tickets.
+    pub reviewer: Option<String>,
 }
 
 /// Creates an empty chain in a project.
@@ -39,6 +41,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         goal: input.goal.unwrap_or_default(),
         autostart: input.autostart.unwrap_or(Chain::DEFAULT_AUTOSTART),
         review_mode: input.review_mode,
+        reviewer: input.reviewer.filter(|r| !r.trim().is_empty()),
     };
     uow.insert_chain(&c)?;
     uow.emit(&DomainEvent::ChainCreated { chain: c.clone() })?;
@@ -157,8 +160,10 @@ fn next_merge_event(ctx: &ChainTx, id: TicketId) -> Option<TicketEvent> {
         TicketStatus::Running => Some(TicketEvent::Finished {
             summary: "Imported as done: every task was already checked.".to_owned(),
             open_threads: Vec::new(),
+            // Nothing was done to review: a person's accept follows at once.
+            mode: ReviewMode::Human,
         }),
-        TicketStatus::Review => Some(TicketEvent::Accept),
+        TicketStatus::Review => Some(TicketEvent::Accept { comment: None }),
         _ => None,
     }
 }

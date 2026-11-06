@@ -10,6 +10,7 @@ mod mcp_tools;
 mod profile;
 mod project;
 mod release;
+mod review;
 mod sim;
 mod spec;
 mod thread;
@@ -78,8 +79,31 @@ pub enum Command {
     Block { ticket: String, reason: String },
     /// Unblock a ticket; it returns to where it was.
     Unblock { ticket: String },
-    /// Accept a ticket in Review: it becomes Merged (Done).
-    Accept { ticket: String },
+    /// Accept a ticket in Review: it becomes Merged (Done). Remarks are optional.
+    Accept {
+        ticket: String,
+        comment: Option<String>,
+    },
+    /// Choose who reviews finished cards: a person, a reviewer agent, or the agent first and
+    /// then a person. Set on a project, a chain or one ticket; the ticket's wins, then the
+    /// chain's, then the project's.
+    ReviewMode {
+        /// human, agent or both.
+        #[arg(value_parser = ["human", "agent", "both"])]
+        mode: Option<String>,
+        /// A ticket (key or title).
+        #[arg(long, conflicts_with_all = ["chain", "project"])]
+        ticket: Option<String>,
+        /// A chain (name).
+        #[arg(long, conflicts_with = "project")]
+        chain: Option<String>,
+        /// A project (key); the only one when none is named.
+        #[arg(long)]
+        project: Option<String>,
+        /// Reviewer agent profile; default `<worker profile>-reviewer`. An empty text clears it.
+        #[arg(long)]
+        reviewer: Option<String>,
+    },
     /// Send a ticket in Review back to its agent with a comment.
     Return { ticket: String, comment: String },
     /// Reopen a Merged ticket for review.
@@ -125,6 +149,9 @@ pub enum Command {
         /// Keep printing as the agent writes, until its run ends.
         #[arg(long, short)]
         follow: bool,
+        /// The reviewer agent's output instead of the worker's.
+        #[arg(long)]
+        reviewer: bool,
     },
     /// Print every change live; resumes after a reconnect.
     Watch {
@@ -204,7 +231,22 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
             ticket::act(&c, &ticket, "block", Some(&reason), json_out)
         }
         Command::Unblock { ticket } => ticket::act(&c, &ticket, "unblock", None, json_out),
-        Command::Accept { ticket } => ticket::act(&c, &ticket, "accept", None, json_out),
+        Command::Accept { ticket, comment } => {
+            ticket::act(&c, &ticket, "accept", comment.as_deref(), json_out)
+        }
+        Command::ReviewMode {
+            mode,
+            ticket,
+            chain,
+            project,
+            reviewer,
+        } => review::run(
+            &c,
+            mode,
+            review::Target::of(ticket, chain, project),
+            reviewer,
+            json_out,
+        ),
         Command::Return { ticket, comment } => {
             ticket::act(&c, &ticket, "return", Some(&comment), json_out)
         }
@@ -223,7 +265,11 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
         Command::Sim { target, action } => sim::run(&c, &target, action, json_out),
         Command::Ls { needs_human, chain } => ticket::ls(&c, needs_human, chain, json_out),
         Command::Show { ticket } => ticket::run(&c, TicketCmd::Show { ticket }, json_out),
-        Command::Logs { ticket, follow } => logs::run(&c, &ticket, follow),
+        Command::Logs {
+            ticket,
+            follow,
+            reviewer,
+        } => logs::run(&c, &ticket, follow, reviewer),
         Command::Watch { since } => watch::run(&c, &paths, since),
         Command::Open => {
             let info = daemon_cmd::running(&paths)?.context("daemon is not running")?;

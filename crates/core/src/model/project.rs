@@ -31,6 +31,10 @@ pub struct Project {
     pub release_branch: String,
     pub default_profile: String,
     pub default_review_mode: ReviewMode,
+    /// Reviewer agent profile for tickets that name none; `None` derives it from the worker's
+    /// profile (`<worker>-reviewer`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_reviewer: Option<String>,
 }
 
 impl Project {
@@ -61,6 +65,7 @@ mod tests {
             release_branch: "main".into(),
             default_profile: AgentProfile::SIM.into(),
             default_review_mode: ReviewMode::Human,
+            default_reviewer: None,
         };
         let mut t = Ticket::new_backlog(
             TicketId::new(),

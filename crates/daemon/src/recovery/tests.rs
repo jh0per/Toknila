@@ -60,6 +60,7 @@ async fn a_clean_store_has_no_drift_and_keeps_sim_tickets_running() {
             tickets: 4,
             running: 2,
             lost: vec![],
+            reviews_lost: vec![],
             drift: vec![]
         }
     );

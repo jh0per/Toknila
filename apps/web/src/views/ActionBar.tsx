@@ -1,13 +1,15 @@
 import { useState } from "react";
-import type { Ticket } from "../api/types";
-import { actionsFor } from "../store/actions";
+import type { Ticket, TicketDetail } from "../api/types";
 import type { Intent } from "../store/msg";
+import { specsFor } from "./actionLabels";
 
-/// The buttons for what the card's status allows; a return asks what is wrong first.
-export function ActionBar({ card, dispatch }: { card: Ticket; dispatch: (i: Intent) => void }) {
+/// The buttons for what the daemon says the card allows now; a return asks what is wrong first.
+export function ActionBar(
+  { card, detail, dispatch }: { card: Ticket; detail?: TicketDetail; dispatch: (i: Intent) => void },
+) {
   const [returning, setReturning] = useState(false);
   const [text, setText] = useState("");
-  const specs = actionsFor(card);
+  const specs = specsFor(detail?.allowed_actions ?? []);
   if (specs.length === 0) return null;
   const send = () => {
     dispatch({ type: "ticketAction", key: card.key, action: "return", text: text.trim() });

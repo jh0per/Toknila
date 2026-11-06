@@ -9,7 +9,7 @@ use toknila_api_types::{
     ActionInput, AgentEvent, ChainDetail, ChainFile, ChainItem, EdgeInput, ErrorBody, EventRecord,
     NewActivity, NewChain, NewComment, NewMessage, NewProject, NewRelease, NewSubtask, NewThread,
     NewTicket, NewVersion, NewWildcard, PatchSubtask, PatchTicket, ProfileList, ReleaseEvent,
-    ThreadDetail, TicketDetail, TicketItem, TicketQuery, TicketThreads,
+    ReviewSettings, ThreadDetail, TicketDetail, TicketItem, TicketQuery, TicketThreads,
 };
 use toknila_core::Project;
 
@@ -156,6 +156,16 @@ impl Client {
     }
 
     /// `POST /chains/{chain}/edges`.
+    /// `PATCH /chains/{chain}`: how the chain's tickets are reviewed.
+    pub fn patch_chain(&self, chain: &str, s: &ReviewSettings) -> ClientResult<ChainDetail> {
+        self.call("PATCH", &format!("/chains/{}", enc(chain)), Some(s))
+    }
+
+    /// `PATCH /projects/{project}`: how the project's tickets are reviewed by default.
+    pub fn patch_project(&self, project: &str, s: &ReviewSettings) -> ClientResult<Project> {
+        self.call("PATCH", &format!("/projects/{}", enc(project)), Some(s))
+    }
+
     pub fn add_edge(&self, chain: &str, e: &EdgeInput) -> ClientResult<ChainDetail> {
         self.call("POST", &format!("/chains/{}/edges", enc(chain)), Some(e))
     }

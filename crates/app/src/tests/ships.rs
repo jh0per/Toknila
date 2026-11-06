@@ -121,7 +121,7 @@ fn merged_queues_the_removal_and_the_outcome_forgets_the_path_but_keeps_the_bran
     recover(&mut mem).expect("settle");
     settle_ships(&mut mem);
     finish_a(&mut mem).expect("finished");
-    act_on_a(&mut mem, TicketEvent::Accept).expect("accept");
+    act_on_a(&mut mem, TicketEvent::Accept { comment: None }).expect("accept");
     assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Merged);
     assert!(
         mem.deferred
@@ -145,7 +145,7 @@ fn a_removal_that_fails_is_journaled_and_the_accept_stands() {
     settle_ships(&mut mem);
     finish_a(&mut mem).expect("finished");
     *mem.yard.fail_remove.borrow_mut() = Some(ShipError::Io("locked".to_owned()));
-    act_on_a(&mut mem, TicketEvent::Accept).expect("accept");
+    act_on_a(&mut mem, TicketEvent::Accept { comment: None }).expect("accept");
     settle_ships(&mut mem);
     assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Merged);
     assert_eq!(count(&mem, "ticket.ship_remove_failed"), 1);

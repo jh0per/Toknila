@@ -5,18 +5,24 @@ use std::io::Write;
 use anyhow::{Context, Result, bail};
 use toknila_api_types::runner::{RunnerControl, decode_frame};
 use toknila_client::Client;
+use toknila_core::AgentRole;
 
-/// Prints the scrollback of the ticket's newest run (raw, ANSI kept). With `follow`, then
-/// streams what the agent writes next, until its run ends.
-pub(super) fn run(c: &Client, ticket: &str, follow: bool) -> Result<()> {
-    let scrollback = c.runner_scrollback(ticket)?;
+/// Prints the scrollback of the ticket's newest run (raw, ANSI kept); the reviewer's when
+/// `reviewer` is set. With `follow`, then streams what the agent writes next, until its run ends.
+pub(super) fn run(c: &Client, ticket: &str, follow: bool, reviewer: bool) -> Result<()> {
+    let role = if reviewer {
+        AgentRole::Reviewer
+    } else {
+        AgentRole::Worker
+    };
+    let scrollback = c.runner_scrollback_of(ticket, role)?;
     let mut out = std::io::stdout().lock();
     out.write_all(&scrollback.bytes)?;
     out.flush()?;
     if !follow {
         return Ok(());
     }
-    let url = c.runner_stream_url(ticket, Some((scrollback.run, scrollback.end)));
+    let url = c.runner_stream_url_of(ticket, role, Some((scrollback.run, scrollback.end)));
     let (mut ws, _) = tungstenite::connect(url).context("cannot open the output stream")?;
     let mut run = scrollback.run;
     loop {

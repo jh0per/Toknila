@@ -9,7 +9,7 @@
 //! [`RunnerControl`] as JSON.
 
 use serde::{Deserialize, Serialize};
-use toknila_core::{ProcessExit, RunId};
+use toknila_core::{AgentRole, ProcessExit, RunId};
 
 /// Characters of a run id in a frame header.
 const ID_LEN: usize = 26;
@@ -34,6 +34,16 @@ pub mod agent_env {
     pub const TICKET: &str = "TOKNILA_TICKET";
     /// Id of the run.
     pub const RUN: &str = "TOKNILA_RUN";
+    /// What the run is: `worker` or `reviewer`. `tok mcp` offers the tools of that role.
+    pub const ROLE: &str = "TOKNILA_ROLE";
+}
+
+/// Query of the runner's scrollback: which of the ticket's runners to read.
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct RunnerQuery {
+    /// `worker` (the default) or `reviewer`. The reviewer's terminal is read-only.
+    pub role: Option<AgentRole>,
 }
 
 /// An output frame, decoded.

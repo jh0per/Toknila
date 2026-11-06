@@ -1,7 +1,8 @@
 // Everything that changes the state: what the person did (intents), API answers, the stream.
 
-import type { ChainDetail, CommentKind, EventRecord, Project, TicketDetail, TicketItem, TicketThreads } from "../api/types";
-import type { CardAction } from "./actions";
+import type {
+  ChainDetail, CommentKind, EventRecord, Project, TicketAction, TicketDetail, TicketItem, TicketThreads,
+} from "../api/types";
 import type { Route, Tab } from "./route";
 
 /// What the person did.
@@ -18,7 +19,7 @@ export type Intent =
 /// What a person does to a card: an action of its status (a return carries the comment), or a
 /// comment of the template's kinds.
 export type CardCommand =
-  | { type: "ticketAction"; key: string; action: CardAction; text?: string }
+  | { type: "ticketAction"; key: string; action: TicketAction; text?: string }
   | { type: "addComment"; key: string; kind: CommentKind; text: string };
 
 /// What a person does in a thread; `text` is the message or the comment of a request for changes.

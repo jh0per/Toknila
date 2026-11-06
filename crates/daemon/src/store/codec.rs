@@ -1,13 +1,11 @@
 //! Row <-> domain mapping. Enums are stored as their serde names; nested values as JSON.
 
-use rusqlite::{Connection, OptionalExtension, Row, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_core::graph::ChainView;
 use toknila_core::wire::wire_name;
-use toknila_core::{
-    Chain, ChainId, Edge, NodeRef, Project, ProjectId, Release, ReleaseId, Timestamp,
-};
+use toknila_core::{ChainId, Edge, NodeRef, Release, ReleaseId, Timestamp};
 
 use super::{EventRecord, StoreError};
 
@@ -69,203 +67,12 @@ pub struct Repo<'c> {
     pub(crate) conn: &'c Connection,
 }
 
-const PROJECT_COLS: &str =
-    "id, key, name, repo_path, work_branch, release_branch, default_profile, default_review_mode";
-const CHAIN_COLS: &str = "id, project_id, name, goal, autostart, review_mode";
 const RELEASE_COLS: &str =
     "id, chain_id, version, channel, start_mode, state, branch, cut_at, released_at";
 
 impl<'c> Repo<'c> {
     pub(crate) fn new(conn: &'c Connection) -> Self {
         Self { conn }
-    }
-
-    // ---- projects ----
-
-    pub fn insert_project(&self, p: &Project) -> Result<(), StoreError> {
-        self.conn.execute(
-            &format!(
-                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"
-            ),
-            params![
-                p.id.to_string(),
-                p.key.as_str(),
-                p.name,
-                p.repo_path,
-                p.work_branch,
-                p.release_branch,
-                p.default_profile,
-                enum_str(&p.default_review_mode)?
-            ],
-        )?;
-        Ok(())
-    }
-
-    fn project_row(r: &Row<'_>) -> rusqlite::Result<[Option<String>; 8]> {
-        Ok([
-            r.get(0)?,
-            r.get(1)?,
-            r.get(2)?,
-            r.get(3)?,
-            r.get(4)?,
-            r.get(5)?,
-            r.get(6)?,
-            r.get(7)?,
-        ])
-    }
-
-    fn project_from(c: [Option<String>; 8]) -> Result<Project, StoreError> {
-        let [id, key, name, repo_path, work, release, profile, review] = c;
-        let req =
-            |v: Option<String>| v.ok_or_else(|| StoreError::Corrupt("null project column".into()));
-        Ok(Project {
-            id: parse(&req(id)?, "project id")?,
-            key: parse(&req(key)?, "project key")?,
-            name: req(name)?,
-            repo_path,
-            work_branch: req(work)?,
-            release_branch: req(release)?,
-            default_profile: req(profile)?,
-            default_review_mode: enum_from(&req(review)?)?,
-        })
-    }
-
-    pub fn projects(&self) -> Result<Vec<Project>, StoreError> {
-        let mut st = self
-            .conn
-            .prepare(&format!("SELECT {PROJECT_COLS} FROM projects ORDER BY key"))?;
-        let rows = st.query_map([], Self::project_row)?;
-        rows.map(|r| Self::project_from(r?)).collect()
-    }
-
-    pub fn project(&self, id: ProjectId) -> Result<Option<Project>, StoreError> {
-        self.conn
-            .query_row(
-                &format!("SELECT {PROJECT_COLS} FROM projects WHERE id = ?1"),
-                [id.to_string()],
-                Self::project_row,
-            )
-            .optional()?
-            .map(Self::project_from)
-            .transpose()
-    }
-
-    pub fn project_by_key(&self, key: &str) -> Result<Option<Project>, StoreError> {
-        self.conn
-            .query_row(
-                &format!("SELECT {PROJECT_COLS} FROM projects WHERE key = ?1"),
-                [key],
-                Self::project_row,
-            )
-            .optional()?
-            .map(Self::project_from)
-            .transpose()
-    }
-
-    /// Reserves the next ticket number of a project.
-    pub fn take_ticket_number(&self, project: ProjectId) -> Result<u32, StoreError> {
-        let n: u32 = self.conn.query_row(
-            "UPDATE projects SET next_ticket_number = next_ticket_number + 1 WHERE id = ?1 RETURNING next_ticket_number - 1",
-            [project.to_string()],
-            |r| r.get(0),
-        )?;
-        Ok(n)
-    }
-
-    // ---- chains ----
-
-    pub fn insert_chain(&self, c: &Chain) -> Result<(), StoreError> {
-        self.conn.execute(
-            &format!("INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"),
-            params![
-                c.id.to_string(),
-                c.project_id.to_string(),
-                c.name,
-                c.goal,
-                c.autostart,
-                opt_enum(&c.review_mode)?
-            ],
-        )?;
-        Ok(())
-    }
-
-    pub fn update_chain(&self, c: &Chain) -> Result<(), StoreError> {
-        self.conn.execute(
-            "UPDATE chains SET name = ?2, goal = ?3, autostart = ?4, review_mode = ?5 WHERE id = ?1",
-            params![c.id.to_string(), c.name, c.goal, c.autostart, opt_enum(&c.review_mode)?],
-        )?;
-        Ok(())
-    }
-
-    fn chain_from(
-        r: &Row<'_>,
-    ) -> rusqlite::Result<(String, String, String, String, bool, Option<String>)> {
-        Ok((
-            r.get(0)?,
-            r.get(1)?,
-            r.get(2)?,
-            r.get(3)?,
-            r.get(4)?,
-            r.get(5)?,
-        ))
-    }
-
-    fn chain_build(
-        t: (String, String, String, String, bool, Option<String>),
-    ) -> Result<Chain, StoreError> {
-        Ok(Chain {
-            id: parse(&t.0, "chain id")?,
-            project_id: parse(&t.1, "project id")?,
-            name: t.2,
-            goal: t.3,
-            autostart: t.4,
-            review_mode: opt_enum_from(t.5)?,
-        })
-    }
-
-    pub fn chain(&self, id: ChainId) -> Result<Option<Chain>, StoreError> {
-        self.conn
-            .query_row(
-                &format!("SELECT {CHAIN_COLS} FROM chains WHERE id = ?1"),
-                [id.to_string()],
-                Self::chain_from,
-            )
-            .optional()?
-            .map(Self::chain_build)
-            .transpose()
-    }
-
-    pub fn chain_by_name(
-        &self,
-        project: ProjectId,
-        name: &str,
-    ) -> Result<Option<Chain>, StoreError> {
-        self.conn
-            .query_row(
-                &format!("SELECT {CHAIN_COLS} FROM chains WHERE project_id = ?1 AND name = ?2"),
-                params![project.to_string(), name],
-                Self::chain_from,
-            )
-            .optional()?
-            .map(Self::chain_build)
-            .transpose()
-    }
-
-    pub fn chains(&self, project: Option<ProjectId>) -> Result<Vec<Chain>, StoreError> {
-        let mut st = self.conn.prepare(&format!(
-            "SELECT {CHAIN_COLS} FROM chains WHERE ?1 IS NULL OR project_id = ?1 ORDER BY rowid"
-        ))?;
-        let rows = st.query_map([project.map(|p| p.to_string())], Self::chain_from)?;
-        rows.map(|r| Self::chain_build(r?)).collect()
-    }
-
-    /// Chains with this name, across projects.
-    pub fn chains_named(&self, name: &str) -> Result<Vec<Chain>, StoreError> {
-        let mut st = self.conn.prepare(&format!(
-            "SELECT {CHAIN_COLS} FROM chains WHERE name = ?1 ORDER BY rowid"
-        ))?;
-        let rows = st.query_map([name], Self::chain_from)?;
-        rows.map(|r| Self::chain_build(r?)).collect()
     }
 
     // ---- releases, edges ----

@@ -30,6 +30,9 @@ pub fn check_invariants(ticket: &Ticket) -> Result<(), String> {
         (_, None) => {}
         (s, Some(r)) => return Err(format!("{s:?} must not carry a reason, has {r:?}")),
     }
+    if ticket.review.turn.is_some() && ticket.status != S::Review {
+        return Err(format!("awaiting a verdict in {:?}", ticket.status));
+    }
     if ticket.paused && ticket.status != S::Backlog {
         return Err(format!("paused ticket in {:?}", ticket.status));
     }

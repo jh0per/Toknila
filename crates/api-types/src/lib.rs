@@ -7,6 +7,7 @@ pub mod runner;
 
 use serde::{Deserialize, Serialize};
 use toknila_core::graph::{ChainSummary, ChainView};
+use toknila_core::machine::TicketAction;
 use toknila_core::profile::{Catalog, ListedProfile, ProfileProblem};
 use toknila_core::{
     Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Release, ReleaseId, Ship, Subtask,
@@ -16,6 +17,7 @@ use toknila_core::{
 pub use toknila_app::chains::NewChain;
 pub use toknila_app::projects::NewProject;
 pub use toknila_app::releases::NewRelease;
+pub use toknila_app::reviews::{ReviewSettings, ReviewView};
 pub use toknila_app::threads::{NewMessage, NewThread, NewVersion};
 pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;
@@ -88,6 +90,10 @@ pub struct TicketDetail {
     /// The ticket's worktree and branch while it has them; `null` before it started, after it
     /// merged, or when its project has no repository.
     pub ship: Option<Ship>,
+    /// How the card is reviewed (mode, reviewer, whose turn) and the rounds so far.
+    pub review: ReviewView,
+    /// What a person can do with the ticket now, computed by the state machine.
+    pub allowed_actions: Vec<TicketAction>,
 }
 
 /// A thread with its messages and artifact versions.

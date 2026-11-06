@@ -35,11 +35,13 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         paused: false,
         profile: Some("sim".to_owned()),
         review_mode: Some(ReviewMode::Both),
+        reviewer: None,
         branch: None,
         needs_secrets: true,
         tokens_used: 12_345,
         wildcard: None,
         done_out_of_order: None,
+        review: crate::Review::default(),
     }
 }
 
@@ -54,6 +56,7 @@ fn project_roundtrips() {
         release_branch: "main".to_owned(),
         default_profile: "sim".to_owned(),
         default_review_mode: ReviewMode::Human,
+        default_reviewer: None,
     });
 }
 
@@ -66,6 +69,7 @@ fn chain_and_edges_roundtrip() {
         goal: "Skeleton".to_owned(),
         autostart: true,
         review_mode: None,
+        reviewer: None,
     };
     roundtrip(&chain);
     for kind in [EdgeKind::Normal, EdgeKind::AfterRelease] {
