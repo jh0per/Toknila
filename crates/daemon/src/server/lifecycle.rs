@@ -77,6 +77,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         shutdown: shutdown.clone(),
         profiles: paths.profiles(),
         runners: runners.clone(),
+        tools: Arc::new(crate::tools::SystemTools),
     };
 
     let listener = match reuse.as_ref().map(|i| i.port).filter(|p| *p != 0) {

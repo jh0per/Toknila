@@ -182,6 +182,10 @@ export interface paths {
         };
         get: operations["list_projects"];
         put?: never;
+        /**
+         * Creates a project. A folder (`repo_path`) must be a repository with the base branch; the
+         *     refusal names the field.
+         */
         post: operations["create_project"];
         delete?: never;
         options?: never;
@@ -204,7 +208,8 @@ export interface paths {
         head?: never;
         /**
          * Changes project settings. A higher parallel limit starts waiting cards at once; a lower one
-         *     never stops a running agent.
+         *     never stops a running agent. A new base branch must exist in the project's repository and a
+         *     default profile must be in the catalog; the refusal names the field.
          */
         patch: operations["patch_project"];
         trace?: never;
@@ -267,6 +272,43 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["release_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repos/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Is this folder a git repository with the base branch? The branches come back so a form can
+         *     offer them when the base is missing.
+         */
+        post: operations["repos_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Is `git` new enough, is `claude` installed, is `gh` logged in; each with a fix hint. */
+        get: operations["system_checks"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -747,6 +789,22 @@ export interface components {
             /** @description Tickets in the plan: wildcard cards count only once approved. */
             total: number;
         };
+        /** @description One line of the system check. */
+        Check: {
+            /** @description What was found, in a sentence. */
+            detail: string;
+            /** @description What to do about it; always set, also when the check passes. */
+            hint: string;
+            status: components["schemas"]["CheckStatus"];
+            tool: components["schemas"]["Tool"];
+            /** @description The version the tool reported, when it did. */
+            version?: string | null;
+        };
+        /**
+         * @description The verdict on one tool.
+         * @enum {string}
+         */
+        CheckStatus: "ok" | "missing" | "outdated" | "not_logged_in" | "failed";
         /**
          * @description A permanent record in a ticket: an instruction from a person, an agent's report, or a decision.
          *     Everything said to an agent is stored here first and delivered after.
@@ -803,6 +861,11 @@ export interface components {
             code: string;
             /** @description Human-readable message. */
             error: string;
+            /**
+             * @description The input the error belongs to (`repo_path`, `work_branch`, `default_profile`), when it
+             *     is about one field; a form shows the message next to that field.
+             */
+            field?: string | null;
         };
         /** @description One journal entry. `seq` is increasing; clients resume from it. */
         EventRecord: {
@@ -1030,6 +1093,8 @@ export interface components {
         };
         /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
         PatchProject: {
+            /** @description Profile of cards that name none; a name from `GET /v1/profiles`. */
+            default_profile?: string | null;
             /**
              * Format: int32
              * @description Most agents working at once (1 to 64).
@@ -1038,6 +1103,8 @@ export interface components {
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
             reviewer?: string | null;
+            /** @description The base branch ships start from and merges go into. */
+            work_branch?: string | null;
         };
         /** @description `PATCH /v1/tickets/{ticket}/subtasks/{position}`. */
         PatchSubtask: {
@@ -1183,6 +1250,37 @@ export interface components {
          * @enum {string}
          */
         ReleaseState: "planned" | "cut" | "released";
+        /** @description The answer to "may this folder be a project's repository, with this base branch?". */
+        RepoCheck: {
+            /**
+             * @description Local branches of the repository, to offer when the base branch is missing; empty when
+             *     the folder is not a repository.
+             */
+            branches: string[];
+            problems: components["schemas"]["RepoProblem"][];
+        };
+        /** @description `POST /v1/repos/check`: the folder a person is about to make a project of. */
+        RepoCheckRequest: {
+            repo_path: string;
+            /** @description The base branch to look for; default `develop`. */
+            work_branch?: string | null;
+        };
+        /**
+         * @description Which input a problem belongs to, so a client can show it next to that field.
+         * @enum {string}
+         */
+        RepoField: "repo_path" | "work_branch";
+        /** @description One thing that stops the folder from being used. */
+        RepoProblem: {
+            code: components["schemas"]["RepoProblemCode"];
+            field: components["schemas"]["RepoField"];
+            message: string;
+        };
+        /**
+         * @description What is wrong.
+         * @enum {string}
+         */
+        RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing";
         /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
         Review: {
             /** @description Oldest first. */
@@ -1296,6 +1394,11 @@ export interface components {
         };
         /** @description Identifies a [`crate::Subtask`]. */
         SubtaskId: string;
+        /** @description All checks, and whether every one passed. */
+        SystemChecks: {
+            checks: components["schemas"]["Check"][];
+            ok: boolean;
+        };
         /** @description Body of `POST /v1/tickets/{ticket}/runner/size`: the size of the panel showing the terminal. */
         TerminalSize: {
             /** Format: int32 */
@@ -1473,6 +1576,11 @@ export interface components {
          * @description Milliseconds since the Unix epoch, UTC.
          */
         Timestamp: number;
+        /**
+         * @description Which tool a check is about.
+         * @enum {string}
+         */
+        Tool: "git" | "claude" | "gh";
         /**
          * @description A reviewer's decision about the work.
          * @enum {string}
@@ -2197,6 +2305,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    repos_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepoCheckRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoCheck"];
+                };
+            };
+        };
+    };
+    system_checks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemChecks"];
                 };
             };
         };

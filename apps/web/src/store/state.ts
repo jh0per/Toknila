@@ -2,6 +2,7 @@
 
 import type { ChainDetail, EventRecord, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads } from "../api/types";
 import { type Route, type Tab, routePath } from "./route";
+import { type SettingsState, initialSettings } from "./settings";
 
 export type Link = "connecting" | "live" | "offline";
 
@@ -31,6 +32,8 @@ export interface State {
   retryMs: number;
   route: Route;
   tab: Tab;
+  /// Settings and onboarding: checks, profiles, the answers of the last form.
+  settings: SettingsState;
 }
 
 export const FIRST_RETRY_MS = 500;
@@ -54,6 +57,7 @@ export function initialState(route: Route): State {
     retryMs: FIRST_RETRY_MS,
     route,
     tab: "details",
+    settings: initialSettings,
   };
 }
 
@@ -64,7 +68,7 @@ function allChains(s: State): ChainDetail[] {
 /// The project in focus: the one in the route, the chain's for phase 0 paths, else the first.
 export function currentProject(s: State): Project | undefined {
   const r = s.route;
-  if ("project" in r) return s.projects.find((p) => p.key === r.project || p.id === r.project);
+  if ("project" in r && r.project) return s.projects.find((p) => p.key === r.project || p.id === r.project);
   if (r.name === "chain") {
     const c = allChains(s).find((x) => x.chain.name === r.chain);
     return s.projects.find((p) => p.id === c?.chain.project_id);

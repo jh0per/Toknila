@@ -86,9 +86,9 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
       </section>
 
       <div className="side-foot">
-        <span className="item" title="Settings will live here">
+        <NavLink route={{ name: "settings", project: project?.key }} dispatch={dispatch} className={`item${state.route.name === "settings" ? " sel" : ""}`} testId="settings-link">
           <span className="t">Settings</span>
-        </span>
+        </NavLink>
       </div>
     </nav>
   );

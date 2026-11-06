@@ -34,6 +34,8 @@ pub struct AppState {
     pub profiles: PathBuf,
     /// The agents' terminals (`/tickets/{ticket}/runner/...`).
     pub runners: Arc<crate::runner::Runners>,
+    /// How the system checks and the repository checks run `git`, `claude` and `gh`.
+    pub tools: Arc<dyn crate::tools::Tools>,
 }
 
 /// Current wall-clock time.
@@ -86,6 +88,8 @@ pub fn router(state: AppState) -> Router {
         // The page's own routes, so a deep link opens the right screen (apps/web/src/store/route.ts).
         .route("/chains/{chain}", get(crate::web::index))
         .route("/inbox", get(crate::web::index))
+        .route("/settings", get(crate::web::index))
+        .route("/projects/{project}/settings", get(crate::web::index))
         .route("/projects/{project}", get(crate::web::index))
         .route("/projects/{project}/chains/{chain}", get(crate::web::index))
         .route(

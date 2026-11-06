@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest";
+import type { Project, RepoProblem } from "../api/types";
+import { reduce } from "./reduce";
+import { type State, currentProject, initialState } from "./state";
+import { fieldError, formError } from "./settings";
+
+const project = (over: Partial<Project> = {}) =>
+  ({ id: "p1", key: "DEMO", name: "Demo", max_parallel: 2, ...over }) as Project;
+
+const draft = { key: "DEMO", name: "", repo_path: "/work/demo", work_branch: "develop" };
+
+function ready(projects: Project[]): State {
+  const [s] = reduce(initialState({ name: "chains" }), { type: "loaded", projects, chains: [], tickets: [] });
+  return s;
+}
+
+describe("first run", () => {
+  it("loads the checks and the profiles when there is no project", () => {
+    const [, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: [], chains: [], tickets: [] });
+    expect(fx).toEqual([{ type: "loadChecks" }, { type: "loadProfiles" }]);
+  });
+
+  it("loads nothing extra at home once there are projects", () => {
+    const [, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: [project()], chains: [], tickets: [] });
+    expect(fx).toEqual([]);
+  });
+
+  it("loads them when the settings page opens", () => {
+    const [s, fx] = reduce(ready([project()]), { type: "navigate", route: { name: "settings", project: "DEMO" } });
+    expect(fx).toContainEqual({ type: "loadChecks" });
+    expect(fx).toContainEqual({ type: "loadProfiles" });
+    expect(currentProject(s)?.key).toBe("DEMO");
+  });
+
+  it("settings without a project in the address is about the first project", () => {
+    const s = ready([project(), project({ id: "p2", key: "OTHER" })]);
+    const [at] = reduce(s, { type: "navigate", route: { name: "settings" } });
+    expect(currentProject(at)?.key).toBe("DEMO");
+  });
+});
+
+describe("adding a project", () => {
+  it("asks the daemon and marks the form busy", () => {
+    const [s, fx] = reduce(ready([]), { type: "addProject", draft });
+    expect(s.settings.busy).toBe(true);
+    expect(fx).toEqual([{ type: "addProject", draft }]);
+  });
+
+  it("keeps each problem for its own field, and the branches to pick", () => {
+    const problems = [{ field: "work_branch", code: "branch_missing", message: "no branch" }] as RepoProblem[];
+    const [busy] = reduce(ready([]), { type: "addProject", draft });
+    const [s] = reduce(busy, { type: "addRejected", problems, branches: ["main", "trunk"] });
+    expect(fieldError(s.settings, "work_branch")).toBe("no branch");
+    expect(fieldError(s.settings, "repo_path")).toBeUndefined();
+    expect(s.settings.branches).toEqual(["main", "trunk"]);
+    expect(s.settings.busy).toBe(false);
+  });
+
+  it("a new attempt clears the old problems", () => {
+    const problems = [{ field: "repo_path", code: "path_missing", message: "gone" }] as RepoProblem[];
+    const [rejected] = reduce(ready([]), { type: "addRejected", problems, branches: [] });
+    const [again] = reduce(rejected, { type: "addProject", draft });
+    expect(again.settings.problems).toEqual([]);
+  });
+
+  it("an added project joins the list, the page moves to its settings and the agents reload", () => {
+    const [s, fx] = reduce(ready([]), { type: "projectAdded", project: project() });
+    expect(s.projects.map((p) => p.key)).toEqual(["DEMO"]);
+    expect(s.route).toEqual({ name: "settings", project: "DEMO" });
+    expect(fx).toContainEqual({ type: "pushUrl", path: "/projects/DEMO/settings" });
+    expect(fx).toContainEqual({ type: "loadAgents" });
+  });
+});
+
+describe("saving settings", () => {
+  it("replaces the project with the saved one and says so", () => {
+    const s0 = ready([project()]);
+    const [s, fx] = reduce(s0, { type: "projectSaved", project: project({ max_parallel: 4 }) });
+    expect(s.projects[0].max_parallel).toBe(4);
+    expect(s.settings.saved).toBe(true);
+    expect(fx).toContainEqual({ type: "loadAgents" });
+  });
+
+  it("a refusal names its field, and one without a field is the form's", () => {
+    const [named] = reduce(ready([project()]), { type: "settingsRejected", field: "work_branch", message: "no such branch" });
+    expect(fieldError(named.settings, "work_branch")).toBe("no such branch");
+    expect(formError(named.settings)).toBeUndefined();
+    const [plain] = reduce(ready([project()]), { type: "settingsRejected", field: undefined, message: "limit is 1 to 64" });
+    expect(formError(plain.settings)).toBe("limit is 1 to 64");
+  });
+});

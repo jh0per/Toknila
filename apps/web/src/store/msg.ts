@@ -5,6 +5,7 @@ import type {
   TicketThreads,
 } from "../api/types";
 import type { Route, Tab } from "./route";
+import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
 
 /// What the person did.
 export type Intent =
@@ -15,7 +16,8 @@ export type Intent =
   | { type: "selectTab"; tab: Tab }
   | { type: "pickVersion"; thread: string; number: number }
   | CardCommand
-  | ThreadAction;
+  | ThreadAction
+  | SettingsIntent;
 
 /// What a person does to a card: an action of its status (a return carries the comment), or a
 /// comment of the template's kinds.
@@ -47,7 +49,8 @@ export type Msg =
   | { type: "linkOpened" }
   | { type: "linkClosed" }
   | { type: "event"; event: EventRecord }
-  | { type: "urlChanged"; route: Route };
+  | { type: "urlChanged"; route: Route }
+  | SettingsResult;
 
 /// A side effect for the runner; the reducer only describes it.
 export type Effect =
@@ -61,5 +64,6 @@ export type Effect =
   | { type: "loadThreads"; key: string }
   | CardCommand
   | ThreadAction
+  | SettingsEffect
   | { type: "connect"; since: number; delayMs: number }
   | { type: "pushUrl"; path: string };

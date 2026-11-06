@@ -9,10 +9,16 @@ export function token(): string {
 
 const auth = () => ({ Authorization: `Bearer ${token()}` });
 
-/// The daemon's error message for a refused request.
-async function refusal(r: Response): Promise<Error> {
+/// A refused request: the daemon's message, and the input it is about when it names one.
+export class Refusal extends Error {
+  constructor(message: string, readonly code: string, readonly field: string | undefined) {
+    super(message);
+  }
+}
+
+async function refusal(r: Response): Promise<Refusal> {
   const body = (await r.json().catch(() => ({}))) as Partial<ErrorBody>;
-  return new Error(body.error ?? `${r.status} ${r.statusText}`);
+  return new Refusal(body.error ?? `${r.status} ${r.statusText}`, body.code ?? "", body.field ?? undefined);
 }
 
 export async function get<T>(path: string): Promise<T> {
@@ -30,6 +36,17 @@ export async function post<T = void>(path: string, body: unknown): Promise<T> {
   });
   if (!r.ok) throw await refusal(r);
   return (r.status === 204 ? undefined : await r.json().catch(() => undefined)) as T;
+}
+
+/// A change of settings: PATCH a JSON body, throw the daemon's refusal.
+export async function patch<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(`/v1${path}`, {
+    method: "PATCH",
+    headers: { ...auth(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw await refusal(r);
+  return r.json() as Promise<T>;
 }
 
 /// Raw bytes typed into a terminal, as they are.

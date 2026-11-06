@@ -3,7 +3,9 @@ import { currentChain, currentProject, runningAgents, slotsOf } from "../store/s
 import { useStore } from "../store/useStore";
 import { Canvas } from "./Canvas";
 import { Inbox } from "./Inbox";
+import { Onboarding } from "./Onboarding";
 import { Panel } from "./Panel";
+import { Settings } from "./Settings";
 import { Sidebar } from "./Sidebar";
 
 export function App() {
@@ -12,7 +14,7 @@ export function App() {
     return <main><p className="error">Open the address that <code>tok open</code> prints; it carries the access token.</p></main>;
   }
   const chain = currentChain(state);
-  const showChain = Boolean(chain) && state.loaded && state.route.name !== "inbox";
+  const showChain = Boolean(chain) && state.loaded && state.route.name !== "inbox" && state.route.name !== "settings";
   const running = runningAgents(state).length;
   const slots = slotsOf(state);
   return (
@@ -20,7 +22,11 @@ export function App() {
       <Sidebar state={state} dispatch={dispatch} />
       <main className={showChain ? "" : "plain"}>
         {state.error && !showChain && <p className="error">{state.error}</p>}
-        {!state.loaded ? <p className="muted">Loading…</p> : state.route.name === "inbox" ? (
+        {!state.loaded ? <p className="muted">Loading…</p> : state.route.name === "settings" ? (
+          <Settings state={state} dispatch={dispatch} />
+        ) : state.projects.length === 0 ? (
+          <Onboarding state={state} dispatch={dispatch} />
+        ) : state.route.name === "inbox" ? (
           <Inbox state={state} dispatch={dispatch} />
         ) : chain ? (
           <>
@@ -42,9 +48,7 @@ export function App() {
           </>
         ) : (
           <p className="muted empty">
-            {state.projects.length === 0
-              ? <>No projects yet. Try <code>tok chain import examples/demo.toml</code>.</>
-              : "Pick a chain in the sidebar."}
+            Pick a chain in the sidebar.
           </p>
         )}
       </main>
