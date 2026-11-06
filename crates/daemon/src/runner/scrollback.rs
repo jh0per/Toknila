@@ -16,9 +16,14 @@ pub struct Scrollback {
 impl Scrollback {
     /// An empty scrollback that keeps `max_lines` lines (at least one).
     pub fn new(max_lines: usize) -> Self {
+        Self::starting_at(max_lines, 0)
+    }
+
+    /// Like [`Scrollback::new`] for output whose first byte is at `offset` of the run.
+    pub fn starting_at(max_lines: usize, offset: u64) -> Self {
         Self {
             buf: Vec::new(),
-            start: 0,
+            start: offset,
             lines: 0,
             max_lines: max_lines.max(1),
         }
@@ -96,6 +101,14 @@ mod tests {
         s.push(b"one\ntwo\n");
         assert_eq!(text(&s, 4), (4, "two\n".to_owned()));
         assert_eq!(text(&s, 99), (8, String::new()));
+    }
+
+    #[test]
+    fn a_scrollback_can_start_at_an_offset_of_the_run() {
+        let mut s = Scrollback::starting_at(10, 100);
+        s.push(b"one\n");
+        assert_eq!(text(&s, 0), (100, "one\n".to_owned()));
+        assert_eq!(s.end(), 104);
     }
 
     #[test]

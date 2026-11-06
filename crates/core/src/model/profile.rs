@@ -45,6 +45,8 @@ pub struct OutputRules {
     pub strip_ansi: bool,
     /// Lines of output kept per run.
     pub scrollback_lines: u32,
+    /// Size at which a run's log file is rotated to `<run>.log.1`, in bytes.
+    pub max_log_bytes: u64,
 }
 
 impl Default for OutputRules {
@@ -52,6 +54,7 @@ impl Default for OutputRules {
         Self {
             strip_ansi: true,
             scrollback_lines: 10_000,
+            max_log_bytes: 20 * 1024 * 1024,
         }
     }
 }

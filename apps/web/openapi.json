@@ -3129,6 +3129,13 @@
         "type": "object",
         "description": "How the terminal output of an agent is kept and shown.",
         "properties": {
+          "max_log_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Size at which a run's log file is rotated to `<run>.log.1`, in bytes.",
+            "default": 20971520,
+            "minimum": 0
+          },
           "scrollback_lines": {
             "type": "integer",
             "format": "int32",

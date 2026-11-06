@@ -20,6 +20,7 @@
 //! [output]
 //! strip_ansi = true
 //! scrollback_lines = 10000
+//! max_log_bytes = 20971520              # a run's log rotates to <run>.log.1 at this size
 //!
 //! [nudge]
 //! idle_secs = 300

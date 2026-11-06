@@ -30,6 +30,7 @@
           "message": "Continue, or report with the finished event."
         },
         "output": {
+          "max_log_bytes": 20971520,
           "scrollback_lines": 10000,
           "strip_ansi": true
         },
@@ -59,6 +60,7 @@
           "message": "Continue, or report with the finished event."
         },
         "output": {
+          "max_log_bytes": 20971520,
           "scrollback_lines": 10000,
           "strip_ansi": true
         },
@@ -89,6 +91,7 @@
           "message": "Continue, or report with the finished event."
         },
         "output": {
+          "max_log_bytes": 20971520,
           "scrollback_lines": 10000,
           "strip_ansi": true
         },

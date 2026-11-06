@@ -142,6 +142,12 @@ as external effects; the daemon implements the `Runner` port (`toknila-app`) in 
   (all of its output; never read back by the daemon except for a ticket it did not run since the
   last start) and a bounded in-memory scrollback of the last `output.scrollback_lines` lines of
   its profile. Offsets count bytes from the start of the run, so they match the log file.
+  A log is capped at the profile's `output.max_log_bytes` (default 20 MiB): when the next write
+  would pass the cap the file becomes `<run id>.log.1` (replacing an earlier one) and a new
+  `.log` starts, so a run keeps its last one to two caps. `<run id>.base` records the offset of
+  the first byte of the current `.log`, which keeps offsets the run's own after a rotation and a
+  restart. The scrollback is in memory and is not touched by a rotation. A ticket keeps the logs
+  of its 20 newest runs; older ones are deleted when a new run starts.
   Journal entries: `ticket.runner_started` (`{run: {id, ticket_id, key, profile, dir}}`) and
   `ticket.runner_exited`; output itself is not journaled.
 
@@ -186,6 +192,23 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
 Tests use `fake-agent` (`crates/daemon/src/bin/fake-agent.rs`: prints lines, echoes a line of
 input, sleeps, exits with a code) as the profile command, so the same tests run on a Unix pty and
 on ConPTY without a shell.
+
+## Data safety
+
+The database is the only copy of the plan, so an upgrade must not lose it.
+
+- **Backup before migration.** When the daemon opens a database whose schema is older than the
+  build's, and before it applies any migration, it writes a consistent copy (`VACUUM INTO`, never
+  a copy of the live file) to `<home>/backups/toknila-v<old version>-<UTC timestamp>.sqlite`. The
+  newest 5 stay. A fresh database needs none. If the copy cannot be made, no migration runs and
+  the daemon refuses to start with an error naming the backup path; the database is untouched.
+- **Check at start.** The daemon runs `PRAGMA quick_check` before anything else. A database that
+  fails is refused, and the error names the newest backup.
+- **Restore.** Stop the daemon (`tok daemon stop`), move `<home>/toknila.db` and its
+  `toknila.db-wal` and `toknila.db-shm` files out of the way, copy the chosen backup to
+  `<home>/toknila.db`, and start again. The daemon migrates a restored older backup forward (and
+  backs it up first, as always). Anything done after the backup was made is not in it; the
+  moved-away file is kept for that reason.
 
 ## Presentation: MVI
 

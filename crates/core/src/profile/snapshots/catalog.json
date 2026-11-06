@@ -17,7 +17,8 @@
         },
         "output": {
           "strip_ansi": true,
-          "scrollback_lines": 10000
+          "scrollback_lines": 10000,
+          "max_log_bytes": 20971520
         },
         "nudge": {
           "idle_secs": 300,
@@ -46,7 +47,8 @@
         },
         "output": {
           "strip_ansi": true,
-          "scrollback_lines": 10000
+          "scrollback_lines": 10000,
+          "max_log_bytes": 20971520
         },
         "nudge": {
           "idle_secs": 300,
@@ -78,7 +80,8 @@
         },
         "output": {
           "strip_ansi": true,
-          "scrollback_lines": 10000
+          "scrollback_lines": 10000,
+          "max_log_bytes": 20971520
         },
         "nudge": {
           "idle_secs": 60,
