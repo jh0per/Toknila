@@ -122,6 +122,9 @@ pub enum BlockedReason {
     RunnerLost,
     /// The ship (worktree and branch) could not be prepared.
     ShipFailed { detail: String },
+    /// The runner has no directory to start in: the project has no repository, so the ticket has
+    /// no ship. Unblocking starts the ship and the runner again.
+    NoWorkingDir,
 }
 
 impl BlockedReason {
@@ -197,6 +200,9 @@ impl fmt::Display for BlockedReason {
             ),
             Self::RunnerLost => f.write_str("runner lost"),
             Self::ShipFailed { detail } => write!(f, "ship_failed: {detail}"),
+            Self::NoWorkingDir => f.write_str(
+                "no_working_dir: the project has no repository, so the ticket has no ship; give it one or use the sim profile",
+            ),
         }
     }
 }
@@ -303,6 +309,10 @@ mod tests {
                     detail: "git not found".into(),
                 }),
                 "ship_failed: git not found",
+            ),
+            (
+                blocked(BlockedReason::NoWorkingDir),
+                "no_working_dir: the project has no repository, so the ticket has no ship; give it one or use the sim profile",
             ),
             (
                 StatusReason::Cancelled { text: "dup".into() },

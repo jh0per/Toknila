@@ -782,6 +782,9 @@ export interface components {
             detail: string;
             /** @enum {string} */
             kind: "ship_failed";
+        } | {
+            /** @enum {string} */
+            kind: "no_working_dir";
         };
         /**
          * @description A flow of tickets with dependencies and release milestones between them. Its status,
