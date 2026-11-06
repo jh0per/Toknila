@@ -75,10 +75,45 @@ fn profile(tok: &Tok, name: &str, steps: &[&str]) {
     std::fs::write(folder.join(format!("{name}.toml")), text).expect("profile");
 }
 
-fn wait_until(what: &str, mut ok: impl FnMut() -> bool) {
+/// What a failed wait needs to be diagnosed from a CI log: the tickets and the daemon's logs.
+fn diagnostics(tok: &Tok) -> String {
+    let mut out = String::new();
+    for key in ["DEMO-1", "DEMO-2", "DEMO-3"] {
+        let shown = Command::new(env!("CARGO_BIN_EXE_tok"))
+            .args(["show", key, "--json"])
+            .env("TOKNILA_HOME", &tok.home)
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+            .unwrap_or_default();
+        let ticket: serde_json::Value = serde_json::from_str(&shown).unwrap_or_default();
+        out.push_str(&format!(
+            "{key}: {} {}\n",
+            ticket["ticket"]["status"], ticket["ticket"]["status_reason"]
+        ));
+    }
+    let entries = std::fs::read_dir(tok.home.join("logs"))
+        .into_iter()
+        .flatten();
+    for entry in entries.filter_map(Result::ok) {
+        let text = std::fs::read_to_string(entry.path()).unwrap_or_default();
+        let tail: Vec<&str> = text.lines().rev().take(40).collect();
+        out.push_str(&format!(
+            "-- {}\n{}\n",
+            entry.path().display(),
+            tail.join("\n")
+        ));
+    }
+    out
+}
+
+fn wait_until(tok: &Tok, what: &str, mut ok: impl FnMut() -> bool) {
     let until = Instant::now() + WAIT;
     while !ok() {
-        assert!(Instant::now() < until, "timed out waiting for {what}");
+        assert!(
+            Instant::now() < until,
+            "timed out waiting for {what}\n{}",
+            diagnostics(tok)
+        );
         std::thread::sleep(Duration::from_millis(100));
     }
 }
@@ -174,7 +209,7 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
     tok.run(&["ticket", "new", "demo", "Lost", "--profile", "lost"]);
 
     // Output reaches the scrollback, and the runner works in the ship, not in the repository.
-    wait_until("the agent's output", || {
+    wait_until(&tok, "the agent's output", || {
         logs(&tok.home, "DEMO-1").contains("hello from the agent")
     });
     let out = logs(&tok.home, "DEMO-1");
@@ -193,7 +228,7 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
 
     // StopRunner: cancelling stops the process, and the follower sees the run end.
     tok.run(&["cancel", "DEMO-1", "not needed"]);
-    wait_until("the follower to end", || {
+    wait_until(&tok, "the follower to end", || {
         follower.try_wait().expect("wait").is_some()
     });
     assert!(follower.wait().expect("status").success());
@@ -204,7 +239,9 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
     );
 
     // A crash comes back through the machine: exit 3 blocks the ticket, saying why.
-    wait_until("DEMO-2 to block", || tok.status("DEMO-2") == "blocked");
+    wait_until(&tok, "DEMO-2 to block", || {
+        tok.status("DEMO-2") == "blocked"
+    });
     assert!(
         reason_of(&tok, "DEMO-2").contains("exit 3"),
         "{}",
@@ -216,7 +253,7 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
     assert_eq!(tok.status("DEMO-3"), "running");
     let pid = info.pid;
     kill_hard(pid);
-    wait_until("the daemon to die", || !Client::healthy(&base));
+    wait_until(&tok, "the daemon to die", || !Client::healthy(&base));
     // Any command starts the daemon again; recovery runs before it answers.
     assert_eq!(tok.status("DEMO-3"), "blocked");
     assert!(
