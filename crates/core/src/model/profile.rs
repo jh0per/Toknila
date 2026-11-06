@@ -287,7 +287,9 @@ impl AgentProfile {
             ..Self::new(
                 Self::CLAUDE_CODE,
                 AgentRole::Worker,
-                vec!["claude".to_owned(), Self::KICKOFF.to_owned()],
+                ["claude", "--permission-mode", "acceptEdits", Self::KICKOFF]
+                    .map(str::to_owned)
+                    .to_vec(),
             )
         }
     }

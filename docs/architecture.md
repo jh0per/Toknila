@@ -74,8 +74,11 @@ A new agent is a new file, not new code.
   runner writes them into the generated `settings.json` (`permissions.allow`), next to the hooks,
   and the file is passed by `hooks.settings_flag`. A rule that contains `{check_command}` applies
   only when the project has a check command and has it in place (`Permissions::rules`).
-  `claude-code` allows read-only git, `git add` and `git commit`, the check command and the
-  `toknila` MCP server. `claude-code-reviewer` runs with `--permission-mode dontAsk` (nobody can
+  `claude-code` runs with `--permission-mode acceptEdits` (in the default mode every file edit
+  prompts, and "don't ask again" lasts only for the session; in this mode edits and
+  `mkdir`/`touch`/`mv`/`cp` inside the working directory, the isolated ship, need no prompt) and
+  allows read-only git, `git add` and `git commit`, the check command and the `toknila` MCP
+  server. `claude-code-reviewer` runs with `--permission-mode dontAsk` (nobody can
   answer its prompts, so it may do what the list says and nothing else) and allows read-only
   git (`status`, `diff`, `log`, `show`, `merge-base`, `rev-parse`), the check command and the
   filters a check is piped through (`grep`, `head`, `tail`, `wc`), plus the MCP server. Syntax,

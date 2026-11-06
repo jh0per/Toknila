@@ -252,11 +252,11 @@ fn the_first_prompt_fills_the_kickoff_placeholder_per_role() {
     let w = rig.prepare_as(&AgentProfile::claude_code(), AgentRole::Worker);
     assert_eq!(w.command[0], "claude");
     assert!(
-        w.command[1].starts_with("Start ticket DEMO-1 now"),
+        w.command[3].starts_with("Start ticket DEMO-1 now"),
         "{:?}",
         w.command
     );
-    assert!(w.command[1].contains("`finished`"));
+    assert!(w.command[3].contains("`finished`"));
     let r = rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
     assert_eq!(&r.command[..3], ["claude", "--permission-mode", "dontAsk"]);
     assert!(
@@ -280,7 +280,7 @@ fn the_check_command_reaches_the_instructions_the_kickoff_and_both_allow_lists()
     rig.brief.check_command = Some("cargo xtask verify".to_owned());
     let w = rig.prepare_as(&AgentProfile::claude_code(), AgentRole::Worker);
     assert!(
-        w.command[1].contains("Run `cargo xtask verify`"),
+        w.command[3].contains("Run `cargo xtask verify`"),
         "{:?}",
         w.command
     );

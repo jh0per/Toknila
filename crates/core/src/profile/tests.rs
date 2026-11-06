@@ -154,7 +154,7 @@ fn the_catalog_reports_bad_files_and_still_lists_the_good_ones() {
     assert_eq!(c.profiles.len(), 5, "four built-ins and good");
     assert_eq!(
         c.profiles[1].profile.command,
-        ["claude", "{kickoff}"],
+        ["claude", "--permission-mode", "acceptEdits", "{kickoff}"],
         "no override"
     );
     let got: Vec<(&str, u32, u32)> = c
@@ -180,7 +180,10 @@ fn the_built_in_profiles_launch_what_they_say() {
         AgentProfile::sim().command.is_empty(),
         "sim starts no process"
     );
-    assert_eq!(AgentProfile::claude_code().command, ["claude", "{kickoff}"]);
+    assert_eq!(
+        AgentProfile::claude_code().command,
+        ["claude", "--permission-mode", "acceptEdits", "{kickoff}"]
+    );
     let claude = AgentProfile::claude_code();
     assert!(claude.mcp.enabled && claude.hooks.enabled);
     assert_eq!(claude.mcp.config_flag.as_deref(), Some("--mcp-config"));
@@ -246,6 +249,7 @@ fn the_built_in_claude_profiles_pass_the_kickoff_and_the_reviewer_cannot_ask() {
         reviewer.command,
         ["claude", "--permission-mode", "dontAsk", "{kickoff}"]
     );
+    assert!(worker.command.iter().any(|a| a == "acceptEdits"));
     assert!(!worker.command.iter().any(|a| a == "dontAsk"));
 }
 
