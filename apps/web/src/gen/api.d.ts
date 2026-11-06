@@ -904,6 +904,12 @@ export interface components {
         /** @description How the terminal output of an agent is kept and shown. */
         OutputRules: {
             /**
+             * Format: int64
+             * @description Size at which a run's log file is rotated to `<run>.log.1`, in bytes.
+             * @default 20971520
+             */
+            max_log_bytes: number;
+            /**
              * Format: int32
              * @description Lines of output kept per run.
              * @default 10000

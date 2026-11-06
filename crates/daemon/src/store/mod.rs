@@ -4,7 +4,9 @@
 //! and appends its events to the `events` journal; either both land or neither does. Committed
 //! events are then published to subscribers (the WebSocket stream).
 
+mod backup;
 mod codec;
+mod error;
 mod external;
 mod notes;
 mod ports;
@@ -27,24 +29,8 @@ use toknila_core::events::DomainEvent;
 use toknila_core::{Actor, Timestamp};
 
 pub use codec::Repo;
+pub use error::StoreError;
 pub use toknila_api_types::EventRecord;
-
-/// Store failures.
-#[derive(Debug, thiserror::Error)]
-pub enum StoreError {
-    #[error("sqlite: {0}")]
-    Sqlite(#[from] rusqlite::Error),
-    #[error("json: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("database is newer than this build (schema {found}, supported {supported})")]
-    TooNew { found: i64, supported: i64 },
-    #[error("command panicked: {0}")]
-    Panicked(String),
-    #[error("store task stopped")]
-    Closed,
-    #[error("{0}")]
-    Corrupt(String),
-}
 
 /// A command's view of the database: its transaction plus the events it emits.
 pub struct WriteTx<'c> {
@@ -144,7 +130,9 @@ impl Store {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "FULL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
-        migrate(&mut conn)?;
+        let backups = path.parent().unwrap_or(Path::new("")).join("backups");
+        backup::check(&conn, path, &backups)?;
+        migrate(&mut conn, &backups)?;
         Ok(Self::spawn(conn, path.to_owned()))
     }
 
@@ -330,13 +318,17 @@ fn panic_message(p: &Box<dyn std::any::Any + Send>) -> String {
 /// Current schema version this build writes.
 pub const SCHEMA_VERSION: i64 = schema::MIGRATIONS.len() as i64;
 
-fn migrate(conn: &mut Connection) -> Result<(), StoreError> {
+fn migrate(conn: &mut Connection, backups: &Path) -> Result<(), StoreError> {
     let found: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
     if found > SCHEMA_VERSION {
         return Err(StoreError::TooNew {
             found,
             supported: SCHEMA_VERSION,
         });
+    }
+    // A fresh database (version 0) has nothing to lose; an older one is copied first.
+    if found > 0 && found < SCHEMA_VERSION {
+        backup::before_migration(conn, backups, found)?;
     }
     for (i, sql) in schema::MIGRATIONS
         .iter()

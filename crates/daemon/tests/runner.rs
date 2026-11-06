@@ -210,6 +210,57 @@ fn after_a_restart_the_newest_log_is_the_scrollback_and_how_it_ended_is_unknown(
 }
 
 #[test]
+fn a_log_that_passes_its_cap_rotates_and_the_scrollback_and_offsets_stay_whole() {
+    let mut rig = Rig::new();
+    let steps: Vec<String> = (1..=200)
+        .flat_map(|i| {
+            [
+                "print".to_owned(),
+                format!("line-{i:03}-{}", "x".repeat(40)),
+            ]
+        })
+        .collect();
+    let steps: Vec<&str> = steps.iter().map(String::as_str).collect();
+    rig.profile("fake", &steps, "[output]\nmax_log_bytes = 2000\n");
+    let started = rig.start("fake");
+    rig.wait_end();
+    let live = rig.runners.read(rig.ticket, None).expect("live");
+    assert!(
+        live.bytes.windows(8).any(|w| w == b"line-200"),
+        "the tail is served"
+    );
+    assert_eq!(
+        live.offset, 0,
+        "the scrollback holds the whole run: its offsets are the run's"
+    );
+    assert_eq!(live.end, live.bytes.len() as u64);
+    let log = log_of(rig.dir.path(), rig.ticket, &started.run.id.to_string());
+    let rotated = PathBuf::from(format!("{}.1", log.display()));
+    let (now, before) = (
+        std::fs::read(&log).expect("log"),
+        std::fs::read(&rotated).expect("rotated log"),
+    );
+    assert!(
+        now.len() <= 2000 && before.len() <= 2000,
+        "{} {}",
+        now.len(),
+        before.len()
+    );
+    assert!(now.windows(8).any(|w| w == b"line-200"));
+    // A restarted daemon sees the same end offset and the same tail, from the two files.
+    let (fresh, _rx) = Runners::new(rig.dir.path().join("runs"), rig.dir.path().join("profiles"));
+    let after = fresh.read(rig.ticket, None).expect("log on disk");
+    assert_eq!(after.end, live.end);
+    assert!(after.bytes.windows(8).any(|w| w == b"line-200"));
+    assert_eq!(
+        after.offset + after.bytes.len() as u64,
+        after.end,
+        "the offset of the tail matches the run's offsets"
+    );
+    assert_eq!(&live.bytes[(after.offset as usize)..], &after.bytes[..]);
+}
+
+#[test]
 fn a_missing_profile_a_sim_profile_and_a_missing_program_are_refused_with_a_typed_error() {
     let rig = Rig::new();
     assert_eq!(

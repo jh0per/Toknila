@@ -188,8 +188,9 @@ impl Runners {
         };
         let wiring = wiring::prepare(profile, &cx)?;
         let process = pty::spawn(profile, Path::new(&req.dir), &wiring)?;
-        let log = logs::create(&self.root, req.ticket, run.id)
-            .map_err(|e| RunnerError::Spawn(format!("cannot create the run log: {e}")))?;
+        let log =
+            logs::RunLog::create(&self.root, req.ticket, run.id, profile.output.max_log_bytes)
+                .map_err(|e| RunnerError::Spawn(format!("cannot create the run log: {e}")))?;
         let lines = usize::try_from(profile.output.scrollback_lines).unwrap_or(usize::MAX);
         Active::launch(
             run.clone(),
