@@ -133,6 +133,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_profiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects": {
         parameters: {
             query?: never;
@@ -487,6 +503,34 @@ export interface components {
             thread: string;
         };
         /**
+         * @description How to launch an agent and in which role. A new agent is a new profile file, not new code.
+         *     The working directory is not part of it: the ship supplies it at launch.
+         */
+        AgentProfile: {
+            /**
+             * @description Program and arguments, never a shell string. Empty only for the simulated profile, which
+             *     starts no process: a person sends its events from the CLI.
+             */
+            command: string[];
+            /** @description Extra environment of the process. */
+            env: {
+                [key: string]: string;
+            };
+            hooks: components["schemas"]["HookWiring"];
+            /** @description Instructions file the agent reads, relative to its working directory. */
+            instructions_file?: string | null;
+            mcp: components["schemas"]["McpWiring"];
+            name: string;
+            nudge: components["schemas"]["Nudge"];
+            output: components["schemas"]["OutputRules"];
+            role: components["schemas"]["AgentRole"];
+        };
+        /**
+         * @description What an agent profile is for.
+         * @enum {string}
+         */
+        AgentRole: "worker" | "reviewer" | "release";
+        /**
          * @description How an artifact body is to be read.
          * @enum {string}
          */
@@ -636,6 +680,44 @@ export interface components {
             seq: number;
         };
         /**
+         * @description How an agent reports through hooks, a second event source. A placeholder until the MCP ticket
+         *     fills it: nothing reads it yet.
+         */
+        HookWiring: {
+            /**
+             * @description Whether the launcher wires hooks into this agent.
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * @description Flag of the agent's command that takes the path of a generated hook settings file.
+             * @default null
+             */
+            settings_flag: string | null;
+        };
+        /** @description A profile and where it comes from. */
+        ListedProfile: {
+            /** @description File name in the profiles folder; `None` for a built-in profile. */
+            file?: string | null;
+            profile: components["schemas"]["AgentProfile"];
+        };
+        /**
+         * @description How an agent receives its MCP server (the agent event contract). A placeholder until the MCP
+         *     ticket fills it: nothing reads it yet.
+         */
+        McpWiring: {
+            /**
+             * @description Flag of the agent's command that takes the path of a generated MCP config.
+             * @default null
+             */
+            config_flag: string | null;
+            /**
+             * @description Whether the launcher wires the MCP server into this agent.
+             * @default false
+             */
+            enabled: boolean;
+        };
+        /**
          * @description Plain message, or a person's request for changes.
          * @enum {string}
          */
@@ -734,6 +816,40 @@ export interface components {
             /** @enum {string} */
             kind: "release";
         };
+        /** @description When a silent agent is nudged and how often. */
+        Nudge: {
+            /**
+             * Format: int64
+             * @description Seconds without output before a nudge.
+             * @default 300
+             */
+            idle_secs: number;
+            /**
+             * Format: int32
+             * @description Nudges sent before the ticket is blocked.
+             * @default 3
+             */
+            max_nudges: number;
+            /**
+             * @description Text sent to the agent.
+             * @default Continue, or report with the finished event.
+             */
+            message: string;
+        };
+        /** @description How the terminal output of an agent is kept and shown. */
+        OutputRules: {
+            /**
+             * Format: int32
+             * @description Lines of output kept per run.
+             * @default 10000
+             */
+            scrollback_lines: number;
+            /**
+             * @description Remove ANSI escape sequences from the text kept for search and summaries.
+             * @default true
+             */
+            strip_ansi: boolean;
+        };
         /** @description `PATCH /v1/tickets/{ticket}/subtasks/{position}`. */
         PatchSubtask: {
             done?: boolean | null;
@@ -757,6 +873,22 @@ export interface components {
          * @enum {string}
          */
         Phase: "design" | "implement";
+        /** @description The profiles folder, the usable profiles and the files that were not. */
+        ProfileList: {
+            /** @description Where profile files go. */
+            folder: string;
+            problems: components["schemas"]["ProfileProblem"][];
+            profiles: components["schemas"]["ListedProfile"][];
+        };
+        /** @description A profile file that cannot be used. `line` and `column` are 1-based. */
+        ProfileProblem: {
+            /** Format: int32 */
+            column: number;
+            file: string;
+            /** Format: int32 */
+            line: number;
+            message: string;
+        };
         /** @description One product: one monorepo, its chains, depot and settings. */
         Project: {
             default_profile: string;
@@ -1361,6 +1493,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventRecord"][];
+                };
+            };
+        };
+    };
+    list_profiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileList"];
                 };
             };
         };

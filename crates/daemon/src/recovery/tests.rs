@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -32,6 +33,7 @@ async fn seeded() -> (tempfile::TempDir, Store) {
         store: store.clone(),
         token: "t".into(),
         shutdown: Arc::new(Notify::new()),
+        profiles: PathBuf::new(),
     });
     post(&app, "/v1/projects", json!({ "key": "DEMO" })).await;
     let toml = include_str!("../../../../examples/demo.toml");

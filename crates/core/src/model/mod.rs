@@ -19,7 +19,7 @@ pub use ids::{
     ThreadVersionId, TicketId,
 };
 pub use keys::{KeyError, ProjectKey, TicketKey};
-pub use profile::{AgentProfile, AgentRole, ProfileKind};
+pub use profile::{AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules};
 pub use project::{Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};

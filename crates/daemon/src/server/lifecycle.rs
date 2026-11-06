@@ -70,6 +70,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         store,
         token: token.clone(),
         shutdown: shutdown.clone(),
+        profiles: paths.profiles(),
     };
 
     let listener = match reuse.as_ref().map(|i| i.port).filter(|p| *p != 0) {

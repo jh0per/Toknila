@@ -1,0 +1,93 @@
+{
+  "profiles": [
+    {
+      "profile": {
+        "name": "sim",
+        "role": "worker",
+        "command": [],
+        "env": {},
+        "instructions_file": null,
+        "mcp": {
+          "enabled": false,
+          "config_flag": null
+        },
+        "hooks": {
+          "enabled": false,
+          "settings_flag": null
+        },
+        "output": {
+          "strip_ansi": true,
+          "scrollback_lines": 10000
+        },
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        }
+      },
+      "file": null
+    },
+    {
+      "profile": {
+        "name": "claude-code",
+        "role": "worker",
+        "command": [
+          "claude"
+        ],
+        "env": {},
+        "instructions_file": "CLAUDE.md",
+        "mcp": {
+          "enabled": false,
+          "config_flag": "--mcp-config"
+        },
+        "hooks": {
+          "enabled": false,
+          "settings_flag": "--settings"
+        },
+        "output": {
+          "strip_ansi": true,
+          "scrollback_lines": 10000
+        },
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        }
+      },
+      "file": null
+    },
+    {
+      "profile": {
+        "name": "my-agent",
+        "role": "reviewer",
+        "command": [
+          "my-agent",
+          "--headless"
+        ],
+        "env": {
+          "MY_AGENT_MODE": "headless"
+        },
+        "instructions_file": "AGENTS.md",
+        "mcp": {
+          "enabled": true,
+          "config_flag": "--mcp-config"
+        },
+        "hooks": {
+          "enabled": false,
+          "settings_flag": null
+        },
+        "output": {
+          "strip_ansi": true,
+          "scrollback_lines": 10000
+        },
+        "nudge": {
+          "idle_secs": 60,
+          "max_nudges": 1,
+          "message": "Report, please."
+        }
+      },
+      "file": "my-agent.toml"
+    }
+  ],
+  "problems": []
+}

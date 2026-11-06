@@ -468,6 +468,25 @@
         }
       }
     },
+    "/profiles": {
+      "get": {
+        "tags": [
+          "profiles"
+        ],
+        "operationId": "list_profiles",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects": {
       "get": {
         "tags": [
@@ -1854,6 +1873,73 @@
         ],
         "description": "One report from the agent working on a ticket."
       },
+      "AgentProfile": {
+        "type": "object",
+        "description": "How to launch an agent and in which role. A new agent is a new profile file, not new code.\nThe working directory is not part of it: the ship supplies it at launch.",
+        "required": [
+          "name",
+          "role",
+          "command",
+          "env",
+          "mcp",
+          "hooks",
+          "output",
+          "nudge"
+        ],
+        "properties": {
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Program and arguments, never a shell string. Empty only for the simulated profile, which\nstarts no process: a person sends its events from the CLI."
+          },
+          "env": {
+            "type": "object",
+            "description": "Extra environment of the process.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "hooks": {
+            "$ref": "#/components/schemas/HookWiring"
+          },
+          "instructions_file": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Instructions file the agent reads, relative to its working directory."
+          },
+          "mcp": {
+            "$ref": "#/components/schemas/McpWiring"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nudge": {
+            "$ref": "#/components/schemas/Nudge"
+          },
+          "output": {
+            "$ref": "#/components/schemas/OutputRules"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AgentRole"
+          }
+        }
+      },
+      "AgentRole": {
+        "type": "string",
+        "description": "What an agent profile is for.",
+        "enum": [
+          "worker",
+          "reviewer",
+          "release"
+        ]
+      },
       "ArtifactFormat": {
         "type": "string",
         "description": "How an artifact body is to be read.",
@@ -2351,6 +2437,65 @@
           }
         }
       },
+      "HookWiring": {
+        "type": "object",
+        "description": "How an agent reports through hooks, a second event source. A placeholder until the MCP ticket\nfills it: nothing reads it yet.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the launcher wires hooks into this agent.",
+            "default": false
+          },
+          "settings_flag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Flag of the agent's command that takes the path of a generated hook settings file.",
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      },
+      "ListedProfile": {
+        "type": "object",
+        "description": "A profile and where it comes from.",
+        "required": [
+          "profile"
+        ],
+        "properties": {
+          "file": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "File name in the profiles folder; `None` for a built-in profile."
+          },
+          "profile": {
+            "$ref": "#/components/schemas/AgentProfile"
+          }
+        }
+      },
+      "McpWiring": {
+        "type": "object",
+        "description": "How an agent receives its MCP server (the agent event contract). A placeholder until the MCP\nticket fills it: nothing reads it yet.",
+        "properties": {
+          "config_flag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Flag of the agent's command that takes the path of a generated MCP config.",
+            "default": null
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the launcher wires the MCP server into this agent.",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
       "MessageKind": {
         "type": "string",
         "description": "Plain message, or a person's request for changes.",
@@ -2733,6 +2878,51 @@
         ],
         "description": "A node of the chain graph: a ticket or a release milestone."
       },
+      "Nudge": {
+        "type": "object",
+        "description": "When a silent agent is nudged and how often.",
+        "properties": {
+          "idle_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds without output before a nudge.",
+            "default": 300,
+            "minimum": 0
+          },
+          "max_nudges": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Nudges sent before the ticket is blocked.",
+            "default": 3,
+            "minimum": 0
+          },
+          "message": {
+            "type": "string",
+            "description": "Text sent to the agent.",
+            "default": "Continue, or report with the finished event."
+          }
+        },
+        "additionalProperties": false
+      },
+      "OutputRules": {
+        "type": "object",
+        "description": "How the terminal output of an agent is kept and shown.",
+        "properties": {
+          "scrollback_lines": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines of output kept per run.",
+            "default": 10000,
+            "minimum": 0
+          },
+          "strip_ansi": {
+            "type": "boolean",
+            "description": "Remove ANSI escape sequences from the text kept for search and summaries.",
+            "default": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PatchSubtask": {
         "type": "object",
         "description": "`PATCH /v1/tickets/{ticket}/subtasks/{position}`.",
@@ -2807,6 +2997,61 @@
           "design",
           "implement"
         ]
+      },
+      "ProfileList": {
+        "type": "object",
+        "description": "The profiles folder, the usable profiles and the files that were not.",
+        "required": [
+          "folder",
+          "profiles",
+          "problems"
+        ],
+        "properties": {
+          "folder": {
+            "type": "string",
+            "description": "Where profile files go."
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileProblem"
+            }
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListedProfile"
+            }
+          }
+        }
+      },
+      "ProfileProblem": {
+        "type": "object",
+        "description": "A profile file that cannot be used. `line` and `column` are 1-based.",
+        "required": [
+          "file",
+          "line",
+          "column",
+          "message"
+        ],
+        "properties": {
+          "column": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          }
+        }
       },
       "Project": {
         "type": "object",

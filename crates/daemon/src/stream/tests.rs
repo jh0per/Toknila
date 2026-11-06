@@ -1,4 +1,5 @@
 use std::net::Ipv4Addr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -59,6 +60,7 @@ async fn reconnect_gets_exactly_the_missed_events() {
         store: store.clone(),
         token: "tkn".into(),
         shutdown: Arc::new(Notify::new()),
+        profiles: PathBuf::new(),
     };
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await

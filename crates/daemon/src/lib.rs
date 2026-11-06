@@ -3,6 +3,7 @@
 pub mod http;
 pub mod info;
 pub mod paths;
+pub mod profiles;
 pub mod recovery;
 pub mod server;
 pub mod store;

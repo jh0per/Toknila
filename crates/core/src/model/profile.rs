@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 /// What an agent profile is for.
@@ -10,34 +12,137 @@ pub enum AgentRole {
     Release,
 }
 
-/// How a profile runs its agent. Phase 0 has only `sim`, which starts no process: a person sends
-/// the agent's events from the CLI.
+/// How an agent receives its MCP server (the agent event contract). A placeholder until the MCP
+/// ticket fills it: nothing reads it yet.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ProfileKind {
-    Sim,
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct McpWiring {
+    /// Whether the launcher wires the MCP server into this agent.
+    pub enabled: bool,
+    /// Flag of the agent's command that takes the path of a generated MCP config.
+    pub config_flag: Option<String>,
 }
 
-/// How to launch an agent and in which role. A new agent is a new profile, not new code.
+/// How an agent reports through hooks, a second event source. A placeholder until the MCP ticket
+/// fills it: nothing reads it yet.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct HookWiring {
+    /// Whether the launcher wires hooks into this agent.
+    pub enabled: bool,
+    /// Flag of the agent's command that takes the path of a generated hook settings file.
+    pub settings_flag: Option<String>,
+}
+
+/// How the terminal output of an agent is kept and shown.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct OutputRules {
+    /// Remove ANSI escape sequences from the text kept for search and summaries.
+    pub strip_ansi: bool,
+    /// Lines of output kept per run.
+    pub scrollback_lines: u32,
+}
+
+impl Default for OutputRules {
+    fn default() -> Self {
+        Self {
+            strip_ansi: true,
+            scrollback_lines: 10_000,
+        }
+    }
+}
+
+/// When a silent agent is nudged and how often.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Nudge {
+    /// Seconds without output before a nudge.
+    pub idle_secs: u64,
+    /// Nudges sent before the ticket is blocked.
+    pub max_nudges: u32,
+    /// Text sent to the agent.
+    pub message: String,
+}
+
+impl Default for Nudge {
+    fn default() -> Self {
+        Self {
+            idle_secs: 300,
+            max_nudges: 3,
+            message: "Continue, or report with the finished event.".to_owned(),
+        }
+    }
+}
+
+/// How to launch an agent and in which role. A new agent is a new profile file, not new code.
+/// The working directory is not part of it: the ship supplies it at launch.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentProfile {
     pub name: String,
     pub role: AgentRole,
-    pub kind: ProfileKind,
+    /// Program and arguments, never a shell string. Empty only for the simulated profile, which
+    /// starts no process: a person sends its events from the CLI.
+    pub command: Vec<String>,
+    /// Extra environment of the process.
+    pub env: BTreeMap<String, String>,
+    /// Instructions file the agent reads, relative to its working directory.
+    pub instructions_file: Option<String>,
+    pub mcp: McpWiring,
+    pub hooks: HookWiring,
+    pub output: OutputRules,
+    pub nudge: Nudge,
 }
 
 impl AgentProfile {
     /// Name of the built-in simulated profile.
     pub const SIM: &str = "sim";
+    /// Name of the built-in Claude Code profile.
+    pub const CLAUDE_CODE: &str = "claude-code";
+
+    /// A profile that runs `command`, with defaults everywhere else.
+    pub fn new(name: &str, role: AgentRole, command: Vec<String>) -> Self {
+        Self {
+            name: name.to_owned(),
+            role,
+            command,
+            env: BTreeMap::new(),
+            instructions_file: None,
+            mcp: McpWiring::default(),
+            hooks: HookWiring::default(),
+            output: OutputRules::default(),
+            nudge: Nudge::default(),
+        }
+    }
 
     /// The built-in simulated profile.
     pub fn sim() -> Self {
+        Self::new(Self::SIM, AgentRole::Worker, Vec::new())
+    }
+
+    /// The built-in profile that launches Claude Code. Its MCP and hook wiring is filled in by
+    /// the MCP ticket.
+    pub fn claude_code() -> Self {
         Self {
-            name: Self::SIM.to_owned(),
-            role: AgentRole::Worker,
-            kind: ProfileKind::Sim,
+            instructions_file: Some("CLAUDE.md".to_owned()),
+            mcp: McpWiring {
+                enabled: false,
+                config_flag: Some("--mcp-config".to_owned()),
+            },
+            hooks: HookWiring {
+                enabled: false,
+                settings_flag: Some("--settings".to_owned()),
+            },
+            ..Self::new(
+                Self::CLAUDE_CODE,
+                AgentRole::Worker,
+                vec!["claude".to_owned()],
+            )
         }
     }
 }
