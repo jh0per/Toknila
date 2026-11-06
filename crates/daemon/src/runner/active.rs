@@ -16,6 +16,7 @@ use toknila_core::{ProcessExit, Run, TicketId};
 use super::Chunk;
 use super::pty::{self, Spawned};
 use super::scrollback::Scrollback;
+use super::tokens::AgentTokens;
 
 /// How long the watcher waits for the last output after the process ended.
 const DRAIN: Duration = Duration::from_secs(2);
@@ -25,6 +26,13 @@ struct State {
     scrollback: Scrollback,
     /// Set once, when the process has ended and its output is complete.
     exit: Option<ProcessExit>,
+}
+
+/// What a run reports to: the stream's wake-ups, the end of the process, the agent tokens.
+pub(super) struct Channels {
+    pub wake: broadcast::Sender<TicketId>,
+    pub ended: mpsc::UnboundedSender<RunEnded>,
+    pub tokens: Arc<AgentTokens>,
 }
 
 /// A run, live or finished.
@@ -54,9 +62,13 @@ impl Active {
         process: Spawned,
         log: File,
         lines: usize,
-        wake: broadcast::Sender<TicketId>,
-        ended: mpsc::UnboundedSender<RunEnded>,
+        channels: Channels,
     ) -> Result<Arc<Active>, RunnerError> {
+        let Channels {
+            wake,
+            ended,
+            tokens,
+        } = channels;
         let Spawned {
             reader,
             writer,
@@ -107,6 +119,8 @@ impl Active {
                         let _ = drained.recv_timeout(DRAIN);
                         drop(master);
                     }
+                    // The run is over: its token stops working before anyone hears about the end.
+                    tokens.revoke(a.run.id);
                     a.finish(exit, &wake, &ended);
                 })
         };

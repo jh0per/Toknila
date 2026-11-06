@@ -9,11 +9,11 @@
 //! [env]
 //! MY_AGENT_MODE = "headless"
 //!
-//! [mcp]                                 # wiring filled in by the MCP ticket
+//! [mcp]                                 # the runner writes a config file and passes its path with the flag
 //! enabled = false
 //! config_flag = "--mcp-config"
 //!
-//! [hooks]                               # wiring filled in by the MCP ticket
+//! [hooks]                               # the runner writes a settings file and passes its path with the flag
 //! enabled = false
 //! settings_flag = "--settings"
 //!

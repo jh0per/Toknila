@@ -12,8 +12,8 @@ pub enum AgentRole {
     Release,
 }
 
-/// How an agent receives its MCP server (the agent event contract). A placeholder until the MCP
-/// ticket fills it: nothing reads it yet.
+/// How an agent receives its MCP server (the agent event contract): the runner writes a config
+/// file under the data home and passes its path with `config_flag`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -24,8 +24,8 @@ pub struct McpWiring {
     pub config_flag: Option<String>,
 }
 
-/// How an agent reports through hooks, a second event source. A placeholder until the MCP ticket
-/// fills it: nothing reads it yet.
+/// How an agent reports through hooks, a second event source: the runner writes a settings file
+/// under the data home and passes its path with `settings_flag`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -125,17 +125,17 @@ impl AgentProfile {
         Self::new(Self::SIM, AgentRole::Worker, Vec::new())
     }
 
-    /// The built-in profile that launches Claude Code. Its MCP and hook wiring is filled in by
-    /// the MCP ticket.
+    /// The built-in profile that launches Claude Code, with the MCP server and the hooks wired in
+    /// through `--mcp-config` and `--settings`.
     pub fn claude_code() -> Self {
         Self {
             instructions_file: Some("CLAUDE.md".to_owned()),
             mcp: McpWiring {
-                enabled: false,
+                enabled: true,
                 config_flag: Some("--mcp-config".to_owned()),
             },
             hooks: HookWiring {
-                enabled: false,
+                enabled: true,
                 settings_flag: Some("--settings".to_owned()),
             },
             ..Self::new(

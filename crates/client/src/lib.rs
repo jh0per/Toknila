@@ -7,9 +7,9 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_api_types::{
     ActionInput, AgentEvent, ChainDetail, ChainFile, ChainItem, EdgeInput, ErrorBody, EventRecord,
-    NewChain, NewComment, NewMessage, NewProject, NewRelease, NewSubtask, NewThread, NewTicket,
-    NewVersion, NewWildcard, PatchSubtask, PatchTicket, ProfileList, ReleaseEvent, ThreadDetail,
-    TicketDetail, TicketItem, TicketQuery, TicketThreads,
+    NewActivity, NewChain, NewComment, NewMessage, NewProject, NewRelease, NewSubtask, NewThread,
+    NewTicket, NewVersion, NewWildcard, PatchSubtask, PatchTicket, ProfileList, ReleaseEvent,
+    ThreadDetail, TicketDetail, TicketItem, TicketQuery, TicketThreads,
 };
 use toknila_core::Project;
 
@@ -324,6 +324,15 @@ impl Client {
     /// or the new card for `propose`.
     pub fn agent_event(&self, ticket: &str, e: &AgentEvent) -> ClientResult<TicketDetail> {
         self.call("POST", &format!("/tickets/{}/events", enc(ticket)), Some(e))
+    }
+
+    /// `POST /tickets/{ticket}/activity`: a sign of life from the ticket's agent.
+    pub fn activity(&self, ticket: &str, a: &NewActivity) -> ClientResult<()> {
+        self.call(
+            "POST",
+            &format!("/tickets/{}/activity", enc(ticket)),
+            Some(a),
+        )
     }
 
     // ---- journal and daemon ----

@@ -66,6 +66,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(release_action))
         .routes(routes!(list_events))
         .routes(routes!(agent_event))
+        .routes(routes!(ticket_activity))
         .routes(routes!(release_event))
         .split_for_parts();
     // Routes are nested under /v1; say so in the document.

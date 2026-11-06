@@ -1040,6 +1040,59 @@
         }
       }
     },
+    "/tickets/{ticket}/activity": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;\nnothing about the ticket changes.",
+        "operationId": "ticket_activity",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewActivity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/comments": {
       "post": {
         "tags": [
@@ -1136,6 +1189,15 @@
             }
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -2570,7 +2632,7 @@
       },
       "HookWiring": {
         "type": "object",
-        "description": "How an agent reports through hooks, a second event source. A placeholder until the MCP ticket\nfills it: nothing reads it yet.",
+        "description": "How an agent reports through hooks, a second event source: the runner writes a settings file\nunder the data home and passes its path with `settings_flag`.",
         "properties": {
           "enabled": {
             "type": "boolean",
@@ -2609,7 +2671,7 @@
       },
       "McpWiring": {
         "type": "object",
-        "description": "How an agent receives its MCP server (the agent event contract). A placeholder until the MCP\nticket fills it: nothing reads it yet.",
+        "description": "How an agent receives its MCP server (the agent event contract): the runner writes a config\nfile under the data home and passes its path with `config_flag`.",
         "properties": {
           "config_flag": {
             "type": [
@@ -2634,6 +2696,19 @@
           "message",
           "changes_requested"
         ]
+      },
+      "NewActivity": {
+        "type": "object",
+        "description": "Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook.",
+        "required": [
+          "signal"
+        ],
+        "properties": {
+          "signal": {
+            "type": "string",
+            "description": "What fired, for example `hook:stop`."
+          }
+        }
       },
       "NewChain": {
         "type": "object",

@@ -37,11 +37,11 @@
         "env": {},
         "instructions_file": "CLAUDE.md",
         "mcp": {
-          "enabled": false,
+          "enabled": true,
           "config_flag": "--mcp-config"
         },
         "hooks": {
-          "enabled": false,
+          "enabled": true,
           "settings_flag": "--settings"
         },
         "output": {

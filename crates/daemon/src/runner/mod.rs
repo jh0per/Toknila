@@ -11,11 +11,13 @@ mod logs;
 mod pty;
 mod scrollback;
 mod supervise;
+mod tokens;
+mod wiring;
 mod ws;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use tokio::sync::{broadcast, mpsc};
 use toknila_app::runner::{RunEnded, RunRequest, Runner, RunnerError, Started};
@@ -23,6 +25,7 @@ use toknila_core::{AgentProfile, OutputRules, ProcessExit, Run, RunId, TicketId}
 
 use active::Active;
 pub use supervise::supervise;
+pub use tokens::{Activity, AgentTokens, Grant};
 pub use ws::stream;
 
 /// What a client sees of a ticket's output: the scrollback of its newest run.
@@ -50,6 +53,12 @@ pub struct Runners {
     /// Pings with the ticket whose output or state changed.
     wake: broadcast::Sender<TicketId>,
     ended: mpsc::UnboundedSender<RunEnded>,
+    /// One token per live run, and the agents' last signs of life.
+    tokens: Arc<AgentTokens>,
+    /// The daemon's address, known once it listens; agents get it in their environment.
+    url: OnceLock<String>,
+    /// The `toknila` binary agents run for `mcp` and `hook`; this process unless set.
+    bin: OnceLock<PathBuf>,
 }
 
 impl Runners {
@@ -67,8 +76,34 @@ impl Runners {
             active: Mutex::default(),
             wake,
             ended,
+            tokens: Arc::default(),
+            url: OnceLock::new(),
+            bin: OnceLock::new(),
         };
         (Arc::new(runners), rx)
+    }
+
+    /// The agent tokens of the live runs.
+    pub fn tokens(&self) -> &Arc<AgentTokens> {
+        &self.tokens
+    }
+
+    /// Tells runners where the daemon listens, so agents can reach it. Set once.
+    pub fn set_daemon_url(&self, url: String) {
+        let _ = self.url.set(url);
+    }
+
+    /// Sets the `toknila` binary agents run for `mcp` and `hook`. Set once.
+    pub fn set_agent_bin(&self, bin: PathBuf) {
+        let _ = self.bin.set(bin);
+    }
+
+    fn agent_bin(&self) -> PathBuf {
+        self.bin
+            .get()
+            .cloned()
+            .or_else(|| std::env::current_exe().ok())
+            .unwrap_or_else(|| PathBuf::from("toknila"))
     }
 
     /// Pings whenever a ticket's runner wrote or ended.
@@ -132,6 +167,44 @@ impl Runners {
     }
 }
 
+impl Runners {
+    /// Wires the agent, starts its process and the threads that watch it.
+    fn launch(
+        &self,
+        profile: &AgentProfile,
+        req: &RunRequest,
+        run: &Run,
+        token: &str,
+    ) -> Result<Arc<Active>, RunnerError> {
+        let dir = self.root.join(req.ticket.to_string());
+        let bin = self.agent_bin();
+        let cx = wiring::Context {
+            dir: &dir,
+            key: &req.key,
+            run: run.id,
+            token,
+            url: self.url.get().map(String::as_str),
+            bin: &bin,
+        };
+        let wiring = wiring::prepare(profile, &cx)?;
+        let process = pty::spawn(profile, Path::new(&req.dir), &wiring)?;
+        let log = logs::create(&self.root, req.ticket, run.id)
+            .map_err(|e| RunnerError::Spawn(format!("cannot create the run log: {e}")))?;
+        let lines = usize::try_from(profile.output.scrollback_lines).unwrap_or(usize::MAX);
+        Active::launch(
+            run.clone(),
+            process,
+            log,
+            lines,
+            active::Channels {
+                wake: self.wake.clone(),
+                ended: self.ended.clone(),
+                tokens: self.tokens.clone(),
+            },
+        )
+    }
+}
+
 impl Runner for Runners {
     fn start(&self, req: &RunRequest) -> Result<Started, RunnerError> {
         let profile = self.profile(&req.profile)?;
@@ -149,18 +222,17 @@ impl Runner for Runners {
             profile: profile.name.clone(),
             dir: req.dir.clone(),
         };
-        let process = pty::spawn(&profile, &req.dir)?;
-        let log = logs::create(&self.root, req.ticket, run.id)
-            .map_err(|e| RunnerError::Spawn(format!("cannot create the run log: {e}")))?;
-        let lines = usize::try_from(profile.output.scrollback_lines).unwrap_or(usize::MAX);
-        let active = Active::launch(
-            run.clone(),
-            process,
-            log,
-            lines,
-            self.wake.clone(),
-            self.ended.clone(),
-        )?;
+        let grant = Grant {
+            ticket: req.ticket,
+            run: run.id,
+        };
+        let token = self
+            .tokens
+            .issue(grant, crate::server::now())
+            .map_err(RunnerError::Spawn)?;
+        let active = self
+            .launch(&profile, req, &run, &token)
+            .inspect_err(|_| self.tokens.revoke(run.id))?;
         map.insert(req.ticket, active);
         Ok(Started { run, reused: false })
     }

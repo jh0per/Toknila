@@ -177,6 +177,14 @@ pub struct EventQuery {
     pub limit: Option<usize>,
 }
 
+/// Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct NewActivity {
+    /// What fired, for example `hook:stop`.
+    pub signal: String,
+}
+
 impl From<(ReleaseId, TicketId)> for ReleaseMember {
     fn from((release, ticket): (ReleaseId, TicketId)) -> Self {
         Self { release, ticket }

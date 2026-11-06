@@ -164,10 +164,10 @@ fn the_built_in_profiles_launch_what_they_say() {
         "sim starts no process"
     );
     assert_eq!(AgentProfile::claude_code().command, ["claude"]);
-    assert!(
-        !AgentProfile::claude_code().mcp.enabled,
-        "wiring is a placeholder until the MCP ticket"
-    );
+    let claude = AgentProfile::claude_code();
+    assert!(claude.mcp.enabled && claude.hooks.enabled);
+    assert_eq!(claude.mcp.config_flag.as_deref(), Some("--mcp-config"));
+    assert_eq!(claude.hooks.settings_flag.as_deref(), Some("--settings"));
 }
 
 /// Profile JSON is read by the CLI, the web page and the launcher; changes must be deliberate.

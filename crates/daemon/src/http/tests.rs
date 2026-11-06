@@ -12,6 +12,7 @@ use tower::ServiceExt;
 use crate::server::{AppState, router};
 use crate::store::Store;
 
+mod agent_tokens;
 mod profiles;
 mod ships;
 mod threads;
@@ -21,6 +22,7 @@ const TOKEN: &str = "test-token";
 struct Api {
     _dir: tempfile::TempDir,
     app: axum::Router,
+    runners: Arc<crate::runner::Runners>,
 }
 
 impl Api {
@@ -35,28 +37,38 @@ impl Api {
         if let Some(yard) = yard {
             store = store.with_shipyard(yard);
         }
+        let (runners, _) =
+            crate::runner::Runners::new(dir.path().join("runs"), dir.path().join("profiles"));
         let state = AppState {
             store,
             token: TOKEN.into(),
             shutdown: Arc::new(Notify::new()),
             profiles: dir.path().join("profiles"),
-            runners: crate::runner::Runners::new(
-                dir.path().join("runs"),
-                dir.path().join("profiles"),
-            )
-            .0,
+            runners: runners.clone(),
         };
         Self {
             _dir: dir,
             app: router(state),
+            runners,
         }
     }
 
     async fn call(&self, method: Method, uri: &str, body: Option<Value>) -> (StatusCode, Value) {
+        self.call_with(TOKEN, method, uri, body).await
+    }
+
+    /// Like [`Api::call`] with another bearer token.
+    async fn call_with(
+        &self,
+        token: &str,
+        method: Method,
+        uri: &str,
+        body: Option<Value>,
+    ) -> (StatusCode, Value) {
         let mut req = Request::builder()
             .method(method)
             .uri(uri)
-            .header("authorization", format!("Bearer {TOKEN}"));
+            .header("authorization", format!("Bearer {token}"));
         let body = match body {
             Some(v) => {
                 req = req.header("content-type", "application/json");
@@ -710,6 +722,7 @@ async fn openapi_describes_every_route() {
             "/tickets",
             "/tickets/{ticket}",
             "/tickets/{ticket}/actions/{action}",
+            "/tickets/{ticket}/activity",
             "/tickets/{ticket}/comments",
             "/tickets/{ticket}/events",
             "/tickets/{ticket}/runner/input",
