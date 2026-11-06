@@ -40,6 +40,8 @@
         "role": "worker",
         "command": [
           "claude",
+          "--permission-mode",
+          "acceptEdits",
           "{kickoff}"
         ],
         "env": {},

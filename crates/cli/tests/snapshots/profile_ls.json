@@ -48,6 +48,8 @@
       "profile": {
         "command": [
           "claude",
+          "--permission-mode",
+          "acceptEdits",
           "{kickoff}"
         ],
         "env": {},
