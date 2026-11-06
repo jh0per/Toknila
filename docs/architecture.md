@@ -55,9 +55,41 @@ progress, where a chain stopped) are never stored, here or in a client.
 ## Agent profiles
 
 A profile says how to launch one agent: `command` (an argv list, never a shell string), `env`,
-`role` (`worker`, `reviewer` or `release`), `instructions_file`, `instructions_flag`, `mcp` and `hooks` wiring, `output`
-rules and `nudge` thresholds. The working directory is not in it: the ship supplies it at launch.
+`role` (`worker`, `reviewer` or `release`), `instructions_file`, `instructions_flag`, `mcp` and `hooks` wiring,
+`permissions` (allow rules), `output` rules and `nudge` thresholds. The working directory is not in it: the ship supplies it at launch.
 A new agent is a new file, not new code.
+
+- **First prompt.** An agent that starts at an empty prompt waits for someone to tell it to
+  begin. A `{kickoff}` placeholder in `command` (a whole element, or part of one such as
+  `--prompt={kickoff}`) is replaced at launch by the first prompt of the run's role; a profile
+  without it starts the agent silent, as before. A placeholder in the argv, not a field, because
+  agent CLIs differ in how they take a first prompt (a positional argument, a flag), and the
+  profile author knows which; one field would need a second knob for the position, and the
+  argv already is that knob. Core owns the text (`toknila_core::instructions::kickoff`): the
+  worker is told to read its instructions, work the card, commit its work on the branch, call
+  `finished` (and to run the project's check command, when it has one); the reviewer, to review
+  and call `review_verdict` once. The text is one line; the details stay in the instructions
+  file. `AgentProfile::argv` fills the placeholder.
+- **Permissions.** `[permissions] allow = [...]` lists rules in the agent's own syntax; the
+  runner writes them into the generated `settings.json` (`permissions.allow`), next to the hooks,
+  and the file is passed by `hooks.settings_flag`. A rule that contains `{check_command}` applies
+  only when the project has a check command and has it in place (`Permissions::rules`).
+  `claude-code` allows read-only git, `git add` and `git commit`, the check command and the
+  `toknila` MCP server. `claude-code-reviewer` runs with `--permission-mode dontAsk` (nobody can
+  answer its prompts, so it may do what the list says and nothing else) and allows read-only
+  git (`status`, `diff`, `log`, `show`, `merge-base`, `rev-parse`), the check command and the
+  filters a check is piped through (`grep`, `head`, `tail`, `wc`), plus the MCP server. Syntax,
+  from the Claude Code permissions page (code.claude.com/docs/en/permissions): `Bash(git diff *)`
+  matches `git diff` and `git diff <anything>` (the space before the trailing `*` is part of the
+  rule); a compound command (`&&`, `||`, `;`, `|`, `&`) runs without a prompt only when **every**
+  part is allowed, which is why the reviewer's `cargo ... | tail` was denied in the first real run
+  and why the filters are listed; `mcp__toknila` allows every tool of that MCP server. Allow-list
+  and mode are set with documented flags and settings only (`--permission-mode`, `--settings`
+  with `permissions.allow`).
+- **Environment.** The agent's process gets the daemon's environment minus `CLAUDECODE` and
+  `CLAUDE_CODE_*` (they describe the session that started the daemon: the child-session marker
+  turns transcript saving off), unless the profile's own `env` sets the variable
+  (`AgentProfile::inherited_to_drop`).
 
 - Built in: `sim` (starts no process; a person sends its events with `tok sim`) and `claude-code`
   (launches `claude` with the MCP server and the hooks wired in, see "Agent access" below), and
@@ -133,8 +165,9 @@ Accept does not move a card straight to Merged: the work has to land in the proj
   merge and the host answers at once. The accept's HTTP answer is the committed state (merging);
   the outcome follows on the stream.
 - **Reasons.** `merge_conflict` (details name the conflicting files), `base_checkout_dirty`
-  (names the path of the checkout and what to do) and `merge_failed` (git missing or older than
-  2.38, a branch missing, the base kept moving). **Unblock retries the merge**; the person or the
+  (names the path of the checkout and what to do), `ship_uncommitted` and `ship_empty` (see
+  [The uncommitted-ship guard](#the-uncommitted-ship-guard)) and `merge_failed` (git missing or
+  older than 2.38, a branch missing, the base kept moving). **Unblock retries the merge**; the person or the
   agent resolves a conflict on the ship first (merge the base branch into it, fix, commit).
   A daemon restart while a card is merging queues the merge again (`merges_resumed` in the
   recovery report); repeating a merge that landed is harmless (`UpToDate`).
@@ -155,6 +188,29 @@ Accept does not move a card straight to Merged: the work has to land in the proj
 - **Dependents** start after the merge landed, and a ship is made with `git worktree add -b
   <branch> <path> <base>`, so it branches from the new base tip.
 - Limit: a `cancel` that races a running merge cannot stop git; the merge may still land.
+
+### The uncommitted-ship guard
+
+Work that is not in a commit never reaches the base branch or a pull request, so two places look
+at the ship before trusting it. Core decides (`toknila_core::guard`: `ShipState` is what the host
+saw, `judge` gives `ShipProblem::Uncommitted { files }` or `Empty`; changes come first, since
+committing them fixes both); the host looks (`Shipyard::inspect`, `GitShipyard`: `git status
+--porcelain=v1 -z --untracked-files=all`, which lists tracked changes and untracked files and
+skips ignored ones, and `git rev-list --count <start>..HEAD`, with `<start>` the ship's starting
+point, `origin/<base>` in pull-request mode). Git never runs inside a transaction.
+
+- **`finished`.** The agent route reads the ticket's ship in a read, looks at it off the store
+  thread (`Store::guard_ship`), and only then runs the command. A ship with uncommitted changes or
+  no commit of its own answers `409` with a text that tells the agent to commit and call
+  `finished` again (the MCP tool returns it as an error); the card stays Running. A ticket without
+  a ship (sim, a project without a repository) is not checked.
+- **Accept, defence in depth.** `merges::run` looks again in the `Merge` effect, before the
+  merger runs, whenever the step would push or merge (a local merge, or opening the pull request;
+  not while an already open pull request is only watched). Dirty is Blocked `ship_uncommitted`
+  (`files` names them), nothing ahead is Blocked `ship_empty`; nothing was pushed, opened or
+  merged. Both are merge reasons: **Unblock looks again** and merges once the work is committed.
+  A yard that cannot look (git missing) is `merge_failed`. Both reasons are `blocked` inbox items
+  with readable text in the web page and `tok`.
 
 ### Pull-request mode
 
@@ -301,7 +357,11 @@ the agent hands in and passes it to the machine in the `Finished` event.
   enters Review in `agent` and `both` mode (`StartReviewer`), in the worker's ship. Its profile is
   the first of the ticket's, the chain's and the project's `reviewer` setting (`tok review-mode
   --reviewer <profile>`; blank clears it), else `<worker profile>-reviewer`. It is one-shot: its
-  token (role `reviewer`) may send only `review_verdict`, then it exits. A reviewer that cannot
+  token (role `reviewer`) may send only `review_verdict`. Once the verdict is recorded the machine
+  emits `StopReviewer`: the host ends the reviewer's whole process tree and, when its exit is
+  reported, `runs::ended` gives the slot it held to the next waiting card, so it does not hold a
+  slot while the pull request's checks run. The worker's session stays alive (a `return` goes to
+  it). A reviewer that cannot
   start, or ends while the card still waits for it (no verdict), or is lost with a daemon restart,
   hands the card to a person (`ReviewerFailed`; a report comment says why). The simulated
   reviewer (`sim-reviewer`) has no process: a person sends `tok sim <ticket> review
@@ -348,8 +408,11 @@ The web shows what the daemon says and keeps no rule of its own.
   without a repository is not checked (a simulated project needs none).
 - **Project settings.** `PATCH /v1/projects/{p}` reads and saves default profile, parallel limit,
   review mode, reviewer profile and base branch, plus the merge settings (mode `local` | `github`,
-  pull request title template, merge method; see [Pull-request mode](#pull-request-mode)); all of
-  them live in the project row, so they survive a daemon restart. The page shows the title and the
+  pull request title template, merge method; see [Pull-request mode](#pull-request-mode)) and
+  the optional `check_command` (`cargo xtask verify`: named in both roles' instructions and
+  kickoff, and allowed without asking in both allow-lists; `tok project set KEY --check-command`,
+  an empty text clears it; one line without parentheses, since it goes into a permission rule);
+  all of them live in the project row, so they survive a daemon restart. The page shows the title and the
   method only while the mode is `github`. `github` is refused (400) for a project without a
   repository, and a blank title template too.
 - **Window.** `/settings` and `/projects/{p}/settings` (`Settings.tsx`): checks, project settings,
@@ -382,14 +445,18 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
   the instruction claim of its own ticket); everything else is `403`. The ownership rule is `toknila_app::agent::ensure_granted`
   (`ErrorKind::Forbidden`, `403`). Business rules stay in core: `person_only` still guards the
   use cases, the allowlist keeps agents from reaching them.
-- **Wiring.** `runner/wiring.rs`: for a profile with `mcp.enabled` / `hooks.enabled` and the
-  flag set, the runner writes `runs/<ticket id>/mcp.json` and `settings.json` under the data home
+- **Wiring.** `runner/wiring.rs`: for a profile with `mcp.enabled` / `hooks.enabled` (or allow
+  rules) and the flag set, the runner writes `runs/<ticket id>/<role>/mcp.json` and
+  `settings.json` under the data home (`<role>` is `worker`, `reviewer` or `release`, so the
+  worker and the reviewer of a ticket never overwrite each other's files; the flat layout of
+  earlier builds is not read by anything, as every start regenerates the files, and is left
+  alone)
   (never the worktree, never the user's own Claude settings) and appends `--mcp-config <file>` and
   `--settings <file>` to the command. Neither file holds a token; both name environment variables.
   The files run the `toknila` binary of the daemon (`current_exe`) as `toknila mcp` and
   `toknila hook <name>`; the settings file also names `toknila statusline` as the status line (see "Usage").
 - **Instructions file.** For a profile with `instructions_flag` (the built-in `claude-code` has
-  `--append-system-prompt-file`) the runner also writes `runs/<ticket id>/instructions.md` and
+  `--append-system-prompt-file`) the runner also writes `runs/<ticket id>/<role>/instructions.md` and
   passes it by that flag. It holds the ticket's title, task and acceptance, the comment template,
   the short-output rules and how to report through the MCP tools
   (`toknila_core::instructions::generate`, pinned by `snapshots/run.md`). It is added to the

@@ -318,3 +318,51 @@ async fn project_settings_survive_a_daemon_restart() {
     assert_eq!(p["default_reviewer"], "sim-reviewer");
     assert_eq!(p["default_profile"], "claude-code");
 }
+
+#[tokio::test]
+async fn the_check_command_is_saved_cleared_refused_at_its_field_and_survives_a_restart() {
+    let api = Api::new();
+    api.post("/v1/projects", json!({ "key": "DEMO" })).await;
+    assert!(
+        api.get("/v1/projects/DEMO")
+            .await
+            .get("check_command")
+            .is_none()
+    );
+    let patch = |body: Value| api.call(Method::PATCH, "/v1/projects/DEMO", Some(body));
+
+    let (s, p) = patch(json!({ "check_command": " cargo xtask verify " })).await;
+    assert_eq!(
+        (s, p["check_command"].as_str()),
+        (StatusCode::OK, Some("cargo xtask verify"))
+    );
+
+    let (s, e) = patch(json!({ "check_command": "make (all)" })).await;
+    assert_eq!(
+        (s, e["field"].as_str()),
+        (StatusCode::BAD_REQUEST, Some("check_command"))
+    );
+    let still = api.get("/v1/projects/DEMO").await;
+    assert_eq!(
+        still["check_command"], "cargo xtask verify",
+        "a refused value changes nothing"
+    );
+
+    let api = api.restart();
+    assert_eq!(
+        api.get("/v1/projects/DEMO").await["check_command"],
+        "cargo xtask verify"
+    );
+    let (s, p) = api
+        .call(
+            Method::PATCH,
+            "/v1/projects/DEMO",
+            Some(json!({ "check_command": "" })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(
+        p.get("check_command").is_none(),
+        "an empty text clears it: {p}"
+    );
+}

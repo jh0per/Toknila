@@ -152,7 +152,11 @@ fn the_catalog_reports_bad_files_and_still_lists_the_good_ones() {
         file("good.toml", "command = [\"g\"]"),
     ]);
     assert_eq!(c.profiles.len(), 5, "four built-ins and good");
-    assert_eq!(c.profiles[1].profile.command, ["claude"], "no override");
+    assert_eq!(
+        c.profiles[1].profile.command,
+        ["claude", "{kickoff}"],
+        "no override"
+    );
     let got: Vec<(&str, u32, u32)> = c
         .problems
         .iter()
@@ -176,7 +180,7 @@ fn the_built_in_profiles_launch_what_they_say() {
         AgentProfile::sim().command.is_empty(),
         "sim starts no process"
     );
-    assert_eq!(AgentProfile::claude_code().command, ["claude"]);
+    assert_eq!(AgentProfile::claude_code().command, ["claude", "{kickoff}"]);
     let claude = AgentProfile::claude_code();
     assert!(claude.mcp.enabled && claude.hooks.enabled);
     assert_eq!(claude.mcp.config_flag.as_deref(), Some("--mcp-config"));
@@ -205,5 +209,115 @@ fn profile_json_is_pinned() {
     assert_eq!(
         text, want,
         "profile JSON changed; if intended, rerun with TOKNILA_UPDATE_SNAPSHOTS=1"
+    );
+}
+
+#[test]
+fn the_kickoff_placeholder_is_filled_wherever_it_stands_in_the_command() {
+    let p = parse(
+        "x",
+        r#"command = ["agent", "--prompt={kickoff}", "{kickoff}", "--other"]"#,
+    )
+    .expect("valid");
+    assert_eq!(
+        p.argv("begin\nnow"),
+        ["agent", "--prompt=begin\nnow", "begin\nnow", "--other"]
+    );
+    let none = parse("y", r#"command = ["agent"]"#).expect("valid");
+    assert_eq!(
+        none.argv("begin"),
+        ["agent"],
+        "no placeholder, no first prompt"
+    );
+}
+
+#[test]
+fn the_built_in_claude_profiles_pass_the_kickoff_and_the_reviewer_cannot_ask() {
+    let worker = AgentProfile::claude_code();
+    let reviewer = AgentProfile::claude_code_reviewer();
+    for p in [&worker, &reviewer] {
+        assert!(
+            p.command.iter().any(|a| a == AgentProfile::KICKOFF),
+            "{}",
+            p.name
+        );
+    }
+    assert_eq!(
+        reviewer.command,
+        ["claude", "--permission-mode", "dontAsk", "{kickoff}"]
+    );
+    assert!(!worker.command.iter().any(|a| a == "dontAsk"));
+}
+
+#[test]
+fn the_reviewers_allow_list_covers_read_only_git_the_check_and_the_filters_of_a_pipe() {
+    let rules = AgentProfile::claude_code_reviewer()
+        .permissions
+        .rules(Some("cargo xtask verify"));
+    for want in [
+        "Bash(git diff *)",
+        "Bash(git log *)",
+        "Bash(git show *)",
+        "Bash(git status *)",
+        "Bash(cargo xtask verify *)",
+        "Bash(grep *)",
+        "Bash(head *)",
+        "Bash(tail *)",
+        "Bash(wc *)",
+        "mcp__toknila",
+    ] {
+        assert!(rules.iter().any(|r| r == want), "{want} in {rules:?}");
+    }
+    for never in ["git push", "git commit", "git add", "rm "] {
+        assert!(
+            !rules.iter().any(|r| r.contains(never)),
+            "{never} in {rules:?}"
+        );
+    }
+}
+
+#[test]
+fn a_rule_that_needs_the_check_command_is_dropped_without_one() {
+    let p = AgentProfile::claude_code();
+    let with = p.permissions.rules(Some("make check"));
+    let without = p.permissions.rules(None);
+    assert!(with.iter().any(|r| r == "Bash(make check *)"));
+    assert!(without.iter().all(|r| !r.contains("check")), "{without:?}");
+    assert_eq!(with.len(), without.len() + 1);
+}
+
+#[test]
+fn permissions_are_read_from_the_profile_file() {
+    let p = parse(
+        "x",
+        "command = [\"a\"]\n[permissions]\nallow = [\"Bash(ls *)\"]\n",
+    )
+    .expect("valid");
+    assert_eq!(p.permissions.allow, ["Bash(ls *)"]);
+    let e = err("command = [\"a\"]\n[permissions]\ndeny = []\n");
+    assert_eq!(e.line, 3, "{e}");
+}
+
+#[test]
+fn claude_code_variables_are_dropped_unless_the_profile_sets_them() {
+    let mut p = AgentProfile::claude_code();
+    p.env.insert("CLAUDE_CODE_USE_BEDROCK".into(), "1".into());
+    let names = [
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CLAUDE_CODE_USE_BEDROCK",
+        "claude_code_child_session",
+        "CLAUDE_CONFIG_DIR",
+        "PATH",
+        "ANTHROPIC_API_KEY",
+    ]
+    .map(str::to_owned);
+    assert_eq!(
+        p.inherited_to_drop(names),
+        [
+            "CLAUDECODE",
+            "CLAUDE_CODE_ENTRYPOINT",
+            "claude_code_child_session"
+        ]
     );
 }

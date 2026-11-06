@@ -65,6 +65,9 @@ pub(super) fn agent_decides(
         non_empty(comment, "request_changes")?;
     }
     next.review.record(Actor::Agent, verdict, comment, now);
+    // The reviewer is done once its verdict is recorded: its process ends and its parallel slot
+    // is free again. The worker's runner stays; a Return goes to that session.
+    effects.push(Effect::StopReviewer);
     if !decides {
         next.review.turn = Some(ReviewTurn::Person);
         return Ok((TicketStatus::Review, None));

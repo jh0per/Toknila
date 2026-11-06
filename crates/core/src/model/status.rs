@@ -113,6 +113,12 @@ pub enum BlockedReason {
     /// The merge could not run or finish (the VCS is missing or too old, a branch is gone, the
     /// base kept moving); `detail` says why.
     MergeFailed { detail: String },
+    /// Accept found changes in the ship that are not committed; nothing was pushed or merged.
+    /// `files` names them. Unblocking checks again.
+    ShipUncommitted { files: Vec<String> },
+    /// Accept found no commit on the ship's branch: there is nothing to open a pull request for
+    /// or to merge. Unblocking checks again.
+    ShipEmpty,
     /// The pull request's checks failed (pull-request mode); `checks` names the failed ones.
     /// Unblocking pushes the ship again and watches the pull request again.
     CiFailed { url: String, checks: Vec<String> },
@@ -136,6 +142,8 @@ impl BlockedReason {
             Self::MergeConflict { .. }
                 | Self::BaseCheckoutDirty { .. }
                 | Self::MergeFailed { .. }
+                | Self::ShipUncommitted { .. }
+                | Self::ShipEmpty
                 | Self::CiFailed { .. }
                 | Self::PrClosed { .. }
         )
@@ -189,6 +197,14 @@ impl fmt::Display for BlockedReason {
                 )
             }
             Self::MergeFailed { detail } => write!(f, "merge_failed: {detail}"),
+            Self::ShipUncommitted { files } => write!(
+                f,
+                "ship_uncommitted: the ship has changes that are not committed ({}); commit them on the ship, then unblock",
+                crate::guard::list_files(files)
+            ),
+            Self::ShipEmpty => f.write_str(
+                "ship_empty: the ship's branch has no commit of its own, so there is nothing to merge; the work has to be committed on the ship, then unblock",
+            ),
             Self::CiFailed { url, checks } => write!(
                 f,
                 "ci_failed: {} failed on {url}; fix it on the ship, then unblock",
@@ -302,6 +318,16 @@ mod tests {
                     detail: "too old".into(),
                 }),
                 "merge_failed: too old",
+            ),
+            (
+                blocked(BlockedReason::ShipUncommitted {
+                    files: vec!["a.rs".into(), "b.rs".into()],
+                }),
+                "ship_uncommitted: the ship has changes that are not committed (a.rs, b.rs); commit them on the ship, then unblock",
+            ),
+            (
+                blocked(BlockedReason::ShipEmpty),
+                "ship_empty: the ship's branch has no commit of its own, so there is nothing to merge; the work has to be committed on the ship, then unblock",
             ),
             (blocked(BlockedReason::RunnerLost), "runner lost"),
             (

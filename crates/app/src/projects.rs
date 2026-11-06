@@ -46,6 +46,9 @@ pub struct PatchProject {
     pub pr_title: Option<String>,
     /// How a pull request merges: `merge`, `squash` or `rebase`.
     pub merge_method: Option<MergeMethod>,
+    /// The command that checks the work (`cargo xtask verify`); agents are told to run it and may
+    /// without asking. An empty text clears it.
+    pub check_command: Option<String>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -75,6 +78,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             .map_or(Ok(schedule::DEFAULT_LIMIT), schedule::check_limit)
             .map_err(|e| AppError::bad_request(e.to_string()))?,
         merge: Default::default(),
+        check_command: None,
     };
     uow.insert_project(&p)?;
     uow.emit(&DomainEvent::ProjectCreated { project: p.clone() })?;
@@ -108,6 +112,9 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     }
     if let Some(m) = patch.merge_method {
         p.merge.method = m;
+    }
+    if let Some(c) = patch.check_command {
+        p.check_command = Project::clean_check_command(&c).map_err(AppError::bad_request)?;
     }
     if let Some(m) = patch.merge_mode {
         if m == MergeMode::Github && p.repo_path.as_deref().is_none_or(|r| r.trim().is_empty()) {

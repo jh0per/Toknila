@@ -572,3 +572,77 @@ fn the_reviewers_remarks_wait_for_the_stop_hook_of_a_working_worker() {
     assert_eq!(claimed.count, 1);
     assert!(claimed.reason.contains("handle the empty list"));
 }
+
+#[test]
+fn a_recorded_verdict_stops_the_reviewer_and_its_slot_starts_the_next_card() {
+    let mut mem = three_cards();
+    mem.project.max_parallel = 3;
+    mem.project.default_review_mode = ReviewMode::Both;
+    for n in 1..=2 {
+        let t = card(&mem, n);
+        tickets::act(&mut mem, &t, TicketEvent::Request).expect("request");
+    }
+    settle(&mut mem);
+    let one = card(&mem, 1);
+    let finished = AgentEvent::Finished {
+        summary: "done".to_owned(),
+    };
+    agent::ticket_event(&mut mem, &one, finished).expect("finished");
+    settle(&mut mem);
+    assert_eq!(
+        live(&mem.runner).len(),
+        3,
+        "worker and reviewer of 1, worker of 2"
+    );
+    let three = card(&mem, 3);
+    tickets::act(&mut mem, &three, TicketEvent::Request).expect("request");
+    settle(&mut mem);
+    assert!(card(&mem, 3).queued, "the three slots are taken");
+
+    // The reviewer gives its verdict: its process is stopped, the worker's is not.
+    let verdict = AgentEvent::ReviewVerdict {
+        verdict: Verdict::Approve,
+        comment: "fine".to_owned(),
+    };
+    agent::ticket_event(&mut mem, &one, verdict).expect("verdict");
+    assert!(
+        mem.deferred
+            .iter()
+            .any(|e| matches!(e, ExternalEffect::StopReviewer { ticket } if *ticket == one.id)),
+        "the stop is queued for after the commit: {:?}",
+        mem.deferred
+    );
+    settle(&mut mem);
+    assert_eq!(
+        mem.runner.stopped_roles.borrow().as_slice(),
+        [(one.id, AgentRole::Reviewer)]
+    );
+    assert!(live(&mem.runner).contains(&AgentRole::Worker));
+    assert_eq!(live(&mem.runner).len(), 2, "worker of 1, worker of 2");
+
+    // The process is gone: the host reports its end, which frees the slot for card 3.
+    let req = RunRequest {
+        ticket: one.id,
+        key: one.key.clone(),
+        role: AgentRole::Reviewer,
+        profile: "fake-reviewer".to_owned(),
+        dir: "/ships/demo/demo/demo-1-a".to_owned(),
+        brief: crate::runner::RunBrief::default(),
+    };
+    let end = RunEnded {
+        run: run_of(&req),
+        exit: ProcessExit {
+            code: None,
+            signal: Some("SIGTERM".to_owned()),
+        },
+        stopped: true,
+    };
+    runs::ended(&mut mem, end).expect("ended");
+    settle(&mut mem);
+    assert_eq!(card(&mem, 3).status, TicketStatus::Running);
+    assert_eq!(
+        card(&mem, 1).status,
+        TicketStatus::Review,
+        "the card itself waits for the person"
+    );
+}

@@ -4,8 +4,9 @@
 use std::cell::RefCell;
 
 use toknila_core::agent::AgentEvent;
+use toknila_core::guard::ShipState;
 use toknila_core::machine::TicketEvent;
-use toknila_core::{BlockedReason, Ship, ShipSpec, StatusReason, TicketStatus};
+use toknila_core::{BlockedReason, Ship, ShipLook, ShipSpec, StatusReason, TicketStatus};
 
 use super::Mem;
 use super::runs::settle as settle_ships;
@@ -14,12 +15,31 @@ use crate::recovery::recover;
 use crate::{AppResult, ShipError, Shipyard, agent, tickets};
 
 /// A shipyard that remembers what it was asked and can be told to fail.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(super) struct FakeYard {
     prepared: RefCell<Vec<ShipSpec>>,
     pub(super) removed: RefCell<Vec<Ship>>,
     pub(super) fail_prepare: RefCell<Option<ShipError>>,
     fail_remove: RefCell<Option<ShipError>>,
+    /// What `inspect` finds: a clean ship with one commit unless a test says otherwise.
+    pub(super) found: RefCell<Result<ShipState, ShipError>>,
+    pub(super) looked: RefCell<Vec<ShipLook>>,
+}
+
+impl Default for FakeYard {
+    fn default() -> Self {
+        Self {
+            prepared: RefCell::default(),
+            removed: RefCell::default(),
+            fail_prepare: RefCell::default(),
+            fail_remove: RefCell::default(),
+            found: RefCell::new(Ok(ShipState {
+                changed: Vec::new(),
+                ahead: 1,
+            })),
+            looked: RefCell::default(),
+        }
+    }
 }
 
 impl Shipyard for FakeYard {
@@ -40,6 +60,11 @@ impl Shipyard for FakeYard {
         }
         self.removed.borrow_mut().push(ship.clone());
         Ok(())
+    }
+
+    fn inspect(&self, look: &ShipLook) -> Result<ShipState, ShipError> {
+        self.looked.borrow_mut().push(look.clone());
+        self.found.borrow().clone()
     }
 }
 

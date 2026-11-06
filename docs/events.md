@@ -16,9 +16,14 @@ for `propose` it is the new card.
 | `ask_human` | `text`, `permission` (bool, default false) | -> Waiting with the question or permission request as reason; the text is stored as an agent report comment | Running |
 | `subtask_done` | `position` (1-based) | ticks the checklist item, `done_by: "agent"` | any |
 | `note` | `body` (comment template fields: `gist`, `what`, `why`, `how_to_verify`, `alternatives`, `consequences`) | stores an agent report comment | any |
-| `finished` | `summary` | -> Review; summary stored as an agent report comment. Refused with `409` while the ticket has an open thread | Running |
+| `finished` | `summary` | -> Review; summary stored as an agent report comment. Refused with `409` while the ticket has an open thread, and while its ship has changes that are not committed (tracked or untracked, not ignored) or no commit of its own on top of its starting point: the error text tells the agent to commit and call `finished` again, and the card stays Running | Running |
 | `crashed` | `detail` | -> Blocked (reason `crashed`, resumes to the previous status on unblock) | Running, Waiting |
 | `review_verdict` | `verdict` (`approve`, `request_changes`), `comment` (required with `request_changes`) | the reviewer agent's decision, recorded as a review round. In `agent` mode `approve` merges the card and `request_changes` returns it to the worker with the comment; in `both` mode the card then waits for a person. **Only a reviewer's token may send it, and a reviewer's token may send nothing else** (`403`) | Review, while it waits for the agent (else `409`) |
+
+Accept looks at the ship again before it merges or pushes: changes that are not committed block the
+card with `ship_uncommitted` (`files` names them), a branch with no commit of its own with
+`ship_empty`. Both are `blocked` inbox items; unblock looks again. When the reviewer's
+`review_verdict` is recorded, its process is stopped and its parallel slot freed.
 
 The runner sends `crashed` itself when the agent's process ends while the ticket is Running or
 Waiting and nobody asked it to stop: a non-zero exit code or a signal, and also a zero exit

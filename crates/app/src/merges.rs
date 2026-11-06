@@ -3,6 +3,7 @@
 //! committed ([`crate::external`]); this module queues that work and turns the outcome into an
 //! event for the ticket: `MergeDone`, or a block with a typed reason.
 
+use toknila_core::guard::ShipProblem;
 use toknila_core::machine::TicketEvent;
 use toknila_core::pr::PrSpec;
 use toknila_core::{
@@ -11,7 +12,8 @@ use toknila_core::{
 };
 
 use crate::chain::tell_ticket;
-use crate::external::ExternalEffect;
+use crate::external::{ExternalEffect, Host};
+use crate::ships::{self, GuardError};
 use crate::{AppResult, UnitOfWork};
 
 /// How a merge ended when nothing went wrong on the host.
@@ -21,6 +23,10 @@ pub enum MergeOutcome {
     Merged { commit: String },
     /// The base branch already contains the ship's branch (or the card has no ship): nothing to do.
     UpToDate,
+    /// The ship has changes that are not committed; nothing was pushed or merged.
+    ShipUncommitted { files: Vec<String> },
+    /// The ship's branch has no commit of its own; nothing was pushed or merged.
+    ShipEmpty,
     /// The branches changed the same files; the base branch is untouched.
     Conflict { files: Vec<String> },
     /// The base branch is checked out at `path` with local changes; nothing was changed.
@@ -90,6 +96,27 @@ pub trait Merger: std::fmt::Debug {
     fn merge(&self, spec: &MergeSpec) -> Result<MergeOutcome, MergeError>;
 }
 
+/// Runs one step of a merge on the host. When the step would push or merge the ship's work (a
+/// local merge, or opening the pull request) the work is looked at first: changes that are not
+/// committed, or a branch with nothing of its own, end the merge as a typed outcome and nothing
+/// is pushed. Watching a pull request that is already open does not look again.
+pub(crate) fn run(host: &Host<'_>, spec: &MergeSpec) -> Result<MergeOutcome, MergeError> {
+    let watching = spec.pr.as_ref().is_some_and(|pr| pr.watching.is_some());
+    if !watching {
+        match ships::guard(host.yard, &spec.look) {
+            Ok(()) => {}
+            Err(GuardError::Problem(ShipProblem::Uncommitted { files })) => {
+                return Ok(MergeOutcome::ShipUncommitted { files });
+            }
+            Err(GuardError::Problem(ShipProblem::Empty)) => return Ok(MergeOutcome::ShipEmpty),
+            Err(GuardError::Ship(e)) => {
+                return Err(MergeError::Io(format!("cannot look at the ship: {e}")));
+            }
+        }
+    }
+    host.merger.merge(spec)
+}
+
 /// `Merge`: queue the merge for after the commit. A card without a ship (its project has no
 /// repository, or it never started) has nothing to merge: the host answers right away. In
 /// pull-request mode the spec says whether the pull request is already open (the card has one):
@@ -109,10 +136,10 @@ pub(crate) fn queue_merge<U: UnitOfWork + ?Sized>(
         // The branch the ship was made with, not the one the title would name today.
         (Some(ship), Some(spec)) => {
             let mut merge = ShipSpec {
-                branch: ship.branch,
+                branch: ship.branch.clone(),
                 ..spec
             }
-            .merge_spec(&ticket.title);
+            .merge_spec(&ticket.title, &ship.path);
             if project.merge.mode == MergeMode::Github {
                 merge.pr = Some(PrSpec::for_ticket(&project, ticket));
             }
@@ -193,6 +220,10 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
                 files.join(", ")
             ),
         }),
+        Ok(MergeOutcome::ShipUncommitted { files }) => {
+            block(BlockedReason::ShipUncommitted { files })
+        }
+        Ok(MergeOutcome::ShipEmpty) => block(BlockedReason::ShipEmpty),
         Ok(MergeOutcome::BaseCheckoutDirty { path }) => {
             block(BlockedReason::BaseCheckoutDirty { path })
         }

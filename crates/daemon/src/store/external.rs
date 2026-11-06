@@ -4,11 +4,12 @@
 
 use std::sync::Arc;
 
+use toknila_app::ships::{self, GuardError};
 use toknila_app::{
     AppError, MergeError, MergeOutcome, Merger, ShipError, Shipyard,
     external::{self, ExternalEffect},
 };
-use toknila_core::{Actor, MergeSpec, Ship, ShipSpec};
+use toknila_core::{Actor, MergeSpec, Ship, ShipLook, ShipSpec};
 
 use super::{Store, Yard};
 
@@ -63,6 +64,25 @@ impl Store {
             };
         }
         tracing::error!("external effects kept queueing more; stopped");
+    }
+}
+
+impl Store {
+    /// Looks at a ship's worktree on a blocking thread, outside any transaction, and judges it
+    /// (`finished` is refused when the work is not committed). A store without a shipyard has no
+    /// ships, so there is nothing to refuse.
+    pub async fn guard_ship(&self, look: ShipLook) -> Result<(), GuardError> {
+        let Some(yard) = self.yard.clone() else {
+            return Ok(());
+        };
+        let judged = look.clone();
+        tokio::task::spawn_blocking(move || ships::guard(&*yard, &judged))
+            .await
+            .unwrap_or_else(|e| {
+                Err(GuardError::Ship(ShipError::Io(format!(
+                    "guard panicked: {e}"
+                ))))
+            })
     }
 }
 

@@ -27,6 +27,7 @@ mod resume;
 mod reviews;
 mod runs;
 mod settings;
+mod ship_guard;
 mod ships;
 mod threads;
 mod wildcards;
@@ -68,6 +69,7 @@ impl Mem {
             default_reviewer: None,
             max_parallel: 2,
             merge: Default::default(),
+            check_command: None,
         };
         let chain = Chain {
             id: ChainId::new(),

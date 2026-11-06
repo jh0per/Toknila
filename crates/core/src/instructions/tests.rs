@@ -29,6 +29,7 @@ fn the_generated_file_is_pinned() {
         title: "Generated instructions",
         prompt: "Generate the instructions for the run.\n",
         acceptance: &acceptance,
+        check_command: None,
     });
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/instructions/snapshots/run.md");
@@ -48,6 +49,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         title: "t",
         prompt: "p",
         acceptance: &[],
+        check_command: None,
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -118,4 +120,59 @@ fn sizes_are_clamped_to_sane_bounds() {
     assert_eq!(terminal::clamp(1, 2), terminal::MIN);
     assert_eq!(terminal::clamp(100_000, 100_000), terminal::MAX);
     assert_eq!(terminal::clamp(u32::MAX, u32::MAX), terminal::MAX);
+}
+
+fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
+    RunBrief {
+        key: "DEMO-3",
+        title: "t",
+        prompt: "p",
+        acceptance: &[],
+        check_command: check,
+    }
+}
+
+#[test]
+fn the_worker_kickoff_says_to_begin_commit_and_call_finished() {
+    let text = kickoff(crate::AgentRole::Worker, &brief(None));
+    assert!(text.contains("DEMO-3") && text.contains("commit") && text.contains("`finished`"));
+    assert!(
+        !text.contains('\n') && !text.contains("review_verdict"),
+        "{text}"
+    );
+    assert!(!text.contains("Run `"), "no check command named: {text}");
+    let text = kickoff(crate::AgentRole::Worker, &brief(Some("cargo xtask verify")));
+    assert!(
+        text.contains("Run `cargo xtask verify` before you hand in"),
+        "{text}"
+    );
+}
+
+#[test]
+fn the_reviewer_kickoff_says_to_review_and_call_the_verdict_tool() {
+    let text = kickoff(
+        crate::AgentRole::Reviewer,
+        &brief(Some("cargo xtask verify")),
+    );
+    assert!(
+        text.contains("DEMO-3") && text.contains("`review_verdict`"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("`finished`") && !text.contains('\n'),
+        "{text}"
+    );
+}
+
+#[test]
+fn both_roles_instructions_name_the_check_command_only_when_there_is_one() {
+    let with = brief(Some("cargo xtask verify"));
+    for text in [generate(&with), generate_review(&with)] {
+        assert!(text.contains("## Checks"), "{text}");
+        assert!(text.contains("`cargo xtask verify`") && text.contains("without asking"));
+    }
+    let without = brief(None);
+    for text in [generate(&without), generate_review(&without)] {
+        assert!(!text.contains("## Checks"), "{text}");
+    }
 }

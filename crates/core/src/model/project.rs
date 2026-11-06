@@ -100,6 +100,10 @@ pub struct Project {
     pub max_parallel: u32,
     /// Where accepted work lands: the local base branch or a GitHub pull request.
     pub merge: MergeSettings,
+    /// The command that checks the project's work (`cargo xtask verify`). Both agent roles are
+    /// told to use it, and may run it without asking. `None`: the project names none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_command: Option<String>,
 }
 
 impl Project {
@@ -107,6 +111,17 @@ impl Project {
     pub const DEFAULT_WORK_BRANCH: &str = "develop";
     /// Release branch of a project that does not name one.
     pub const DEFAULT_RELEASE_BRANCH: &str = "main";
+
+    /// The check command as a person typed it: trimmed, and `None` when empty (it clears the
+    /// setting). It is one line without parentheses, because it goes into an agent's permission
+    /// rule (`Bash(<command> *)`).
+    pub fn clean_check_command(text: &str) -> Result<Option<String>, &'static str> {
+        let text = text.trim();
+        if text.contains(['\n', '\r', '(', ')']) {
+            return Err("the check command is one line without parentheses");
+        }
+        Ok(Some(text.to_owned()).filter(|c| !c.is_empty()))
+    }
 
     /// Name of the agent profile `ticket` runs with: its own, else the project's default.
     pub fn profile_for<'a>(&'a self, ticket: &'a super::Ticket) -> &'a str {
@@ -118,6 +133,18 @@ impl Project {
 mod tests {
     use super::*;
     use crate::{AgentProfile, ChainId, Ticket, TicketDraft, TicketId, Timestamp};
+
+    #[test]
+    fn a_check_command_is_trimmed_cleared_when_empty_and_refused_when_unfit_for_a_rule() {
+        assert_eq!(
+            Project::clean_check_command("  cargo xtask verify "),
+            Ok(Some("cargo xtask verify".to_owned()))
+        );
+        assert_eq!(Project::clean_check_command("   "), Ok(None));
+        for bad in ["a\nb", "npm run (x)", "make) ; rm"] {
+            assert!(Project::clean_check_command(bad).is_err(), "{bad:?}");
+        }
+    }
 
     #[test]
     fn a_ticket_profile_overrides_the_project_default() {
@@ -133,6 +160,7 @@ mod tests {
             default_reviewer: None,
             max_parallel: crate::schedule::DEFAULT_LIMIT,
             merge: Default::default(),
+            check_command: None,
         };
         let mut t = Ticket::new_backlog(
             TicketId::new(),

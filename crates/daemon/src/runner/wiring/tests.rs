@@ -28,6 +28,7 @@ impl Rig {
                 title: "Wire it".to_owned(),
                 prompt: "Wire the instructions.".to_owned(),
                 acceptance: vec!["It is wired".to_owned()],
+                check_command: None,
             },
         }
     }
@@ -51,7 +52,17 @@ impl Rig {
     }
 
     fn file(&self, name: &str) -> (PathBuf, String) {
-        let path = self.dir.path().join("runs").join("t1").join(name);
+        self.file_of("worker", name)
+    }
+
+    fn file_of(&self, role: &str, name: &str) -> (PathBuf, String) {
+        let path = self
+            .dir
+            .path()
+            .join("runs")
+            .join("t1")
+            .join(role)
+            .join(name);
         let text = std::fs::read_to_string(&path).expect("generated file");
         (path, text)
     }
@@ -108,6 +119,7 @@ fn a_profile_without_an_instructions_flag_gets_no_instructions_file() {
             .path()
             .join("runs")
             .join("t1")
+            .join("worker")
             .join("instructions.md")
             .exists()
     );
@@ -185,6 +197,7 @@ fn a_profile_without_wiring_gets_no_files_and_no_flags() {
     profile.mcp.enabled = false;
     profile.hooks.enabled = false;
     profile.instructions_flag = None;
+    profile.permissions.allow.clear();
     let w = rig.prepare(&profile);
     assert!(w.args.is_empty());
     assert!(!rig.dir.path().join("runs").join("t1").exists());
@@ -193,4 +206,164 @@ fn a_profile_without_wiring_gets_no_files_and_no_flags() {
     profile.mcp.enabled = true;
     profile.mcp.config_flag = None;
     assert!(rig.prepare(&profile).args.is_empty());
+}
+
+fn rules(text: &str) -> Vec<String> {
+    let v: Value = serde_json::from_str(text).expect("json");
+    v["permissions"]["allow"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|r| r.as_str().expect("rule").to_owned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn the_worker_and_the_reviewer_of_a_ticket_get_files_of_their_own() {
+    let rig = Rig::new();
+    rig.prepare_as(&AgentProfile::claude_code(), AgentRole::Worker);
+    rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    for name in ["instructions.md", "mcp.json", "settings.json"] {
+        let (w, worker) = rig.file_of("worker", name);
+        let (r, reviewer) = rig.file_of("reviewer", name);
+        assert_ne!(w, r, "{name}");
+        if name == "instructions.md" {
+            assert!(worker.contains("# Toknila: ticket DEMO-1"), "{worker}");
+            assert!(
+                reviewer.contains("# Toknila: review of ticket DEMO-1"),
+                "{reviewer}"
+            );
+        }
+    }
+    let flat = rig
+        .dir
+        .path()
+        .join("runs")
+        .join("t1")
+        .join("instructions.md");
+    assert!(!flat.exists(), "nothing is written in the old flat layout");
+}
+
+#[test]
+fn the_first_prompt_fills_the_kickoff_placeholder_per_role() {
+    let rig = Rig::new();
+    let w = rig.prepare_as(&AgentProfile::claude_code(), AgentRole::Worker);
+    assert_eq!(w.command[0], "claude");
+    assert!(
+        w.command[1].starts_with("Start ticket DEMO-1 now"),
+        "{:?}",
+        w.command
+    );
+    assert!(w.command[1].contains("`finished`"));
+    let r = rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    assert_eq!(&r.command[..3], ["claude", "--permission-mode", "dontAsk"]);
+    assert!(
+        r.command[3].starts_with("Review ticket DEMO-1 now"),
+        "{:?}",
+        r.command
+    );
+    assert!(r.command[3].contains("`review_verdict`"));
+    assert!(
+        !r.command
+            .iter()
+            .chain(&w.command)
+            .any(|a| a.contains("{kickoff}")),
+        "the placeholder is always filled"
+    );
+}
+
+#[test]
+fn the_check_command_reaches_the_instructions_the_kickoff_and_both_allow_lists() {
+    let mut rig = Rig::new();
+    rig.brief.check_command = Some("cargo xtask verify".to_owned());
+    let w = rig.prepare_as(&AgentProfile::claude_code(), AgentRole::Worker);
+    assert!(
+        w.command[1].contains("Run `cargo xtask verify`"),
+        "{:?}",
+        w.command
+    );
+    rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    for role in ["worker", "reviewer"] {
+        let (_, instructions) = rig.file_of(role, "instructions.md");
+        assert!(instructions.contains("`cargo xtask verify`"), "{role}");
+        let (_, settings) = rig.file_of(role, "settings.json");
+        assert!(
+            rules(&settings).contains(&"Bash(cargo xtask verify *)".to_owned()),
+            "{role}: {settings}"
+        );
+    }
+}
+
+#[test]
+fn without_a_check_command_no_rule_names_one() {
+    let rig = Rig::new();
+    rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    let (_, settings) = rig.file_of("reviewer", "settings.json");
+    let allowed = rules(&settings);
+    assert!(
+        allowed.contains(&"Bash(git diff *)".to_owned()),
+        "{allowed:?}"
+    );
+    assert!(
+        allowed.iter().all(|r| !r.contains("{check_command}")),
+        "{allowed:?}"
+    );
+    assert!(
+        allowed.iter().all(|r| !r.starts_with("Bash( ")),
+        "{allowed:?}"
+    );
+    let (_, instructions) = rig.file_of("reviewer", "instructions.md");
+    assert!(!instructions.contains("## Checks"));
+}
+
+#[test]
+fn the_settings_hold_hooks_and_rules_side_by_side() {
+    let rig = Rig::new();
+    rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    let (_, text) = rig.file_of("reviewer", "settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    assert!(v["hooks"]["Stop"].is_array(), "{text}");
+    assert!(v["permissions"]["allow"].is_array(), "{text}");
+    assert!(
+        v["permissions"].get("defaultMode").is_none(),
+        "the mode is a flag, not a setting"
+    );
+}
+
+#[test]
+fn a_profile_without_rules_and_hooks_writes_no_settings() {
+    let rig = Rig::new();
+    let mut profile = AgentProfile::claude_code();
+    profile.hooks.enabled = false;
+    profile.permissions.allow.clear();
+    let w = rig.prepare(&profile);
+    assert!(!w.args.iter().any(|a| a == "--settings"), "{:?}", w.args);
+}
+
+#[test]
+fn inherited_claude_code_variables_are_dropped_unless_the_profile_sets_them() {
+    let rig = Rig::new();
+    let cx_names = [
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CLAUDE_CODE_MINE",
+        "HOME",
+    ]
+    .map(str::to_owned);
+    let mut profile = AgentProfile::claude_code();
+    profile.env.insert("CLAUDE_CODE_MINE".into(), "1".into());
+    let cx = Context {
+        dir: &rig.dir.path().join("runs").join("t1"),
+        key: &rig.key,
+        role: AgentRole::Worker,
+        run: rig.run,
+        token: TOKEN,
+        url: None,
+        bin: &rig.bin,
+        brief: &rig.brief,
+    };
+    let w = prepare_with(&profile, &cx, cx_names).expect("prepare");
+    assert_eq!(w.env_remove, ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"]);
 }

@@ -7,6 +7,7 @@ pub mod agent;
 pub mod dag;
 pub mod events;
 pub mod graph;
+pub mod guard;
 pub mod hook;
 pub mod inbox;
 pub mod instructions;

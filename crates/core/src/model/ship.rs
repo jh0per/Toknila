@@ -47,6 +47,18 @@ pub struct MergeSpec {
     pub message: String,
     /// Set in pull-request mode: the branch goes through a pull request instead of a local merge.
     pub pr: Option<PrSpec>,
+    /// Where the ship's work is looked at before it is pushed or merged (`guard`).
+    pub look: ShipLook,
+}
+
+/// Where to look at a ship's work: its worktree, and what the branch is counted against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShipLook {
+    /// The worktree's path on the host.
+    pub path: String,
+    /// The commit-ish the ship started from (`ShipSpec::start_point`): commits beyond it are the
+    /// ship's own.
+    pub start: String,
 }
 
 /// Longest slug part, so paths stay short on Windows.
@@ -73,7 +85,7 @@ pub fn slugify(text: &str) -> String {
 
 impl ShipSpec {
     /// The merge of this ship's branch into its base for a ticket called `title`.
-    pub fn merge_spec(&self, title: &str) -> MergeSpec {
+    pub fn merge_spec(&self, title: &str, ship_path: &str) -> MergeSpec {
         MergeSpec {
             key: self.key.clone(),
             repo: self.repo.clone(),
@@ -81,6 +93,10 @@ impl ShipSpec {
             branch: self.branch.clone(),
             message: format!("Merge {}: {} {}", self.branch, self.key, title),
             pr: None,
+            look: ShipLook {
+                path: ship_path.to_owned(),
+                start: self.start_point(),
+            },
         }
     }
 
@@ -133,6 +149,7 @@ mod tests {
             default_reviewer: None,
             max_parallel: 2,
             merge: Default::default(),
+            check_command: None,
         };
         let chain = Chain {
             id: ChainId::new(),
@@ -173,7 +190,7 @@ mod tests {
     fn the_merge_names_the_branch_the_card_and_the_base() {
         let (p, c, t) = fixture(Some("/repo"));
         let spec = ShipSpec::for_ticket(&p, &c, &t).expect("spec");
-        let merge = spec.merge_spec("Add login: OAuth");
+        let merge = spec.merge_spec("Add login: OAuth", "/ships/x");
         assert_eq!(
             (merge.repo.as_str(), merge.base.as_str()),
             ("/repo", "develop")
@@ -200,7 +217,7 @@ mod tests {
             (true, "origin/develop")
         );
         assert_eq!(
-            remote.merge_spec("x").base,
+            remote.merge_spec("x", "/ships/x").base,
             "develop",
             "the pull request goes into the plain base"
         );

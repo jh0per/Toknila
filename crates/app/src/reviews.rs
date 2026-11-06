@@ -88,6 +88,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
             title: t.title.clone(),
             prompt: t.prompt.clone(),
             acceptance: t.acceptance.clone(),
+            check_command: project.check_command.clone(),
         },
     });
     Ok(())

@@ -44,6 +44,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 title: t.title.clone(),
                 prompt: t.prompt.clone(),
                 acceptance: t.acceptance.clone(),
+                check_command: project.check_command.clone(),
             },
         });
     }
@@ -90,7 +91,9 @@ pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<
         exit: exit.clone(),
     })?;
     if stopped {
-        return Ok(());
+        // The host ended it on purpose (a reviewer whose verdict is in, an accepted card): the
+        // slot it held is free now that the process is gone, so a waiting card starts.
+        return free_slot(uow, ticket);
     }
     if role == AgentRole::Reviewer {
         // A reviewer reports its verdict first and exits after; one that ends while the card
@@ -106,6 +109,18 @@ pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<
         return reviews::failed(uow, ticket, detail);
     }
     tell_ticket(uow, ticket, TicketEvent::Block { reason })
+}
+
+/// Gives the slot a runner that has ended held to the cards waiting for one in its project.
+fn free_slot<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: TicketId) -> AppResult<()> {
+    let Some(chain) = uow
+        .ticket(ticket)?
+        .and_then(|t| uow.chain(t.chain_id).transpose())
+        .transpose()?
+    else {
+        return Ok(());
+    };
+    crate::schedule::run(uow, chain.project_id)
 }
 
 /// After a daemon start: tickets whose agent is a process, and that were working, lost their

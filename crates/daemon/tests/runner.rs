@@ -568,6 +568,7 @@ fn a_profile_that_asks_for_mcp_gets_a_config_file_under_the_data_home_and_the_fl
         .path()
         .join("runs")
         .join(rig.ticket.to_string())
+        .join("worker")
         .join("mcp.json");
     let text = std::fs::read_to_string(&file).expect("generated config");
     assert!(text.contains("\"mcpServers\""), "{text}");
@@ -661,4 +662,77 @@ fn stopping_a_reviewer_ends_its_process_tree_too() {
     rig.runners.stop_role(rig.ticket, AgentRole::Reviewer);
     assert!(rig.wait_end().stopped);
     wait_until("the reviewer's child survived the stop", || !alive(child));
+}
+
+/// The marker the outer run sets for the inner one: the real body runs only there, with a daemon
+/// environment that has the variables this test is about. (A test cannot change its own
+/// environment: that is `unsafe`, denied here.)
+const INNER: &str = "TOKNILA_TEST_INNER";
+
+#[test]
+fn claude_code_variables_of_the_daemon_do_not_reach_the_agent_unless_its_profile_sets_them() {
+    if std::env::var_os(INNER).is_none() {
+        let out = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args([
+                "--exact",
+                "claude_code_variables_of_the_daemon_do_not_reach_the_agent_unless_its_profile_sets_them",
+                "--nocapture",
+            ])
+            .env(INNER, "1")
+            .env("CLAUDECODE", "1")
+            .env("CLAUDE_CODE_ENTRYPOINT", "cli")
+            .env("CLAUDE_CODE_MINE", "from-the-daemon")
+            .output()
+            .expect("run the inner test");
+        assert!(
+            out.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        return;
+    }
+    // Controls: the daemon really has them.
+    assert_eq!(std::env::var("CLAUDECODE").as_deref(), Ok("1"));
+    assert_eq!(
+        std::env::var("CLAUDE_CODE_ENTRYPOINT").as_deref(),
+        Ok("cli")
+    );
+
+    let mut rig = Rig::new();
+    rig.profile(
+        "fake",
+        &[
+            "env",
+            "CLAUDECODE",
+            "env",
+            "CLAUDE_CODE_ENTRYPOINT",
+            "env",
+            "CLAUDE_CODE_MINE",
+            "env",
+            "TOKNILA_TEST_INNER",
+            "exit",
+            "0",
+        ],
+        "[env]\nCLAUDE_CODE_MINE = \"from-the-profile\"\n",
+    );
+    rig.start("fake");
+    let out = rig.wait_for("TOKNILA_TEST_INNER=1");
+    assert_eq!(printed_env(&out, "CLAUDECODE"), "", "dropped: {out:?}");
+    assert_eq!(
+        printed_env(&out, "CLAUDE_CODE_ENTRYPOINT"),
+        "",
+        "dropped: {out:?}"
+    );
+    assert_eq!(
+        printed_env(&out, "CLAUDE_CODE_MINE"),
+        "from-the-profile",
+        "the profile's own value wins: {out:?}"
+    );
+    assert_eq!(
+        printed_env(&out, "TOKNILA_TEST_INNER"),
+        "1",
+        "other variables are inherited as before"
+    );
+    rig.wait_end();
 }

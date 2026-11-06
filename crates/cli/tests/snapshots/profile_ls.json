@@ -36,6 +36,9 @@
           "scrollback_lines": 10000,
           "strip_ansi": true
         },
+        "permissions": {
+          "allow": []
+        },
         "role": "worker"
       }
     },
@@ -43,7 +46,8 @@
       "file": null,
       "profile": {
         "command": [
-          "claude"
+          "claude",
+          "{kickoff}"
         ],
         "env": {},
         "hooks": {
@@ -67,6 +71,18 @@
           "max_log_bytes": 20971520,
           "scrollback_lines": 10000,
           "strip_ansi": true
+        },
+        "permissions": {
+          "allow": [
+            "Bash(git status *)",
+            "Bash(git diff *)",
+            "Bash(git log *)",
+            "Bash(git show *)",
+            "Bash(git add *)",
+            "Bash(git commit *)",
+            "Bash({check_command} *)",
+            "mcp__toknila"
+          ]
         },
         "role": "worker"
       }
@@ -98,6 +114,9 @@
           "scrollback_lines": 10000,
           "strip_ansi": true
         },
+        "permissions": {
+          "allow": []
+        },
         "role": "reviewer"
       }
     },
@@ -105,7 +124,10 @@
       "file": null,
       "profile": {
         "command": [
-          "claude"
+          "claude",
+          "--permission-mode",
+          "dontAsk",
+          "{kickoff}"
         ],
         "env": {},
         "hooks": {
@@ -129,6 +151,22 @@
           "max_log_bytes": 20971520,
           "scrollback_lines": 10000,
           "strip_ansi": true
+        },
+        "permissions": {
+          "allow": [
+            "Bash(git status *)",
+            "Bash(git diff *)",
+            "Bash(git log *)",
+            "Bash(git show *)",
+            "Bash(git merge-base *)",
+            "Bash(git rev-parse *)",
+            "Bash(grep *)",
+            "Bash(head *)",
+            "Bash(tail *)",
+            "Bash(wc *)",
+            "Bash({check_command} *)",
+            "mcp__toknila"
+          ]
         },
         "role": "reviewer"
       }
@@ -162,6 +200,9 @@
           "max_log_bytes": 20971520,
           "scrollback_lines": 10000,
           "strip_ansi": true
+        },
+        "permissions": {
+          "allow": []
         },
         "role": "reviewer"
       }

@@ -7,7 +7,7 @@ use super::StoreError;
 use super::codec::{Repo, enum_from, enum_str, parse};
 
 const PROJECT_COLS: &str = "id, key, name, repo_path, work_branch, release_branch, default_profile, \
-     default_review_mode, max_parallel, default_reviewer, merge_mode, pr_title, merge_method";
+     default_review_mode, max_parallel, default_reviewer, merge_mode, pr_title, merge_method, check_command";
 
 type RawProject = (
     String,
@@ -23,6 +23,7 @@ type RawProject = (
     String,
     String,
     String,
+    Option<String>,
 );
 
 fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
@@ -40,6 +41,7 @@ fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
         r.get(10)?,
         r.get(11)?,
         r.get(12)?,
+        r.get(13)?,
     ))
 }
 
@@ -58,6 +60,7 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         merge_mode,
         pr_title,
         merge_method,
+        check_command,
     ) = c;
     Ok(Project {
         id: parse(&id, "project id")?,
@@ -76,6 +79,7 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
             pr_title,
             method: enum_from(&merge_method)?,
         },
+        check_command,
     })
 }
 
@@ -83,7 +87,7 @@ impl Repo<'_> {
     pub fn insert_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"
+                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)"
             ),
             params![
                 p.id.to_string(),
@@ -99,6 +103,7 @@ impl Repo<'_> {
                 enum_str(&p.merge.mode)?,
                 p.merge.pr_title,
                 enum_str(&p.merge.method)?,
+                p.check_command,
             ],
         )?;
         Ok(())
@@ -109,7 +114,7 @@ impl Repo<'_> {
         self.conn.execute(
             "UPDATE projects SET name = ?2, repo_path = ?3, work_branch = ?4, release_branch = ?5, \
              default_profile = ?6, default_review_mode = ?7, max_parallel = ?8, default_reviewer = ?9, \
-             merge_mode = ?10, pr_title = ?11, merge_method = ?12 \
+             merge_mode = ?10, pr_title = ?11, merge_method = ?12, check_command = ?13 \
              WHERE id = ?1",
             params![
                 p.id.to_string(),
@@ -124,6 +129,7 @@ impl Repo<'_> {
                 enum_str(&p.merge.mode)?,
                 p.merge.pr_title,
                 enum_str(&p.merge.method)?,
+                p.check_command,
             ],
         )?;
         Ok(())

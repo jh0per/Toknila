@@ -166,6 +166,16 @@ fn a_card_whose_merge_failed_is_a_blocked_item_with_the_reason() {
             },
             "merge_failed: too old",
         ),
+        (
+            BlockedReason::ShipUncommitted {
+                files: vec!["a.rs".to_owned()],
+            },
+            "ship_uncommitted: the ship has changes that are not committed (a.rs); commit them on the ship, then unblock",
+        ),
+        (
+            BlockedReason::ShipEmpty,
+            "ship_empty: the ship's branch has no commit of its own, so there is nothing to merge; the work has to be committed on the ship, then unblock",
+        ),
     ];
     for (reason, text) in reasons {
         let mut t = ticket(1, TicketStatus::Review, 5);

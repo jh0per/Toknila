@@ -22,6 +22,7 @@ export function ProjectSettings({ project, state, dispatch }: { project: Project
   const [mergeMode, setMergeMode] = useState<MergeMode>(project.merge.mode);
   const [prTitle, setPrTitle] = useState(project.merge.pr_title);
   const [method, setMethod] = useState<MergeMethod>(project.merge.method);
+  const [check, setCheck] = useState(project.check_command ?? "");
   const named = (role: string) => s.profiles.filter((l) => l.profile.role === role).map((l) => l.profile.name);
   // A saved name the catalog no longer lists stays selectable, so saving never changes it silently.
   const options = (role: string, current: string) => {
@@ -40,7 +41,7 @@ export function ProjectSettings({ project, state, dispatch }: { project: Project
           project: project.key,
           patch: {
             default_profile: profile, max_parallel: Number(limit), review_mode: mode, reviewer, work_branch: branch.trim(),
-            merge_mode: mergeMode, pr_title: prTitle, merge_method: method,
+            merge_mode: mergeMode, pr_title: prTitle, merge_method: method, check_command: check.trim(),
           },
         });
       }}
@@ -70,6 +71,9 @@ export function ProjectSettings({ project, state, dispatch }: { project: Project
       </Field>
       <Field label="Base branch" name="work_branch" error={fieldError(s, "work_branch")}>
         <input data-testid="project-branch" value={branch} spellCheck={false} onChange={(e) => setBranch(e.target.value)} />
+      </Field>
+      <Field label="Check command (agents run it before they hand in)" name="check_command" error={fieldError(s, "check_command")}>
+        <input data-testid="check-command" value={check} spellCheck={false} placeholder="cargo xtask verify" onChange={(e) => setCheck(e.target.value)} />
       </Field>
       <Field label="Accepted work lands" name="merge_mode" error={fieldError(s, "merge_mode")}>
         <select data-testid="merge-mode" value={mergeMode} onChange={(e) => setMergeMode(e.target.value as MergeMode)}>

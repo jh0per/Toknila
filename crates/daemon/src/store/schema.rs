@@ -228,4 +228,8 @@ pub(super) const MIGRATIONS: &[&str] = &[
         value TEXT NOT NULL
     );
     "#,
+    // 9: the project's check command.
+    r#"
+    ALTER TABLE projects ADD COLUMN check_command TEXT;
+    "#,
 ];

@@ -741,6 +741,10 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(BlockedReason::BaseCheckoutDirty {
             path: "p".to_owned()
         }),
+        Just(BlockedReason::ShipUncommitted {
+            files: vec!["u".to_owned()]
+        }),
+        Just(BlockedReason::ShipEmpty),
         Just(BlockedReason::MergeFailed {
             detail: "f".to_owned()
         }),

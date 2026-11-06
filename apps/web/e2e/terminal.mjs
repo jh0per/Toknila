@@ -95,6 +95,11 @@ try {
   await expectText(page.locator("[data-testid=comments] [data-kind=instruction]"), "instruction", "it is an instruction comment");
 
   // The agent hands in: the card is in review. Return it with a comment: round 1.
+  // The work is committed on the ship first: handing in a ship with nothing committed is refused.
+  const ship = JSON.parse(tok("show", "WEB-1", "--json")).ship.path;
+  writeFileSync(join(ship, "work.txt"), "work\n");
+  git(ship, "add", "work.txt");
+  git(ship, "commit", "--quiet", "-m", "work");
   tok("sim", "WEB-1", "finish", "first try");
   await expectText(status, "review", "the agent finished, the card is in review");
   await page.getByRole("button", { name: "Return", exact: true }).click();

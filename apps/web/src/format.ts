@@ -46,6 +46,8 @@ export function reasonText(r: StatusReason | null | undefined): string {
         case "dependency_reopened": return `dependency reopened: ${b.dependency}`;
         case "merge_conflict": return `merge conflict: ${b.detail}`;
         case "base_checkout_dirty": return `${b.path} has local changes; commit or stash them, then unblock`;
+        case "ship_uncommitted": return `the ship has changes that are not committed (${b.files.slice(0, 8).join(", ")}${b.files.length > 8 ? ` and ${b.files.length - 8} more` : ""}); commit them on the ship, then unblock`;
+        case "ship_empty": return "the ship's branch has no commit of its own, so there is nothing to merge; commit the work on the ship, then unblock";
         case "merge_failed": return `merge failed: ${b.detail}`;
         case "ci_failed": return `checks failed: ${b.checks.join(", ")}`;
         case "pr_closed": return "the pull request was closed without merging";

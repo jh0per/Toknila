@@ -347,6 +347,10 @@ fn a_return_goes_to_the_same_live_agent_session_and_is_delivered_once() {
     });
     let first_run = tok.run(&["show", "DEMO-1"])["ship"]["path"].clone();
 
+    let ship = PathBuf::from(first_run.as_str().expect("ship path"));
+    std::fs::write(ship.join("alpha.txt"), "alpha\n").expect("write");
+    git(&ship, &["add", "alpha.txt"]);
+    git(&ship, &["commit", "--quiet", "-m", "alpha"]);
     tok.run(&["sim", "DEMO-1", "finish", "first try"]);
     assert_eq!(tok.status("DEMO-1"), "review");
     tok.run(&["return", "DEMO-1", "fix the look"]);
