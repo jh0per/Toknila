@@ -240,12 +240,7 @@ fn without_a_ship_there_is_no_directory_and_the_ticket_is_blocked_with_the_reaso
     settle(&mut mem);
     let t = a(&mem);
     assert_eq!(t.status, TicketStatus::Blocked);
-    assert_eq!(
-        blocked_reason(&t),
-        BlockedReason::Crashed {
-            detail: RunnerError::NoWorkingDir.to_string()
-        }
-    );
+    assert_eq!(blocked_reason(&t), BlockedReason::NoWorkingDir);
     assert!(mem.runner.started.borrow().is_empty());
 }
 

@@ -24,6 +24,7 @@ export function reasonText(r: StatusReason | null | undefined): string {
         case "pr_closed": return "the pull request was closed without merging";
         case "runner_lost": return "runner lost";
         case "ship_failed": return `ship failed: ${b.detail}`;
+        case "no_working_dir": return "no working directory: the project has no repository; give it one or use the sim profile";
       }
     }
   }

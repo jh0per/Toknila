@@ -231,8 +231,8 @@ worker; the reviewer's output is read, never written, with `?role=reviewer`.
   `env` is added to the daemon's environment.
 - **Where.** After the ship is ready, with the ship's worktree as working directory. A project
   without a repository has no ship and so no directory: the runner is refused with a typed error
-  (`RunnerError::NoWorkingDir`) and the ticket is Blocked(`crashed`, with that text); use `sim` or
-  give the project a repository. A failed ship starts no runner (the ticket is blocked by that).
+  (`RunnerError::NoWorkingDir`) and the ticket is Blocked(`no_working_dir`); unblocking starts the
+  ship and the runner again, like `ship_failed`. Use `sim` or give the project a repository. A failed ship starts no runner (the ticket is blocked by that).
 - **Ensure, not restart.** Starting a ticket whose runner is still live keeps it (`Return` after
   `finished`: the agent may still be there). A stop kills the process; the exit is journaled but is
   not a crash.

@@ -61,14 +61,18 @@ pub(crate) fn started<U: UnitOfWork + ?Sized>(uow: &mut U, run: Run) -> AppResul
     uow.emit(&DomainEvent::RunnerStarted { run })
 }
 
-/// The host could not start the runner: the ticket is blocked as crashed, with the reason.
+/// The host could not start the runner: the ticket is blocked with `no_working_dir` when it has no
+/// directory, else as crashed, with the reason.
 pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     ticket: TicketId,
     error: &RunnerError,
 ) -> AppResult<()> {
-    let reason = BlockedReason::Crashed {
-        detail: error.to_string(),
+    let reason = match error {
+        RunnerError::NoWorkingDir => BlockedReason::NoWorkingDir,
+        other => BlockedReason::Crashed {
+            detail: other.to_string(),
+        },
     };
     tell_ticket(uow, ticket, TicketEvent::Block { reason })
 }

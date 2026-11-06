@@ -365,6 +365,19 @@ fn unblock_to_running_prepares_the_ship_again() {
 }
 
 #[test]
+fn unblock_after_no_working_dir_starts_the_ship_and_runner_again() {
+    let blocked = ok(
+        TicketStatus::Running,
+        TicketEvent::Block {
+            reason: BlockedReason::NoWorkingDir,
+        },
+    );
+    assert_eq!(blocked.effects, vec![Effect::StopRunner]);
+    let tr = apply(&blocked.ticket, &TicketEvent::Unblock, NOW).expect("unblock");
+    assert_eq!(tr.effects, vec![Effect::PrepareShip, Effect::EnsureRunner]);
+}
+
+#[test]
 fn ship_ready_tells_an_active_ticket_its_branch_without_moving_it() {
     for from in [TicketStatus::Running, TicketStatus::Waiting] {
         let tr = ok(
@@ -721,6 +734,7 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(BlockedReason::ShipFailed {
             detail: "s".to_owned()
         }),
+        Just(BlockedReason::NoWorkingDir),
         Just(BlockedReason::MergeConflict {
             detail: "m".to_owned()
         }),

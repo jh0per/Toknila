@@ -2744,6 +2744,21 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "The runner has no directory to start in: the project has no repository, so the ticket has\nno ship. Unblocking starts the ship and the runner again.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "no_working_dir"
+                ]
+              }
+            }
           }
         ],
         "description": "Why a ticket is Blocked."

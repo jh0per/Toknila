@@ -280,6 +280,20 @@ fn agent_profile_roundtrips() {
 }
 
 #[test]
+fn pinned_no_working_dir_reason_json() {
+    let reason = StatusReason::Blocked {
+        reason: BlockedReason::NoWorkingDir,
+        resume_to: TicketStatus::Running,
+        waiting: None,
+    };
+    assert_eq!(
+        serde_json::to_string(&reason).expect("serialize"),
+        r#"{"status":"blocked","reason":{"kind":"no_working_dir"},"resume_to":"running"}"#
+    );
+    roundtrip(&ticket(TicketStatus::Blocked, Some(reason)));
+}
+
+#[test]
 fn pinned_ticket_json_shape() {
     // Other processes (CLI --json, web page) read this shape; changes must be deliberate.
     let mut t = ticket(TicketStatus::Blocked, None);

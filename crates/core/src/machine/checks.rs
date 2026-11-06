@@ -33,6 +33,7 @@ pub(super) fn block(
         BlockedReason::Crashed { .. }
             | BlockedReason::RunnerLost
             | BlockedReason::ShipFailed { .. }
+            | BlockedReason::NoWorkingDir
     ) {
         effects.push(Effect::StopRunner);
     }

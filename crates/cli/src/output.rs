@@ -364,6 +364,15 @@ mod tests {
             waiting: None,
         };
         assert_eq!(reason(Some(&blocked)), "manual: key");
+        let no_dir = StatusReason::Blocked {
+            reason: BlockedReason::NoWorkingDir,
+            resume_to: TicketStatus::Running,
+            waiting: None,
+        };
+        assert_eq!(
+            reason(Some(&no_dir)),
+            "no_working_dir: the project has no repository, so the ticket has no ship; give it one or use the sim profile"
+        );
         assert_eq!(reason(None), "");
     }
 
