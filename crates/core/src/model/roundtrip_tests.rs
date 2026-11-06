@@ -264,12 +264,9 @@ fn releases_roundtrip() {
 #[test]
 fn agent_profile_roundtrips() {
     roundtrip(&AgentProfile::sim());
+    roundtrip(&AgentProfile::claude_code());
     for role in [AgentRole::Worker, AgentRole::Reviewer, AgentRole::Release] {
-        roundtrip(&AgentProfile {
-            name: "x".to_owned(),
-            role,
-            kind: ProfileKind::Sim,
-        });
+        roundtrip(&AgentProfile::new("x", role, vec!["x".to_owned()]));
     }
 }
 

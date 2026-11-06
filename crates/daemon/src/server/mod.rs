@@ -1,5 +1,6 @@
 //! HTTP server on 127.0.0.1: random port, bearer token, `/healthz`, graceful shutdown.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -29,6 +30,8 @@ pub struct AppState {
     pub store: Store,
     pub token: Arc<str>,
     pub shutdown: Arc<Notify>,
+    /// The profiles folder (`Paths::profiles`); read on every request, so edits apply at once.
+    pub profiles: PathBuf,
 }
 
 /// Current wall-clock time.

@@ -2,6 +2,9 @@
 //! folder, and JSON snapshots in `tests/snapshots/` (`TOKNILA_UPDATE_SNAPSHOTS=1` rewrites them
 //! after an intended change).
 
+// Each test file uses only some helpers.
+#![allow(dead_code)]
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 

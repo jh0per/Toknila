@@ -1,4 +1,5 @@
 use std::net::Ipv4Addr;
+use std::path::PathBuf;
 
 use super::*;
 use crate::info::{DaemonInfo, new_token};
@@ -18,6 +19,7 @@ async fn spawn_test_server() -> (
         store,
         token: token.clone().into(),
         shutdown: shutdown.clone(),
+        profiles: PathBuf::new(),
     };
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await

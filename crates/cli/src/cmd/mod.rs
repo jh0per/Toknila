@@ -2,6 +2,7 @@
 //! JSON answer. One module per command group; no business rules here.
 
 mod chain;
+mod profile;
 mod project;
 mod release;
 mod sim;
@@ -17,6 +18,7 @@ use toknila_client::Client;
 use toknila_daemon::paths::Paths;
 
 pub use chain::{ChainCmd, DepCmd};
+pub use profile::ProfileCmd;
 pub use project::ProjectCmd;
 pub use release::ReleaseCmd;
 pub use sim::SimCmd;
@@ -35,6 +37,9 @@ pub enum Command {
     /// Projects: one product, one repository.
     #[command(subcommand)]
     Project(ProjectCmd),
+    /// Agent profiles: how each agent is launched.
+    #[command(subcommand)]
+    Profile(ProfileCmd),
     /// Chains of tickets.
     #[command(subcommand)]
     Chain(ChainCmd),
@@ -153,6 +158,7 @@ pub fn run(cmd: Command, json_out: bool) -> Result<()> {
     match cmd {
         Command::Daemon(_) => unreachable!("handled above"),
         Command::Project(p) => project::run(&c, p, json_out),
+        Command::Profile(p) => profile::run(&c, p, json_out),
         Command::Chain(ch) => chain::run(&c, ch, json_out),
         Command::Dep(d) => chain::dep(&c, d, json_out),
         Command::Ticket(t) => ticket::run(&c, t, json_out),

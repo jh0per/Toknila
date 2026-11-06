@@ -12,6 +12,7 @@ use tower::ServiceExt;
 use crate::server::{AppState, router};
 use crate::store::Store;
 
+mod profiles;
 mod threads;
 
 const TOKEN: &str = "test-token";
@@ -29,6 +30,7 @@ impl Api {
             store,
             token: TOKEN.into(),
             shutdown: Arc::new(Notify::new()),
+            profiles: dir.path().join("profiles"),
         };
         Self {
             _dir: dir,
@@ -684,6 +686,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/tickets",
             "/chains/{chain}/wildcards",
             "/events",
+            "/profiles",
             "/projects",
             "/projects/{project}",
             "/projects/{project}/chains",

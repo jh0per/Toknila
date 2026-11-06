@@ -112,6 +112,11 @@ impl Paths {
         self.home.join("daemon.last.json")
     }
 
+    /// Agent profiles: one `<name>.toml` per agent, next to the built-in `sim` and `claude-code`.
+    pub fn profiles(&self) -> PathBuf {
+        self.home.join("profiles")
+    }
+
     /// Rotated daemon logs.
     pub fn logs(&self) -> PathBuf {
         self.home.join("logs")

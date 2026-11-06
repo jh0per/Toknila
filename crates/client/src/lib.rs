@@ -8,8 +8,8 @@ use serde::de::DeserializeOwned;
 use toknila_api_types::{
     ActionInput, AgentEvent, ChainDetail, ChainFile, ChainItem, EdgeInput, ErrorBody, EventRecord,
     NewChain, NewComment, NewMessage, NewProject, NewRelease, NewSubtask, NewThread, NewTicket,
-    NewVersion, NewWildcard, PatchSubtask, PatchTicket, ReleaseEvent, ThreadDetail, TicketDetail,
-    TicketItem, TicketQuery, TicketThreads,
+    NewVersion, NewWildcard, PatchSubtask, PatchTicket, ProfileList, ReleaseEvent, ThreadDetail,
+    TicketDetail, TicketItem, TicketQuery, TicketThreads,
 };
 use toknila_core::Project;
 
@@ -116,6 +116,13 @@ impl Client {
     /// `POST /projects`.
     pub fn create_project(&self, p: &NewProject) -> ClientResult<Project> {
         self.call("POST", "/projects", Some(p))
+    }
+
+    // ---- profiles ----
+
+    /// `GET /profiles`.
+    pub fn profiles(&self) -> ClientResult<ProfileList> {
+        self.call("GET", "/profiles", NO_BODY)
     }
 
     // ---- chains ----

@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use toknila_core::graph::{ChainSummary, ChainView};
+use toknila_core::profile::{Catalog, ListedProfile, ProfileProblem};
 use toknila_core::{
     Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Release, ReleaseId, Subtask, Thread,
     ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
@@ -18,6 +19,27 @@ pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;
 pub use toknila_core::TicketPatch as PatchTicket;
 pub use toknila_core::agent::{AgentEvent, Proposal, ReleaseEvent};
+
+/// The profiles folder, the usable profiles and the files that were not.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProfileList {
+    /// Where profile files go.
+    pub folder: String,
+    pub profiles: Vec<ListedProfile>,
+    pub problems: Vec<ProfileProblem>,
+}
+
+impl ProfileList {
+    /// The catalog of the profiles folder `folder`.
+    pub fn new(folder: String, catalog: Catalog) -> Self {
+        Self {
+            folder,
+            profiles: catalog.profiles,
+            problems: catalog.problems,
+        }
+    }
+}
 
 /// A chain with its graph and computed status.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

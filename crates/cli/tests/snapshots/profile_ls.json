@@ -1,0 +1,99 @@
+{
+  "folder": "<home>/profiles",
+  "problems": [
+    {
+      "column": 1,
+      "file": "broken.toml",
+      "line": 4,
+      "message": "unknown field `idle_sec`, expected one of `idle_secs`, `max_nudges`, `message`"
+    }
+  ],
+  "profiles": [
+    {
+      "file": null,
+      "profile": {
+        "command": [],
+        "env": {},
+        "hooks": {
+          "enabled": false,
+          "settings_flag": null
+        },
+        "instructions_file": null,
+        "mcp": {
+          "config_flag": null,
+          "enabled": false
+        },
+        "name": "sim",
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        },
+        "output": {
+          "scrollback_lines": 10000,
+          "strip_ansi": true
+        },
+        "role": "worker"
+      }
+    },
+    {
+      "file": null,
+      "profile": {
+        "command": [
+          "claude"
+        ],
+        "env": {},
+        "hooks": {
+          "enabled": false,
+          "settings_flag": "--settings"
+        },
+        "instructions_file": "CLAUDE.md",
+        "mcp": {
+          "config_flag": "--mcp-config",
+          "enabled": false
+        },
+        "name": "claude-code",
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        },
+        "output": {
+          "scrollback_lines": 10000,
+          "strip_ansi": true
+        },
+        "role": "worker"
+      }
+    },
+    {
+      "file": "my-agent.toml",
+      "profile": {
+        "command": [
+          "my-agent",
+          "--headless"
+        ],
+        "env": {},
+        "hooks": {
+          "enabled": false,
+          "settings_flag": null
+        },
+        "instructions_file": null,
+        "mcp": {
+          "config_flag": null,
+          "enabled": false
+        },
+        "name": "my-agent",
+        "nudge": {
+          "idle_secs": 300,
+          "max_nudges": 3,
+          "message": "Continue, or report with the finished event."
+        },
+        "output": {
+          "scrollback_lines": 10000,
+          "strip_ansi": true
+        },
+        "role": "reviewer"
+      }
+    }
+  ]
+}

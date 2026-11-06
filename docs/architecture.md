@@ -26,10 +26,10 @@ ones above. `cargo xtask guards` checks the rules it can check mechanically.
 
 | Layer | Crate | Holds | Must not hold |
 |---|---|---|---|
-| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, threads on a card (`thread`: open, post, approve, the hand-in gate, the computed phase), entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
+| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, threads on a card (`thread`: open, post, approve, the hand-in gate, the computed phase), agent profiles (`profile`: parse and validate a profile file, the catalog of built-in and file profiles), entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
 | Application | `toknila-app` | Every use case (`projects`, `chains` with import and export, `tickets` with typed `TicketAction`, `wildcards` (proposals), `threads`, `releases` with `ReleaseAction`, comments and subtasks, agent events), the chain unit of work (`with_chain`: change, settle, save, journal, deliver), reference resolution, startup recovery, `AppError`, and the command inputs (`NewTicket`, `NewChain`, ...) the API accepts as request bodies. Ports: `Reader` and `UnitOfWork` (which carries the command's clock and actor); a `Runner` port arrives with real runners in phase 1 | `axum`, `rusqlite`, `tokio`, HTTP status codes |
 | Protocol | `toknila-api-types` | Read models (`ChainDetail::from_view`, `TicketDetail`, list items), `ErrorBody`, `EventRecord`, query and small request types; re-exports the command inputs of `toknila-app` and the agent events of core. OpenAPI is generated from them (feature `openapi`), TypeScript types from OpenAPI | Logic, transport |
-| Adapters | `toknila-daemon` | `http/` (`routes/*`: one module per resource, each handler parses, runs one use case, answers; one `ErrorBody` for every failure including 401), `server/` (router, auth, lifecycle, logging), `store/` (SQLite implementation of the ports), `stream`, `runner/` (sim now, PTY in phase 1), lifecycle (`daemon.json`, signals), paths, logging, embedded web assets | Business rules |
+| Adapters | `toknila-daemon` | `http/` (`routes/*`: one module per resource, each handler parses, runs one use case, answers; one `ErrorBody` for every failure including 401), `server/` (router, auth, lifecycle, logging), `store/` (SQLite implementation of the ports), `stream`, `runner/` (sim now, PTY in phase 1), lifecycle (`daemon.json`, signals), paths, `profiles` (reads the profiles folder), logging, embedded web assets | Business rules |
 | Client | `toknila-client` | Typed blocking HTTP client of the API: one method per route, `ClientError` carrying the daemon's `ErrorBody`, the stream address | Output formatting |
 | Presentation | `crates/cli`, `apps/web`, `apps/desktop` | Argument parsing and output (CLI); MVI screens (web); the Tauri 2 shell that starts or attaches to the daemon | Domain rules |
 
@@ -51,6 +51,26 @@ Commands and state travel separately.
 Reads do not go through use cases with side effects: query functions build read models
 (chain detail, ticket list). The database is the source of truth; computed values (chain status,
 progress, where a chain stopped) are never stored, here or in a client.
+
+## Agent profiles
+
+A profile says how to launch one agent: `command` (an argv list, never a shell string), `env`,
+`role` (`worker`, `reviewer` or `release`), `instructions_file`, `mcp` and `hooks` wiring, `output`
+rules and `nudge` thresholds. The working directory is not in it: the ship supplies it at launch.
+A new agent is a new file, not new code.
+
+- Built in: `sim` (starts no process; a person sends its events with `tok sim`) and `claude-code`
+  (launches `claude`; its `mcp` and `hooks` wiring is a placeholder until the MCP ticket fills it).
+- Files: `<name>.toml` in the `profiles` folder of the data home (`Paths::profiles()`):
+  `~/Library/Application Support/toknila/profiles` on macOS, `%APPDATA%\toknila\profiles` on
+  Windows, `~/.toknila/profiles` on Linux, or `$TOKNILA_HOME/profiles`. The file name is the
+  profile name (lowercase letters, digits, `-`, `_`). A file named like a built-in profile is
+  rejected, not an override. The format is documented at the top of `crates/core/src/profile/mod.rs`.
+- Every `GET /v1/profiles` reads the folder again, so an edit applies at once. Core validates
+  (`profile::parse`, typed `ProfileError` with line and column) and builds the catalog; the daemon
+  only reads the files. An invalid file does not hide the others: the answer lists the usable
+  profiles and the problems (`file`, `line`, `column`, `message`), and `tok profile ls` prints
+  the problems on stderr as `path:line:col: message`.
 
 ## Presentation: MVI
 

@@ -3,6 +3,7 @@
 
 pub mod chains;
 pub mod events;
+pub mod profiles;
 pub mod projects;
 pub mod releases;
 pub mod threads;
