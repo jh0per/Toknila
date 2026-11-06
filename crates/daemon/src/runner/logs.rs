@@ -62,14 +62,21 @@ impl RunLog {
         })
     }
 
-    /// Appends output, rotating first when it would pass the cap. A chunk is never split.
-    pub fn write(&mut self, bytes: &[u8]) -> std::io::Result<()> {
-        if self.written > 0 && self.written + bytes.len() as u64 > self.cap {
-            self.rotate()?;
+    /// Appends output, rotating whenever the file is full; a chunk that does not fit is split, so
+    /// a file never holds more than the cap.
+    pub fn write(&mut self, mut bytes: &[u8]) -> std::io::Result<()> {
+        let cap = self.cap.max(1);
+        while !bytes.is_empty() {
+            if self.written >= cap {
+                self.rotate()?;
+            }
+            let room = usize::try_from(cap - self.written).unwrap_or(usize::MAX);
+            let (now, later) = bytes.split_at(room.min(bytes.len()));
+            self.file.write_all(now)?;
+            self.file.flush()?;
+            self.written += now.len() as u64;
+            bytes = later;
         }
-        self.file.write_all(bytes)?;
-        self.file.flush()?;
-        self.written += bytes.len() as u64;
         Ok(())
     }
 
@@ -186,6 +193,21 @@ mod tests {
         let kept = load(&file, 100).expect("load");
         assert_eq!(kept.end(), 25);
         assert_eq!(kept.from(0), (10, b"cccc\ndddd\neeee\n".as_slice()));
+    }
+
+    #[test]
+    fn one_chunk_larger_than_the_cap_is_split_across_the_rotation() {
+        let dir = tempfile::tempdir().expect("dir");
+        let (ticket, run) = (TicketId::new(), run_id(1));
+        let mut log = RunLog::create(dir.path(), ticket, run, 4).expect("create");
+        log.write(b"abcdefghij").expect("write");
+        let file = path(dir.path(), ticket, run);
+        assert_eq!(std::fs::read(&file).expect("log"), b"ij");
+        assert_eq!(std::fs::read(rotated(&file)).expect("rotated"), b"efgh");
+        assert_eq!(
+            load(&file, 10).expect("load").from(0),
+            (4, b"efghij".as_slice())
+        );
     }
 
     #[test]
