@@ -17,6 +17,7 @@ dmg="${1:-$(ls "$root"/dist/app/Toknila-*.dmg | head -n 1)}"
 want="$(sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\(.*\)"/\1/p;}' "$root/Cargo.toml")"
 
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/toknila-smoke.XXXXXX")"
+tmp="$(cd "$tmp" && pwd -P)"   # the resolved path is what process listings show
 mnt="$tmp/mnt"
 home="$tmp/data home"
 copy="$tmp/with space"
