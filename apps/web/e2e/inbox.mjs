@@ -6,10 +6,10 @@
 // taken on three cards that a later card was imported done behind.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, launch } from "./helpers.mjs";
+import { checks, cleanup, launch } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -121,10 +121,5 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  try {
-    tok("daemon", "stop");
-  } catch {
-    /* already stopped */
-  }
-  rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  await cleanup(tok, home);
 }
