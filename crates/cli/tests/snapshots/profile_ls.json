@@ -39,7 +39,8 @@
         "permissions": {
           "allow": []
         },
-        "role": "worker"
+        "role": "worker",
+        "startup_secs": 20
       }
     },
     {
@@ -84,7 +85,8 @@
             "mcp__toknila"
           ]
         },
-        "role": "worker"
+        "role": "worker",
+        "startup_secs": 20
       }
     },
     {
@@ -117,7 +119,8 @@
         "permissions": {
           "allow": []
         },
-        "role": "reviewer"
+        "role": "reviewer",
+        "startup_secs": 20
       }
     },
     {
@@ -168,7 +171,8 @@
             "mcp__toknila"
           ]
         },
-        "role": "reviewer"
+        "role": "reviewer",
+        "startup_secs": 20
       }
     },
     {
@@ -204,7 +208,8 @@
         "permissions": {
           "allow": []
         },
-        "role": "reviewer"
+        "role": "reviewer",
+        "startup_secs": 20
       }
     }
   ]

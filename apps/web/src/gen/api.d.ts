@@ -391,7 +391,9 @@ export interface paths {
         put?: never;
         /**
          * A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;
-         *     nothing about the ticket changes unless the signal shows work and the ticket waits.
+         *     it also ends the run's startup wait and the questions that were open for it. A `PreToolUse`
+         *     hook says which tool is about to run, and a permission notification (`prompt`) asks the person
+         *     (the worker's card waits, a reviewer's dialog is listed in the inbox).
          */
         post: operations["ticket_activity"];
         delete?: never;
@@ -463,6 +465,50 @@ export interface paths {
         put?: never;
         /** A person's decision about the open subtasks left behind a card done out of order. */
         post: operations["resolve_leftovers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/permission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The agent's `PermissionRequest` hook: a permission dialog is about to show. The worker's card
+         *     waits for the person (a reviewer's dialog is listed in the inbox), and the call is held until
+         *     the person allows or denies in the window, up to the daemon's wait; then the agent shows its
+         *     own dialog (`decision: ask`).
+         */
+        post: operations["agent_permission"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/runner/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A person's answer to what the ticket's worker or reviewer asks: allow or deny a permission, or
+         *     a key or text for an agent that waits on its screen. Core says which answers the open question
+         *     takes; an answer to a permission goes to the agent's waiting hook, else to its terminal. The
+         *     card of a waiting worker is Running again at once.
+         */
+        post: operations["runner_answer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -789,12 +835,23 @@ export interface components {
             output: components["schemas"]["OutputRules"];
             permissions?: components["schemas"]["Permissions"];
             role: components["schemas"]["AgentRole"];
+            /**
+             * Format: int64
+             * @description Seconds after spawn without any sign of life from the agent (hook or MCP) before the
+             *     window shows that it waits on its screen. 0 turns the check off.
+             */
+            startup_secs?: number;
         };
         /**
          * @description What an agent profile is for.
          * @enum {string}
          */
         AgentRole: "worker" | "reviewer" | "release";
+        /**
+         * @description One way a person answers a question.
+         * @enum {string}
+         */
+        AnswerKind: "allow" | "deny" | "text" | "enter" | "one" | "two" | "escape";
         /**
          * @description How an artifact body is to be read.
          * @enum {string}
@@ -1041,15 +1098,26 @@ export interface components {
              *     no other card action.
              */
             allowed_actions: components["schemas"]["TicketAction"][];
+            /**
+             * @description How the question can be answered, as core allows it (`question` items; empty for an
+             *     `ask_human` question, which a comment answers).
+             */
+            answers?: components["schemas"]["AnswerKind"][];
             chain: components["schemas"]["ChainId"];
             /** @description The cards done out of order that these subtasks are behind (`leftovers` items). */
             done_cards: components["schemas"]["TicketKey"][];
             kind: components["schemas"]["InboxKind"];
             /**
+             * @description The last lines of the agent's screen, ANSI removed (`question` items of an agent that
+             *     waits on its screen).
+             */
+            lines?: string[];
+            /**
              * @description The card's pull request on GitHub, for a blocked card that has one (failed checks, a
              *     closed pull request, a conflict); absent otherwise.
              */
             link?: string | null;
+            role?: components["schemas"]["AgentRole"] | null;
             /** @description Since when it waits; items are sorted by this, newest first. */
             since: components["schemas"]["Timestamp"];
             /** @description The open subtasks, verbatim (`leftovers` items). */
@@ -1127,12 +1195,29 @@ export interface components {
         MessageKind: "message" | "changes_requested";
         /** @description Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook. */
         NewActivity: {
+            /**
+             * @description A permission prompt notification: its message. The ticket's worker then waits for the
+             *     person; a reviewer's prompt is listed in the inbox.
+             */
+            prompt?: string | null;
             /** @description Claude Code's session id, from the hook's input. */
             session_id?: string | null;
             /** @description What fired, for example `hook:stop`. */
             signal: string;
+            /**
+             * @description A `PreToolUse` hook: the summary of the tool call that is about to run (the command or the
+             *     file, at most 300 characters), kept to say what a later permission prompt is about.
+             */
+            tool?: string | null;
             /** @description The session's transcript file, from the hook's input. */
             transcript_path?: string | null;
+        };
+        /** @description Body of `POST /v1/tickets/{ticket}/runner/answer`: a person's answer to what an agent asks. */
+        NewAnswer: {
+            answer: components["schemas"]["AnswerKind"];
+            role?: components["schemas"]["AgentRole"] | null;
+            /** @description The text of a `text` answer; the optional comment of a `deny`. */
+            text?: string | null;
         };
         /** @description `POST /v1/projects/{project}/chains`. */
         NewChain: {
@@ -1332,6 +1417,28 @@ export interface components {
             review_mode?: components["schemas"]["ReviewMode"] | null;
             reviewer?: string | null;
             title?: string | null;
+        };
+        /**
+         * @description Body of `POST /v1/tickets/{ticket}/permission`: an agent's `PermissionRequest` hook, which
+         *     waits for the person's decision.
+         */
+        PermissionAsk: {
+            /**
+             * @description Summary of the tool call that needs permission (the command or the file); the daemon
+             *     uses the last one it was told when this is absent.
+             */
+            tool?: string | null;
+        };
+        /**
+         * @description What the person decided.
+         * @enum {string}
+         */
+        PermissionDecision: "allow" | "deny" | "ask";
+        /** @description Answer of `POST /v1/tickets/{ticket}/permission`. */
+        PermissionReply: {
+            decision: components["schemas"]["PermissionDecision"];
+            /** @description Why it was denied, for the agent. */
+            message?: string | null;
         };
         /**
          * @description What the agent may do without asking, in the agent's own rule syntax. The runner writes the
@@ -3121,9 +3228,103 @@ export interface operations {
             };
         };
     };
-    runner_input: {
+    agent_permission: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PermissionAsk"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionReply"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    runner_answer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewAnswer"];
+            };
+        };
+        responses: {
+            /** @description Delivered to the agent and journaled */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    runner_input: {
+        parameters: {
+            query?: {
+                /** @description `worker` (the default) or `reviewer`. */
+                role?: components["schemas"]["AgentRole"] | null;
+            };
             header?: never;
             path: {
                 /** @description Ticket id or key */
@@ -3174,7 +3375,7 @@ export interface operations {
     scrollback: {
         parameters: {
             query?: {
-                /** @description `worker` (the default) or `reviewer`. The reviewer's terminal is read-only. */
+                /** @description `worker` (the default) or `reviewer`. */
                 role?: components["schemas"]["AgentRole"] | null;
             };
             header?: never;

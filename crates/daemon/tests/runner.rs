@@ -739,6 +739,7 @@ fn claude_code_variables_of_the_daemon_do_not_reach_the_agent_unless_its_profile
         "other variables are inherited as before"
     );
     rig.wait_end();
+}
 
 #[test]
 fn typing_addressed_to_the_reviewer_reaches_the_reviewer_and_not_the_worker() {

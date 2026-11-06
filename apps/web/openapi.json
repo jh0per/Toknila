@@ -1267,7 +1267,7 @@
         "tags": [
           "agent"
         ],
-        "summary": "A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;\nnothing about the ticket changes unless the signal shows work and the ticket waits.",
+        "summary": "A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;\nit also ends the run's startup wait and the questions that were open for it. A `PreToolUse`\nhook says which tool is about to run, and a permission notification (`prompt`) asks the person\n(the worker's card waits, a reviewer's dialog is listed in the inbox).",
         "operationId": "ticket_activity",
         "parameters": [
           {
@@ -1556,6 +1556,127 @@
         }
       }
     },
+    "/tickets/{ticket}/permission": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "The agent's `PermissionRequest` hook: a permission dialog is about to show. The worker's card\nwaits for the person (a reviewer's dialog is listed in the inbox), and the call is held until\nthe person allows or denies in the window, up to the daemon's wait; then the agent shows its\nown dialog (`decision: ask`).",
+        "operationId": "agent_permission",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionReply"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/runner/answer": {
+      "post": {
+        "tags": [
+          "runner"
+        ],
+        "summary": "A person's answer to what the ticket's worker or reviewer asks: allow or deny a permission, or\na key or text for an agent that waits on its screen. Core says which answers the open question\ntakes; an answer to a permission goes to the agent's waiting hook, else to its terminal. The\ncard of a waiting worker is Running again at once.",
+        "operationId": "runner_answer",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Delivered to the agent and journaled"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/runner/input": {
       "post": {
         "tags": [
@@ -1570,6 +1691,22 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "description": "`worker` (the default) or `reviewer`.",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AgentRole"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         ],
@@ -1642,7 +1779,7 @@
           {
             "name": "role",
             "in": "query",
-            "description": "`worker` (the default) or `reviewer`. The reviewer's terminal is read-only.",
+            "description": "`worker` (the default) or `reviewer`.",
             "required": false,
             "schema": {
               "oneOf": [
@@ -2640,6 +2777,12 @@
           },
           "role": {
             "$ref": "#/components/schemas/AgentRole"
+          },
+          "startup_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds after spawn without any sign of life from the agent (hook or MCP) before the\nwindow shows that it waits on its screen. 0 turns the check off.",
+            "minimum": 0
           }
         }
       },
@@ -2650,6 +2793,19 @@
           "worker",
           "reviewer",
           "release"
+        ]
+      },
+      "AnswerKind": {
+        "type": "string",
+        "description": "One way a person answers a question.",
+        "enum": [
+          "allow",
+          "deny",
+          "text",
+          "enter",
+          "one",
+          "two",
+          "escape"
         ]
       },
       "ArtifactFormat": {
@@ -3455,6 +3611,13 @@
             },
             "description": "What a person may do to the card now, as the state machine allows it; the window offers\nno other card action."
           },
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnswerKind"
+            },
+            "description": "How the question can be answered, as core allows it (`question` items; empty for an\n`ask_human` question, which a comment answers)."
+          },
           "chain": {
             "$ref": "#/components/schemas/ChainId"
           },
@@ -3468,12 +3631,30 @@
           "kind": {
             "$ref": "#/components/schemas/InboxKind"
           },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The last lines of the agent's screen, ANSI removed (`question` items of an agent that\nwaits on its screen)."
+          },
           "link": {
             "type": [
               "string",
               "null"
             ],
             "description": "The card's pull request on GitHub, for a blocked card that has one (failed checks, a\nclosed pull request, a conflict); absent otherwise."
+          },
+          "role": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AgentRole",
+                "description": "Whose question it is (`question` items): the card's worker or its reviewer."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "since": {
             "$ref": "#/components/schemas/Timestamp",
@@ -3632,6 +3813,13 @@
           "signal"
         ],
         "properties": {
+          "prompt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A permission prompt notification: its message. The ticket's worker then waits for the\nperson; a reviewer's prompt is listed in the inbox."
+          },
           "session_id": {
             "type": [
               "string",
@@ -3643,12 +3831,49 @@
             "type": "string",
             "description": "What fired, for example `hook:stop`."
           },
+          "tool": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A `PreToolUse` hook: the summary of the tool call that is about to run (the command or the\nfile, at most 300 characters), kept to say what a later permission prompt is about."
+          },
           "transcript_path": {
             "type": [
               "string",
               "null"
             ],
             "description": "The session's transcript file, from the hook's input."
+          }
+        }
+      },
+      "NewAnswer": {
+        "type": "object",
+        "description": "Body of `POST /v1/tickets/{ticket}/runner/answer`: a person's answer to what an agent asks.",
+        "required": [
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/AnswerKind"
+          },
+          "role": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AgentRole",
+                "description": "Whose question: the ticket's `worker` (the default) or its `reviewer`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The text of a `text` answer; the optional comment of a `deny`."
           }
         }
       },
@@ -4290,6 +4515,47 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "PermissionAsk": {
+        "type": "object",
+        "description": "Body of `POST /v1/tickets/{ticket}/permission`: an agent's `PermissionRequest` hook, which\nwaits for the person's decision.",
+        "properties": {
+          "tool": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Summary of the tool call that needs permission (the command or the file); the daemon\nuses the last one it was told when this is absent."
+          }
+        }
+      },
+      "PermissionDecision": {
+        "type": "string",
+        "description": "What the person decided.",
+        "enum": [
+          "allow",
+          "deny",
+          "ask"
+        ]
+      },
+      "PermissionReply": {
+        "type": "object",
+        "description": "Answer of `POST /v1/tickets/{ticket}/permission`.",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/PermissionDecision"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it was denied, for the agent."
           }
         }
       },
