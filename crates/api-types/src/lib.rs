@@ -301,6 +301,19 @@ pub struct ErrorBody {
     pub error: String,
     /// Stable machine code: not_found, bad_request, conflict, ambiguous, internal, unauthorized.
     pub code: String,
+    /// The input the error belongs to (`repo_path`, `work_branch`, `default_profile`), when it
+    /// is about one field; a form shows the message next to that field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+}
+
+/// `POST /v1/repos/check`: the folder a person is about to make a project of.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoCheckRequest {
+    pub repo_path: String,
+    /// The base branch to look for; default `develop`.
+    pub work_branch: Option<String>,
 }
 
 /// One journal entry. `seq` is increasing; clients resume from it.

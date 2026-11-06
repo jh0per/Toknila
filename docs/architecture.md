@@ -26,7 +26,7 @@ ones above. `cargo xtask guards` checks the rules it can check mechanically.
 
 | Layer | Crate | Holds | Must not hold |
 |---|---|---|---|
-| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, threads on a card (`thread`: open, post, approve, the hand-in gate, the computed phase), agent profiles (`profile`: parse and validate a profile file, the catalog of built-in and file profiles), parallel agents (`schedule`: slots, the queue, who starts next), entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
+| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, threads on a card (`thread`: open, post, approve, the hand-in gate, the computed phase), agent profiles (`profile`: parse and validate a profile file, the catalog of built-in and file profiles), parallel agents (`schedule`: slots, the queue, who starts next), the system checks and the folder check of a project (`system`, `repo`: what the tools said and what is wrong, as data), entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
 | Application | `toknila-app` | Every use case (`projects`, `chains` with import and export, `tickets` with typed `TicketAction`, `wildcards` (proposals), `threads`, `releases` with `ReleaseAction`, comments and subtasks, agent events), the chain unit of work (`with_chain`: change, settle, save, journal, deliver, then start the cards the schedule gives a slot), reference resolution, startup recovery, `AppError`, and the command inputs (`NewTicket`, `NewChain`, ...) the API accepts as request bodies. Ports: `Reader` and `UnitOfWork` (which carries the command's clock and actor); a `Runner` port arrives with real runners in phase 1 | `axum`, `rusqlite`, `tokio`, HTTP status codes |
 | Protocol | `toknila-api-types` | Read models (`ChainDetail::from_view`, `TicketDetail`, list items), `ErrorBody`, `EventRecord`, query and small request types; re-exports the command inputs of `toknila-app` and the agent events of core. OpenAPI is generated from them (feature `openapi`), TypeScript types from OpenAPI | Logic, transport |
 | Adapters | `toknila-daemon` | `http/` (`routes/*`: one module per resource, each handler parses, runs one use case, answers; one `ErrorBody` for every failure including 401), `server/` (router, auth, lifecycle, logging), `store/` (SQLite implementation of the ports), `stream`, `runner/` (sim now, PTY in phase 1), lifecycle (`daemon.json`, signals), paths, `profiles` (reads the profiles folder), logging, embedded web assets | Business rules |
@@ -217,6 +217,50 @@ the agent hands in and passes it to the machine in the `Finished` event.
   or Waiting, and each live runner of a card in Running, Waiting or Review holds one too, counted
   once. A card in review with its worker and its reviewer alive uses two. A merged, cancelled or
   blocked card's runners are being stopped by the same command, so they already count as free.
+
+## Settings and onboarding
+
+Everything needed to set a project up is possible in the window; the CLI stays a second way in.
+The web shows what the daemon says and keeps no rule of its own.
+
+- **Tools.** The daemon runs `git`, `claude` and `gh` through the `Tools` trait (`daemon/src/tools.rs`):
+  an argument list, no shell, a timeout of 10 seconds each, the process killed when it hangs. The
+  answer is a `toknila_core::system::Probe` (missing, timed out, failed, or ran with code and
+  output). `AppState.tools` is the production runner (`SystemTools`); tests inject a fake, so no
+  test needs `claude` or `gh` installed.
+- **System checks.** `GET /v1/system/checks` runs the probes in parallel and core judges them
+  (`system::git`, `claude`, `gh`): git needs 2.38 for `git merge-tree --write-tree`; `claude` must
+  answer `--version`; `gh` must answer `--version` and `gh auth status`. Each check has a status
+  (`ok`, `missing`, `outdated`, `not_logged_in`, `failed`), the version, a sentence and a fix hint.
+  Settings and onboarding show them.
+- **Folder check.** `POST /v1/repos/check` (`{repo_path, work_branch?}`, base default `develop`)
+  gathers facts (stat the path; `git rev-parse --is-inside-work-tree`; the local branches) and
+  core judges them (`repo::judge`): `path_empty`, `path_not_absolute`, `path_missing`,
+  `not_a_directory`, `not_a_git_repo`, `git_missing` on field `repo_path`, `branch_missing` on
+  `work_branch` (with the repository's branches so a form can offer them). It always answers 200;
+  the problems are data.
+- **Typed refusals.** `POST /v1/projects` with a `repo_path`, and `PATCH /v1/projects/{p}` with a
+  new `work_branch`, run the same check and answer 400 with `{error, code, field}`: `code` is the
+  problem code and `field` the input it belongs to (`ErrorBody.field`, absent for errors that
+  belong to no field). The same shape carries `profile_unknown` (a default profile that is not in
+  the catalog) on `default_profile` and `limit_out_of_range` on `max_parallel`. A project created
+  without a repository is not checked (a simulated project needs none).
+- **Project settings.** `PATCH /v1/projects/{p}` reads and saves default profile, parallel limit,
+  review mode, reviewer profile and base branch; all five live in the project row, so they survive
+  a daemon restart. The merge mode arrives with the GitHub ticket and gets its row in
+  `ProjectSettings`, where the layout keeps the place.
+- **Window.** `/settings` and `/projects/{p}/settings` (`Settings.tsx`): checks, project settings,
+  a chain-file import (the browser reads the file; `POST /v1/projects/{p}/import` is the existing
+  route), and a form to add another project. With no project the home page is onboarding
+  (`Onboarding.tsx`): the checks, then the add-project form, which opens the new project's
+  settings. The form first calls the folder check, so every problem shows next to its field. Store:
+  `store/settings.ts` (state, reducer) and `store/settingsEffects.ts` (network).
+- **Folder picker.** A text field with a paste-friendly path, not a native picker. The desktop
+  window loads the daemon's page as a remote URL, so a dialog plugin would need the Tauri IPC
+  opened to that page; and a browser file input never yields a path. Revisit if the shell ever
+  serves the page itself.
+- **Spec folders** still import with `tok chain import <folder>`: reading a folder is a CLI
+  adapter (`cmd/spec.rs`) and the window offers the chain file only.
 
 ## Agent access
 

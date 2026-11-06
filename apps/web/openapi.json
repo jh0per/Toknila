@@ -583,6 +583,7 @@
         "tags": [
           "projects"
         ],
+        "summary": "Creates a project. A folder (`repo_path`) must be a repository with the base branch; the\nrefusal names the field.",
         "operationId": "create_project",
         "requestBody": {
           "content": {
@@ -667,7 +668,7 @@
         "tags": [
           "projects"
         ],
-        "summary": "Changes project settings. A higher parallel limit starts waiting cards at once; a lower one\nnever stops a running agent.",
+        "summary": "Changes project settings. A higher parallel limit starts waiting cards at once; a lower one\nnever stops a running agent. A new base branch must exist in the project's repository and a\ndefault profile must be in the catalog; the refusal names the field.",
         "operationId": "patch_project",
         "parameters": [
           {
@@ -954,6 +955,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/check": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Is this folder a git repository with the base branch? The branches come back so a form can\noffer them when the base is missing.",
+        "operationId": "repos_check",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoCheck"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/checks": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Is `git` new enough, is `claude` installed, is `gh` logged in; each with a fix hint.",
+        "operationId": "system_checks",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemChecks"
                 }
               }
             }
@@ -2706,6 +2757,50 @@
           }
         }
       },
+      "Check": {
+        "type": "object",
+        "description": "One line of the system check.",
+        "required": [
+          "tool",
+          "status",
+          "detail",
+          "hint"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "What was found, in a sentence."
+          },
+          "hint": {
+            "type": "string",
+            "description": "What to do about it; always set, also when the check passes."
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus"
+          },
+          "tool": {
+            "$ref": "#/components/schemas/Tool"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The version the tool reported, when it did."
+          }
+        }
+      },
+      "CheckStatus": {
+        "type": "string",
+        "description": "The verdict on one tool.",
+        "enum": [
+          "ok",
+          "missing",
+          "outdated",
+          "not_logged_in",
+          "failed"
+        ]
+      },
       "Comment": {
         "type": "object",
         "description": "A permanent record in a ticket: an instruction from a person, an agent's report, or a decision.\nEverything said to an agent is stored here first and delivered after.",
@@ -2872,6 +2967,13 @@
           "error": {
             "type": "string",
             "description": "Human-readable message."
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The input the error belongs to (`repo_path`, `work_branch`, `default_profile`), when it\nis about one field; a form shows the message next to that field."
           }
         }
       },
@@ -3493,6 +3595,13 @@
         "type": "object",
         "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
         "properties": {
+          "default_profile": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Profile of cards that name none; a name from `GET /v1/profiles`."
+          },
           "max_parallel": {
             "type": [
               "integer",
@@ -3519,6 +3628,13 @@
               "null"
             ],
             "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
+          },
+          "work_branch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The base branch ships start from and merges go into."
           }
         }
       },
@@ -3936,6 +4052,89 @@
           "released"
         ]
       },
+      "RepoCheck": {
+        "type": "object",
+        "description": "The answer to \"may this folder be a project's repository, with this base branch?\".",
+        "required": [
+          "problems",
+          "branches"
+        ],
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Local branches of the repository, to offer when the base branch is missing; empty when\nthe folder is not a repository."
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepoProblem"
+            }
+          }
+        }
+      },
+      "RepoCheckRequest": {
+        "type": "object",
+        "description": "`POST /v1/repos/check`: the folder a person is about to make a project of.",
+        "required": [
+          "repo_path"
+        ],
+        "properties": {
+          "repo_path": {
+            "type": "string"
+          },
+          "work_branch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The base branch to look for; default `develop`."
+          }
+        }
+      },
+      "RepoField": {
+        "type": "string",
+        "description": "Which input a problem belongs to, so a client can show it next to that field.",
+        "enum": [
+          "repo_path",
+          "work_branch"
+        ]
+      },
+      "RepoProblem": {
+        "type": "object",
+        "description": "One thing that stops the folder from being used.",
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/RepoProblemCode"
+          },
+          "field": {
+            "$ref": "#/components/schemas/RepoField"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "RepoProblemCode": {
+        "type": "string",
+        "description": "What is wrong.",
+        "enum": [
+          "path_empty",
+          "path_not_absolute",
+          "path_missing",
+          "not_a_directory",
+          "not_a_git_repo",
+          "git_missing",
+          "branch_missing"
+        ]
+      },
       "Review": {
         "type": "object",
         "description": "A ticket's review state: whose turn it is while in Review, and every round so far.",
@@ -4308,6 +4507,25 @@
       "SubtaskId": {
         "type": "string",
         "description": "Identifies a [`crate::Subtask`]."
+      },
+      "SystemChecks": {
+        "type": "object",
+        "description": "All checks, and whether every one passed.",
+        "required": [
+          "ok",
+          "checks"
+        ],
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            }
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        }
       },
       "TerminalSize": {
         "type": "object",
@@ -4837,6 +5055,15 @@
         "type": "integer",
         "format": "int64",
         "description": "Milliseconds since the Unix epoch, UTC."
+      },
+      "Tool": {
+        "type": "string",
+        "description": "Which tool a check is about.",
+        "enum": [
+          "git",
+          "claude",
+          "gh"
+        ]
       },
       "Verdict": {
         "type": "string",

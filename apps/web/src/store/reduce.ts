@@ -3,6 +3,7 @@
 import type { EventRecord } from "../api/types";
 import type { Effect, Msg } from "./msg";
 import { type Route, routePath } from "./route";
+import { reduceSettings, setupLoads } from "./settings";
 import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, chainOfTicket, ticketOfEvent } from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
@@ -32,7 +33,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
         loaded: true,
         error: "",
       };
-      return [withTickets(next, msg.tickets), enter(next.route)];
+      // First run: no project yet, so the window offers the checks and a form to add one.
+      return [withTickets(next, msg.tickets), [...enter(next.route), ...(msg.projects.length ? [] : setupLoads)]];
     }
     case "projectsLoaded":
       return [{ ...s, projects: msg.projects }, []];
@@ -71,6 +73,22 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return go(s, { name: "card", project: msg.project, chain: msg.chain, key: msg.key });
     case "urlChanged":
       return [{ ...s, route: msg.route }, enter(msg.route)];
+    case "projectAdded": {
+      const [added, fx] = reduceSettings(s, msg);
+      const [moved, more] = go(added, { name: "settings", project: msg.project.key });
+      return [moved, [...fx, ...more]];
+    }
+    case "recheck":
+    case "addProject":
+    case "saveProject":
+    case "importChain":
+    case "checksLoaded":
+    case "profilesLoaded":
+    case "addRejected":
+    case "projectSaved":
+    case "chainImported":
+    case "settingsRejected":
+      return reduceSettings(s, msg);
   }
 }
 
@@ -81,6 +99,7 @@ function go(s: State, route: Route): [State, Effect[]] {
 
 /// What a screen needs fetched when it opens.
 function enter(route: Route): Effect[] {
+  if (route.name === "settings") return setupLoads;
   return route.name === "card"
     ? [{ type: "loadDetail", key: route.key }, { type: "loadThreads", key: route.key }]
     : [];

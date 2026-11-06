@@ -1,0 +1,21 @@
+/* Settings and onboarding: forms, the system checks, the reserved merge-mode row. */
+.settings { max-width: 640px; display: flex; flex-direction: column; gap: var(--s3); }
+.settings h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.settings .step { margin: var(--s2) 0 0; font-size: var(--fs-l); font-weight: 600; }
+.card-block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); padding: var(--s3) var(--s4); display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; }
+.card-block h2 { margin: 0; font-size: var(--fs-l); font-weight: 600; }
+.checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); width: 100%; }
+.checks li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); }
+.checks .detail { color: var(--muted); }
+.checks .hint { flex-basis: 100%; margin: 0 0 0 22px; color: var(--block); font-size: var(--fs-s); }
+.mark { width: 14px; text-align: center; font-weight: 700; }
+.mark.st-ok { color: var(--done); }
+.mark:not(.st-ok) { color: var(--block); }
+.form { width: 100%; }
+.field { display: flex; flex-direction: column; gap: 2px; width: 100%; font-size: var(--fs-s); color: var(--muted); }
+.field input, .field select { font: inherit; font-size: var(--fs-m); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-s); padding: 5px var(--s2); width: 100%; }
+.field-error { color: var(--danger); font-size: var(--fs-s); }
+.branches { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); font-size: var(--fs-s); }
+.reserved { border: 1px dashed var(--line); border-radius: var(--r-s); padding: var(--s2); }
+.row { display: flex; align-items: center; gap: var(--s3); }
+.saved { color: var(--done); font-size: var(--fs-s); }

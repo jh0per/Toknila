@@ -34,6 +34,10 @@ pub struct PatchProject {
     pub review_mode: Option<ReviewMode>,
     /// Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`.
     pub reviewer: Option<String>,
+    /// Profile of cards that name none; a name from `GET /v1/profiles`.
+    pub default_profile: Option<String>,
+    /// The base branch ships start from and merges go into.
+    pub work_branch: Option<String>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -79,6 +83,16 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     if let Some(n) = patch.max_parallel {
         p.max_parallel =
             schedule::check_limit(n).map_err(|e| AppError::bad_request(e.to_string()))?;
+    }
+    let name = |what: &str, v: String| match v.trim() {
+        "" => Err(AppError::bad_request(format!("{what} cannot be blank"))),
+        v => Ok(v.to_owned()),
+    };
+    if let Some(v) = patch.default_profile {
+        p.default_profile = name("the default profile", v)?;
+    }
+    if let Some(v) = patch.work_branch {
+        p.work_branch = name("the base branch", v)?;
     }
     if let Some(m) = patch.review_mode {
         p.default_review_mode = m;

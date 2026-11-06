@@ -5,6 +5,7 @@ import type {
   ChainDetail, ChainItem, EventRecord, Project, ProjectAgents, TicketDetail, TicketItem, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
+import { runSettingsEffect } from "./settingsEffects";
 
 type Dispatch = (msg: Msg) => void;
 
@@ -121,6 +122,13 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         void post<TicketDetail>(...cardRequest(e))
           .then((detail) => dispatch({ type: "detailLoaded", detail }))
           .catch(failed);
+        return;
+      case "loadChecks":
+      case "loadProfiles":
+      case "addProject":
+      case "saveProject":
+      case "importChain":
+        runSettingsEffect(e, dispatch);
         return;
       case "loadChain":
         later(`chain:${e.id}`, () => {

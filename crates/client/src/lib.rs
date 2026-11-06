@@ -372,6 +372,7 @@ fn transport_error(e: ureq::Error) -> ClientError {
             let body = r.into_json().unwrap_or_else(|_| ErrorBody {
                 error: format!("HTTP {status}"),
                 code: String::new(),
+                field: None,
             });
             ClientError::Api { status, body }
         }

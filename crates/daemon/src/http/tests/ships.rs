@@ -113,13 +113,14 @@ async fn start_makes_the_worktree_and_merged_removes_it_but_keeps_the_branch() {
 async fn a_ship_that_cannot_be_made_blocks_the_ticket_with_ship_failed() {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = repo(tmp.path());
-    // A project whose base branch does not exist in the repository.
+    // A project whose base branch is gone from the repository after it was added.
     let api = Api::with_yard(Some(Arc::new(GitShipyard::new(tmp.path().join("ships")))));
     api.post(
         "/v1/projects",
-        json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(), "work_branch": "nope" }),
+        json!({ "key": "DEMO", "repo_path": repo.to_string_lossy() }),
     )
     .await;
+    git(&repo, &["branch", "-m", "develop", "elsewhere"]);
     api.post("/v1/projects/DEMO/chains", json!({ "name": "auth" }))
         .await;
 
@@ -136,7 +137,7 @@ async fn a_ship_that_cannot_be_made_blocks_the_ticket_with_ship_failed() {
         d["ticket"]["status_reason"]["reason"],
         json!({
             "kind": "ship_failed",
-            "detail": "base branch nope does not exist in the repository",
+            "detail": "base branch develop does not exist in the repository",
         })
     );
     assert_eq!(d["ship"], Value::Null);

@@ -23,6 +23,7 @@ mod parallel;
 mod resume;
 mod reviews;
 mod runs;
+mod settings;
 mod ships;
 mod threads;
 mod wildcards;

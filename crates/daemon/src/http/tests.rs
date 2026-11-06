@@ -17,6 +17,7 @@ mod parallel;
 mod profiles;
 mod resume;
 mod reviews;
+mod settings;
 mod ships;
 mod threads;
 
@@ -35,7 +36,24 @@ impl Api {
 
     /// Like [`Api::new`] with a shipyard.
     fn with_yard(yard: Option<crate::store::Yard>) -> Self {
-        let dir = tempfile::tempdir().expect("tempdir");
+        Self::build(yard, Arc::new(crate::tools::SystemTools))
+    }
+
+    /// Like [`Api::new`] with injected tools (`git`, `claude`, `gh`).
+    fn with_tools(tools: Arc<dyn crate::tools::Tools>) -> Self {
+        Self::build(None, tools)
+    }
+
+    fn build(yard: Option<crate::store::Yard>, tools: Arc<dyn crate::tools::Tools>) -> Self {
+        Self::open(tempfile::tempdir().expect("tempdir"), yard, tools)
+    }
+
+    /// A daemon over the database in `dir`: a new one, or the same one after a restart.
+    fn open(
+        dir: tempfile::TempDir,
+        yard: Option<crate::store::Yard>,
+        tools: Arc<dyn crate::tools::Tools>,
+    ) -> Self {
         let mut store = Store::open(&dir.path().join("t.db")).expect("store");
         if let Some(yard) = yard {
             store = store.with_shipyard(yard);
@@ -48,12 +66,20 @@ impl Api {
             shutdown: Arc::new(Notify::new()),
             profiles: dir.path().join("profiles"),
             runners: runners.clone(),
+            tools,
         };
         Self {
             _dir: dir,
             app: router(state),
             runners,
         }
+    }
+
+    /// Stops this daemon and starts another over the same database.
+    fn restart(self) -> Self {
+        let Self { _dir, app, runners } = self;
+        drop((app, runners));
+        Self::open(_dir, None, Arc::new(crate::tools::SystemTools))
     }
 
     async fn call(&self, method: Method, uri: &str, body: Option<Value>) -> (StatusCode, Value) {
@@ -723,6 +749,8 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/import",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",
+            "/repos/check",
+            "/system/checks",
             "/tickets",
             "/tickets/{ticket}",
             "/tickets/{ticket}/actions/{action}",
