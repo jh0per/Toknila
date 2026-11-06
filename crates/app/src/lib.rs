@@ -12,6 +12,7 @@ pub mod external;
 pub mod inbox;
 pub mod instructions;
 pub mod leftovers;
+pub mod merges;
 pub mod notes;
 pub mod nudge;
 pub mod ports;
@@ -30,6 +31,7 @@ pub mod wildcards;
 
 pub use chain::{ChainTx, with_chain};
 pub use error::{AppError, AppResult, ErrorKind};
+pub use merges::{MergeError, MergeOutcome, Merger};
 pub use ports::{Reader, UnitOfWork};
 pub use runner::{Runner, RunnerError};
 pub use ships::{ShipError, Shipyard};

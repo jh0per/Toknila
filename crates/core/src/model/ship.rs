@@ -29,6 +29,20 @@ pub struct ShipSpec {
     pub slug: String,
 }
 
+/// What a merge needs: the ship's branch goes into the base branch of the repository with a
+/// merge commit (two parents), so the history shows the card.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeSpec {
+    pub key: TicketKey,
+    pub repo: String,
+    /// The branch that receives the merge.
+    pub base: String,
+    /// The ship's branch.
+    pub branch: String,
+    /// The merge commit's message.
+    pub message: String,
+}
+
 /// Longest slug part, so paths stay short on Windows.
 const MAX_SLUG: usize = 40;
 
@@ -52,6 +66,17 @@ pub fn slugify(text: &str) -> String {
 }
 
 impl ShipSpec {
+    /// The merge of this ship's branch into its base for a ticket called `title`.
+    pub fn merge_spec(&self, title: &str) -> MergeSpec {
+        MergeSpec {
+            key: self.key.clone(),
+            repo: self.repo.clone(),
+            base: self.base.clone(),
+            branch: self.branch.clone(),
+            message: format!("Merge {}: {} {}", self.branch, self.key, title),
+        }
+    }
+
     /// The ship of `ticket`; `None` when the project has no repository, so the ticket runs
     /// without one.
     pub fn for_ticket(project: &Project, chain: &Chain, ticket: &Ticket) -> Option<Self> {
@@ -124,6 +149,22 @@ mod tests {
             ("demo", "auth-flow", "demo-3-add-login-oauth")
         );
         assert_eq!((s.repo.as_str(), s.base.as_str()), ("/repo", "develop"));
+    }
+
+    #[test]
+    fn the_merge_names_the_branch_the_card_and_the_base() {
+        let (p, c, t) = fixture(Some("/repo"));
+        let spec = ShipSpec::for_ticket(&p, &c, &t).expect("spec");
+        let merge = spec.merge_spec("Add login: OAuth");
+        assert_eq!(
+            (merge.repo.as_str(), merge.base.as_str()),
+            ("/repo", "develop")
+        );
+        assert_eq!(merge.branch, "ship/auth-flow/demo-3-add-login-oauth");
+        assert_eq!(
+            merge.message,
+            "Merge ship/auth-flow/demo-3-add-login-oauth: DEMO-3 Add login: OAuth"
+        );
     }
 
     #[test]

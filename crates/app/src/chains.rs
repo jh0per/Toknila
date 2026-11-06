@@ -5,7 +5,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
 use toknila_core::machine::TicketEvent;
-use toknila_core::{Chain, ChainId, Edge, EdgeKind, ReviewMode, TicketId, TicketKey, TicketStatus};
+use toknila_core::{
+    Chain, ChainId, Edge, EdgeKind, ReviewMode, ReviewTurn, TicketId, TicketKey, TicketStatus,
+};
 
 use crate::notes::{add_subtask, update_subtask};
 use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork, resolve, with_chain};
@@ -163,6 +165,10 @@ fn next_merge_event(ctx: &ChainTx, id: TicketId) -> Option<TicketEvent> {
             // Nothing was done to review: a person's accept follows at once.
             mode: ReviewMode::Human,
         }),
+        // The work is already in the repository: the merge is done as soon as it is asked for.
+        TicketStatus::Review if t.review.turn == Some(ReviewTurn::Merging) => {
+            Some(TicketEvent::MergeDone)
+        }
         TicketStatus::Review => Some(TicketEvent::Accept { comment: None }),
         _ => None,
     }

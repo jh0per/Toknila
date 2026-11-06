@@ -1,22 +1,21 @@
 //! The shipyard over `git`: one worktree per ticket under `<home>/ships/<project>/<chain>/<slug>`.
 //!
-//! No shell: every command is `git` with an argument list through [`std::process::Command`], so
-//! paths with spaces or odd characters pass through untouched on every platform. A missing `git`
-//! is [`ShipError::GitMissing`], not a panic.
+//! No shell: every command goes through [`crate::git::Git`], an argument list. A missing `git` is
+//! [`ShipError::GitMissing`], not a panic.
 
 use std::ffi::OsStr;
-use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use toknila_app::{ShipError, Shipyard};
 use toknila_core::{Ship, ShipSpec};
+
+use crate::git::Git;
 
 /// Makes and removes ships with the `git` on the path.
 #[derive(Debug, Clone)]
 pub struct GitShipyard {
     root: PathBuf,
-    program: String,
+    git: Git,
 }
 
 impl GitShipyard {
@@ -31,7 +30,7 @@ impl GitShipyard {
         let root = std::path::absolute(&root).unwrap_or(root);
         Self {
             root,
-            program: program.to_owned(),
+            git: Git::new(program),
         }
     }
 
@@ -49,28 +48,7 @@ impl GitShipyard {
         S: AsRef<OsStr>,
     {
         let args: Vec<S> = args.into_iter().collect();
-        let out = Command::new(&self.program)
-            .arg("-C")
-            .arg(repo)
-            .args(&args)
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .output()
-            .map_err(|e| match e.kind() {
-                ErrorKind::NotFound => ShipError::GitMissing,
-                _ => ShipError::Io(format!("cannot run {}: {e}", self.program)),
-            })?;
-        if out.status.success() {
-            return Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned());
-        }
-        let command = args
-            .iter()
-            .map(|a| a.as_ref().to_string_lossy().into_owned())
-            .collect::<Vec<_>>()
-            .join(" ");
-        Err(ShipError::Git {
-            command,
-            detail: String::from_utf8_lossy(&out.stderr).trim().to_owned(),
-        })
+        self.git.run(repo, &args).map_err(ShipError::from)
     }
 
     fn succeeds<I, S>(&self, repo: &str, args: I) -> Result<bool, ShipError>
@@ -78,11 +56,8 @@ impl GitShipyard {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        match self.git(repo, args) {
-            Ok(_) => Ok(true),
-            Err(ShipError::Git { .. }) => Ok(false),
-            Err(e) => Err(e),
-        }
+        let args: Vec<S> = args.into_iter().collect();
+        self.git.succeeds(repo, &args).map_err(ShipError::from)
     }
 }
 

@@ -14,6 +14,7 @@ use crate::store::Store;
 
 mod agent_tokens;
 mod inbox;
+mod merges;
 mod parallel;
 mod profiles;
 mod resume;
@@ -57,7 +58,9 @@ impl Api {
     ) -> Self {
         let mut store = Store::open(&dir.path().join("t.db")).expect("store");
         if let Some(yard) = yard {
-            store = store.with_shipyard(yard);
+            store = store
+                .with_shipyard(yard)
+                .with_merger(Arc::new(crate::merger::GitMerger::new()));
         }
         let (runners, _) =
             crate::runner::Runners::new(dir.path().join("runs"), dir.path().join("profiles"));

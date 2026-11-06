@@ -40,6 +40,9 @@ pub enum ReviewTurn {
     Agent { decides: bool },
     /// A person.
     Person,
+    /// The work was accepted and its merge into the base branch is running on the host. Nobody
+    /// is awaited; the outcome arrives as an event (`MergeDone`, or a block with the reason).
+    Merging,
 }
 
 /// A ticket's review state: whose turn it is while in Review, and every round so far.

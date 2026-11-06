@@ -122,6 +122,7 @@ pub(super) fn settle(mem: &mut Mem) {
         let queued = std::mem::take(&mut mem.deferred);
         let host = Host {
             yard: &mem.yard,
+            merger: &mem.merger,
             runner: &mem.runner,
         };
         let outcomes = external::execute(host, queued);

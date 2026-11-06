@@ -91,7 +91,10 @@ fn the_three_modes_with_simulated_reviewers() {
         tok.fails(&["sim", "DEMO-1", "review", "approve"])
             .contains("review_verdict")
     );
-    let done = tok.run(&["accept", "DEMO-1", "well done"]);
+    // The accept answers with the card merging; the merge's outcome follows it.
+    let accepted = tok.run(&["accept", "DEMO-1", "well done"]);
+    assert_eq!(accepted["review"]["awaiting"]["by"], "merging");
+    let done = tok.run(&["show", "DEMO-1"]);
     assert_eq!(done["ticket"]["status"], "merged");
     assert_eq!(rounds(&done), ["1:human:approve:well done"]);
 
@@ -107,7 +110,8 @@ fn the_three_modes_with_simulated_reviewers() {
     ]);
     assert_eq!(back["ticket"]["status"], "running");
     tok.run(&["sim", "DEMO-2", "finish", "fixed"]);
-    let merged = tok.run(&["sim", "DEMO-2", "review", "approve", "now fine"]);
+    tok.run(&["sim", "DEMO-2", "review", "approve", "now fine"]);
+    let merged = tok.run(&["show", "DEMO-2"]);
     assert_eq!(merged["ticket"]["status"], "merged");
     assert_eq!(
         rounds(&merged),

@@ -55,6 +55,9 @@ pub enum TicketEvent {
     /// Import: the work was already done although cards before this one are still open. The
     /// card is Merged and keeps the keys of those cards as its mark.
     DoneOutOfOrder { behind: Vec<TicketKey> },
+    /// Host: the ship's branch is merged into the base branch (or there was nothing to merge).
+    /// Only a card whose merge is running takes it; the card is then Merged.
+    MergeDone,
     /// Shipyard: the ticket's ship exists; the ticket learns its branch. No status change.
     ShipReady { branch: String },
     /// Graph: the milestone this ticket belongs to was released.
@@ -92,6 +95,7 @@ impl TicketEvent {
             Self::ReviewVerdict { .. } => "review_verdict",
             Self::ReviewerFailed { .. } => "reviewer_failed",
             Self::DoneOutOfOrder { .. } => "done_out_of_order",
+            Self::MergeDone => "merge_done",
             Self::ShipReady { .. } => "ship_ready",
             Self::Released => "released",
             Self::Reopen => "reopen",
@@ -113,6 +117,9 @@ pub enum Effect {
     EnsureRunner,
     /// Make sure the ticket has its ship (worktree and branch); reuse it if it exists.
     PrepareShip,
+    /// Merge the ticket's ship branch into the project's base branch. The outcome comes back as
+    /// `MergeDone` or as a block (`merge_conflict`, `base_checkout_dirty`, `merge_failed`).
+    Merge,
     /// Take the ticket's worktree away; the branch stays.
     RemoveShip,
     /// Stop the ticket's runners, worker and reviewer, if any.

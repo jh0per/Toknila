@@ -54,6 +54,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
     let (runners, ended) = crate::runner::Runners::new(paths.runs(), paths.profiles());
     let store = Store::open(&paths.db())?
         .with_shipyard(Arc::new(crate::shipyard::GitShipyard::new(paths.ships())))
+        .with_merger(Arc::new(crate::merger::GitMerger::new()))
         .with_runner(runners.clone());
     crate::runner::supervise(store.clone(), ended);
     crate::runner::watch_silence(store.clone(), runners.clone());

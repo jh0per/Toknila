@@ -24,9 +24,9 @@ use std::sync::Arc;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 use tokio::sync::{broadcast, mpsc, oneshot};
-use toknila_app::Shipyard;
 use toknila_app::external::ExternalEffect;
 use toknila_app::runner::{NoRunner, Runner};
+use toknila_app::{Merger, Shipyard};
 use toknila_core::events::DomainEvent;
 use toknila_core::{Actor, AgentRole, TicketId, Timestamp};
 
@@ -47,6 +47,9 @@ pub struct WriteTx<'c> {
 
 /// Where a command's ships are made; shared by every command of the store.
 pub type Yard = Arc<dyn Shipyard + Send + Sync>;
+
+/// Where a command's merges run; shared by every command of the store.
+pub type Merges = Arc<dyn Merger + Send + Sync>;
 
 /// Where a command's agents run; shared by every command of the store.
 pub type Agents = Arc<dyn Runner + Send + Sync>;
@@ -124,6 +127,7 @@ pub struct Store {
     events: broadcast::Sender<EventRecord>,
     path: PathBuf,
     yard: Option<Yard>,
+    merger: Merges,
     runner: Agents,
 }
 
@@ -158,6 +162,7 @@ impl Store {
             events,
             path,
             yard: None,
+            merger: Arc::new(external::NoMerger),
             runner: Arc::new(NoRunner),
         }
     }
@@ -165,6 +170,12 @@ impl Store {
     /// Gives every command a shipyard; without one tickets run without ships.
     pub fn with_shipyard(mut self, yard: Yard) -> Store {
         self.yard = Some(yard);
+        self
+    }
+
+    /// Lets accepted cards merge into their base branch; without one a merge is a typed failure.
+    pub fn with_merger(mut self, merger: Merges) -> Store {
+        self.merger = merger;
         self
     }
 

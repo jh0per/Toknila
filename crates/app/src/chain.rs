@@ -9,7 +9,7 @@ use toknila_core::{
 };
 
 use crate::notes::{add_comment, body_from_text, deliver_to_sim};
-use crate::{AppError, AppResult, ErrorKind, UnitOfWork, reviews, runs, schedule, ships};
+use crate::{AppError, AppResult, ErrorKind, UnitOfWork, merges, reviews, runs, schedule, ships};
 
 /// A chain being changed by one command. Every step is journaled by the graph
 /// ([`ChainView::record`]) so each transition, including intermediate ones
@@ -236,6 +236,12 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
         let (author, kind, text) = match effect {
             Effect::PrepareShip => {
                 ships::queue_prepare(uow, ctx, ticket)?;
+                continue;
+            }
+            Effect::Merge => {
+                if let Some(t) = ctx.view.tickets.iter().find(|t| t.id == ticket) {
+                    merges::queue_merge(uow, &ctx.view.chain, t)?;
+                }
                 continue;
             }
             Effect::RemoveShip => {

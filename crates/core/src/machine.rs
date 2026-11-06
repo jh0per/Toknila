@@ -13,8 +13,10 @@
 //! | Running, Waiting | Blocked | `Block` (Review too, for a merge conflict) |
 //! | Blocked | previous status | `Unblock` |
 //! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
-//! | Review | Merged | `Accept` (removes the ship's worktree, keeps its branch) |
-//! | Review | Running / Merged / same | `ReviewVerdict` (the reviewer agent; see [`review`]) |
+//! | Review | Review (merging) | `Accept`; an approving `ReviewVerdict` that decides does the same |
+//! | Review (merging) | Merged | `MergeDone` (removes the ship's worktree, keeps its branch) |
+//! | Review (merging) | Blocked | `Block` with a merge reason; `Unblock` merges again |
+//! | Review | Running / same | `ReviewVerdict` (the reviewer agent; see [`review`]) |
 //! | Review | same | `ReviewerFailed` (the card then waits for a person) |
 //! | Backlog, Ready | Merged | `DoneOutOfOrder` (import only: work finished behind open cards) |
 //! | Merged | Released | `Released` |
@@ -30,8 +32,8 @@
 //! (dependents becoming Ready, Blocked or Backlog) come back as [`Effect`]s for the chain graph.
 
 use crate::{
-    Actor, BlockedReason, OutOfOrder, ReviewTurn, StatusReason, Ticket, TicketKey, TicketStatus,
-    Timestamp, Verdict, WaitingReason, thread::OpenThread,
+    Actor, OutOfOrder, ReviewTurn, StatusReason, Ticket, TicketKey, TicketStatus, Timestamp,
+    Verdict, WaitingReason, thread::OpenThread,
 };
 
 mod action;
@@ -129,12 +131,7 @@ pub fn apply(
         (S::Running | S::Waiting, TicketEvent::Block { reason }) => {
             block(reason, ticket, &mut effects)?
         }
-        (
-            S::Review,
-            TicketEvent::Block {
-                reason: reason @ BlockedReason::MergeConflict { .. },
-            },
-        ) => {
+        (S::Review, TicketEvent::Block { reason }) if reason.is_merge() => {
             review::leave(&mut next, &mut effects);
             block(reason, ticket, &mut effects)?
         }
@@ -157,13 +154,21 @@ pub fn apply(
                     (S::Running, None)
                 }
                 (S::Review, _) => {
-                    next.review.turn = Some(ReviewTurn::Person);
+                    // A merge that failed is tried again; the person or the agent has fixed
+                    // what stopped it on the ship.
+                    if matches!(&ticket.status_reason, Some(StatusReason::Blocked { reason, .. }) if reason.is_merge())
+                    {
+                        review::start_merge(&mut next, &mut effects);
+                    } else {
+                        next.review.turn = Some(ReviewTurn::Person);
+                    }
                     (S::Review, None)
                 }
                 (other, _) => (other, None),
             }
         }
         (S::Review, TicketEvent::Return { comment }) => {
+            review::not_merging(&next, event)?;
             non_empty(comment, "return")?;
             review::person_decides(
                 &mut next,
@@ -179,9 +184,18 @@ pub fn apply(
             (S::Running, None)
         }
         (S::Review, TicketEvent::Accept { comment }) => {
+            review::not_merging(&next, event)?;
             let remarks = comment.as_deref().unwrap_or_default();
             review::person_decides(&mut next, Verdict::Approve, remarks, now, &mut effects);
-            review::merge(&mut effects);
+            review::start_merge(&mut next, &mut effects);
+            (S::Review, None)
+        }
+        (S::Review, TicketEvent::MergeDone) => {
+            if next.review.turn != Some(ReviewTurn::Merging) {
+                return Err(refuse());
+            }
+            next.review.turn = None;
+            review::merged(&mut effects);
             (S::Merged, None)
         }
         (S::Review, TicketEvent::ReviewVerdict { verdict, comment }) => {

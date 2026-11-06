@@ -6,8 +6,11 @@
 use std::collections::{HashMap, HashSet};
 
 use toknila_core::instructions::{self, Route};
-use toknila_core::{AgentRole, Comment, CommentId, Run, Ship, ShipSpec, TicketId, TicketKey};
+use toknila_core::{
+    AgentRole, Comment, CommentId, MergeSpec, Run, Ship, ShipSpec, TicketId, TicketKey,
+};
 
+use crate::merges::{self, MergeError, MergeOutcome, Merger};
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError};
 use crate::{
     AppResult, ShipError, Shipyard, UnitOfWork, instructions as deliver_instructions, reviews,
@@ -19,6 +22,12 @@ use crate::{
 pub enum ExternalEffect {
     /// Make (or reuse) the ticket's ship.
     PrepareShip { ticket: TicketId, spec: ShipSpec },
+    /// Merge the ticket's ship branch into the base branch. `None` when the ticket has no ship:
+    /// there is nothing to merge, and the host says so.
+    Merge {
+        ticket: TicketId,
+        spec: Option<MergeSpec>,
+    },
     /// Remove the ship's worktree from the repository at `repo`; the branch stays.
     RemoveShip { repo: String, ship: Ship },
     /// Run the profile's command for the ticket in its ship, once the ship is ready.
@@ -58,6 +67,11 @@ pub enum ExternalOutcome {
         ticket: TicketId,
         error: ShipError,
     },
+    /// The merge ended: it landed, was not needed, or says why it could not.
+    MergeFinished {
+        ticket: TicketId,
+        result: Result<MergeOutcome, MergeError>,
+    },
     ShipRemoved {
         ship: Ship,
     },
@@ -89,6 +103,7 @@ pub enum ExternalOutcome {
 #[derive(Debug, Clone, Copy)]
 pub struct Host<'a> {
     pub yard: &'a dyn Shipyard,
+    pub merger: &'a dyn Merger,
     pub runner: &'a dyn Runner,
 }
 
@@ -117,6 +132,13 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                     outcomes.push(ExternalOutcome::ShipFailed { ticket, error });
                 }
             },
+            ExternalEffect::Merge { ticket, spec } => {
+                let result = match spec {
+                    Some(spec) => host.merger.merge(&spec),
+                    None => Ok(MergeOutcome::UpToDate),
+                };
+                outcomes.push(ExternalOutcome::MergeFinished { ticket, result });
+            }
             ExternalEffect::RemoveShip { repo, ship } => {
                 outcomes.push(match host.yard.remove(&repo, &ship) {
                     Ok(()) => ExternalOutcome::ShipRemoved { ship },
@@ -227,6 +249,9 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
         match outcome {
             ExternalOutcome::ShipReady { ticket, ship } => ships::ready(uow, ticket, ship)?,
             ExternalOutcome::ShipFailed { ticket, error } => ships::failed(uow, ticket, &error)?,
+            ExternalOutcome::MergeFinished { ticket, result } => {
+                merges::finished(uow, ticket, result)?;
+            }
             ExternalOutcome::ShipRemoved { ship } => ships::removed(uow, ship)?,
             ExternalOutcome::ShipRemoveFailed { ship, error } => {
                 ships::remove_failed(uow, ship, &error)?;

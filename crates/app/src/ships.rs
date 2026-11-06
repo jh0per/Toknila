@@ -5,7 +5,7 @@
 
 use toknila_core::events::DomainEvent;
 use toknila_core::machine::TicketEvent;
-use toknila_core::{BlockedReason, Ship, ShipSpec, TicketId};
+use toknila_core::{BlockedReason, Chain, Ship, ShipSpec, Ticket, TicketId};
 
 use crate::external::ExternalEffect;
 
@@ -51,13 +51,22 @@ fn spec_for<U: UnitOfWork + ?Sized>(
     ctx: &ChainTx,
     ticket: TicketId,
 ) -> AppResult<Option<ShipSpec>> {
-    let Some(t) = ctx.view.tickets.iter().find(|t| t.id == ticket) else {
-        return Ok(None);
-    };
+    match ctx.view.tickets.iter().find(|t| t.id == ticket) {
+        Some(t) => spec_of(uow, &ctx.view.chain, t),
+        None => Ok(None),
+    }
+}
+
+/// The ship `ticket` of `chain` has or would have; `None` when its project has no repository.
+pub(crate) fn spec_of<U: UnitOfWork + ?Sized>(
+    uow: &U,
+    chain: &Chain,
+    ticket: &Ticket,
+) -> AppResult<Option<ShipSpec>> {
     let project = uow
-        .project(ctx.view.chain.project_id)?
-        .ok_or_else(|| AppError::not_found(format!("project of chain {}", ctx.view.chain.name)))?;
-    Ok(ShipSpec::for_ticket(&project, &ctx.view.chain, t))
+        .project(chain.project_id)?
+        .ok_or_else(|| AppError::not_found(format!("project of chain {}", chain.name)))?;
+    Ok(ShipSpec::for_ticket(&project, chain, ticket))
 }
 
 /// The ship a spec stands for once the shipyard gave it a path.

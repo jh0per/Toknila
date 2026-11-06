@@ -30,7 +30,7 @@ pub use review::{
     resolve_reviewer, reviewer_profile,
 };
 pub use run::{ProcessExit, Run};
-pub use ship::{Ship, ShipSpec, slugify};
+pub use ship::{MergeSpec, Ship, ShipSpec, slugify};
 pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};
 pub use thread::{
     ArtifactFormat, MessageKind, Phase, Thread, ThreadKind, ThreadMessage, ThreadState,

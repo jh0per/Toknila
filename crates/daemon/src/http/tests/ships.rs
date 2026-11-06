@@ -3,33 +3,16 @@
 //! the ticket with a typed reason.
 
 use std::path::Path;
-use std::process::Command;
 use std::sync::Arc;
 
 use serde_json::{Value, json};
 
 use super::Api;
+use crate::git::testing::git;
 use crate::shipyard::GitShipyard;
 
-fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@example.com"])
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .output()
-        .expect("git runs");
-    assert!(
-        out.status.success(),
-        "git {args:?}: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8_lossy(&out.stdout).trim().to_owned()
-}
-
 /// A repository with a `develop` branch and one commit.
-fn repo(dir: &Path) -> std::path::PathBuf {
+pub(super) fn repo(dir: &Path) -> std::path::PathBuf {
     let repo = dir.join("repo");
     std::fs::create_dir_all(&repo).expect("mkdir");
     git(&repo, &["init", "--quiet"]);
@@ -40,7 +23,7 @@ fn repo(dir: &Path) -> std::path::PathBuf {
     repo
 }
 
-async fn project(api: &Api, repo: &Path) {
+pub(super) async fn project(api: &Api, repo: &Path) {
     api.post(
         "/v1/projects",
         json!({ "key": "DEMO", "name": "Demo", "repo_path": repo.to_string_lossy() }),
@@ -95,11 +78,10 @@ async fn start_makes_the_worktree_and_merged_removes_it_but_keeps_the_branch() {
         path.exists(),
         "the worktree stays while the ticket is in review"
     );
-    let d = api
-        .post("/v1/tickets/DEMO-1/actions/accept", json!({}))
+    api.post("/v1/tickets/DEMO-1/actions/accept", json!({}))
         .await;
-    assert_eq!(d["ticket"]["status"], "merged");
     let d = api.get("/v1/tickets/DEMO-1").await;
+    assert_eq!(d["ticket"]["status"], "merged");
     assert_eq!(d["ship"], Value::Null);
     assert!(!path.exists());
     assert!(
@@ -206,7 +188,7 @@ async fn git_runs_after_the_commit_and_never_on_the_store_thread() {
 }
 
 #[tokio::test]
-async fn a_worktree_that_cannot_be_removed_is_journaled_and_the_accept_stands() {
+async fn a_repository_that_disappears_blocks_the_accept_with_merge_failed() {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = repo(tmp.path());
     let api = Api::with_yard(Some(Arc::new(GitShipyard::new(tmp.path().join("ships")))));
@@ -218,13 +200,15 @@ async fn a_worktree_that_cannot_be_removed_is_journaled_and_the_accept_stands() 
         json!({ "event": "finished", "summary": "done" }),
     )
     .await;
-    // The repository disappears under the ship: git cannot remove the worktree from it.
+    // The repository disappears under the ship: git can neither merge nor remove the worktree.
     std::fs::remove_dir_all(&repo).expect("delete the repository");
-    let d = api
-        .post("/v1/tickets/DEMO-1/actions/accept", json!({}))
+    api.post("/v1/tickets/DEMO-1/actions/accept", json!({}))
         .await;
-    assert_eq!(d["ticket"]["status"], "merged");
-    assert_eq!(journal(&api).await, ["ship_created", "ship_remove_failed"]);
     let d = api.get("/v1/tickets/DEMO-1").await;
-    assert_ne!(d["ship"], Value::Null, "the path stays recorded");
+    assert_eq!(d["ticket"]["status"], "blocked");
+    assert_eq!(
+        d["ticket"]["status_reason"]["reason"]["kind"],
+        "merge_failed"
+    );
+    assert_ne!(d["ship"], Value::Null, "the ship stays recorded");
 }
