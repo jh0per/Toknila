@@ -239,14 +239,22 @@ fn log_of(home: &Path, ticket: TicketId, run: &str) -> PathBuf {
         .join(format!("{run}.log"))
 }
 
-/// The value the fake agent printed for environment variable `name`.
+/// The value the fake agent printed for environment variable `name`, if it did yet. ConPTY puts
+/// terminal escapes before the first line, so the line is searched for, not matched from its start.
+fn find_env(output: &str, name: &str) -> Option<String> {
+    let at = output.find(&format!("{name}="))? + name.len() + 1;
+    let value: String = output[at..]
+        .chars()
+        .take_while(|c| !c.is_whitespace() && !c.is_control())
+        .collect();
+    // The value is complete once its line ended.
+    output[at + value.len()..]
+        .starts_with(['\r', '\n'])
+        .then_some(value)
+}
+
 fn printed_env(output: &str, name: &str) -> String {
-    output
-        .lines()
-        .find_map(|l| l.trim().strip_prefix(&format!("{name}=")))
-        .unwrap_or_else(|| panic!("no {name} in {output:?}"))
-        .trim()
-        .to_owned()
+    find_env(output, name).unwrap_or_else(|| panic!("no {name} in {output:?}"))
 }
 
 #[test]
@@ -293,7 +301,8 @@ fn a_run_that_exits_on_its_own_loses_its_token_too_and_the_next_run_has_another(
     let mut rig = Rig::new();
     rig.profile("fake", &["env", "TOKNILA_RUN_TOKEN", "exit", "0"], "");
     rig.start("fake");
-    let first = printed_env(&rig.wait_for("TOKNILA_RUN_TOKEN="), "TOKNILA_RUN_TOKEN");
+    rig.wait_for("TOKNILA_RUN_TOKEN=");
+    let first = printed_env(&rig.wait_for("\n"), "TOKNILA_RUN_TOKEN");
     rig.wait_end();
     assert_eq!(rig.runners.tokens().lookup(&first), None);
 
@@ -301,13 +310,8 @@ fn a_run_that_exits_on_its_own_loses_its_token_too_and_the_next_run_has_another(
     let until = Instant::now() + WAIT;
     let second = loop {
         let out = rig.output();
-        // The log of the newest run only; the first token's line is gone with its run.
-        if let Some(token) = out
-            .lines()
-            .find_map(|l| l.trim().strip_prefix("TOKNILA_RUN_TOKEN="))
-            .filter(|t| t.trim().len() == 64)
-        {
-            break token.trim().to_owned();
+        if let Some(token) = find_env(&out, "TOKNILA_RUN_TOKEN").filter(|t| t.len() == 64) {
+            break token;
         }
         assert!(Instant::now() < until, "no second token in {out:?}");
         std::thread::sleep(Duration::from_millis(25));
