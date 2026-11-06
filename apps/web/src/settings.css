@@ -1,4 +1,4 @@
-/* Settings and onboarding: forms, the system checks, the reserved merge-mode row. */
+/* Settings and onboarding: forms, the system checks. */
 .settings { max-width: 640px; display: flex; flex-direction: column; gap: var(--s3); }
 .settings h1 { margin: 0; font-size: 20px; font-weight: 600; }
 .settings .step { margin: var(--s2) 0 0; font-size: var(--fs-l); font-weight: 600; }
@@ -16,6 +16,5 @@
 .field input, .field select { font: inherit; font-size: var(--fs-m); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-s); padding: 5px var(--s2); width: 100%; }
 .field-error { color: var(--danger); font-size: var(--fs-s); }
 .branches { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); font-size: var(--fs-s); }
-.reserved { border: 1px dashed var(--line); border-radius: var(--r-s); padding: var(--s2); }
 .row { display: flex; align-items: center; gap: var(--s3); }
 .saved { color: var(--done); font-size: var(--fs-s); }

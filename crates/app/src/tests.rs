@@ -22,6 +22,7 @@ mod leftovers;
 mod merges;
 mod nudge;
 mod parallel;
+mod pull_requests;
 mod resume;
 mod reviews;
 mod runs;
@@ -66,6 +67,7 @@ impl Mem {
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
             max_parallel: 2,
+            merge: Default::default(),
         };
         let chain = Chain {
             id: ChainId::new(),

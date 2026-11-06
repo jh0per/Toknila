@@ -2668,6 +2668,51 @@
           },
           {
             "type": "object",
+            "description": "The pull request's checks failed (pull-request mode); `checks` names the failed ones.\nUnblocking pushes the ship again and watches the pull request again.",
+            "required": [
+              "url",
+              "checks",
+              "kind"
+            ],
+            "properties": {
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ci_failed"
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The pull request was closed on GitHub without merging.",
+            "required": [
+              "url",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "pr_closed"
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "The daemon restarted and the runner was gone.",
             "required": [
               "kind"
@@ -2928,6 +2973,31 @@
             "description": "The version the tool reported, when it did."
           }
         }
+      },
+      "CheckRun": {
+        "type": "object",
+        "description": "One check of a pull request.",
+        "required": [
+          "name",
+          "state"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CheckState"
+          }
+        }
+      },
+      "CheckState": {
+        "type": "string",
+        "description": "How one check of a pull request stands.",
+        "enum": [
+          "pending",
+          "passed",
+          "failed"
+        ]
       },
       "CheckStatus": {
         "type": "string",
@@ -3208,6 +3278,13 @@
           "kind": {
             "$ref": "#/components/schemas/InboxKind"
           },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card's pull request on GitHub, for a blocked card that has one (failed checks, a\nclosed pull request, a conflict); absent otherwise."
+          },
           "since": {
             "$ref": "#/components/schemas/Timestamp",
             "description": "Since when it waits; items are sorted by this, newest first."
@@ -3311,6 +3388,44 @@
           }
         },
         "additionalProperties": false
+      },
+      "MergeMethod": {
+        "type": "string",
+        "description": "How GitHub merges a pull request (`gh pr merge --merge|--squash|--rebase`).",
+        "enum": [
+          "merge",
+          "squash",
+          "rebase"
+        ]
+      },
+      "MergeMode": {
+        "type": "string",
+        "description": "Where an accepted card's work lands.",
+        "enum": [
+          "local",
+          "github"
+        ]
+      },
+      "MergeSettings": {
+        "type": "object",
+        "description": "A project's merge settings.",
+        "required": [
+          "mode",
+          "pr_title",
+          "method"
+        ],
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/MergeMethod"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/MergeMode"
+          },
+          "pr_title": {
+            "type": "string",
+            "description": "Title of a pull request; `{key}` and `{title}` are the card's."
+          }
+        }
       },
       "MessageKind": {
         "type": "string",
@@ -3838,6 +3953,35 @@
             "description": "Most agents working at once (1 to 64).",
             "minimum": 0
           },
+          "merge_method": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MergeMethod",
+                "description": "How a pull request merges: `merge`, `squash` or `rebase`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "merge_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MergeMode",
+                "description": "`local` merges into the base branch; `github` opens a pull request and merges it there."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pr_title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Title of the pull requests; `{key}` and `{title}` are the card's."
+          },
           "review_mode": {
             "oneOf": [
               {
@@ -4012,7 +4156,8 @@
           "release_branch",
           "default_profile",
           "default_review_mode",
-          "max_parallel"
+          "max_parallel",
+          "merge"
         ],
         "properties": {
           "default_profile": {
@@ -4039,6 +4184,10 @@
             "format": "int32",
             "description": "Most agents of this project that work at once (`schedule`); a card that starts beyond it\nis queued.",
             "minimum": 0
+          },
+          "merge": {
+            "$ref": "#/components/schemas/MergeSettings",
+            "description": "Where accepted work lands: the local base branch or a GitHub pull request."
           },
           "name": {
             "type": "string"
@@ -4138,6 +4287,32 @@
             "description": "The task for whoever does it."
           },
           "title": {
+            "type": "string"
+          }
+        }
+      },
+      "PullRequest": {
+        "type": "object",
+        "description": "The pull request a card opened, as last seen on the host.",
+        "required": [
+          "number",
+          "url",
+          "checks"
+        ],
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckRun"
+            },
+            "description": "The checks at the last look; empty before any was reported."
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "url": {
             "type": "string"
           }
         }
@@ -5039,6 +5214,17 @@
           "paused": {
             "type": "boolean",
             "description": "Paused tickets stay in Backlog and are skipped by autostart."
+          },
+          "pr": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PullRequest",
+                "description": "The pull request of a card that merges through GitHub: opened when the card was accepted,\nits checks refreshed while it is watched. It stays after the card merged."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "profile": {
             "type": [

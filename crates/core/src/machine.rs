@@ -15,7 +15,8 @@
 //! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
 //! | Review | Review (merging) | `Accept`; an approving `ReviewVerdict` that decides does the same |
 //! | Review (merging) | Merged | `MergeDone` (removes the ship's worktree, keeps its branch) |
-//! | Review (merging) | Blocked | `Block` with a merge reason; `Unblock` merges again |
+//! | Review (merging) | Blocked | `Block` with a merge reason (`merge_conflict`, `ci_failed`, `pr_closed`, ...); `Unblock` merges again |
+//! | Review (merging) | same | `PrUpdated` (pull-request mode: the card's pull request and its checks) |
 //! | Review | Running / same | `ReviewVerdict` (the reviewer agent; see [`review`]) |
 //! | Review | same | `ReviewerFailed` (the card then waits for a person) |
 //! | Backlog, Ready | Merged | `DoneOutOfOrder` (import only: work finished behind open cards) |
@@ -197,6 +198,13 @@ pub fn apply(
             next.review.turn = None;
             review::merged(&mut effects);
             (S::Merged, None)
+        }
+        (S::Review, TicketEvent::PrUpdated { pr }) => {
+            if next.review.turn != Some(ReviewTurn::Merging) {
+                return Err(refuse());
+            }
+            next.pr = Some(pr.clone());
+            (S::Review, None)
         }
         (S::Review, TicketEvent::ReviewVerdict { verdict, comment }) => {
             review::agent_decides(&mut next, *verdict, comment, now, &mut effects)?

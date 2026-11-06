@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Actor, BlockedReason, NodeRef, ReviewMode, TicketKey, Verdict, WaitingReason,
+    Actor, BlockedReason, NodeRef, PullRequest, ReviewMode, TicketKey, Verdict, WaitingReason,
     thread::OpenThread,
 };
 
@@ -58,6 +58,9 @@ pub enum TicketEvent {
     /// Host: the ship's branch is merged into the base branch (or there was nothing to merge).
     /// Only a card whose merge is running takes it; the card is then Merged.
     MergeDone,
+    /// Host: the pull request of the card's merge was opened or its checks changed. Only a
+    /// card whose merge is running takes it; no status change.
+    PrUpdated { pr: PullRequest },
     /// Shipyard: the ticket's ship exists; the ticket learns its branch. No status change.
     ShipReady { branch: String },
     /// Graph: the milestone this ticket belongs to was released.
@@ -96,6 +99,7 @@ impl TicketEvent {
             Self::ReviewerFailed { .. } => "reviewer_failed",
             Self::DoneOutOfOrder { .. } => "done_out_of_order",
             Self::MergeDone => "merge_done",
+            Self::PrUpdated { .. } => "pr_updated",
             Self::ShipReady { .. } => "ship_ready",
             Self::Released => "released",
             Self::Reopen => "reopen",

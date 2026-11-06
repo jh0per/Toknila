@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Actor, ChainId, NodeRef, Review, ReviewMode, StatusReason, SubtaskId, TicketId, TicketKey,
-    TicketStatus, Timestamp,
+    Actor, ChainId, NodeRef, PullRequest, Review, ReviewMode, StatusReason, SubtaskId, TicketId,
+    TicketKey, TicketStatus, Timestamp,
 };
 
 /// One unit of work for one ship.
@@ -48,6 +48,10 @@ pub struct Ticket {
     /// folder whose work was done in another order). It stays after the card moves on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done_out_of_order: Option<OutOfOrder>,
+    /// The pull request of a card that merges through GitHub: opened when the card was accepted,
+    /// its checks refreshed while it is watched. It stays after the card merged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr: Option<PullRequest>,
     /// Whose verdict the card waits for in Review, and the rounds held so far.
     #[serde(default, skip_serializing_if = "Review::is_empty")]
     pub review: Review,
@@ -145,6 +149,7 @@ impl Ticket {
             tokens_used: 0,
             wildcard: None,
             done_out_of_order: None,
+            pr: None,
             review: Review::default(),
         }
     }

@@ -16,6 +16,66 @@ pub enum ReviewMode {
     Both,
 }
 
+/// Where an accepted card's work lands.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MergeMode {
+    /// Merged into the base branch of the local repository. The default.
+    #[default]
+    Local,
+    /// Pushed, opened as a pull request on GitHub, merged there when its checks pass.
+    Github,
+}
+
+/// How GitHub merges a pull request (`gh pr merge --merge|--squash|--rebase`).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MergeMethod {
+    /// A merge commit. The default.
+    #[default]
+    Merge,
+    Squash,
+    Rebase,
+}
+
+impl MergeMethod {
+    /// The flag `gh pr merge` takes for it.
+    pub fn flag(self) -> &'static str {
+        match self {
+            Self::Merge => "--merge",
+            Self::Squash => "--squash",
+            Self::Rebase => "--rebase",
+        }
+    }
+}
+
+/// A project's merge settings.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MergeSettings {
+    pub mode: MergeMode,
+    /// Title of a pull request; `{key}` and `{title}` are the card's.
+    pub pr_title: String,
+    pub method: MergeMethod,
+}
+
+impl MergeSettings {
+    /// Pull request title of a project that does not name one.
+    pub const DEFAULT_PR_TITLE: &str = "{key}: {title}";
+}
+
+impl Default for MergeSettings {
+    fn default() -> Self {
+        Self {
+            mode: MergeMode::default(),
+            pr_title: Self::DEFAULT_PR_TITLE.to_owned(),
+            method: MergeMethod::default(),
+        }
+    }
+}
+
 /// One product: one monorepo, its chains, depot and settings.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,6 +98,8 @@ pub struct Project {
     /// Most agents of this project that work at once (`schedule`); a card that starts beyond it
     /// is queued.
     pub max_parallel: u32,
+    /// Where accepted work lands: the local base branch or a GitHub pull request.
+    pub merge: MergeSettings,
 }
 
 impl Project {
@@ -70,6 +132,7 @@ mod tests {
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
             max_parallel: crate::schedule::DEFAULT_LIMIT,
+            merge: Default::default(),
         };
         let mut t = Ticket::new_backlog(
             TicketId::new(),

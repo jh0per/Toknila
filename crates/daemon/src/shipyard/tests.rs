@@ -24,6 +24,7 @@ fn spec(repo: &str) -> ShipSpec {
         key: "DEMO-1".parse().expect("key"),
         repo: repo.to_owned(),
         base: "develop".to_owned(),
+        remote: false,
         branch: "ship/auth/demo-1-login".to_owned(),
         project: "demo".to_owned(),
         chain: "auth".to_owned(),
@@ -175,4 +176,35 @@ fn a_path_held_by_something_else_is_not_overwritten() {
         yard.prepare(&spec),
         Err(ShipError::PathTaken(taken.to_string_lossy().into_owned()))
     );
+}
+
+#[test]
+fn a_ship_in_pull_request_mode_starts_from_the_fetched_origin_base() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let repo = repo(tmp.path());
+    let origin = tmp.path().join("origin.git");
+    git(tmp.path(), &["init", "--quiet", "--bare", "origin.git"]);
+    git(
+        Path::new(&repo),
+        &["remote", "add", "origin", &origin.to_string_lossy()],
+    );
+    git(Path::new(&repo), &["push", "--quiet", "origin", "develop"]);
+    git(&origin, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
+    // Someone else's merge moved develop on the remote; the local branch is behind.
+    let other = tmp.path().join("other");
+    git(
+        tmp.path(),
+        &["clone", "--quiet", &origin.to_string_lossy(), "other"],
+    );
+    crate::git::testing::commit_file(&other, "new.txt", "n\n", "merged elsewhere");
+    git(&other, &["push", "--quiet", "origin", "develop"]);
+    let tip = git(&other, &["rev-parse", "HEAD"]);
+
+    let spec = ShipSpec {
+        remote: true,
+        ..spec(&repo)
+    };
+    let path = yard(tmp.path()).prepare(&spec).expect("prepare");
+    assert_eq!(git(Path::new(&path), &["rev-parse", "HEAD"]), tip);
+    assert!(Path::new(&path).join("new.txt").is_file());
 }

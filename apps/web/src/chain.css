@@ -11,6 +11,10 @@ a.node:hover { border-color: var(--muted); }
 .node .key { font-size: var(--fs-xs); color: var(--muted); }
 .node .st { font-size: 11px; color: var(--muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node .mark { font-size: var(--fs-xs); color: var(--block); border: 1px solid var(--block); border-radius: 3px; padding: 0 4px; white-space: nowrap; width: fit-content; }
+.node .mark.pr { cursor: pointer; }
+.node .mark.pr.passed { color: var(--done); border-color: var(--done); }
+.node .mark.pr.failed { color: var(--danger); border-color: var(--danger); }
+.node .mark.pr.pending { color: var(--muted); border-color: var(--muted); }
 .runner { font-family: var(--mono); font-size: 10px; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; color: var(--muted); white-space: nowrap; flex: none; }
 .g-todo { border-top-color: var(--todo); } .g-in_progress { border-top-color: var(--prog); }
 .g-blocked { border-top-color: var(--block); } .g-done { border-top-color: var(--done); }

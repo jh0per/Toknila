@@ -45,6 +45,7 @@ fn spec(f: &Fixture) -> MergeSpec {
         base: "develop".to_owned(),
         branch: "ship/x".to_owned(),
         message: "Merge ship/x: DEMO-1 Add feature".to_owned(),
+        pr: None,
     }
 }
 

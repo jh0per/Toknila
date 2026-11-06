@@ -22,6 +22,7 @@ fn project() -> Project {
         default_review_mode: ReviewMode::Human,
         default_reviewer: None,
         max_parallel: 2,
+        merge: Default::default(),
     }
 }
 
@@ -58,6 +59,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         tokens_used: 0,
         wildcard: None,
         done_out_of_order: None,
+        pr: None,
         review: toknila_core::Review::default(),
     }
 }

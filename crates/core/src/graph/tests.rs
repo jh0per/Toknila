@@ -76,6 +76,7 @@ impl Builder {
             tokens_used: 0,
             wildcard: None,
             done_out_of_order: None,
+            pr: None,
             review: crate::Review::default(),
         };
         self.next += 1;

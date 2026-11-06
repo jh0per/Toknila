@@ -102,6 +102,8 @@ is the committed state, so the ship shows up in the next read and on the stream.
   the journal has `ticket.ship_created`, `ticket.ship_removed` and `ticket.ship_remove_failed`.
 - Idempotent: an existing worktree is reused, an existing branch is checked out as it is, a
   worktree deleted by hand is pruned and made again.
+- In pull-request mode a ship starts from `origin/<base>` after `git fetch origin` (see
+  [Pull-request mode](#pull-request-mode)).
 - Merged removes the worktree after the commit (forced; the work is merged) and keeps the
   branch. A removal that fails does not undo the accept: the journal gets `ticket.ship_remove_failed`
   and the path stays recorded.
@@ -153,6 +155,59 @@ Accept does not move a card straight to Merged: the work has to land in the proj
 - **Dependents** start after the merge landed, and a ship is made with `git worktree add -b
   <branch> <path> <base>`, so it branches from the new base tip.
 - Limit: a `cancel` that races a running merge cannot stop git; the merge may still land.
+
+### Pull-request mode
+
+A project setting `merge` chooses where accepted work lands (`PATCH /v1/projects/{p}` with
+`merge_mode`, `pr_title`, `merge_method`; `tok project set KEY --merge github --pr-title ...
+--merge-method squash`; the Settings page). The settings are `Project.merge` (`MergeSettings`:
+`mode` `local` | `github`, default `local`; `pr_title`, default `{key}: {title}`; `method`
+`merge` | `squash` | `rebase`, default `merge`). `github` needs a project with a repository.
+
+The card stays in Review (`merging`) exactly as in local mode; only the `Merger` port behaves
+differently, because the `MergeSpec` carries a `PrSpec` (core: title from the template, a body
+built from the ticket prompt, the acceptance items and the review rounds, the merge method, and
+the card's pull request when it has one). The daemon's `Mergers` picks `GitMerger` or
+`GithubMerger` by that field. `GithubMerger` runs `git` and `gh` as argument lists, no shell, in
+the person's own environment and credentials, and one call is one step:
+
+1. **Open** (Accept, Unblock, a restart without a recorded pull request): `git push origin
+   refs/heads/<ship>:refs/heads/<ship>`, then `gh pr view <branch>`; an open pull request is
+   reused, none or a closed one means `gh pr create --head --base --title --body`.
+2. **Look** (the ticker, and the end of step 1): `gh pr view --json number,url,state,mergeable`
+   and `gh pr checks --json name,bucket`. Facts only; `core::pr::judge` decides: no check
+   reported yet or any pending is *pending* (CI may not have started), all finished and well
+   (`pass`, `skipping`) is *passed*, otherwise *failed*, naming every failed check.
+3. **Merge** when passed: `gh pr merge <n> --merge|--squash|--rebase`, then `git fetch origin`.
+
+Outcomes return through the machine like every host result. `PrOpen` records the pull request
+and its checks on the card (`TicketEvent::PrUpdated`, no status change; an unchanged pull
+request is not an event). `PrMerged` records it and sends `MergeDone`: the card is Merged, the
+worktree is removed. `CiFailed` records the pull request and blocks with `ci_failed` (link and
+the failing check names); `PrClosed` blocks with `pr_closed`; a conflict that GitHub reports
+blocks with `merge_conflict` and the link in its details. All of them are merge reasons, so
+**Unblock** starts a merge again: the ship (where the agent may have committed a fix) is pushed
+again, the same pull request is reused and watched. Starting a merge forgets the card's
+previous pull request (`review::start_merge`), so a ticker tick never judges checks of a
+superseded push.
+
+**The ticker.** `pr_watch` (every 20 seconds) runs `app::merges::poll` in one command: for each
+card that is merging and has a pull request, it queues the same `Merge` effect with
+`PrSpec::watching` set, so the host only looks. Nothing runs inside a transaction: the effect
+runs after the commit and its outcome is applied in a second one, as for every external effect.
+
+**Ships in this mode** start from `origin/<base>` (`ShipSpec::remote`, `start_point()`); the
+shipyard runs `git fetch origin` first (a failed fetch falls back to the copy it has). The local
+base branch is not touched by the merge, so the person's checkout is never changed.
+
+**Typed errors.** `gh` missing is `MergeError::GhMissing` (install hint), no login is
+`GhNotLoggedIn` (`gh auth login`, detected from `gh`'s own message); both block the card as
+`merge_failed` with that text, and the system checks of Settings show the same facts earlier.
+A push that fails (no `origin`, no credentials) is a `merge_failed` with git's message.
+
+**Tests** run without network: a bare local repository is `origin`, and the workspace's
+`fake-gh` binary (a state file instead of GitHub: it answers `pr view`, `create`, `checks`, and
+`merge`, which moves the base in the bare repository) is first on `PATH` as `gh`.
 
 ## Runners
 
@@ -292,9 +347,11 @@ The web shows what the daemon says and keeps no rule of its own.
   the catalog) on `default_profile` and `limit_out_of_range` on `max_parallel`. A project created
   without a repository is not checked (a simulated project needs none).
 - **Project settings.** `PATCH /v1/projects/{p}` reads and saves default profile, parallel limit,
-  review mode, reviewer profile and base branch; all five live in the project row, so they survive
-  a daemon restart. The merge mode arrives with the GitHub ticket and gets its row in
-  `ProjectSettings`, where the layout keeps the place.
+  review mode, reviewer profile and base branch, plus the merge settings (mode `local` | `github`,
+  pull request title template, merge method; see [Pull-request mode](#pull-request-mode)); all of
+  them live in the project row, so they survive a daemon restart. The page shows the title and the
+  method only while the mode is `github`. `github` is refused (400) for a project without a
+  repository, and a blank title template too.
 - **Window.** `/settings` and `/projects/{p}/settings` (`Settings.tsx`): checks, project settings,
   a chain-file import (the browser reads the file; `POST /v1/projects/{p}/import` is the existing
   route), and a form to add another project. With no project the home page is onboarding
@@ -456,7 +513,7 @@ the kind uses them).
 |---|---|---|
 | `proposal` | a wildcard card is Proposed | Approve, Reject with a reason (the ordinary card actions) |
 | `question` | a card is Waiting on a question or a permission prompt | a reply: an instruction comment, which the runner delivers to the live agent |
-| `blocked` | a card is Blocked; the item carries the reason | Unblock |
+| `blocked` | a card is Blocked; the item carries the reason, and `link` when the card has a pull request (`ci_failed`, `pr_closed`, a conflict on GitHub) | Unblock |
 | `review` | a card is in Review and it is the person's turn (not while the reviewer agent has it, and not while its accepted work is `merging`; a merge that failed is a `blocked` item with its reason) | open the card |
 | `thread` | a thread is open and its newest version came after the person's last request for changes (`thread::awaiting_person`) | open the thread |
 | `leftovers` | a card was done out of order (`Ticket::done_out_of_order`) and an earlier card in its `behind` list still has open subtasks that nobody dismissed | the three decisions below |

@@ -100,17 +100,24 @@ impl Shipyard for GitShipyard {
         if branch_exists {
             args.extend([path_text(&path), spec.branch.clone()]);
         } else {
-            let base = format!("{}^{{commit}}", spec.base);
-            let base_ok = !spec.base.starts_with('-')
-                && self.succeeds(repo, ["rev-parse", "--verify", "--quiet", &base])?;
-            if !base_ok {
-                return Err(ShipError::BaseBranchMissing(spec.base.clone()));
+            // Pull-request mode: the base moves on the remote, so the ship starts from its fresh
+            // copy. A fetch that fails is not the end: the copy we have may do, and if there is
+            // none the check below says so.
+            if spec.remote {
+                let _ = self.git(repo, ["fetch", "origin"]);
+            }
+            let start = spec.start_point();
+            let commit = format!("{start}^{{commit}}");
+            let start_ok = !start.starts_with('-')
+                && self.succeeds(repo, ["rev-parse", "--verify", "--quiet", &commit])?;
+            if !start_ok {
+                return Err(ShipError::BaseBranchMissing(start));
             }
             args.extend([
                 "-b".to_owned(),
                 spec.branch.clone(),
                 path_text(&path),
-                spec.base.clone(),
+                start,
             ]);
         }
         self.git(repo, &args)?;

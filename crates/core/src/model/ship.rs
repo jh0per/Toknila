@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use super::{Chain, Project, Ticket, TicketId, TicketKey};
+use super::{Chain, MergeMode, Project, Ticket, TicketId, TicketKey};
+use crate::pr::PrSpec;
 
 /// The worktree and branch a ticket works in, once the shipyard has made them.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -22,6 +23,9 @@ pub struct ShipSpec {
     pub repo: String,
     /// Branch the ship starts from (the project's work branch).
     pub base: String,
+    /// The ship starts from the remote's `base` (pull-request mode: the base moves on GitHub),
+    /// fetched first, not from the local branch.
+    pub remote: bool,
     pub branch: String,
     /// Path-safe names under which the worktree lives: `<project>/<chain>/<slug>`.
     pub project: String,
@@ -41,6 +45,8 @@ pub struct MergeSpec {
     pub branch: String,
     /// The merge commit's message.
     pub message: String,
+    /// Set in pull-request mode: the branch goes through a pull request instead of a local merge.
+    pub pr: Option<PrSpec>,
 }
 
 /// Longest slug part, so paths stay short on Windows.
@@ -74,6 +80,16 @@ impl ShipSpec {
             base: self.base.clone(),
             branch: self.branch.clone(),
             message: format!("Merge {}: {} {}", self.branch, self.key, title),
+            pr: None,
+        }
+    }
+
+    /// What the ship's worktree is made from: the base branch, or the remote's copy of it.
+    pub fn start_point(&self) -> String {
+        if self.remote {
+            format!("origin/{}", self.base)
+        } else {
+            self.base.clone()
         }
     }
 
@@ -90,6 +106,7 @@ impl ShipSpec {
             key: ticket.key.clone(),
             repo: repo.to_owned(),
             base: project.work_branch.clone(),
+            remote: project.merge.mode == MergeMode::Github,
             branch: format!("ship/{chain}/{slug}"),
             project: slugify(&project.key.to_string()),
             chain,
@@ -115,6 +132,7 @@ mod tests {
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
             max_parallel: 2,
+            merge: Default::default(),
         };
         let chain = Chain {
             id: ChainId::new(),
@@ -164,6 +182,27 @@ mod tests {
         assert_eq!(
             merge.message,
             "Merge ship/auth-flow/demo-3-add-login-oauth: DEMO-3 Add login: OAuth"
+        );
+    }
+
+    #[test]
+    fn pull_request_mode_starts_ships_from_the_remote_base() {
+        let (mut p, c, t) = fixture(Some("/repo"));
+        let local = ShipSpec::for_ticket(&p, &c, &t).expect("spec");
+        assert_eq!(
+            (local.remote, local.start_point().as_str()),
+            (false, "develop")
+        );
+        p.merge.mode = MergeMode::Github;
+        let remote = ShipSpec::for_ticket(&p, &c, &t).expect("spec");
+        assert_eq!(
+            (remote.remote, remote.start_point().as_str()),
+            (true, "origin/develop")
+        );
+        assert_eq!(
+            remote.merge_spec("x").base,
+            "develop",
+            "the pull request goes into the plain base"
         );
     }
 

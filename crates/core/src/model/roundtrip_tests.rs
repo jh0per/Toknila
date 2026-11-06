@@ -42,6 +42,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         tokens_used: 12_345,
         wildcard: None,
         done_out_of_order: None,
+        pr: None,
         review: crate::Review::default(),
     }
 }
@@ -59,6 +60,7 @@ fn project_roundtrips() {
         default_review_mode: ReviewMode::Human,
         default_reviewer: None,
         max_parallel: 2,
+        merge: Default::default(),
     });
 }
 
