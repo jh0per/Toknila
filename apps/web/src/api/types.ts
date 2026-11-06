@@ -25,4 +25,6 @@ export type TicketThreads = Schemas["TicketThreads"];
 export type ThreadDetail = Schemas["ThreadDetail"];
 export type ThreadVersion = Schemas["ThreadVersion"];
 export type ThreadMessage = Schemas["ThreadMessage"];
+export type OutOfOrder = Schemas["OutOfOrder"];
+export type Ship = Schemas["Ship"];
 export type Phase = Schemas["Phase"];

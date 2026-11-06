@@ -9,69 +9,87 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
   const running = runningAgents(state);
   return (
     <nav className="sidebar" aria-label="Sidebar">
-      <h1><NavLink route={{ name: "chains" }} dispatch={dispatch}>Toknila</NavLink></h1>
-      <span className={`link l-${state.link}`} data-testid="link">{state.link}</span>
+      <div className="brand">
+        <h1><NavLink route={{ name: "chains" }} dispatch={dispatch}>Toknila</NavLink></h1>
+        <span className={`link l-${state.link}`} data-testid="link">{state.link}</span>
+      </div>
 
-      <section data-testid="projects">
+      <section className="sec" data-testid="projects">
         <h2>Projects</h2>
         <ul>
           {state.projects.map((p) => (
-            <li key={p.id} className={p.id === project?.id ? "sel" : ""}>
-              <NavLink route={{ name: "project", project: p.key }} dispatch={dispatch}>{p.name}</NavLink>
+            <li key={p.id}>
+              <NavLink
+                route={{ name: "project", project: p.key }}
+                dispatch={dispatch}
+                className={`item${p.id === project?.id ? " sel" : ""}`}
+              >
+                <span className="key">{p.key}</span>
+                <span className="t">{p.name}</span>
+              </NavLink>
             </li>
           ))}
         </ul>
       </section>
 
-      <section data-testid="chains">
+      <section className="sec" data-testid="chains">
         <h2>Chains</h2>
         <ul>
           {chainsOf(state, project).map((c) => (
-            <li key={c.chain.id} className={c.chain.id === chain?.chain.id ? "sel" : ""}>
+            <li key={c.chain.id}>
               <NavLink
                 route={{ name: "projectChain", project: project?.key ?? "", chain: c.chain.name }}
                 dispatch={dispatch}
+                className={`item${c.chain.id === chain?.chain.id ? " sel" : ""}`}
               >
-                {c.chain.name}
+                <span className="t key">{c.chain.name}</span>
+                <span className="n">{c.summary.done}/{c.summary.total}</span>
               </NavLink>
-              <span className="muted"> {c.summary.done}/{c.summary.total}</span>
             </li>
           ))}
         </ul>
       </section>
 
-      <section>
+      <section className="sec">
         <h2>
-          <NavLink route={{ name: "inbox" }} dispatch={dispatch} testId="inbox-link">Inbox</NavLink>{" "}
-          <span className="count" data-testid="inbox-count">{waiting.length}</span>
+          <NavLink route={{ name: "inbox" }} dispatch={dispatch} testId="inbox-link">Inbox</NavLink>
+          <span className={`badge${waiting.length === 0 ? " zero" : ""}`} data-testid="inbox-count">{waiting.length}</span>
         </h2>
         <ul>
           {waiting.map(({ ticket, chain: c }) => (
             <li key={ticket.id}>
-              <NavLink route={cardRoute(state, c, ticket)} dispatch={dispatch}>{ticket.key}</NavLink>
-              <span className="muted"> {ticket.status}</span>
+              <NavLink route={cardRoute(state, c, ticket)} dispatch={dispatch} className="item">
+                <span className="dot" style={{ background: "var(--block)" }} />
+                <span className="key">{ticket.key}</span>
+                <span className="t">{ticket.status}</span>
+              </NavLink>
             </li>
           ))}
         </ul>
+        {waiting.length === 0 && <p className="muted side-note">Nothing waiting.</p>}
       </section>
 
-      <section data-testid="running">
-        <h2>Running agents</h2>
-        {running.length === 0 && <p className="muted">None.</p>}
+      <section className="sec" data-testid="running">
+        <h2>Agents</h2>
+        {running.length === 0 && <p className="muted side-note">None running.</p>}
         <ul>
           {running.map(({ ticket, chain: c }) => (
             <li key={ticket.id}>
-              <NavLink route={cardRoute(state, c, ticket)} dispatch={dispatch}>{ticket.key}</NavLink>
-              <span className="muted"> {ticket.title}</span>
+              <NavLink route={cardRoute(state, c, ticket)} dispatch={dispatch} className="item">
+                <span className="dot pulse" />
+                <span className="key">{ticket.key}</span>
+                <span className="t">{ticket.title}</span>
+              </NavLink>
             </li>
           ))}
         </ul>
       </section>
 
-      <section>
-        <h2>Settings</h2>
-        <p className="muted">Settings will live here.</p>
-      </section>
+      <div className="side-foot">
+        <span className="item" title="Settings will live here">
+          <span className="t">Settings</span>
+        </span>
+      </div>
     </nav>
   );
 }

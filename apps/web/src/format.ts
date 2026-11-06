@@ -1,6 +1,6 @@
 // Text for people: status reasons and durations.
 
-import type { StatusReason } from "./api/types";
+import type { OutOfOrder, StatusReason } from "./api/types";
 
 export function reasonText(r: StatusReason | null | undefined): string {
   if (!r) return "";
@@ -33,4 +33,10 @@ export function duration(ms: number): string {
   const h = Math.floor(m / 60);
   if (h < 48) return `${h}h ${m % 60}m`;
   return `${Math.floor(h / 24)}d`;
+}
+
+/// The mark of a card done out of order, naming the earlier cards that were still open.
+export function outOfOrderText(mark: OutOfOrder | null | undefined): string {
+  if (!mark) return "";
+  return `done out of order: ${mark.behind.join(", ")} still open`;
 }
