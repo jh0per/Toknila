@@ -18,6 +18,12 @@ for `propose` it is the new card.
 | `note` | `body` (comment template fields: `gist`, `what`, `why`, `how_to_verify`, `alternatives`, `consequences`) | stores an agent report comment | any |
 | `finished` | `summary` | -> Review; summary stored as an agent report comment. Refused with `409` while the ticket has an open thread | Running |
 | `crashed` | `detail` | -> Blocked (reason `crashed`, resumes to the previous status on unblock) | Running, Waiting |
+
+The runner sends `crashed` itself when the agent's process ends while the ticket is Running or
+Waiting and nobody asked it to stop: a non-zero exit code or a signal, and also a zero exit
+without a `finished` event (the detail says which: `exit 101`, `killed by signal ...`,
+`exited without a finished event`). A restart that lost the process blocks the ticket with
+`runner_lost` instead. See the runner section of `docs/architecture.md`.
 | `open_thread` | `kind` (`design`, `flow`, `architecture`, `other`), `title` | opens a thread on the ticket; nothing else changes | any |
 | `thread_message` | `thread` (number on the ticket, or id), `text` | a message from the agent in the thread | any |
 | `thread_version` | `thread`, `format` (`mermaid`, `markdown`, `html`), `body` | the next artifact version (at most 512 KiB, else `400`); reopens an approved thread | any |

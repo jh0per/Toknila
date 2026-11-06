@@ -22,6 +22,7 @@ use serde::Serialize;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use toknila_app::Shipyard;
 use toknila_app::external::ExternalEffect;
+use toknila_app::runner::{NoRunner, Runner};
 use toknila_core::events::DomainEvent;
 use toknila_core::{Actor, Timestamp};
 
@@ -56,6 +57,9 @@ pub struct WriteTx<'c> {
 
 /// Where a command's ships are made; shared by every command of the store.
 pub type Yard = Arc<dyn Shipyard + Send + Sync>;
+
+/// Where a command's agents run; shared by every command of the store.
+pub type Agents = Arc<dyn Runner + Send + Sync>;
 
 impl std::fmt::Debug for WriteTx<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -130,6 +134,7 @@ pub struct Store {
     events: broadcast::Sender<EventRecord>,
     path: PathBuf,
     yard: Option<Yard>,
+    runner: Agents,
 }
 
 impl Store {
@@ -161,12 +166,19 @@ impl Store {
             events,
             path,
             yard: None,
+            runner: Arc::new(NoRunner),
         }
     }
 
     /// Gives every command a shipyard; without one tickets run without ships.
     pub fn with_shipyard(mut self, yard: Yard) -> Store {
         self.yard = Some(yard);
+        self
+    }
+
+    /// Lets commands start and stop agents; without one a non-simulated ticket cannot start.
+    pub fn with_runner(mut self, runner: Agents) -> Store {
+        self.runner = runner;
         self
     }
 

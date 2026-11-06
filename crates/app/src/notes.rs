@@ -118,16 +118,20 @@ pub(crate) fn deliver_to_sim<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     ctx: &mut ChainTx,
 ) -> AppResult<bool> {
-    let default_profile = uow
-        .project(ctx.view.chain.project_id)?
-        .map(|p| p.default_profile)
-        .unwrap_or_else(|| AgentProfile::SIM.to_owned());
+    let project = uow.project(ctx.view.chain.project_id)?;
     let candidates: Vec<(TicketId, TicketStatus)> = ctx
         .view
         .tickets
         .iter()
         .filter(|t| matches!(t.status, TicketStatus::Running | TicketStatus::Waiting))
-        .filter(|t| t.profile.as_deref().unwrap_or(&default_profile) == AgentProfile::SIM)
+        .filter(|t| {
+            project
+                .as_ref()
+                .map_or(t.profile.as_deref().unwrap_or(AgentProfile::SIM), |p| {
+                    p.profile_for(t)
+                })
+                == AgentProfile::SIM
+        })
         .map(|t| (t.id, t.status))
         .collect();
     let mut changed = false;

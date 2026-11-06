@@ -8,7 +8,7 @@ use toknila_core::machine::TicketEvent;
 use toknila_core::{BlockedReason, Ship, ShipSpec, StatusReason, TicketStatus};
 
 use super::Mem;
-use crate::external::{self, ExternalEffect};
+use crate::external::{self, ExternalEffect, Host};
 use crate::recovery::recover;
 use crate::{AppResult, ShipError, Shipyard, agent, tickets};
 
@@ -17,7 +17,7 @@ use crate::{AppResult, ShipError, Shipyard, agent, tickets};
 pub(super) struct FakeYard {
     prepared: RefCell<Vec<ShipSpec>>,
     removed: RefCell<Vec<Ship>>,
-    fail_prepare: RefCell<Option<ShipError>>,
+    pub(super) fail_prepare: RefCell<Option<ShipError>>,
     fail_remove: RefCell<Option<ShipError>>,
 }
 
@@ -53,7 +53,11 @@ fn with_repo() -> Mem {
 fn settle_ships(mem: &mut Mem) {
     while !mem.deferred.is_empty() {
         let queued = std::mem::take(&mut mem.deferred);
-        let outcomes = external::execute(&mem.yard, queued);
+        let host = Host {
+            yard: &mem.yard,
+            runner: &mem.runner,
+        };
+        let outcomes = external::execute(host, queued);
         external::apply(mem, outcomes).expect("apply outcomes");
     }
 }

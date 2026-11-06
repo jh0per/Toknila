@@ -122,6 +122,11 @@ impl Paths {
         self.home.join("ships")
     }
 
+    /// Output of agent runs: `runs/<ticket id>/<run id>.log`.
+    pub fn runs(&self) -> PathBuf {
+        self.home.join("runs")
+    }
+
     /// Rotated daemon logs.
     pub fn logs(&self) -> PathBuf {
         self.home.join("logs")

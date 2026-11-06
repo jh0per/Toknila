@@ -51,8 +51,11 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
             port: info.port,
         });
     }
+    let (runners, ended) = crate::runner::Runners::new(paths.runs(), paths.profiles());
     let store = Store::open(&paths.db())?
-        .with_shipyard(Arc::new(crate::shipyard::GitShipyard::new(paths.ships())));
+        .with_shipyard(Arc::new(crate::shipyard::GitShipyard::new(paths.ships())))
+        .with_runner(runners.clone());
+    crate::runner::supervise(store.clone(), ended);
     let recovery = crate::recovery::recover(&store)
         .await
         .map_err(|e| RunError::Other(format!("startup recovery: {e}")))?;
@@ -72,6 +75,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         token: token.clone(),
         shutdown: shutdown.clone(),
         profiles: paths.profiles(),
+        runners: runners.clone(),
     };
 
     let listener = match reuse.as_ref().map(|i| i.port).filter(|p| *p != 0) {
@@ -100,6 +104,10 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
             }
         })
         .await;
+
+    // Agents do not outlive the daemon that started them; the next start marks their tickets
+    // `runner_lost`.
+    runners.stop_all();
 
     // Remove daemon.json only if it is still ours (a newer daemon may have replaced it).
     if DaemonInfo::read(&paths.daemon_json())

@@ -9,7 +9,8 @@ use toknila_core::{BlockedReason, Ship, ShipSpec, TicketId};
 
 use crate::external::ExternalEffect;
 
-use crate::{AppError, AppResult, ChainTx, ErrorKind, UnitOfWork, with_chain};
+use crate::chain::tell_ticket;
+use crate::{AppError, AppResult, ChainTx, UnitOfWork};
 
 /// Why a ship could not be made or removed. The text lands in the ticket's blocked reason.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -96,24 +97,6 @@ pub(crate) fn queue_remove<U: UnitOfWork + ?Sized>(
         ship,
     });
     Ok(())
-}
-
-/// Feeds an outcome to the ticket through the machine. A ticket that has moved on meanwhile
-/// refuses the event; that is not an error of the outcome.
-fn tell_ticket<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    ticket: TicketId,
-    event: TicketEvent,
-) -> AppResult<()> {
-    let Some(t) = uow.ticket(ticket)? else {
-        return Ok(());
-    };
-    match with_chain(uow, t.chain_id, |tx| {
-        tx.ticket_event(ticket, event).map_err(AppError::from)
-    }) {
-        Err(e) if e.kind == ErrorKind::Conflict => Ok(()),
-        other => other,
-    }
 }
 
 /// The shipyard made the ship: remember it, journal it, tell the ticket its branch.

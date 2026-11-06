@@ -6,6 +6,7 @@ pub mod events;
 pub mod profiles;
 pub mod projects;
 pub mod releases;
+pub mod runner;
 pub mod threads;
 pub mod tickets;
 

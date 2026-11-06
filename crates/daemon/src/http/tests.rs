@@ -40,6 +40,11 @@ impl Api {
             token: TOKEN.into(),
             shutdown: Arc::new(Notify::new()),
             profiles: dir.path().join("profiles"),
+            runners: crate::runner::Runners::new(
+                dir.path().join("runs"),
+                dir.path().join("profiles"),
+            )
+            .0,
         };
         Self {
             _dir: dir,
@@ -707,6 +712,8 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/actions/{action}",
             "/tickets/{ticket}/comments",
             "/tickets/{ticket}/events",
+            "/tickets/{ticket}/runner/input",
+            "/tickets/{ticket}/runner/scrollback",
             "/tickets/{ticket}/subtasks",
             "/tickets/{ticket}/subtasks/{position}",
             "/tickets/{ticket}/threads",

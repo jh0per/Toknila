@@ -34,6 +34,7 @@ async fn seeded() -> (tempfile::TempDir, Store) {
         token: "t".into(),
         shutdown: Arc::new(Notify::new()),
         profiles: PathBuf::new(),
+        runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
     });
     post(&app, "/v1/projects", json!({ "key": "DEMO" })).await;
     let toml = include_str!("../../../../examples/demo.toml");
@@ -58,6 +59,7 @@ async fn a_clean_store_has_no_drift_and_keeps_sim_tickets_running() {
             chains: 1,
             tickets: 4,
             running: 2,
+            lost: vec![],
             drift: vec![]
         }
     );

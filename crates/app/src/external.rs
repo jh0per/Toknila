@@ -1,11 +1,14 @@
-//! Work that leaves the database: git, and later processes. A command never does it inside its
-//! unit of work. It queues [`ExternalEffect`]s ([`crate::UnitOfWork::defer`]); the adapter commits
-//! the command, then [`execute`]s them on the host, then runs [`apply`] in a second unit of work
-//! so each outcome reaches the ticket as an event through the state machine.
+//! Work that leaves the database: git and the agents' processes. A command never does it inside
+//! its unit of work. It queues [`ExternalEffect`]s ([`crate::UnitOfWork::defer`]); the adapter
+//! commits the command, then [`execute`]s them on the host, then runs [`apply`] in a second unit
+//! of work so each outcome reaches the ticket as an event through the state machine.
 
-use toknila_core::{Ship, ShipSpec, TicketId};
+use std::collections::{HashMap, HashSet};
 
-use crate::{AppResult, ShipError, Shipyard, UnitOfWork, ships};
+use toknila_core::{Run, Ship, ShipSpec, TicketId, TicketKey};
+
+use crate::runner::{RunRequest, Runner, RunnerError};
+use crate::{AppResult, ShipError, Shipyard, UnitOfWork, runs, ships};
 
 /// Something to do on the host once the command that asked for it has committed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,35 +17,109 @@ pub enum ExternalEffect {
     PrepareShip { ticket: TicketId, spec: ShipSpec },
     /// Remove the ship's worktree from the repository at `repo`; the branch stays.
     RemoveShip { repo: String, ship: Ship },
+    /// Run the profile's command for the ticket in its ship, once the ship is ready.
+    StartRunner {
+        ticket: TicketId,
+        key: TicketKey,
+        profile: String,
+    },
+    /// Stop the ticket's runner.
+    StopRunner { ticket: TicketId },
 }
 
 /// What happened on the host.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExternalOutcome {
-    ShipReady { ticket: TicketId, ship: Ship },
-    ShipFailed { ticket: TicketId, error: ShipError },
-    ShipRemoved { ship: Ship },
-    ShipRemoveFailed { ship: Ship, error: ShipError },
+    ShipReady {
+        ticket: TicketId,
+        ship: Ship,
+    },
+    ShipFailed {
+        ticket: TicketId,
+        error: ShipError,
+    },
+    ShipRemoved {
+        ship: Ship,
+    },
+    ShipRemoveFailed {
+        ship: Ship,
+        error: ShipError,
+    },
+    /// A new runner process started.
+    RunnerStarted {
+        run: Run,
+    },
+    RunnerFailed {
+        ticket: TicketId,
+        error: RunnerError,
+    },
 }
 
-/// Runs the effects on the host, in order. Touches no database.
-pub fn execute(yard: &dyn Shipyard, effects: Vec<ExternalEffect>) -> Vec<ExternalOutcome> {
-    effects
-        .into_iter()
-        .map(|effect| match effect {
-            ExternalEffect::PrepareShip { ticket, spec } => match yard.prepare(&spec) {
-                Ok(path) => ExternalOutcome::ShipReady {
-                    ticket,
-                    ship: ships::ship_of(ticket, &spec, path),
-                },
-                Err(error) => ExternalOutcome::ShipFailed { ticket, error },
+/// The host's ports for [`execute`].
+#[derive(Debug, Clone, Copy)]
+pub struct Host<'a> {
+    pub yard: &'a dyn Shipyard,
+    pub runner: &'a dyn Runner,
+}
+
+/// Runs the effects on the host, in order. Touches no database. A runner starts where the
+/// ticket's ship was just made; a ticket whose ship failed gets no runner (it is blocked by
+/// that), and one without a ship (its project has no repository) is refused.
+pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutcome> {
+    let mut dirs: HashMap<TicketId, String> = HashMap::new();
+    let mut failed: HashSet<TicketId> = HashSet::new();
+    let mut outcomes = Vec::new();
+    for effect in effects {
+        match effect {
+            ExternalEffect::PrepareShip { ticket, spec } => match host.yard.prepare(&spec) {
+                Ok(path) => {
+                    dirs.insert(ticket, path.clone());
+                    let ship = ships::ship_of(ticket, &spec, path);
+                    outcomes.push(ExternalOutcome::ShipReady { ticket, ship });
+                }
+                Err(error) => {
+                    failed.insert(ticket);
+                    outcomes.push(ExternalOutcome::ShipFailed { ticket, error });
+                }
             },
-            ExternalEffect::RemoveShip { repo, ship } => match yard.remove(&repo, &ship) {
-                Ok(()) => ExternalOutcome::ShipRemoved { ship },
-                Err(error) => ExternalOutcome::ShipRemoveFailed { ship, error },
-            },
-        })
-        .collect()
+            ExternalEffect::RemoveShip { repo, ship } => {
+                outcomes.push(match host.yard.remove(&repo, &ship) {
+                    Ok(()) => ExternalOutcome::ShipRemoved { ship },
+                    Err(error) => ExternalOutcome::ShipRemoveFailed { ship, error },
+                });
+            }
+            ExternalEffect::StartRunner {
+                ticket,
+                key,
+                profile,
+            } => {
+                if failed.contains(&ticket) {
+                    continue;
+                }
+                let result = dirs
+                    .get(&ticket)
+                    .ok_or(RunnerError::NoWorkingDir)
+                    .and_then(|dir| {
+                        let dir = dir.clone();
+                        host.runner.start(&RunRequest {
+                            ticket,
+                            key,
+                            profile,
+                            dir,
+                        })
+                    });
+                match result {
+                    Ok(started) if !started.reused => {
+                        outcomes.push(ExternalOutcome::RunnerStarted { run: started.run });
+                    }
+                    Ok(_) => {}
+                    Err(error) => outcomes.push(ExternalOutcome::RunnerFailed { ticket, error }),
+                }
+            }
+            ExternalEffect::StopRunner { ticket } => host.runner.stop(ticket),
+        }
+    }
+    outcomes
 }
 
 /// Records the outcomes: state and journal, with ticket changes going through the machine.
@@ -54,6 +131,10 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             ExternalOutcome::ShipRemoved { ship } => ships::removed(uow, ship)?,
             ExternalOutcome::ShipRemoveFailed { ship, error } => {
                 ships::remove_failed(uow, ship, &error)?;
+            }
+            ExternalOutcome::RunnerStarted { run } => runs::started(uow, run)?,
+            ExternalOutcome::RunnerFailed { ticket, error } => {
+                runs::start_failed(uow, ticket, &error)?;
             }
         }
     }

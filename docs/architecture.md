@@ -87,8 +87,8 @@ blocking thread (`external::execute`, no database), then opens a second transact
 `external::apply`s each `ExternalOutcome`: the ship row and journal, and a `TicketEvent` through
 the machine (`ShipReady` tells the ticket its branch, `Block(ShipFailed)` blocks it). A ticket
 that moved on meanwhile refuses the event and the outcome is dropped. The command's own answer
-is the committed state, so the ship shows up in the next read and on the stream. The PTY runner
-uses the same path.
+is the committed state, so the ship shows up in the next read and on the stream. The runner
+(below) uses the same path.
 
 - Needs a project with `repo_path` (`tok project new KEY --repo <path> [--base develop]`; the base
   is the project's `work_branch`, default `develop`). Without a repo the ticket runs without a
@@ -105,6 +105,59 @@ uses the same path.
   cleaning up cancelled ships is a manual step for now.
 - A ship that cannot be made moves the ticket to Blocked with `ship_failed` (details from git)
   through the machine; `tok unblock` retries.
+
+## Runners
+
+A runner is the agent's process, started in a pseudo-terminal in the ticket's ship. Core decides
+when (`EnsureRunner` on Start, Unblock into Running and Return; `StopRunner` on Accept, Cancel,
+Pause and every block that ends the agent). The application queues `StartRunner` and `StopRunner`
+as external effects; the daemon implements the `Runner` port (`toknila-app`) in `runner/` with
+`portable-pty` (Unix ptys, Windows ConPTY), which no other crate depends on.
+
+- **Profile.** The ticket's own `profile`, else the project's `default_profile` (`Project::profile_for`;
+  `tok project new --profile`, `tok ticket new --profile`). `sim` has no command and starts no
+  process, exactly as before. Any other profile is looked up in the catalog when the runner
+  starts, so an edit of a profile file applies to the next start. The command is an argument list;
+  `env` is added to the daemon's environment.
+- **Where.** After the ship is ready, with the ship's worktree as working directory. A project
+  without a repository has no ship and so no directory: the runner is refused with a typed error
+  (`RunnerError::NoWorkingDir`) and the ticket is Blocked(`crashed`, with that text); use `sim` or
+  give the project a repository. A failed ship starts no runner (the ticket is blocked by that).
+- **Ensure, not restart.** Starting a ticket whose runner is still live keeps it (`Return` after
+  `finished`: the agent may still be there). A stop kills the process; the exit is journaled but is
+  not a crash.
+- **Exit.** The process's end comes back as `runs::ended` in one unit of work: it journals
+  `ticket.runner_exited` (`{run, exit: {code, signal}}`) and, if the ticket's agent was still
+  working (Running or Waiting) and the host did not stop it, feeds the machine
+  `Block(crashed)`: non-zero code and signals say so (`exit 101`, `killed by signal ...`), and a
+  zero exit without a `finished` event is a crash too (`exited without a finished event`), since
+  the work cannot be taken as done; `tok unblock` starts the runner again. After the hand-in
+  (Review) an exit changes nothing.
+- **Lost runners.** Startup recovery runs `runs::mark_lost` before it settles: every Running or
+  Waiting ticket whose agent is a process (not `sim`) goes to Blocked(`runner_lost`) through the
+  machine and is journaled as an ordinary status change. At startup no process is live, because
+  none outlives the daemon: a graceful shutdown kills the runners, and a hard kill closes their
+  terminals. `tok unblock` starts the agent again in the same ship.
+- **Output.** Raw bytes, ANSI kept. Each run has a log file `<home>/runs/<ticket id>/<run id>.log`
+  (all of its output; never read back by the daemon except for a ticket it did not run since the
+  last start) and a bounded in-memory scrollback of the last `output.scrollback_lines` lines of
+  its profile. Offsets count bytes from the start of the run, so they match the log file.
+  Journal entries: `ticket.runner_started` (`{run: {id, ticket_id, key, profile, dir}}`) and
+  `ticket.runner_exited`; output itself is not journaled.
+
+| Route | What |
+|---|---|
+| `GET /v1/tickets/{ticket}/runner/scrollback` | The scrollback of the newest run as `application/octet-stream`, with headers `x-toknila-run`, `x-toknila-offset` (of its first byte) and `x-toknila-end` (after its last byte). `404` if the ticket never ran |
+| `GET /v1/tickets/{ticket}/runner/stream?run=<id>&from=<offset>` | WebSocket (token as `?token=`). Binary frames: 26 ASCII characters of the run id, the 8-byte big-endian offset of the payload, the raw bytes (at most 64 KiB). Text frame `{"type":"ended","run":"...","exit":{"code":0,"signal":null}}` once the run's output is complete (`exit` absent for a run found on disk after a restart). Without `run` and `from` it starts at the first retained byte, so a late client sees history first; with them it continues after the bytes the client has (scrollback `end`). A new run of the same ticket shows up as frames with another run id |
+| `POST /v1/tickets/{ticket}/runner/input` | Body: bytes typed into the terminal as they are (`\r` is Enter on every platform). A person's action: the route acts as a person, and `toknila_app::runs::send_input` refuses any other actor. `409` when no runner is live |
+
+The frame format is `toknila_api_types::runner`; `/v1/stream` stays journal-only.
+`tok logs <ticket> [--follow]` prints the scrollback and, with `--follow`, continues on the
+stream until the run ends.
+
+Tests use `fake-agent` (`crates/daemon/src/bin/fake-agent.rs`: prints lines, echoes a line of
+input, sleeps, exits with a code) as the profile command, so the same tests run on a Unix pty and
+on ConPTY without a shell.
 
 ## Presentation: MVI
 

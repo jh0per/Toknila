@@ -32,6 +32,8 @@ pub struct AppState {
     pub shutdown: Arc<Notify>,
     /// The profiles folder (`Paths::profiles`); read on every request, so edits apply at once.
     pub profiles: PathBuf,
+    /// The agents' terminals (`/tickets/{ticket}/runner/...`).
+    pub runners: Arc<crate::runner::Runners>,
 }
 
 /// Current wall-clock time.
@@ -71,6 +73,10 @@ pub fn router(state: AppState) -> Router {
     let v1 = api
         .route("/shutdown", post(shutdown))
         .route("/stream", get(crate::stream::stream))
+        .route(
+            "/tickets/{ticket}/runner/stream",
+            get(crate::runner::stream),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_token,

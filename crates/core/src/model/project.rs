@@ -38,4 +38,39 @@ impl Project {
     pub const DEFAULT_WORK_BRANCH: &str = "develop";
     /// Release branch of a project that does not name one.
     pub const DEFAULT_RELEASE_BRANCH: &str = "main";
+
+    /// Name of the agent profile `ticket` runs with: its own, else the project's default.
+    pub fn profile_for<'a>(&'a self, ticket: &'a super::Ticket) -> &'a str {
+        ticket.profile.as_deref().unwrap_or(&self.default_profile)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AgentProfile, ChainId, Ticket, TicketDraft, TicketId, Timestamp};
+
+    #[test]
+    fn a_ticket_profile_overrides_the_project_default() {
+        let project = Project {
+            id: ProjectId::new(),
+            key: "DEMO".parse().expect("key"),
+            name: "Demo".into(),
+            repo_path: None,
+            work_branch: "develop".into(),
+            release_branch: "main".into(),
+            default_profile: AgentProfile::SIM.into(),
+            default_review_mode: ReviewMode::Human,
+        };
+        let mut t = Ticket::new_backlog(
+            TicketId::new(),
+            ChainId::new(),
+            "DEMO-1".parse().expect("key"),
+            TicketDraft::default(),
+            Timestamp(1),
+        );
+        assert_eq!(project.profile_for(&t), "sim");
+        t.profile = Some("claude-code".into());
+        assert_eq!(project.profile_for(&t), "claude-code");
+    }
 }
