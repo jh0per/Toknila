@@ -9,6 +9,7 @@ use toknila_app::RunnerError;
 use toknila_core::instructions::terminal;
 use toknila_core::{AgentProfile, ProcessExit};
 
+use super::drain::Slave;
 use super::wiring::Wiring;
 
 /// The size a terminal starts with, until a client fits it to its panel.
@@ -27,6 +28,8 @@ pub(super) struct Spawned {
     pub child: Box<dyn Child + Send + Sync>,
     /// Dropping it closes the terminal; the reader then reaches its end.
     pub master: Box<dyn MasterPty + Send>,
+    /// A slave end kept open for the run, to tell the reader the output is complete.
+    pub slave: Slave,
 }
 
 impl std::fmt::Debug for Spawned {
@@ -55,10 +58,12 @@ pub(super) fn spawn(
     for (k, v) in &wiring.env {
         cmd.env(k, v);
     }
+    // Opened before the child starts, so a slave end is open from the first byte it prints.
+    let slave = Slave::open(pair.master.tty_name().as_deref());
     let child = pair.slave.spawn_command(cmd).map_err(spawn_error)?;
-    // The child holds the only slave end now; with ours closed, the reader ends when it exits.
     drop(pair.slave);
     Ok(Spawned {
+        slave,
         reader: pair.master.try_clone_reader().map_err(spawn_error)?,
         writer: pair.master.take_writer().map_err(spawn_error)?,
         killer: child.clone_killer(),
