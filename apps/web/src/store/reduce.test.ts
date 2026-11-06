@@ -141,6 +141,13 @@ describe("threads", () => {
     expect(fx).toEqual([{ type: "threadAction", key: "DEMO-1", thread: "th1", action: "approve" }]);
   });
 
+  it("a card action and a comment are effects, not state changes", () => {
+    const action = { type: "ticketAction", key: "DEMO-1", action: "return", text: "fix it" } as const;
+    expect(reduce(card, action)).toEqual([card, [action]]);
+    const comment = { type: "addComment", key: "DEMO-1", kind: "instruction", text: "go on" } as const;
+    expect(reduce(card, comment)).toEqual([card, [comment]]);
+  });
+
   it("picking a version is remembered per thread", () => {
     const [s] = reduce(card, { type: "pickVersion", thread: "th1", number: 1 });
     expect(s.versionPick.th1).toBe(1);
