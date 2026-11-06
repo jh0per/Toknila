@@ -7,6 +7,7 @@
         "command": [],
         "env": {},
         "instructions_file": null,
+        "instructions_flag": null,
         "mcp": {
           "enabled": false,
           "config_flag": null
@@ -37,6 +38,7 @@
         ],
         "env": {},
         "instructions_file": "CLAUDE.md",
+        "instructions_flag": "--append-system-prompt-file",
         "mcp": {
           "enabled": true,
           "config_flag": "--mcp-config"
@@ -70,6 +72,7 @@
           "MY_AGENT_MODE": "headless"
         },
         "instructions_file": "AGENTS.md",
+        "instructions_flag": "--append-system-prompt-file",
         "mcp": {
           "enabled": true,
           "config_flag": "--mcp-config"

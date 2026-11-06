@@ -1307,6 +1307,55 @@
         }
       }
     },
+    "/tickets/{ticket}/instructions/claim": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "The ticket's agent asks, from its Stop hook, for what a person told it while it worked. Each\ninstruction is handed out once: it is marked delivered as it is claimed.",
+        "operationId": "claim_instructions",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstructionClaim"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/runner/input": {
       "post": {
         "tags": [
@@ -1408,6 +1457,59 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/runner/size": {
+      "post": {
+        "tags": [
+          "runner"
+        ],
+        "summary": "The size of the panel that shows the agent's terminal. The agent is a full-screen terminal\nprogram, so its terminal follows the panel.",
+        "operationId": "runner_size",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalSize"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Resized; sizes outside 20x5..500x200 are brought into that range"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -2168,6 +2270,13 @@
             ],
             "description": "Instructions file the agent reads, relative to its working directory."
           },
+          "instructions_flag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Flag of the agent's command that takes the path of the generated per-run instructions\n(under the data home; the project's own instructions file is never written)."
+          },
           "mcp": {
             "$ref": "#/components/schemas/McpWiring"
           },
@@ -2729,6 +2838,25 @@
           }
         },
         "additionalProperties": false
+      },
+      "InstructionClaim": {
+        "type": "object",
+        "description": "Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it\nworked, now handed over and marked delivered.",
+        "required": [
+          "count",
+          "reason"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "How many instructions were handed over; 0 when nothing was pending.",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "description": "The instructions as one text for the agent, in the comment template; empty when none."
+          }
+        }
       },
       "ListedProfile": {
         "type": "object",
@@ -3873,6 +4001,26 @@
       "SubtaskId": {
         "type": "string",
         "description": "Identifies a [`crate::Subtask`]."
+      },
+      "TerminalSize": {
+        "type": "object",
+        "description": "Body of `POST /v1/tickets/{ticket}/runner/size`: the size of the panel showing the terminal.",
+        "required": [
+          "cols",
+          "rows"
+        ],
+        "properties": {
+          "cols": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
       },
       "Thread": {
         "type": "object",

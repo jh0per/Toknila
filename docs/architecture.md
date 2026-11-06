@@ -55,7 +55,7 @@ progress, where a chain stopped) are never stored, here or in a client.
 ## Agent profiles
 
 A profile says how to launch one agent: `command` (an argv list, never a shell string), `env`,
-`role` (`worker`, `reviewer` or `release`), `instructions_file`, `mcp` and `hooks` wiring, `output`
+`role` (`worker`, `reviewer` or `release`), `instructions_file`, `instructions_flag`, `mcp` and `hooks` wiring, `output`
 rules and `nudge` thresholds. The working directory is not in it: the ship supplies it at launch.
 A new agent is a new file, not new code.
 
@@ -155,6 +155,7 @@ as external effects; the daemon implements the `Runner` port (`toknila-app`) in 
 |---|---|
 | `GET /v1/tickets/{ticket}/runner/scrollback` | The scrollback of the newest run as `application/octet-stream`, with headers `x-toknila-run`, `x-toknila-offset` (of its first byte) and `x-toknila-end` (after its last byte). `404` if the ticket never ran |
 | `GET /v1/tickets/{ticket}/runner/stream?run=<id>&from=<offset>` | WebSocket (token as `?token=`). Binary frames: 26 ASCII characters of the run id, the 8-byte big-endian offset of the payload, the raw bytes (at most 64 KiB). Text frame `{"type":"ended","run":"...","exit":{"code":0,"signal":null}}` once the run's output is complete (`exit` absent for a run found on disk after a restart). Without `run` and `from` it starts at the first retained byte, so a late client sees history first; with them it continues after the bytes the client has (scrollback `end`). A new run of the same ticket shows up as frames with another run id |
+| `POST /v1/tickets/{ticket}/runner/size` | Body `{"cols": n, "rows": n}`: the size of the panel showing the terminal; the agent's terminal follows it (window-size signal), within 20x5 and 500x200 (`toknila_core::instructions::terminal::clamp`; a terminal starts at 160x40). A person's action; `409` when no runner is live. The web terminal sends it after the panel has been still for 150 ms, and again when the stream goes live |
 | `POST /v1/tickets/{ticket}/runner/input` | Body: bytes typed into the terminal as they are (`\r` is Enter on every platform). A person's action: the route acts as a person, and `toknila_app::runs::send_input` refuses any other actor. `409` when no runner is live |
 
 The frame format is `toknila_api_types::runner`; `/v1/stream` stays journal-only.
@@ -172,8 +173,8 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
   `TOKNILA_TICKET`, `TOKNILA_RUN`, in `toknila_api_types::runner::agent_env`); the person's token
   is not known to `Runners` at all.
 - **Who is calling.** `server/auth.rs` turns the bearer token into a `Principal` (`Person` or
-  `Agent(grant)`) for the handlers. An agent may call only `AGENT_ROUTES` (events and activity of
-  its own ticket); everything else is `403`. The ownership rule is `toknila_app::agent::ensure_granted`
+  `Agent(grant)`) for the handlers. An agent may call only `AGENT_ROUTES` (events, activity and
+  the instruction claim of its own ticket); everything else is `403`. The ownership rule is `toknila_app::agent::ensure_granted`
   (`ErrorKind::Forbidden`, `403`). Business rules stay in core: `person_only` still guards the
   use cases, the allowlist keeps agents from reaching them.
 - **Wiring.** `runner/wiring.rs`: for a profile with `mcp.enabled` / `hooks.enabled` and the
@@ -182,15 +183,42 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
   `--settings <file>` to the command. Neither file holds a token; both name environment variables.
   The files run the `toknila` binary of the daemon (`current_exe`) as `toknila mcp` and
   `toknila hook <name>`.
+- **Instructions file.** For a profile with `instructions_flag` (the built-in `claude-code` has
+  `--append-system-prompt-file`) the runner also writes `runs/<ticket id>/instructions.md` and
+  passes it by that flag. It holds the ticket's title, task and acceptance, the comment template,
+  the short-output rules and how to report through the MCP tools
+  (`toknila_core::instructions::generate`, pinned by `snapshots/run.md`). It is added to the
+  system prompt; the worktree's own `CLAUDE.md` and `AGENTS.md` are never written and still apply.
+  The ticket-independent part (`instructions::protocol`) is also the `instructions` field of
+  `tok mcp`'s `initialize` answer, a second route to the same text. Verified against `claude`
+  2.1.319: `--append-system-prompt-file <missing>` fails on the file path, not as an unknown
+  option (`--help` lists only `--append-system-prompt`). `instructions_file` is a different
+  field, the file the agent reads on its own (`CLAUDE.md`).
 - **Agent side.** `tok mcp` (stdio MCP server) and `tok hook <name>` in `crates/cli`
   (`cmd/mcp.rs`, `cmd/mcp_tools.rs`, `cmd/hook.rs`) are thin clients of the daemon that read the
   environment above and do not start a daemon. The hook-to-event mapping is pure and lives in
   `toknila_core::hook`.
+- **Instructions to the agent.** A person's instruction comment on a ticket whose agent is a
+  process is queued as `ExternalEffect::DeliverInstruction` (`toknila_app::instructions`, for any
+  instruction comment from a person, whoever left it: a typed one or a Return). The host picks the
+  way in with `toknila_core::instructions::route(hooks, idle)`: type it into the terminal as one
+  line, then Enter as a separate keystroke (`InstructionTyped` outcome), when the profile wires no
+  hooks or the agent has printed nothing for 3 seconds; otherwise leave it pending for the
+  agent's next Stop hook. `tok hook stop` calls `POST /v1/tickets/{ticket}/instructions/claim`
+  (an agent route) and, when instructions were pending, prints
+  `{"decision":"block","reason":"<the instructions in the comment template>"}` so Claude Code
+  continues with them; with none pending it prints nothing and the agent stops. Each comment is
+  delivered once: claiming or typing marks `delivered_at`, journals `comment.delivered` and moves
+  a Waiting ticket back to Running. That is also the loop guard (`stop_hook_active`, which Claude
+  Code sets while it continues because of a stop hook, and its cap of 8 consecutive
+  continuations): the stop that follows finds nothing pending. A comment for a ticket without a
+  live runner stays pending. Deliveries run after the command's other effects, so a ship or
+  runner queued with them is not held up.
 - **Activity.** Hook signals and any call made with a run token are kept as the ticket's last
   activity (time and signal) in memory; the nudge ticket reads it.
 
 Tests use `fake-agent` (`crates/daemon/src/bin/fake-agent.rs`: prints lines, echoes a line of
-input, sleeps, exits with a code) as the profile command, so the same tests run on a Unix pty and
+input, prints its terminal size, sleeps, exits with a code) as the profile command, so the same tests run on a Unix pty and
 on ConPTY without a shell.
 
 ## Data safety

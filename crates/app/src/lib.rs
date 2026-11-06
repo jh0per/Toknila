@@ -9,6 +9,7 @@ pub mod chain;
 pub mod chains;
 pub mod error;
 pub mod external;
+pub mod instructions;
 pub mod notes;
 pub mod ports;
 pub mod projects;

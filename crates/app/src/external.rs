@@ -5,10 +5,13 @@
 
 use std::collections::{HashMap, HashSet};
 
-use toknila_core::{Run, Ship, ShipSpec, TicketId, TicketKey};
+use toknila_core::instructions::{self, Route};
+use toknila_core::{Comment, CommentId, Run, Ship, ShipSpec, TicketId, TicketKey};
 
-use crate::runner::{RunRequest, Runner, RunnerError};
-use crate::{AppResult, ShipError, Shipyard, UnitOfWork, runs, ships};
+use crate::runner::{RunBrief, RunRequest, Runner, RunnerError};
+use crate::{
+    AppResult, ShipError, Shipyard, UnitOfWork, instructions as deliver_instructions, runs, ships,
+};
 
 /// Something to do on the host once the command that asked for it has committed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,9 +25,13 @@ pub enum ExternalEffect {
         ticket: TicketId,
         key: TicketKey,
         profile: String,
+        /// What the agent is told: the ticket's title, task and acceptance.
+        brief: RunBrief,
     },
     /// Stop the ticket's runner.
     StopRunner { ticket: TicketId },
+    /// Get a person's instruction to the ticket's live agent (see [`crate::instructions`]).
+    DeliverInstruction { ticket: TicketId, comment: Comment },
 }
 
 /// What happened on the host.
@@ -53,6 +60,11 @@ pub enum ExternalOutcome {
         ticket: TicketId,
         error: RunnerError,
     },
+    /// The instruction was typed into the agent's terminal.
+    InstructionTyped {
+        ticket: TicketId,
+        comment: CommentId,
+    },
 }
 
 /// The host's ports for [`execute`].
@@ -69,6 +81,11 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
     let mut dirs: HashMap<TicketId, String> = HashMap::new();
     let mut failed: HashSet<TicketId> = HashSet::new();
     let mut outcomes = Vec::new();
+    // Typing an instruction takes a moment, so it goes last: it must not hold up ships and
+    // runners that the same command queued, and it sees the runner as they left it.
+    let (deliveries, effects): (Vec<_>, Vec<_>) = effects
+        .into_iter()
+        .partition(|e| matches!(e, ExternalEffect::DeliverInstruction { .. }));
     for effect in effects {
         match effect {
             ExternalEffect::PrepareShip { ticket, spec } => match host.yard.prepare(&spec) {
@@ -92,6 +109,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 ticket,
                 key,
                 profile,
+                brief,
             } => {
                 if failed.contains(&ticket) {
                     continue;
@@ -106,6 +124,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                             key,
                             profile,
                             dir,
+                            brief,
                         })
                     });
                 match result {
@@ -117,9 +136,42 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 }
             }
             ExternalEffect::StopRunner { ticket } => host.runner.stop(ticket),
+            ExternalEffect::DeliverInstruction { .. } => {}
+        }
+    }
+    for effect in deliveries {
+        if let ExternalEffect::DeliverInstruction { ticket, comment } = effect
+            && deliver(host.runner, ticket, &comment)
+        {
+            outcomes.push(ExternalOutcome::InstructionTyped {
+                ticket,
+                comment: comment.id,
+            });
         }
     }
     outcomes
+}
+
+/// Pause between the typed text and Enter.
+const ENTER_DELAY: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// Types the instruction into the agent's terminal when that is the way in. Returns whether it
+/// was typed. An agent that works with hooks takes it at its next Stop instead, and a ticket
+/// without a live runner keeps it pending; neither is an error.
+fn deliver(runner: &dyn Runner, ticket: TicketId, comment: &Comment) -> bool {
+    let Some(state) = runner.state(ticket) else {
+        return false;
+    };
+    if instructions::route(state.hooks, state.idle) != Route::Type {
+        return false;
+    }
+    let line = instructions::typed(comment);
+    // The text, then Enter as a separate keystroke: a terminal application takes a newline that
+    // arrives with the text as part of a paste.
+    runner.write(ticket, line.as_bytes()).is_ok() && {
+        std::thread::sleep(ENTER_DELAY);
+        runner.write(ticket, b"\r").is_ok()
+    }
 }
 
 /// Records the outcomes: state and journal, with ticket changes going through the machine.
@@ -135,6 +187,9 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             ExternalOutcome::RunnerStarted { run } => runs::started(uow, run)?,
             ExternalOutcome::RunnerFailed { ticket, error } => {
                 runs::start_failed(uow, ticket, &error)?;
+            }
+            ExternalOutcome::InstructionTyped { ticket, comment } => {
+                deliver_instructions::typed(uow, ticket, comment)?;
             }
         }
     }

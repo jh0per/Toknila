@@ -39,7 +39,7 @@ try {
   git(repo, "add", "README.md");
   git(repo, "commit", "--quiet", "-m", "init");
   mkdirSync(join(home, "profiles"), { recursive: true });
-  writeFileSync(join(home, "profiles", "fake.toml"), `command = ['${fakeAgent}', 'print', 'agent ready', 'echo', 'hold']\n`);
+  writeFileSync(join(home, "profiles", "fake.toml"), `command = ['${fakeAgent}', 'print', 'agent ready', 'echo', 'size', 'hold']\n`);
   tok("project", "new", "WEB", "--repo", repo, "--base", "develop", "--profile", "fake");
   tok("chain", "new", "work", "--project", "WEB", "--no-autostart");
   tok("ticket", "new", "work", "Echo task", "--prompt", "Say hello.");
@@ -69,6 +69,18 @@ try {
   await page.keyboard.type("hello agent");
   await page.keyboard.press("Enter");
   await expectText(term, "got:hello agent", "a typed line reaches the agent and its echo comes back");
+
+  // The agent's terminal follows the panel: the size it reports after the line is the grid the
+  // page fitted, not the daemon's default of 160x40.
+  await expectText(term, "size=", "the agent reports its terminal size");
+  const reported = (await term.innerText()).match(/size=(\d+)x(\d+)/);
+  if (!reported) throw new Error("no size line in the terminal");
+  const [, cols, rows] = reported;
+  const fitted = await page.evaluate(() => {
+    const screen = document.querySelector("[data-testid=term-host] .xterm-screen");
+    return screen ? { width: screen.clientWidth, height: screen.clientHeight } : null;
+  });
+  if (`${cols}x${rows}` === "160x40") throw new Error(`the terminal kept the default size (${fitted && fitted.width}px wide)`);
 
   // A reload gets the same output from the scrollback.
   await page.reload();
@@ -105,8 +117,7 @@ try {
   // What a CI log needs to tell a slow runner from a broken one: the ticket and its journal.
   try {
     const shown = JSON.parse(tok("show", "WEB-1", "--json")).ticket;
-    console.error(`WEB-1: ${shown.status} ${JSON.stringify(shown.status_reason)}`);
-  } catch {
+    console.error(`WEB-1: ${shown.status} ${JSON.stringify(shown.status_reason)}`);  } catch {
     /* the daemon is not reachable */
   }
   process.exitCode = 1;

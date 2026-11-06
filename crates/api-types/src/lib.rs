@@ -232,6 +232,25 @@ pub struct NewActivity {
     pub signal: String,
 }
 
+/// Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
+/// worked, now handed over and marked delivered.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct InstructionClaim {
+    /// How many instructions were handed over; 0 when nothing was pending.
+    pub count: usize,
+    /// The instructions as one text for the agent, in the comment template; empty when none.
+    pub reason: String,
+}
+
+/// Body of `POST /v1/tickets/{ticket}/runner/size`: the size of the panel showing the terminal.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct TerminalSize {
+    pub cols: u32,
+    pub rows: u32,
+}
+
 impl From<(ReleaseId, TicketId)> for ReleaseMember {
     fn from((release, ticket): (ReleaseId, TicketId)) -> Self {
         Self { release, ticket }

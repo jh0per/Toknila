@@ -369,6 +369,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tickets/{ticket}/instructions/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The ticket's agent asks, from its Stop hook, for what a person told it while it worked. Each
+         *     instruction is handed out once: it is marked delivered as it is claimed.
+         */
+        post: operations["claim_instructions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets/{ticket}/runner/input": {
         parameters: {
             query?: never;
@@ -395,6 +415,26 @@ export interface paths {
         get: operations["scrollback"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/runner/size": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The size of the panel that shows the agent's terminal. The agent is a full-screen terminal
+         *     program, so its terminal follows the panel.
+         */
+        post: operations["runner_size"];
         delete?: never;
         options?: never;
         head?: never;
@@ -595,6 +635,11 @@ export interface components {
             hooks: components["schemas"]["HookWiring"];
             /** @description Instructions file the agent reads, relative to its working directory. */
             instructions_file?: string | null;
+            /**
+             * @description Flag of the agent's command that takes the path of the generated per-run instructions
+             *     (under the data home; the project's own instructions file is never written).
+             */
+            instructions_flag?: string | null;
             mcp: components["schemas"]["McpWiring"];
             name: string;
             nudge: components["schemas"]["Nudge"];
@@ -774,6 +819,16 @@ export interface components {
              * @default null
              */
             settings_flag: string | null;
+        };
+        /**
+         * @description Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
+         *     worked, now handed over and marked delivered.
+         */
+        InstructionClaim: {
+            /** @description How many instructions were handed over; 0 when nothing was pending. */
+            count: number;
+            /** @description The instructions as one text for the agent, in the comment template; empty when none. */
+            reason: string;
         };
         /** @description A profile and where it comes from. */
         ListedProfile: {
@@ -1161,6 +1216,13 @@ export interface components {
         };
         /** @description Identifies a [`crate::Subtask`]. */
         SubtaskId: string;
+        /** @description Body of `POST /v1/tickets/{ticket}/runner/size`: the size of the panel showing the terminal. */
+        TerminalSize: {
+            /** Format: int32 */
+            cols: number;
+            /** Format: int32 */
+            rows: number;
+        };
         /** @description A discussion on one ticket that ends in a person's approval. */
         Thread: {
             approved_at?: components["schemas"]["Timestamp"] | null;
@@ -2285,6 +2347,44 @@ export interface operations {
             };
         };
     };
+    claim_instructions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstructionClaim"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     runner_input: {
         parameters: {
             query?: never;
@@ -2357,6 +2457,47 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    runner_size: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminalSize"];
+            };
+        };
+        responses: {
+            /** @description Resized; sizes outside 20x5..500x200 are brought into that range */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

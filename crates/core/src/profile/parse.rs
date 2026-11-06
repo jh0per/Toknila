@@ -24,6 +24,7 @@ struct Raw {
     #[serde(default)]
     env: BTreeMap<String, Spanned<String>>,
     instructions_file: Option<String>,
+    instructions_flag: Option<String>,
     #[serde(default)]
     mcp: McpWiring,
     #[serde(default)]
@@ -100,6 +101,7 @@ pub fn parse(name: &str, text: &str) -> Result<AgentProfile, ProfileError> {
             .map(|(k, v)| (k, v.into_inner()))
             .collect(),
         instructions_file: raw.instructions_file,
+        instructions_flag: raw.instructions_flag,
         mcp: raw.mcp,
         hooks: raw.hooks,
         output: raw.output,

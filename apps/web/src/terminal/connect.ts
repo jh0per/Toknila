@@ -2,7 +2,8 @@
 // scrollback ended, reconnecting by itself. Output goes out through callbacks; typing comes in
 // through `send`. No DOM here, so the view can be any terminal emulator.
 
-import { getBytes, postBytes, runnerStreamUrl } from "../api/http";
+import { getBytes, post, postBytes, runnerStreamUrl } from "../api/http";
+import type { Size } from "./size";
 import { type Exit, type Frame, type TermCursor, applyFrame, parseFrame } from "./wire";
 
 export type TermStatus =
@@ -26,6 +27,9 @@ const MAX_RETRY_MS = 10_000;
 
 export interface TerminalConnection {
   send(bytes: Uint8Array): void;
+  /// The size of the panel showing the terminal. A ticket without a live runner refuses; that is
+  /// not worth showing, the size is sent again when the stream goes live.
+  resize(size: Size): void;
   close(): void;
 }
 
@@ -101,6 +105,9 @@ export function openTerminal(key: string, sink: TerminalSink): TerminalConnectio
       typing = typing
         .then(() => postBytes(`${base}/input`, bytes))
         .catch((e: unknown) => sink.refused(e instanceof Error ? e.message : String(e)));
+    },
+    resize(size) {
+      void post(`${base}/size`, size).catch(() => undefined);
     },
     close() {
       closed = true;
