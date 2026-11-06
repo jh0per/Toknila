@@ -23,6 +23,19 @@ pub const HEADER_OFFSET: &str = "x-toknila-offset";
 /// Header of the scrollback answer: offset after its last byte; the stream continues from here.
 pub const HEADER_END: &str = "x-toknila-end";
 
+/// Environment of an agent's process: where the daemon is, and the run's own token. The MCP
+/// server and the hooks (`tok mcp`, `tok hook`) read these and nothing else.
+pub mod agent_env {
+    /// Base URL of the daemon.
+    pub const URL: &str = "TOKNILA_URL";
+    /// The run's agent token: scoped to its ticket, revoked when the run ends.
+    pub const TOKEN: &str = "TOKNILA_RUN_TOKEN";
+    /// Key of the run's ticket.
+    pub const TICKET: &str = "TOKNILA_TICKET";
+    /// Id of the run.
+    pub const RUN: &str = "TOKNILA_RUN";
+}
+
 /// An output frame, decoded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Frame<'a> {

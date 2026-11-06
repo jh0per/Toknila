@@ -1,9 +1,9 @@
 # Agent event contract
 
-How an agent reports on its ticket. In phase 0 the built-in `sim` profile starts no process and a
-person sends these events with `tok sim <ticket> ...`. In phase 1 the Claude Code profile sends the
-same events from MCP tools (`ask_human`, `subtask_done`, `note`, `finished`) and from agent hooks
-(Notification, Stop) or the runner (process exit). The daemon does not care who sent them.
+How an agent reports on its ticket. The built-in `sim` profile starts no process and a person
+sends these events with `tok sim <ticket> ...`. The `claude-code` profile sends the same events
+from MCP tools (`tok mcp`, below) and, for a few clear cases, from agent hooks (`tok hook`), or
+the runner does (process exit). The daemon does not care who sent them: one route, one use case.
 
 `POST /v1/tickets/{ticket}/events` with `Authorization: Bearer <token>` (from `daemon.json`).
 `{ticket}` is a ticket key (`DEMO-3`) or id. The body is one JSON object tagged by `event`.
@@ -41,7 +41,70 @@ without a `finished` event (the detail says which: `exit 101`, `killed by signal
 {"event":"thread_message","thread":"1","text":"empty, loading, error and content states"}
 ```
 
+An agent token (below) sends these with `Authorization: Bearer <run token>` and only for its own
+ticket; any other ticket answers `403 {"error": "...", "code": "forbidden"}`.
+
 A refused transition answers `409 {"error": "...", "code": "conflict"}` and changes nothing.
+
+## MCP server (`tok mcp`)
+
+`tok mcp` is a stdio MCP server (newline-delimited JSON-RPC 2.0: `initialize`, `ping`,
+`tools/list`, `tools/call`). It reads the daemon address and the run's token from the environment
+the runner gives the agent (`TOKNILA_URL`, `TOKNILA_RUN_TOKEN`, `TOKNILA_TICKET`; `TOKNILA_RUN`
+names the run), never from the data home, and forwards each call to
+`POST /v1/tickets/{ticket}/events`. There is one tool per event, named like it, taking the
+event's fields: `started`, `ask_human`, `subtask_done`, `note`, `finished`, `crashed`, `propose`,
+`open_thread`, `thread_message`, `thread_version`. A call the daemon refuses (a `409` such as an
+open thread blocking `finished`, or a `403`) comes back as a tool result with `isError: true` and
+the daemon's message; the agent reads it and adapts. No tool approves, rejects, accepts or
+cancels anything: those are a person's.
+
+## Hooks (`tok hook <name>`)
+
+Claude Code hooks are a second source, conservative on purpose. The runner subscribes to five;
+`tok hook <name>` reads the hook's JSON from stdin, and the mapping lives in core
+(`toknila_core::hook`):
+
+| Hook | `<name>` | Activity | Event |
+|---|---|---|---|
+| `Notification` with `notification_type: "permission_prompt"` | `notification` | yes | `ask_human` with `permission: true`, text = the notification's `message` |
+| `Notification` of any other type (`idle_prompt`, ...) | `notification` | yes | none |
+| `Stop` | `stop` | yes | none: it fires after every reply, so it is **not** `finished` |
+| `SubagentStop` | `subagent_stop` | yes | none |
+| `UserPromptSubmit` | `user_prompt_submit` | yes | none |
+| `PostToolUse` | `post_tool_use` | yes | none |
+
+Every hook is an activity signal: `POST /v1/tickets/{ticket}/activity` with `{"signal":
+"hook:stop"}` (`204`, no journal entry, nothing about the ticket changes). The daemon keeps the
+last signal of each ticket's agent in memory (`AgentTokens::last_activity`: its time and what it
+was); any other call made with the run's token counts as activity `api`. The nudge consumes this;
+nothing else reads it yet. A hook never gets in the agent's way: failures are one line on stderr
+and exit code 0, and outside a Toknila run (no `TOKNILA_*` environment) it does nothing. The
+transition `ask_human` makes (Running -> Waiting) is refused with `409` in any other status; the
+hook reports that on stderr and carries on.
+
+## Agent tokens
+
+Each run has its own token, scoped to its ticket. The runner creates it when the run starts,
+puts it in the agent's environment only (`TOKNILA_RUN_TOKEN`) and revokes it when the process
+ends (before the end is journaled); a revoked or made-up token is `401`. The person's token
+(`daemon.json`) is never put in any runner environment or generated file: the generated MCP
+config and hook settings name `${TOKNILA_RUN_TOKEN}` and the agent expands it from its own
+environment.
+
+An agent token may call exactly two routes, both `POST`, both for its own ticket:
+`/v1/tickets/{ticket}/events` (every agent event, including the agent's thread posts and
+`propose`) and `/v1/tickets/{ticket}/activity`. Everything else answers `403` with code
+`forbidden`: approve and reject of wildcards, approve and request changes on threads, accept,
+return, cancel, runner input, comments, edits, the stream, release events, shutdown. The rule is
+an allowlist (`AGENT_ROUTES` in `crates/daemon/src/server/auth.rs`), so a route added later is
+refused to agents until it is listed on purpose; a test walks every route of the API. Events for
+a ticket the token does not own answer `403` and change nothing.
+
+Residual risk: an agent runs as the same OS user as the daemon and could read the person's token
+from `daemon.json` (mode 600, same user) and use it. The scoping stops a cooperating or confused
+agent and keeps person-only actions out of the agent's reach by construction; it is not a sandbox
+against a hostile process.
 
 ## Wildcard cards
 

@@ -238,3 +238,107 @@ fn log_of(home: &Path, ticket: TicketId, run: &str) -> PathBuf {
         .join(ticket.to_string())
         .join(format!("{run}.log"))
 }
+
+/// The value the fake agent printed for environment variable `name`.
+fn printed_env(output: &str, name: &str) -> String {
+    output
+        .lines()
+        .find_map(|l| l.trim().strip_prefix(&format!("{name}=")))
+        .unwrap_or_else(|| panic!("no {name} in {output:?}"))
+        .trim()
+        .to_owned()
+}
+
+#[test]
+fn each_run_gets_its_own_token_scoped_to_its_ticket_and_revoked_when_it_ends() {
+    let mut rig = Rig::new();
+    rig.runners
+        .set_daemon_url("http://127.0.0.1:4242".to_owned());
+    rig.profile(
+        "fake",
+        &[
+            "env",
+            "TOKNILA_RUN_TOKEN",
+            "env",
+            "TOKNILA_TICKET",
+            "env",
+            "TOKNILA_URL",
+            "print",
+            "up",
+            "hold",
+        ],
+        "",
+    );
+    let started = rig.start("fake");
+    let out = rig.wait_for("up");
+    let token = printed_env(&out, "TOKNILA_RUN_TOKEN");
+    assert_eq!(printed_env(&out, "TOKNILA_TICKET"), "DEMO-1");
+    assert_eq!(printed_env(&out, "TOKNILA_URL"), "http://127.0.0.1:4242");
+
+    let grant = rig.runners.tokens().lookup(&token).expect("a live token");
+    assert_eq!((grant.ticket, grant.run), (rig.ticket, started.run.id));
+    assert!(rig.runners.tokens().last_activity(rig.ticket).is_some());
+
+    rig.runners.stop(rig.ticket);
+    rig.wait_end();
+    assert_eq!(
+        rig.runners.tokens().lookup(&token),
+        None,
+        "revoked once the run ended"
+    );
+}
+
+#[test]
+fn a_run_that_exits_on_its_own_loses_its_token_too_and_the_next_run_has_another() {
+    let mut rig = Rig::new();
+    rig.profile("fake", &["env", "TOKNILA_RUN_TOKEN", "exit", "0"], "");
+    rig.start("fake");
+    let first = printed_env(&rig.wait_for("TOKNILA_RUN_TOKEN="), "TOKNILA_RUN_TOKEN");
+    rig.wait_end();
+    assert_eq!(rig.runners.tokens().lookup(&first), None);
+
+    rig.start("fake");
+    let until = Instant::now() + WAIT;
+    let second = loop {
+        let out = rig.output();
+        // The log of the newest run only; the first token's line is gone with its run.
+        if let Some(token) = out
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("TOKNILA_RUN_TOKEN="))
+            .filter(|t| t.trim().len() == 64)
+        {
+            break token.trim().to_owned();
+        }
+        assert!(Instant::now() < until, "no second token in {out:?}");
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    assert_ne!(first, second);
+    rig.wait_end();
+}
+
+#[test]
+fn a_profile_that_asks_for_mcp_gets_a_config_file_under_the_data_home_and_the_flag() {
+    let mut rig = Rig::new();
+    // The fake agent has no `--mcp-config`; its `print` step stands in for the flag and prints
+    // the path it is given.
+    rig.profile(
+        "fake",
+        &[],
+        "[mcp]\nenabled = true\nconfig_flag = \"print\"\n",
+    );
+    rig.start("fake");
+    rig.wait_for("mcp.json");
+    rig.wait_end();
+    let file = rig
+        .dir
+        .path()
+        .join("runs")
+        .join(rig.ticket.to_string())
+        .join("mcp.json");
+    let text = std::fs::read_to_string(&file).expect("generated config");
+    assert!(text.contains("\"mcpServers\""), "{text}");
+    assert!(
+        !rig.ship().join("mcp.json").exists(),
+        "nothing is written into the worktree"
+    );
+}

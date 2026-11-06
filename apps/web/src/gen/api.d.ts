@@ -293,6 +293,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tickets/{ticket}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;
+         *     nothing about the ticket changes.
+         */
+        post: operations["ticket_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets/{ticket}/comments": {
         parameters: {
             query?: never;
@@ -716,8 +736,8 @@ export interface components {
             seq: number;
         };
         /**
-         * @description How an agent reports through hooks, a second event source. A placeholder until the MCP ticket
-         *     fills it: nothing reads it yet.
+         * @description How an agent reports through hooks, a second event source: the runner writes a settings file
+         *     under the data home and passes its path with `settings_flag`.
          */
         HookWiring: {
             /**
@@ -738,8 +758,8 @@ export interface components {
             profile: components["schemas"]["AgentProfile"];
         };
         /**
-         * @description How an agent receives its MCP server (the agent event contract). A placeholder until the MCP
-         *     ticket fills it: nothing reads it yet.
+         * @description How an agent receives its MCP server (the agent event contract): the runner writes a config
+         *     file under the data home and passes its path with `config_flag`.
          */
         McpWiring: {
             /**
@@ -758,6 +778,11 @@ export interface components {
          * @enum {string}
          */
         MessageKind: "message" | "changes_requested";
+        /** @description Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook. */
+        NewActivity: {
+            /** @description What fired, for example `hook:stop`. */
+            signal: string;
+        };
         /** @description `POST /v1/projects/{project}/chains`. */
         NewChain: {
             /** @description Defaults to true. */
@@ -1969,6 +1994,47 @@ export interface operations {
             };
         };
     };
+    ticket_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewActivity"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     add_comment: {
         parameters: {
             query?: never;
@@ -2036,6 +2102,14 @@ export interface operations {
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

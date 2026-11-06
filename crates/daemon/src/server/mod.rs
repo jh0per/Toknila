@@ -19,8 +19,8 @@ mod auth;
 mod lifecycle;
 mod logging;
 
-#[cfg(test)]
-use auth::constant_time_eq;
+pub(crate) use auth::constant_time_eq;
+pub use auth::{AGENT_ROUTES, Principal};
 pub use lifecycle::{RunError, probe, run};
 pub use logging::init_logging;
 

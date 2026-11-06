@@ -2,10 +2,13 @@
 //! workspace touches it.
 
 use std::io::{Read, Write};
+use std::path::Path;
 
 use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use toknila_app::RunnerError;
 use toknila_core::{AgentProfile, ProcessExit};
+
+use super::wiring::Wiring;
 
 /// Terminal size an agent sees. Fixed for now; resizing arrives with the web terminal.
 const SIZE: PtySize = PtySize {
@@ -32,15 +35,23 @@ impl std::fmt::Debug for Spawned {
 }
 
 /// Starts the profile's command (an argument list, never a shell string) in `dir`.
-pub(super) fn spawn(profile: &AgentProfile, dir: &str) -> Result<Spawned, RunnerError> {
+pub(super) fn spawn(
+    profile: &AgentProfile,
+    dir: &Path,
+    wiring: &Wiring,
+) -> Result<Spawned, RunnerError> {
     let Some((program, args)) = profile.command.split_first() else {
         return Err(RunnerError::NoCommand(profile.name.clone()));
     };
     let pair = native_pty_system().openpty(SIZE).map_err(spawn_error)?;
     let mut cmd = CommandBuilder::new(program);
     cmd.args(args);
+    cmd.args(&wiring.args);
     cmd.cwd(dir);
     for (k, v) in &profile.env {
+        cmd.env(k, v);
+    }
+    for (k, v) in &wiring.env {
         cmd.env(k, v);
     }
     let child = pair.slave.spawn_command(cmd).map_err(spawn_error)?;

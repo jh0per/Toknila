@@ -1,8 +1,12 @@
 //! Every `tok` subcommand: parse, call the daemon through the typed client, print a table or the
 //! JSON answer. One module per command group; no business rules here.
 
+mod agent;
 mod chain;
+mod hook;
 mod logs;
+mod mcp;
+mod mcp_tools;
 mod profile;
 mod project;
 mod release;
@@ -130,6 +134,14 @@ pub enum Command {
     },
     /// Print the web page address of the daemon.
     Open,
+    /// Run the MCP server of an agent on stdio (the runner wires it in; needs the runner's
+    /// environment).
+    Mcp,
+    /// Handle a Claude Code hook: read its JSON from stdin, record activity, report what is clear.
+    Hook {
+        /// The hook: notification, stop, subagent_stop, user_prompt_submit or post_tool_use.
+        name: String,
+    },
 }
 
 /// Prints `v` as JSON (keys sorted, as before typed answers), or with the human formatter.
@@ -162,10 +174,19 @@ pub fn run(cmd: Command, json_out: bool) -> Result<()> {
     if let Command::Daemon(d) = cmd {
         return daemon_cmd::run(d, json_out);
     }
+    // The agent side finds the daemon in the runner's environment and never starts one.
+    match cmd {
+        Command::Mcp => mcp::run(),
+        Command::Hook { name } => hook::run(&name),
+        cmd => run_on_home(cmd, json_out),
+    }
+}
+
+fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
     let paths = Paths::resolve().map_err(anyhow::Error::msg)?;
     let c = crate::client::connect(&paths)?;
     match cmd {
-        Command::Daemon(_) => unreachable!("handled above"),
+        Command::Daemon(_) | Command::Mcp | Command::Hook { .. } => unreachable!("handled above"),
         Command::Project(p) => project::run(&c, p, json_out),
         Command::Profile(p) => profile::run(&c, p, json_out),
         Command::Chain(ch) => chain::run(&c, ch, json_out),

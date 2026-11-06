@@ -44,13 +44,13 @@
         ],
         "env": {},
         "hooks": {
-          "enabled": false,
+          "enabled": true,
           "settings_flag": "--settings"
         },
         "instructions_file": "CLAUDE.md",
         "mcp": {
           "config_flag": "--mcp-config",
-          "enabled": false
+          "enabled": true
         },
         "name": "claude-code",
         "nudge": {

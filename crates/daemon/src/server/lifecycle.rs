@@ -93,6 +93,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         version: toknila_core::VERSION.to_owned(),
         started_at: now().0,
     };
+    runners.set_daemon_url(info.base_url());
     info.write(&paths.daemon_json())?;
     tracing::info!(port, pid = info.pid, "daemon listening on 127.0.0.1");
 

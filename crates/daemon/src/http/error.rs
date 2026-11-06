@@ -34,6 +34,7 @@ impl ApiError {
             ErrorKind::NotFound => StatusCode::NOT_FOUND,
             ErrorKind::BadRequest => StatusCode::BAD_REQUEST,
             ErrorKind::Conflict | ErrorKind::Ambiguous => StatusCode::CONFLICT,
+            ErrorKind::Forbidden => StatusCode::FORBIDDEN,
             ErrorKind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

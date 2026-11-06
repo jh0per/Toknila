@@ -60,7 +60,7 @@ rules and `nudge` thresholds. The working directory is not in it: the ship suppl
 A new agent is a new file, not new code.
 
 - Built in: `sim` (starts no process; a person sends its events with `tok sim`) and `claude-code`
-  (launches `claude`; its `mcp` and `hooks` wiring is a placeholder until the MCP ticket fills it).
+  (launches `claude` with the MCP server and the hooks wired in, see "Agent access" below).
 - Files: `<name>.toml` in the `profiles` folder of the data home (`Paths::profiles()`):
   `~/Library/Application Support/toknila/profiles` on macOS, `%APPDATA%\toknila\profiles` on
   Windows, `~/.toknila/profiles` on Linux, or `$TOKNILA_HOME/profiles`. The file name is the
@@ -154,6 +154,34 @@ as external effects; the daemon implements the `Runner` port (`toknila-app`) in 
 The frame format is `toknila_api_types::runner`; `/v1/stream` stays journal-only.
 `tok logs <ticket> [--follow]` prints the scrollback and, with `--follow`, continues on the
 stream until the run ends.
+
+## Agent access
+
+How a running agent talks back, over the same route and use cases as `tok sim` (events in
+`docs/events.md`).
+
+- **Tokens.** `runner/tokens.rs` (`AgentTokens`, owned by `Runners`): `Runners::start` issues one
+  token per run, scoped to the run's ticket; the watcher thread revokes it when the process ends.
+  The token reaches the agent only through its environment (`TOKNILA_URL`, `TOKNILA_RUN_TOKEN`,
+  `TOKNILA_TICKET`, `TOKNILA_RUN`, in `toknila_api_types::runner::agent_env`); the person's token
+  is not known to `Runners` at all.
+- **Who is calling.** `server/auth.rs` turns the bearer token into a `Principal` (`Person` or
+  `Agent(grant)`) for the handlers. An agent may call only `AGENT_ROUTES` (events and activity of
+  its own ticket); everything else is `403`. The ownership rule is `toknila_app::agent::ensure_granted`
+  (`ErrorKind::Forbidden`, `403`). Business rules stay in core: `person_only` still guards the
+  use cases, the allowlist keeps agents from reaching them.
+- **Wiring.** `runner/wiring.rs`: for a profile with `mcp.enabled` / `hooks.enabled` and the
+  flag set, the runner writes `runs/<ticket id>/mcp.json` and `settings.json` under the data home
+  (never the worktree, never the user's own Claude settings) and appends `--mcp-config <file>` and
+  `--settings <file>` to the command. Neither file holds a token; both name environment variables.
+  The files run the `toknila` binary of the daemon (`current_exe`) as `toknila mcp` and
+  `toknila hook <name>`.
+- **Agent side.** `tok mcp` (stdio MCP server) and `tok hook <name>` in `crates/cli`
+  (`cmd/mcp.rs`, `cmd/mcp_tools.rs`, `cmd/hook.rs`) are thin clients of the daemon that read the
+  environment above and do not start a daemon. The hook-to-event mapping is pure and lives in
+  `toknila_core::hook`.
+- **Activity.** Hook signals and any call made with a run token are kept as the ticket's last
+  activity (time and signal) in memory; the nudge ticket reads it.
 
 Tests use `fake-agent` (`crates/daemon/src/bin/fake-agent.rs`: prints lines, echoes a line of
 input, sleeps, exits with a code) as the profile command, so the same tests run on a Unix pty and

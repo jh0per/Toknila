@@ -15,6 +15,8 @@ pub enum ErrorKind {
     Conflict,
     /// A human reference matches more than one thing.
     Ambiguous,
+    /// The caller is known but may not do this (an agent acting on a ticket that is not its own).
+    Forbidden,
     /// A bug or a storage failure.
     Internal,
 }
@@ -27,6 +29,7 @@ impl ErrorKind {
             ErrorKind::BadRequest => "bad_request",
             ErrorKind::Conflict => "conflict",
             ErrorKind::Ambiguous => "ambiguous",
+            ErrorKind::Forbidden => "forbidden",
             ErrorKind::Internal => "internal",
         }
     }
@@ -70,6 +73,11 @@ impl AppError {
     /// A reference matches more than one thing.
     pub fn ambiguous(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::Ambiguous, message)
+    }
+
+    /// The caller may not do this.
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Forbidden, message)
     }
 
     /// A bug or a storage failure.
