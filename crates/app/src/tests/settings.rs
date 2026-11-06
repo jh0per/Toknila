@@ -38,3 +38,44 @@ fn a_blank_profile_or_branch_is_refused_and_changes_nothing() {
     }
     assert_eq!(mem.project, before);
 }
+
+#[test]
+fn the_check_command_is_set_and_cleared_through_the_patch() {
+    let mut mem = Mem::demo();
+    let set = PatchProject {
+        check_command: Some("cargo xtask verify".to_owned()),
+        ..PatchProject::default()
+    };
+    let p = projects::patch(&mut mem, "DEMO", set).expect("patch");
+    assert_eq!(p.check_command.as_deref(), Some("cargo xtask verify"));
+    let other = PatchProject {
+        max_parallel: Some(3),
+        ..PatchProject::default()
+    };
+    let p = projects::patch(&mut mem, "DEMO", other).expect("patch");
+    assert_eq!(
+        p.check_command.as_deref(),
+        Some("cargo xtask verify"),
+        "unset stays"
+    );
+    let clear = PatchProject {
+        check_command: Some(String::new()),
+        ..PatchProject::default()
+    };
+    assert_eq!(
+        projects::patch(&mut mem, "DEMO", clear)
+            .expect("patch")
+            .check_command,
+        None
+    );
+    let bad = PatchProject {
+        check_command: Some("a\nb".to_owned()),
+        ..PatchProject::default()
+    };
+    assert_eq!(
+        projects::patch(&mut mem, "DEMO", bad)
+            .expect_err("bad")
+            .kind,
+        ErrorKind::BadRequest
+    );
+}

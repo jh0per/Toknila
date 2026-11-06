@@ -42,6 +42,10 @@ pub enum ProjectCmd {
         /// How a pull request merges: merge, squash or rebase (default: merge).
         #[arg(long)]
         merge_method: Option<String>,
+        /// The command that checks the work (e.g. `cargo xtask verify`); agents are told to run it
+        /// and may without asking. An empty text clears it.
+        #[arg(long)]
+        check_command: Option<String>,
     },
     /// List projects.
     Ls,
@@ -72,6 +76,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             merge,
             pr_title,
             merge_method,
+            check_command,
         } => {
             let patch = PatchProject {
                 max_parallel: parallel,
@@ -84,6 +89,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     .as_deref()
                     .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge method {m}")))
                     .transpose()?,
+                check_command,
                 ..PatchProject::default()
             };
             let p = c.patch_project(&key, &patch)?;
@@ -96,6 +102,9 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     output::w(&p.merge.method),
                     p.merge.pr_title
                 );
+                if let Some(c) = &p.check_command {
+                    println!("check command: {c}");
+                }
             });
         }
         ProjectCmd::Ls => {

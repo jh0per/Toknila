@@ -72,6 +72,17 @@ pub async fn patch_project(
             e.to_string(),
         ));
     }
+    if let Some(Err(e)) = patch
+        .check_command
+        .as_deref()
+        .map(Project::clean_check_command)
+    {
+        return Err(FormError::field(
+            "check_command",
+            "check_command_invalid",
+            e,
+        ));
+    }
     if let Some(profile) = &patch.default_profile {
         let catalog = crate::profiles::load(&state.profiles);
         if !catalog

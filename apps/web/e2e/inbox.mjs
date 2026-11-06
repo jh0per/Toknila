@@ -6,7 +6,7 @@
 // taken on three cards that a later card was imported done behind.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checks, cleanup, launch } from "./helpers.mjs";
@@ -114,6 +114,37 @@ try {
   await row("question", "INB-1").locator("a.key").click();
   await page.waitForFunction(() => window.location.pathname.endsWith("/cards/INB-1"), null, { timeout: 10_000 });
   console.log("PASS an item opens its card");
+  // Accept of a ship whose work is not committed: the card is blocked with ship_uncommitted and
+  // the inbox says so in words (P1-25). The ship is a real worktree of a temporary repository.
+  const git = (cwd, ...args) =>
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], {
+      cwd,
+      encoding: "utf8",
+    });
+  const repo = join(home, "repo");
+  mkdirSync(repo);
+  git(repo, "init", "--quiet");
+  git(repo, "symbolic-ref", "HEAD", "refs/heads/develop");
+  writeFileSync(join(repo, "README.md"), "hi\n");
+  git(repo, "add", "README.md");
+  git(repo, "commit", "--quiet", "-m", "init");
+  tok("project", "new", "GIT", "--repo", repo, "--base", "develop");
+  const shipChain = join(home, "ship.toml");
+  writeFileSync(shipChain, chainFile("shipped", true, [{ id: "work" }]));
+  tok("chain", "import", shipChain, "--project", "GIT");
+  const ship = JSON.parse(tok("show", "GIT-1", "--json")).ship.path;
+  writeFileSync(join(ship, "done.txt"), "done\n");
+  git(ship, "add", "done.txt");
+  git(ship, "commit", "--quiet", "-m", "done");
+  tok("sim", "GIT-1", "finish", "all done");
+  writeFileSync(join(ship, "late.txt"), "forgotten\n");
+  tok("accept", "GIT-1");
+  await page.locator("[data-testid=inbox-link]").click();
+  await row("blocked", "GIT-1").waitFor({ timeout: 10_000 });
+  await expectText(row("blocked", "GIT-1"), "not committed", "the blocked item says the ship has uncommitted changes");
+  await expectText(row("blocked", "GIT-1"), "late.txt", "the blocked item names the file");
+  if (!tok("show", "GIT-1").includes("ship_uncommitted")) throw new Error("the card is not blocked with ship_uncommitted");
+  console.log("PASS accept of an uncommitted ship is blocked as ship_uncommitted");
   if (failed) throw new Error("the page threw errors");
   console.log("inbox: PASS");
 } catch (e) {

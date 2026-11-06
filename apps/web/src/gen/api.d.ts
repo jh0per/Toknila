@@ -787,6 +787,7 @@ export interface components {
             name: string;
             nudge: components["schemas"]["Nudge"];
             output: components["schemas"]["OutputRules"];
+            permissions?: components["schemas"]["Permissions"];
             role: components["schemas"]["AgentRole"];
         };
         /**
@@ -824,6 +825,13 @@ export interface components {
             detail: string;
             /** @enum {string} */
             kind: "merge_failed";
+        } | {
+            files: string[];
+            /** @enum {string} */
+            kind: "ship_uncommitted";
+        } | {
+            /** @enum {string} */
+            kind: "ship_empty";
         } | {
             checks: string[];
             /** @enum {string} */
@@ -1285,6 +1293,11 @@ export interface components {
         };
         /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
         PatchProject: {
+            /**
+             * @description The command that checks the work (`cargo xtask verify`); agents are told to run it and may
+             *     without asking. An empty text clears it.
+             */
+            check_command?: string | null;
             /** @description Profile of cards that name none; a name from `GET /v1/profiles`. */
             default_profile?: string | null;
             /**
@@ -1321,6 +1334,19 @@ export interface components {
             title?: string | null;
         };
         /**
+         * @description What the agent may do without asking, in the agent's own rule syntax. The runner writes the
+         *     rules into the generated settings file (`hooks.settings_flag` names the flag that takes it).
+         *     A rule that contains `{check_command}` applies only when the project names a check command, and
+         *     has the command in its place.
+         */
+        Permissions: {
+            /**
+             * @description Allow rules, e.g. `Bash(git diff *)`.
+             * @default []
+             */
+            allow: string[];
+        };
+        /**
          * @description Where a ticket is: settling its design while any thread is open, implementing otherwise.
          *     Computed from the threads, never stored.
          * @enum {string}
@@ -1355,6 +1381,11 @@ export interface components {
         };
         /** @description One product: one monorepo, its chains, depot and settings. */
         Project: {
+            /**
+             * @description The command that checks the project's work (`cargo xtask verify`). Both agent roles are
+             *     told to use it, and may run it without asking. `None`: the project names none.
+             */
+            check_command?: string | null;
             default_profile: string;
             default_review_mode: components["schemas"]["ReviewMode"];
             /**

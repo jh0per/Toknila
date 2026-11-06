@@ -20,6 +20,7 @@ mod profiles;
 mod resume;
 mod reviews;
 mod settings;
+mod ship_guard;
 mod ships;
 mod threads;
 mod usage;

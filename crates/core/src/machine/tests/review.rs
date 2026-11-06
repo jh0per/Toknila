@@ -60,7 +60,7 @@ fn in_agent_mode_an_approval_starts_the_merge_and_is_a_round() {
         (1, Actor::Agent, Verdict::Approve)
     );
     assert_eq!(round.comment, "looks right");
-    assert_eq!(tr.effects, [Effect::Merge]);
+    assert_eq!(tr.effects, [Effect::StopReviewer, Effect::Merge]);
 }
 
 #[test]
@@ -75,6 +75,7 @@ fn in_agent_mode_requested_changes_go_back_to_the_worker() {
     assert_eq!(
         tr.effects,
         [
+            Effect::StopReviewer,
             Effect::RecordRemarks {
                 text: "handle the empty list".to_owned()
             },
@@ -97,7 +98,11 @@ fn in_both_mode_the_agents_verdict_hands_the_card_to_a_person() {
         assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
         assert_eq!(tr.ticket.review.rounds.len(), 1);
         assert_eq!(tr.ticket.review.rounds[0].verdict, v);
-        assert!(tr.effects.is_empty(), "nothing moves until the person acts");
+        assert_eq!(
+            tr.effects,
+            [Effect::StopReviewer],
+            "only the finished reviewer goes; nothing else moves until the person acts"
+        );
     }
 }
 
@@ -240,4 +245,28 @@ fn leaving_review_any_other_way_clears_whose_turn_it_is() {
     merged.review.rounds.clear();
     let reopened = step(&merged, &TicketEvent::Reopen);
     assert_eq!(reopened.ticket.review.turn, Some(ReviewTurn::Person));
+}
+
+#[test]
+fn every_recorded_verdict_stops_the_reviewer_and_never_the_worker() {
+    for (decides, v, comment) in [
+        (true, Verdict::Approve, ""),
+        (true, Verdict::RequestChanges, "fix it"),
+        (false, Verdict::Approve, "fine"),
+        (false, Verdict::RequestChanges, "fix it"),
+    ] {
+        let t = in_review(ReviewTurn::Agent { decides });
+        let tr = step(&t, &verdict(v, comment));
+        assert!(
+            tr.effects.contains(&Effect::StopReviewer),
+            "decides {decides}, {v:?}"
+        );
+        assert!(!tr.effects.contains(&Effect::StopRunner), "{v:?}");
+    }
+}
+
+#[test]
+fn a_refused_verdict_stops_nothing() {
+    let t = in_review(ReviewTurn::Agent { decides: true });
+    assert!(apply(&t, &verdict(Verdict::RequestChanges, " "), NOW).is_err());
 }

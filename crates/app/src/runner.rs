@@ -54,6 +54,8 @@ pub struct RunBrief {
     pub title: String,
     pub prompt: String,
     pub acceptance: Vec<String>,
+    /// The project's check command, named in the agent's instructions.
+    pub check_command: Option<String>,
 }
 
 /// A runner now works for the ticket.

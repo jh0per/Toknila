@@ -4,13 +4,14 @@
 //! queues that work and records what came of it.
 
 use toknila_core::events::DomainEvent;
+use toknila_core::guard::{self, ShipProblem, ShipState};
 use toknila_core::machine::TicketEvent;
-use toknila_core::{BlockedReason, Chain, Ship, ShipSpec, Ticket, TicketId};
+use toknila_core::{BlockedReason, Chain, Ship, ShipLook, ShipSpec, Ticket, TicketId};
 
 use crate::external::ExternalEffect;
 
 use crate::chain::tell_ticket;
-use crate::{AppError, AppResult, ChainTx, UnitOfWork};
+use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork};
 
 /// Why a ship could not be made or removed. The text lands in the ticket's blocked reason.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -44,6 +45,16 @@ pub trait Shipyard: std::fmt::Debug {
     /// Removes the ship's worktree from the repository at `repo` and keeps its branch. A worktree
     /// that is already gone is fine.
     fn remove(&self, repo: &str, ship: &Ship) -> Result<(), ShipError>;
+    /// Looks at the worktree at `look.path`: the changes in it that are not committed, and the
+    /// commits its branch has beyond `look.start`. A yard that cannot look says the ship holds
+    /// one clean commit, so nothing is refused for lack of an answer.
+    fn inspect(&self, look: &ShipLook) -> Result<ShipState, ShipError> {
+        let _ = look;
+        Ok(ShipState {
+            changed: Vec::new(),
+            ahead: 1,
+        })
+    }
 }
 
 fn spec_for<U: UnitOfWork + ?Sized>(
@@ -58,7 +69,7 @@ fn spec_for<U: UnitOfWork + ?Sized>(
 }
 
 /// The ship `ticket` of `chain` has or would have; `None` when its project has no repository.
-pub(crate) fn spec_of<U: UnitOfWork + ?Sized>(
+pub(crate) fn spec_of<U: Reader + ?Sized>(
     uow: &U,
     chain: &Chain,
     ticket: &Ticket,
@@ -67,6 +78,44 @@ pub(crate) fn spec_of<U: UnitOfWork + ?Sized>(
         .project(chain.project_id)?
         .ok_or_else(|| AppError::not_found(format!("project of chain {}", chain.name)))?;
     Ok(ShipSpec::for_ticket(&project, chain, ticket))
+}
+
+/// Why the guard did not let a ship's work through.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GuardError {
+    /// The work is not in commits (core's verdict).
+    Problem(ShipProblem),
+    /// The yard could not look.
+    Ship(ShipError),
+}
+
+/// Looks at a ship through the yard and judges it. Runs on the host, never inside a unit of work.
+pub fn guard(yard: &dyn Shipyard, look: &ShipLook) -> Result<(), GuardError> {
+    let state = yard.inspect(look).map_err(GuardError::Ship)?;
+    guard::judge(&state).map_err(GuardError::Problem)
+}
+
+/// Where to look at the ticket's ship when its agent says `finished`; `None` for a ticket
+/// without a ship (sim tickets and projects without a repository), which has nothing to check.
+pub fn finished_look<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<Option<ShipLook>> {
+    let (Some(ship), Some(chain)) = (r.ship(t.id)?, r.chain(t.chain_id)?) else {
+        return Ok(None);
+    };
+    Ok(spec_of(r, &chain, t)?.map(|spec| ShipLook {
+        path: ship.path,
+        start: spec.start_point(),
+    }))
+}
+
+/// The error `finished` answers with when the ship's work is not in commits: the agent's text
+/// says what to do, and the card stays Running.
+pub fn refuse_finished(error: GuardError, look: &ShipLook) -> AppError {
+    match error {
+        GuardError::Problem(p) => AppError::conflict(p.for_agent(&look.start)),
+        GuardError::Ship(e) => AppError::conflict(format!(
+            "Not finished: Toknila could not look at the ship to see that the work is committed ({e}). Try again."
+        )),
+    }
 }
 
 /// The ship a spec stands for once the shipyard gave it a path.

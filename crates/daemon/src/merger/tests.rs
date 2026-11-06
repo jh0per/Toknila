@@ -46,6 +46,10 @@ fn spec(f: &Fixture) -> MergeSpec {
         branch: "ship/x".to_owned(),
         message: "Merge ship/x: DEMO-1 Add feature".to_owned(),
         pr: None,
+        look: toknila_core::ShipLook {
+            path: f.ship.to_string_lossy().into_owned(),
+            start: "develop".to_owned(),
+        },
     }
 }
 

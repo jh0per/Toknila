@@ -36,6 +36,37 @@ pub struct HookWiring {
     pub settings_flag: Option<String>,
 }
 
+/// What the agent may do without asking, in the agent's own rule syntax. The runner writes the
+/// rules into the generated settings file (`hooks.settings_flag` names the flag that takes it).
+/// A rule that contains `{check_command}` applies only when the project names a check command, and
+/// has the command in its place.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Permissions {
+    /// Allow rules, e.g. `Bash(git diff *)`.
+    pub allow: Vec<String>,
+}
+
+impl Permissions {
+    /// The placeholder for the project's check command inside a rule.
+    pub const CHECK_COMMAND: &'static str = "{check_command}";
+
+    /// The rules with the check command filled in; rules that need one are dropped without it.
+    pub fn rules(&self, check_command: Option<&str>) -> Vec<String> {
+        self.allow
+            .iter()
+            .filter_map(
+                |rule| match (rule.contains(Self::CHECK_COMMAND), check_command) {
+                    (false, _) => Some(rule.clone()),
+                    (true, Some(c)) => Some(rule.replace(Self::CHECK_COMMAND, c)),
+                    (true, None) => None,
+                },
+            )
+            .collect()
+    }
+}
+
 /// How the terminal output of an agent is kept and shown.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,6 +138,8 @@ pub struct AgentProfile {
     pub instructions_flag: Option<String>,
     pub mcp: McpWiring,
     pub hooks: HookWiring,
+    #[serde(default)]
+    pub permissions: Permissions,
     pub output: OutputRules,
     pub nudge: Nudge,
 }
@@ -121,6 +154,36 @@ impl AgentProfile {
     /// Name of the built-in Claude Code reviewer profile.
     pub const CLAUDE_CODE_REVIEWER: &str = "claude-code-reviewer";
 
+    /// The placeholder in `command` for the first prompt of the run (see
+    /// `instructions::kickoff`). It is an argv element, or part of one (`--prompt={kickoff}`), so
+    /// the profile decides where the agent's CLI takes its first prompt. Without it the agent
+    /// starts at an empty prompt.
+    pub const KICKOFF: &'static str = "{kickoff}";
+
+    /// The command with the first prompt filled in.
+    pub fn argv(&self, kickoff: &str) -> Vec<String> {
+        self.command
+            .iter()
+            .map(|a| a.replace(Self::KICKOFF, kickoff))
+            .collect()
+    }
+
+    /// The inherited environment variables of the agent's own kind that must not reach it:
+    /// `CLAUDECODE` and `CLAUDE_CODE_*` describe the session that started Toknila (a child-session
+    /// marker, the entrypoint), not this run. A variable the profile's `env` sets is its choice and
+    /// stays. `names` are the names in the daemon's environment.
+    pub fn inherited_to_drop<I: IntoIterator<Item = String>>(&self, names: I) -> Vec<String> {
+        let same = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
+        names
+            .into_iter()
+            .filter(|n| {
+                let up = n.to_ascii_uppercase();
+                (up == "CLAUDECODE" || up.starts_with("CLAUDE_CODE_"))
+                    && !self.env.keys().any(|k| same(k, n))
+            })
+            .collect()
+    }
+
     /// A profile that runs `command`, with defaults everywhere else.
     pub fn new(name: &str, role: AgentRole, command: Vec<String>) -> Self {
         Self {
@@ -132,6 +195,7 @@ impl AgentProfile {
             instructions_flag: None,
             mcp: McpWiring::default(),
             hooks: HookWiring::default(),
+            permissions: Permissions::default(),
             output: OutputRules::default(),
             nudge: Nudge::default(),
         }
@@ -149,10 +213,36 @@ impl AgentProfile {
 
     /// The built-in reviewer that launches Claude Code like the worker profile does, in the
     /// reviewer role.
+    ///
+    /// It runs in `dontAsk` mode: nobody can answer its permission prompts, so what it may do is
+    /// the allow-list and nothing else. Read-only git, the project's check command, and the
+    /// filters a check is piped through (every part of a piped command must be allowed, see
+    /// the permissions page of the Claude Code docs, "Compound commands").
     pub fn claude_code_reviewer() -> Self {
+        let mut allow: Vec<String> = [
+            "git status *",
+            "git diff *",
+            "git log *",
+            "git show *",
+            "git merge-base *",
+            "git rev-parse *",
+            "grep *",
+            "head *",
+            "tail *",
+            "wc *",
+        ]
+        .iter()
+        .map(|r| format!("Bash({r})"))
+        .collect();
+        allow.push(format!("Bash({} *)", Permissions::CHECK_COMMAND));
+        allow.push("mcp__toknila".to_owned());
         Self {
             name: Self::CLAUDE_CODE_REVIEWER.to_owned(),
             role: AgentRole::Reviewer,
+            command: ["claude", "--permission-mode", "dontAsk", Self::KICKOFF]
+                .map(str::to_owned)
+                .to_vec(),
+            permissions: Permissions { allow },
             ..Self::claude_code()
         }
     }
@@ -171,10 +261,24 @@ impl AgentProfile {
                 enabled: true,
                 settings_flag: Some("--settings".to_owned()),
             },
+            permissions: Permissions {
+                allow: [
+                    "Bash(git status *)",
+                    "Bash(git diff *)",
+                    "Bash(git log *)",
+                    "Bash(git show *)",
+                    "Bash(git add *)",
+                    "Bash(git commit *)",
+                    "Bash({check_command} *)",
+                    "mcp__toknila",
+                ]
+                .map(str::to_owned)
+                .to_vec(),
+            },
             ..Self::new(
                 Self::CLAUDE_CODE,
                 AgentRole::Worker,
-                vec!["claude".to_owned()],
+                vec!["claude".to_owned(), Self::KICKOFF.to_owned()],
             )
         }
     }

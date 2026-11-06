@@ -2635,6 +2635,9 @@
           "output": {
             "$ref": "#/components/schemas/OutputRules"
           },
+          "permissions": {
+            "$ref": "#/components/schemas/Permissions"
+          },
           "role": {
             "$ref": "#/components/schemas/AgentRole"
           }
@@ -2770,6 +2773,43 @@
                 "type": "string",
                 "enum": [
                   "merge_failed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Accept found changes in the ship that are not committed; nothing was pushed or merged.\n`files` names them. Unblocking checks again.",
+            "required": [
+              "files",
+              "kind"
+            ],
+            "properties": {
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ship_uncommitted"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Accept found no commit on the ship's branch: there is nothing to open a pull request for\nor to merge. Unblocking checks again.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ship_empty"
                 ]
               }
             }
@@ -4101,6 +4141,13 @@
         "type": "object",
         "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
         "properties": {
+          "check_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command that checks the work (`cargo xtask verify`); agents are told to run it and may\nwithout asking. An empty text clears it."
+          },
           "default_profile": {
             "type": [
               "string",
@@ -4246,6 +4293,21 @@
           }
         }
       },
+      "Permissions": {
+        "type": "object",
+        "description": "What the agent may do without asking, in the agent's own rule syntax. The runner writes the\nrules into the generated settings file (`hooks.settings_flag` names the flag that takes it).\nA rule that contains `{check_command}` applies only when the project names a check command, and\nhas the command in its place.",
+        "properties": {
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Allow rules, e.g. `Bash(git diff *)`.",
+            "default": []
+          }
+        },
+        "additionalProperties": false
+      },
       "Phase": {
         "type": "string",
         "description": "Where a ticket is: settling its design while any thread is open, implementing otherwise.\nComputed from the threads, never stored.",
@@ -4357,6 +4419,13 @@
           "merge"
         ],
         "properties": {
+          "check_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command that checks the project's work (`cargo xtask verify`). Both agent roles are\ntold to use it, and may run it without asking. `None`: the project names none."
+          },
           "default_profile": {
             "type": "string"
           },

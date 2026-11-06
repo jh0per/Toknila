@@ -44,7 +44,7 @@ pub(super) fn spawn(
     dir: &Path,
     wiring: &Wiring,
 ) -> Result<Spawned, RunnerError> {
-    let Some((program, args)) = profile.command.split_first() else {
+    let Some((program, args)) = wiring.command.split_first() else {
         return Err(RunnerError::NoCommand(profile.name.clone()));
     };
     let pair = native_pty_system().openpty(SIZE).map_err(spawn_error)?;
@@ -52,6 +52,9 @@ pub(super) fn spawn(
     cmd.args(args);
     cmd.args(&wiring.args);
     cmd.cwd(dir);
+    for name in &wiring.env_remove {
+        cmd.env_remove(name);
+    }
     for (k, v) in &profile.env {
         cmd.env(k, v);
     }

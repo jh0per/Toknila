@@ -3,7 +3,7 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
-use toknila_app::{agent, instructions, resolve};
+use toknila_app::{agent, instructions, resolve, ships};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::{Actor, TicketStatus, nudge};
 
@@ -33,6 +33,28 @@ pub async fn agent_event(
     Json(event): Json<AgentEvent>,
 ) -> ApiResult<Json<TicketDetail>> {
     let (at, prices) = stamp(&state);
+    // The ship is looked at here, off the store thread and before the command: git never runs
+    // inside a transaction. The card stays Running when the work is not in commits.
+    if matches!(event, AgentEvent::Finished { .. }) {
+        let looked = ticket.clone();
+        let target = state
+            .store
+            .read(move |repo| {
+                Ok(resolve::ticket(repo, &looked).and_then(|t| {
+                    let look = ships::finished_look(repo, &t)?;
+                    Ok((t, look))
+                }))
+            })
+            .await??;
+        principal.owns(&target.0)?;
+        if let Some(look) = target.1 {
+            state
+                .store
+                .guard_ship(look.clone())
+                .await
+                .map_err(|e| ships::refuse_finished(e, &look))?;
+        }
+    }
     let (detail, _) = state
         .store
         .write(Actor::Agent, at, move |tx| -> ApiResult<TicketDetail> {

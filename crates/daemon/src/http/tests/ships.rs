@@ -8,7 +8,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use super::Api;
-use crate::git::testing::git;
+use crate::git::testing::{commit_file, git};
 use crate::shipyard::GitShipyard;
 
 /// A repository with a `develop` branch and one commit.
@@ -69,6 +69,7 @@ async fn start_makes_the_worktree_and_merged_removes_it_but_keeps_the_branch() {
     );
     assert_eq!(journal(&api).await, ["ship_created"]);
 
+    commit_file(&path, "login.txt", "login\n", "add login");
     api.post(
         "/v1/tickets/DEMO-1/events",
         json!({ "event": "finished", "summary": "done" }),
@@ -195,6 +196,9 @@ async fn a_repository_that_disappears_blocks_the_accept_with_merge_failed() {
     project(&api, &repo).await;
     api.post("/v1/chains/auth/tickets", json!({ "title": "Login" }))
         .await;
+    let d = api.get("/v1/tickets/DEMO-1").await;
+    let ship = Path::new(d["ship"]["path"].as_str().expect("path")).to_owned();
+    commit_file(&ship, "login.txt", "login\n", "add login");
     api.post(
         "/v1/tickets/DEMO-1/events",
         json!({ "event": "finished", "summary": "done" }),

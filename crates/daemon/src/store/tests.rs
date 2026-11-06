@@ -23,6 +23,7 @@ fn project() -> Project {
         default_reviewer: None,
         max_parallel: 2,
         merge: Default::default(),
+        check_command: None,
     }
 }
 

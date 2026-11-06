@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! role = "worker"                       # worker (default) | reviewer | release
-//! command = ["my-agent", "--yolo"]      # argv list, never a shell string
+//! command = ["my-agent", "{kickoff}"]   # argv list, never a shell string; {kickoff} is the first prompt
 //! instructions_file = "AGENTS.md"       # optional, relative to the working directory
 //! instructions_flag = "--append-system-prompt-file"  # takes the path of the generated per-run instructions
 //!
@@ -17,6 +17,9 @@
 //! [hooks]                               # the runner writes a settings file and passes its path with the flag
 //! enabled = false
 //! settings_flag = "--settings"
+//!
+//! [permissions]                         # allow rules in the agent's syntax, written into the settings file
+//! allow = ["Bash(git diff *)", "Bash({check_command} *)"]   # {check_command}: the project's, rule dropped without one
 //!
 //! [output]
 //! strip_ansi = true

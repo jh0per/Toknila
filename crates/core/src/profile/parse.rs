@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::collections::BTreeMap;
 use toml::Spanned;
 
-use crate::{AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules};
+use crate::{AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules, Permissions};
 
 /// A problem in a profile file. `line` and `column` are 1-based.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -29,6 +29,8 @@ struct Raw {
     mcp: McpWiring,
     #[serde(default)]
     hooks: HookWiring,
+    #[serde(default)]
+    permissions: Permissions,
     #[serde(default)]
     output: OutputRules,
     #[serde(default)]
@@ -104,6 +106,7 @@ pub fn parse(name: &str, text: &str) -> Result<AgentProfile, ProfileError> {
         instructions_flag: raw.instructions_flag,
         mcp: raw.mcp,
         hooks: raw.hooks,
+        permissions: raw.permissions,
         output: raw.output,
         nudge: raw.nudge,
     })

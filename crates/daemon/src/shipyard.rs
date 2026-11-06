@@ -7,9 +7,12 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use toknila_app::{ShipError, Shipyard};
-use toknila_core::{Ship, ShipSpec};
+use toknila_core::guard::ShipState;
+use toknila_core::{Ship, ShipLook, ShipSpec};
 
 use crate::git::Git;
+
+mod inspect;
 
 /// Makes and removes ships with the `git` on the path.
 #[derive(Debug, Clone)]
@@ -137,6 +140,10 @@ impl Shipyard for GitShipyard {
             }
         }
         Ok(())
+    }
+
+    fn inspect(&self, look: &ShipLook) -> Result<ShipState, ShipError> {
+        self.look(look)
     }
 }
 

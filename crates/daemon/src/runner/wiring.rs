@@ -1,6 +1,7 @@
 //! What a run's agent is given besides its command: the environment (daemon address, the run's
 //! token) and, for a profile that asks for it, generated MCP and hook config files. The files
-//! live under the data home (`runs/<ticket>/`), never in the worktree and never in the user's
+//! live under the data home (`runs/<ticket>/<role>/`, so the worker and the reviewer of a ticket
+//! never share or overwrite a file), never in the worktree and never in the user's
 //! own agent settings, and reach the agent through command-line flags. The instructions file
 //! (`instructions.md`) is passed the same way, as an addition to the system prompt, so the
 //! worktree's own `CLAUDE.md` and `AGENTS.md` stay untouched and still apply. The token is not in any
@@ -21,7 +22,8 @@ const SERVER: &str = "toknila";
 
 /// What one run needs wired.
 pub(super) struct Context<'a> {
-    /// `runs/<ticket id>`: where generated files go.
+    /// `runs/<ticket id>`: the folder of the ticket's runs; generated files go in a folder of the
+    /// role under it.
     pub dir: &'a Path,
     pub key: &'a TicketKey,
     pub role: AgentRole,
@@ -38,8 +40,22 @@ pub(super) struct Context<'a> {
 /// Extra arguments and environment of the agent's process.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct Wiring {
+    /// The profile's command with the first prompt filled in (`{kickoff}`).
+    pub command: Vec<String>,
+    /// Flags for the generated files, after the command.
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
+    /// Inherited variables the process must not get (see `AgentProfile::inherited_to_drop`).
+    pub env_remove: Vec<String>,
+}
+
+/// The folder name of a role's generated files.
+fn role_dir(role: AgentRole) -> &'static str {
+    match role {
+        AgentRole::Worker => "worker",
+        AgentRole::Reviewer => "reviewer",
+        AgentRole::Release => "release",
+    }
 }
 
 /// `${NAME}`: the agent expands it from its own environment when it reads the file.
@@ -64,6 +80,19 @@ fn mcp_config(bin: &Path) -> Value {
         "args": ["mcp"],
         "env": env,
     }}})
+}
+
+/// The settings file: the hooks and the status line of [`hook_settings`], and the profile's allow
+/// rules, when it has any for this project, are what the agent may do without asking.
+fn settings(bin: &Path, hooks: bool, rules: &[String]) -> Value {
+    let mut out = serde_json::Map::new();
+    if hooks && let Value::Object(h) = hook_settings(bin) {
+        out.extend(h);
+    }
+    if !rules.is_empty() {
+        out.insert("permissions".to_owned(), json!({ "allow": rules }));
+    }
+    Value::Object(out)
 }
 
 /// The hook settings: every subscribed hook runs `toknila hook <name>`, and the status line runs
@@ -91,9 +120,37 @@ fn write_json(path: &Path, value: &Value) -> Result<(), RunnerError> {
         .map_err(|e| RunnerError::Spawn(format!("cannot write {}: {e}", path.display())))
 }
 
+fn brief_of_key<'a>(cx: &'a Context<'_>, key: &'a str) -> instructions::RunBrief<'a> {
+    instructions::RunBrief {
+        key,
+        title: &cx.brief.title,
+        prompt: &cx.brief.prompt,
+        acceptance: &cx.brief.acceptance,
+        check_command: cx.brief.check_command.as_deref(),
+    }
+}
+
 /// Generates the files `profile` asks for and returns the flags and environment of the process.
 pub(super) fn prepare(profile: &AgentProfile, cx: &Context<'_>) -> Result<Wiring, RunnerError> {
-    let mut wiring = Wiring::default();
+    let inherited = std::env::vars_os().filter_map(|(k, _)| k.into_string().ok());
+    prepare_with(profile, cx, inherited)
+}
+
+/// [`prepare`] for a daemon whose environment has the variables called `inherited`.
+pub(super) fn prepare_with(
+    profile: &AgentProfile,
+    cx: &Context<'_>,
+    inherited: impl IntoIterator<Item = String>,
+) -> Result<Wiring, RunnerError> {
+    let key = cx.key.to_string();
+    let brief = brief_of_key(cx, &key);
+    let mut wiring = Wiring {
+        command: profile.argv(&instructions::kickoff(cx.role, &brief)),
+        env_remove: profile.inherited_to_drop(inherited),
+        ..Wiring::default()
+    };
+    let dir = cx.dir.join(role_dir(cx.role));
+    let rules = profile.permissions.rules(cx.brief.check_command.as_deref());
     if let Some(url) = cx.url {
         wiring.env.push((agent_env::URL.to_owned(), url.to_owned()));
     }
@@ -118,37 +175,31 @@ pub(super) fn prepare(profile: &AgentProfile, cx: &Context<'_>) -> Result<Wiring
             mcp_config(cx.bin),
         ),
         (
-            profile.hooks.enabled,
+            profile.hooks.enabled || !rules.is_empty(),
             profile.hooks.settings_flag.as_deref(),
             "settings.json",
-            hook_settings(cx.bin),
+            settings(cx.bin, profile.hooks.enabled, &rules),
         ),
     ];
     for (enabled, flag, name, content) in files {
         let (true, Some(flag)) = (enabled, flag) else {
             continue;
         };
-        std::fs::create_dir_all(cx.dir)
-            .map_err(|e| RunnerError::Spawn(format!("cannot create {}: {e}", cx.dir.display())))?;
-        let path: PathBuf = cx.dir.join(name);
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| RunnerError::Spawn(format!("cannot create {}: {e}", dir.display())))?;
+        let path: PathBuf = dir.join(name);
         write_json(&path, &content)?;
         wiring.args.push(flag.to_owned());
         wiring.args.push(path.display().to_string());
     }
     if let Some(flag) = profile.instructions_flag.as_deref() {
-        let brief = instructions::RunBrief {
-            key: &cx.key.to_string(),
-            title: &cx.brief.title,
-            prompt: &cx.brief.prompt,
-            acceptance: &cx.brief.acceptance,
-        };
         let text = match cx.role {
             AgentRole::Reviewer => instructions::generate_review(&brief),
             _ => instructions::generate(&brief),
         };
-        std::fs::create_dir_all(cx.dir)
-            .map_err(|e| RunnerError::Spawn(format!("cannot create {}: {e}", cx.dir.display())))?;
-        let path = cx.dir.join("instructions.md");
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| RunnerError::Spawn(format!("cannot create {}: {e}", dir.display())))?;
+        let path = dir.join("instructions.md");
         std::fs::write(&path, text)
             .map_err(|e| RunnerError::Spawn(format!("cannot write {}: {e}", path.display())))?;
         wiring.args.push(flag.to_owned());

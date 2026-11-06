@@ -61,6 +61,7 @@ fn project_roundtrips() {
         default_reviewer: None,
         max_parallel: 2,
         merge: Default::default(),
+        check_command: None,
     });
 }
 
@@ -291,6 +292,31 @@ fn pinned_no_working_dir_reason_json() {
         r#"{"status":"blocked","reason":{"kind":"no_working_dir"},"resume_to":"running"}"#
     );
     roundtrip(&ticket(TicketStatus::Blocked, Some(reason)));
+}
+
+#[test]
+fn pinned_ship_guard_reason_json() {
+    let cases = [
+        (
+            BlockedReason::ShipUncommitted {
+                files: vec!["a.rs".into()],
+            },
+            r#"{"status":"blocked","reason":{"kind":"ship_uncommitted","files":["a.rs"]},"resume_to":"review"}"#,
+        ),
+        (
+            BlockedReason::ShipEmpty,
+            r#"{"status":"blocked","reason":{"kind":"ship_empty"},"resume_to":"review"}"#,
+        ),
+    ];
+    for (reason, json) in cases {
+        let reason = StatusReason::Blocked {
+            reason,
+            resume_to: TicketStatus::Review,
+            waiting: None,
+        };
+        assert_eq!(serde_json::to_string(&reason).expect("serialize"), json);
+        roundtrip(&ticket(TicketStatus::Blocked, Some(reason)));
+    }
 }
 
 #[test]

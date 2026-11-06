@@ -16,6 +16,9 @@
           "enabled": false,
           "settings_flag": null
         },
+        "permissions": {
+          "allow": []
+        },
         "output": {
           "strip_ansi": true,
           "scrollback_lines": 10000,
@@ -35,7 +38,8 @@
         "name": "claude-code",
         "role": "worker",
         "command": [
-          "claude"
+          "claude",
+          "{kickoff}"
         ],
         "env": {},
         "instructions_file": "CLAUDE.md",
@@ -47,6 +51,18 @@
         "hooks": {
           "enabled": true,
           "settings_flag": "--settings"
+        },
+        "permissions": {
+          "allow": [
+            "Bash(git status *)",
+            "Bash(git diff *)",
+            "Bash(git log *)",
+            "Bash(git show *)",
+            "Bash(git add *)",
+            "Bash(git commit *)",
+            "Bash({check_command} *)",
+            "mcp__toknila"
+          ]
         },
         "output": {
           "strip_ansi": true,
@@ -78,6 +94,9 @@
           "enabled": false,
           "settings_flag": null
         },
+        "permissions": {
+          "allow": []
+        },
         "output": {
           "strip_ansi": true,
           "scrollback_lines": 10000,
@@ -97,7 +116,10 @@
         "name": "claude-code-reviewer",
         "role": "reviewer",
         "command": [
-          "claude"
+          "claude",
+          "--permission-mode",
+          "dontAsk",
+          "{kickoff}"
         ],
         "env": {},
         "instructions_file": "CLAUDE.md",
@@ -109,6 +131,22 @@
         "hooks": {
           "enabled": true,
           "settings_flag": "--settings"
+        },
+        "permissions": {
+          "allow": [
+            "Bash(git status *)",
+            "Bash(git diff *)",
+            "Bash(git log *)",
+            "Bash(git show *)",
+            "Bash(git merge-base *)",
+            "Bash(git rev-parse *)",
+            "Bash(grep *)",
+            "Bash(head *)",
+            "Bash(tail *)",
+            "Bash(wc *)",
+            "Bash({check_command} *)",
+            "mcp__toknila"
+          ]
         },
         "output": {
           "strip_ansi": true,
@@ -144,6 +182,9 @@
         "hooks": {
           "enabled": false,
           "settings_flag": null
+        },
+        "permissions": {
+          "allow": []
         },
         "output": {
           "strip_ansi": true,

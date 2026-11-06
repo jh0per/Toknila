@@ -24,6 +24,41 @@ pub struct RunBrief<'a> {
     pub title: &'a str,
     pub prompt: &'a str,
     pub acceptance: &'a [String],
+    /// The project's check command, named in both roles' instructions.
+    pub check_command: Option<&'a str>,
+}
+
+/// The first message of a run, passed to the agent when it starts (the profile's `{kickoff}`
+/// placeholder), because an agent that starts at an empty prompt waits for someone to tell it to
+/// begin. Short and one line: the details are in the instructions file the agent already has.
+pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
+    let checks = brief
+        .check_command
+        .map(|c| format!(" Run `{c}` before you hand in."))
+        .unwrap_or_default();
+    match role {
+        crate::AgentRole::Reviewer => format!(
+            "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
+             branch, run the checks, then call `review_verdict` once. You do not change the code.",
+            key = brief.key
+        ),
+        _ => format!(
+            "Start ticket {key} now. Read your Toknila instructions, work the card, commit your \
+             work on this branch, then call `finished`.{checks}",
+            key = brief.key
+        ),
+    }
+}
+
+/// The section that names the project's check command, if it has one.
+fn checks_section(brief: &RunBrief<'_>, who: &str) -> String {
+    match brief.check_command {
+        Some(c) => format!(
+            "\n## Checks\n\nThe project's check command is `{c}`. {who} You may run it without \
+             asking.\n"
+        ),
+        None => String::new(),
+    }
 }
 
 /// The part of the instructions that is the same for every ticket.
@@ -48,6 +83,10 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
+    out.push_str(&checks_section(
+        brief,
+        "Run it before you call `finished`; the work is not done while it fails.",
+    ));
     out.push('\n');
     out.push_str(protocol::PROTOCOL);
     out
@@ -75,6 +114,10 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
+    out.push_str(&checks_section(
+        brief,
+        "Run it to see the result for yourself, and report it as a check in your verdict.",
+    ));
     out.push('\n');
     out.push_str(protocol::REVIEW_PROTOCOL);
     out

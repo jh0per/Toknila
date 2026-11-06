@@ -134,7 +134,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
             },
             ExternalEffect::Merge { ticket, spec } => {
                 let result = match spec {
-                    Some(spec) => host.merger.merge(&spec),
+                    Some(spec) => merges::run(&host, &spec),
                     None => Ok(MergeOutcome::UpToDate),
                 };
                 outcomes.push(ExternalOutcome::MergeFinished { ticket, result });

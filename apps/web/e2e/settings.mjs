@@ -92,6 +92,7 @@ try {
   if ((await t("pr-title").inputValue()) !== "{key}: {title}") throw new Error("the default title template");
   await t("pr-title").fill("[{key}] {title}");
   await t("merge-method").selectOption("squash");
+  await t("check-command").fill("cargo xtask verify");
   await t("save-settings").click();
   await expectText(t("saved"), "Saved", "settings saved");
   // A refused value comes back at its field and changes nothing.
@@ -115,6 +116,9 @@ try {
   const merge = [await t("merge-mode").inputValue(), await t("pr-title").inputValue(), await t("merge-method").inputValue()];
   if (merge.join("|") !== "github|[{key}] {title}|squash") throw new Error(`after the restart: merge settings ${merge}`);
   console.log("PASS merge mode github, the title template and squash survive a daemon restart");
+  const check = await t("check-command").inputValue();
+  if (check !== "cargo xtask verify") throw new Error(`after the restart: check command ${check}`);
+  console.log("PASS the check command survives a daemon restart");
   if (pageError) throw new Error(`page error: ${pageError}`);
   console.log("web settings: PASS");
 } catch (e) {

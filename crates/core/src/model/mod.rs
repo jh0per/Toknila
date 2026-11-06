@@ -23,7 +23,9 @@ pub use ids::{
     ThreadVersionId, TicketId,
 };
 pub use keys::{KeyError, ProjectKey, TicketKey};
-pub use profile::{AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules};
+pub use profile::{
+    AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules, Permissions,
+};
 pub use project::{MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use review::{
@@ -31,7 +33,7 @@ pub use review::{
     resolve_reviewer, reviewer_profile,
 };
 pub use run::{ProcessExit, Run};
-pub use ship::{MergeSpec, Ship, ShipSpec, slugify};
+pub use ship::{MergeSpec, Ship, ShipLook, ShipSpec, slugify};
 pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};
 pub use thread::{
     ArtifactFormat, MessageKind, Phase, Thread, ThreadKind, ThreadMessage, ThreadState,
