@@ -6,13 +6,14 @@
 use serde::{Deserialize, Serialize};
 use toknila_core::graph::{ChainSummary, ChainView};
 use toknila_core::{
-    Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Release, ReleaseId, Subtask, Ticket, TicketId,
-    Timestamp,
+    Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Release, ReleaseId, Subtask, Thread,
+    ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
 };
 
 pub use toknila_app::chains::NewChain;
 pub use toknila_app::projects::NewProject;
 pub use toknila_app::releases::NewRelease;
+pub use toknila_app::threads::{NewMessage, NewThread, NewVersion};
 pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;
 pub use toknila_core::TicketPatch as PatchTicket;
@@ -58,6 +59,29 @@ pub struct TicketDetail {
     pub comments: Vec<Comment>,
     /// Milliseconds in the current status.
     pub in_status_ms: u64,
+    /// Computed from the ticket's threads: design while any is open, implement otherwise.
+    pub phase: Phase,
+}
+
+/// A thread with its messages and artifact versions.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreadDetail {
+    pub thread: Thread,
+    /// Oldest first.
+    pub messages: Vec<ThreadMessage>,
+    /// By number; immutable.
+    pub versions: Vec<ThreadVersion>,
+}
+
+/// `GET /v1/tickets/{ticket}/threads`: every thread of a ticket and the ticket's phase.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TicketThreads {
+    /// The ticket's key.
+    pub ticket: String,
+    pub phase: Phase,
+    pub threads: Vec<ThreadDetail>,
 }
 
 /// A ticket in a list.

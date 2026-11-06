@@ -12,6 +12,8 @@ use tower::ServiceExt;
 use crate::server::{AppState, router};
 use crate::store::Store;
 
+mod threads;
+
 const TOKEN: &str = "test-token";
 
 struct Api {
@@ -695,6 +697,11 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/events",
             "/tickets/{ticket}/subtasks",
             "/tickets/{ticket}/subtasks/{position}",
+            "/tickets/{ticket}/threads",
+            "/tickets/{ticket}/threads/{thread}/approve",
+            "/tickets/{ticket}/threads/{thread}/changes",
+            "/tickets/{ticket}/threads/{thread}/messages",
+            "/tickets/{ticket}/threads/{thread}/versions",
         ]
     );
     for schema in [
@@ -707,6 +714,10 @@ async fn openapi_describes_every_route() {
         "Wildcard",
         "NewWildcard",
         "Proposal",
+        "Thread",
+        "ThreadDetail",
+        "TicketThreads",
+        "Phase",
     ] {
         assert!(
             doc["components"]["schemas"][schema].is_object(),

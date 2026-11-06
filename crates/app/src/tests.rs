@@ -6,8 +6,8 @@ use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
     Actor, AgentProfile, Chain, ChainId, Comment, CommentKind, Edge, EdgeKind, NodeRef, Project,
-    ProjectId, Release, ReleaseId, ReviewMode, Subtask, Ticket, TicketDraft, TicketId, TicketKey,
-    TicketStatus, Timestamp,
+    ProjectId, Release, ReleaseId, ReviewMode, Subtask, Thread, ThreadId, ThreadMessage,
+    ThreadVersion, Ticket, TicketDraft, TicketId, TicketKey, TicketStatus, Timestamp,
 };
 
 use crate::notes::{add_comment, body_from_text};
@@ -17,6 +17,7 @@ use crate::{
     AppResult, ErrorKind, Reader, UnitOfWork, agent, chains, resolve, tickets, with_chain,
 };
 
+mod threads;
 mod wildcards;
 
 #[derive(Debug)]
@@ -25,6 +26,9 @@ struct Mem {
     view: ChainView,
     comments: Vec<Comment>,
     subtasks: Vec<Subtask>,
+    threads: Vec<Thread>,
+    messages: Vec<ThreadMessage>,
+    versions: Vec<ThreadVersion>,
     events: Vec<DomainEvent>,
     now: Timestamp,
     taken: u32,
@@ -84,6 +88,9 @@ impl Mem {
             view,
             comments: vec![],
             subtasks: vec![],
+            threads: vec![],
+            messages: vec![],
+            versions: vec![],
             events: vec![],
             now,
             taken: 2,
@@ -174,6 +181,18 @@ impl Reader for Mem {
             .cloned()
             .collect())
     }
+    fn threads(&self, ticket: TicketId) -> AppResult<Vec<Thread>> {
+        let all = self.threads.iter();
+        Ok(all.filter(|t| t.ticket_id == ticket).cloned().collect())
+    }
+    fn thread_messages(&self, thread: ThreadId) -> AppResult<Vec<ThreadMessage>> {
+        let all = self.messages.iter();
+        Ok(all.filter(|m| m.thread_id == thread).cloned().collect())
+    }
+    fn thread_versions(&self, thread: ThreadId) -> AppResult<Vec<ThreadVersion>> {
+        let all = self.versions.iter();
+        Ok(all.filter(|v| v.thread_id == thread).cloned().collect())
+    }
     fn last_event_payload(&self, entity: &str, id: &str) -> AppResult<Option<Value>> {
         let last = self
             .events
@@ -221,6 +240,19 @@ impl UnitOfWork for Mem {
     fn upsert_subtask(&mut self, s: &Subtask) -> AppResult<()> {
         self.subtasks.retain(|x| x.id != s.id);
         self.subtasks.push(s.clone());
+        Ok(())
+    }
+    fn upsert_thread(&mut self, t: &Thread) -> AppResult<()> {
+        self.threads.retain(|x| x.id != t.id);
+        self.threads.push(t.clone());
+        Ok(())
+    }
+    fn insert_thread_message(&mut self, m: &ThreadMessage) -> AppResult<()> {
+        self.messages.push(m.clone());
+        Ok(())
+    }
+    fn insert_thread_version(&mut self, v: &ThreadVersion) -> AppResult<()> {
+        self.versions.push(v.clone());
         Ok(())
     }
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {

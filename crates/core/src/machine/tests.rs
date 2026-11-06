@@ -128,6 +128,7 @@ fn running_to_review_on_finished_records_report() {
         TicketStatus::Running,
         TicketEvent::Finished {
             summary: "зроблено X".to_owned(),
+            open_threads: vec![],
         },
     );
     assert_eq!(tr.ticket.status, TicketStatus::Review);
@@ -517,6 +518,7 @@ fn sample_events() -> Vec<TicketEvent> {
         TicketEvent::InstructionDelivered,
         TicketEvent::Finished {
             summary: "s".to_owned(),
+            open_threads: vec![],
         },
         TicketEvent::Block { reason: manual() },
         TicketEvent::Unblock,
@@ -608,7 +610,8 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         }),
         Just(TicketEvent::InstructionDelivered),
         Just(TicketEvent::Finished {
-            summary: "s".to_owned()
+            summary: "s".to_owned(),
+            open_threads: vec![],
         }),
         reason.prop_map(|reason| TicketEvent::Block { reason }),
         Just(TicketEvent::Unblock),

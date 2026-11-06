@@ -1,0 +1,41 @@
+{
+  "phase": "design",
+  "threads": [
+    {
+      "messages": [
+        {
+          "author": "agent",
+          "created_at": 0,
+          "id": "<id>",
+          "kind": "message",
+          "text": "empty, loading, error and content states to follow",
+          "thread_id": "<id>"
+        }
+      ],
+      "thread": {
+        "approved_at": null,
+        "approved_version": null,
+        "created_at": 0,
+        "id": "<id>",
+        "kind": "design",
+        "number": 1,
+        "opened_by": "agent",
+        "state": "open",
+        "ticket_id": "<id>",
+        "title": "List screen"
+      },
+      "versions": [
+        {
+          "author": "agent",
+          "body": "flowchart TD\n  A[List] --> B[Item]\n",
+          "created_at": 0,
+          "format": "mermaid",
+          "id": "<id>",
+          "number": 1,
+          "thread_id": "<id>"
+        }
+      ]
+    }
+  ],
+  "ticket": "DEMO-1"
+}

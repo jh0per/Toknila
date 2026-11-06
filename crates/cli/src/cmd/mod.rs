@@ -5,6 +5,7 @@ mod chain;
 mod project;
 mod release;
 mod sim;
+mod thread;
 mod ticket;
 mod watch;
 mod wildcard;
@@ -19,6 +20,7 @@ pub use chain::{ChainCmd, DepCmd};
 pub use project::ProjectCmd;
 pub use release::ReleaseCmd;
 pub use sim::SimCmd;
+pub use thread::ThreadCmd;
 pub use ticket::{SubtaskCmd, TicketCmd};
 pub use wildcard::CardArgs;
 
@@ -45,6 +47,9 @@ pub enum Command {
     /// Checklist items of a ticket.
     #[command(subcommand)]
     Subtask(SubtaskCmd),
+    /// Threads on a card: settle a design, a flow or an architecture before implementation.
+    #[command(subcommand)]
+    Thread(ThreadCmd),
     /// Write to a ticket: an instruction for its agent, or a report or decision.
     Comment {
         ticket: String,
@@ -152,6 +157,7 @@ pub fn run(cmd: Command, json_out: bool) -> Result<()> {
         Command::Dep(d) => chain::dep(&c, d, json_out),
         Command::Ticket(t) => ticket::run(&c, t, json_out),
         Command::Subtask(s) => ticket::subtask(&c, s, json_out),
+        Command::Thread(t) => thread::run(&c, t, json_out),
         Command::Comment { ticket, text, kind } => {
             ticket::comment(&c, &ticket, text, &kind, json_out)
         }

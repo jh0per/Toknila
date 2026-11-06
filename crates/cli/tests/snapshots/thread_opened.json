@@ -1,0 +1,16 @@
+{
+  "messages": [],
+  "thread": {
+    "approved_at": null,
+    "approved_version": null,
+    "created_at": 0,
+    "id": "<id>",
+    "kind": "flow",
+    "number": 1,
+    "opened_by": "human",
+    "state": "open",
+    "ticket_id": "<id>",
+    "title": "Sign-in flow"
+  },
+  "versions": []
+}

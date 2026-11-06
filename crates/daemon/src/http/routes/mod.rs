@@ -5,12 +5,13 @@ pub mod chains;
 pub mod events;
 pub mod projects;
 pub mod releases;
+pub mod threads;
 pub mod tickets;
 
 use axum::Json;
-use toknila_core::{Actor, ChainId, Ticket, TicketId, Timestamp};
+use toknila_core::{Actor, ChainId, Thread, Ticket, TicketId, Timestamp};
 
-use super::dto::{ChainDetail, TicketDetail};
+use super::dto::{ChainDetail, ThreadDetail, TicketDetail};
 use super::error::ApiError;
 use crate::server::{AppState, now};
 use crate::store::{Repo, WriteTx};
@@ -33,8 +34,17 @@ fn load_ticket_detail(repo: &Repo<'_>, ticket: TicketId, at: Timestamp) -> ApiRe
         subtasks: repo.subtasks(t.id)?,
         comments: repo.comments(t.id)?,
         in_status_ms: at.millis_since(t.status_since),
+        phase: toknila_core::thread::phase(&repo.threads(t.id)?),
         chain,
         ticket: t,
+    })
+}
+
+fn load_thread_detail(repo: &Repo<'_>, thread: Thread) -> ApiResult<ThreadDetail> {
+    Ok(ThreadDetail {
+        messages: repo.thread_messages(thread.id)?,
+        versions: repo.thread_versions(thread.id)?,
+        thread,
     })
 }
 

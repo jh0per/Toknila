@@ -6,6 +6,7 @@ use toknila_api_types::{AgentEvent, ReleaseEvent};
 use toknila_client::Client;
 use toknila_core::CommentBody;
 
+use super::thread::{PostArgs, kind_of};
 use super::{CardArgs, emit};
 use crate::output;
 
@@ -37,9 +38,57 @@ pub enum SimCmd {
         #[command(flatten)]
         card: CardArgs,
     },
+    /// The agent works in threads on its card.
+    #[command(subcommand)]
+    Thread(SimThreadCmd),
+}
+
+/// What the simulated agent does in threads. It cannot approve: that is a person's.
+#[derive(Debug, Subcommand)]
+pub enum SimThreadCmd {
+    /// Open a thread; the hand-in waits until it is approved.
+    Open {
+        #[arg(value_parser = ["design", "flow", "architecture", "other"])]
+        kind: String,
+        title: String,
+    },
+    /// Post a message and/or the next artifact version.
+    Post {
+        #[command(flatten)]
+        post: PostArgs,
+    },
 }
 
 pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> Result<()> {
+    if let SimCmd::Thread(t) = action {
+        let events = match t {
+            SimThreadCmd::Open { kind, title } => vec![AgentEvent::OpenThread {
+                kind: kind_of(&kind)?,
+                title,
+            }],
+            SimThreadCmd::Post { post } => {
+                let p = post.read()?;
+                let thread = post.thread;
+                let note = p.message.or_else(|| p.version.as_ref()?.message.clone());
+                let version = p.version.map(|v| AgentEvent::ThreadVersion {
+                    thread: thread.clone(),
+                    format: v.format,
+                    body: v.body,
+                });
+                let message = note.map(|text| AgentEvent::ThreadMessage { thread, text });
+                version.into_iter().chain(message).collect()
+            }
+        };
+        // A version and a message are two events; the answer is the ticket after the last.
+        let mut last = None;
+        for event in events {
+            last = Some(c.agent_event(target, &event)?);
+        }
+        if let Some(detail) = last {
+            emit(json_out, &detail, output::ticket_line);
+        }
+        return Ok(());
+    }
     let event = match action {
         SimCmd::Start => AgentEvent::Started,
         SimCmd::Ask { text, permission } => AgentEvent::AskHuman { text, permission },
@@ -52,6 +101,7 @@ pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> R
         },
         SimCmd::Crash { detail } => AgentEvent::Crashed { detail },
         SimCmd::Propose { card } => AgentEvent::Propose(card.into()),
+        SimCmd::Thread(_) => unreachable!("handled above"),
         // A ticket first; if no ticket has this name, a release.
         SimCmd::Finish { summary } => match c.ticket(target) {
             Ok(_) => AgentEvent::Finished {

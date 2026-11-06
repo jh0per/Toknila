@@ -4,8 +4,8 @@ use serde_json::Value;
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
-    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Subtask, Ticket,
-    TicketId, TicketKey, Timestamp,
+    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Subtask, Thread,
+    ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey, Timestamp,
 };
 
 use crate::AppResult;
@@ -42,6 +42,12 @@ pub trait Reader {
     fn subtasks(&self, ticket: TicketId) -> AppResult<Vec<Subtask>>;
     /// A ticket's comments, oldest first.
     fn comments(&self, ticket: TicketId) -> AppResult<Vec<Comment>>;
+    /// A ticket's threads, oldest first.
+    fn threads(&self, ticket: TicketId) -> AppResult<Vec<Thread>>;
+    /// A thread's messages, oldest first.
+    fn thread_messages(&self, thread: ThreadId) -> AppResult<Vec<ThreadMessage>>;
+    /// A thread's artifact versions, by number.
+    fn thread_versions(&self, thread: ThreadId) -> AppResult<Vec<ThreadVersion>>;
     /// Payload of the newest journal event about one entity.
     fn last_event_payload(&self, entity: &str, entity_id: &str) -> AppResult<Option<Value>>;
 }
@@ -64,6 +70,12 @@ pub trait UnitOfWork: Reader {
     fn upsert_comment(&mut self, comment: &Comment) -> AppResult<()>;
     /// Inserts or replaces a subtask.
     fn upsert_subtask(&mut self, subtask: &Subtask) -> AppResult<()>;
+    /// Inserts or replaces a thread.
+    fn upsert_thread(&mut self, thread: &Thread) -> AppResult<()>;
+    /// Stores a new thread message.
+    fn insert_thread_message(&mut self, message: &ThreadMessage) -> AppResult<()>;
+    /// Stores a new artifact version; versions are never changed after.
+    fn insert_thread_version(&mut self, version: &ThreadVersion) -> AppResult<()>;
     /// Journals a domain event.
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()>;
 }

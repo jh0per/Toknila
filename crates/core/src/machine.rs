@@ -27,7 +27,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Actor, BlockedReason, NodeRef, StatusReason, Ticket, TicketStatus, Timestamp, WaitingReason,
+    Actor, BlockedReason, NodeRef, StatusReason, Ticket, TicketKey, TicketStatus, Timestamp,
+    WaitingReason, thread::OpenThread,
 };
 
 /// Something that happened to a ticket.
@@ -46,7 +47,12 @@ pub enum TicketEvent {
     /// A person's new comment reached the agent.
     InstructionDelivered,
     /// Agent: done, a diff is ready. The summary becomes a report comment.
-    Finished { summary: String },
+    Finished {
+        summary: String,
+        /// Still-open threads of the ticket; the hand-in is refused unless this is empty.
+        #[serde(skip)]
+        open_threads: Vec<OpenThread>,
+    },
     /// Agent crash, runner loss, dependency reopened, merge conflict, or `tok block`.
     Block { reason: BlockedReason },
     /// `tok unblock`.
@@ -143,6 +149,8 @@ pub enum TransitionError {
     NotPaused,
     #[error("{0} needs a non-empty text")]
     EmptyText(&'static str),
+    #[error("cannot hand in {0}: {open}", open = crate::thread::list(.1))]
+    OpenThreads(TicketKey, Vec<OpenThread>),
     #[error("only a person can {event} a card; this came from {actor:?}")]
     PersonOnly { event: &'static str, actor: Actor },
 }
@@ -179,7 +187,14 @@ pub fn apply(
             (S::Waiting, Some(StatusReason::Waiting(reason.clone())))
         }
         (S::Waiting, TicketEvent::InstructionDelivered) => (S::Running, None),
-        (S::Running, TicketEvent::Finished { summary }) => {
+        (
+            S::Running,
+            TicketEvent::Finished {
+                summary,
+                open_threads,
+            },
+        ) => {
+            crate::thread::require_none_open(&ticket.key, open_threads)?;
             effects.push(Effect::RecordReport {
                 summary: summary.clone(),
             });
