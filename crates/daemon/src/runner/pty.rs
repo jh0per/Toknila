@@ -59,6 +59,22 @@ fn spawn_error<E: std::fmt::Display>(e: E) -> RunnerError {
     RunnerError::Spawn(format!("{e:#}"))
 }
 
+/// What ConPTY prints when it starts: "where is the cursor?" (`ESC [ 6 n`). It holds the process
+/// back until the terminal answers, and the daemon is the only terminal there is until a client
+/// attaches, so it answers once, at the top left.
+const CURSOR_QUERY: &[u8] = b"\x1b[6n";
+/// The answer: row 1, column 1.
+pub(super) const CURSOR_REPLY: &[u8] = b"\x1b[1;1R";
+/// Bytes of the previous read to keep, so a query split between two reads is still seen.
+pub(super) const QUERY_OVERLAP: usize = CURSOR_QUERY.len() - 1;
+
+/// Whether `output` contains the cursor query.
+pub(super) fn asks_for_cursor(output: &[u8]) -> bool {
+    output
+        .windows(CURSOR_QUERY.len())
+        .any(|w| w == CURSOR_QUERY)
+}
+
 /// How the process ended.
 pub(super) fn exit_of(status: &portable_pty::ExitStatus) -> ProcessExit {
     let signal = status.signal().map(str::to_owned);
@@ -67,5 +83,26 @@ pub(super) fn exit_of(status: &portable_pty::ExitStatus) -> ProcessExit {
             .is_none()
             .then(|| i32::try_from(status.exit_code()).unwrap_or(i32::MAX)),
         signal,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_cursor_query_is_found_anywhere_in_the_output() {
+        assert!(asks_for_cursor(b"\x1b[6n"));
+        assert!(asks_for_cursor(b"\x1b[?9001h\x1b[6nhello"));
+        assert!(!asks_for_cursor(b"\x1b[6"));
+        assert!(!asks_for_cursor(b"plain output"));
+    }
+
+    #[test]
+    fn a_query_split_between_reads_is_found_with_the_kept_overlap() {
+        let (first, second) = (&b"abc\x1b[6"[..], &b"n"[..]);
+        let mut window = first[first.len() - QUERY_OVERLAP..].to_vec();
+        window.extend_from_slice(second);
+        assert!(asks_for_cursor(&window));
     }
 }

@@ -126,11 +126,24 @@ impl Active {
     ) {
         let mut buf = vec![0; 8192];
         let mut log_failed = false;
+        let mut answered_cursor = !cfg!(windows);
+        let mut tail: Vec<u8> = Vec::new();
         loop {
             let n = match reader.read(&mut buf) {
                 Ok(0) | Err(_) => return,
                 Ok(n) => n,
             };
+            if !answered_cursor {
+                tail.extend_from_slice(&buf[..n]);
+                if pty::asks_for_cursor(&tail) {
+                    answered_cursor = true;
+                    if let Err(e) = self.write(pty::CURSOR_REPLY) {
+                        tracing::warn!(run = %self.run.id, error = %e, "cannot answer the cursor query");
+                    }
+                } else {
+                    tail.drain(..tail.len().saturating_sub(pty::QUERY_OVERLAP));
+                }
+            }
             // The log first: whatever a subscriber is told is already on disk.
             if let Err(e) = log.write_all(&buf[..n]).and_then(|()| log.flush())
                 && !log_failed
