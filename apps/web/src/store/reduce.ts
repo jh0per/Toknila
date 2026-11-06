@@ -34,7 +34,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
         error: "",
       };
       // First run: no project yet, so the window offers the checks and a form to add one.
-      return [withTickets(next, msg.tickets), [...enter(next.route), ...(msg.projects.length ? [] : setupLoads)]];
+      return [next, [...enter(next.route), ...(msg.projects.length ? [] : setupLoads)]];
     }
     case "projectsLoaded":
       return [{ ...s, projects: msg.projects }, []];
@@ -45,8 +45,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       const chainOrder = s.chainOrder.includes(id) ? s.chainOrder : [...s.chainOrder, id];
       return [{ ...s, chains: { ...s.chains, [id]: msg.chain }, chainOrder, error: "" }, []];
     }
-    case "ticketsLoaded":
-      return [withTickets(s, msg.tickets), []];
+    case "inboxLoaded":
+      return [{ ...s, inbox: msg.items }, []];
     case "detailLoaded":
       return [{ ...s, details: { ...s.details, [msg.detail.ticket.key]: msg.detail } }, []];
     case "threadsLoaded":
@@ -54,6 +54,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "pickVersion":
       return [{ ...s, versionPick: { ...s.versionPick, [msg.thread]: msg.number } }, []];
     case "threadAction":
+    case "leftovers":
     case "ticketAction":
     case "addComment":
       return [s, [msg]];
@@ -105,12 +106,6 @@ function enter(route: Route): Effect[] {
     : [];
 }
 
-function withTickets(s: State, tickets: { ticket: { id: string }; needs_human: boolean }[]): State {
-  const needsHuman: Record<string, true> = {};
-  for (const t of tickets) if (t.needs_human) needsHuman[t.ticket.id] = true;
-  return { ...s, needsHuman };
-}
-
 /// A journal event refreshes what it touches: its chain, the inbox, and the open card. A gap in
 /// `seq` or an event the page cannot place reloads everything.
 function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
@@ -121,7 +116,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.entity === "thread") return [next, threadEventEffects(s, ticketOfEvent(e))];
   const chain = chainOf(s, e);
   if (!chain) return [next, [{ type: "loadAll" }]];
-  const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadTickets" }, { type: "loadAgents" }];
+  const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadInbox" }, { type: "loadAgents" }];
   const ticket = ticketOfEvent(e);
   const open = s.route.name === "card" ? s.details[s.route.key]?.ticket : undefined;
   if (open && ticket === open.id) fx.push({ type: "loadDetail", key: open.key });
@@ -130,7 +125,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
 
 /// A thread event changes the card's threads and its phase; the hand-in gate may move its status.
 function threadEventEffects(s: State, key: string | undefined): Effect[] {
-  const fx: Effect[] = [{ type: "loadTickets" }, { type: "loadAgents" }];
+  const fx: Effect[] = [{ type: "loadInbox" }, { type: "loadAgents" }];
   if (key && s.route.name === "card" && s.route.key === key) {
     fx.push({ type: "loadThreads", key }, { type: "loadDetail", key });
   }

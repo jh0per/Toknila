@@ -12,7 +12,7 @@ impl Repo<'_> {
     pub fn upsert_subtask(&self, s: &Subtask) -> Result<(), StoreError> {
         self.conn.execute(
             "INSERT INTO subtasks (id, ticket_id, position, text, done, done_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-             ON CONFLICT(id) DO UPDATE SET position = excluded.position, text = excluded.text, \
+             ON CONFLICT(id) DO UPDATE SET ticket_id = excluded.ticket_id, position = excluded.position, text = excluded.text, \
              done = excluded.done, done_by = excluded.done_by",
             params![s.id.to_string(), s.ticket_id.to_string(), s.position, s.text, s.done, opt_enum(&s.done_by)?],
         )?;

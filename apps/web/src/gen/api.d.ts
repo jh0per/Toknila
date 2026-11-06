@@ -246,6 +246,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everything in the project that waits on a person, newest first, as core computes it. */
+        get: operations["get_inbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/releases/{release}/actions/{action}": {
         parameters: {
             query?: never;
@@ -429,6 +446,23 @@ export interface paths {
          *     instruction is handed out once: it is marked delivered as it is claimed.
          */
         post: operations["claim_instructions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/leftovers/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person's decision about the open subtasks left behind a card done out of order. */
+        post: operations["resolve_leftovers"];
         delete?: never;
         options?: never;
         head?: never;
@@ -894,6 +928,38 @@ export interface components {
              */
             settings_flag: string | null;
         };
+        /** @description One entry of the inbox. */
+        InboxItem: {
+            /**
+             * @description What a person may do to the card now, as the state machine allows it; the window offers
+             *     no other card action.
+             */
+            allowed_actions: components["schemas"]["TicketAction"][];
+            chain: components["schemas"]["ChainId"];
+            /** @description The cards done out of order that these subtasks are behind (`leftovers` items). */
+            done_cards: components["schemas"]["TicketKey"][];
+            kind: components["schemas"]["InboxKind"];
+            /** @description Since when it waits; items are sorted by this, newest first. */
+            since: components["schemas"]["Timestamp"];
+            /** @description The open subtasks, verbatim (`leftovers` items). */
+            subtasks: string[];
+            /** @description The question, the blocking reason, or the thread's title; empty otherwise. */
+            text: string;
+            /**
+             * Format: int32
+             * @description The thread's number on the card (`thread` items).
+             */
+            thread?: number | null;
+            /** @description The card to open and act on; for `leftovers` the earlier card that holds the subtasks. */
+            ticket: components["schemas"]["TicketKey"];
+            /** @description The card's title. */
+            title: string;
+        };
+        /**
+         * @description What kind of thing waits on the person; the order is the order clients group them in.
+         * @enum {string}
+         */
+        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers";
         /**
          * @description Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
          *     worked, now handed over and marked delivered.
@@ -1070,6 +1136,8 @@ export interface components {
         /** @description The mark of a card that was done out of order: the earlier cards that were still open. */
         OutOfOrder: {
             behind: components["schemas"]["TicketKey"][];
+            /** @description Earlier cards whose leftovers a person chose to leave as they are. */
+            dismissed?: components["schemas"]["TicketKey"][];
         };
         /** @description How the terminal output of an agent is kept and shown. */
         OutputRules: {
@@ -2227,6 +2295,36 @@ export interface operations {
             };
         };
     };
+    get_inbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     release_action: {
         parameters: {
             query?: never;
@@ -2661,6 +2759,46 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    resolve_leftovers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The earlier card that holds the open subtasks (id or key) */
+                ticket: string;
+                /** @description move (into a new card at the end of the chain), close or leave */
+                action: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

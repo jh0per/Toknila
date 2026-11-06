@@ -196,9 +196,7 @@ async fn the_out_of_order_mark_is_stored_and_old_rows_have_none() {
     let plain = ticket(c.id, 1);
     let mut marked = ticket(c.id, 2);
     marked.status = TicketStatus::Merged;
-    marked.done_out_of_order = Some(toknila_core::OutOfOrder {
-        behind: vec![plain.key.clone()],
-    });
+    marked.done_out_of_order = Some(toknila_core::OutOfOrder::new(vec![plain.key.clone()]));
     let (a, b) = (plain.clone(), marked.clone());
     store
         .write(Actor::Human, NOW, move |tx| {

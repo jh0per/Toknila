@@ -195,9 +195,7 @@ pub fn apply(
                 return Err(TransitionError::NothingBehind);
             }
             next.paused = false;
-            next.done_out_of_order = Some(OutOfOrder {
-                behind: behind.clone(),
-            });
+            next.done_out_of_order = Some(OutOfOrder::new(behind.clone()));
             effects.push(Effect::DependencySatisfied);
             (S::Merged, None)
         }

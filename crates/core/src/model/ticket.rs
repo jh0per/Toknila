@@ -58,6 +58,31 @@ pub struct Ticket {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutOfOrder {
     pub behind: Vec<TicketKey>,
+    /// Earlier cards whose leftovers a person chose to leave as they are.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dismissed: Vec<TicketKey>,
+}
+
+impl OutOfOrder {
+    /// The mark for a card done behind `behind`, nothing dismissed yet.
+    pub fn new(behind: Vec<TicketKey>) -> Self {
+        Self {
+            behind,
+            dismissed: Vec::new(),
+        }
+    }
+
+    /// Whether `card`'s leftovers still wait for a decision: it was behind, and was not dismissed.
+    pub fn awaits(&self, card: &TicketKey) -> bool {
+        self.behind.contains(card) && !self.dismissed.contains(card)
+    }
+
+    /// Records that the person left `card`'s leftovers as they are.
+    pub fn dismiss(&mut self, card: &TicketKey) {
+        if self.behind.contains(card) && !self.dismissed.contains(card) {
+            self.dismissed.push(card.clone());
+        }
+    }
 }
 
 /// The mark of a wildcard card: work found during the chain that waits for a person's approval

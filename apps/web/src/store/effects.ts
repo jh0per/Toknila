@@ -2,7 +2,7 @@
 
 import { get, post, streamUrl } from "../api/http";
 import type {
-  ChainDetail, ChainItem, EventRecord, Project, ProjectAgents, TicketDetail, TicketItem, TicketThreads,
+  ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { runSettingsEffect } from "./settingsEffects";
@@ -22,9 +22,11 @@ function threadPath(e: ThreadAction): string {
 /// A card command is a POST that answers with the card's new detail.
 function cardRequest(e: CardCommand): [string, unknown] {
   const ticket = encodeURIComponent(e.key);
-  return e.type === "ticketAction"
-    ? [`/tickets/${ticket}/actions/${e.action}`, { text: e.text }]
-    : [`/tickets/${ticket}/comments`, { kind: e.kind, text: e.text }];
+  switch (e.type) {
+    case "ticketAction": return [`/tickets/${ticket}/actions/${e.action}`, { text: e.text }];
+    case "leftovers": return [`/tickets/${ticket}/leftovers/${e.action}`, {}];
+    case "addComment": return [`/tickets/${ticket}/comments`, { kind: e.kind, text: e.text }];
+  }
 }
 
 export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; stop: () => void } {
@@ -50,9 +52,19 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     const projects = await get<Project[]>("/projects");
     const list = await get<ChainItem[]>("/chains");
     const chains = await Promise.all(list.map((c) => get<ChainDetail>(`/chains/${c.chain.id}`)));
-    const tickets = await get<TicketItem[]>("/tickets");
-    dispatch({ type: "loaded", projects, chains, tickets });
+    dispatch({ type: "loaded", projects, chains });
+    await loadInbox();
     dispatch({ type: "agentsLoaded", agents: await get<ProjectAgents[]>("/agents") });
+  };
+
+  /// The inbox of every project, newest first.
+  const loadInbox = async () => {
+    const projects = await get<Project[]>("/projects");
+    const lists = await Promise.all(
+      projects.map((p) => get<InboxItem[]>(`/projects/${encodeURIComponent(p.key)}/inbox`)),
+    );
+    const items = lists.flat().sort((a, b) => b.since - a.since);
+    dispatch({ type: "inboxLoaded", items });
   };
 
   const loadThreads = async (key: string) => {
@@ -118,6 +130,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
           .catch(failed);
         return;
       case "ticketAction":
+      case "leftovers":
       case "addComment":
         void post<TicketDetail>(...cardRequest(e))
           .then((detail) => dispatch({ type: "detailLoaded", detail }))
@@ -137,12 +150,8 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
             .catch(failed);
         }, DEBOUNCE_MS);
         return;
-      case "loadTickets":
-        later("tickets", () => {
-          get<TicketItem[]>("/tickets")
-            .then((tickets) => dispatch({ type: "ticketsLoaded", tickets }))
-            .catch(failed);
-        }, DEBOUNCE_MS);
+      case "loadInbox":
+        later("inbox", () => void loadInbox().catch(failed), DEBOUNCE_MS);
         return;
       case "connect":
         if (e.delayMs === 0) connect(e.since);

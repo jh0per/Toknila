@@ -25,7 +25,6 @@ function loaded(): State {
     type: "loaded",
     projects,
     chains: [chain("c1", "demo", "DEMO", ["t1", "t2"]), chain("c2", "other", "OTH", ["t3"])],
-    tickets: [],
   });
   return { ...s, lastSeq: 10 };
 }
@@ -82,7 +81,7 @@ describe("selection", () => {
   it("fetches the detail of a card opened by a deep link once the data is there", () => {
     const route = { name: "card", project: "DEMO", chain: "demo", key: "DEMO-1" } as const;
     const [, fx] = reduce(initialState(route), {
-      type: "loaded", projects, chains: [chain("c1", "demo", "DEMO", ["t1"])], tickets: [],
+      type: "loaded", projects, chains: [chain("c1", "demo", "DEMO", ["t1"])],
     });
     expect(fx).toEqual([
       { type: "loadDetail", key: "DEMO-1" },
@@ -105,11 +104,11 @@ describe("stream events", () => {
     const [s] = reduce(open, { type: "detailLoaded", detail });
     const other = event(11, "ticket", "updated", { ticket: { id: "t3", chain_id: "c2" } });
     expect(reduce(s, { type: "event", event: other })[1]).toEqual([
-      { type: "loadChain", id: "c2" }, { type: "loadTickets" }, { type: "loadAgents" },
+      { type: "loadChain", id: "c2" }, { type: "loadInbox" }, { type: "loadAgents" },
     ]);
     const mine = event(11, "ticket", "status_changed", { ticket: { id: "t1", chain_id: "c1" } });
     expect(reduce(s, { type: "event", event: mine })[1]).toEqual([
-      { type: "loadChain", id: "c1" }, { type: "loadTickets" }, { type: "loadAgents" },
+      { type: "loadChain", id: "c1" }, { type: "loadInbox" }, { type: "loadAgents" },
       { type: "loadDetail", key: "DEMO-1" },
     ]);
   });
@@ -123,10 +122,17 @@ describe("stream events", () => {
     expect(ticketEvents(s, "t3").map((e) => e.seq)).toEqual([12]);
   });
 
-  it("keep what needs a person", () => {
-    const tickets = [{ ticket: { id: "t1" }, needs_human: true }] as never;
-    const [s] = reduce(loaded(), { type: "ticketsLoaded", tickets });
-    expect(s.needsHuman).toEqual({ t1: true });
+  it("keep the inbox the daemon computed, as it came", () => {
+    const items = [{ kind: "question", ticket: "DEMO-1" }, { kind: "blocked", ticket: "DEMO-2" }] as never;
+    const [s, fx] = reduce(loaded(), { type: "inboxLoaded", items });
+    expect(s.inbox).toBe(items);
+    expect(fx).toEqual([]);
+  });
+
+  it("a leftovers decision is an effect, not a state change", () => {
+    const intent = { type: "leftovers", key: "DEMO-1", action: "move" } as const;
+    const s = loaded();
+    expect(reduce(s, intent)).toEqual([s, [intent]]);
   });
 });
 

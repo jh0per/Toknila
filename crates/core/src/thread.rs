@@ -213,6 +213,26 @@ pub fn phase(threads: &[Thread]) -> Phase {
     }
 }
 
+/// Since when an open thread waits for the person: its newest version, as long as no request
+/// for changes came after it. `None` when the thread is approved, has no version yet, or waits
+/// for the agent to answer a request.
+pub fn awaiting_person(
+    thread: &Thread,
+    versions: &[ThreadVersion],
+    messages: &[ThreadMessage],
+) -> Option<Timestamp> {
+    if thread.state != ThreadState::Open {
+        return None;
+    }
+    let newest = versions.iter().map(|v| v.created_at).max()?;
+    let asked = messages
+        .iter()
+        .filter(|m| m.kind == MessageKind::ChangesRequested)
+        .map(|m| m.created_at)
+        .max();
+    asked.is_none_or(|at| newest > at).then_some(newest)
+}
+
 /// The hand-in gate: refused, naming them, while any thread is open.
 pub fn require_none_open(ticket: &TicketKey, open: &[OpenThread]) -> Result<(), TransitionError> {
     if open.is_empty() {

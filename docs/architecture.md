@@ -26,7 +26,7 @@ ones above. `cargo xtask guards` checks the rules it can check mechanically.
 
 | Layer | Crate | Holds | Must not hold |
 |---|---|---|---|
-| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, threads on a card (`thread`: open, post, approve, the hand-in gate, the computed phase), agent profiles (`profile`: parse and validate a profile file, the catalog of built-in and file profiles), parallel agents (`schedule`: slots, the queue, who starts next), the system checks and the folder check of a project (`system`, `repo`: what the tools said and what is wrong, as data), entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
+| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, threads on a card (`thread`: open, post, approve, the hand-in gate, the computed phase), agent profiles (`profile`: parse and validate a profile file, the catalog of built-in and file profiles), parallel agents (`schedule`: slots, the queue, who starts next), the system checks and the folder check of a project (`system`, `repo`: what the tools said and what is wrong, as data), the inbox (`inbox`: what waits on a person, and the leftover decisions), entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
 | Application | `toknila-app` | Every use case (`projects`, `chains` with import and export, `tickets` with typed `TicketAction`, `wildcards` (proposals), `threads`, `releases` with `ReleaseAction`, comments and subtasks, agent events), the chain unit of work (`with_chain`: change, settle, save, journal, deliver, then start the cards the schedule gives a slot), reference resolution, startup recovery, `AppError`, and the command inputs (`NewTicket`, `NewChain`, ...) the API accepts as request bodies. Ports: `Reader` and `UnitOfWork` (which carries the command's clock and actor); a `Runner` port arrives with real runners in phase 1 | `axum`, `rusqlite`, `tokio`, HTTP status codes |
 | Protocol | `toknila-api-types` | Read models (`ChainDetail::from_view`, `TicketDetail`, list items), `ErrorBody`, `EventRecord`, query and small request types; re-exports the command inputs of `toknila-app` and the agent events of core. OpenAPI is generated from them (feature `openapi`), TypeScript types from OpenAPI | Logic, transport |
 | Adapters | `toknila-daemon` | `http/` (`routes/*`: one module per resource, each handler parses, runs one use case, answers; one `ErrorBody` for every failure including 401), `server/` (router, auth, lifecycle, logging), `store/` (SQLite implementation of the ports), `stream`, `runner/` (sim now, PTY in phase 1), lifecycle (`daemon.json`, signals), paths, `profiles` (reads the profiles folder), logging, embedded web assets | Business rules |
@@ -398,6 +398,42 @@ A project has a limit of agents working at once, `Project::max_parallel` (defaul
   shows a "queued #n" chip on the card and "used/limit agents" in the top bar, read-only; `tok ls`
   and `tok show` print `(queued #n)`.
 
+## Inbox
+
+The inbox is everything that waits on a person, computed and never stored. The rules are core's
+(`inbox`); `toknila-app::inbox::load` only gathers a project's cards, threads and the subtasks
+involved, and `GET /v1/projects/{project}/inbox` returns the list, newest first (`InboxItem`:
+`kind`, `ticket`, `chain`, `title`, `since`, and `text`, `thread`, `subtasks`, `done_cards` where
+the kind uses them).
+
+| Kind | Listed while | The person's action |
+|---|---|---|
+| `proposal` | a wildcard card is Proposed | Approve, Reject with a reason (the ordinary card actions) |
+| `question` | a card is Waiting on a question or a permission prompt | a reply: an instruction comment, which the runner delivers to the live agent |
+| `blocked` | a card is Blocked; the item carries the reason | Unblock |
+| `review` | a card is in Review (to be refined by the review rounds with "awaiting the person") | open the card |
+| `thread` | a thread is open and its newest version came after the person's last request for changes (`thread::awaiting_person`) | open the thread |
+| `leftovers` | a card was done out of order (`Ticket::done_out_of_order`) and an earlier card in its `behind` list still has open subtasks that nobody dismissed | the three decisions below |
+
+A silent agent (Waiting, `silent`) is not an inbox item yet.
+
+**Leftovers.** One item per earlier card, naming the cards done before it. The decision is
+`POST /v1/tickets/{ticket}/leftovers/{move|close|leave}` on that earlier card; a person only, and
+`409` when nothing is left to decide. The rules are `inbox::leftovers` in core:
+
+- `move`: a new card `Leftovers from <title>` waits for every ticket nothing else waits for (the end
+  of the chain); the open subtasks move to it as the same rows with their text untouched and the
+  old card's checklist is numbered again; a decision comment on the old card names them. The spec
+  folder export matches a card by its tasks' `T` ids, so the new card is matched to the old phase
+  and the exported `tasks.md` stays byte-identical.
+- `close`: the open subtasks are marked done by the person and a decision comment on the card
+  lists them. The export then differs from the original only in those checkboxes.
+- `leave`: the earlier card's key is added to `OutOfOrder::dismissed` on every card that was done
+  behind it. The mark lives in the ticket's existing JSON column, so there is no migration, and
+  the dismissal survives restarts.
+
+The stream refreshes the inbox: every journal event that refreshes a chain also reloads it.
+
 ## Presentation: MVI
 
 
@@ -432,7 +468,7 @@ Navigation is state too, and it lives in the URL, so a deep link opens the right
 | `/` | Chains, with the "needs a human" filter |
 | `/chains/:chain` | Chain graph |
 | `/chains/:chain/tickets/:key` | Ticket details and runner terminal |
-| `/inbox` | Everything waiting on a person, across chains |
+| `/inbox` | Everything waiting on a person, across projects, grouped by kind, each item with its action inline; the sidebar badge shows the count |
 | `/settings` | Projects and agent profiles |
 
 Phase 0 serves `/`, `/chains/:chain` and `/inbox` (the daemon answers these paths with the page);

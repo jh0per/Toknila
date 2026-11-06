@@ -13,6 +13,7 @@ use crate::server::{AppState, router};
 use crate::store::Store;
 
 mod agent_tokens;
+mod inbox;
 mod parallel;
 mod profiles;
 mod resume;
@@ -747,6 +748,7 @@ async fn openapi_describes_every_route() {
             "/projects/{project}",
             "/projects/{project}/chains",
             "/projects/{project}/import",
+            "/projects/{project}/inbox",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",
             "/repos/check",
@@ -758,6 +760,7 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/comments",
             "/tickets/{ticket}/events",
             "/tickets/{ticket}/instructions/claim",
+            "/tickets/{ticket}/leftovers/{action}",
             "/tickets/{ticket}/runner/input",
             "/tickets/{ticket}/runner/scrollback",
             "/tickets/{ticket}/runner/size",
