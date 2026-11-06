@@ -45,6 +45,12 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [withTickets(s, msg.tickets), []];
     case "detailLoaded":
       return [{ ...s, details: { ...s.details, [msg.detail.ticket.key]: msg.detail } }, []];
+    case "threadsLoaded":
+      return [{ ...s, threads: { ...s.threads, [msg.threads.ticket]: msg.threads } }, []];
+    case "pickVersion":
+      return [{ ...s, versionPick: { ...s.versionPick, [msg.thread]: msg.number } }, []];
+    case "threadAction":
+      return [s, [msg]];
     case "loadFailed":
       return [{ ...s, error: msg.error }, []];
     case "event":
@@ -71,7 +77,9 @@ function go(s: State, route: Route): [State, Effect[]] {
 
 /// What a screen needs fetched when it opens.
 function enter(route: Route): Effect[] {
-  return route.name === "card" ? [{ type: "loadDetail", key: route.key }] : [];
+  return route.name === "card"
+    ? [{ type: "loadDetail", key: route.key }, { type: "loadThreads", key: route.key }]
+    : [];
 }
 
 function withTickets(s: State, tickets: { ticket: { id: string }; needs_human: boolean }[]): State {
@@ -87,6 +95,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
   if (e.entity === "project") return [next, [{ type: "loadProjects" }]];
+  if (e.entity === "thread") return [next, threadEventEffects(s, ticketOfEvent(e))];
   const chain = chainOf(s, e);
   if (!chain) return [next, [{ type: "loadAll" }]];
   const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadTickets" }];
@@ -94,6 +103,15 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   const open = s.route.name === "card" ? s.details[s.route.key]?.ticket : undefined;
   if (open && ticket === open.id) fx.push({ type: "loadDetail", key: open.key });
   return [next, fx];
+}
+
+/// A thread event changes the card's threads and its phase; the hand-in gate may move its status.
+function threadEventEffects(s: State, key: string | undefined): Effect[] {
+  const fx: Effect[] = [{ type: "loadTickets" }];
+  if (key && s.route.name === "card" && s.route.key === key) {
+    fx.push({ type: "loadThreads", key }, { type: "loadDetail", key });
+  }
+  return fx;
 }
 
 function chainOf(s: State, e: EventRecord): string | undefined {

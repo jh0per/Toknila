@@ -114,3 +114,36 @@ describe("journal events", () => {
   });
 });
 
+describe("threads", () => {
+  const card: State = { ...loaded(), route: { name: "card", project: "DEMO", chain: "demo", key: "DEMO-1" } };
+  const threads = { ticket: "DEMO-1", phase: "design", threads: [] } as never;
+
+  it("opening a card loads its details and its threads", () => {
+    const [, fx] = reduce(loaded(), { type: "selectCard", project: "DEMO", chain: "demo", key: "DEMO-1" });
+    expect(fx).toContainEqual({ type: "loadThreads", key: "DEMO-1" });
+  });
+
+  it("keeps the answer by ticket key", () => {
+    const [s] = reduce(card, { type: "threadsLoaded", threads });
+    expect(s.threads["DEMO-1"]).toBe(threads);
+  });
+
+  it("a thread event of the open card reloads its threads", () => {
+    const e = event(11, "thread", "opened", { ticket: "DEMO-1" });
+    const [, fx] = reduce(card, { type: "event", event: e });
+    expect(fx).toContainEqual({ type: "loadThreads", key: "DEMO-1" });
+  });
+
+  it("a thread action is an effect, not a state change", () => {
+    const intent = { type: "threadAction", key: "DEMO-1", thread: "th1", action: "approve" } as const;
+    const [s, fx] = reduce(card, intent);
+    expect(s).toBe(card);
+    expect(fx).toEqual([{ type: "threadAction", key: "DEMO-1", thread: "th1", action: "approve" }]);
+  });
+
+  it("picking a version is remembered per thread", () => {
+    const [s] = reduce(card, { type: "pickVersion", thread: "th1", number: 1 });
+    expect(s.versionPick.th1).toBe(1);
+  });
+});
+

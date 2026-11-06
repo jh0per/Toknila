@@ -16,6 +16,19 @@ export async function get<T>(path: string): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+/// A command: POST a JSON body, throw the daemon's error message on refusal.
+export async function post(path: string, body: unknown): Promise<void> {
+  const r = await fetch(`/v1${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const e = (await r.json().catch(() => ({}))) as Partial<ErrorBody>;
+    throw new Error(e.error ?? `${r.status} ${r.statusText}`);
+  }
+}
+
 export function streamUrl(since: number): string {
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${window.location.host}/v1/stream?since=${since}&token=${encodeURIComponent(token())}`;
