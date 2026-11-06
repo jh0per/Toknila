@@ -33,10 +33,7 @@ pub fn merge(paths: &[&str]) -> String {
             out.push(p.to_owned());
         }
     };
-    paths
-        .iter()
-        .flat_map(|s| s.split(':'))
-        .for_each(&mut add);
+    paths.iter().flat_map(|s| s.split(':')).for_each(&mut add);
     USUAL.iter().for_each(|p| add(p));
     out.join(":")
 }
