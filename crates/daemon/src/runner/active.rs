@@ -2,6 +2,7 @@
 //! stream, and the watcher that reports how it ended.
 
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -18,6 +19,7 @@ use super::logs::RunLog;
 use super::pty::{self, Spawned};
 use super::scrollback::Scrollback;
 use super::tokens::AgentTokens;
+use super::tree;
 
 /// How long a terminal prints nothing before its agent counts as waiting at its prompt. A working
 /// agent keeps its spinner and output moving.
@@ -54,6 +56,10 @@ pub(super) struct Active {
     last_output: Mutex<Instant>,
     /// The agent's Stop hook reports to Toknila.
     hooks: bool,
+    /// The agent's process id, while it is known.
+    pid: Option<u32>,
+    /// The `toknila` binary the agent runs for its MCP server and hooks; not work of its own.
+    helper: PathBuf,
 }
 
 impl std::fmt::Debug for Active {
@@ -74,6 +80,7 @@ impl Active {
         log: RunLog,
         lines: usize,
         hooks: bool,
+        helper: PathBuf,
         channels: Channels,
     ) -> Result<Arc<Active>, RunnerError> {
         let Channels {
@@ -100,6 +107,8 @@ impl Active {
             master: Mutex::new(Some(master)),
             last_output: Mutex::new(Instant::now()),
             hooks,
+            pid: child.process_id(),
+            helper,
         });
         let (done, drained) = channel();
         let pump = {
@@ -237,9 +246,14 @@ impl Active {
 
     /// How to reach the agent, or `None` once it is over.
     pub fn state(&self) -> Option<RunnerState> {
-        (!self.is_over()).then(|| RunnerState {
-            hooks: self.hooks,
-            idle: lock(&self.last_output).elapsed() >= IDLE_AFTER,
+        (!self.is_over()).then(|| {
+            let quiet = lock(&self.last_output).elapsed();
+            RunnerState {
+                hooks: self.hooks,
+                idle: quiet >= IDLE_AFTER,
+                quiet_ms: u64::try_from(quiet.as_millis()).unwrap_or(u64::MAX),
+                busy: self.pid.is_some_and(|pid| tree::busy(pid, &self.helper)),
+            }
         })
     }
 
@@ -257,12 +271,14 @@ impl Active {
             .map_err(|e| RunnerError::Write(e.to_string()))
     }
 
-    /// Kills the process on purpose; its exit then is not a crash.
+    /// Ends the process and everything it started, on purpose; its exit then is not a crash.
     pub fn kill(&self) {
         if self.is_over() {
             return;
         }
         self.stopped.store(true, Ordering::SeqCst);
-        let _ = lock(&self.killer).kill();
+        if !self.pid.is_some_and(tree::terminate) {
+            let _ = lock(&self.killer).kill();
+        }
     }
 }

@@ -14,8 +14,10 @@ mod active;
 mod logs;
 mod pty;
 mod scrollback;
+mod silence;
 mod supervise;
 mod tokens;
+mod tree;
 mod wiring;
 mod ws;
 
@@ -29,6 +31,7 @@ use toknila_core::instructions::terminal::Size;
 use toknila_core::{AgentProfile, AgentRole, OutputRules, ProcessExit, Run, RunId, TicketId};
 
 use active::Active;
+pub use silence::{tick as silence_tick, watch as watch_silence};
 pub use supervise::supervise;
 pub use tokens::{Activity, AgentTokens, Grant};
 pub use ws::stream;
@@ -151,6 +154,17 @@ impl Runners {
             .ok_or_else(|| RunnerError::UnknownProfile(name.to_owned()))
     }
 
+    /// The nudge settings of the profile the ticket's live worker run was started with.
+    fn nudge_of(&self, ticket: TicketId) -> Option<toknila_core::Nudge> {
+        let profile = self
+            .active()
+            .get(&(ticket, AgentRole::Worker))?
+            .run()
+            .profile
+            .clone();
+        self.profile(&profile).ok().map(|p| p.nudge)
+    }
+
     /// The scrollback of the ticket's newest run of `role` from `cursor` on (the same run, at an
     /// offset) or from its first retained byte. A ticket this daemon has not run is read from its
     /// newest log. `None` when the ticket never ran in that role.
@@ -221,6 +235,7 @@ impl Runners {
             log,
             lines,
             profile.hooks.enabled && profile.hooks.settings_flag.is_some(),
+            bin,
             active::Channels {
                 wake: self.wake.clone(),
                 ended: self.ended.clone(),

@@ -272,8 +272,28 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
   continuations): the stop that follows finds nothing pending. A comment for a ticket without a
   live runner stays pending. Deliveries run after the command's other effects, so a ship or
   runner queued with them is not held up.
-- **Activity.** Hook signals and any call made with a run token are kept as the ticket's last
-  activity (time and signal) in memory; the nudge ticket reads it.
+- **Activity.** Hook signals and any call made with a run token are kept in memory per ticket:
+  the last MCP call, the last hook and the run's start (`AgentTokens::reported`).
+- **Silence and nudges.** A daemon ticker (`runner/silence.rs`, every 5 s) looks at each live run.
+  The rule is pure core (`toknila_core::nudge::decide`: last signals, child alive, nudge history,
+  now). Silence is measured from the freshest MCP call or hook; only if neither was ever seen,
+  from the last output. A delivered instruction and a nudge restart the timer. A live child
+  process of the agent (a build, tests; `sysinfo`, exact pin, every OS; Toknila's own `mcp` and
+  `hook` helpers excluded) suppresses both nudge and give-up. After `idle_secs` (default 120) the
+  agent is nudged, at most `max_nudges` (3) within `window_secs` (900); then the card goes to
+  Waiting (silent) through the machine (`AskHuman`). Thresholds come from the profile's
+  `[nudge]`. A nudge is an instruction comment written by the system, so it travels the existing
+  delivery (typed into an idle agent or claimed by its Stop hook, journaled `comment.delivered`);
+  the comments are also the nudge history, so a daemon restart forgets nothing
+  (`toknila_app::nudge`). The ticker reads facts outside the store's writer and acts in one command.
+- **Back to Running.** `TicketEvent::AgentActive` moves Waiting to Running. Any agent event except
+  `ask_human` and `crashed`, and the hooks `post_tool_use` and `user_prompt_submit`
+  (`toknila_core::nudge::resumes`), cause it; `stop` and `notification` do not, since they fire when
+  the agent stops to wait. This also ends Waiting (silent).
+- **Stopping.** `StopRunner` ends the whole process tree. On Unix the agent leads its own process
+  group (the pty makes it a session leader): the group gets TERM and KILL after a 3 s grace
+  (`nix`, exact pin). On Windows `taskkill /T /F` walks the tree (a Job Object would also catch
+  orphans but needs FFI outside the one audited file).
 
 Tests use `fake-agent` (`crates/daemon/src/bin/fake-agent.rs`: prints lines, echoes a line of
 input, prints its terminal size, sleeps, exits with a code) as the profile command, so the same tests run on a Unix pty and

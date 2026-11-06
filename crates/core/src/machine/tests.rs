@@ -176,6 +176,30 @@ fn waiting_to_running_when_instruction_delivered() {
 }
 
 #[test]
+fn waiting_to_running_when_the_agent_is_active_again() {
+    let tr = ok(TicketStatus::Waiting, TicketEvent::AgentActive);
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert_eq!(tr.ticket.status_reason, None);
+    assert!(tr.effects.is_empty());
+}
+
+#[test]
+fn agent_activity_changes_nothing_outside_waiting() {
+    for from in [
+        TicketStatus::Running,
+        TicketStatus::Review,
+        TicketStatus::Blocked,
+    ] {
+        let t = ticket_in(from);
+        let err = apply(&t, &TicketEvent::AgentActive, Timestamp(1)).expect_err("refused");
+        assert!(
+            matches!(err, TransitionError::NotAllowed { .. }),
+            "{from:?}"
+        );
+    }
+}
+
+#[test]
 fn running_to_review_on_finished_records_report() {
     let tr = ok(
         TicketStatus::Running,
@@ -628,6 +652,7 @@ fn sample_events() -> Vec<TicketEvent> {
             reason: WaitingReason::Silent,
         },
         TicketEvent::InstructionDelivered,
+        TicketEvent::AgentActive,
         TicketEvent::Finished {
             summary: "s".to_owned(),
             open_threads: vec![],
@@ -662,6 +687,7 @@ fn only_table_transitions_are_allowed() {
         (S::Ready, "start"),
         (S::Running, "ask_human"),
         (S::Waiting, "instruction_delivered"),
+        (S::Waiting, "agent_active"),
         (S::Running, "finished"),
         (S::Running, "block"),
         (S::Waiting, "block"),
@@ -729,6 +755,7 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
             reason: WaitingReason::Silent
         }),
         Just(TicketEvent::InstructionDelivered),
+        Just(TicketEvent::AgentActive),
         any::<u8>().prop_map(|n| TicketEvent::Finished {
             summary: "s".to_owned(),
             open_threads: vec![],

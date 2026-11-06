@@ -5,7 +5,7 @@
       "column": 1,
       "file": "broken.toml",
       "line": 4,
-      "message": "unknown field `idle_sec`, expected one of `idle_secs`, `max_nudges`, `message`"
+      "message": "unknown field `idle_sec`, expected one of `idle_secs`, `max_nudges`, `window_secs`, `message`"
     }
   ],
   "profiles": [
@@ -26,9 +26,10 @@
         },
         "name": "sim",
         "nudge": {
-          "idle_secs": 300,
+          "idle_secs": 120,
           "max_nudges": 3,
-          "message": "Continue, or report with the finished event."
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done.",
+          "window_secs": 900
         },
         "output": {
           "max_log_bytes": 20971520,
@@ -57,9 +58,10 @@
         },
         "name": "claude-code",
         "nudge": {
-          "idle_secs": 300,
+          "idle_secs": 120,
           "max_nudges": 3,
-          "message": "Continue, or report with the finished event."
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done.",
+          "window_secs": 900
         },
         "output": {
           "max_log_bytes": 20971520,
@@ -149,9 +151,10 @@
         },
         "name": "my-agent",
         "nudge": {
-          "idle_secs": 300,
+          "idle_secs": 120,
           "max_nudges": 3,
-          "message": "Continue, or report with the finished event."
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done.",
+          "window_secs": 900
         },
         "output": {
           "max_log_bytes": 20971520,

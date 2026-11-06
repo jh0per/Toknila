@@ -24,9 +24,10 @@
 //! max_log_bytes = 20971520              # a run's log rotates to <run>.log.1 at this size
 //!
 //! [nudge]
-//! idle_secs = 300
-//! max_nudges = 3
-//! message = "Continue, or report with the finished event."
+//! idle_secs = 120                       # no sign of life (MCP, hook, else output) and no child process
+//! max_nudges = 3                        # nudges within window_secs, then Waiting (silent)
+//! window_secs = 900
+//! message = "Report your state through the Toknila tools: ..."
 //! ```
 //!
 //! The profile's name is the file's name without `.toml`.

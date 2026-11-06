@@ -1173,7 +1173,7 @@
         "tags": [
           "agent"
         ],
-        "summary": "A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;\nnothing about the ticket changes.",
+        "summary": "A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;\nnothing about the ticket changes unless the signal shows work and the ticket waits.",
         "operationId": "ticket_activity",
         "parameters": [
           {
@@ -3422,21 +3422,28 @@
           "idle_secs": {
             "type": "integer",
             "format": "int64",
-            "description": "Seconds without output before a nudge.",
-            "default": 300,
+            "description": "Seconds without a sign of life before a nudge.",
+            "default": 120,
             "minimum": 0
           },
           "max_nudges": {
             "type": "integer",
             "format": "int32",
-            "description": "Nudges sent before the ticket is blocked.",
+            "description": "Nudges sent within `window_secs` before the ticket goes to Waiting (silent).",
             "default": 3,
             "minimum": 0
           },
           "message": {
             "type": "string",
             "description": "Text sent to the agent.",
-            "default": "Continue, or report with the finished event."
+            "default": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done."
+          },
+          "window_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The sliding window, in seconds, in which `max_nudges` count.",
+            "default": 900,
+            "minimum": 0
           }
         },
         "additionalProperties": false

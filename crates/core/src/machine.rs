@@ -8,7 +8,7 @@
 //! | Ready | Ready (queued) | `Request` (a person's start; the schedule turns it into `Start` when a slot is free) |
 //! | Ready | Running | `Start` (the schedule decides; see `schedule`) |
 //! | Running | Waiting | `AskHuman` |
-//! | Waiting | Running | `InstructionDelivered` |
+//! | Waiting | Running | `InstructionDelivered`, `AgentActive` |
 //! | Running | Review | `Finished` |
 //! | Running, Waiting | Blocked | `Block` (Review too, for a merge conflict) |
 //! | Blocked | previous status | `Unblock` |
@@ -108,7 +108,9 @@ pub fn apply(
         (S::Running, TicketEvent::AskHuman { reason }) => {
             (S::Waiting, Some(StatusReason::Waiting(reason.clone())))
         }
-        (S::Waiting, TicketEvent::InstructionDelivered) => (S::Running, None),
+        (S::Waiting, TicketEvent::InstructionDelivered | TicketEvent::AgentActive) => {
+            (S::Running, None)
+        }
         (
             S::Running,
             TicketEvent::Finished {
