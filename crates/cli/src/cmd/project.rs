@@ -1,9 +1,10 @@
 //! `tok project`.
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Subcommand;
 use toknila_api_types::{NewProject, PatchProject};
 use toknila_client::Client;
+use toknila_core::wire::from_wire_name;
 
 use super::emit;
 use crate::output;
@@ -31,6 +32,16 @@ pub enum ProjectCmd {
         /// Most agents working at once (1 to 64, default 2); more started cards wait in a queue.
         #[arg(long)]
         parallel: Option<u32>,
+        /// Where accepted work lands: `local` (merge into the base branch) or `github` (open a
+        /// pull request, merge it there when its checks pass).
+        #[arg(long)]
+        merge: Option<String>,
+        /// Pull request title; {key} and {title} are the card's (default: "{key}: {title}").
+        #[arg(long)]
+        pr_title: Option<String>,
+        /// How a pull request merges: merge, squash or rebase (default: merge).
+        #[arg(long)]
+        merge_method: Option<String>,
     },
     /// List projects.
     Ls,
@@ -55,14 +66,36 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             })?;
             emit(json_out, &p, |p| println!("project {} created", p.key));
         }
-        ProjectCmd::Set { key, parallel } => {
+        ProjectCmd::Set {
+            key,
+            parallel,
+            merge,
+            pr_title,
+            merge_method,
+        } => {
             let patch = PatchProject {
                 max_parallel: parallel,
+                merge_mode: merge
+                    .as_deref()
+                    .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge mode {m}")))
+                    .transpose()?,
+                pr_title,
+                merge_method: merge_method
+                    .as_deref()
+                    .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge method {m}")))
+                    .transpose()?,
                 ..PatchProject::default()
             };
             let p = c.patch_project(&key, &patch)?;
             emit(json_out, &p, |p| {
-                println!("project {}: up to {} agents at once", p.key, p.max_parallel);
+                println!(
+                    "project {}: up to {} agents at once; merge: {} ({}), PR title {:?}",
+                    p.key,
+                    p.max_parallel,
+                    output::w(&p.merge.mode),
+                    output::w(&p.merge.method),
+                    p.merge.pr_title
+                );
             });
         }
         ProjectCmd::Ls => {

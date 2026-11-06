@@ -14,6 +14,7 @@ pub mod machine;
 pub mod model;
 pub mod nudge;
 pub mod plan;
+pub mod pr;
 pub mod profile;
 pub mod repo;
 pub mod schedule;

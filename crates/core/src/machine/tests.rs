@@ -50,6 +50,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         tokens_used: 0,
         wildcard,
         done_out_of_order: None,
+        pr: None,
         review: crate::Review::default(),
     }
 }

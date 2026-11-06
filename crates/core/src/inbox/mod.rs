@@ -64,6 +64,10 @@ pub struct InboxItem {
     pub subtasks: Vec<String>,
     /// The cards done out of order that these subtasks are behind (`leftovers` items).
     pub done_cards: Vec<TicketKey>,
+    /// The card's pull request on GitHub, for a blocked card that has one (failed checks, a
+    /// closed pull request, a conflict); absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
     /// What a person may do to the card now, as the state machine allows it; the window offers
     /// no other card action.
     pub allowed_actions: Vec<TicketAction>,
@@ -112,6 +116,11 @@ fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxIte
         thread: None,
         subtasks: Vec::new(),
         done_cards: Vec::new(),
+        link: t
+            .pr
+            .as_ref()
+            .filter(|_| t.status == TicketStatus::Blocked)
+            .map(|p| p.url.clone()),
         allowed_actions: TicketAction::allowed(t),
     }
 }

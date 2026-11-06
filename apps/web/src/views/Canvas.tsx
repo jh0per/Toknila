@@ -4,6 +4,7 @@ import { outOfOrderText } from "../format";
 import { statusGroup, statusText } from "../store/groups";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
+import { PrChip } from "./PrChip";
 
 const W = 196;
 const H = 84;
@@ -84,6 +85,7 @@ export function Canvas({ chain, state, dispatch }: {
                   queued #{queuePosition(state, t.id)}
                 </span>
               )}
+              {t.pr && <PrChip pr={t.pr} />}
               {t.done_out_of_order && (
                 <span className="mark" title={outOfOrderText(t.done_out_of_order)}>out of order</span>
               )}

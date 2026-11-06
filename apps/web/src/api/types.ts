@@ -42,3 +42,6 @@ export type ListedProfile = Schemas["ListedProfile"];
 export type ProfileList = Schemas["ProfileList"];
 export type PatchProject = Schemas["PatchProject"];
 export type ReviewMode = Schemas["ReviewMode"];
+export type MergeMode = Schemas["MergeMode"];
+export type MergeMethod = Schemas["MergeMethod"];
+export type PullRequest = Schemas["PullRequest"];

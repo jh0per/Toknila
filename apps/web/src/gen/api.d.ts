@@ -767,6 +767,15 @@ export interface components {
             /** @enum {string} */
             kind: "merge_failed";
         } | {
+            checks: string[];
+            /** @enum {string} */
+            kind: "ci_failed";
+            url: string;
+        } | {
+            /** @enum {string} */
+            kind: "pr_closed";
+            url: string;
+        } | {
             /** @enum {string} */
             kind: "runner_lost";
         } | {
@@ -842,6 +851,16 @@ export interface components {
             /** @description The version the tool reported, when it did. */
             version?: string | null;
         };
+        /** @description One check of a pull request. */
+        CheckRun: {
+            name: string;
+            state: components["schemas"]["CheckState"];
+        };
+        /**
+         * @description How one check of a pull request stands.
+         * @enum {string}
+         */
+        CheckState: "pending" | "passed" | "failed";
         /**
          * @description The verdict on one tool.
          * @enum {string}
@@ -947,6 +966,11 @@ export interface components {
             /** @description The cards done out of order that these subtasks are behind (`leftovers` items). */
             done_cards: components["schemas"]["TicketKey"][];
             kind: components["schemas"]["InboxKind"];
+            /**
+             * @description The card's pull request on GitHub, for a blocked card that has one (failed checks, a
+             *     closed pull request, a conflict); absent otherwise.
+             */
+            link?: string | null;
             /** @description Since when it waits; items are sorted by this, newest first. */
             since: components["schemas"]["Timestamp"];
             /** @description The open subtasks, verbatim (`leftovers` items). */
@@ -999,6 +1023,23 @@ export interface components {
              * @default false
              */
             enabled: boolean;
+        };
+        /**
+         * @description How GitHub merges a pull request (`gh pr merge --merge|--squash|--rebase`).
+         * @enum {string}
+         */
+        MergeMethod: "merge" | "squash" | "rebase";
+        /**
+         * @description Where an accepted card's work lands.
+         * @enum {string}
+         */
+        MergeMode: "local" | "github";
+        /** @description A project's merge settings. */
+        MergeSettings: {
+            method: components["schemas"]["MergeMethod"];
+            mode: components["schemas"]["MergeMode"];
+            /** @description Title of a pull request; `{key}` and `{title}` are the card's. */
+            pr_title: string;
         };
         /**
          * @description Plain message, or a person's request for changes.
@@ -1176,6 +1217,10 @@ export interface components {
              * @description Most agents working at once (1 to 64).
              */
             max_parallel?: number | null;
+            merge_method?: components["schemas"]["MergeMethod"] | null;
+            merge_mode?: components["schemas"]["MergeMode"] | null;
+            /** @description Title of the pull requests; `{key}` and `{title}` are the card's. */
+            pr_title?: string | null;
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
             reviewer?: string | null;
@@ -1239,6 +1284,8 @@ export interface components {
              *     is queued.
              */
             max_parallel: number;
+            /** @description Where accepted work lands: the local base branch or a GitHub pull request. */
+            merge: components["schemas"]["MergeSettings"];
             name: string;
             /** @description Branch that only receives tagged releases (`main`). */
             release_branch: string;
@@ -1281,6 +1328,14 @@ export interface components {
             /** @description The task for whoever does it. */
             prompt?: string;
             title: string;
+        };
+        /** @description The pull request a card opened, as last seen on the host. */
+        PullRequest: {
+            /** @description The checks at the last look; empty before any was reported. */
+            checks: components["schemas"]["CheckRun"][];
+            /** Format: int64 */
+            number: number;
+            url: string;
         };
         /** @description A card waiting for an agent slot. */
         QueuedCard: {
@@ -1567,6 +1622,7 @@ export interface components {
             needs_secrets: boolean;
             /** @description Paused tickets stay in Backlog and are skipped by autostart. */
             paused: boolean;
+            pr?: components["schemas"]["PullRequest"] | null;
             /** @description Agent profile name; `None` means the project default. */
             profile?: string | null;
             /** @description The task given to the agent; the only source of what to do. */

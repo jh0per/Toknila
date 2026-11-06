@@ -2,7 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
-use toknila_core::{AgentProfile, Project, ProjectId, ReviewMode, schedule};
+use toknila_core::{
+    AgentProfile, MergeMethod, MergeMode, Project, ProjectId, ReviewMode, schedule,
+};
 
 use crate::{AppError, AppResult, UnitOfWork, resolve};
 
@@ -38,6 +40,12 @@ pub struct PatchProject {
     pub default_profile: Option<String>,
     /// The base branch ships start from and merges go into.
     pub work_branch: Option<String>,
+    /// `local` merges into the base branch; `github` opens a pull request and merges it there.
+    pub merge_mode: Option<MergeMode>,
+    /// Title of the pull requests; `{key}` and `{title}` are the card's.
+    pub pr_title: Option<String>,
+    /// How a pull request merges: `merge`, `squash` or `rebase`.
+    pub merge_method: Option<MergeMethod>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -66,6 +74,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             .max_parallel
             .map_or(Ok(schedule::DEFAULT_LIMIT), schedule::check_limit)
             .map_err(|e| AppError::bad_request(e.to_string()))?,
+        merge: Default::default(),
     };
     uow.insert_project(&p)?;
     uow.emit(&DomainEvent::ProjectCreated { project: p.clone() })?;
@@ -93,6 +102,20 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     }
     if let Some(v) = patch.work_branch {
         p.work_branch = name("the base branch", v)?;
+    }
+    if let Some(v) = patch.pr_title {
+        p.merge.pr_title = name("the pull request title", v)?;
+    }
+    if let Some(m) = patch.merge_method {
+        p.merge.method = m;
+    }
+    if let Some(m) = patch.merge_mode {
+        if m == MergeMode::Github && p.repo_path.as_deref().is_none_or(|r| r.trim().is_empty()) {
+            return Err(AppError::bad_request(
+                "pull-request mode needs the project's repository (a project without one has no ships to push)",
+            ));
+        }
+        p.merge.mode = m;
     }
     if let Some(m) = patch.review_mode {
         p.default_review_mode = m;

@@ -244,6 +244,14 @@ pub fn ticket(d: &TicketDetail) {
     if let Some(s) = &d.ship {
         println!("ship: {}  ({})", s.path, s.branch);
     }
+    if let Some(pr) = &t.pr {
+        let checks: Vec<String> = pr
+            .checks
+            .iter()
+            .map(|c| format!("{} {}", c.name, w(&c.state)))
+            .collect();
+        println!("pr: {}  checks: {}", pr.url, checks.join(", "));
+    }
     review(d);
     if let Some(wc) = &t.wildcard {
         let from = wc.from.as_ref().map(|k| format!(" during {k}"));

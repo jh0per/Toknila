@@ -28,6 +28,7 @@ function Body({ item, route, dispatch }: { item: InboxItem; route: Route | undef
       return (
         <div className="row-body">
           <span className="muted">{item.text}</span>
+          {item.link && <a href={item.link} target="_blank" rel="noreferrer" data-testid="pr-link">Open the pull request</a>}
           {item.allowed_actions.includes("unblock") && (
             <button onClick={() => dispatch({ type: "ticketAction", key: item.ticket, action: "unblock" })}>Unblock</button>
           )}

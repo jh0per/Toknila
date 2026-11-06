@@ -135,6 +135,7 @@ mod tests {
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
             max_parallel: 2,
+            merge: Default::default(),
         };
         let chain = Chain {
             id: ChainId::new(),

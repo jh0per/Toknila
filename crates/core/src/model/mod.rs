@@ -15,6 +15,7 @@ mod thread;
 mod ticket;
 mod time;
 
+pub use crate::pr::{CheckRun, CheckState, PullRequest};
 pub use chain::{Chain, Edge, EdgeKind, NodeRef};
 pub use comment::{Actor, Comment, CommentBody, CommentKind};
 pub use ids::{
@@ -23,7 +24,7 @@ pub use ids::{
 };
 pub use keys::{KeyError, ProjectKey, TicketKey};
 pub use profile::{AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules};
-pub use project::{Project, ReviewMode};
+pub use project::{MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use review::{
     Review, ReviewRound, ReviewTurn, Verdict, resolve_mode as resolve_review_mode,

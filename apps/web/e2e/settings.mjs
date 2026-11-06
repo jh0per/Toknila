@@ -4,8 +4,8 @@
 // An empty home opens onboarding: the git, claude and gh checks, then a form that adds a project
 // from a temporary repository. Wrong folders and a missing base branch are refused next to their
 // field (the repository's branches are offered). Then a chain file is imported, the parallel limit
-// and the review mode are changed, the top bar shows the new limit, and both settings are still
-// there after the daemon restarts.
+// the review mode and the merge settings (github mode, title template, squash) are changed, the top
+// bar shows the new limit, and all of them are still there after the daemon restarts.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync } from "node:fs";
@@ -85,6 +85,13 @@ try {
   if ((await t("max-parallel").inputValue()) !== "2") throw new Error("the default limit should be 2");
   await t("max-parallel").fill("3");
   await t("review-mode").selectOption("agent");
+  // Merging through GitHub: the pull request title and the merge method appear with the mode.
+  if ((await t("merge-mode").inputValue()) !== "local") throw new Error("the default merge mode should be local");
+  if (await t("pr-title").count()) throw new Error("the pull request fields belong to github mode");
+  await t("merge-mode").selectOption("github");
+  if ((await t("pr-title").inputValue()) !== "{key}: {title}") throw new Error("the default title template");
+  await t("pr-title").fill("[{key}] {title}");
+  await t("merge-method").selectOption("squash");
   await t("save-settings").click();
   await expectText(t("saved"), "Saved", "settings saved");
   // A refused value comes back at its field and changes nothing.
@@ -105,6 +112,9 @@ try {
   const mode = await t("review-mode").inputValue();
   if (limit !== "3" || mode !== "agent") throw new Error(`after the restart: limit ${limit}, review mode ${mode}`);
   console.log("PASS limit 3 and review mode agent survive a daemon restart");
+  const merge = [await t("merge-mode").inputValue(), await t("pr-title").inputValue(), await t("merge-method").inputValue()];
+  if (merge.join("|") !== "github|[{key}] {title}|squash") throw new Error(`after the restart: merge settings ${merge}`);
+  console.log("PASS merge mode github, the title template and squash survive a daemon restart");
   if (pageError) throw new Error(`page error: ${pageError}`);
   console.log("web settings: PASS");
 } catch (e) {

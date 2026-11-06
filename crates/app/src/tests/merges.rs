@@ -16,7 +16,7 @@ use crate::{MergeError, MergeOutcome, Merger, agent, tickets};
 /// A merger that remembers what it was asked and answers what it was told to.
 #[derive(Debug)]
 pub(super) struct FakeMerger {
-    asked: RefCell<Vec<MergeSpec>>,
+    pub(super) asked: RefCell<Vec<MergeSpec>>,
     answer: RefCell<Result<MergeOutcome, MergeError>>,
 }
 
@@ -38,12 +38,12 @@ impl Merger for FakeMerger {
     }
 }
 
-fn answer(mem: &Mem, answer: Result<MergeOutcome, MergeError>) {
+pub(super) fn answer(mem: &Mem, answer: Result<MergeOutcome, MergeError>) {
     *mem.merger.answer.borrow_mut() = answer;
 }
 
 /// DEMO-1 (A) is in Review with its ship made; DEMO-2 (B) waits for it.
-fn in_review() -> Mem {
+pub(super) fn in_review() -> Mem {
     let mut mem = Mem::demo();
     mem.project.repo_path = Some("/repo".to_owned());
     recover(&mut mem).expect("settle");
@@ -54,17 +54,17 @@ fn in_review() -> Mem {
     mem
 }
 
-fn accept(mem: &mut Mem) {
+pub(super) fn accept(mem: &mut Mem) {
     let a = mem.ticket_by_title("A");
     tickets::act(mem, &a, TicketEvent::Accept { comment: None }).expect("accept");
 }
 
-fn unblock(mem: &mut Mem) {
+pub(super) fn unblock(mem: &mut Mem) {
     let a = mem.ticket_by_title("A");
     tickets::act(mem, &a, TicketEvent::Unblock).expect("unblock");
 }
 
-fn blocked_reason(t: &Ticket) -> BlockedReason {
+pub(super) fn blocked_reason(t: &Ticket) -> BlockedReason {
     let Some(StatusReason::Blocked { reason, .. }) = t.status_reason.clone() else {
         panic!("not blocked: {:?}", t.status_reason);
     };

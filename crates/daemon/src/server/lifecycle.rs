@@ -54,10 +54,11 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
     let (runners, ended) = crate::runner::Runners::new(paths.runs(), paths.profiles());
     let store = Store::open(&paths.db())?
         .with_shipyard(Arc::new(crate::shipyard::GitShipyard::new(paths.ships())))
-        .with_merger(Arc::new(crate::merger::GitMerger::new()))
+        .with_merger(Arc::new(crate::github::Mergers::new()))
         .with_runner(runners.clone());
     crate::runner::supervise(store.clone(), ended);
     crate::runner::watch_silence(store.clone(), runners.clone());
+    crate::pr_watch::watch(store.clone());
     let recovery = crate::recovery::recover(&store)
         .await
         .map_err(|e| RunError::Other(format!("startup recovery: {e}")))?;

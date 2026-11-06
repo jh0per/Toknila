@@ -113,6 +113,11 @@ pub enum BlockedReason {
     /// The merge could not run or finish (the VCS is missing or too old, a branch is gone, the
     /// base kept moving); `detail` says why.
     MergeFailed { detail: String },
+    /// The pull request's checks failed (pull-request mode); `checks` names the failed ones.
+    /// Unblocking pushes the ship again and watches the pull request again.
+    CiFailed { url: String, checks: Vec<String> },
+    /// The pull request was closed on GitHub without merging.
+    PrClosed { url: String },
     /// The daemon restarted and the runner was gone.
     RunnerLost,
     /// The ship (worktree and branch) could not be prepared.
@@ -125,7 +130,11 @@ impl BlockedReason {
     pub fn is_merge(&self) -> bool {
         matches!(
             self,
-            Self::MergeConflict { .. } | Self::BaseCheckoutDirty { .. } | Self::MergeFailed { .. }
+            Self::MergeConflict { .. }
+                | Self::BaseCheckoutDirty { .. }
+                | Self::MergeFailed { .. }
+                | Self::CiFailed { .. }
+                | Self::PrClosed { .. }
         )
     }
 }
@@ -177,6 +186,15 @@ impl fmt::Display for BlockedReason {
                 )
             }
             Self::MergeFailed { detail } => write!(f, "merge_failed: {detail}"),
+            Self::CiFailed { url, checks } => write!(
+                f,
+                "ci_failed: {} failed on {url}; fix it on the ship, then unblock",
+                checks.join(", ")
+            ),
+            Self::PrClosed { url } => write!(
+                f,
+                "pr_closed: {url} was closed without merging; reopen it or unblock to open a new one"
+            ),
             Self::RunnerLost => f.write_str("runner lost"),
             Self::ShipFailed { detail } => write!(f, "ship_failed: {detail}"),
         }

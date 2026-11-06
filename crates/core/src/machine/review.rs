@@ -110,6 +110,9 @@ pub(super) fn agent_failed(
 /// whoever has to fix a conflict can do it on the ship.
 pub(super) fn start_merge(next: &mut Ticket, effects: &mut Vec<Effect>) {
     next.review.turn = Some(ReviewTurn::Merging);
+    // A merge that starts opens its pull request (again): the one seen before is stale, and
+    // only a card with a pull request is watched, so the ticker cannot judge old checks.
+    next.pr = None;
     effects.push(Effect::Merge);
 }
 

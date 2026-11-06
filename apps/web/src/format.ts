@@ -20,6 +20,8 @@ export function reasonText(r: StatusReason | null | undefined): string {
         case "merge_conflict": return `merge conflict: ${b.detail}`;
         case "base_checkout_dirty": return `${b.path} has local changes; commit or stash them, then unblock`;
         case "merge_failed": return `merge failed: ${b.detail}`;
+        case "ci_failed": return `checks failed: ${b.checks.join(", ")}`;
+        case "pr_closed": return "the pull request was closed without merging";
         case "runner_lost": return "runner lost";
         case "ship_failed": return `ship failed: ${b.detail}`;
       }

@@ -1,13 +1,13 @@
 //! Row <-> domain mapping for projects.
 
 use rusqlite::{OptionalExtension, Row, params};
-use toknila_core::{Project, ProjectId};
+use toknila_core::{MergeSettings, Project, ProjectId};
 
 use super::StoreError;
 use super::codec::{Repo, enum_from, enum_str, parse};
 
 const PROJECT_COLS: &str = "id, key, name, repo_path, work_branch, release_branch, default_profile, \
-     default_review_mode, max_parallel, default_reviewer";
+     default_review_mode, max_parallel, default_reviewer, merge_mode, pr_title, merge_method";
 
 type RawProject = (
     String,
@@ -20,6 +20,9 @@ type RawProject = (
     String,
     i64,
     Option<String>,
+    String,
+    String,
+    String,
 );
 
 fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
@@ -34,6 +37,9 @@ fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
         r.get(7)?,
         r.get(8)?,
         r.get(9)?,
+        r.get(10)?,
+        r.get(11)?,
+        r.get(12)?,
     ))
 }
 
@@ -49,6 +55,9 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         review,
         max,
         reviewer,
+        merge_mode,
+        pr_title,
+        merge_method,
     ) = c;
     Ok(Project {
         id: parse(&id, "project id")?,
@@ -62,6 +71,11 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         max_parallel: u32::try_from(max)
             .map_err(|_| StoreError::Corrupt(format!("bad max_parallel {max}")))?,
         default_reviewer: reviewer,
+        merge: MergeSettings {
+            mode: enum_from(&merge_mode)?,
+            pr_title,
+            method: enum_from(&merge_method)?,
+        },
     })
 }
 
@@ -69,7 +83,7 @@ impl Repo<'_> {
     pub fn insert_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
+                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"
             ),
             params![
                 p.id.to_string(),
@@ -82,6 +96,9 @@ impl Repo<'_> {
                 enum_str(&p.default_review_mode)?,
                 p.max_parallel,
                 p.default_reviewer,
+                enum_str(&p.merge.mode)?,
+                p.merge.pr_title,
+                enum_str(&p.merge.method)?,
             ],
         )?;
         Ok(())
@@ -91,7 +108,8 @@ impl Repo<'_> {
     pub fn update_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             "UPDATE projects SET name = ?2, repo_path = ?3, work_branch = ?4, release_branch = ?5, \
-             default_profile = ?6, default_review_mode = ?7, max_parallel = ?8, default_reviewer = ?9 \
+             default_profile = ?6, default_review_mode = ?7, max_parallel = ?8, default_reviewer = ?9, \
+             merge_mode = ?10, pr_title = ?11, merge_method = ?12 \
              WHERE id = ?1",
             params![
                 p.id.to_string(),
@@ -103,6 +121,9 @@ impl Repo<'_> {
                 enum_str(&p.default_review_mode)?,
                 p.max_parallel,
                 p.default_reviewer,
+                enum_str(&p.merge.mode)?,
+                p.merge.pr_title,
+                enum_str(&p.merge.method)?,
             ],
         )?;
         Ok(())

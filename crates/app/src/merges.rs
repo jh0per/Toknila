@@ -4,14 +4,14 @@
 //! event for the ticket: `MergeDone`, or a block with a typed reason.
 
 use toknila_core::machine::TicketEvent;
+use toknila_core::pr::PrSpec;
 use toknila_core::{
-    BlockedReason, Chain, MergeSpec, ReviewTurn, ShipSpec, Ticket, TicketId, TicketKey,
-    TicketStatus,
+    BlockedReason, Chain, MergeMode, MergeSpec, PullRequest, ReviewTurn, ShipSpec, Ticket,
+    TicketId, TicketKey, TicketStatus,
 };
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
-use crate::ships::spec_of;
 use crate::{AppResult, UnitOfWork};
 
 /// How a merge ended when nothing went wrong on the host.
@@ -25,6 +25,19 @@ pub enum MergeOutcome {
     Conflict { files: Vec<String> },
     /// The base branch is checked out at `path` with local changes; nothing was changed.
     BaseCheckoutDirty { path: String },
+    /// Pull-request mode: the pull request is open and its checks have not all finished.
+    PrOpen { pr: PullRequest },
+    /// Pull-request mode: the checks finished and these failed.
+    CiFailed {
+        pr: PullRequest,
+        failed: Vec<String>,
+    },
+    /// Pull-request mode: the pull request was closed on GitHub without merging.
+    PrClosed { url: String },
+    /// Pull-request mode: GitHub reports a merge conflict on the pull request.
+    PrConflict { url: String },
+    /// Pull-request mode: the pull request merged on GitHub and the base was fetched.
+    PrMerged { pr: PullRequest },
 }
 
 /// Why a merge could not run or finish. The text lands in the ticket's blocked reason.
@@ -48,35 +61,63 @@ pub enum MergeError {
     /// A git command failed.
     #[error("git {command} failed: {detail}")]
     Git { command: String, detail: String },
+    /// Pull-request mode needs the GitHub CLI.
+    #[error(
+        "gh (the GitHub CLI) is not installed or not on PATH; install it from https://cli.github.com, then unblock"
+    )]
+    GhMissing,
+    /// `gh` has no GitHub login.
+    #[error("gh is not logged in to GitHub; run `gh auth login`, then unblock")]
+    GhNotLoggedIn,
+    /// A `gh` command failed.
+    #[error("gh {command} failed: {detail}")]
+    Gh { command: String, detail: String },
     /// The file system refused.
     #[error("{0}")]
     Io(String),
 }
 
 /// What the application needs from the host to land a card's work. The daemon implements it
-/// over `git`; a pull-request mode plugs in here too.
+/// over `git`, and over `git` and `gh` when the spec has a pull request.
 pub trait Merger: std::fmt::Debug {
     /// Merges `spec.branch` into `spec.base` of the repository at `spec.repo` with a merge commit.
     /// Safe to call again: a branch the base already contains is [`MergeOutcome::UpToDate`].
+    ///
+    /// With `spec.pr` the work goes through a pull request: the branch is pushed and the pull
+    /// request opened or reused (`watching` is `None`), or only looked at (`watching` is set);
+    /// the pull request is merged when every check passed. Each call is one step: while checks
+    /// run the answer is [`MergeOutcome::PrOpen`] and the caller asks again later.
     fn merge(&self, spec: &MergeSpec) -> Result<MergeOutcome, MergeError>;
 }
 
 /// `Merge`: queue the merge for after the commit. A card without a ship (its project has no
-/// repository, or it never started) has nothing to merge: the host answers right away.
+/// repository, or it never started) has nothing to merge: the host answers right away. In
+/// pull-request mode the spec says whether the pull request is already open (the card has one):
+/// then the host only looks at it.
 pub(crate) fn queue_merge<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     chain: &Chain,
     ticket: &Ticket,
 ) -> AppResult<()> {
-    let spec = match (uow.ship(ticket.id)?, spec_of(uow, chain, ticket)?) {
+    let project = uow
+        .project(chain.project_id)?
+        .ok_or_else(|| crate::AppError::not_found(format!("project of chain {}", chain.name)))?;
+    let spec = match (
+        uow.ship(ticket.id)?,
+        ShipSpec::for_ticket(&project, chain, ticket),
+    ) {
         // The branch the ship was made with, not the one the title would name today.
-        (Some(ship), Some(spec)) => Some(
-            ShipSpec {
+        (Some(ship), Some(spec)) => {
+            let mut merge = ShipSpec {
                 branch: ship.branch,
                 ..spec
             }
-            .merge_spec(&ticket.title),
-        ),
+            .merge_spec(&ticket.title);
+            if project.merge.mode == MergeMode::Github {
+                merge.pr = Some(PrSpec::for_ticket(&project, ticket));
+            }
+            Some(merge)
+        }
         _ => None,
     };
     uow.defer(ExternalEffect::Merge {
@@ -84,6 +125,24 @@ pub(crate) fn queue_merge<U: UnitOfWork + ?Sized>(
         spec,
     });
     Ok(())
+}
+
+/// The daemon's ticker: every card whose pull request is open and whose merge is running gets
+/// its pull request looked at again, after the commit. Returns the keys asked.
+pub fn poll<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Vec<TicketKey>> {
+    let mut asked = Vec::new();
+    for chain in uow.chains(None)? {
+        for t in uow.tickets(Some(chain.id))? {
+            if t.status == TicketStatus::Review
+                && t.review.turn == Some(ReviewTurn::Merging)
+                && t.pr.is_some()
+            {
+                queue_merge(uow, &chain, &t)?;
+                asked.push(t.key);
+            }
+        }
+    }
+    Ok(asked)
 }
 
 /// After a daemon start: a merge that was running when it stopped is queued again. It is safe to
@@ -109,6 +168,25 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
 ) -> AppResult<()> {
     let event = match result {
         Ok(MergeOutcome::Merged { .. } | MergeOutcome::UpToDate) => TicketEvent::MergeDone,
+        Ok(MergeOutcome::PrMerged { pr }) => {
+            record_pr(uow, ticket, pr)?;
+            TicketEvent::MergeDone
+        }
+        Ok(MergeOutcome::PrOpen { pr }) => return record_pr(uow, ticket, pr),
+        Ok(MergeOutcome::CiFailed { pr, failed }) => {
+            let url = pr.url.clone();
+            record_pr(uow, ticket, pr)?;
+            block(BlockedReason::CiFailed {
+                url,
+                checks: failed,
+            })
+        }
+        Ok(MergeOutcome::PrClosed { url }) => block(BlockedReason::PrClosed { url }),
+        Ok(MergeOutcome::PrConflict { url }) => block(BlockedReason::MergeConflict {
+            detail: format!(
+                "GitHub reports a merge conflict on {url}. Resolve it on the ship (merge the base branch into it), unblock pushes it and watches the pull request again."
+            ),
+        }),
         Ok(MergeOutcome::Conflict { files }) => block(BlockedReason::MergeConflict {
             detail: format!(
                 "conflicting files: {}. Resolve them on the ship (merge the base branch into it), then unblock.",
@@ -123,6 +201,16 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
         }),
     };
     tell_ticket(uow, ticket, event)
+}
+
+/// The card's pull request as the host last saw it (an unchanged one changes nothing, so the
+/// journal gets no entry for it).
+fn record_pr<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    pr: PullRequest,
+) -> AppResult<()> {
+    tell_ticket(uow, ticket, TicketEvent::PrUpdated { pr })
 }
 
 fn block(reason: BlockedReason) -> TicketEvent {

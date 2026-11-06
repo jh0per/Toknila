@@ -35,6 +35,7 @@ pub(super) fn ticket(n: u32, status: TicketStatus, since: i64) -> Ticket {
         tokens_used: 0,
         wildcard: None,
         done_out_of_order: None,
+        pr: None,
     }
 }
 
@@ -316,4 +317,37 @@ fn kinds_are_ordered_for_grouping() {
         kinds,
         [Proposal, Question, Blocked, Review, Thread, Leftovers]
     );
+}
+
+#[test]
+fn a_blocked_card_with_a_pull_request_carries_its_link_and_other_cards_do_not() {
+    let pr = crate::PullRequest {
+        number: 7,
+        url: "https://github.com/o/r/pull/7".to_owned(),
+        checks: Vec::new(),
+    };
+    let mut failed = blocked(
+        ticket(1, TicketStatus::Review, 5),
+        BlockedReason::CiFailed {
+            url: pr.url.clone(),
+            checks: vec!["verify".to_owned()],
+        },
+    );
+    failed.pr = Some(pr.clone());
+    let mut running = ticket(2, TicketStatus::Review, 6);
+    running.pr = Some(pr.clone());
+    running.review.turn = Some(ReviewTurn::Person);
+    let got = items(vec![failed, running]);
+    let link = |key: &str| {
+        got.iter()
+            .find(|i| i.ticket.to_string() == key)
+            .map(|i| i.link.clone())
+    };
+    assert_eq!(link("DEMO-1"), Some(Some(pr.url)));
+    assert_eq!(link("DEMO-2"), Some(None));
+    let text = got
+        .iter()
+        .find(|i| i.kind == InboxKind::Blocked)
+        .map(|i| i.text.clone());
+    assert!(text.is_some_and(|t| t.starts_with("ci_failed: verify failed on ")));
 }
