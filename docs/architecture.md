@@ -457,7 +457,7 @@ the kind uses them).
 | `proposal` | a wildcard card is Proposed | Approve, Reject with a reason (the ordinary card actions) |
 | `question` | a card is Waiting on a question or a permission prompt | a reply: an instruction comment, which the runner delivers to the live agent |
 | `blocked` | a card is Blocked; the item carries the reason | Unblock |
-| `review` | a card is in Review (to be refined by the review rounds with "awaiting the person") | open the card |
+| `review` | a card is in Review and it is the person's turn (not while the reviewer agent has it, and not while its accepted work is `merging`; a merge that failed is a `blocked` item with its reason) | open the card |
 | `thread` | a thread is open and its newest version came after the person's last request for changes (`thread::awaiting_person`) | open the thread |
 | `leftovers` | a card was done out of order (`Ticket::done_out_of_order`) and an earlier card in its `behind` list still has open subtasks that nobody dismissed | the three decisions below |
 

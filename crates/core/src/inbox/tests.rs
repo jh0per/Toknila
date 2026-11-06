@@ -140,6 +140,45 @@ fn a_card_in_review_waits_for_the_person_only_when_it_is_the_persons_turn() {
 }
 
 #[test]
+fn a_merging_card_is_nobodys_turn_and_is_not_listed() {
+    assert_eq!(items(vec![reviewed_by(Some(ReviewTurn::Merging))]), []);
+}
+
+#[test]
+fn a_card_whose_merge_failed_is_a_blocked_item_with_the_reason() {
+    let reasons = [
+        (
+            BlockedReason::MergeConflict {
+                detail: "conflicting files: a.rs".to_owned(),
+            },
+            "merge_conflict: conflicting files: a.rs",
+        ),
+        (
+            BlockedReason::BaseCheckoutDirty {
+                path: "/repo".to_owned(),
+            },
+            "base_checkout_dirty: /repo has local changes; commit or stash them, then unblock",
+        ),
+        (
+            BlockedReason::MergeFailed {
+                detail: "too old".to_owned(),
+            },
+            "merge_failed: too old",
+        ),
+    ];
+    for (reason, text) in reasons {
+        let mut t = ticket(1, TicketStatus::Review, 5);
+        t = blocked(t, reason);
+        let got = items(vec![t]);
+        assert_eq!(got.len(), 1, "{text}");
+        assert_eq!(
+            (got[0].kind, got[0].text.as_str()),
+            (InboxKind::Blocked, text)
+        );
+    }
+}
+
+#[test]
 fn an_item_carries_the_actions_the_machine_allows_the_person() {
     use crate::machine::TicketAction;
     let blocked = blocked(

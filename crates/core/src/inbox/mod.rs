@@ -6,7 +6,7 @@
 //! | `proposal` | a wildcard card is Proposed |
 //! | `question` | the agent is Waiting with a question or a permission prompt |
 //! | `blocked` | the card is Blocked (the item carries the reason) |
-//! | `review` | the card is in Review and it is the person's turn (`review.turn`; while the reviewer agent has it the card is not listed) |
+//! | `review` | the card is in Review and it is the person's turn (`review.turn`; while the reviewer agent has it, or the merge is running, the card is not listed; a failed merge is a `blocked` item) |
 //! | `thread` | a thread is open and its newest version came after the person's last request |
 //! | `leftovers` | a card was done out of order and an earlier card still has open subtasks that nobody dismissed |
 //!
@@ -130,9 +130,14 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
             InboxKind::Blocked,
             reason.as_ref().map(ToString::to_string).unwrap_or_default(),
         ),
-        // The reviewer agent still has the card: in agent mode it decides, in both mode the
-        // person comes after its verdict.
-        (TicketStatus::Review, _) if matches!(t.review.turn, Some(ReviewTurn::Agent { .. })) => {
+        // The reviewer agent still has the card (in agent mode it decides, in both mode the
+        // person comes after its verdict), or the accepted work is being merged: nobody's turn.
+        (TicketStatus::Review, _)
+            if matches!(
+                t.review.turn,
+                Some(ReviewTurn::Agent { .. } | ReviewTurn::Merging)
+            ) =>
+        {
             return None;
         }
         (TicketStatus::Review, _) => (InboxKind::Review, String::new()),

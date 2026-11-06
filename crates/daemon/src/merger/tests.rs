@@ -267,12 +267,6 @@ fn missing_branches_and_a_missing_program_are_typed_errors() {
 #[test]
 fn a_git_older_than_the_merge_needs_is_refused_with_both_versions() {
     assert_eq!(
-        parse_version("git version 2.50.1 (Apple Git-155)"),
-        Some((2, 50))
-    );
-    assert_eq!(parse_version("git version 2.43.0.windows.1"), Some((2, 43)));
-    assert_eq!(parse_version("nonsense"), None);
-    assert_eq!(
         check_version("git version 2.37.9"),
         Err(MergeError::GitTooOld {
             found: "2.37".to_owned(),

@@ -19,11 +19,9 @@
 
 use toknila_app::{MergeError, MergeOutcome, Merger};
 use toknila_core::MergeSpec;
+use toknila_core::system::{MIN_GIT, git_version};
 
 use crate::git::{Git, GitError};
-
-/// The oldest git with `merge-tree --write-tree`.
-const MIN_GIT: (u32, u32) = (2, 38);
 
 /// How many times a merge starts over when the base branch moved under it.
 const ATTEMPTS: u32 = 3;
@@ -257,21 +255,10 @@ fn checkout_of(listing: &str, base_ref: &str) -> Option<String> {
     None
 }
 
-/// `(major, minor)` from the output of `git --version`.
-fn parse_version(text: &str) -> Option<(u32, u32)> {
-    let version = text
-        .trim()
-        .strip_prefix("git version ")?
-        .split_whitespace()
-        .next()?;
-    let mut parts = version.split('.');
-    Some((parts.next()?.parse().ok()?, parts.next()?.parse().ok()?))
-}
-
 /// Refuses a git older than [`MIN_GIT`]. Output that cannot be read is let through: the commands
 /// themselves fail with git's own message if they are not supported.
 fn check_version(text: &str) -> Result<(), MergeError> {
-    match parse_version(text) {
+    match git_version(text) {
         Some(found) if found < MIN_GIT => Err(MergeError::GitTooOld {
             found: format!("{}.{}", found.0, found.1),
             needs: format!("{}.{}", MIN_GIT.0, MIN_GIT.1),
