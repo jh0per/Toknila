@@ -65,13 +65,19 @@ pub fn table(header: &[&str], rows: &[Vec<String>]) {
     }
 }
 
+/// ` (queued #2)` for a card waiting for an agent slot, else nothing.
+fn queued(position: Option<u32>) -> String {
+    position.map_or_else(String::new, |n| format!(" (queued #{n})"))
+}
+
 /// `KEY status (reason)`: the answer of ticket actions and agent events.
 pub fn ticket_line(d: &TicketDetail) {
     let t = &d.ticket;
     println!(
-        "{} {}{}",
+        "{} {}{}{}",
         t.key,
         w(&t.status),
+        queued(d.queue_position),
         in_parens(t.status_reason.as_ref())
     );
 }
@@ -86,6 +92,7 @@ pub fn tickets(items: &[TicketItem]) {
             if t.paused {
                 status.push_str(" (paused)");
             }
+            status.push_str(&queued(it.queue_position));
             vec![
                 t.key.to_string(),
                 status,
@@ -190,10 +197,11 @@ fn node_label(d: &ChainDetail, node: NodeRef) -> String {
 pub fn ticket(d: &TicketDetail) {
     let t = &d.ticket;
     println!(
-        "{}  {}  [{}] for {}",
+        "{}  {}  [{}{}] for {}",
         t.key,
         t.title,
         w(&t.status),
+        queued(d.queue_position),
         duration(d.in_status_ms)
     );
     let r = reason(t.status_reason.as_ref());

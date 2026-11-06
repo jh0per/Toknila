@@ -88,6 +88,7 @@ mod tests {
             release_branch: "main".into(),
             default_profile: AgentProfile::SIM.into(),
             default_review_mode: ReviewMode::Human,
+            max_parallel: 2,
         };
         let chain = Chain {
             id: ChainId::new(),

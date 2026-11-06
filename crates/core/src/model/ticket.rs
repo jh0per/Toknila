@@ -23,6 +23,10 @@ pub struct Ticket {
     pub status_since: Timestamp,
     /// Paused tickets stay in Backlog and are skipped by autostart.
     pub paused: bool,
+    /// A person asked to start this Ready card; it runs as soon as a slot is free (see
+    /// `schedule`). Only a Ready card has it. Its place in the queue is computed, never stored.
+    #[serde(default)]
+    pub queued: bool,
     /// Agent profile name; `None` means the project default.
     pub profile: Option<String>,
     /// `None` means the chain's, then the project's review mode.
@@ -99,6 +103,7 @@ impl Ticket {
             status_reason: None,
             status_since: now,
             paused: draft.paused,
+            queued: false,
             profile: draft.profile,
             review_mode: draft.review_mode,
             branch: None,

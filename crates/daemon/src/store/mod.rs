@@ -10,6 +10,7 @@ mod error;
 mod external;
 mod notes;
 mod ports;
+mod projects;
 mod schema;
 mod ships;
 mod threads;
@@ -199,23 +200,7 @@ impl Store {
         Ok((value, emitted))
     }
 
-    /// Like [`Store::write`] for a command that queues nothing for the host.
-    pub(super) async fn commit<T, E, F>(
-        &self,
-        actor: Actor,
-        now: Timestamp,
-        f: F,
-    ) -> Result<(T, Vec<EventRecord>), E>
-    where
-        T: Send + 'static,
-        E: From<StoreError> + Send + 'static,
-        F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
-    {
-        let (value, emitted, _) = self.commit_with_effects(actor, now, f).await?;
-        Ok((value, emitted))
-    }
-
-    async fn commit_with_effects<T, E, F>(
+    pub(super) async fn commit_with_effects<T, E, F>(
         &self,
         actor: Actor,
         now: Timestamp,

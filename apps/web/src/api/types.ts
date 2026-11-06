@@ -29,3 +29,4 @@ export type ThreadMessage = Schemas["ThreadMessage"];
 export type OutOfOrder = Schemas["OutOfOrder"];
 export type Ship = Schemas["Ship"];
 export type Phase = Schemas["Phase"];
+export type ProjectAgents = Schemas["ProjectAgents"];

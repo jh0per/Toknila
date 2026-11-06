@@ -5,6 +5,25 @@ use super::*;
 const MAX_SETTLE_STEPS: usize = 10_000;
 
 impl ChainView {
+    /// Ready cards that want to run, in dependency order: a person started them
+    /// (`Ticket::queued`) or the chain autostarts. Whether a slot is free is the schedule's call
+    /// (`crate::schedule::plan`), not the graph's.
+    pub fn start_requests(&self) -> Vec<TicketId> {
+        let mut out = Vec::new();
+        for node in self.topo_order() {
+            let NodeRef::Ticket(id) = node else { continue };
+            let Some(t) = self.ticket(id) else { continue };
+            let wanted = t.status == TicketStatus::Ready
+                && !t.paused
+                && (t.queued || self.chain.autostart)
+                && self.unsatisfied_deps(node).is_empty();
+            if wanted {
+                out.push(id);
+            }
+        }
+        out
+    }
+
     /// What should happen now, in graph order. Empty when the chain is settled.
     pub fn next_actions(&self) -> Vec<Action> {
         let mut actions = Vec::new();
@@ -24,12 +43,6 @@ impl ChainView {
                             ticket: id,
                             event: TicketEvent::DepsUnsatisfied,
                         }),
-                        TicketStatus::Ready if self.chain.autostart => {
-                            actions.push(Action::Ticket {
-                                ticket: id,
-                                event: TicketEvent::Start,
-                            })
-                        }
                         _ => {}
                     }
                 }

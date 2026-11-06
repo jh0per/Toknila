@@ -18,6 +18,7 @@ use crate::{
 };
 
 mod import_done;
+mod parallel;
 mod runs;
 mod ships;
 mod threads;
@@ -56,6 +57,7 @@ impl Mem {
             release_branch: Project::DEFAULT_RELEASE_BRANCH.to_owned(),
             default_profile: AgentProfile::SIM.to_owned(),
             default_review_mode: ReviewMode::Human,
+            max_parallel: 2,
         };
         let chain = Chain {
             id: ChainId::new(),
@@ -226,6 +228,10 @@ impl UnitOfWork for Mem {
         self.actor
     }
     fn insert_project(&mut self, p: &Project) -> AppResult<()> {
+        self.project = p.clone();
+        Ok(())
+    }
+    fn update_project(&mut self, p: &Project) -> AppResult<()> {
         self.project = p.clone();
         Ok(())
     }

@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The agent slots of every project and the cards waiting for one, as core's schedule computes
+         *     them.
+         */
+        get: operations["list_agents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chains": {
         parameters: {
             query?: never;
@@ -178,7 +198,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Changes project settings. A higher parallel limit starts waiting cards at once; a lower one
+         *     never stops a running agent.
+         */
+        patch: operations["patch_project"];
         trace?: never;
     };
     "/projects/{project}/chains": {
@@ -810,6 +834,11 @@ export interface components {
             default_review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Short uppercase key, prefix of ticket keys (`DEMO`). */
             key: string;
+            /**
+             * Format: int32
+             * @description Most agents working at once; default 2.
+             */
+            max_parallel?: number | null;
             name?: string | null;
             release_branch?: string | null;
             repo_path?: string | null;
@@ -921,6 +950,14 @@ export interface components {
              */
             strip_ansi: boolean;
         };
+        /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
+        PatchProject: {
+            /**
+             * Format: int32
+             * @description Most agents working at once (1 to 64).
+             */
+            max_parallel?: number | null;
+        };
         /** @description `PATCH /v1/tickets/{ticket}/subtasks/{position}`. */
         PatchSubtask: {
             done?: boolean | null;
@@ -966,6 +1003,12 @@ export interface components {
             default_review_mode: components["schemas"]["ReviewMode"];
             id: components["schemas"]["ProjectId"];
             key: components["schemas"]["ProjectKey"];
+            /**
+             * Format: int32
+             * @description Most agents of this project that work at once (`schedule`); a card that starts beyond it
+             *     is queued.
+             */
+            max_parallel: number;
             name: string;
             /** @description Branch that only receives tagged releases (`main`). */
             release_branch: string;
@@ -973,6 +1016,22 @@ export interface components {
             repo_path?: string | null;
             /** @description Branch ships start from and merge into (`develop`). */
             work_branch: string;
+        };
+        /** @description `GET /v1/agents`: one project's agent slots and the cards waiting for one. */
+        ProjectAgents: {
+            /**
+             * Format: int32
+             * @description Agents that may work at once.
+             */
+            limit: number;
+            project: components["schemas"]["ProjectId"];
+            /** @description Waiting cards, first in line first. */
+            queued: components["schemas"]["QueuedCard"][];
+            /**
+             * Format: int32
+             * @description Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
+             */
+            used: number;
         };
         /** @description Identifies a [`crate::Project`]. */
         ProjectId: string;
@@ -992,6 +1051,15 @@ export interface components {
             /** @description The task for whoever does it. */
             prompt?: string;
             title: string;
+        };
+        /** @description A card waiting for an agent slot. */
+        QueuedCard: {
+            /**
+             * Format: int32
+             * @description 1 is next.
+             */
+            position: number;
+            ticket: components["schemas"]["TicketId"];
         };
         /** @description A release milestone between tickets on the chain graph. */
         Release: {
@@ -1179,6 +1247,11 @@ export interface components {
             profile?: string | null;
             /** @description The task given to the agent; the only source of what to do. */
             prompt: string;
+            /**
+             * @description A person asked to start this Ready card; it runs as soon as a slot is free (see
+             *     `schedule`). Only a Ready card has it. Its place in the queue is computed, never stored.
+             */
+            queued?: boolean;
             review_mode?: components["schemas"]["ReviewMode"] | null;
             status: components["schemas"]["TicketStatus"];
             status_reason?: components["schemas"]["StatusReason"] | null;
@@ -1199,6 +1272,11 @@ export interface components {
             in_status_ms: number;
             /** @description Computed from the ticket's threads: design while any is open, implement otherwise. */
             phase: components["schemas"]["Phase"];
+            /**
+             * Format: int32
+             * @description Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
+             */
+            queue_position?: number | null;
             ship?: components["schemas"]["Ship"] | null;
             subtasks: components["schemas"]["Subtask"][];
             ticket: components["schemas"]["Ticket"];
@@ -1211,6 +1289,11 @@ export interface components {
             /** Format: int64 */
             in_status_ms: number;
             needs_human: boolean;
+            /**
+             * Format: int32
+             * @description Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
+             */
+            queue_position?: number | null;
             ticket: components["schemas"]["Ticket"];
         };
         /** @example DEMO-3 */
@@ -1269,6 +1352,25 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectAgents"][];
+                };
+            };
+        };
+    };
     list_chains: {
         parameters: {
             query?: {
@@ -1674,6 +1776,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    patch_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchProject"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {

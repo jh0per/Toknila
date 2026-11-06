@@ -6,7 +6,7 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_app::tickets::{self, TicketAction};
-use toknila_app::{notes, resolve, wildcards};
+use toknila_app::{notes, resolve, schedule, wildcards};
 use toknila_core::{Actor, ChainId};
 
 use super::{ApiResult, load_ticket_detail, read, ticket_write};
@@ -74,6 +74,7 @@ pub async fn list_tickets(
             .into_iter()
             .map(|c| (c.id, c.name))
             .collect();
+        let queue = schedule::queue_positions(repo)?;
         Ok(repo
             .tickets(chain.map(|c| c.id))?
             .into_iter()
@@ -82,6 +83,7 @@ pub async fn list_tickets(
                 chain: names.get(&t.chain_id).cloned().unwrap_or_default(),
                 in_status_ms: at.millis_since(t.status_since),
                 needs_human: t.status.needs_human(),
+                queue_position: queue.get(&t.id).copied(),
                 ticket: t,
             })
             .collect())

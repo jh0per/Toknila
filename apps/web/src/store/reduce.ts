@@ -36,6 +36,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     }
     case "projectsLoaded":
       return [{ ...s, projects: msg.projects }, []];
+    case "agentsLoaded":
+      return [{ ...s, agents: msg.agents }, []];
     case "chainLoaded": {
       const id = msg.chain.chain.id;
       const chainOrder = s.chainOrder.includes(id) ? s.chainOrder : [...s.chainOrder, id];
@@ -96,11 +98,11 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq <= s.lastSeq) return [s, []];
   const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
-  if (e.entity === "project") return [next, [{ type: "loadProjects" }]];
+  if (e.entity === "project") return [next, [{ type: "loadProjects" }, { type: "loadAgents" }]];
   if (e.entity === "thread") return [next, threadEventEffects(s, ticketOfEvent(e))];
   const chain = chainOf(s, e);
   if (!chain) return [next, [{ type: "loadAll" }]];
-  const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadTickets" }];
+  const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadTickets" }, { type: "loadAgents" }];
   const ticket = ticketOfEvent(e);
   const open = s.route.name === "card" ? s.details[s.route.key]?.ticket : undefined;
   if (open && ticket === open.id) fx.push({ type: "loadDetail", key: open.key });
@@ -109,7 +111,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
 
 /// A thread event changes the card's threads and its phase; the hand-in gate may move its status.
 function threadEventEffects(s: State, key: string | undefined): Effect[] {
-  const fx: Effect[] = [{ type: "loadTickets" }];
+  const fx: Effect[] = [{ type: "loadTickets" }, { type: "loadAgents" }];
   if (key && s.route.name === "card" && s.route.key === key) {
     fx.push({ type: "loadThreads", key }, { type: "loadDetail", key });
   }

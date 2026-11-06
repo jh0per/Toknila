@@ -33,6 +33,9 @@ pub fn check_invariants(ticket: &Ticket) -> Result<(), String> {
     if ticket.paused && ticket.status != S::Backlog {
         return Err(format!("paused ticket in {:?}", ticket.status));
     }
+    if ticket.queued && ticket.status != S::Ready {
+        return Err(format!("queued ticket in {:?}", ticket.status));
+    }
     if ticket.status == S::Proposed && ticket.wildcard.as_ref().is_none_or(|w| w.approved) {
         return Err(format!("proposed ticket with mark {:?}", ticket.wildcard));
     }

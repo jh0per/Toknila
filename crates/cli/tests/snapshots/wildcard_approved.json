@@ -3,6 +3,7 @@
   "comments": [],
   "in_status_ms": 0,
   "phase": "implement",
+  "queue_position": null,
   "ship": null,
   "subtasks": [],
   "ticket": {
@@ -17,6 +18,7 @@
     "paused": false,
     "profile": null,
     "prompt": "Login needs a token refresh endpoint first",
+    "queued": false,
     "review_mode": null,
     "status": "backlog",
     "status_reason": null,

@@ -2,9 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
-use toknila_core::{AgentProfile, Project, ProjectId, ReviewMode};
+use toknila_core::{AgentProfile, Project, ProjectId, ReviewMode, schedule};
 
-use crate::{AppError, AppResult, UnitOfWork};
+use crate::{AppError, AppResult, UnitOfWork, resolve};
 
 /// `POST /v1/projects`: a new project; unset fields take the project defaults.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -18,6 +18,16 @@ pub struct NewProject {
     pub release_branch: Option<String>,
     pub default_profile: Option<String>,
     pub default_review_mode: Option<ReviewMode>,
+    /// Most agents working at once; default 2.
+    pub max_parallel: Option<u32>,
+}
+
+/// `PATCH /v1/projects/{project}`: the settings to change; unset fields stay.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PatchProject {
+    /// Most agents working at once (1 to 64).
+    pub max_parallel: Option<u32>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -41,8 +51,30 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             .default_profile
             .unwrap_or_else(|| AgentProfile::SIM.to_owned()),
         default_review_mode: draft.default_review_mode.unwrap_or_default(),
+        max_parallel: draft
+            .max_parallel
+            .map_or(Ok(schedule::DEFAULT_LIMIT), schedule::check_limit)
+            .map_err(|e| AppError::bad_request(e.to_string()))?,
     };
     uow.insert_project(&p)?;
     uow.emit(&DomainEvent::ProjectCreated { project: p.clone() })?;
+    Ok(p)
+}
+
+/// Changes a project's settings. A higher parallel limit starts waiting cards at once; a lower
+/// one never stops a running agent, it only holds back the next start.
+pub fn patch<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    project: &str,
+    patch: PatchProject,
+) -> AppResult<Project> {
+    let mut p = resolve::project(uow, project)?;
+    if let Some(n) = patch.max_parallel {
+        p.max_parallel =
+            schedule::check_limit(n).map_err(|e| AppError::bad_request(e.to_string()))?;
+    }
+    uow.update_project(&p)?;
+    uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;
+    crate::schedule::run(uow, p.id)?;
     Ok(p)
 }

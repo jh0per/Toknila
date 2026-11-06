@@ -14,6 +14,29 @@
     }
   ],
   "paths": {
+    "/agents": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "The agent slots of every project and the cards waiting for one, as core's schedule computes\nthem.",
+        "operationId": "list_agents",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectAgents"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains": {
       "get": {
         "tags": [
@@ -577,6 +600,63 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Changes project settings. A higher parallel limit starts waiting cards at once; a lower one\nnever stops a running agent.",
+        "operationId": "patch_project",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchProject"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -2817,6 +2897,15 @@
             "type": "string",
             "description": "Short uppercase key, prefix of ticket keys (`DEMO`)."
           },
+          "max_parallel": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Most agents working at once; default 2.",
+            "minimum": 0
+          },
           "name": {
             "type": [
               "string",
@@ -3151,6 +3240,21 @@
         },
         "additionalProperties": false
       },
+      "PatchProject": {
+        "type": "object",
+        "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
+        "properties": {
+          "max_parallel": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Most agents working at once (1 to 64).",
+            "minimum": 0
+          }
+        }
+      },
       "PatchSubtask": {
         "type": "object",
         "description": "`PATCH /v1/tickets/{ticket}/subtasks/{position}`.",
@@ -3291,7 +3395,8 @@
           "work_branch",
           "release_branch",
           "default_profile",
-          "default_review_mode"
+          "default_review_mode",
+          "max_parallel"
         ],
         "properties": {
           "default_profile": {
@@ -3305,6 +3410,12 @@
           },
           "key": {
             "$ref": "#/components/schemas/ProjectKey"
+          },
+          "max_parallel": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Most agents of this project that work at once (`schedule`); a card that starts beyond it\nis queued.",
+            "minimum": 0
           },
           "name": {
             "type": "string"
@@ -3323,6 +3434,40 @@
           "work_branch": {
             "type": "string",
             "description": "Branch ships start from and merge into (`develop`)."
+          }
+        }
+      },
+      "ProjectAgents": {
+        "type": "object",
+        "description": "`GET /v1/agents`: one project's agent slots and the cards waiting for one.",
+        "required": [
+          "project",
+          "limit",
+          "used",
+          "queued"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Agents that may work at once.",
+            "minimum": 0
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "queued": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueuedCard"
+            },
+            "description": "Waiting cards, first in line first."
+          },
+          "used": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.",
+            "minimum": 0
           }
         }
       },
@@ -3371,6 +3516,25 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "QueuedCard": {
+        "type": "object",
+        "description": "A card waiting for an agent slot.",
+        "required": [
+          "ticket",
+          "position"
+        ],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1 is next.",
+            "minimum": 0
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/TicketId"
           }
         }
       },
@@ -3972,6 +4136,10 @@
             "type": "string",
             "description": "The task given to the agent; the only source of what to do."
           },
+          "queued": {
+            "type": "boolean",
+            "description": "A person asked to start this Ready card; it runs as soon as a slot is free (see\n`schedule`). Only a Ready card has it. Its place in the queue is computed, never stored."
+          },
           "review_mode": {
             "oneOf": [
               {
@@ -4052,6 +4220,15 @@
             "$ref": "#/components/schemas/Phase",
             "description": "Computed from the ticket's threads: design while any is open, implement otherwise."
           },
+          "queue_position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.",
+            "minimum": 0
+          },
           "ship": {
             "oneOf": [
               {
@@ -4098,6 +4275,15 @@
           },
           "needs_human": {
             "type": "boolean"
+          },
+          "queue_position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.",
+            "minimum": 0
           },
           "ticket": {
             "$ref": "#/components/schemas/Ticket"

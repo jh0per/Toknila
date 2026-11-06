@@ -73,6 +73,28 @@ try {
   console.log("PASS canvas: 4 cards and 1 milestone");
   await shot("chain");
 
+  // Agent slots: one of the two slots is taken; a chain without autostart whose three cards are
+  // started takes the second slot, so its second and third cards queue and wear "queued #1" and "#2" chips.
+  await expectText(page.locator("[data-testid=slots]"), "1/2 agents", "top bar shows the slots");
+  const extra = join(home, "extra.toml");
+  writeFileSync(
+    extra,
+    '[chain]\nname = "extra"\ngoal = "slots"\nautostart = false\n' +
+      [1, 2, 3].map((i) => `\n[[ticket]]\nid = "x${i}"\ntitle = "Extra ${i}"\nprofile = "sim"\n`).join(""),
+  );
+  tok("chain", "import", extra, "--project", "DEMO");
+  for (const key of ["DEMO-5", "DEMO-6", "DEMO-7"]) tok("start", key);
+  await page.locator("[data-testid=chains]").getByRole("link", { name: "extra" }).click();
+  await expectPath("/projects/DEMO/chains/extra", "extra chain route");
+  await expectText(page.locator("[data-testid=slots]"), "2/2 agents", "both slots are taken");
+  await expectText(page.locator('a[data-key="DEMO-6"] [data-testid=queued]'), "queued #1", "the second card is first in line");
+  await expectText(page.locator('a[data-key="DEMO-7"] [data-testid=queued]'), "queued #2", "the third card is next");
+  if ((await page.locator('a[data-key="DEMO-5"] [data-testid=queued]').count()) !== 0) {
+    throw new Error("a running card must not wear the queued chip");
+  }
+  await shot("queued");
+  await openChain();
+
   // Open a card: the Details tab shows the ticket.
   await page.locator('a[data-key="DEMO-1"]').click();
   await expectPath("/projects/DEMO/chains/demo/cards/DEMO-1", "card route");

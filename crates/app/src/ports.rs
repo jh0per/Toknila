@@ -62,6 +62,8 @@ pub trait UnitOfWork: Reader {
     fn actor(&self) -> Actor;
     /// Inserts a new project.
     fn insert_project(&mut self, project: &Project) -> AppResult<()>;
+    /// Saves the changed settings of an existing project.
+    fn update_project(&mut self, project: &Project) -> AppResult<()>;
     /// Inserts a new, empty chain.
     fn insert_chain(&mut self, chain: &Chain) -> AppResult<()>;
     /// Takes the next ticket number of a project; never handed out twice.

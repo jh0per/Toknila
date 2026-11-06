@@ -16,6 +16,10 @@ pub enum DomainEvent {
     ProjectCreated {
         project: Project,
     },
+    /// A project setting changed (the parallel agent limit).
+    ProjectUpdated {
+        project: Project,
+    },
     ChainCreated {
         chain: Chain,
     },
@@ -183,7 +187,7 @@ impl DomainEvent {
     /// `subtask`, `thread`. Edge events belong to their chain.
     pub fn entity(&self) -> &'static str {
         match self {
-            Self::ProjectCreated { .. } => "project",
+            Self::ProjectCreated { .. } | Self::ProjectUpdated { .. } => "project",
             Self::ChainCreated { .. } | Self::EdgeAdded { .. } | Self::EdgeRemoved { .. } => {
                 "chain"
             }
@@ -212,7 +216,9 @@ impl DomainEvent {
     /// Id of the entity the event is about.
     pub fn entity_id(&self) -> String {
         match self {
-            Self::ProjectCreated { project } => project.id.to_string(),
+            Self::ProjectCreated { project } | Self::ProjectUpdated { project } => {
+                project.id.to_string()
+            }
             Self::ChainCreated { chain } => chain.id.to_string(),
             Self::EdgeAdded { edge } | Self::EdgeRemoved { edge } => edge.chain_id.to_string(),
             Self::TicketCreated { ticket }
@@ -254,7 +260,9 @@ impl DomainEvent {
             Self::EdgeAdded { .. } => "edge_added",
             Self::EdgeRemoved { .. } => "edge_removed",
             Self::TicketStatusChanged { .. } => "status_changed",
-            Self::TicketUpdated { .. } | Self::SubtaskUpdated { .. } => "updated",
+            Self::TicketUpdated { .. }
+            | Self::SubtaskUpdated { .. }
+            | Self::ProjectUpdated { .. } => "updated",
             Self::ReleaseStateChanged { .. } => "state_changed",
             Self::CommentAdded { .. } | Self::SubtaskAdded { .. } => "added",
             Self::CommentDelivered { .. } => "delivered",

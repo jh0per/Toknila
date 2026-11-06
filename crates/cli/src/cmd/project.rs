@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::Subcommand;
-use toknila_api_types::NewProject;
+use toknila_api_types::{NewProject, PatchProject};
 use toknila_client::Client;
 
 use super::emit;
@@ -24,6 +24,13 @@ pub enum ProjectCmd {
         /// Agent profile tickets run with unless they name one (default: sim).
         #[arg(long)]
         profile: Option<String>,
+    },
+    /// Change a project's settings.
+    Set {
+        key: String,
+        /// Most agents working at once (1 to 64, default 2); more started cards wait in a queue.
+        #[arg(long)]
+        parallel: Option<u32>,
     },
     /// List projects.
     Ls,
@@ -48,14 +55,29 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             })?;
             emit(json_out, &p, |p| println!("project {} created", p.key));
         }
+        ProjectCmd::Set { key, parallel } => {
+            let patch = PatchProject {
+                max_parallel: parallel,
+            };
+            let p = c.patch_project(&key, &patch)?;
+            emit(json_out, &p, |p| {
+                println!("project {}: up to {} agents at once", p.key, p.max_parallel);
+            });
+        }
         ProjectCmd::Ls => {
             let projects = c.projects()?;
             emit(json_out, &projects, |ps| {
                 let rows: Vec<Vec<String>> = ps
                     .iter()
-                    .map(|p| vec![p.key.to_string(), p.name.clone()])
+                    .map(|p| {
+                        vec![
+                            p.key.to_string(),
+                            p.name.clone(),
+                            p.max_parallel.to_string(),
+                        ]
+                    })
                     .collect();
-                output::table(&["KEY", "NAME"], &rows);
+                output::table(&["KEY", "NAME", "AGENTS"], &rows);
             });
         }
     }
