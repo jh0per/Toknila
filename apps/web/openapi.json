@@ -2041,6 +2041,25 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "The ship (worktree and branch) could not be prepared.",
+            "required": [
+              "detail",
+              "kind"
+            ],
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ship_failed"
+                ]
+              }
+            }
           }
         ],
         "description": "Why a ticket is Blocked."
@@ -3288,6 +3307,32 @@
           "both"
         ]
       },
+      "Ship": {
+        "type": "object",
+        "description": "The worktree and branch a ticket works in, once the shipyard has made them.",
+        "required": [
+          "ticket_id",
+          "key",
+          "branch",
+          "path"
+        ],
+        "properties": {
+          "branch": {
+            "type": "string",
+            "description": "`ship/<chain>/<slug>`."
+          },
+          "key": {
+            "$ref": "#/components/schemas/TicketKey"
+          },
+          "path": {
+            "type": "string",
+            "description": "Absolute path of the worktree on the host."
+          },
+          "ticket_id": {
+            "$ref": "#/components/schemas/TicketId"
+          }
+        }
+      },
       "StartMode": {
         "type": "string",
         "description": "Whether the milestone cuts itself or waits for a person.",
@@ -3812,6 +3857,17 @@
           "phase": {
             "$ref": "#/components/schemas/Phase",
             "description": "Computed from the ticket's threads: design while any is open, implement otherwise."
+          },
+          "ship": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ship",
+                "description": "The ticket's worktree and branch while it has them; `null` before it started, after it\nmerged, or when its project has no repository."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "subtasks": {
             "type": "array",

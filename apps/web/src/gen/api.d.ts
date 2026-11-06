@@ -555,6 +555,10 @@ export interface components {
         } | {
             /** @enum {string} */
             kind: "runner_lost";
+        } | {
+            detail: string;
+            /** @enum {string} */
+            kind: "ship_failed";
         };
         /**
          * @description A flow of tickets with dependencies and release milestones between them. Its status,
@@ -966,6 +970,15 @@ export interface components {
          * @enum {string}
          */
         ReviewMode: "human" | "agent" | "both";
+        /** @description The worktree and branch a ticket works in, once the shipyard has made them. */
+        Ship: {
+            /** @description `ship/<chain>/<slug>`. */
+            branch: string;
+            key: components["schemas"]["TicketKey"];
+            /** @description Absolute path of the worktree on the host. */
+            path: string;
+            ticket_id: components["schemas"]["TicketId"];
+        };
         /**
          * @description Whether the milestone cuts itself or waits for a person.
          * @enum {string}
@@ -1123,6 +1136,7 @@ export interface components {
             in_status_ms: number;
             /** @description Computed from the ticket's threads: design while any is open, implement otherwise. */
             phase: components["schemas"]["Phase"];
+            ship?: components["schemas"]["Ship"] | null;
             subtasks: components["schemas"]["Subtask"][];
             ticket: components["schemas"]["Ticket"];
         };

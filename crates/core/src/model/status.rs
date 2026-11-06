@@ -109,6 +109,8 @@ pub enum BlockedReason {
     MergeConflict { detail: String },
     /// The daemon restarted and the runner was gone.
     RunnerLost,
+    /// The ship (worktree and branch) could not be prepared.
+    ShipFailed { detail: String },
 }
 
 /// The reason attached to the current status, if that status carries one.
@@ -152,6 +154,7 @@ impl fmt::Display for BlockedReason {
             }
             Self::MergeConflict { detail } => write!(f, "merge_conflict: {detail}"),
             Self::RunnerLost => f.write_str("runner lost"),
+            Self::ShipFailed { detail } => write!(f, "ship_failed: {detail}"),
         }
     }
 }
@@ -241,6 +244,12 @@ mod tests {
                 "merge_conflict: a.rs",
             ),
             (blocked(BlockedReason::RunnerLost), "runner lost"),
+            (
+                blocked(BlockedReason::ShipFailed {
+                    detail: "git not found".into(),
+                }),
+                "ship_failed: git not found",
+            ),
             (
                 StatusReason::Cancelled { text: "dup".into() },
                 "cancelled: dup",

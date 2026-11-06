@@ -13,6 +13,7 @@ use crate::server::{AppState, router};
 use crate::store::Store;
 
 mod profiles;
+mod ships;
 mod threads;
 
 const TOKEN: &str = "test-token";
@@ -24,8 +25,16 @@ struct Api {
 
 impl Api {
     fn new() -> Self {
+        Self::with_yard(None)
+    }
+
+    /// Like [`Api::new`] with a shipyard.
+    fn with_yard(yard: Option<crate::store::Yard>) -> Self {
         let dir = tempfile::tempdir().expect("tempdir");
-        let store = Store::open(&dir.path().join("t.db")).expect("store");
+        let mut store = Store::open(&dir.path().join("t.db")).expect("store");
+        if let Some(yard) = yard {
+            store = store.with_shipyard(yard);
+        }
         let state = AppState {
             store,
             token: TOKEN.into(),

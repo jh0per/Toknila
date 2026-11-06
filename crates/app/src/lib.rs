@@ -14,6 +14,7 @@ pub mod projects;
 pub mod recovery;
 pub mod releases;
 pub mod resolve;
+pub mod ships;
 pub mod threads;
 pub mod tickets;
 pub mod wildcards;
@@ -21,6 +22,7 @@ pub mod wildcards;
 pub use chain::{ChainTx, with_chain};
 pub use error::{AppError, AppResult, ErrorKind};
 pub use ports::{Reader, UnitOfWork};
+pub use ships::{ShipError, Shipyard};
 
 #[cfg(test)]
 mod tests;

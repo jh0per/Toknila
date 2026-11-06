@@ -6,6 +6,7 @@ pub mod paths;
 pub mod profiles;
 pub mod recovery;
 pub mod server;
+pub mod shipyard;
 pub mod store;
 pub mod stream;
 pub mod web;

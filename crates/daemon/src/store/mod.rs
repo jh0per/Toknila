@@ -8,15 +8,18 @@ mod codec;
 mod notes;
 mod ports;
 mod schema;
+mod ships;
 mod threads;
 mod tickets;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 use tokio::sync::{broadcast, mpsc, oneshot};
+use toknila_app::Shipyard;
 use toknila_core::events::DomainEvent;
 use toknila_core::{Actor, Timestamp};
 
@@ -46,7 +49,11 @@ pub struct WriteTx<'c> {
     actor: Actor,
     now: Timestamp,
     events: Vec<EventRecord>,
+    yard: Option<Yard>,
 }
+
+/// Where a command's ships are made; shared by every command of the store.
+pub type Yard = Arc<dyn Shipyard + Send + Sync>;
 
 impl std::fmt::Debug for WriteTx<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -120,6 +127,7 @@ pub struct Store {
     jobs: mpsc::Sender<Job>,
     events: broadcast::Sender<EventRecord>,
     path: PathBuf,
+    yard: Option<Yard>,
 }
 
 impl Store {
@@ -146,7 +154,18 @@ impl Store {
             })
             .map(|_| ())
             .unwrap_or_else(|e| panic!("cannot spawn store thread: {e}"));
-        Store { jobs, events, path }
+        Store {
+            jobs,
+            events,
+            path,
+            yard: None,
+        }
+    }
+
+    /// Gives every command a shipyard; without one tickets run without ships.
+    pub fn with_shipyard(mut self, yard: Yard) -> Store {
+        self.yard = Some(yard);
+        self
     }
 
     /// Path of the database file.
@@ -173,6 +192,7 @@ impl Store {
         F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
     {
         let events = self.events.clone();
+        let yard = self.yard.clone();
         let outcome = self
             .run(move |conn| {
                 let tx = match conn.transaction() {
@@ -184,6 +204,7 @@ impl Store {
                     actor,
                     now,
                     events: Vec::new(),
+                    yard,
                 };
                 let value = match catch_unwind(AssertUnwindSafe(|| f(&mut w))) {
                     Ok(Ok(v)) => v,

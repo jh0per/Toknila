@@ -12,13 +12,13 @@
 //! | Running, Waiting | Blocked | `Block` (Review too, for a merge conflict) |
 //! | Blocked | previous status | `Unblock` |
 //! | Review | Running | `Return` |
-//! | Review | Merged | `Accept` |
+//! | Review | Merged | `Accept` (removes the ship's worktree, keeps its branch) |
 //! | Backlog, Ready | Merged | `DoneOutOfOrder` (import only: work finished behind open cards) |
 //! | Merged | Released | `Released` |
 //! | Merged | Review | `Reopen` |
 //! | Backlog, Ready, Running, Waiting, Blocked | Backlog (paused) | `Pause` |
 //! | Backlog (paused) | Backlog | `Resume` |
-//! | any but Proposed, Merged, Released, Cancelled | Cancelled | `Cancel` |
+//! | any but Proposed, Merged, Released, Cancelled | Cancelled | `Cancel` (the ship stays) |
 //! | Proposed | Backlog | `Approve` (a person only; the proposed edges follow) |
 //! | Proposed | Cancelled | `Reject` (a person only, with a reason) |
 //!
@@ -114,6 +114,10 @@ impl TicketEvent {
 pub enum Effect {
     /// Make sure a runner is working on the ticket (start or restart it).
     EnsureRunner,
+    /// Make sure the ticket has its ship (worktree and branch); reuse it if it exists.
+    PrepareShip,
+    /// Take the ticket's worktree away; the branch stays.
+    RemoveShip,
     /// Stop the ticket's runner, if any.
     StopRunner,
     /// Store the agent's summary as a report comment.
@@ -187,7 +191,7 @@ pub fn apply(
         }
         (S::Ready, TicketEvent::DepsUnsatisfied) => (S::Backlog, None),
         (S::Ready, TicketEvent::Start) => {
-            effects.push(Effect::EnsureRunner);
+            run_on_ship(&mut effects);
             (S::Running, None)
         }
         (S::Running, TicketEvent::AskHuman { reason }) => {
@@ -231,7 +235,7 @@ pub fn apply(
                     Some(StatusReason::Waiting(WaitingReason::Silent)),
                 ),
                 (S::Running, _) => {
-                    effects.push(Effect::EnsureRunner);
+                    run_on_ship(&mut effects);
                     (S::Running, None)
                 }
                 (other, _) => (other, None),
@@ -242,10 +246,11 @@ pub fn apply(
             effects.push(Effect::RecordInstruction {
                 text: comment.clone(),
             });
-            effects.push(Effect::EnsureRunner);
+            run_on_ship(&mut effects);
             (S::Running, None)
         }
         (S::Review, TicketEvent::Accept) => {
+            effects.push(Effect::RemoveShip);
             effects.push(Effect::StopRunner);
             effects.push(Effect::DependencySatisfied);
             (S::Merged, None)
@@ -344,7 +349,9 @@ fn block(
     }
     if matches!(
         reason,
-        BlockedReason::Crashed { .. } | BlockedReason::RunnerLost
+        BlockedReason::Crashed { .. }
+            | BlockedReason::RunnerLost
+            | BlockedReason::ShipFailed { .. }
     ) {
         effects.push(Effect::StopRunner);
     }
@@ -359,6 +366,12 @@ fn block(
             },
         }),
     ))
+}
+
+/// The ticket works on its ship: make sure it exists, then (re)start the runner there.
+fn run_on_ship(effects: &mut Vec<Effect>) {
+    effects.push(Effect::PrepareShip);
+    effects.push(Effect::EnsureRunner);
 }
 
 /// Wildcard decisions belong to a person; an agent or the system cannot make them.

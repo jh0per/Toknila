@@ -117,6 +117,11 @@ impl Paths {
         self.home.join("profiles")
     }
 
+    /// Worktrees of ships: `ships/<project>/<chain>/<slug>`.
+    pub fn ships(&self) -> PathBuf {
+        self.home.join("ships")
+    }
+
     /// Rotated daemon logs.
     pub fn logs(&self) -> PathBuf {
         self.home.join("logs")

@@ -205,6 +205,9 @@ pub fn ticket(d: &TicketDetail) {
         d.chain,
         t.profile.as_deref().unwrap_or("(project default)")
     );
+    if let Some(s) = &d.ship {
+        println!("ship: {}  ({})", s.path, s.branch);
+    }
     if let Some(wc) = &t.wildcard {
         let from = wc.from.as_ref().map(|k| format!(" during {k}"));
         let approved = if wc.approved { ", approved" } else { "" };

@@ -72,6 +72,30 @@ A new agent is a new file, not new code.
   profiles and the problems (`file`, `line`, `column`, `message`), and `tok profile ls` prints
   the problems on stderr as `path:line:col: message`.
 
+## Ships
+
+A ship is the git worktree and branch a ticket works in. Core decides: `machine::apply` emits
+`PrepareShip` (with `EnsureRunner`, on Start, Unblock into Running and Return) and `RemoveShip`
+(on Accept), and `ShipSpec::for_ticket` names the branch `ship/<chain>/<slug>` (slug: the ticket
+key and title, path-safe). The application layer runs the effects through the `Shipyard` port
+(`toknila-app`); the daemon implements it with `git` (`shipyard.rs`: `std::process::Command` with
+an argument list, no shell; a missing `git` is `ShipError::GitMissing`).
+
+- Needs a project with `repo_path` (`tok project new KEY --repo <path> [--base develop]`; the base
+  is the project's `work_branch`, default `develop`). Without a repo the ticket runs without a
+  ship, as sim tickets do.
+- Worktrees live under `<home>/ships/<project>/<chain>/<slug>`. The path is stored in the `ships`
+  table (one row per ticket), so a daemon restart keeps track; `TicketDetail.ship` exposes it and
+  the journal has `ticket.ship_created` and `ticket.ship_removed`.
+- Idempotent: an existing worktree is reused, an existing branch is checked out as it is, a
+  worktree deleted by hand is pruned and made again.
+- Merged removes the worktree (forced; the work is accepted) and keeps the branch. A removal that
+  fails refuses the accept with a conflict; nothing is half-done.
+- Cancelled leaves worktree and branch alone: nothing a person may still want is destroyed;
+  cleaning up cancelled ships is a manual step for now.
+- A ship that cannot be made moves the ticket to Blocked with `ship_failed` (details from git)
+  through the machine; `tok unblock` retries.
+
 ## Presentation: MVI
 
 The UI follows Model-View-Intent, the same unidirectional shape the core already has

@@ -6,7 +6,7 @@ use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
     Actor, AgentProfile, Chain, ChainId, Comment, CommentKind, Edge, EdgeKind, NodeRef, Project,
-    ProjectId, Release, ReleaseId, ReviewMode, Subtask, Thread, ThreadId, ThreadMessage,
+    ProjectId, Release, ReleaseId, ReviewMode, Ship, Subtask, Thread, ThreadId, ThreadMessage,
     ThreadVersion, Ticket, TicketDraft, TicketId, TicketKey, TicketStatus, Timestamp,
 };
 
@@ -18,6 +18,7 @@ use crate::{
 };
 
 mod import_done;
+mod ships;
 mod threads;
 mod wildcards;
 
@@ -30,6 +31,8 @@ struct Mem {
     threads: Vec<Thread>,
     messages: Vec<ThreadMessage>,
     versions: Vec<ThreadVersion>,
+    ships: Vec<Ship>,
+    yard: ships::FakeYard,
     events: Vec<DomainEvent>,
     now: Timestamp,
     taken: u32,
@@ -92,6 +95,8 @@ impl Mem {
             threads: vec![],
             messages: vec![],
             versions: vec![],
+            ships: vec![],
+            yard: ships::FakeYard::default(),
             events: vec![],
             now,
             taken: 2,
@@ -194,6 +199,9 @@ impl Reader for Mem {
         let all = self.versions.iter();
         Ok(all.filter(|v| v.thread_id == thread).cloned().collect())
     }
+    fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>> {
+        Ok(self.ships.iter().find(|s| s.ticket_id == ticket).cloned())
+    }
     fn last_event_payload(&self, entity: &str, id: &str) -> AppResult<Option<Value>> {
         let last = self
             .events
@@ -255,6 +263,18 @@ impl UnitOfWork for Mem {
     fn insert_thread_version(&mut self, v: &ThreadVersion) -> AppResult<()> {
         self.versions.push(v.clone());
         Ok(())
+    }
+    fn save_ship(&mut self, ship: &Ship) -> AppResult<()> {
+        self.ships.retain(|s| s.ticket_id != ship.ticket_id);
+        self.ships.push(ship.clone());
+        Ok(())
+    }
+    fn delete_ship(&mut self, ticket: TicketId) -> AppResult<()> {
+        self.ships.retain(|s| s.ticket_id != ticket);
+        Ok(())
+    }
+    fn shipyard(&self) -> Option<&dyn crate::Shipyard> {
+        Some(&self.yard)
     }
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {
         self.events.push(event.clone());
