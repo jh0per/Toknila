@@ -80,12 +80,17 @@ fn e2e_web() -> Result<(), String> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let web = root.join("apps/web");
     cargo(&["build", "--locked", "--bin", "tok"])?;
+    cargo(&[
+        "build",
+        "--locked",
+        "-p",
+        "toknila-daemon",
+        "--bin",
+        "fake-agent",
+    ])?;
     let target = std::env::var_os("CARGO_TARGET_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| root.join("target"));
-    let tok = target
-        .join("debug")
-        .join(format!("tok{}", std::env::consts::EXE_SUFFIX));
     if std::env::var_os("CI").is_some() {
         let npx = if cfg!(windows) { "npx.cmd" } else { "npx" };
         let mut args = vec!["playwright", "install", "chromium"];
@@ -94,7 +99,20 @@ fn e2e_web() -> Result<(), String> {
         }
         run(npx, &args, &web)?;
     }
-    run("node", &["e2e/smoke.mjs", &tok.to_string_lossy()], &web)?;
+    let exe = |name: &str| {
+        let file = format!("{name}{}", std::env::consts::EXE_SUFFIX);
+        target
+            .join("debug")
+            .join(file)
+            .to_string_lossy()
+            .into_owned()
+    };
+    run("node", &["e2e/smoke.mjs", &exe("tok")], &web)?;
+    run(
+        "node",
+        &["e2e/terminal.mjs", &exe("tok"), &exe("fake-agent")],
+        &web,
+    )?;
     eprintln!("xtask e2e-web: PASS");
     Ok(())
 }

@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { chromium } from "playwright";
+import { checks, launch } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -35,9 +35,7 @@ try {
   console.log(`page: ${url.replace(/token=.*/, "token=…")}`);
   const at = (path) => url.replace("/?", `${path}?`);
 
-  browser = await chromium.launch(
-    process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
-  );
+  browser = await launch();
   const page = await browser.newPage();
   page.on("pageerror", (e) => {
     console.error(`page error: ${e.message}`);
@@ -53,18 +51,7 @@ try {
     await page.emulateMedia({ colorScheme: "light" });
     console.log(`PASS screenshot ${name}`);
   };
-  const expectText = async (loc, text, what) => {
-    await loc.filter({ hasText: text }).first().waitFor({ timeout: 10_000 }).catch(async () => {
-      throw new Error(`${what}: expected "${text}", got "${await loc.first().textContent().catch(() => "?")}"`);
-    });
-    console.log(`PASS ${what}: ${text}`);
-  };
-  const expectPath = async (path, what) => {
-    await page.waitForFunction((p) => window.location.pathname === p, path, { timeout: 10_000 }).catch(() => {
-      throw new Error(`${what}: expected path ${path}, at ${new URL(page.url()).pathname}`);
-    });
-    console.log(`PASS ${what}: ${path}`);
-  };
+  const { expectText, expectPath } = checks(page);
   const openChain = async () => {
     await page.locator("[data-testid=chains]").getByRole("link", { name: "demo" }).click();
     await expectPath("/projects/DEMO/chains/demo", "chain route");

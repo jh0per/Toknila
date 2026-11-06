@@ -2,7 +2,7 @@
 
 import { get, post, streamUrl } from "../api/http";
 import type { ChainDetail, ChainItem, EventRecord, Project, TicketDetail, TicketItem, TicketThreads } from "../api/types";
-import type { Effect, Msg, ThreadAction } from "./msg";
+import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 
 type Dispatch = (msg: Msg) => void;
 
@@ -14,6 +14,14 @@ const ACTION_PATH = { message: "messages", changes: "changes", approve: "approve
 function threadPath(e: ThreadAction): string {
   const ticket = encodeURIComponent(e.key);
   return `/tickets/${ticket}/threads/${encodeURIComponent(e.thread)}/${ACTION_PATH[e.action]}`;
+}
+
+/// A card command is a POST that answers with the card's new detail.
+function cardRequest(e: CardCommand): [string, unknown] {
+  const ticket = encodeURIComponent(e.key);
+  return e.type === "ticketAction"
+    ? [`/tickets/${ticket}/actions/${e.action}`, { text: e.text }]
+    : [`/tickets/${ticket}/comments`, { kind: e.kind, text: e.text }];
 }
 
 export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; stop: () => void } {
@@ -96,6 +104,12 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "threadAction":
         void post(threadPath(e), { text: e.text })
           .then(() => loadThreads(e.key))
+          .catch(failed);
+        return;
+      case "ticketAction":
+      case "addComment":
+        void post<TicketDetail>(...cardRequest(e))
+          .then((detail) => dispatch({ type: "detailLoaded", detail }))
           .catch(failed);
         return;
       case "loadChain":

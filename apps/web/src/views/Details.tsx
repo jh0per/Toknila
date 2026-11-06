@@ -1,10 +1,13 @@
 import type { Ticket } from "../api/types";
 import { reasonText } from "../format";
+import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
+import { Comments } from "./Comments";
 import { DetailsMeta } from "./DetailsMeta";
+import { Rounds } from "./Rounds";
 
 /// Prompt, acceptance, subtasks, ship and comments of a card.
-export function Details({ state, card }: { state: State; card: Ticket }) {
+export function Details({ state, card, dispatch }: { state: State; card: Ticket; dispatch: (i: Intent) => void }) {
   const detail = state.details[card.key];
   return (
     <div className="details" data-testid="details">
@@ -40,20 +43,8 @@ export function Details({ state, card }: { state: State; card: Ticket }) {
           )}
         </section>
       </div>
-      <section className="comments">
-        <h4>Comments</h4>
-        {!detail ? <p className="muted">Loading…</p> : detail.comments.length === 0 ? <p className="muted">None.</p> : (
-          <ul>
-            {detail.comments.map((c) => (
-              <li key={c.id}>
-                <b>{c.body.gist}</b> <span className="muted">{c.author}</span>
-                {c.body.what && <div>{c.body.what}</div>}
-                {c.body.why && <div className="muted">{c.body.why}</div>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Rounds state={state} card={card} />
+      <Comments key={card.key} card={card} detail={detail} dispatch={dispatch} />
     </div>
   );
 }
