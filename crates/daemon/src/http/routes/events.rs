@@ -3,9 +3,10 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
-use toknila_app::{agent, instructions, resolve, ships};
+use toknila_app::{agent, instructions, questions, resolve, ships};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
-use toknila_core::{Actor, TicketStatus, nudge};
+use toknila_core::question::QuestionKind;
+use toknila_core::{Actor, AgentRole, TicketStatus, hook, nudge};
 
 use super::{ApiResult, chain_write, load_ticket_detail, stamp};
 use crate::http::dto::{ChainDetail, EventQuery, InstructionClaim, NewActivity, TicketDetail};
@@ -74,7 +75,9 @@ pub async fn agent_event(
     params(("ticket" = String, Path, description = "Ticket id or key")),
     responses((status = 204, description = "Recorded"), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
 /// A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;
-/// nothing about the ticket changes unless the signal shows work and the ticket waits.
+/// it also ends the run's startup wait and the questions that were open for it. A `PreToolUse`
+/// hook says which tool is about to run, and a permission notification (`prompt`) asks the person
+/// (the worker's card waits, a reviewer's dialog is listed in the inbox).
 pub async fn ticket_activity(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -101,20 +104,58 @@ pub async fn ticket_activity(
             tracing::warn!(%error, ticket = %t.key, "could not read the session's usage");
         }
     }
-    // Only the worker's signs of life count: a reviewer beside it is not the worker working, and
-    // never brings a waiting worker back to Running.
-    if !matches!(principal, Principal::Agent(g) if g.role != toknila_core::AgentRole::Worker) {
-        let at = now();
-        state.runners.tokens().touch(t.id, at, &input.signal);
-        if t.status == TicketStatus::Waiting && nudge::resumes(&input.signal) {
-            let signal = input.signal;
-            state
-                .store
-                .write(Actor::Agent, at, move |tx| -> ApiResult<()> {
-                    Ok(agent::activity(tx, &t, &signal)?)
-                })
-                .await?;
-        }
+    let role = match principal {
+        Principal::Agent(grant) => grant.role,
+        Principal::Person => AgentRole::Worker,
+    };
+    let at = now();
+    let (tokens, prompts) = (state.runners.tokens(), state.runners.prompts());
+    tokens.mark_active(t.id, role, at);
+    if let Some(tool) = &input.tool {
+        prompts.remember_tool(t.id, role, hook::cap_summary(tool));
+    }
+    let screen_gone = prompts.unflag_screen(t.id, role);
+    let dialog_gone = hook::clears_prompt(&input.signal) && prompts.clear(t.id, role);
+    // A prompt that the permission hook already holds is the same dialog.
+    let asked = input.prompt.as_deref().map(|message| {
+        let text = hook::permission_text(Some(message), prompts.last_tool(t.id, role).as_deref());
+        let (fresh, _) = prompts.begin(t.id, role, text.clone(), at, false);
+        (fresh, text)
+    });
+    // Only the worker's signs of life count for the nudge and bring a waiting card back: a
+    // reviewer beside it is not the worker working.
+    let worker = role == AgentRole::Worker;
+    if worker {
+        tokens.touch(t.id, at, &input.signal);
+    }
+    let resume = worker && t.status == TicketStatus::Waiting && nudge::resumes(&input.signal);
+    let raised = asked.filter(|(fresh, _)| *fresh).map(|(_, text)| text);
+    let reviewer_gone = (screen_gone || dialog_gone) && !worker;
+    if resume || raised.is_some() || screen_gone || reviewer_gone {
+        let signal = input.signal;
+        state
+            .store
+            .write(Actor::Agent, at, move |tx| -> ApiResult<()> {
+                if resume {
+                    agent::activity(tx, &t, &signal)?;
+                }
+                if let Some(text) = raised {
+                    if worker && t.status == TicketStatus::Running {
+                        let event = AgentEvent::AskHuman {
+                            text,
+                            permission: true,
+                        };
+                        agent::ticket_event(tx, &t, event)?;
+                    } else if !worker {
+                        questions::raised(tx, &t, role, QuestionKind::Permission)?;
+                    }
+                }
+                if screen_gone || reviewer_gone {
+                    questions::cleared(tx, &t, role)?;
+                }
+                Ok(())
+            })
+            .await?;
     }
     Ok(StatusCode::NO_CONTENT)
 }

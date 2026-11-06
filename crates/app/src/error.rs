@@ -96,6 +96,15 @@ impl From<TransitionError> for AppError {
     }
 }
 
+impl From<toknila_core::question::AnswerError> for AppError {
+    fn from(e: toknila_core::question::AnswerError) -> Self {
+        match e {
+            toknila_core::question::AnswerError::EmptyText => AppError::bad_request(e.to_string()),
+            toknila_core::question::AnswerError::NotOffered(_) => AppError::conflict(e.to_string()),
+        }
+    }
+}
+
 impl From<UnknownAction> for AppError {
     fn from(e: UnknownAction) -> Self {
         AppError::not_found(e.to_string())

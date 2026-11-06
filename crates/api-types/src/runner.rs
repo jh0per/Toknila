@@ -42,7 +42,7 @@ pub mod agent_env {
 #[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct RunnerQuery {
-    /// `worker` (the default) or `reviewer`. The reviewer's terminal is read-only.
+    /// `worker` (the default) or `reviewer`.
     pub role: Option<AgentRole>,
 }
 

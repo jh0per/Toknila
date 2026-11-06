@@ -1,0 +1,26 @@
+{
+  "actor": "human",
+  "at": 0,
+  "entity": "project",
+  "entity_id": "<id>",
+  "kind": "created",
+  "payload": {
+    "project": {
+      "default_profile": "sim",
+      "default_review_mode": "human",
+      "id": "<id>",
+      "key": "DEMO",
+      "max_parallel": 2,
+      "merge": {
+        "method": "merge",
+        "mode": "local",
+        "pr_title": "{key}: {title}"
+      },
+      "name": "DEMO",
+      "release_branch": "main",
+      "repo_path": null,
+      "work_branch": "develop"
+    }
+  },
+  "seq": 1
+}

@@ -35,10 +35,34 @@ struct Seen {
     reported: Reported,
 }
 
+/// When a run was spawned and whether it has shown any sign of life since, for the startup rule.
+#[derive(Debug, Clone, Copy)]
+struct Spawn {
+    run: RunId,
+    ticket: TicketId,
+    role: AgentRole,
+    at: Timestamp,
+    startup_secs: u64,
+    first_activity: Option<Timestamp>,
+}
+
+/// What the startup rule needs to know about one run (`toknila_core::question::RunFacts`
+/// without the screen).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpawnFacts {
+    pub run: RunId,
+    pub ticket: TicketId,
+    pub role: AgentRole,
+    pub spawned: Timestamp,
+    pub first_activity: Option<Timestamp>,
+    pub startup_secs: u64,
+}
+
 #[derive(Debug, Default)]
 struct Inner {
     grants: Vec<(String, Grant)>,
     activity: HashMap<TicketId, Seen>,
+    spawns: Vec<Spawn>,
 }
 
 /// The tokens of the live runs.
@@ -88,7 +112,71 @@ impl AgentTokens {
 
     /// Revokes every token of `run`.
     pub fn revoke(&self, run: RunId) {
-        self.inner().grants.retain(|(_, g)| g.run != run);
+        let mut inner = self.inner();
+        inner.grants.retain(|(_, g)| g.run != run);
+        inner.spawns.retain(|s| s.run != run);
+    }
+
+    /// Notes that `grant`'s run was spawned at `at`; `startup_secs` is its profile's startup
+    /// time (0: the profile does not report to Toknila, so silence means nothing).
+    pub fn spawned(&self, grant: Grant, at: Timestamp, startup_secs: u64) {
+        let mut inner = self.inner();
+        inner
+            .spawns
+            .retain(|s| !(s.ticket == grant.ticket && s.role == grant.role));
+        inner.spawns.push(Spawn {
+            run: grant.run,
+            ticket: grant.ticket,
+            role: grant.role,
+            at,
+            startup_secs,
+            first_activity: None,
+        });
+    }
+
+    /// A person answered a run that waits on its screen: the wait starts over from `at`, so the
+    /// next dialog (or the silence after this one) is counted from the answer.
+    pub fn rewait(&self, ticket: TicketId, role: AgentRole, at: Timestamp) {
+        let mut inner = self.inner();
+        if let Some(s) = inner
+            .spawns
+            .iter_mut()
+            .find(|s| s.ticket == ticket && s.role == role && s.first_activity.is_none())
+        {
+            s.at = at;
+        }
+    }
+
+    /// Records the first sign of life of the ticket's run of `role` (any call of its token, any
+    /// hook). Returns whether it was the first.
+    pub fn mark_active(&self, ticket: TicketId, role: AgentRole, at: Timestamp) -> bool {
+        let mut inner = self.inner();
+        let Some(s) = inner
+            .spawns
+            .iter_mut()
+            .find(|s| s.ticket == ticket && s.role == role)
+        else {
+            return false;
+        };
+        let first = s.first_activity.is_none();
+        s.first_activity.get_or_insert(at);
+        first
+    }
+
+    /// The spawn facts of every live run.
+    pub fn spawn_facts(&self) -> Vec<SpawnFacts> {
+        self.inner()
+            .spawns
+            .iter()
+            .map(|s| SpawnFacts {
+                run: s.run,
+                ticket: s.ticket,
+                role: s.role,
+                spawned: s.at,
+                first_activity: s.first_activity,
+                startup_secs: s.startup_secs,
+            })
+            .collect()
     }
 
     /// Records a sign of life from the agent of `ticket`.
@@ -144,6 +232,43 @@ mod tests {
         assert_eq!(tokens.lookup(&ta), None);
         assert_eq!(tokens.lookup(&tb), Some(b));
         assert_eq!(tokens.lookup("nope"), None);
+    }
+
+    #[test]
+    fn the_first_sign_of_life_of_a_run_is_noted_once_and_a_revoked_run_is_forgotten() {
+        let tokens = AgentTokens::default();
+        let worker = grant();
+        tokens.spawned(worker, Timestamp(100), 20);
+        let g = Grant {
+            run: RunId::new(),
+            role: AgentRole::Reviewer,
+            ..worker
+        };
+        tokens.spawned(g, Timestamp(200), 20);
+        assert!(tokens.mark_active(g.ticket, AgentRole::Worker, Timestamp(300)));
+        assert!(!tokens.mark_active(g.ticket, AgentRole::Worker, Timestamp(400)));
+        let facts = tokens.spawn_facts();
+        let find = |role| facts.iter().find(|f| f.role == role).copied().expect("run");
+        assert_eq!(find(AgentRole::Worker).first_activity, Some(Timestamp(300)));
+        assert_eq!(find(AgentRole::Reviewer).first_activity, None);
+        assert_eq!(find(AgentRole::Reviewer).spawned, Timestamp(200));
+        tokens.rewait(g.ticket, AgentRole::Reviewer, Timestamp(900));
+        tokens.rewait(g.ticket, AgentRole::Worker, Timestamp(900));
+        let facts = tokens.spawn_facts();
+        let find = |role| facts.iter().find(|f| f.role == role).copied().expect("run");
+        assert_eq!(
+            find(AgentRole::Reviewer).spawned,
+            Timestamp(900),
+            "restarted"
+        );
+        assert_eq!(
+            find(AgentRole::Worker).spawned,
+            Timestamp(100),
+            "it showed life: kept"
+        );
+        tokens.revoke(g.run);
+        assert_eq!(tokens.spawn_facts().len(), 1);
+        assert!(!tokens.mark_active(g.ticket, AgentRole::Reviewer, Timestamp(1)));
     }
 
     #[test]

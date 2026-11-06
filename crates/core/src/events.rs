@@ -4,9 +4,11 @@
 
 use serde::Serialize;
 
+use crate::question::{AnswerKind, QuestionKind};
 use crate::{
-    Actor, ArtifactFormat, Chain, Comment, Edge, ProcessExit, Project, Release, ReleaseState, Run,
-    Ship, StatusReason, Subtask, Thread, ThreadId, ThreadMessage, Ticket, TicketKey, TicketStatus,
+    Actor, AgentRole, ArtifactFormat, Chain, Comment, Edge, ProcessExit, Project, Release,
+    ReleaseState, Run, Ship, StatusReason, Subtask, Thread, ThreadId, ThreadMessage, Ticket,
+    TicketId, TicketKey, TicketStatus,
 };
 
 /// One change. Serialises as its payload: the variant's fields, without a tag.
@@ -82,6 +84,28 @@ pub enum DomainEvent {
     RunnerExited {
         run: Run,
         exit: ProcessExit,
+    },
+    /// A run of the ticket asked something that no status change shows: a reviewer's permission
+    /// dialog, or an agent that waits on its screen.
+    QuestionRaised {
+        key: TicketKey,
+        ticket: TicketId,
+        role: AgentRole,
+        kind: QuestionKind,
+    },
+    /// Such a question went away without an answer: the agent showed life again, or its run ended.
+    QuestionCleared {
+        key: TicketKey,
+        ticket: TicketId,
+        role: AgentRole,
+    },
+    /// A person answered a run's question and the answer reached it. The journal entry's actor
+    /// says who; `role` says whose run it was.
+    QuestionAnswered {
+        key: TicketKey,
+        ticket: TicketId,
+        role: AgentRole,
+        answer: AnswerKind,
     },
     ReleaseCreated {
         release: Release,
@@ -206,7 +230,10 @@ impl DomainEvent {
             | Self::ShipRemoved { .. }
             | Self::ShipRemoveFailed { .. }
             | Self::RunnerStarted { .. }
-            | Self::RunnerExited { .. } => "ticket",
+            | Self::RunnerExited { .. }
+            | Self::QuestionRaised { .. }
+            | Self::QuestionCleared { .. }
+            | Self::QuestionAnswered { .. } => "ticket",
             Self::ReleaseCreated { .. } | Self::ReleaseStateChanged { .. } => "release",
             Self::CommentAdded { .. } | Self::CommentDelivered { .. } => "comment",
             Self::SubtaskAdded { .. } | Self::SubtaskUpdated { .. } => "subtask",
@@ -238,6 +265,9 @@ impl DomainEvent {
             Self::RunnerStarted { run } | Self::RunnerExited { run, .. } => {
                 run.ticket_id.to_string()
             }
+            Self::QuestionRaised { ticket, .. }
+            | Self::QuestionCleared { ticket, .. }
+            | Self::QuestionAnswered { ticket, .. } => ticket.to_string(),
             Self::ReleaseCreated { release } | Self::ReleaseStateChanged { release, .. } => {
                 release.id.to_string()
             }
@@ -277,6 +307,9 @@ impl DomainEvent {
             Self::ShipRemoveFailed { .. } => "ship_remove_failed",
             Self::RunnerStarted { .. } => "runner_started",
             Self::RunnerExited { .. } => "runner_exited",
+            Self::QuestionRaised { .. } => "question_raised",
+            Self::QuestionCleared { .. } => "question_cleared",
+            Self::QuestionAnswered { .. } => "question_answered",
             Self::TicketProposed { .. } => "proposed",
             Self::TicketApproved { .. } => "approved",
             Self::TicketRejected { .. } => "rejected",

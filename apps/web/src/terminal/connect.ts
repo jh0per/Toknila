@@ -33,8 +33,10 @@ export interface TerminalConnection {
   close(): void;
 }
 
-export function openTerminal(key: string, sink: TerminalSink): TerminalConnection {
+export function openTerminal(key: string, sink: TerminalSink, role: "worker" | "reviewer" = "worker"): TerminalConnection {
   const base = `/tickets/${encodeURIComponent(key)}/runner`;
+  // The worker is the default; the reviewer's terminal is addressed with `?role=reviewer`.
+  const roleQuery = role === "reviewer" ? "?role=reviewer" : "";
   let cursor: TermCursor = { run: null, end: 0 };
   let ws: WebSocket | null = null;
   let closed = false;
@@ -53,7 +55,7 @@ export function openTerminal(key: string, sink: TerminalSink): TerminalConnectio
   const connect = () => {
     if (closed) return;
     const from = cursor.run === null ? null : { run: cursor.run, from: cursor.end };
-    ws = new WebSocket(runnerStreamUrl(key, from));
+    ws = new WebSocket(runnerStreamUrl(key, from, role));
     ws.binaryType = "arraybuffer";
     ws.onopen = () => {
       retryMs = FIRST_RETRY_MS;
@@ -83,7 +85,7 @@ export function openTerminal(key: string, sink: TerminalSink): TerminalConnectio
 
   const start = async () => {
     try {
-      const scrollback = await getBytes(`${base}/scrollback`);
+      const scrollback = await getBytes(`${base}/scrollback${roleQuery}`);
       if (closed) return;
       const run = scrollback?.headers.get("x-toknila-run");
       const offset = Number(scrollback?.headers.get("x-toknila-offset") ?? 0);
@@ -103,11 +105,12 @@ export function openTerminal(key: string, sink: TerminalSink): TerminalConnectio
     send(bytes) {
       // One request at a time, so keystrokes reach the agent in the order they were typed.
       typing = typing
-        .then(() => postBytes(`${base}/input`, bytes))
+        .then(() => postBytes(`${base}/input${roleQuery}`, bytes))
         .catch((e: unknown) => sink.refused(e instanceof Error ? e.message : String(e)));
     },
     resize(size) {
-      void post(`${base}/size`, size).catch(() => undefined);
+      // The panel's size belongs to the worker's terminal.
+      if (role === "worker") void post(`${base}/size`, size).catch(() => undefined);
     },
     close() {
       closed = true;

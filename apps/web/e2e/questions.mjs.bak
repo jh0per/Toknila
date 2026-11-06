@@ -1,0 +1,129 @@
+// Browser test of what agents ask and a person answers from the Inbox, against a real daemon
+// and the workspace's `fake-agent` (never a real agent), in a real git ship.
+// Usage: node e2e/questions.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
+//
+// Three cards run: two play an agent's permission hook (the call waits for the person), one shows
+// a screen and no sign of life. From the inbox: Allow one permission, Deny the other with a
+// comment (the hook gets each decision, the cards are Running at once), and answer the waiting
+// screen with typed text (the agent receives it).
+
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { checks, cleanup, launch } from "./helpers.mjs";
+
+const [tokArg, agentArg] = process.argv.slice(2);
+if (!tokArg || !agentArg) {
+  console.error("usage: node e2e/questions.mjs <tok binary> <fake-agent binary>");
+  process.exit(2);
+}
+const tokBin = resolve(tokArg);
+const fakeAgent = resolve(agentArg);
+const home = mkdtempSync(join(tmpdir(), "toknila-q-"));
+const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", ...opts });
+const tok = (...args) => run(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home } });
+const git = (dir, ...args) =>
+  run("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const logs = (key) => tok("logs", key);
+
+async function until(what, f) {
+  for (const stop = Date.now() + 20_000; Date.now() < stop; await sleep(100)) {
+    if (f()) return;
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
+const status = (key) => JSON.parse(tok("show", key, "--json")).ticket.status;
+
+let browser;
+try {
+  const repo = join(home, "repo");
+  mkdirSync(repo, { recursive: true });
+  git(repo, "init", "--quiet");
+  git(repo, "symbolic-ref", "HEAD", "refs/heads/develop");
+  writeFileSync(join(repo, "README.md"), "hi\n");
+  git(repo, "add", "README.md");
+  git(repo, "commit", "--quiet", "-m", "init");
+  mkdirSync(join(home, "profiles"), { recursive: true });
+  const steps = (...s) => s.map((x) => `'${x}'`).join(", ");
+  const ask = (tool) =>
+    steps(
+      "post", "/tickets/{ticket}/activity", JSON.stringify({ signal: "hook:pre_tool_use", tool }),
+      "post", "/tickets/{ticket}/permission", "{}",
+      "hold",
+    );
+  writeFileSync(join(home, "profiles", "allow.toml"), `command = ['${fakeAgent}', ${ask("Bash: cargo test -p core")}]\n`);
+  writeFileSync(join(home, "profiles", "deny.toml"), `command = ['${fakeAgent}', ${ask("Bash: rm -rf build")}]\n`);
+  writeFileSync(
+    join(home, "profiles", "screen.toml"),
+    `command = ['${fakeAgent}', ${steps("print", "Do you trust this folder?", "print", "1. Yes  2. No", "echo", "hold")}]\n` +
+      "startup_secs = 1\n[hooks]\nenabled = true\n",
+  );
+  tok("project", "new", "Q", "--repo", repo, "--base", "develop", "--profile", "allow");
+  tok("project", "set", "Q", "--parallel", "3");
+  tok("chain", "new", "work", "--project", "Q");
+  tok("ticket", "new", "work", "Allowed");
+  tok("ticket", "new", "work", "Denied", "--profile", "deny");
+  tok("ticket", "new", "work", "Silent", "--profile", "screen");
+  const { url } = JSON.parse(tok("open", "--json"));
+
+  browser = await launch();
+  const page = await browser.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const { expectText } = checks(page);
+  await page.goto(url);
+  await page.locator("[data-testid=inbox-link]").click();
+  const inbox = page.locator("[data-testid=inbox]");
+  const row = (key) => inbox.locator(`li[data-kind=question][data-key="${key}"]`);
+
+  // What is asked is shown with the tool, not just "needs your permission".
+  await expectText(row("Q-1"), "Bash: cargo test -p core", "the permission names the command");
+  await expectText(row("Q-2"), "Bash: rm -rf build", "the second permission names its command");
+  await expectText(row("Q-3"), "The agent waits on its screen", "the silent agent is listed");
+  await expectText(row("Q-3").locator("[data-testid=screen]"), "Do you trust this folder?", "its screen lines are shown");
+
+  // Allow: the card is Running at once and the hook got the decision.
+  await row("Q-1").locator("[data-testid=answer-allow]").click();
+  await row("Q-1").waitFor({ state: "detached", timeout: 10_000 });
+  await until("Q-1 running", () => status("Q-1") === "running");
+  await until("the allow reached the hook", () => logs("Q-1").includes('"decision":"allow"'));
+  console.log("PASS Allow reached the agent and the card is running");
+
+  // Deny with a comment.
+  await page.getByLabel("Why Q-2 is denied").fill("use cargo clean instead");
+  await row("Q-2").locator("[data-testid=answer-deny]").click();
+  await row("Q-2").waitFor({ state: "detached", timeout: 10_000 });
+  await until("Q-2 running", () => status("Q-2") === "running");
+  await until("the deny reached the hook", () =>
+    logs("Q-2").includes('"decision":"deny","message":"use cargo clean instead"'),
+  );
+  console.log("PASS Deny with a comment reached the agent");
+
+  // The screen is answered with text typed to the agent.
+  await page.getByLabel("Type to Q-3").fill("yes");
+  await row("Q-3").getByRole("button", { name: "Send" }).click();
+  await until("the agent got the text", () => logs("Q-3").includes("got:yes"));
+  await row("Q-3").waitFor({ state: "detached", timeout: 10_000 });
+  console.log("PASS text typed from the inbox reached the agent's terminal");
+
+  // The journal says who answered and for which role.
+  const origin = new URL(url).origin;
+  const token = new URL(url).searchParams.get("token");
+  const res = await fetch(`${origin}/v1/events?since=0&limit=10000`, { headers: { Authorization: `Bearer ${token}` } });
+  const answered = (await res.json()).filter((e) => e.kind === "question_answered");
+  const seen = answered.map((e) => `${e.actor}:${e.payload.key}:${e.payload.role}:${e.payload.answer}`).sort();
+  const want = ["human:Q-1:worker:allow", "human:Q-2:worker:deny", "human:Q-3:worker:text"];
+  if (JSON.stringify(seen) !== JSON.stringify(want)) throw new Error(`journal: ${JSON.stringify(seen)}`);
+  console.log("PASS the journal records who answered, for which role");
+  if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
+  console.log("web questions: PASS");
+} catch (e) {
+  console.error(`web questions: FAIL: ${e.message.slice(0, 600)}`);
+  process.exitCode = 1;
+} finally {
+  await browser?.close();
+  await cleanup(tok, home);
+}

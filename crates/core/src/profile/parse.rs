@@ -35,6 +35,7 @@ struct Raw {
     output: OutputRules,
     #[serde(default)]
     nudge: Nudge,
+    startup_secs: Option<u64>,
 }
 
 /// Whether `name` can name a profile: lowercase letters, digits, `-` and `_`, starting with a
@@ -109,5 +110,8 @@ pub fn parse(name: &str, text: &str) -> Result<AgentProfile, ProfileError> {
         permissions: raw.permissions,
         output: raw.output,
         nudge: raw.nudge,
+        startup_secs: raw
+            .startup_secs
+            .unwrap_or(crate::question::DEFAULT_STARTUP_SECS),
     })
 }

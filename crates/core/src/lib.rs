@@ -17,6 +17,7 @@ pub mod nudge;
 pub mod plan;
 pub mod pr;
 pub mod profile;
+pub mod question;
 pub mod repo;
 pub mod schedule;
 pub mod spec;

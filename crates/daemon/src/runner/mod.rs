@@ -5,7 +5,7 @@
 //!
 //! A ticket has one runner per role: its worker, and while the card is in review a reviewer next
 //! to it, on the same ship. The worker's output is what the ticket's routes mean; the reviewer's
-//! is read through the `reviewer` role selector and cannot be written to.
+//! is read, written to and answered through the `reviewer` role selector.
 //!
 //! No database here and nothing runs inside a transaction: the store calls [`Runners`] after a
 //! command committed. `portable-pty` lives in `pty` and nowhere else.
@@ -13,7 +13,9 @@
 mod active;
 mod drain;
 mod logs;
+mod prompts;
 mod pty;
+mod screens;
 mod scrollback;
 mod silence;
 mod supervise;
@@ -24,7 +26,9 @@ mod ws;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::time::Duration;
 
 use tokio::sync::{broadcast, mpsc};
 use toknila_app::runner::{RunEnded, RunRequest, Runner, RunnerError, RunnerState, Started};
@@ -32,9 +36,10 @@ use toknila_core::instructions::terminal::Size;
 use toknila_core::{AgentProfile, AgentRole, OutputRules, ProcessExit, Run, RunId, TicketId};
 
 use active::Active;
+pub use prompts::Prompts;
 pub use silence::{tick as silence_tick, watch as watch_silence};
 pub use supervise::supervise;
-pub use tokens::{Activity, AgentTokens, Grant};
+pub use tokens::{Activity, AgentTokens, Grant, SpawnFacts};
 pub use ws::stream;
 
 /// What a client sees of a ticket's output: the scrollback of its newest run.
@@ -64,11 +69,18 @@ pub struct Runners {
     ended: mpsc::UnboundedSender<RunEnded>,
     /// One token per live run, and the agents' last signs of life.
     tokens: Arc<AgentTokens>,
+    /// The last tool of each run and the questions that wait for a person.
+    prompts: Prompts,
+    /// How long a permission hook is held for an answer, in milliseconds.
+    permission_wait_ms: AtomicU64,
     /// The daemon's address, known once it listens; agents get it in their environment.
     url: OnceLock<String>,
     /// The `toknila` binary agents run for `mcp` and `hook`; this process unless set.
     bin: OnceLock<PathBuf>,
 }
+
+/// How much of the end of a run's output the inbox reads to show its screen.
+const TAIL_BYTES: usize = 16 * 1024;
 
 impl Runners {
     /// Runners that keep logs under `root` and read profiles from `profiles`. The receiver gets
@@ -86,6 +98,8 @@ impl Runners {
             wake,
             ended,
             tokens: Arc::default(),
+            prompts: Prompts::default(),
+            permission_wait_ms: AtomicU64::new(toknila_core::hook::PERMISSION_WAIT_SECS * 1000),
             url: OnceLock::new(),
             bin: OnceLock::new(),
         };
@@ -95,6 +109,62 @@ impl Runners {
     /// The agent tokens of the live runs.
     pub fn tokens(&self) -> &Arc<AgentTokens> {
         &self.tokens
+    }
+
+    /// The questions of the live runs that the daemon holds in memory.
+    pub fn prompts(&self) -> &Prompts {
+        &self.prompts
+    }
+
+    /// How long a permission hook is held for the person's answer.
+    pub fn permission_wait(&self) -> Duration {
+        Duration::from_millis(self.permission_wait_ms.load(Ordering::Relaxed))
+    }
+
+    /// Sets how long a permission hook is held (tests shorten it).
+    pub fn set_permission_wait(&self, wait: Duration) {
+        let ms = u64::try_from(wait.as_millis()).unwrap_or(u64::MAX);
+        self.permission_wait_ms.store(ms, Ordering::Relaxed);
+    }
+
+    /// What the host knows of the live runs for the inbox at `now`: the open permission dialogs,
+    /// and each run's spawn time, first sign of life and the end of its output.
+    pub fn facts(&self, now: toknila_core::Timestamp) -> toknila_app::inbox::Live {
+        // A run whose process is known to be over asks nothing any more.
+        let over: std::collections::HashSet<(TicketId, AgentRole)> = self
+            .active()
+            .iter()
+            .filter(|(_, a)| a.is_over())
+            .map(|(key, _)| *key)
+            .collect();
+        let permissions = self
+            .prompts
+            .pending()
+            .into_iter()
+            .filter(|p| !over.contains(&(p.ticket, p.role)))
+            .collect();
+        let runs = self
+            .tokens
+            .spawn_facts()
+            .into_iter()
+            .filter(|s| !over.contains(&(s.ticket, s.role)))
+            .map(|s| {
+                let active = self.active().get(&(s.ticket, s.role)).cloned();
+                toknila_core::question::RunFacts {
+                    ticket: s.ticket,
+                    role: s.role,
+                    spawned: s.spawned,
+                    first_activity: s.first_activity,
+                    startup_secs: s.startup_secs,
+                    tail: active.map(|a| a.tail(TAIL_BYTES)).unwrap_or_default(),
+                }
+            })
+            .collect();
+        toknila_app::inbox::Live {
+            now: Some(now),
+            permissions,
+            runs,
+        }
     }
 
     /// Tells runners where the daemon listens, so agents can reach it. Set once.
@@ -276,6 +346,12 @@ impl Runner for Runners {
         let active = self
             .launch(&profile, req, &run, &token)
             .inspect_err(|_| self.tokens.revoke(run.id))?;
+        // A run that reports to Toknila (hooks or MCP) and shows nothing for `startup_secs` waits
+        // on its screen; one that never reports cannot be told apart from a working one.
+        let reports = profile.hooks.enabled || profile.mcp.enabled;
+        let startup = if reports { profile.startup_secs } else { 0 };
+        self.prompts.reset(req.ticket, req.role);
+        self.tokens.spawned(grant, crate::server::now(), startup);
         map.insert((req.ticket, req.role), active);
         Ok(Started { run, reused: false })
     }
@@ -301,8 +377,8 @@ impl Runner for Runners {
         }
     }
 
-    fn write(&self, ticket: TicketId, bytes: &[u8]) -> Result<(), RunnerError> {
-        let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
+    fn write(&self, ticket: TicketId, role: AgentRole, bytes: &[u8]) -> Result<(), RunnerError> {
+        let active = self.active().get(&(ticket, role)).cloned();
         match active.filter(|a| !a.is_over()) {
             Some(a) => a.write(bytes),
             None => Err(RunnerError::NotRunning),

@@ -72,7 +72,7 @@ fn is_agent_route(method: &str, uri: &str) -> bool {
 }
 
 #[tokio::test]
-async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_four() {
+async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_five() {
     let api = Api::new();
     api.demo_with(&["A"]).await;
     let (token, _) = api.agent_token("DEMO-1").await;
@@ -125,6 +125,9 @@ async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_four() {
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body, json!({ "count": 0, "reason": "" }));
+    // Nobody answers within the wait: the agent is told to show its own dialog.
+    api.runners
+        .set_permission_wait(std::time::Duration::from_millis(50));
     let (status, body) = api
         .call_with(
             &token,
@@ -134,9 +137,19 @@ async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_four() {
         )
         .await;
     assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    let (status, body) = api
+        .call_with(
+            &token,
+            Method::POST,
+            "/v1/tickets/DEMO-1/permission",
+            Some(json!({ "tool": "Bash: ls" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body, json!({ "decision": "ask" }));
     assert_eq!(
         routes.iter().filter(|(m, u)| is_agent_route(m, u)).count(),
-        4
+        5
     );
 }
 

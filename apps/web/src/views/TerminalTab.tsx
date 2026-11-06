@@ -19,6 +19,7 @@ export function TerminalTab({ card }: { card: Ticket }) {
   const host = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<TermStatus>({ kind: "connecting" });
   const [refused, setRefused] = useState("");
+  const [role, setRole] = useState<"worker" | "reviewer">("worker");
 
   useEffect(() => {
     let dispose = () => {};
@@ -46,6 +47,7 @@ export function TerminalTab({ card }: { card: Ticket }) {
       // The agent draws for the grid the person sees: tell the daemon the panel's size when it
       // changes, and again whenever the stream goes live (a new run starts at the default size).
       let sizes: SizeReporter | null = null;
+      setStatus({ kind: "connecting" });
       const conn = openTerminal(card.key, {
         output: (bytes, reset) => {
           if (reset) term.reset();
@@ -59,7 +61,7 @@ export function TerminalTab({ card }: { card: Ticket }) {
           }
         },
         refused: setRefused,
-      });
+      }, role);
       sizes = sizeReporter((s) => conn.resize(s));
       sizes.report({ cols: term.cols, rows: term.rows });
       const onResize = term.onResize((s) => sizes?.report(s));
@@ -78,11 +80,16 @@ export function TerminalTab({ card }: { card: Ticket }) {
       cancelled = true;
       dispose();
     };
-  }, [card.key]);
+  }, [card.key, role]);
 
   return (
     <div className="terminal" data-testid="terminal">
       <div className="term-status" data-testid="term-status">
+        {(["worker", "reviewer"] as const).map((r) => (
+          <button key={r} className={role === r ? "primary" : ""} data-testid={`term-role-${r}`} onClick={() => setRole(r)}>
+            {r === "worker" ? "Worker" : "Reviewer"}
+          </button>
+        ))}{" "}
         <span className="muted">{STATUS_TEXT(status)}</span>
         {refused && <span className="error"> · {refused}</span>}
       </div>

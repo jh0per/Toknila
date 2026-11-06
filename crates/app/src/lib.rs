@@ -17,6 +17,7 @@ pub mod notes;
 pub mod nudge;
 pub mod ports;
 pub mod projects;
+pub mod questions;
 pub mod recovery;
 pub mod releases;
 pub mod resolve;

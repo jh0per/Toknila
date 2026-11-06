@@ -105,7 +105,12 @@ fn hook_settings(bin: &Path) -> Value {
         .iter()
         .map(|(claude, ours)| {
             let command = format!("\"{program}\" hook {ours}");
-            let entry = json!([{ "hooks": [{ "type": "command", "command": command }] }]);
+            let mut hook = json!({ "type": "command", "command": command });
+            // The permission hook holds the agent's dialog until the person answers in the window.
+            if *ours == "permission_request" {
+                hook["timeout"] = json!(toknila_core::hook::PERMISSION_HOOK_TIMEOUT_SECS);
+            }
+            let entry = json!([{ "hooks": [hook] }]);
             ((*claude).to_owned(), entry)
         })
         .collect();

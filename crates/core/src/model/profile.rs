@@ -142,6 +142,14 @@ pub struct AgentProfile {
     pub permissions: Permissions,
     pub output: OutputRules,
     pub nudge: Nudge,
+    /// Seconds after spawn without any sign of life from the agent (hook or MCP) before the
+    /// window shows that it waits on its screen. 0 turns the check off.
+    #[serde(default = "default_startup_secs")]
+    pub startup_secs: u64,
+}
+
+fn default_startup_secs() -> u64 {
+    crate::question::DEFAULT_STARTUP_SECS
 }
 
 impl AgentProfile {
@@ -198,6 +206,7 @@ impl AgentProfile {
             permissions: Permissions::default(),
             output: OutputRules::default(),
             nudge: Nudge::default(),
+            startup_secs: default_startup_secs(),
         }
     }
 

@@ -3,6 +3,7 @@
 //! in `toknila-app` and are re-exported here; this crate adds the read models, errors and journal
 //! entries.
 
+pub mod questions;
 pub mod runner;
 mod usage;
 
@@ -18,6 +19,7 @@ use toknila_core::{
     Ship, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
 };
 
+pub use questions::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
 pub use toknila_app::chains::NewChain;
 pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;
@@ -256,6 +258,27 @@ pub struct NewActivity {
     /// The session's transcript file, from the hook's input.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<String>,
+    /// A `PreToolUse` hook: the summary of the tool call that is about to run (the command or the
+    /// file, at most 300 characters), kept to say what a later permission prompt is about.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
+    /// A permission prompt notification: its message. The ticket's worker then waits for the
+    /// person; a reviewer's prompt is listed in the inbox.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+}
+
+impl NewActivity {
+    /// A bare sign of life.
+    pub fn signal(signal: impl Into<String>) -> Self {
+        Self {
+            signal: signal.into(),
+            session_id: None,
+            transcript_path: None,
+            tool: None,
+            prompt: None,
+        }
+    }
 }
 
 /// Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it

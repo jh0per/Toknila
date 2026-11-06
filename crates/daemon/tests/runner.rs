@@ -175,7 +175,7 @@ fn input_reaches_the_process_and_its_answer_comes_back() {
     rig.start("fake");
     rig.wait_for("ready");
     rig.runners
-        .write(rig.ticket, b"ping\r")
+        .write(rig.ticket, AgentRole::Worker, b"ping\r")
         .expect("write input");
     rig.wait_for("got:ping");
     assert_eq!(rig.wait_end().exit.code, Some(0));
@@ -200,7 +200,9 @@ fn the_terminal_starts_at_the_default_size_and_follows_a_resize() {
     rig.runners
         .resize(rig.ticket, Size { cols: 90, rows: 30 })
         .expect("resize");
-    rig.runners.write(rig.ticket, b"go\r").expect("write");
+    rig.runners
+        .write(rig.ticket, AgentRole::Worker, b"go\r")
+        .expect("write");
     rig.wait_for("size=90x30");
     assert_eq!(rig.wait_end().exit.code, Some(0));
     let err = rig
@@ -240,7 +242,7 @@ fn stop_kills_a_running_process_and_says_it_was_asked_to() {
     assert!(rig.runners.live().is_empty());
     let err = rig
         .runners
-        .write(rig.ticket, b"x")
+        .write(rig.ticket, AgentRole::Worker, b"x")
         .expect_err("nobody listens");
     assert_eq!(err, RunnerError::NotRunning);
 }
@@ -305,8 +307,10 @@ fn a_reviewer_runs_next_to_the_worker_with_its_own_output_token_and_stop() {
     assert_eq!(rig.runners.live_in(AgentRole::Reviewer), vec![rig.ticket]);
     assert_eq!(rig.runners.live(), vec![rig.ticket]);
 
-    // Typing goes to the worker only.
-    rig.runners.write(rig.ticket, b"hello\r").expect("write");
+    // Typing goes to the role it is addressed to.
+    rig.runners
+        .write(rig.ticket, AgentRole::Worker, b"hello\r")
+        .expect("write");
     rig.wait_for("worker done");
     assert!(!rig.output_of(AgentRole::Reviewer).contains("got:hello"));
 
@@ -735,4 +739,32 @@ fn claude_code_variables_of_the_daemon_do_not_reach_the_agent_unless_its_profile
         "other variables are inherited as before"
     );
     rig.wait_end();
+}
+
+#[test]
+fn typing_addressed_to_the_reviewer_reaches_the_reviewer_and_not_the_worker() {
+    let rig = Rig::new();
+    rig.profile("fake", &["print", "ready", "echo", "hold"], "");
+    rig.start("fake");
+    rig.wait_for("ready");
+    rig.runners
+        .start(&rig.request_as("fake", AgentRole::Reviewer))
+        .expect("start reviewer");
+    let until = Instant::now() + WAIT;
+    while !rig.output_of(AgentRole::Reviewer).contains("ready") {
+        assert!(Instant::now() < until, "the reviewer never started");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    rig.runners
+        .write(rig.ticket, AgentRole::Reviewer, b"hi\r")
+        .expect("write to the reviewer");
+    while !rig.output_of(AgentRole::Reviewer).contains("got:hi") {
+        assert!(Instant::now() < until, "the reviewer never got the text");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    assert!(
+        !rig.output().contains("got:hi"),
+        "the worker did not get it"
+    );
+    rig.runners.stop(rig.ticket);
 }

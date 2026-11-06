@@ -69,28 +69,42 @@ cancels anything: those are a person's.
 
 ## Hooks (`tok hook <name>`)
 
-Claude Code hooks are a second source, conservative on purpose. The runner subscribes to five;
+Claude Code hooks are a second source, conservative on purpose. The runner subscribes to seven;
 `tok hook <name>` reads the hook's JSON from stdin, and the mapping lives in core
 (`toknila_core::hook`):
 
 | Hook | `<name>` | Activity | Event |
 |---|---|---|---|
-| `Notification` with `notification_type: "permission_prompt"` | `notification` | yes | `ask_human` with `permission: true`, text = the notification's `message` |
+| `Notification` with `notification_type: "permission_prompt"` | `notification` | yes | the activity carries `prompt` (the message); the daemon asks the person: a worker's card goes Waiting (`ask_human` with `permission: true`, text = the message plus the last tool summary), a reviewer's dialog is an inbox `question` |
 | `Notification` of any other type (`idle_prompt`, ...) | `notification` | yes | none |
 | `Stop` | `stop` | yes | none: it fires after every reply, so it is **not** `finished` |
 | `SubagentStop` | `subagent_stop` | yes | none |
 | `UserPromptSubmit` | `user_prompt_submit` | yes | none |
 | `PostToolUse` | `post_tool_use` | yes | none |
+| `PreToolUse` | `pre_tool_use` | yes | none: the activity carries `tool`, a summary of the call (`Bash: <command>`, `Write: <path>`; the command or the path only, one line, at most 300 characters) that the daemon remembers per run to say what a permission prompt is about |
+| `PermissionRequest` | `permission_request` | yes | none: the hook calls `POST /tickets/{ticket}/permission` (`{"tool": "..."}`) and waits for the person; it prints Claude Code's `hookSpecificOutput.decision` (`allow`, or `deny` with the person's `message`), or nothing if nobody answered within 570 s, so the agent shows its own dialog |
 
 Every hook is an activity signal: `POST /v1/tickets/{ticket}/activity` with `{"signal":
 "hook:stop"}` (`204`, no journal entry, nothing about the ticket changes). The hook's `session_id` and `transcript_path`, when it has them, ride along as `session_id` and `transcript_path`: the daemon ties the Claude Code session to the run and reads its transcript for the token usage (see "Usage" in `architecture.md`). The daemon keeps the
 last signal of each ticket's agent in memory (`AgentTokens::last_activity`: its time and what it
 was); any other call made with the run's token counts as activity `api`. The silence detector
 consumes this (see "Silence and nudges" in `architecture.md`). `post_tool_use` and
-`user_prompt_submit` also move a Waiting ticket back to Running; the other hooks change nothing. A hook never gets in the agent's way: failures are one line on stderr
+`user_prompt_submit` also move a Waiting ticket back to Running (and, with `stop` and `subagent_stop`, close a permission question that was open for the run); the other hooks change nothing. A hook never gets in the agent's way: failures are one line on stderr
 and exit code 0, and outside a Toknila run (no `TOKNILA_*` environment) it does nothing. The
 transition `ask_human` makes (Running -> Waiting) is refused with `409` in any other status; the
 hook reports that on stderr and carries on.
+
+## Questions and answers
+
+A person answers what an agent asks with `POST /v1/tickets/{ticket}/runner/answer`
+(`{"role": "worker"|"reviewer", "answer": "allow"|"deny"|"text"|"enter"|"one"|"two"|"escape",
+"text": ...}`; a person's token only). Core says which answers a question takes; an answer goes to
+the agent's waiting permission hook, else to the role's terminal as keys. Journal entries (entity
+`ticket`): `question_raised` (`key`, `ticket`, `role`, `kind`: a reviewer's permission dialog, or a
+run that waits on its screen), `question_cleared` (`key`, `ticket`, `role`: it went away without
+an answer) and `question_answered` (`key`, `ticket`, `role`, `answer`; the entry's actor is who
+answered). A waiting worker leaves Waiting at once by the machine event `answered`. See "Answering
+an agent" in `architecture.md`.
 
 ## Waiting and back
 

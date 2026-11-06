@@ -116,6 +116,11 @@ fn e2e_web() -> Result<(), String> {
         &["e2e/terminal.mjs", &exe("tok"), &exe("fake-agent")],
         &web,
     )?;
+    run(
+        "node",
+        &["e2e/questions.mjs", &exe("tok"), &exe("fake-agent")],
+        &web,
+    )?;
     eprintln!("xtask e2e-web: PASS");
     Ok(())
 }

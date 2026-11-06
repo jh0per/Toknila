@@ -56,7 +56,7 @@ progress, where a chain stopped) are never stored, here or in a client.
 
 A profile says how to launch one agent: `command` (an argv list, never a shell string), `env`,
 `role` (`worker`, `reviewer` or `release`), `instructions_file`, `instructions_flag`, `mcp` and `hooks` wiring,
-`permissions` (allow rules), `output` rules and `nudge` thresholds. The working directory is not in it: the ship supplies it at launch.
+`permissions` (allow rules), `output` rules, `nudge` thresholds and `startup_secs` (default 20; see "Answering an agent"). The working directory is not in it: the ship supplies it at launch.
 A new agent is a new file, not new code.
 
 - **First prompt.** An agent that starts at an empty prompt waits for someone to tell it to
@@ -322,7 +322,8 @@ worker; the reviewer's output is read, never written, with `?role=reviewer`.
 | `GET /v1/tickets/{ticket}/runner/scrollback[?role=reviewer]` | The scrollback of the newest run (the worker's, or the reviewer's with `role=reviewer`) as `application/octet-stream`, with headers `x-toknila-run`, `x-toknila-offset` (of its first byte) and `x-toknila-end` (after its last byte). `404` if the ticket never ran |
 | `GET /v1/tickets/{ticket}/runner/stream?run=<id>&from=<offset>[&role=reviewer]` | WebSocket (token as `?token=`). Binary frames: 26 ASCII characters of the run id, the 8-byte big-endian offset of the payload, the raw bytes (at most 64 KiB). Text frame `{"type":"ended","run":"...","exit":{"code":0,"signal":null}}` once the run's output is complete (`exit` absent for a run found on disk after a restart). Without `run` and `from` it starts at the first retained byte, so a late client sees history first; with them it continues after the bytes the client has (scrollback `end`). A new run of the same ticket shows up as frames with another run id |
 | `POST /v1/tickets/{ticket}/runner/size` | Body `{"cols": n, "rows": n}`: the size of the panel showing the terminal; the agent's terminal follows it (window-size signal), within 20x5 and 500x200 (`toknila_core::instructions::terminal::clamp`; a terminal starts at 160x40). A person's action; `409` when no runner is live. The web terminal sends it after the panel has been still for 150 ms, and again when the stream goes live |
-| `POST /v1/tickets/{ticket}/runner/input` | Body: bytes typed into the terminal as they are (`\r` is Enter on every platform). A person's action: the route acts as a person, and `toknila_app::runs::send_input` refuses any other actor. `409` when no runner is live |
+| `POST /v1/tickets/{ticket}/runner/input[?role=reviewer]` | Body: bytes typed into the terminal of the worker (or, with `role=reviewer`, of the reviewer) as they are (`\r` is Enter on every platform). A person's action: the route acts as a person, and `toknila_app::runs::send_input` refuses any other actor. `409` when no runner of that role is live. The web terminal panel types through this route, with a Worker / Reviewer switch |
+| `POST /v1/tickets/{ticket}/runner/answer` | Body `{"role": "worker"\|"reviewer", "answer": ..., "text": ...}`: a person's answer to what the agent asks (see "Answering an agent"). `204`; `409` when that role asks nothing, or the answer does not fit the question |
 
 The frame format is `toknila_api_types::runner`; `/v1/stream` stays journal-only.
 `tok logs <ticket> [--follow] [--reviewer]` prints the scrollback and, with `--follow`, continues
@@ -579,13 +580,56 @@ the kind uses them).
 | Kind | Listed while | The person's action |
 |---|---|---|
 | `proposal` | a wildcard card is Proposed | Approve, Reject with a reason (the ordinary card actions) |
-| `question` | a card is Waiting on a question or a permission prompt | a reply: an instruction comment, which the runner delivers to the live agent |
+| `question` | a card is Waiting on a question or a permission prompt; or a run (either role) shows a permission dialog; or a run shows no sign of life for `startup_secs` after its spawn | an `ask_human` question: a reply (an instruction comment, delivered to the live agent). Otherwise the answers core offers in the item's `answers` (`role`, `answers`, `lines`): see "Answering an agent" |
 | `blocked` | a card is Blocked; the item carries the reason, and `link` when the card has a pull request (`ci_failed`, `pr_closed`, a conflict on GitHub) | Unblock |
 | `review` | a card is in Review and it is the person's turn (not while the reviewer agent has it, and not while its accepted work is `merging`; a merge that failed is a `blocked` item with its reason) | open the card |
 | `thread` | a thread is open and its newest version came after the person's last request for changes (`thread::awaiting_person`) | open the thread |
 | `leftovers` | a card was done out of order (`Ticket::done_out_of_order`) and an earlier card in its `behind` list still has open subtasks that nobody dismissed | the three decisions below |
 
 A silent agent (Waiting, `silent`) is not an inbox item yet.
+
+### Answering an agent
+
+A `question` item says whose it is (`role`: the card's worker or its reviewer), what is asked
+(`text`; for a permission it ends with the tool and a summary of the call, the command or the
+file, at most 300 characters, never the contents of a prompt or a file) and which answers it takes
+(`answers`, from `toknila_core::question::QuestionKind::answers`):
+
+| Question | Answers | Source |
+|---|---|---|
+| `ask_human` | none: the reply is an instruction comment | the agent's MCP call |
+| permission | `allow`, `deny` (a deny may carry a comment for the agent) | the agent's `PermissionRequest` hook, else its permission `Notification` |
+| the agent waits on its screen | `enter`, `one`, `two`, `escape`, `text` | the startup rule below |
+
+**Which mechanism answers a permission.** Claude Code documents a `PermissionRequest` hook
+("Hooks reference", code.claude.com/docs/en/hooks, section PermissionRequest): it runs when the
+agent is about to ask the person, gets `tool_name` and `tool_input`, and its JSON output
+`hookSpecificOutput.decision.behavior` (`allow` or `deny`, with `message` for a denial) decides
+without the dialog. Toknila uses it: `tok hook permission_request` posts to
+`POST /v1/tickets/{ticket}/permission` and the daemon holds that call (at most 570 s, under the
+hook's own `timeout` of 600 s that the generated settings carry) until the person answers in the
+window; the hook then prints the decision. The worker's card is Waiting meanwhile; a reviewer's
+dialog is listed in the inbox only (a card in Review has no Waiting state). If nobody answers in
+time the hook prints nothing and the agent shows its own dialog. That dialog also fires the
+`Notification` hook (`permission_prompt`), which lists the question again with the last tool that
+`PreToolUse` reported (the daemon keeps one summary per run, in memory); there is no hook that can
+answer an open dialog, so `allow` and `deny` then go to the terminal as keys (`1`, Escape), the
+fallback core's `question::deliver` chooses when no hook waits.
+
+**Delivery and the card.** `question::deliver` (core) decides hook reply or keys; the daemon
+delivers outside any transaction, then records `ticket.question_answered` (actor: the person;
+payload: `key`, `ticket`, `role`, `answer`). A waiting worker leaves Waiting at once by the
+machine event `Answered` (a reviewer's card has no such state). `ticket.question_raised` and
+`ticket.question_cleared` journal a question that no status shows, so open windows refresh.
+
+**Waiting on its screen.** A profile that reports to Toknila (`hooks` or `mcp` enabled) has
+`startup_secs` (default 20, 0 turns it off). `question::waits_on_screen(spawned, first_activity,
+now, startup_secs)` is true when the run has shown no sign of life (any hook, any call of its
+token) that long after its spawn. The inbox then lists "The agent waits on its screen" with the
+last 15 lines of the run's output, ANSI removed (`question::last_lines`), for either role; nothing
+matches the text of the screen, so it is not specific to one agent. The item goes with the first
+sign of life, and an answer by keys starts the wait over (the next dialog is counted from the
+answer). Toknila never edits an agent's own configuration to skip such dialogs.
 
 **Leftovers.** One item per earlier card, naming the cards done before it. The decision is
 `POST /v1/tickets/{ticket}/leftovers/{move|close|leave}` on that earlier card; a person only, and

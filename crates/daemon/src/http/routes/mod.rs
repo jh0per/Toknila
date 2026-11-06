@@ -7,6 +7,7 @@ pub mod events;
 pub mod inbox;
 pub mod profiles;
 pub mod projects;
+pub mod questions;
 pub mod releases;
 pub mod runner;
 pub mod system;

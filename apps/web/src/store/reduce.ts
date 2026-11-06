@@ -58,6 +58,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "leftovers":
     case "ticketAction":
     case "addComment":
+    case "answer":
       return [s, [msg]];
     case "loadFailed":
       return [{ ...s, error: msg.error }, []];

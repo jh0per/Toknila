@@ -4,7 +4,8 @@
 use std::collections::BTreeSet;
 
 use toknila_core::inbox::{InboxData, InboxItem, ThreadFacts, compute};
-use toknila_core::{ProjectId, Ticket, TicketKey};
+use toknila_core::question::{PendingPermission, RunFacts};
+use toknila_core::{ProjectId, Ticket, TicketKey, Timestamp};
 
 use crate::{AppResult, Reader};
 
@@ -20,10 +21,34 @@ pub(crate) fn project_tickets<R: Reader + ?Sized>(
     Ok(out)
 }
 
-/// What waits on a person in `project`, newest first.
+/// What the host knows about the live runs: not stored, so it comes with the request.
+#[derive(Debug, Clone, Default)]
+pub struct Live {
+    pub now: Option<Timestamp>,
+    /// Permission dialogs that runs reported.
+    pub permissions: Vec<PendingPermission>,
+    /// The live runs, for the startup rule.
+    pub runs: Vec<RunFacts>,
+}
+
+/// What waits on a person in `project`, newest first, without any live run.
 pub fn load<R: Reader + ?Sized>(r: &R, project: ProjectId) -> AppResult<Vec<InboxItem>> {
+    load_with(r, project, &Live::default())
+}
+
+/// What waits on a person in `project`, newest first, given the live runs of the host.
+pub fn load_with<R: Reader + ?Sized>(
+    r: &R,
+    project: ProjectId,
+    live: &Live,
+) -> AppResult<Vec<InboxItem>> {
     let tickets = project_tickets(r, project)?;
-    let mut data = InboxData::default();
+    let mut data = InboxData {
+        now: live.now.unwrap_or(Timestamp(0)),
+        permissions: live.permissions.clone(),
+        runs: live.runs.clone(),
+        ..InboxData::default()
+    };
     // The earlier cards of the cards done out of order hold the subtasks that may be left over.
     let behind: BTreeSet<&TicketKey> = tickets
         .iter()

@@ -185,6 +185,46 @@ fn waiting_to_running_when_the_agent_is_active_again() {
 }
 
 #[test]
+fn waiting_to_running_at_once_when_a_person_answers() {
+    for reason in [
+        WaitingReason::Question { text: "q".into() },
+        WaitingReason::Permission { text: "p".into() },
+        WaitingReason::Silent,
+    ] {
+        let mut t = ticket_in(TicketStatus::Waiting);
+        t.status_reason = Some(StatusReason::Waiting(reason));
+        let tr = apply(&t, &TicketEvent::Answered, Timestamp(9)).expect("allowed");
+        assert_eq!(tr.ticket.status, TicketStatus::Running);
+        assert_eq!(tr.ticket.status_reason, None);
+        assert_eq!(tr.ticket.status_since, Timestamp(9));
+        assert!(tr.effects.is_empty());
+    }
+}
+
+#[test]
+fn an_answer_changes_nothing_outside_waiting() {
+    for from in [
+        TicketStatus::Running,
+        TicketStatus::Review,
+        TicketStatus::Blocked,
+        TicketStatus::Ready,
+    ] {
+        let err =
+            apply(&ticket_in(from), &TicketEvent::Answered, Timestamp(1)).expect_err("refused");
+        assert!(
+            matches!(
+                err,
+                TransitionError::NotAllowed {
+                    event: "answered",
+                    ..
+                }
+            ),
+            "{from:?}"
+        );
+    }
+}
+
+#[test]
 fn agent_activity_changes_nothing_outside_waiting() {
     for from in [
         TicketStatus::Running,
@@ -653,6 +693,7 @@ fn sample_events() -> Vec<TicketEvent> {
         },
         TicketEvent::InstructionDelivered,
         TicketEvent::AgentActive,
+        TicketEvent::Answered,
         TicketEvent::Finished {
             summary: "s".to_owned(),
             open_threads: vec![],
@@ -689,6 +730,7 @@ fn only_table_transitions_are_allowed() {
         (S::Running, "ask_human"),
         (S::Waiting, "instruction_delivered"),
         (S::Waiting, "agent_active"),
+        (S::Waiting, "answered"),
         (S::Running, "finished"),
         (S::Running, "block"),
         (S::Waiting, "block"),
@@ -768,6 +810,7 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         }),
         Just(TicketEvent::InstructionDelivered),
         Just(TicketEvent::AgentActive),
+        Just(TicketEvent::Answered),
         any::<u8>().prop_map(|n| TicketEvent::Finished {
             summary: "s".to_owned(),
             open_threads: vec![],
