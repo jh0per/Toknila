@@ -12,13 +12,14 @@
 //! | Running, Waiting | Blocked | `Block` (Review too, for a merge conflict) |
 //! | Blocked | previous status | `Unblock` |
 //! | Review | Running | `Return` |
-//! | Review | Merged | `Accept` |
+//! | Review | Merged | `Accept` (removes the ship's worktree, keeps its branch) |
 //! | Backlog, Ready | Merged | `DoneOutOfOrder` (import only: work finished behind open cards) |
 //! | Merged | Released | `Released` |
 //! | Merged | Review | `Reopen` |
 //! | Backlog, Ready, Running, Waiting, Blocked | Backlog (paused) | `Pause` |
+//! | Running, Waiting | same | `ShipReady` (the ticket learns its branch) |
 //! | Backlog (paused) | Backlog | `Resume` |
-//! | any but Proposed, Merged, Released, Cancelled | Cancelled | `Cancel` |
+//! | any but Proposed, Merged, Released, Cancelled | Cancelled | `Cancel` (the ship stays) |
 //! | Proposed | Backlog | `Approve` (a person only; the proposed edges follow) |
 //! | Proposed | Cancelled | `Reject` (a person only, with a reason) |
 //!
@@ -65,6 +66,8 @@ pub enum TicketEvent {
     /// Import: the work was already done although cards before this one are still open. The
     /// card is Merged and keeps the keys of those cards as its mark.
     DoneOutOfOrder { behind: Vec<TicketKey> },
+    /// Shipyard: the ticket's ship exists; the ticket learns its branch. No status change.
+    ShipReady { branch: String },
     /// Graph: the milestone this ticket belongs to was released.
     Released,
     /// `tok reopen`.
@@ -96,6 +99,7 @@ impl TicketEvent {
             Self::Return { .. } => "return",
             Self::Accept => "accept",
             Self::DoneOutOfOrder { .. } => "done_out_of_order",
+            Self::ShipReady { .. } => "ship_ready",
             Self::Released => "released",
             Self::Reopen => "reopen",
             Self::Pause => "pause",
@@ -114,6 +118,10 @@ impl TicketEvent {
 pub enum Effect {
     /// Make sure a runner is working on the ticket (start or restart it).
     EnsureRunner,
+    /// Make sure the ticket has its ship (worktree and branch); reuse it if it exists.
+    PrepareShip,
+    /// Take the ticket's worktree away; the branch stays.
+    RemoveShip,
     /// Stop the ticket's runner, if any.
     StopRunner,
     /// Store the agent's summary as a report comment.
@@ -187,7 +195,7 @@ pub fn apply(
         }
         (S::Ready, TicketEvent::DepsUnsatisfied) => (S::Backlog, None),
         (S::Ready, TicketEvent::Start) => {
-            effects.push(Effect::EnsureRunner);
+            run_on_ship(&mut effects);
             (S::Running, None)
         }
         (S::Running, TicketEvent::AskHuman { reason }) => {
@@ -231,7 +239,7 @@ pub fn apply(
                     Some(StatusReason::Waiting(WaitingReason::Silent)),
                 ),
                 (S::Running, _) => {
-                    effects.push(Effect::EnsureRunner);
+                    run_on_ship(&mut effects);
                     (S::Running, None)
                 }
                 (other, _) => (other, None),
@@ -242,10 +250,11 @@ pub fn apply(
             effects.push(Effect::RecordInstruction {
                 text: comment.clone(),
             });
-            effects.push(Effect::EnsureRunner);
+            run_on_ship(&mut effects);
             (S::Running, None)
         }
         (S::Review, TicketEvent::Accept) => {
+            effects.push(Effect::RemoveShip);
             effects.push(Effect::StopRunner);
             effects.push(Effect::DependencySatisfied);
             (S::Merged, None)
@@ -275,6 +284,10 @@ pub fn apply(
             }
             next.paused = true;
             (S::Backlog, None)
+        }
+        (S::Running | S::Waiting, TicketEvent::ShipReady { branch }) => {
+            next.branch = Some(branch.clone());
+            (from, ticket.status_reason.clone())
         }
         (_, TicketEvent::Resume) => {
             if !ticket.paused {
@@ -344,7 +357,9 @@ fn block(
     }
     if matches!(
         reason,
-        BlockedReason::Crashed { .. } | BlockedReason::RunnerLost
+        BlockedReason::Crashed { .. }
+            | BlockedReason::RunnerLost
+            | BlockedReason::ShipFailed { .. }
     ) {
         effects.push(Effect::StopRunner);
     }
@@ -361,23 +376,14 @@ fn block(
     ))
 }
 
-/// Wildcard decisions belong to a person; an agent or the system cannot make them.
-fn person_only(by: Actor, event: &'static str) -> Result<(), TransitionError> {
-    if by == Actor::Human {
-        Ok(())
-    } else {
-        Err(TransitionError::PersonOnly { event, actor: by })
-    }
+/// The ticket works on its ship: make sure it exists, then (re)start the runner there.
+fn run_on_ship(effects: &mut Vec<Effect>) {
+    effects.push(Effect::PrepareShip);
+    effects.push(Effect::EnsureRunner);
 }
 
-fn non_empty(text: &str, what: &'static str) -> Result<(), TransitionError> {
-    if text.trim().is_empty() {
-        Err(TransitionError::EmptyText(what))
-    } else {
-        Ok(())
-    }
-}
-
+mod checks;
+use checks::{non_empty, person_only};
 mod invariants;
 
 pub use invariants::check_invariants;

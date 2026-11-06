@@ -98,7 +98,7 @@ fn ready_back_to_backlog_when_deps_unsatisfied() {
 fn ready_to_running_on_start() {
     let tr = ok(TicketStatus::Ready, TicketEvent::Start);
     assert_eq!(tr.ticket.status, TicketStatus::Running);
-    assert_eq!(tr.effects, vec![Effect::EnsureRunner]);
+    assert_eq!(tr.effects, vec![Effect::PrepareShip, Effect::EnsureRunner]);
 }
 
 #[test]
@@ -254,6 +254,7 @@ fn review_back_to_running_on_return_with_comment() {
             Effect::RecordInstruction {
                 text: "додай тест".to_owned()
             },
+            Effect::PrepareShip,
             Effect::EnsureRunner
         ]
     );
@@ -276,8 +277,65 @@ fn review_to_merged_on_accept_satisfies_dependents() {
     assert_eq!(tr.ticket.status, TicketStatus::Merged);
     assert_eq!(
         tr.effects,
-        vec![Effect::StopRunner, Effect::DependencySatisfied]
+        vec![
+            Effect::RemoveShip,
+            Effect::StopRunner,
+            Effect::DependencySatisfied
+        ]
     );
+}
+
+#[test]
+fn unblock_to_running_prepares_the_ship_again() {
+    let blocked = ok(
+        TicketStatus::Running,
+        TicketEvent::Block {
+            reason: BlockedReason::ShipFailed {
+                detail: "no git".to_owned(),
+            },
+        },
+    );
+    assert_eq!(blocked.effects, vec![Effect::StopRunner]);
+    let tr = apply(&blocked.ticket, &TicketEvent::Unblock, NOW).expect("unblock");
+    assert_eq!(tr.effects, vec![Effect::PrepareShip, Effect::EnsureRunner]);
+}
+
+#[test]
+fn ship_ready_tells_an_active_ticket_its_branch_without_moving_it() {
+    for from in [TicketStatus::Running, TicketStatus::Waiting] {
+        let tr = ok(
+            from,
+            TicketEvent::ShipReady {
+                branch: "ship/demo/demo-1-a".to_owned(),
+            },
+        );
+        assert_eq!(tr.ticket.status, from);
+        assert_eq!(tr.ticket.branch.as_deref(), Some("ship/demo/demo-1-a"));
+        assert_eq!(tr.ticket.status_since, T0);
+        assert!(tr.effects.is_empty());
+    }
+    let late = apply(
+        &ticket_in(TicketStatus::Review),
+        &TicketEvent::ShipReady {
+            branch: "b".to_owned(),
+        },
+        NOW,
+    );
+    assert!(matches!(late, Err(TransitionError::NotAllowed { .. })));
+}
+
+#[test]
+fn cancel_leaves_the_ship_alone() {
+    for from in [TicketStatus::Running, TicketStatus::Review] {
+        let tr = ok(
+            from,
+            TicketEvent::Cancel {
+                reason: "dup".to_owned(),
+            },
+        );
+        assert!(!tr.effects.contains(&Effect::RemoveShip), "{from:?}");
+        assert!(!tr.effects.contains(&Effect::PrepareShip), "{from:?}");
+    }
 }
 
 #[test]
@@ -592,6 +650,9 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
             detail: "c".to_owned()
         }),
         Just(BlockedReason::RunnerLost),
+        Just(BlockedReason::ShipFailed {
+            detail: "s".to_owned()
+        }),
         Just(BlockedReason::MergeConflict {
             detail: "m".to_owned()
         }),
@@ -606,6 +667,9 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(TicketEvent::DepsSatisfied),
         Just(TicketEvent::DepsUnsatisfied),
         Just(TicketEvent::Start),
+        Just(TicketEvent::ShipReady {
+            branch: "b".to_owned()
+        }),
         Just(TicketEvent::AskHuman {
             reason: WaitingReason::Silent
         }),

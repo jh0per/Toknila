@@ -5,8 +5,8 @@
 use serde::Serialize;
 
 use crate::{
-    Actor, ArtifactFormat, Chain, Comment, Edge, Project, Release, ReleaseState, StatusReason,
-    Subtask, Thread, ThreadId, ThreadMessage, Ticket, TicketKey, TicketStatus,
+    Actor, ArtifactFormat, Chain, Comment, Edge, Project, Release, ReleaseState, Ship,
+    StatusReason, Subtask, Thread, ThreadId, ThreadMessage, Ticket, TicketKey, TicketStatus,
 };
 
 /// One change. Serialises as its payload: the variant's fields, without a tag.
@@ -52,6 +52,19 @@ pub enum DomainEvent {
         key: TicketKey,
         reason: String,
         ticket: Ticket,
+    },
+    /// The ticket's ship (worktree and branch) was made.
+    ShipCreated {
+        ship: Ship,
+    },
+    /// The ticket's worktree was removed; its branch stays.
+    ShipRemoved {
+        ship: Ship,
+    },
+    /// The worktree could not be removed (the ticket stays Merged); the path is still recorded.
+    ShipRemoveFailed {
+        ship: Ship,
+        detail: String,
     },
     ReleaseCreated {
         release: Release,
@@ -170,7 +183,10 @@ impl DomainEvent {
             | Self::TicketUpdated { .. }
             | Self::TicketProposed { .. }
             | Self::TicketApproved { .. }
-            | Self::TicketRejected { .. } => "ticket",
+            | Self::TicketRejected { .. }
+            | Self::ShipCreated { .. }
+            | Self::ShipRemoved { .. }
+            | Self::ShipRemoveFailed { .. } => "ticket",
             Self::ReleaseCreated { .. } | Self::ReleaseStateChanged { .. } => "release",
             Self::CommentAdded { .. } | Self::CommentDelivered { .. } => "comment",
             Self::SubtaskAdded { .. } | Self::SubtaskUpdated { .. } => "subtask",
@@ -194,6 +210,9 @@ impl DomainEvent {
             | Self::TicketProposed { ticket }
             | Self::TicketApproved { ticket, .. }
             | Self::TicketRejected { ticket, .. } => ticket.id.to_string(),
+            Self::ShipCreated { ship }
+            | Self::ShipRemoved { ship }
+            | Self::ShipRemoveFailed { ship, .. } => ship.ticket_id.to_string(),
             Self::ReleaseCreated { release } | Self::ReleaseStateChanged { release, .. } => {
                 release.id.to_string()
             }
@@ -225,6 +244,9 @@ impl DomainEvent {
             Self::ReleaseStateChanged { .. } => "state_changed",
             Self::CommentAdded { .. } | Self::SubtaskAdded { .. } => "added",
             Self::CommentDelivered { .. } => "delivered",
+            Self::ShipCreated { .. } => "ship_created",
+            Self::ShipRemoved { .. } => "ship_removed",
+            Self::ShipRemoveFailed { .. } => "ship_remove_failed",
             Self::TicketProposed { .. } => "proposed",
             Self::TicketApproved { .. } => "approved",
             Self::TicketRejected { .. } => "rejected",

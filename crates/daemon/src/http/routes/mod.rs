@@ -36,6 +36,7 @@ fn load_ticket_detail(repo: &Repo<'_>, ticket: TicketId, at: Timestamp) -> ApiRe
         comments: repo.comments(t.id)?,
         in_status_ms: at.millis_since(t.status_since),
         phase: toknila_core::thread::phase(&repo.threads(t.id)?),
+        ship: repo.ship(t.id)?,
         chain,
         ticket: t,
     })

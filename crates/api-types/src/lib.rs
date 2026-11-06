@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use toknila_core::graph::{ChainSummary, ChainView};
 use toknila_core::profile::{Catalog, ListedProfile, ProfileProblem};
 use toknila_core::{
-    Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Release, ReleaseId, Subtask, Thread,
-    ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
+    Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Release, ReleaseId, Ship, Subtask,
+    Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
 };
 
 pub use toknila_app::chains::NewChain;
@@ -83,6 +83,9 @@ pub struct TicketDetail {
     pub in_status_ms: u64,
     /// Computed from the ticket's threads: design while any is open, implement otherwise.
     pub phase: Phase,
+    /// The ticket's worktree and branch while it has them; `null` before it started, after it
+    /// merged, or when its project has no repository.
+    pub ship: Option<Ship>,
 }
 
 /// A thread with its messages and artifact versions.

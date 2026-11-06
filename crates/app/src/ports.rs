@@ -4,7 +4,7 @@ use serde_json::Value;
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
-    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Subtask, Thread,
+    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship, Subtask, Thread,
     ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey, Timestamp,
 };
 
@@ -48,6 +48,8 @@ pub trait Reader {
     fn thread_messages(&self, thread: ThreadId) -> AppResult<Vec<ThreadMessage>>;
     /// A thread's artifact versions, by number.
     fn thread_versions(&self, thread: ThreadId) -> AppResult<Vec<ThreadVersion>>;
+    /// The ship a ticket has now, if any.
+    fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>>;
     /// Payload of the newest journal event about one entity.
     fn last_event_payload(&self, entity: &str, entity_id: &str) -> AppResult<Option<Value>>;
 }
@@ -76,6 +78,12 @@ pub trait UnitOfWork: Reader {
     fn insert_thread_message(&mut self, message: &ThreadMessage) -> AppResult<()>;
     /// Stores a new artifact version; versions are never changed after.
     fn insert_thread_version(&mut self, version: &ThreadVersion) -> AppResult<()>;
+    /// Remembers a ticket's ship, replacing the one it had.
+    fn save_ship(&mut self, ship: &Ship) -> AppResult<()>;
+    /// Forgets a ticket's ship.
+    fn delete_ship(&mut self, ticket: TicketId) -> AppResult<()>;
+    /// Queues work on the host for after this command commits (see [`crate::external`]).
+    fn defer(&mut self, effect: crate::external::ExternalEffect);
     /// Journals a domain event.
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()>;
 }

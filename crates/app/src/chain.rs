@@ -8,6 +8,7 @@ use toknila_core::{
 };
 
 use crate::notes::{add_comment, body_from_text, deliver_to_sim};
+use crate::ships;
 use crate::{AppError, UnitOfWork};
 
 /// A chain being changed by one command. Every step is journaled by the graph
@@ -178,9 +179,17 @@ fn round<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Result<bool,
 fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Result<(), AppError> {
     for (ticket, effect) in std::mem::take(&mut ctx.effects) {
         let (author, kind, text) = match effect {
+            Effect::PrepareShip => {
+                ships::queue_prepare(uow, ctx, ticket)?;
+                continue;
+            }
+            Effect::RemoveShip => {
+                ships::queue_remove(uow, ctx, ticket)?;
+                continue;
+            }
             Effect::RecordReport { summary } => (Actor::Agent, CommentKind::Report, summary),
             Effect::RecordInstruction { text } => (Actor::Human, CommentKind::Instruction, text),
-            // Phase 0 has no runners; sim needs no process started or stopped.
+            // Sim needs no process started or stopped; the PTY runner arrives next.
             _ => continue,
         };
         add_comment(uow, &ctx.view, ticket, author, kind, body_from_text(&text))?;

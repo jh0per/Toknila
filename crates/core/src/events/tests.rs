@@ -216,3 +216,31 @@ fn thread_events_pin_their_names_and_payloads() {
         ("approved", "reopened", "thread")
     );
 }
+
+#[test]
+fn ship_events_belong_to_the_ticket_and_carry_branch_and_path() {
+    let ship = Ship {
+        ticket_id: "01JBQ7ZJ0000000000000000T1"
+            .parse::<TicketId>()
+            .expect("id"),
+        key: "DEMO-1".parse().expect("key"),
+        branch: "ship/demo/demo-1-a".into(),
+        path: "/h/ships/demo/demo/demo-1-a".into(),
+    };
+    let created = DomainEvent::ShipCreated { ship: ship.clone() };
+    let removed = DomainEvent::ShipRemoved { ship };
+    assert_eq!(
+        (created.entity(), created.kind(), removed.kind()),
+        ("ticket", "ship_created", "ship_removed")
+    );
+    assert_eq!(created.entity_id(), "01JBQ7ZJ0000000000000000T1");
+    assert_eq!(
+        payload(&removed),
+        json!({ "ship": {
+            "ticket_id": "01JBQ7ZJ0000000000000000T1",
+            "key": "DEMO-1",
+            "branch": "ship/demo/demo-1-a",
+            "path": "/h/ships/demo/demo/demo-1-a",
+        }})
+    );
+}

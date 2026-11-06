@@ -7,6 +7,7 @@ mod keys;
 mod profile;
 mod project;
 mod release;
+mod ship;
 mod status;
 mod thread;
 mod ticket;
@@ -22,6 +23,7 @@ pub use keys::{KeyError, ProjectKey, TicketKey};
 pub use profile::{AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules};
 pub use project::{Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
+pub use ship::{Ship, ShipSpec, slugify};
 pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};
 pub use thread::{
     ArtifactFormat, MessageKind, Phase, Thread, ThreadKind, ThreadMessage, ThreadState,

@@ -8,12 +8,14 @@ pub mod agent;
 pub mod chain;
 pub mod chains;
 pub mod error;
+pub mod external;
 pub mod notes;
 pub mod ports;
 pub mod projects;
 pub mod recovery;
 pub mod releases;
 pub mod resolve;
+pub mod ships;
 pub mod threads;
 pub mod tickets;
 pub mod wildcards;
@@ -21,6 +23,7 @@ pub mod wildcards;
 pub use chain::{ChainTx, with_chain};
 pub use error::{AppError, AppResult, ErrorKind};
 pub use ports::{Reader, UnitOfWork};
+pub use ships::{ShipError, Shipyard};
 
 #[cfg(test)]
 mod tests;

@@ -5,7 +5,7 @@ use toknila_app::{AppError, AppResult, Reader, UnitOfWork};
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
-    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Subtask, Thread,
+    Actor, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship, Subtask, Thread,
     ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey, Timestamp,
 };
 
@@ -62,6 +62,7 @@ reader! {
     threads(ticket: TicketId) -> Vec<Thread>;
     thread_messages(thread: ThreadId) -> Vec<ThreadMessage>;
     thread_versions(thread: ThreadId) -> Vec<ThreadVersion>;
+    ship(ticket: TicketId) -> Option<Ship>;
     last_event_payload(entity: &str, entity_id: &str) -> Option<Value>;
 }
 
@@ -108,6 +109,18 @@ impl UnitOfWork for WriteTx<'_> {
 
     fn insert_thread_version(&mut self, version: &ThreadVersion) -> AppResult<()> {
         Ok(self.repo().insert_thread_version(version)?)
+    }
+
+    fn save_ship(&mut self, ship: &Ship) -> AppResult<()> {
+        Ok(self.repo().save_ship(ship)?)
+    }
+
+    fn delete_ship(&mut self, ticket: TicketId) -> AppResult<()> {
+        Ok(self.repo().delete_ship(ticket)?)
+    }
+
+    fn defer(&mut self, effect: toknila_app::external::ExternalEffect) {
+        self.deferred.push(effect);
     }
 
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {

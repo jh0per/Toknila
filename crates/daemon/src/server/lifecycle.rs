@@ -51,7 +51,8 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
             port: info.port,
         });
     }
-    let store = Store::open(&paths.db())?;
+    let store = Store::open(&paths.db())?
+        .with_shipyard(Arc::new(crate::shipyard::GitShipyard::new(paths.ships())));
     let recovery = crate::recovery::recover(&store)
         .await
         .map_err(|e| RunError::Other(format!("startup recovery: {e}")))?;
