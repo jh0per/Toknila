@@ -3,7 +3,7 @@ import { layoutChain, nodeKey } from "../layout";
 import { outOfOrderText } from "../format";
 import { statusGroup, statusText } from "../store/groups";
 import type { Intent } from "../store/msg";
-import { type State, currentProject, hrefOf } from "../store/state";
+import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
 
 const W = 196;
 const H = 84;
@@ -79,6 +79,11 @@ export function Canvas({ chain, state, dispatch }: {
                 <span className="st" data-testid="status">{statusText(t.status)}</span>
                 <span className="key">{t.key}</span>
               </span>
+              {queuePosition(state, t.id) !== undefined && (
+                <span className="mark queued" data-testid="queued" title="Waiting for a free agent slot">
+                  queued #{queuePosition(state, t.id)}
+                </span>
+              )}
               {t.done_out_of_order && (
                 <span className="mark" title={outOfOrderText(t.done_out_of_order)}>out of order</span>
               )}

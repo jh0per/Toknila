@@ -145,7 +145,7 @@ impl TicketAction {
                 .ok_or_else(|| AppError::bad_request(format!("{name} needs a text")))
         };
         Ok(match self {
-            Self::Start => TicketEvent::Start,
+            Self::Start => TicketEvent::Request,
             Self::Pause => TicketEvent::Pause,
             Self::Resume => TicketEvent::Resume,
             Self::Block => TicketEvent::Block {

@@ -1,6 +1,7 @@
 //! HTTP handlers, one module per resource. Each handler parses the request, runs one use case
 //! from `toknila-app` in one transaction and answers with the fresh state.
 
+pub mod agents;
 pub mod chains;
 pub mod events;
 pub mod profiles;
@@ -11,6 +12,7 @@ pub mod threads;
 pub mod tickets;
 
 use axum::Json;
+use toknila_app::schedule;
 use toknila_core::{Actor, ChainId, Thread, Ticket, TicketId, Timestamp};
 
 use super::dto::{ChainDetail, ThreadDetail, TicketDetail};
@@ -37,6 +39,7 @@ fn load_ticket_detail(repo: &Repo<'_>, ticket: TicketId, at: Timestamp) -> ApiRe
         comments: repo.comments(t.id)?,
         in_status_ms: at.millis_since(t.status_since),
         phase: toknila_core::thread::phase(&repo.threads(t.id)?),
+        queue_position: schedule::queue_positions(repo)?.get(&t.id).copied(),
         ship: repo.ship(t.id)?,
         chain,
         ticket: t,

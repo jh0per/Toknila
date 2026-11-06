@@ -26,8 +26,8 @@ ones above. `cargo xtask guards` checks the rules it can check mechanically.
 
 | Layer | Crate | Holds | Must not hold |
 |---|---|---|---|
-| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, threads on a card (`thread`: open, post, approve, the hand-in gate, the computed phase), agent profiles (`profile`: parse and validate a profile file, the catalog of built-in and file profiles), entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
-| Application | `toknila-app` | Every use case (`projects`, `chains` with import and export, `tickets` with typed `TicketAction`, `wildcards` (proposals), `threads`, `releases` with `ReleaseAction`, comments and subtasks, agent events), the chain unit of work (`with_chain`: change, settle, save, journal, deliver), reference resolution, startup recovery, `AppError`, and the command inputs (`NewTicket`, `NewChain`, ...) the API accepts as request bodies. Ports: `Reader` and `UnitOfWork` (which carries the command's clock and actor); a `Runner` port arrives with real runners in phase 1 | `axum`, `rusqlite`, `tokio`, HTTP status codes |
+| Domain | `toknila-core` | Entities, the ticket state machine, the chain graph (with wildcard cards: proposed work outside the plan until approved), chain files, the comment template, typed domain events, the agent event mapping, threads on a card (`thread`: open, post, approve, the hand-in gate, the computed phase), agent profiles (`profile`: parse and validate a profile file, the catalog of built-in and file profiles), parallel agents (`schedule`: slots, the queue, who starts next), entity constructors and defaults | I/O, the clock, id generation, async runtimes, storage, transport |
+| Application | `toknila-app` | Every use case (`projects`, `chains` with import and export, `tickets` with typed `TicketAction`, `wildcards` (proposals), `threads`, `releases` with `ReleaseAction`, comments and subtasks, agent events), the chain unit of work (`with_chain`: change, settle, save, journal, deliver, then start the cards the schedule gives a slot), reference resolution, startup recovery, `AppError`, and the command inputs (`NewTicket`, `NewChain`, ...) the API accepts as request bodies. Ports: `Reader` and `UnitOfWork` (which carries the command's clock and actor); a `Runner` port arrives with real runners in phase 1 | `axum`, `rusqlite`, `tokio`, HTTP status codes |
 | Protocol | `toknila-api-types` | Read models (`ChainDetail::from_view`, `TicketDetail`, list items), `ErrorBody`, `EventRecord`, query and small request types; re-exports the command inputs of `toknila-app` and the agent events of core. OpenAPI is generated from them (feature `openapi`), TypeScript types from OpenAPI | Logic, transport |
 | Adapters | `toknila-daemon` | `http/` (`routes/*`: one module per resource, each handler parses, runs one use case, answers; one `ErrorBody` for every failure including 401), `server/` (router, auth, lifecycle, logging), `store/` (SQLite implementation of the ports), `stream`, `runner/` (sim now, PTY in phase 1), lifecycle (`daemon.json`, signals), paths, `profiles` (reads the profiles folder), logging, embedded web assets | Business rules |
 | Client | `toknila-client` | Typed blocking HTTP client of the API: one method per route, `ClientError` carrying the daemon's `ErrorBody`, the stream address | Output formatting |
@@ -210,7 +210,46 @@ The database is the only copy of the plan, so an upgrade must not lose it.
   backs it up first, as always). Anything done after the backup was made is not in it; the
   moved-away file is kept for that reason.
 
+## Parallel agents
+
+A project has a limit of agents working at once, `Project::max_parallel` (default 2, 1 to 64;
+`tok project set <key> --parallel N`, `PATCH /v1/projects/{project}`). The rules are core's
+(`schedule`); the application only applies them.
+
+- **Slots.** A card holds a slot while it is Running or Waiting (its agent is alive). Review,
+  Blocked, Merged, Released, Cancelled and Backlog hold none. Simulated agents count the same, so
+  tests can use them. Return and Unblock put a card straight back to Running, and an agent's own
+  `started` is a fact, not a request: these may exceed the limit for a while, and the card then
+  holds a slot that delays the queue.
+- **Queued is a flag on Ready, not a status.** `Ticket::queued` is set by the state machine's
+  `Request` event (what `tok start` and the Start action send) and cleared by anything that
+  leaves Ready. A new status would touch the transition table, the board columns, dependency
+  rules, the database and every client for a state that is only "Ready, and wanted". The flag
+  stores the one thing that cannot be derived (a person asked); the place in line is computed
+  and never stored.
+- **Who starts.** `schedule::plan(chains, limit)` is pure: it returns the slots used, the wanted
+  cards that start now and those that wait. A card is wanted when it is Ready, not paused, has
+  its dependencies done, and is `queued` or in a chain with autostart on. So a chain with
+  autostart off only runs cards a person started; the queue never starts an unrequested card. The
+  order is chain order (creation order across the project), then the card's place in its chain's
+  dependency order, so a card never goes before the cards it waits for. `Start` is now sent only
+  by the schedule; the graph's settle no longer starts autostart cards itself.
+- **When.** `with_chain` ends every command on a chain by running the schedule for its project
+  (`toknila-app::schedule::run`): the cards that have a slot get `Start` through the machine in
+  the same transaction, which emits the usual `PrepareShip` and `EnsureRunner` effects. Nothing
+  starts a process inside a transaction: the daemon runs those effects after the commit, as for
+  every runner. A change of the limit runs the schedule too, so a higher limit starts waiting
+  cards at once, and a lower one starts nothing and never stops a running agent; it only holds
+  back the next start. Outcomes recorded after a commit can free a slot (a failed ship blocks its
+  card), so the store keeps running "effects, then outcomes" until no more work is queued.
+- **Read models.** `GET /v1/agents` lists each project's `limit`, `used` and `queued` cards
+  with their place; `TicketDetail` and `TicketItem` carry `queue_position`. The web page
+  shows a "queued #n" chip on the card and "used/limit agents" in the top bar, read-only; `tok ls`
+  and `tok show` print `(queued #n)`.
+
 ## Presentation: MVI
+
+
 
 The UI follows Model-View-Intent, the same unidirectional shape the core already has
 (`apply(state, event) -> (state, effects)`):

@@ -5,7 +5,8 @@
 //! |---|---|---|
 //! | Backlog | Ready | `DepsSatisfied` (not paused) |
 //! | Ready | Backlog | `DepsUnsatisfied` |
-//! | Ready | Running | `Start` |
+//! | Ready | Ready (queued) | `Request` (a person's start; the schedule turns it into `Start` when a slot is free) |
+//! | Ready | Running | `Start` (the schedule decides; see `schedule`) |
 //! | Running | Waiting | `AskHuman` |
 //! | Waiting | Running | `InstructionDelivered` |
 //! | Running | Review | `Finished` |
@@ -42,7 +43,10 @@ pub enum TicketEvent {
     DepsSatisfied,
     /// Graph: a dependency is no longer satisfied (it was reopened).
     DepsUnsatisfied,
-    /// Autostart or `tok start`; the runner confirmed it started.
+    /// A person started the card (`tok start`): it wants a runner. It runs once the schedule has
+    /// a free slot, and waits in line until then (`Ticket::queued`).
+    Request,
+    /// The schedule gave the card a slot: its runner starts.
     Start,
     /// Agent: asked a question, wants permission, or went silent.
     AskHuman { reason: WaitingReason },
@@ -90,6 +94,7 @@ impl TicketEvent {
         match self {
             Self::DepsSatisfied => "deps_satisfied",
             Self::DepsUnsatisfied => "deps_unsatisfied",
+            Self::Request => "start",
             Self::Start => "start",
             Self::AskHuman { .. } => "ask_human",
             Self::InstructionDelivered => "instruction_delivered",
@@ -158,6 +163,8 @@ pub enum TransitionError {
     },
     #[error("ticket is paused; resume it first")]
     Paused,
+    #[error("ticket is already started and waits for a free slot")]
+    AlreadyQueued,
     #[error("ticket is not paused")]
     NotPaused,
     #[error("{0} needs a non-empty text")]
@@ -194,6 +201,13 @@ pub fn apply(
             (S::Ready, None)
         }
         (S::Ready, TicketEvent::DepsUnsatisfied) => (S::Backlog, None),
+        (S::Ready, TicketEvent::Request) => {
+            if ticket.queued {
+                return Err(TransitionError::AlreadyQueued);
+            }
+            next.queued = true;
+            (S::Ready, None)
+        }
         (S::Ready, TicketEvent::Start) => {
             run_on_ship(&mut effects);
             (S::Running, None)
@@ -339,6 +353,9 @@ pub fn apply(
     if status != from {
         next.status_since = now;
     }
+    if status != S::Ready {
+        next.queued = false;
+    }
     next.status = status;
     next.status_reason = reason;
     Ok(Transition {
@@ -347,44 +364,9 @@ pub fn apply(
     })
 }
 
-fn block(
-    reason: &BlockedReason,
-    ticket: &Ticket,
-    effects: &mut Vec<Effect>,
-) -> Result<(TicketStatus, Option<StatusReason>), TransitionError> {
-    if let BlockedReason::Manual { text } = reason {
-        non_empty(text, "block")?;
-    }
-    if matches!(
-        reason,
-        BlockedReason::Crashed { .. }
-            | BlockedReason::RunnerLost
-            | BlockedReason::ShipFailed { .. }
-    ) {
-        effects.push(Effect::StopRunner);
-    }
-    Ok((
-        TicketStatus::Blocked,
-        Some(StatusReason::Blocked {
-            reason: reason.clone(),
-            resume_to: ticket.status,
-            waiting: match &ticket.status_reason {
-                Some(StatusReason::Waiting(w)) => Some(w.clone()),
-                _ => None,
-            },
-        }),
-    ))
-}
-
-/// The ticket works on its ship: make sure it exists, then (re)start the runner there.
-fn run_on_ship(effects: &mut Vec<Effect>) {
-    effects.push(Effect::PrepareShip);
-    effects.push(Effect::EnsureRunner);
-}
-
 mod checks;
-use checks::non_empty;
 pub use checks::person_only;
+use checks::{block, non_empty, run_on_ship};
 mod invariants;
 
 pub use invariants::check_invariants;

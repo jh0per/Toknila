@@ -17,6 +17,7 @@ pub mod releases;
 pub mod resolve;
 pub mod runner;
 pub mod runs;
+pub mod schedule;
 pub mod ships;
 pub mod threads;
 pub mod tickets;

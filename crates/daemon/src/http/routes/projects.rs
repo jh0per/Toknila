@@ -7,7 +7,7 @@ use toknila_app::{projects, resolve};
 use toknila_core::{Actor, Project};
 
 use super::{ApiResult, read};
-use crate::http::dto::NewProject;
+use crate::http::dto::{NewProject, PatchProject};
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
 
@@ -42,4 +42,23 @@ pub async fn get_project(
     Ok(Json(
         read(&state, move |repo| Ok(resolve::project(repo, &project)?)).await?,
     ))
+}
+
+#[utoipa::path(patch, path = "/projects/{project}", tag = "projects", request_body = PatchProject,
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Project), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// Changes project settings. A higher parallel limit starts waiting cards at once; a lower one
+/// never stops a running agent.
+pub async fn patch_project(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+    Json(patch): Json<PatchProject>,
+) -> ApiResult<Json<Project>> {
+    let (p, _) = state
+        .store
+        .write(Actor::Human, now(), move |tx| -> ApiResult<Project> {
+            Ok(projects::patch(tx, &project, patch)?)
+        })
+        .await?;
+    Ok(Json(p))
 }

@@ -8,13 +8,14 @@ pub mod runner;
 use serde::{Deserialize, Serialize};
 use toknila_core::graph::{ChainSummary, ChainView};
 use toknila_core::profile::{Catalog, ListedProfile, ProfileProblem};
+use toknila_core::schedule::Plan;
 use toknila_core::{
-    Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Release, ReleaseId, Ship, Subtask,
-    Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
+    Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Project, ProjectId, Release, ReleaseId,
+    Ship, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
 };
 
 pub use toknila_app::chains::NewChain;
-pub use toknila_app::projects::NewProject;
+pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;
 pub use toknila_app::threads::{NewMessage, NewThread, NewVersion};
 pub use toknila_app::tickets::{NewComment, NewTicket};
@@ -88,6 +89,50 @@ pub struct TicketDetail {
     /// The ticket's worktree and branch while it has them; `null` before it started, after it
     /// merged, or when its project has no repository.
     pub ship: Option<Ship>,
+    /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
+    pub queue_position: Option<u32>,
+}
+
+/// A card waiting for an agent slot.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueuedCard {
+    pub ticket: TicketId,
+    /// 1 is next.
+    pub position: u32,
+}
+
+/// `GET /v1/agents`: one project's agent slots and the cards waiting for one.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectAgents {
+    pub project: ProjectId,
+    /// Agents that may work at once.
+    pub limit: u32,
+    /// Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
+    pub used: u32,
+    /// Waiting cards, first in line first.
+    pub queued: Vec<QueuedCard>,
+}
+
+impl ProjectAgents {
+    /// The slots of `project` as `plan` computed them.
+    pub fn new(project: &Project, plan: &Plan) -> Self {
+        let queued = plan
+            .queue
+            .iter()
+            .zip(1..)
+            .map(|(ticket, position)| QueuedCard {
+                ticket: *ticket,
+                position,
+            });
+        Self {
+            project: project.id,
+            limit: plan.limit,
+            used: plan.used,
+            queued: queued.collect(),
+        }
+    }
 }
 
 /// A thread with its messages and artifact versions.
@@ -119,6 +164,8 @@ pub struct TicketItem {
     pub chain: String,
     pub in_status_ms: u64,
     pub needs_human: bool,
+    /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
+    pub queue_position: Option<u32>,
 }
 
 /// Filters for `GET /v1/tickets`.

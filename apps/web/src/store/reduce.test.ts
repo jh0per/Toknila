@@ -84,7 +84,7 @@ describe("journal events", () => {
     const e = event(11, "ticket", "status_changed", { ticket: { chain_id: "c2" } });
     const [s, fx] = reduce(loaded(), { type: "event", event: e });
     expect(s.lastSeq).toBe(11);
-    expect(fx).toEqual([{ type: "loadChain", id: "c2" }, { type: "loadTickets" }]);
+    expect(fx).toEqual([{ type: "loadChain", id: "c2" }, { type: "loadTickets" }, { type: "loadAgents" }]);
   });
 
   it("place comments and subtasks by their ticket", () => {
@@ -105,7 +105,7 @@ describe("journal events", () => {
   it("ignore what was already applied; a project event reloads the projects", () => {
     expect(reduce(loaded(), { type: "event", event: event(9, "ticket", "updated", {}) })).toEqual([loaded(), []]);
     const [s, fx] = reduce(loaded(), { type: "event", event: event(11, "project", "created", {}) });
-    expect([s.lastSeq, fx]).toEqual([11, [{ type: "loadProjects" }]]);
+    expect([s.lastSeq, fx]).toEqual([11, [{ type: "loadProjects" }, { type: "loadAgents" }]]);
   });
 
   it("add a chain the page has not seen at the end", () => {

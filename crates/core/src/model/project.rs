@@ -31,6 +31,9 @@ pub struct Project {
     pub release_branch: String,
     pub default_profile: String,
     pub default_review_mode: ReviewMode,
+    /// Most agents of this project that work at once (`schedule`); a card that starts beyond it
+    /// is queued.
+    pub max_parallel: u32,
 }
 
 impl Project {
@@ -61,6 +64,7 @@ mod tests {
             release_branch: "main".into(),
             default_profile: AgentProfile::SIM.into(),
             default_review_mode: ReviewMode::Human,
+            max_parallel: crate::schedule::DEFAULT_LIMIT,
         };
         let mut t = Ticket::new_backlog(
             TicketId::new(),

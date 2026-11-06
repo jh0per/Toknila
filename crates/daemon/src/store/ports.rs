@@ -79,6 +79,10 @@ impl UnitOfWork for WriteTx<'_> {
         Ok(self.repo().insert_project(project)?)
     }
 
+    fn update_project(&mut self, project: &Project) -> AppResult<()> {
+        Ok(self.repo().update_project(project)?)
+    }
+
     fn insert_chain(&mut self, chain: &Chain) -> AppResult<()> {
         Ok(self.repo().insert_chain(chain)?)
     }

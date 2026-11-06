@@ -20,7 +20,18 @@ fn project() -> Project {
         release_branch: "main".to_owned(),
         default_profile: "sim".to_owned(),
         default_review_mode: ReviewMode::Human,
+        max_parallel: 2,
     }
+}
+
+/// A project row as a database from before the parallel limit has it (no `max_parallel`).
+fn insert_old_project(conn: &Connection, p: &Project) {
+    conn.execute(
+        "INSERT INTO projects (id, key, name, repo_path, work_branch, release_branch, \
+         default_profile, default_review_mode) VALUES (?1, ?2, ?3, NULL, 'develop', 'main', 'sim', 'human')",
+        params![p.id.to_string(), p.key.as_str(), p.name],
+    )
+    .expect("old project");
 }
 
 fn chain(project: ProjectId) -> Chain {
@@ -46,6 +57,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         status_reason: None,
         status_since: Timestamp(1),
         paused: false,
+        queued: false,
         profile: Some("sim".to_owned()),
         review_mode: None,
         branch: None,
@@ -112,7 +124,7 @@ async fn a_phase_0_database_gains_wildcard_marks() {
         conn.pragma_update(None, "user_version", 1)
             .expect("version");
         let repo = Repo::new(&conn);
-        repo.insert_project(&p).expect("project");
+        insert_old_project(&conn, &p);
         repo.insert_chain(&c).expect("chain");
         conn.execute(
             "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
@@ -124,7 +136,14 @@ async fn a_phase_0_database_gains_wildcard_marks() {
     }
     let store = Store::open(&path).expect("migrates");
     let id = old.id;
+    let pid = p.id;
+    let migrated = store
+        .read(move |repo| repo.project(pid))
+        .await
+        .expect("read");
+    assert_eq!(migrated.map(|p| p.max_parallel), Some(2));
     let loaded = store.read(move |repo| repo.ticket(id)).await.expect("read");
+    assert_eq!(loaded.as_ref().map(|t| t.queued), Some(false));
     assert_eq!(loaded.as_ref().map(|t| &t.wildcard), Some(&None));
     assert_eq!(loaded.map(|t| t.title), Some(old.title.clone()));
 
@@ -204,7 +223,7 @@ async fn a_database_before_threads_gains_them_and_keeps_every_byte_of_an_artifac
         conn.pragma_update(None, "user_version", 2)
             .expect("version");
         let repo = Repo::new(&conn);
-        repo.insert_project(&p).expect("project");
+        insert_old_project(&conn, &p);
         repo.insert_chain(&c).expect("chain");
         conn.execute(
             "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
