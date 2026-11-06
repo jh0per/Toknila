@@ -256,8 +256,16 @@ mod tests {
         tokens.rewait(g.ticket, AgentRole::Worker, Timestamp(900));
         let facts = tokens.spawn_facts();
         let find = |role| facts.iter().find(|f| f.role == role).copied().expect("run");
-        assert_eq!(find(AgentRole::Reviewer).spawned, Timestamp(900), "restarted");
-        assert_eq!(find(AgentRole::Worker).spawned, Timestamp(100), "it showed life: kept");
+        assert_eq!(
+            find(AgentRole::Reviewer).spawned,
+            Timestamp(900),
+            "restarted"
+        );
+        assert_eq!(
+            find(AgentRole::Worker).spawned,
+            Timestamp(100),
+            "it showed life: kept"
+        );
         tokens.revoke(g.run);
         assert_eq!(tokens.spawn_facts().len(), 1);
         assert!(!tokens.mark_active(g.ticket, AgentRole::Reviewer, Timestamp(1)));

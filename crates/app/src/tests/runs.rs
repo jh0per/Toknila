@@ -407,7 +407,8 @@ fn only_a_person_writes_to_the_terminal_and_only_while_it_runs() {
     settle(&mut mem);
     let t = a(&mem);
 
-    let refused = runs::send_input(&mem.runner, Actor::Agent, &t, AgentRole::Worker, b"x\n").expect_err("agent");
+    let refused = runs::send_input(&mem.runner, Actor::Agent, &t, AgentRole::Worker, b"x\n")
+        .expect_err("agent");
     assert_eq!(refused.kind, ErrorKind::Conflict);
     assert!(mem.runner.written.borrow().is_empty());
 
@@ -415,6 +416,7 @@ fn only_a_person_writes_to_the_terminal_and_only_while_it_runs() {
     assert_eq!(mem.runner.written.borrow().as_slice(), [b"yes\n".to_vec()]);
 
     mem.runner.live.borrow_mut().clear();
-    let gone = runs::send_input(&mem.runner, Actor::Human, &t, AgentRole::Worker, b"yes\n").expect_err("no runner");
+    let gone = runs::send_input(&mem.runner, Actor::Human, &t, AgentRole::Worker, b"yes\n")
+        .expect_err("no runner");
     assert_eq!(gone.kind, ErrorKind::Conflict);
 }

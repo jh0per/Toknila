@@ -88,7 +88,10 @@ pub fn tool_summary(input: &HookInput) -> Option<String> {
 
 /// A tool summary some client sent, brought to a single line of at most [`SUMMARY_MAX`] characters.
 pub fn cap_summary(text: &str) -> String {
-    cut(&text.split_whitespace().collect::<Vec<_>>().join(" "), SUMMARY_MAX)
+    cut(
+        &text.split_whitespace().collect::<Vec<_>>().join(" "),
+        SUMMARY_MAX,
+    )
 }
 
 /// `text` cut to `max` characters, with an ellipsis when something was dropped.
@@ -161,7 +164,10 @@ mod tests {
             Some("Claude needs your permission to use Bash")
         );
         let none = input(Some("permission_prompt"), None);
-        assert_eq!(permission_prompt("notification", &none).as_deref(), Some(""));
+        assert_eq!(
+            permission_prompt("notification", &none).as_deref(),
+            Some("")
+        );
     }
 
     #[test]
@@ -214,11 +220,17 @@ mod tests {
         use serde_json::json;
         let cases = [
             (
-                tool("Bash", json!({"command": "cargo  test\n  -p core", "description": "d"})),
+                tool(
+                    "Bash",
+                    json!({"command": "cargo  test\n  -p core", "description": "d"}),
+                ),
                 "Bash: cargo test -p core",
             ),
             (
-                tool("Write", json!({"file_path": "/w/a.rs", "content": "SECRET"})),
+                tool(
+                    "Write",
+                    json!({"file_path": "/w/a.rs", "content": "SECRET"}),
+                ),
                 "Write: /w/a.rs",
             ),
             (
@@ -228,7 +240,10 @@ mod tests {
                 ),
                 "Edit: /w/b.rs",
             ),
-            (tool("Grep", json!({"pattern": "TODO", "path": "/w"})), "Grep: TODO"),
+            (
+                tool("Grep", json!({"pattern": "TODO", "path": "/w"})),
+                "Grep: TODO",
+            ),
             (tool("mcp__x__y", json!({"prompt": "SECRET"})), "mcp__x__y"),
         ];
         for (input, want) in cases {

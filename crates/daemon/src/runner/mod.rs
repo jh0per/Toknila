@@ -36,9 +36,9 @@ use toknila_core::instructions::terminal::Size;
 use toknila_core::{AgentProfile, AgentRole, OutputRules, ProcessExit, Run, RunId, TicketId};
 
 use active::Active;
+pub use prompts::Prompts;
 pub use silence::{tick as silence_tick, watch as watch_silence};
 pub use supervise::supervise;
-pub use prompts::Prompts;
 pub use tokens::{Activity, AgentTokens, Grant, SpawnFacts};
 pub use ws::stream;
 

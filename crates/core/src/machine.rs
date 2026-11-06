@@ -114,9 +114,7 @@ pub fn apply(
         (
             S::Waiting,
             TicketEvent::InstructionDelivered | TicketEvent::AgentActive | TicketEvent::Answered,
-        ) => {
-            (S::Running, None)
-        }
+        ) => (S::Running, None),
         (
             S::Running,
             TicketEvent::Finished {

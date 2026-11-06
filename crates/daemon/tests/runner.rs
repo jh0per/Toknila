@@ -739,4 +739,31 @@ fn claude_code_variables_of_the_daemon_do_not_reach_the_agent_unless_its_profile
         "other variables are inherited as before"
     );
     rig.wait_end();
+
+#[test]
+fn typing_addressed_to_the_reviewer_reaches_the_reviewer_and_not_the_worker() {
+    let rig = Rig::new();
+    rig.profile("fake", &["print", "ready", "echo", "hold"], "");
+    rig.start("fake");
+    rig.wait_for("ready");
+    rig.runners
+        .start(&rig.request_as("fake", AgentRole::Reviewer))
+        .expect("start reviewer");
+    let until = Instant::now() + WAIT;
+    while !rig.output_of(AgentRole::Reviewer).contains("ready") {
+        assert!(Instant::now() < until, "the reviewer never started");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    rig.runners
+        .write(rig.ticket, AgentRole::Reviewer, b"hi\r")
+        .expect("write to the reviewer");
+    while !rig.output_of(AgentRole::Reviewer).contains("got:hi") {
+        assert!(Instant::now() < until, "the reviewer never got the text");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    assert!(
+        !rig.output().contains("got:hi"),
+        "the worker did not get it"
+    );
+    rig.runners.stop(rig.ticket);
 }

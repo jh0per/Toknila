@@ -13,6 +13,8 @@ export type StatusReason = Schemas["StatusReason"];
 export type Ticket = Schemas["Ticket"];
 export type InboxItem = Schemas["InboxItem"];
 export type InboxKind = Schemas["InboxKind"];
+export type AnswerKind = Schemas["AnswerKind"];
+export type AgentRole = Schemas["AgentRole"];
 export type ErrorBody = Schemas["ErrorBody"];
 
 /// A journal entry; its payload is one domain event, read field by field where needed.

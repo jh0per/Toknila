@@ -27,6 +27,7 @@ function cardRequest(e: CardCommand): [string, unknown] {
     case "ticketAction": return [`/tickets/${ticket}/actions/${e.action}`, { text: e.text }];
     case "leftovers": return [`/tickets/${ticket}/leftovers/${e.action}`, {}];
     case "addComment": return [`/tickets/${ticket}/comments`, { kind: e.kind, text: e.text }];
+    case "answer": return [`/tickets/${ticket}/runner/answer`, { role: e.role, answer: e.answer, text: e.text }];
   }
 }
 
@@ -128,6 +129,11 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "threadAction":
         void post(threadPath(e), { text: e.text })
           .then(() => loadThreads(e.key))
+          .catch(failed);
+        return;
+      case "answer":
+        void post(`/tickets/${encodeURIComponent(e.key)}/runner/answer`, { role: e.role, answer: e.answer, text: e.text })
+          .then(() => loadInbox())
           .catch(failed);
         return;
       case "ticketAction":

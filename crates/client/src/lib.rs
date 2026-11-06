@@ -108,11 +108,6 @@ impl Client {
 
     // ---- projects ----
 
-    /// `GET /projects/{project}/inbox`: what waits on a person, newest first.
-    pub fn inbox(&self, project: &str) -> ClientResult<Vec<toknila_core::inbox::InboxItem>> {
-        self.call("GET", &format!("/projects/{}/inbox", enc(project)), NO_BODY)
-    }
-
     /// `GET /projects`.
     pub fn projects(&self) -> ClientResult<Vec<Project>> {
         self.call("GET", "/projects", NO_BODY)

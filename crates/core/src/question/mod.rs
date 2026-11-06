@@ -84,7 +84,9 @@ impl QuestionKind {
 pub enum Decision {
     Allow,
     /// `message` tells the agent why it was refused.
-    Deny { message: String },
+    Deny {
+        message: String,
+    },
 }
 
 /// How an answer reaches the agent.

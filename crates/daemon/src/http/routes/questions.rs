@@ -21,7 +21,12 @@ use crate::runner::Runners;
 use crate::server::{AppState, Principal, now};
 
 /// The question the run of `role` has open for a person, if any.
-fn open_question(runners: &Runners, t: &Ticket, role: AgentRole, at: Timestamp) -> Option<QuestionKind> {
+fn open_question(
+    runners: &Runners,
+    t: &Ticket,
+    role: AgentRole,
+    at: Timestamp,
+) -> Option<QuestionKind> {
     if runners.prompts().is_pending(t.id, role) {
         return Some(QuestionKind::Permission);
     }

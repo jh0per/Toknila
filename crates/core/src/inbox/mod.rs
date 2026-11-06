@@ -231,7 +231,12 @@ fn question_items(data: &InboxData) -> Vec<InboxItem> {
                 .0
                 .saturating_add(i64::try_from(run.startup_secs.saturating_mul(1000)).unwrap_or(0)),
         );
-        let mut i = item(InboxKind::Question, t, since, question::SCREEN_TEXT.to_owned());
+        let mut i = item(
+            InboxKind::Question,
+            t,
+            since,
+            question::SCREEN_TEXT.to_owned(),
+        );
         i.role = Some(run.role);
         i.answers = QuestionKind::Screen.answers();
         i.lines = question::last_lines(&run.tail, question::SCREEN_LINES);

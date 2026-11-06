@@ -120,7 +120,10 @@ pub(super) async fn require_token(
             );
         }
         // Any call of a run's token is a sign of life; the startup rule counts it for either role.
-        state.runners.tokens().mark_active(grant.ticket, grant.role, now());
+        state
+            .runners
+            .tokens()
+            .mark_active(grant.ticket, grant.role, now());
         if grant.role == AgentRole::Worker {
             state.runners.tokens().touch(grant.ticket, now(), "api");
         }

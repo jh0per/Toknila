@@ -209,10 +209,16 @@ fn an_answer_changes_nothing_outside_waiting() {
         TicketStatus::Blocked,
         TicketStatus::Ready,
     ] {
-        let err = apply(&ticket_in(from), &TicketEvent::Answered, Timestamp(1))
-            .expect_err("refused");
+        let err =
+            apply(&ticket_in(from), &TicketEvent::Answered, Timestamp(1)).expect_err("refused");
         assert!(
-            matches!(err, TransitionError::NotAllowed { event: "answered", .. }),
+            matches!(
+                err,
+                TransitionError::NotAllowed {
+                    event: "answered",
+                    ..
+                }
+            ),
             "{from:?}"
         );
     }

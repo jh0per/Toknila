@@ -2,8 +2,8 @@
 //! agent that waits on its screen.
 
 use super::*;
-use crate::question::{AnswerKind, PendingPermission, RunFacts, SCREEN_TEXT};
 use crate::AgentRole;
+use crate::question::{AnswerKind, PendingPermission, RunFacts, SCREEN_TEXT};
 
 fn data(tickets: Vec<Ticket>, now: i64) -> InboxData {
     InboxData {
@@ -28,7 +28,9 @@ fn run(t: &Ticket, role: AgentRole, tail: &str) -> RunFacts {
 fn a_workers_question_says_whose_it_is_and_what_answers_it_takes() {
     let q = waiting(
         ticket(1, TicketStatus::Running, 5),
-        WaitingReason::Question { text: "why?".into() },
+        WaitingReason::Question {
+            text: "why?".into(),
+        },
     );
     let p = waiting(
         ticket(2, TicketStatus::Running, 6),
@@ -42,7 +44,10 @@ fn a_workers_question_says_whose_it_is_and_what_answers_it_takes() {
         assert_eq!(i.role, Some(AgentRole::Worker));
     }
     assert_eq!(got[0].answers, [AnswerKind::Allow, AnswerKind::Deny]);
-    assert!(got[1].answers.is_empty(), "a question is answered by a comment");
+    assert!(
+        got[1].answers.is_empty(),
+        "a question is answered by a comment"
+    );
 }
 
 #[test]
@@ -94,9 +99,15 @@ fn a_run_with_no_sign_of_life_after_its_startup_time_waits_on_its_screen() {
     let got = compute(&d);
     assert_eq!(got.len(), 1);
     let i = &got[0];
-    assert_eq!((i.kind, i.text.as_str()), (InboxKind::Question, SCREEN_TEXT));
+    assert_eq!(
+        (i.kind, i.text.as_str()),
+        (InboxKind::Question, SCREEN_TEXT)
+    );
     assert_eq!(i.role, Some(AgentRole::Worker));
-    assert_eq!(i.lines, ["Do you trust this folder?", "> 1. Yes", "  2. No"]);
+    assert_eq!(
+        i.lines,
+        ["Do you trust this folder?", "> 1. Yes", "  2. No"]
+    );
     assert_eq!(
         i.answers,
         [
@@ -169,7 +180,11 @@ fn no_screen_item_for_a_card_that_is_not_working_or_already_asks() {
         shown,
         [
             ("DEMO-1".to_owned(), InboxKind::Question, "q".to_owned()),
-            ("DEMO-2".to_owned(), InboxKind::Blocked, "manual: b".to_owned()),
+            (
+                "DEMO-2".to_owned(),
+                InboxKind::Blocked,
+                "manual: b".to_owned()
+            ),
             ("DEMO-3".to_owned(), InboxKind::Question, "p".to_owned()),
         ],
         "no screen item beside a question, a blocked card or a dialog"

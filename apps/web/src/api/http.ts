@@ -87,7 +87,12 @@ export function streamUrl(since: number): string {
 }
 
 /// A ticket's runner stream, continuing after `from` of `run` when the page already has that.
-export function runnerStreamUrl(key: string, cursor: { run: string; from: number } | null): string {
-  const q = cursor ? `run=${encodeURIComponent(cursor.run)}&from=${cursor.from}&` : "";
+export function runnerStreamUrl(
+  key: string,
+  cursor: { run: string; from: number } | null,
+  role: "worker" | "reviewer" = "worker",
+): string {
+  const q = (cursor ? `run=${encodeURIComponent(cursor.run)}&from=${cursor.from}&` : "") +
+    (role === "reviewer" ? "role=reviewer&" : "");
   return `${wsBase()}/tickets/${encodeURIComponent(key)}/runner/stream?${q}token=${encodeURIComponent(token())}`;
 }

@@ -47,7 +47,10 @@ async fn wait_for(api: &Api, n: usize) -> Vec<Value> {
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    panic!("the inbox never listed {n} questions: {:?}", questions(api).await);
+    panic!(
+        "the inbox never listed {n} questions: {:?}",
+        questions(api).await
+    );
 }
 
 async fn permission(api: &Api, token: &str, tool: &str) -> (StatusCode, Value) {
@@ -71,7 +74,11 @@ async fn journal(api: &Api) -> Vec<Value> {
         .as_array()
         .expect("events")
         .iter()
-        .filter(|e| e["kind"].as_str().is_some_and(|k| k.starts_with("question_")))
+        .filter(|e| {
+            e["kind"]
+                .as_str()
+                .is_some_and(|k| k.starts_with("question_"))
+        })
         .cloned()
         .collect()
 }
@@ -118,8 +125,17 @@ async fn a_reviewers_permission_shows_in_the_inbox_and_deny_carries_the_comment(
         let q = wait_for(&api, 1).await;
         assert_eq!(q[0]["role"], "reviewer");
         assert_eq!(q[0]["answers"], json!(["allow", "deny"]));
-        assert!(q[0]["text"].as_str().unwrap_or("").contains("git diff main"));
-        assert_eq!(api.status("DEMO-1").await, "running", "the card does not wait for a reviewer");
+        assert!(
+            q[0]["text"]
+                .as_str()
+                .unwrap_or("")
+                .contains("git diff main")
+        );
+        assert_eq!(
+            api.status("DEMO-1").await,
+            "running",
+            "the card does not wait for a reviewer"
+        );
         let (s, v) = answer(
             &api,
             json!({ "role": "reviewer", "answer": "deny", "text": "read the diff in the PR" }),
@@ -134,7 +150,10 @@ async fn a_reviewers_permission_shows_in_the_inbox_and_deny_carries_the_comment(
         json!({ "decision": "deny", "message": "read the diff in the PR" })
     );
     let events = journal(&api).await;
-    let kinds: Vec<_> = events.iter().map(|e| e["kind"].as_str().unwrap_or("")).collect();
+    let kinds: Vec<_> = events
+        .iter()
+        .map(|e| e["kind"].as_str().unwrap_or(""))
+        .collect();
     assert_eq!(kinds, ["question_raised", "question_answered"]);
     assert_eq!(events[1]["payload"]["role"], "reviewer");
     assert_eq!(events[1]["payload"]["answer"], "deny");
@@ -145,7 +164,10 @@ async fn a_hook_nobody_answers_in_time_lets_the_agent_show_its_own_dialog() {
     let (api, token) = setup().await;
     api.runners.set_permission_wait(Duration::from_millis(60));
     let (status, reply) = permission(&api, &token, "Bash: ls").await;
-    assert_eq!((status, reply), (StatusCode::OK, json!({ "decision": "ask" })));
+    assert_eq!(
+        (status, reply),
+        (StatusCode::OK, json!({ "decision": "ask" }))
+    );
     // The card still waits (the dialog is on the agent's screen); a tool that ends resumes it.
     assert_eq!(api.status("DEMO-1").await, "waiting");
     let (s, _) = api
@@ -164,7 +186,12 @@ async fn a_hook_nobody_answers_in_time_lets_the_agent_show_its_own_dialog() {
 async fn the_last_tool_is_attached_to_a_permission_notification() {
     let (api, token) = setup().await;
     let hook = |body: Value| {
-        api.call_with(&token, Method::POST, "/v1/tickets/DEMO-1/activity", Some(body))
+        api.call_with(
+            &token,
+            Method::POST,
+            "/v1/tickets/DEMO-1/activity",
+            Some(body),
+        )
     };
     let (s, _) = hook(json!({ "signal": "hook:pre_tool_use", "tool": "Bash: rm -rf build" })).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
@@ -201,7 +228,11 @@ async fn a_long_tool_summary_is_capped() {
     )
     .await;
     let q = wait_for(&api, 1).await;
-    assert!(q[0]["text"].as_str().unwrap_or("").chars().count() < 340, "{}", q[0]["text"]);
+    assert!(
+        q[0]["text"].as_str().unwrap_or("").chars().count() < 340,
+        "{}",
+        q[0]["text"]
+    );
 }
 
 #[tokio::test]

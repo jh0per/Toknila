@@ -48,7 +48,10 @@ fn post(path: &str, json: &str) -> String {
     use std::io::Read;
     let var = |name: &str| std::env::var(name).unwrap_or_default();
     let url = var("TOKNILA_URL");
-    let host = url.trim_start_matches("http://").trim_end_matches('/').to_owned();
+    let host = url
+        .trim_start_matches("http://")
+        .trim_end_matches('/')
+        .to_owned();
     let path = path.replace("{ticket}", &var("TOKNILA_TICKET"));
     let request = format!(
         "POST /v1{path} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {}\r\n\

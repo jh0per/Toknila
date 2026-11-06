@@ -28,7 +28,14 @@ fn fake_agent() -> PathBuf {
     if !path.exists() {
         let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
         let status = Command::new(cargo)
-            .args(["build", "--locked", "-p", "toknila-daemon", "--bin", "fake-agent"])
+            .args([
+                "build",
+                "--locked",
+                "-p",
+                "toknila-daemon",
+                "--bin",
+                "fake-agent",
+            ])
             .status()
             .expect("run cargo");
         assert!(status.success(), "cannot build fake-agent");
@@ -143,7 +150,10 @@ fn the_permission_hook_waits_for_allow_from_the_window_and_the_card_resumes_at_o
     wait_until("the permission question", || !questions(&client).is_empty());
     let q = questions(&client);
     assert_eq!(q.len(), 1);
-    assert_eq!(q[0].text, "Claude Code asks for permission: Bash: cargo test");
+    assert_eq!(
+        q[0].text,
+        "Claude Code asks for permission: Bash: cargo test"
+    );
     assert_eq!(q[0].answers, [AnswerKind::Allow, AnswerKind::Deny]);
     assert_eq!(tok.status("DEMO-1"), "waiting");
 
@@ -157,7 +167,11 @@ fn the_permission_hook_waits_for_allow_from_the_window_and_the_card_resumes_at_o
             },
         )
         .expect("answer");
-    assert_eq!(tok.status("DEMO-1"), "running", "at once, not when a tool ends");
+    assert_eq!(
+        tok.status("DEMO-1"),
+        "running",
+        "at once, not when a tool ends"
+    );
     wait_until("the hook's reply", || {
         logs(&tok.home, "DEMO-1").contains(r#"post=200 {"decision":"allow"}"#)
     });
@@ -173,7 +187,15 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
     profile(
         &tok,
         "silent",
-        &["print", "Do you trust this folder?", "print", "1. Yes  2. No", "echo", "sleep", "30000"],
+        &[
+            "print",
+            "Do you trust this folder?",
+            "print",
+            "1. Yes  2. No",
+            "echo",
+            "sleep",
+            "30000",
+        ],
         "startup_secs = 1\n[hooks]\nenabled = true\n",
     );
     setup(&tok, dir.path(), "silent");
@@ -202,5 +224,8 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
     wait_until("the agent to get the text", || {
         logs(&tok.home, "DEMO-1").contains("got:yes")
     });
-    assert!(questions(&client).is_empty(), "an answer starts the wait over");
+    assert!(
+        questions(&client).is_empty(),
+        "an answer starts the wait over"
+    );
 }

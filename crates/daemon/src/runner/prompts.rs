@@ -186,7 +186,11 @@ mod tests {
         assert!(fresh && rx.is_none());
         assert!(prompts.is_pending(t, r) && !prompts.hook_waiting(t, r));
         assert!(!prompts.resolve(t, r, Decision::Allow));
-        assert_eq!(prompts.pending().len(), 1, "no hook to answer: the dialog stays open");
+        assert_eq!(
+            prompts.pending().len(),
+            1,
+            "no hook to answer: the dialog stays open"
+        );
     }
 
     #[test]
@@ -194,14 +198,21 @@ mod tests {
         let prompts = Prompts::default();
         let (t, r) = ids();
         let (_, rx) = prompts.begin(t, r, "from the hook".into(), Timestamp(1), true);
-        let (fresh, none) = prompts.begin(t, r, "from the notification".into(), Timestamp(9), false);
+        let (fresh, none) =
+            prompts.begin(t, r, "from the notification".into(), Timestamp(9), false);
         assert!(!fresh && none.is_none());
         assert!(prompts.hook_waiting(t, r));
         let open = prompts.pending();
         assert_eq!(open.len(), 1);
-        assert_eq!((open[0].text.as_str(), open[0].since), ("from the hook", Timestamp(1)));
+        assert_eq!(
+            (open[0].text.as_str(), open[0].since),
+            ("from the hook", Timestamp(1))
+        );
         drop(rx);
-        assert!(!prompts.hook_waiting(t, r), "a hook that gave up waits no more");
+        assert!(
+            !prompts.hook_waiting(t, r),
+            "a hook that gave up waits no more"
+        );
         assert!(prompts.clear(t, r));
         assert!(!prompts.clear(t, r));
     }

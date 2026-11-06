@@ -1,7 +1,7 @@
 // Everything that changes the state: what the person did (intents), API answers, the stream.
 
 import type {
-  ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, TicketAction, TicketDetail,
+  AgentRole, AnswerKind, ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, TicketAction, TicketDetail,
   TicketThreads,
 } from "../api/types";
 import type { Route, Tab } from "./route";
@@ -29,7 +29,8 @@ export type LeftoverAction = "move" | "close" | "leave";
 export type CardCommand =
   | { type: "ticketAction"; key: string; action: TicketAction; text?: string }
   | { type: "leftovers"; key: string; action: LeftoverAction }
-  | { type: "addComment"; key: string; kind: CommentKind; text: string };
+  | { type: "addComment"; key: string; kind: CommentKind; text: string }
+  | { type: "answer"; key: string; role: AgentRole; answer: AnswerKind; text?: string };
 
 /// What a person does in a thread; `text` is the message or the comment of a request for changes.
 export type ThreadAction = {

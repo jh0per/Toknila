@@ -27,7 +27,9 @@ fn signals(name: &str, stdin: &str) -> NewActivity {
         signal: format!("hook:{name}"),
         session_id: input.session_id.clone(),
         transcript_path: input.transcript_path.clone(),
-        tool: (name == "pre_tool_use").then(|| hook::tool_summary(&input)).flatten(),
+        tool: (name == "pre_tool_use")
+            .then(|| hook::tool_summary(&input))
+            .flatten(),
         prompt: hook::permission_prompt(name, &input),
     }
 }
@@ -184,11 +186,15 @@ mod tests {
                 "decision": {"behavior": "allow"}
             }})
         );
-        let deny = permission_output(&reply(PermissionDecision::Deny, Some("not that"))).expect("deny");
+        let deny =
+            permission_output(&reply(PermissionDecision::Deny, Some("not that"))).expect("deny");
         let v: serde_json::Value = serde_json::from_str(&deny).expect("json");
         assert_eq!(v["hookSpecificOutput"]["decision"]["behavior"], "deny");
         assert_eq!(v["hookSpecificOutput"]["decision"]["message"], "not that");
-        assert_eq!(permission_output(&reply(PermissionDecision::Ask, None)), None);
+        assert_eq!(
+            permission_output(&reply(PermissionDecision::Ask, None)),
+            None
+        );
     }
 
     #[test]

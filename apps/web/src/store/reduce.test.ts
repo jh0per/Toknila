@@ -146,6 +146,11 @@ describe("threads", () => {
     expect(reduce(card, comment)).toEqual([card, [comment]]);
   });
 
+  it("an answer to an agent is an effect carrying the role", () => {
+    const answer = { type: "answer", key: "DEMO-1", role: "reviewer", answer: "deny", text: "no" } as const;
+    expect(reduce(card, answer)).toEqual([card, [answer]]);
+  });
+
   it("picking a version is remembered per thread", () => {
     const [s] = reduce(card, { type: "pickVersion", thread: "th1", number: 1 });
     expect(s.versionPick.th1).toBe(1);

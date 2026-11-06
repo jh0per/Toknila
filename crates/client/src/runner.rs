@@ -5,7 +5,9 @@
 use std::io::Read;
 
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
-use toknila_api_types::{InstructionClaim, NewAnswer, PermissionAsk, PermissionReply, TerminalSize};
+use toknila_api_types::{
+    InstructionClaim, NewAnswer, PermissionAsk, PermissionReply, TerminalSize,
+};
 use toknila_core::{AgentRole, RunId};
 
 use crate::{Client, ClientError, ClientResult, NO_BODY, enc, transport_error};
@@ -131,6 +133,11 @@ impl Client {
             &format!("/tickets/{}/instructions/claim", enc(ticket)),
             NO_BODY,
         )
+    }
+
+    /// `GET /projects/{project}/inbox`: what waits on a person, newest first.
+    pub fn inbox(&self, project: &str) -> ClientResult<Vec<toknila_core::inbox::InboxItem>> {
+        self.call("GET", &format!("/projects/{}/inbox", enc(project)), NO_BODY)
     }
 
     /// `POST /tickets/{ticket}/runner/answer`: a person's answer to what the agent asks.

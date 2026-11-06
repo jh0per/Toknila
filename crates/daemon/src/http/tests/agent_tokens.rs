@@ -126,7 +126,8 @@ async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_five() {
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body, json!({ "count": 0, "reason": "" }));
     // Nobody answers within the wait: the agent is told to show its own dialog.
-    api.runners.set_permission_wait(std::time::Duration::from_millis(50));
+    api.runners
+        .set_permission_wait(std::time::Duration::from_millis(50));
     let (status, body) = api
         .call_with(
             &token,

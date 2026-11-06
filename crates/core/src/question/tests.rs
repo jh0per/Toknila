@@ -34,7 +34,8 @@ fn a_waiting_hook_gets_a_decision_and_a_denial_carries_the_comment() {
             message: "not now".into()
         }))
     );
-    let Ok(Delivery::Hook(Decision::Deny { message })) = deliver(AnswerKind::Deny, Some("  "), true)
+    let Ok(Delivery::Hook(Decision::Deny { message })) =
+        deliver(AnswerKind::Deny, Some("  "), true)
     else {
         panic!("expected a denial");
     };
@@ -44,17 +45,35 @@ fn a_waiting_hook_gets_a_decision_and_a_denial_carries_the_comment() {
 #[test]
 fn without_a_waiting_hook_an_answer_is_keys() {
     let keys = |a, t| deliver(a, t, false);
-    assert_eq!(keys(AnswerKind::Allow, None), Ok(Delivery::Keys(b"1".to_vec())));
+    assert_eq!(
+        keys(AnswerKind::Allow, None),
+        Ok(Delivery::Keys(b"1".to_vec()))
+    );
     assert_eq!(keys(AnswerKind::Deny, None), Ok(Delivery::Keys(vec![0x1b])));
-    assert_eq!(keys(AnswerKind::Enter, None), Ok(Delivery::Keys(b"\r".to_vec())));
-    assert_eq!(keys(AnswerKind::One, None), Ok(Delivery::Keys(b"1".to_vec())));
-    assert_eq!(keys(AnswerKind::Two, None), Ok(Delivery::Keys(b"2".to_vec())));
-    assert_eq!(keys(AnswerKind::Escape, None), Ok(Delivery::Keys(vec![0x1b])));
+    assert_eq!(
+        keys(AnswerKind::Enter, None),
+        Ok(Delivery::Keys(b"\r".to_vec()))
+    );
+    assert_eq!(
+        keys(AnswerKind::One, None),
+        Ok(Delivery::Keys(b"1".to_vec()))
+    );
+    assert_eq!(
+        keys(AnswerKind::Two, None),
+        Ok(Delivery::Keys(b"2".to_vec()))
+    );
+    assert_eq!(
+        keys(AnswerKind::Escape, None),
+        Ok(Delivery::Keys(vec![0x1b]))
+    );
     assert_eq!(
         keys(AnswerKind::Text, Some(" yes please ")),
         Ok(Delivery::Keys(b"yes please\r".to_vec()))
     );
-    assert_eq!(keys(AnswerKind::Text, Some(" ")), Err(AnswerError::EmptyText));
+    assert_eq!(
+        keys(AnswerKind::Text, Some(" ")),
+        Err(AnswerError::EmptyText)
+    );
 }
 
 #[test]
@@ -62,12 +81,18 @@ fn the_startup_rule_is_a_function_of_spawn_activity_and_now() {
     let spawned = Timestamp(1_000);
     let at = |ms: i64| Timestamp(1_000 + ms);
     assert!(!waits_on_screen(spawned, None, at(19_999), 20), "not yet");
-    assert!(waits_on_screen(spawned, None, at(20_000), 20), "at the limit");
+    assert!(
+        waits_on_screen(spawned, None, at(20_000), 20),
+        "at the limit"
+    );
     assert!(
         !waits_on_screen(spawned, Some(at(5_000)), at(60_000), 20),
         "the first sign of life ends it"
     );
-    assert!(!waits_on_screen(spawned, None, at(600_000), 0), "0 turns it off");
+    assert!(
+        !waits_on_screen(spawned, None, at(600_000), 0),
+        "0 turns it off"
+    );
     assert!(
         !waits_on_screen(spawned, None, Timestamp(0), 20),
         "a clock behind the spawn"

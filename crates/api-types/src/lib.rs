@@ -3,6 +3,7 @@
 //! in `toknila-app` and are re-exported here; this crate adds the read models, errors and journal
 //! entries.
 
+pub mod questions;
 pub mod runner;
 mod usage;
 
@@ -14,11 +15,11 @@ use toknila_core::machine::TicketAction;
 use toknila_core::profile::{Catalog, ListedProfile, ProfileProblem};
 use toknila_core::schedule::Plan;
 use toknila_core::{
-    Actor, AgentRole, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Project, ProjectId, Release,
-    ReleaseId, Ship, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
-    question::AnswerKind,
+    Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Project, ProjectId, Release, ReleaseId,
+    Ship, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
 };
 
+pub use questions::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
 pub use toknila_app::chains::NewChain;
 pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;
@@ -278,51 +279,6 @@ impl NewActivity {
             prompt: None,
         }
     }
-}
-
-/// Body of `POST /v1/tickets/{ticket}/permission`: an agent's `PermissionRequest` hook, which
-/// waits for the person's decision.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-pub struct PermissionAsk {
-    /// Summary of the tool call that needs permission (the command or the file); the daemon
-    /// uses the last one it was told when this is absent.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool: Option<String>,
-}
-
-/// What the person decided.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PermissionDecision {
-    Allow,
-    Deny,
-    /// Nobody decided in time: the agent shows its own dialog.
-    Ask,
-}
-
-/// Answer of `POST /v1/tickets/{ticket}/permission`.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct PermissionReply {
-    pub decision: PermissionDecision,
-    /// Why it was denied, for the agent.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-}
-
-/// Body of `POST /v1/tickets/{ticket}/runner/answer`: a person's answer to what an agent asks.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct NewAnswer {
-    /// Whose question: the ticket's `worker` (the default) or its `reviewer`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub role: Option<AgentRole>,
-    pub answer: AnswerKind,
-    /// The text of a `text` answer; the optional comment of a `deny`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
 }
 
 /// Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it

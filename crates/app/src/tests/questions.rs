@@ -40,10 +40,19 @@ fn an_answer_to_a_waiting_worker_makes_it_running_at_once_and_is_journaled() {
     let t = a(&mem);
     questions::answered(&mut mem, &t, AgentRole::Worker, AnswerKind::Allow).expect("answered");
     let now = a(&mem);
-    assert_eq!((now.status, now.status_reason), (TicketStatus::Running, None));
+    assert_eq!(
+        (now.status, now.status_reason),
+        (TicketStatus::Running, None)
+    );
     let kinds = mem.kinds();
-    assert!(kinds.contains(&"ticket.question_answered".to_owned()), "{kinds:?}");
-    assert!(kinds.contains(&"ticket.status_changed".to_owned()), "{kinds:?}");
+    assert!(
+        kinds.contains(&"ticket.question_answered".to_owned()),
+        "{kinds:?}"
+    );
+    assert!(
+        kinds.contains(&"ticket.status_changed".to_owned()),
+        "{kinds:?}"
+    );
 }
 
 #[test]
@@ -70,8 +79,8 @@ fn only_a_person_answers() {
     ask(&mut mem);
     let t = a(&mem);
     mem.actor = Actor::Agent;
-    let refused = questions::answered(&mut mem, &t, AgentRole::Worker, AnswerKind::Allow)
-        .expect_err("agent");
+    let refused =
+        questions::answered(&mut mem, &t, AgentRole::Worker, AnswerKind::Allow).expect_err("agent");
     assert_eq!(refused.kind, ErrorKind::Conflict);
     assert_eq!(a(&mem).status, TicketStatus::Waiting);
 }
