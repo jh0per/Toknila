@@ -92,3 +92,17 @@ fn activity_of_a_running_card_changes_nothing() {
     agent::activity(&mut mem, &t, "hook:post_tool_use").expect("activity");
     assert_eq!(a(&mem).status, TicketStatus::Running);
 }
+
+#[test]
+fn talking_with_the_owner_does_not_resume_a_waiting_card() {
+    use toknila_core::ThreadKind;
+    let mut mem = running();
+    ask(&mut mem, "which flow?", false);
+    let t = a(&mem);
+    let event = AgentEvent::OpenThread {
+        kind: ThreadKind::Design,
+        title: "Flow".to_owned(),
+    };
+    agent::ticket_event(&mut mem, &t, event).expect("thread");
+    assert_eq!(a(&mem).status, TicketStatus::Waiting);
+}

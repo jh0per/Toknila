@@ -286,8 +286,9 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
   delivery (typed into an idle agent or claimed by its Stop hook, journaled `comment.delivered`);
   the comments are also the nudge history, so a daemon restart forgets nothing
   (`toknila_app::nudge`). The ticker reads facts outside the store's writer and acts in one command.
-- **Back to Running.** `TicketEvent::AgentActive` moves Waiting to Running. Any agent event except
-  `ask_human` and `crashed`, and the hooks `post_tool_use` and `user_prompt_submit`
+- **Back to Running.** `TicketEvent::AgentActive` moves Waiting to Running. The agent events
+  `started`, `subtask_done`, `note` and `finished` (not a question, a crash, a proposal or a
+  thread, which talk to the owner), and the hooks `post_tool_use` and `user_prompt_submit`
   (`toknila_core::nudge::resumes`), cause it; `stop` and `notification` do not, since they fire when
   the agent stops to wait. This also ends Waiting (silent).
 - **Stopping.** `StopRunner` ends the whole process tree. On Unix the agent leads its own process

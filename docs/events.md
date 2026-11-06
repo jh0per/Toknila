@@ -89,8 +89,9 @@ hook reports that on stderr and carries on.
 
 ## Waiting and back
 
-`ask_human` (a question, a permission prompt) moves Running to Waiting. Any later agent event
-except `ask_human` and `crashed`, or a `post_tool_use` / `user_prompt_submit` hook, moves it back to
+`ask_human` (a question, a permission prompt) moves Running to Waiting. A later `started`, `subtask_done`,
+`note` or `finished` event (not `ask_human`, `crashed`, `propose` or thread posts, which talk to
+the owner), or a `post_tool_use` / `user_prompt_submit` hook, moves it back to
 Running (machine event `agent_active`, no journal entry of its own beyond the status change). The
 same holds for Waiting (silent), which the silence detector sets after its nudges went unanswered.
 

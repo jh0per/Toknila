@@ -30,10 +30,14 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
     t: &Ticket,
     event: AgentEvent,
 ) -> AppResult<TicketId> {
-    // Any report but a question or a crash shows the agent is working again.
+    // A report of work shows the agent is working again. A question, a crash, and talk with the
+    // owner (a proposal, a thread) do not: the card may well be waiting on the answer.
     let resumed = match event {
-        AgentEvent::AskHuman { .. } | AgentEvent::Crashed { .. } => false,
-        _ => resume(uow, t)?,
+        AgentEvent::Started
+        | AgentEvent::SubtaskDone { .. }
+        | AgentEvent::Note { .. }
+        | AgentEvent::Finished { .. } => resume(uow, t)?,
+        _ => false,
     };
     match event {
         AgentEvent::Propose(card) => {
