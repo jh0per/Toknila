@@ -1,6 +1,6 @@
 // The page's one normalized store and the selectors the views read.
 
-import type { ChainDetail, EventRecord, Project, Ticket, TicketDetail } from "../api/types";
+import type { ChainDetail, EventRecord, Project, Ticket, TicketDetail, TicketThreads } from "../api/types";
 import { type Route, type Tab, routePath } from "./route";
 
 export type Link = "connecting" | "live" | "offline";
@@ -14,6 +14,10 @@ export interface State {
   needsHuman: Record<string, true>;
   /// Ticket details (subtasks, comments) by ticket key, for cards that were opened.
   details: Record<string, TicketDetail>;
+  /// Threads (and the phase) by ticket key, for cards that were opened.
+  threads: Record<string, TicketThreads>;
+  /// The version number shown per thread id, when the person picked an older one.
+  versionPick: Record<string, number>;
   /// The journal as the page has seen it, oldest first.
   events: EventRecord[];
   loaded: boolean;
@@ -37,6 +41,8 @@ export function initialState(route: Route): State {
     chainOrder: [],
     needsHuman: {},
     details: {},
+    threads: {},
+    versionPick: {},
     events: [],
     loaded: false,
     error: "",
@@ -117,6 +123,7 @@ export function ticketOfEvent(e: EventRecord): string | undefined {
   const p = (e.payload ?? {}) as Record<string, Record<string, unknown> | undefined>;
   const str = (v: unknown) => (typeof v === "string" ? v : undefined);
   switch (e.entity) {
+    case "thread": return str(p.ticket);
     case "ticket": return str(p.ticket?.id) ?? (e.entity_id || undefined);
     case "comment": return str(p.comment?.ticket_id);
     case "subtask": return str(p.subtask?.ticket_id);

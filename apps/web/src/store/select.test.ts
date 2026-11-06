@@ -72,6 +72,7 @@ describe("selection", () => {
     expect(fx).toEqual([
       { type: "pushUrl", path: "/projects/DEMO/chains/demo/cards/DEMO-2" },
       { type: "loadDetail", key: "DEMO-2" },
+      { type: "loadThreads", key: "DEMO-2" },
     ]);
     expect(currentCard(s)?.id).toBe("t2");
   });
@@ -81,7 +82,10 @@ describe("selection", () => {
     const [, fx] = reduce(initialState(route), {
       type: "loaded", projects, chains: [chain("c1", "demo", "DEMO", ["t1"])], tickets: [],
     });
-    expect(fx).toEqual([{ type: "loadDetail", key: "DEMO-1" }]);
+    expect(fx).toEqual([
+      { type: "loadDetail", key: "DEMO-1" },
+      { type: "loadThreads", key: "DEMO-1" },
+    ]);
   });
 
   it("switches the bottom tab without touching the route", () => {

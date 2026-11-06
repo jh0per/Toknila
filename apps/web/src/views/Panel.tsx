@@ -3,15 +3,15 @@ import { type Tab, TABS } from "../store/route";
 import { type State, currentCard } from "../store/state";
 import { Details } from "./Details";
 import { EventsTab } from "./EventsTab";
+import { ThreadsTab } from "./ThreadsTab";
 
 const LABEL: Record<Tab, string> = {
   details: "Details", events: "Events", chat: "Chat", terminal: "Terminal", threads: "Threads", pr: "PR",
 };
 
-const PLACEHOLDER: Record<"chat" | "terminal" | "threads" | "pr", string> = {
+const PLACEHOLDER: Record<"chat" | "terminal" | "pr", string> = {
   chat: "Talk to this card's agent here. Not available yet.",
   terminal: "The agent's terminal will be shown here once ships run real agents.",
-  threads: "Side threads of this card will be listed here. Not available yet.",
   pr: "The pull request of this card, with its checks and review state, will be shown here.",
 };
 
@@ -39,7 +39,8 @@ export function Panel({ state, dispatch }: { state: State; dispatch: (i: Intent)
       <div role="tabpanel" className="tabpanel" data-tab={state.tab}>
         {state.tab === "details" && <Details state={state} card={card} />}
         {state.tab === "events" && <EventsTab state={state} card={card} />}
-        {state.tab !== "details" && state.tab !== "events" && (
+        {state.tab === "threads" && <ThreadsTab state={state} card={card} dispatch={dispatch} />}
+        {(state.tab === "chat" || state.tab === "terminal" || state.tab === "pr") && (
           <p className="muted" data-testid="placeholder">{PLACEHOLDER[state.tab]}</p>
         )}
       </div>

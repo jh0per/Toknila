@@ -1,6 +1,6 @@
 // Everything that changes the state: what the person did (intents), API answers, the stream.
 
-import type { ChainDetail, EventRecord, Project, TicketDetail, TicketItem } from "../api/types";
+import type { ChainDetail, EventRecord, Project, TicketDetail, TicketItem, TicketThreads } from "../api/types";
 import type { Route, Tab } from "./route";
 
 /// What the person did.
@@ -9,7 +9,18 @@ export type Intent =
   | { type: "selectProject"; project: string }
   | { type: "selectChain"; project: string; chain: string }
   | { type: "selectCard"; project: string; chain: string; key: string }
-  | { type: "selectTab"; tab: Tab };
+  | { type: "selectTab"; tab: Tab }
+  | { type: "pickVersion"; thread: string; number: number }
+  | ThreadAction;
+
+/// What a person does in a thread; `text` is the message or the comment of a request for changes.
+export type ThreadAction = {
+  type: "threadAction";
+  key: string;
+  thread: string;
+  action: "message" | "changes" | "approve";
+  text?: string;
+};
 
 export type Msg =
   | Intent
@@ -20,6 +31,7 @@ export type Msg =
   | { type: "chainLoaded"; chain: ChainDetail }
   | { type: "ticketsLoaded"; tickets: TicketItem[] }
   | { type: "detailLoaded"; detail: TicketDetail }
+  | { type: "threadsLoaded"; threads: TicketThreads }
   | { type: "loadFailed"; error: string }
   | { type: "linkOpened" }
   | { type: "linkClosed" }
@@ -34,5 +46,7 @@ export type Effect =
   | { type: "loadChain"; id: string }
   | { type: "loadTickets" }
   | { type: "loadDetail"; key: string }
+  | { type: "loadThreads"; key: string }
+  | ThreadAction
   | { type: "connect"; since: number; delayMs: number }
   | { type: "pushUrl"; path: string };

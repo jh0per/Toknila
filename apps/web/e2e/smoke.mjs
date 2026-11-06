@@ -7,7 +7,7 @@
 // links and the title link navigate, and the page reconnects by itself after the daemon restarts.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
@@ -102,6 +102,49 @@ try {
   await expectText(status("DEMO-1"), "running", "a comment answers the question");
   tok("sim", "DEMO-1", "ask", "and now?");
   await expectText(status("DEMO-1"), "waiting", "asked again");
+
+  // Threads tab: an agent posts a Mermaid and an HTML version in a design thread; the person asks
+  // for changes, the agent answers with a new version, the person approves.
+  const art = (name, body) => {
+    const f = join(home, name);
+    writeFileSync(f, body);
+    return f;
+  };
+  const flow = art("flow.mmd", "graph TD; A[List] --> B[Detail]");
+  const states = art("states.html", "<h1 id=s>empty / loading / error / content</h1><script>document.title='ran'</script>");
+  tok("sim", "DEMO-1", "thread", "open", "design", "Profile list states");
+  tok("sim", "DEMO-1", "thread", "post", "1", "--artifact", flow, "--format", "mermaid");
+  tok("sim", "DEMO-1", "thread", "post", "1", "--artifact", states, "--format", "html", "--message", "all four states");
+  await page.getByRole("tab", { name: "Threads" }).click();
+  const threads = page.locator("[data-testid=threads]");
+  await expectText(threads.locator("[data-testid=thread-state]"), "open", "design thread is open");
+  await expectText(page.locator("[data-testid=phase]"), "design", "phase badge reads design");
+  await expectText(page.locator("[data-testid=hand-in-notice]"), "blocks hand-in", "open thread blocks hand-in");
+  const mockup = page.locator("[data-testid=mockup]");
+  await mockup.waitFor({ timeout: 10_000 });
+  if ((await mockup.getAttribute("sandbox")) !== "") throw new Error("mockup iframe must have an empty sandbox");
+  await page.frameLocator("[data-testid=mockup]").locator("#s").waitFor({ timeout: 10_000 });
+  if ((await page.frameLocator("[data-testid=mockup]").locator("html").evaluate(() => document.title)) === "ran") {
+    throw new Error("a script ran inside the sandboxed mockup");
+  }
+  console.log("PASS HTML version renders in a sandboxed iframe, scripts do not run");
+  await page.getByRole("button", { name: "v1" }).click();
+  await page.locator("[data-testid=mermaid] svg").waitFor({ timeout: 20_000 });
+  console.log("PASS Mermaid version renders as an svg diagram");
+  await page.getByLabel("Message in thread 1").fill("show the error state larger");
+  await page.getByRole("button", { name: "Request changes" }).click();
+  await expectText(threads.locator("[data-testid=thread-state]"), "changes requested", "changes requested");
+  await expectText(threads.locator("[data-testid=messages]"), "show the error state larger", "comment is in the thread");
+  tok("sim", "DEMO-1", "thread", "post", "1", "--artifact", states, "--format", "html", "--message", "error state is larger");
+  await expectText(page.locator("[data-testid=versions]"), "v3", "a new version arrived live");
+  await expectText(threads.locator("[data-testid=thread-state]"), "open", "a new version answers the request");
+  await page.getByRole("button", { name: "Approve" }).click();
+  await expectText(threads.locator("[data-testid=thread-state]"), "approved", "thread approved");
+  await expectText(page.locator("[data-testid=phase]"), "implement", "phase badge reads implement");
+  if (!(await page.getByRole("button", { name: "Approve" }).isDisabled())) throw new Error("Approve must be disabled after approval");
+  if (await page.locator("[data-testid=hand-in-notice]").count()) throw new Error("the hand-in notice must go after approval");
+  console.log("PASS actions are disabled after approval, notice is gone");
+  await page.getByRole("tab", { name: "Details" }).click();
 
   // Navigation lives in the URL: deep links open the card and the inbox, the title leads back.
   await page.goto(at("/projects/DEMO/chains/demo/cards/DEMO-2"));

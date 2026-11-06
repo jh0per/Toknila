@@ -1,13 +1,20 @@
 // Runs the effects the reducer describes. The only place that touches the network or history.
 
-import { get, streamUrl } from "../api/http";
-import type { ChainDetail, ChainItem, EventRecord, Project, TicketDetail, TicketItem } from "../api/types";
-import type { Effect, Msg } from "./msg";
+import { get, post, streamUrl } from "../api/http";
+import type { ChainDetail, ChainItem, EventRecord, Project, TicketDetail, TicketItem, TicketThreads } from "../api/types";
+import type { Effect, Msg, ThreadAction } from "./msg";
 
 type Dispatch = (msg: Msg) => void;
 
 /// Coalesces bursts of refreshes (one command journals several events).
 const DEBOUNCE_MS = 50;
+
+const ACTION_PATH = { message: "messages", changes: "changes", approve: "approve" } as const;
+
+function threadPath(e: ThreadAction): string {
+  const ticket = encodeURIComponent(e.key);
+  return `/tickets/${ticket}/threads/${encodeURIComponent(e.thread)}/${ACTION_PATH[e.action]}`;
+}
 
 export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; stop: () => void } {
   let ws: WebSocket | null = null;
@@ -34,6 +41,11 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     const chains = await Promise.all(list.map((c) => get<ChainDetail>(`/chains/${c.chain.id}`)));
     const tickets = await get<TicketItem[]>("/tickets");
     dispatch({ type: "loaded", projects, chains, tickets });
+  };
+
+  const loadThreads = async (key: string) => {
+    const threads = await get<TicketThreads>(`/tickets/${encodeURIComponent(key)}/threads`);
+    dispatch({ type: "threadsLoaded", threads });
   };
 
   const connect = (since: number) => {
@@ -77,6 +89,14 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
             .then((detail) => dispatch({ type: "detailLoaded", detail }))
             .catch(failed);
         }, DEBOUNCE_MS);
+        return;
+      case "loadThreads":
+        later(`threads:${e.key}`, () => void loadThreads(e.key).catch(failed), DEBOUNCE_MS);
+        return;
+      case "threadAction":
+        void post(threadPath(e), { text: e.text })
+          .then(() => loadThreads(e.key))
+          .catch(failed);
         return;
       case "loadChain":
         later(`chain:${e.id}`, () => {
