@@ -126,5 +126,5 @@ try {
   } catch {
     /* already stopped */
   }
-  rmSync(home, { recursive: true, force: true });
+  rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
