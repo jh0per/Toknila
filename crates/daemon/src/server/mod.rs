@@ -91,6 +91,7 @@ pub fn router(state: AppState) -> Router {
         .route("/chains/{chain}", get(crate::web::index))
         .route("/inbox", get(crate::web::index))
         .route("/settings", get(crate::web::index))
+        .route("/usage", get(crate::web::index))
         .route("/projects/{project}/settings", get(crate::web::index))
         .route("/projects/{project}", get(crate::web::index))
         .route("/projects/{project}/chains/{chain}", get(crate::web::index))

@@ -5,6 +5,7 @@ import { statusGroup, statusText } from "../store/groups";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
 import { PrChip } from "./PrChip";
+import { UsageChip } from "./UsageChip";
 
 const W = 196;
 const H = 84;
@@ -78,6 +79,7 @@ export function Canvas({ chain, state, dispatch }: {
               </span>
               <span className="row">
                 <span className="st" data-testid="status">{statusText(t.status)}</span>
+                <UsageChip figures={chain.usage?.[t.key]} />
                 <span className="key">{t.key}</span>
               </span>
               {queuePosition(state, t.id) !== undefined && (

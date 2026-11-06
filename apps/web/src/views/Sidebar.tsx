@@ -2,6 +2,7 @@ import { KIND_TITLE, itemKey, itemRoute } from "../store/inbox";
 import type { Intent } from "../store/msg";
 import { type State, cardRoute, chainsOf, currentChain, currentProject, runningAgents } from "../store/state";
 import { NavLink } from "./Link";
+import { UsageChip } from "./UsageChip";
 
 export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const project = currentProject(state);
@@ -85,6 +86,7 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
                 <span className="dot pulse" />
                 <span className="key">{ticket.key}</span>
                 <span className="t">{ticket.title}</span>
+                <UsageChip figures={c.usage?.[ticket.key]} testId="agent-usage" />
               </NavLink>
             </li>
           ))}
@@ -92,6 +94,9 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
       </section>
 
       <div className="side-foot">
+        <NavLink route={{ name: "usage" }} dispatch={dispatch} className={`item${state.route.name === "usage" ? " sel" : ""}`} testId="usage-link">
+          <span className="t">Usage</span>
+        </NavLink>
         <NavLink route={{ name: "settings", project: project?.key }} dispatch={dispatch} className={`item${state.route.name === "settings" ? " sel" : ""}`} testId="settings-link">
           <span className="t">Settings</span>
         </NavLink>

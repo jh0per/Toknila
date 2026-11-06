@@ -7,6 +7,7 @@ import "./chain.css";
 import "./panel.css";
 import "./threads.css";
 import "./settings.css";
+import "./usage.css";
 
 const root = document.getElementById("root");
 if (root) {

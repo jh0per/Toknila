@@ -5,6 +5,7 @@ import type {
 } from "../api/types";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
+import { type UsageState, initialUsage } from "./usage";
 
 export type Link = "connecting" | "live" | "offline";
 
@@ -36,6 +37,8 @@ export interface State {
   tab: Tab;
   /// Settings and onboarding: checks, profiles, the answers of the last form.
   settings: SettingsState;
+  /// The Usage page: window, metric and the daemon's answer.
+  usage: UsageState;
 }
 
 export const FIRST_RETRY_MS = 500;
@@ -60,6 +63,7 @@ export function initialState(route: Route): State {
     route,
     tab: "details",
     settings: initialSettings,
+    usage: initialUsage,
   };
 }
 

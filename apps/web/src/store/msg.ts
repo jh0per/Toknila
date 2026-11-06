@@ -6,6 +6,7 @@ import type {
 } from "../api/types";
 import type { Route, Tab } from "./route";
 import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
+import type { UsageEffect, UsageIntent, UsageResult } from "./usage";
 
 /// What the person did.
 export type Intent =
@@ -17,7 +18,8 @@ export type Intent =
   | { type: "pickVersion"; thread: string; number: number }
   | CardCommand
   | ThreadAction
-  | SettingsIntent;
+  | SettingsIntent
+  | UsageIntent;
 
 /// What a person decides about the open subtasks left behind a card done out of order.
 export type LeftoverAction = "move" | "close" | "leave";
@@ -54,7 +56,8 @@ export type Msg =
   | { type: "linkClosed" }
   | { type: "event"; event: EventRecord }
   | { type: "urlChanged"; route: Route }
-  | SettingsResult;
+  | SettingsResult
+  | UsageResult;
 
 /// A side effect for the runner; the reducer only describes it.
 export type Effect =
@@ -69,5 +72,6 @@ export type Effect =
   | CardCommand
   | ThreadAction
   | SettingsEffect
+  | UsageEffect
   | { type: "connect"; since: number; delayMs: number }
   | { type: "pushUrl"; path: string };

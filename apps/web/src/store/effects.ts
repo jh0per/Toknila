@@ -6,6 +6,7 @@ import type {
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { runSettingsEffect } from "./settingsEffects";
+import { runUsageEffect } from "./usageEffects";
 
 type Dispatch = (msg: Msg) => void;
 
@@ -142,6 +143,11 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "saveProject":
       case "importChain":
         runSettingsEffect(e, dispatch);
+        return;
+      case "loadUsage":
+      case "saveUsageSettings":
+        if (e.type === "loadUsage") later("usage", () => runUsageEffect(e, dispatch), DEBOUNCE_MS);
+        else runUsageEffect(e, dispatch);
         return;
       case "loadChain":
         later(`chain:${e.id}`, () => {

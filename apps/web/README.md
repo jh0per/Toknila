@@ -15,7 +15,7 @@ It follows MVI (`docs/architecture.md`): `src/store/reduce.ts` is a pure
 `reduce(state, msg) -> [state, effects]` with Vitest tests next to it, `src/store/effects.ts` runs
 the effects (the only network code), and `src/views/` only renders state and dispatches intents.
 Routes live in the URL: `/projects/<key>`, `/projects/<key>/chains/<name>`,
-`/projects/<key>/chains/<name>/cards/<ticket key>`, `/inbox`, and the older `/` and
+`/projects/<key>/chains/<name>/cards/<ticket key>`, `/inbox`, `/usage` (tokens and estimated cost: totals, a per-day chart, breakdowns), and the older `/` and
 `/chains/<name>`, which render in the same layout. The bottom panel's tab is state, not URL.
 
 API types are generated: `openapi.json` is the daemon's API document (pinned by a daemon test;

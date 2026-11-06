@@ -1,6 +1,33 @@
 // Text for people: status reasons and durations.
 
-import type { OutOfOrder, StatusReason } from "./api/types";
+import type { OutOfOrder, StatusReason, UsageFigures } from "./api/types";
+
+/// Said wherever a cost is shown: the numbers are prices times tokens, not a bill.
+export const ESTIMATE_NOTE = "Estimate at API list prices; on a subscription the real cost differs.";
+
+/// A token count in few characters: 842, 12.3k, 1.2M, 3.4B.
+export function tokensText(n: number): string {
+  const scaled = (div: number, unit: string) => `${(n / div).toFixed(1).replace(/\.0$/, "")}${unit}`;
+  if (n >= 1e9) return scaled(1e9, "B");
+  if (n >= 1e6) return scaled(1e6, "M");
+  if (n >= 1e4) return scaled(1e3, "k");
+  return String(Math.round(n));
+}
+
+/// Dollars with cents; amounts under a cent are "<$0.01".
+export function costText(usd: number): string {
+  if (usd > 0 && usd < 0.01) return "<$0.01";
+  return `$${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/// A share from 0 to 1 as a whole percentage.
+export const shareText = (share: number): string => `${Math.round(share * 100)}%`;
+
+/// The small chip on a card: tokens and estimated cost; empty when the card used nothing.
+export function chipText(f: Pick<UsageFigures, "processed" | "cost_usd" | "messages"> | undefined): string {
+  if (!f || f.messages === 0) return "";
+  return `${tokensText(f.processed)} tok · ~${costText(f.cost_usd)}`;
+}
 
 export function reasonText(r: StatusReason | null | undefined): string {
   if (!r) return "";
