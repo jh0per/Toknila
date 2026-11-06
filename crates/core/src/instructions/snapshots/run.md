@@ -21,7 +21,7 @@ Use the tools of the MCP server `toknila`; never change the ticket any other way
 - `subtask_done` (`position`): a checklist item is done.
 - `note` (comment template fields): progress, a decision, a finding.
 - `ask_human` (`text`): you need an answer; then stop and wait.
-- `finished` (`summary`): the work is complete and every acceptance item holds. Not before.
+- `finished` (`summary`): the work is complete and every acceptance item holds. Not before. Commit your work on this branch first: Toknila pushes the branch, so uncommitted changes never reach the pull request.
 - `crashed` (`detail`): you cannot continue.
 - `propose` (`title`, `prompt`, `acceptance`): work you found that nobody planned. It becomes a card a person approves; do not do it yourself.
 - `open_thread`, `thread_message`, `thread_version`: settle a design with the person before you build it; `finished` is refused while a thread is open.
