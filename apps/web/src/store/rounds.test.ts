@@ -27,6 +27,17 @@ describe("reviewRounds", () => {
     expect(reviewRounds([c, r], "T1")[0].comment).toBe("fix it");
   });
 
+  it("takes the comment that was added with the return, not an earlier one that was delivered just before it", () => {
+    const earlier = { comment: { ticket_id: "T1", kind: "instruction", body: { gist: "earlier" } } };
+    const events = [
+      ev("comment", "delivered", earlier),
+      status("review", "running"),
+      comment("this return"),
+      ev("comment", "delivered", { comment: { ticket_id: "T1", kind: "instruction", body: { gist: "this return" } } }),
+    ];
+    expect(reviewRounds(events, "T1")[0].comment).toBe("this return");
+  });
+
   it("ignores other tickets and other moves", () => {
     const events = [status("waiting", "running"), comment("answer"), status("review", "running", "T2")];
     expect(reviewRounds(events, "T1")).toEqual([]);

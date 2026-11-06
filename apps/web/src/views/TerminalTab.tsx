@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Ticket } from "../api/types";
 import { type TermStatus, openTerminal } from "../terminal/connect";
+import { type SizeReporter, sizeReporter } from "../terminal/size";
 import { exitText } from "../terminal/wire";
 
 const STATUS_TEXT = (s: TermStatus): string => {
@@ -42,6 +43,9 @@ export function TerminalTab({ card }: { card: Ticket }) {
       fit.fit();
       const resize = new ResizeObserver(() => fit.fit());
       resize.observe(el);
+      // The agent draws for the grid the person sees: tell the daemon the panel's size when it
+      // changes, and again whenever the stream goes live (a new run starts at the default size).
+      let sizes: SizeReporter | null = null;
       const conn = openTerminal(card.key, {
         output: (bytes, reset) => {
           if (reset) term.reset();
@@ -49,14 +53,22 @@ export function TerminalTab({ card }: { card: Ticket }) {
         },
         status: (s) => {
           setStatus(s);
-          if (s.kind === "live") setRefused("");
+          if (s.kind === "live") {
+            setRefused("");
+            sizes?.resend();
+          }
         },
         refused: setRefused,
       });
+      sizes = sizeReporter((s) => conn.resize(s));
+      sizes.report({ cols: term.cols, rows: term.rows });
+      const onResize = term.onResize((s) => sizes?.report(s));
       const typing = new TextEncoder();
       const onData = term.onData((d) => conn.send(typing.encode(d)));
       dispose = () => {
         onData.dispose();
+        onResize.dispose();
+        sizes?.dispose();
         resize.disconnect();
         conn.close();
         term.dispose();

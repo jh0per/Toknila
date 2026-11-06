@@ -24,7 +24,8 @@ function returned(e: EventRecord, ticket: string): boolean {
 }
 
 function instruction(e: EventRecord, ticket: string): string | undefined {
-  if (e.entity !== "comment" || ticketOfEvent(e) !== ticket) return undefined;
+  // Only a comment being written: its delivery is journaled too, and can land beside a return.
+  if (e.entity !== "comment" || e.kind !== "added" || ticketOfEvent(e) !== ticket) return undefined;
   const c = ((e.payload ?? {}) as Payload).comment as { kind?: string; body?: { gist?: string } } | undefined;
   return c?.kind === "instruction" ? c.body?.gist : undefined;
 }

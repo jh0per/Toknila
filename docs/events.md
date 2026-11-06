@@ -150,9 +150,13 @@ is open and `implement` otherwise; it is computed, never stored.
 ## Instructions back to the agent
 
 Everything a person tells an agent is a ticket comment first (`POST /v1/tickets/{ticket}/comments`,
-kind `instruction`). The runner delivers pending instructions and marks them `delivered_at`; a
-Waiting ticket goes back to Running when one is delivered. The `sim` profile "reads" instantly:
-delivery happens in the same command for Running and Waiting sim tickets.
+kind `instruction`). The runner delivers pending instructions and marks them `delivered_at`
+(journal `comment.delivered`); a Waiting ticket goes back to Running when one is delivered. The
+`sim` profile "reads" instantly: delivery happens in the same command for Running and Waiting sim
+tickets. A process agent gets it typed into its terminal, or, while it works and its Stop hook is
+wired, at its next stop: `POST /v1/tickets/{ticket}/instructions/claim` (agent token) answers
+`{"count": n, "reason": "<instructions>"}` and marks them delivered, once. See "Agent access" in
+`architecture.md`.
 
 ## Release agent
 

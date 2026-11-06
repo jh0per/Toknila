@@ -1,7 +1,7 @@
 //! Runners through the use cases. Like ships, a command only queues the process; `settle`
 //! plays the adapter: run what was queued on a fake runner, then record the outcomes.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 
 use toknila_core::agent::AgentEvent;
@@ -13,8 +13,11 @@ use toknila_core::{
 use super::Mem;
 use crate::external::{self, ExternalEffect, Host};
 use crate::recovery::recover;
-use crate::runner::{RunEnded, RunRequest, Runner, RunnerError, Started};
+use crate::runner::{RunBrief, RunEnded, RunRequest, Runner, RunnerError, RunnerState, Started};
 use crate::{ErrorKind, agent, runs, tickets};
+use toknila_core::instructions::terminal::Size;
+
+mod delivery;
 
 /// A runner that remembers what it was asked and can be told to refuse.
 #[derive(Debug, Default)]
@@ -24,6 +27,18 @@ pub(super) struct FakeRunner {
     written: RefCell<Vec<Vec<u8>>>,
     live: RefCell<HashSet<TicketId>>,
     refuse: RefCell<Option<RunnerError>>,
+    sized: RefCell<Vec<Size>>,
+    /// What `state` reports for a live ticket.
+    reach: Cell<RunnerState>,
+}
+
+impl Default for RunnerState {
+    fn default() -> Self {
+        RunnerState {
+            hooks: true,
+            idle: false,
+        }
+    }
 }
 
 impl Runner for FakeRunner {
@@ -51,6 +66,21 @@ impl Runner for FakeRunner {
             return Err(RunnerError::NotRunning);
         }
         self.written.borrow_mut().push(bytes.to_vec());
+        Ok(())
+    }
+
+    fn state(&self, ticket: TicketId) -> Option<RunnerState> {
+        self.live
+            .borrow()
+            .contains(&ticket)
+            .then(|| self.reach.get())
+    }
+
+    fn resize(&self, ticket: TicketId, size: Size) -> Result<(), RunnerError> {
+        if !self.live.borrow().contains(&ticket) {
+            return Err(RunnerError::NotRunning);
+        }
+        self.sized.borrow_mut().push(size);
         Ok(())
     }
 }
@@ -120,6 +150,7 @@ fn ended(mem: &Mem, code: Option<i32>, stopped: bool) -> RunEnded {
             key: t.key.clone(),
             profile: "fake".to_owned(),
             dir: "/ships/x".to_owned(),
+            brief: RunBrief::default(),
         }),
         exit: ProcessExit { code, signal: None },
         stopped,

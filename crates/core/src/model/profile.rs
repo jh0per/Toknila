@@ -93,6 +93,10 @@ pub struct AgentProfile {
     pub env: BTreeMap<String, String>,
     /// Instructions file the agent reads, relative to its working directory.
     pub instructions_file: Option<String>,
+    /// Flag of the agent's command that takes the path of the generated per-run instructions
+    /// (under the data home; the project's own instructions file is never written).
+    #[serde(default)]
+    pub instructions_flag: Option<String>,
     pub mcp: McpWiring,
     pub hooks: HookWiring,
     pub output: OutputRules,
@@ -113,6 +117,7 @@ impl AgentProfile {
             command,
             env: BTreeMap::new(),
             instructions_file: None,
+            instructions_flag: None,
             mcp: McpWiring::default(),
             hooks: HookWiring::default(),
             output: OutputRules::default(),
@@ -130,6 +135,7 @@ impl AgentProfile {
     pub fn claude_code() -> Self {
         Self {
             instructions_file: Some("CLAUDE.md".to_owned()),
+            instructions_flag: Some("--append-system-prompt-file".to_owned()),
             mcp: McpWiring {
                 enabled: true,
                 config_flag: Some("--mcp-config".to_owned()),

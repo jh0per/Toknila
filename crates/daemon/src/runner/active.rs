@@ -6,17 +6,22 @@ use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use portable_pty::ChildKiller;
+use portable_pty::{ChildKiller, MasterPty, PtySize};
 use tokio::sync::{broadcast, mpsc};
-use toknila_app::runner::{RunEnded, RunnerError};
+use toknila_app::runner::{RunEnded, RunnerError, RunnerState};
+use toknila_core::instructions::terminal::Size;
 use toknila_core::{ProcessExit, Run, TicketId};
 
 use super::Chunk;
 use super::pty::{self, Spawned};
 use super::scrollback::Scrollback;
 use super::tokens::AgentTokens;
+
+/// How long a terminal prints nothing before its agent counts as waiting at its prompt. A working
+/// agent keeps its spinner and output moving.
+const IDLE_AFTER: Duration = Duration::from_secs(3);
 
 /// How long the watcher waits for the last output after the process ended.
 const DRAIN: Duration = Duration::from_secs(2);
@@ -43,6 +48,12 @@ pub(super) struct Active {
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     /// A stop was requested, so the exit is not a crash.
     stopped: AtomicBool,
+    /// The terminal itself, for resizing; taken (and so closed) once the process has ended.
+    master: Mutex<Option<Box<dyn MasterPty + Send>>>,
+    /// When the process last printed.
+    last_output: Mutex<Instant>,
+    /// The agent's Stop hook reports to Toknila.
+    hooks: bool,
 }
 
 impl std::fmt::Debug for Active {
@@ -62,6 +73,7 @@ impl Active {
         process: Spawned,
         log: File,
         lines: usize,
+        hooks: bool,
         channels: Channels,
     ) -> Result<Arc<Active>, RunnerError> {
         let Channels {
@@ -85,6 +97,9 @@ impl Active {
             writer: Mutex::new(writer),
             killer: Mutex::new(killer),
             stopped: AtomicBool::new(false),
+            master: Mutex::new(Some(master)),
+            last_output: Mutex::new(Instant::now()),
+            hooks,
         });
         let (done, drained) = channel();
         let pump = {
@@ -113,11 +128,11 @@ impl Active {
                     // reports the end only once its console is closed, so close it after a pause.
                     if cfg!(windows) {
                         std::thread::sleep(Duration::from_millis(200));
-                        drop(master);
+                        drop(lock(&a.master).take());
                         let _ = drained.recv_timeout(DRAIN);
                     } else {
                         let _ = drained.recv_timeout(DRAIN);
-                        drop(master);
+                        drop(lock(&a.master).take());
                     }
                     // The run is over: its token stops working before anyone hears about the end.
                     tokens.revoke(a.run.id);
@@ -165,6 +180,7 @@ impl Active {
                 log_failed = true;
                 tracing::warn!(run = %self.run.id, error = %e, "cannot write the run log");
             }
+            *lock(&self.last_output) = Instant::now();
             lock(&self.state).scrollback.push(&buf[..n]);
             let _ = wake.send(self.run.ticket_id);
         }
@@ -216,6 +232,28 @@ impl Active {
         writer
             .write_all(bytes)
             .and_then(|()| writer.flush())
+            .map_err(|e| RunnerError::Write(e.to_string()))
+    }
+
+    /// How to reach the agent, or `None` once it is over.
+    pub fn state(&self) -> Option<RunnerState> {
+        (!self.is_over()).then(|| RunnerState {
+            hooks: self.hooks,
+            idle: lock(&self.last_output).elapsed() >= IDLE_AFTER,
+        })
+    }
+
+    /// Gives the terminal a new size; the agent gets the window-size signal.
+    pub fn resize(&self, size: Size) -> Result<(), RunnerError> {
+        let master = lock(&self.master);
+        let master = master.as_ref().ok_or(RunnerError::NotRunning)?;
+        master
+            .resize(PtySize {
+                rows: size.rows,
+                cols: size.cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
             .map_err(|e| RunnerError::Write(e.to_string()))
     }
 

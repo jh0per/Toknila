@@ -5,6 +5,7 @@
 //! role = "worker"                       # worker (default) | reviewer | release
 //! command = ["my-agent", "--yolo"]      # argv list, never a shell string
 //! instructions_file = "AGENTS.md"       # optional, relative to the working directory
+//! instructions_flag = "--append-system-prompt-file"  # takes the path of the generated per-run instructions
 //!
 //! [env]
 //! MY_AGENT_MODE = "headless"

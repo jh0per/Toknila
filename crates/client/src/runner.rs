@@ -5,9 +5,10 @@
 use std::io::Read;
 
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
+use toknila_api_types::{InstructionClaim, TerminalSize};
 use toknila_core::RunId;
 
-use crate::{Client, ClientError, ClientResult, enc, transport_error};
+use crate::{Client, ClientError, ClientResult, NO_BODY, enc, transport_error};
 
 /// The tail of a ticket's newest run, as the daemon keeps it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,6 +79,27 @@ impl Client {
             "{ws}/v1/tickets/{}/runner/stream?token={}{from}",
             enc(ticket),
             self.token
+        )
+    }
+}
+
+impl Client {
+    /// `POST /tickets/{ticket}/instructions/claim`: the instructions a person left for the
+    /// ticket's agent, handed over once.
+    pub fn claim_instructions(&self, ticket: &str) -> ClientResult<InstructionClaim> {
+        self.call(
+            "POST",
+            &format!("/tickets/{}/instructions/claim", enc(ticket)),
+            NO_BODY,
+        )
+    }
+
+    /// `POST /tickets/{ticket}/runner/size`: the size of the panel showing the terminal.
+    pub fn runner_size(&self, ticket: &str, size: &TerminalSize) -> ClientResult<()> {
+        self.call(
+            "POST",
+            &format!("/tickets/{}/runner/size", enc(ticket)),
+            Some(size),
         )
     }
 }

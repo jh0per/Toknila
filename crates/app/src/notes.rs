@@ -51,6 +51,7 @@ pub fn add_comment<U: UnitOfWork + ?Sized>(
         ticket: view.label(NodeRef::Ticket(ticket)),
         comment: c.clone(),
     })?;
+    crate::instructions::queue(uow, view, &c)?;
     Ok(c)
 }
 

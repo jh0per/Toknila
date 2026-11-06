@@ -17,11 +17,13 @@ use super::{AppState, now};
 use crate::http::error::ErrorBody;
 use crate::runner::Grant;
 
-/// The only routes an agent token may call (all `POST`): the agent event contract and the
-/// activity signal of hooks. The ticket in the path must be the token's own.
-pub const AGENT_ROUTES: [&str; 2] = [
+/// The only routes an agent token may call (all `POST`): the agent event contract, the activity
+/// signal of hooks and the claim of pending instructions (the Stop hook). The ticket in the path
+/// must be the token's own.
+pub const AGENT_ROUTES: [&str; 3] = [
     "/v1/tickets/{ticket}/events",
     "/v1/tickets/{ticket}/activity",
+    "/v1/tickets/{ticket}/instructions/claim",
 ];
 
 /// Who is calling, as the token says. Handlers of agent routes check [`Principal::owns`].

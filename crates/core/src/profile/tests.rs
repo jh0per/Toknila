@@ -4,6 +4,7 @@ use crate::{AgentProfile, AgentRole};
 const FULL: &str = r#"role = "reviewer"
 command = ["my-agent", "--headless"]
 instructions_file = "AGENTS.md"
+instructions_flag = "--append-system-prompt-file"
 
 [env]
 MY_AGENT_MODE = "headless"
@@ -37,6 +38,10 @@ fn a_profile_file_becomes_a_profile_named_after_the_file() {
     assert_eq!(p.command, ["my-agent", "--headless"]);
     assert_eq!(p.env["MY_AGENT_MODE"], "headless");
     assert_eq!(p.instructions_file.as_deref(), Some("AGENTS.md"));
+    assert_eq!(
+        p.instructions_flag.as_deref(),
+        Some("--append-system-prompt-file")
+    );
     assert!(p.mcp.enabled && !p.hooks.enabled);
     assert_eq!((p.nudge.idle_secs, p.nudge.max_nudges), (60, 1));
     assert!(p.output.strip_ansi, "unset sections take their defaults");
@@ -168,6 +173,10 @@ fn the_built_in_profiles_launch_what_they_say() {
     assert!(claude.mcp.enabled && claude.hooks.enabled);
     assert_eq!(claude.mcp.config_flag.as_deref(), Some("--mcp-config"));
     assert_eq!(claude.hooks.settings_flag.as_deref(), Some("--settings"));
+    assert_eq!(
+        claude.instructions_flag.as_deref(),
+        Some("--append-system-prompt-file")
+    );
 }
 
 /// Profile JSON is read by the CLI, the web page and the launcher; changes must be deliberate.

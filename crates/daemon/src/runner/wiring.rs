@@ -1,7 +1,9 @@
 //! What a run's agent is given besides its command: the environment (daemon address, the run's
 //! token) and, for a profile that asks for it, generated MCP and hook config files. The files
 //! live under the data home (`runs/<ticket>/`), never in the worktree and never in the user's
-//! own agent settings, and reach the agent through command-line flags. The token is not in any
+//! own agent settings, and reach the agent through command-line flags. The instructions file
+//! (`instructions.md`) is passed the same way, as an addition to the system prompt, so the
+//! worktree's own `CLAUDE.md` and `AGENTS.md` stay untouched and still apply. The token is not in any
 //! file: the files name environment variables that the agent's process inherits.
 
 use std::path::{Path, PathBuf};
@@ -9,7 +11,9 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 use toknila_api_types::runner::agent_env;
 use toknila_app::RunnerError;
+use toknila_app::runner::RunBrief;
 use toknila_core::hook::HOOKS;
+use toknila_core::instructions;
 use toknila_core::{AgentProfile, RunId, TicketKey};
 
 /// Name of the MCP server in the agent's config.
@@ -26,6 +30,8 @@ pub(super) struct Context<'a> {
     pub url: Option<&'a str>,
     /// The `toknila` binary the agent runs for `mcp` and `hook`.
     pub bin: &'a Path,
+    /// The ticket's task, written into the instructions file.
+    pub brief: &'a RunBrief,
 }
 
 /// Extra arguments and environment of the agent's process.
@@ -109,6 +115,21 @@ pub(super) fn prepare(profile: &AgentProfile, cx: &Context<'_>) -> Result<Wiring
             .map_err(|e| RunnerError::Spawn(format!("cannot create {}: {e}", cx.dir.display())))?;
         let path: PathBuf = cx.dir.join(name);
         write_json(&path, &content)?;
+        wiring.args.push(flag.to_owned());
+        wiring.args.push(path.display().to_string());
+    }
+    if let Some(flag) = profile.instructions_flag.as_deref() {
+        let text = instructions::generate(&instructions::RunBrief {
+            key: &cx.key.to_string(),
+            title: &cx.brief.title,
+            prompt: &cx.brief.prompt,
+            acceptance: &cx.brief.acceptance,
+        });
+        std::fs::create_dir_all(cx.dir)
+            .map_err(|e| RunnerError::Spawn(format!("cannot create {}: {e}", cx.dir.display())))?;
+        let path = cx.dir.join("instructions.md");
+        std::fs::write(&path, text)
+            .map_err(|e| RunnerError::Spawn(format!("cannot write {}: {e}", path.display())))?;
         wiring.args.push(flag.to_owned());
         wiring.args.push(path.display().to_string());
     }

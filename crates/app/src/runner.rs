@@ -3,6 +3,7 @@
 //! and stops (the `EnsureRunner` and `StopRunner` effects); [`crate::runs`] queues that work and
 //! records what came of it, and [`crate::external`] calls this port after the command committed.
 
+use toknila_core::instructions::terminal::Size;
 use toknila_core::{ProcessExit, Run, TicketId, TicketKey};
 
 /// Why a runner could not start, or could not be written to. The text lands in the ticket's
@@ -41,6 +42,15 @@ pub struct RunRequest {
     pub profile: String,
     /// The ship's path.
     pub dir: String,
+    pub brief: RunBrief,
+}
+
+/// What the agent is told about its ticket.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RunBrief {
+    pub title: String,
+    pub prompt: String,
+    pub acceptance: Vec<String>,
 }
 
 /// A runner now works for the ticket.
@@ -68,6 +78,19 @@ pub trait Runner: std::fmt::Debug {
     fn stop(&self, ticket: TicketId);
     /// Writes bytes to the ticket's terminal.
     fn write(&self, ticket: TicketId, bytes: &[u8]) -> Result<(), RunnerError>;
+    /// What a live run is like, for choosing how to reach it; `None` without a live process.
+    fn state(&self, ticket: TicketId) -> Option<RunnerState>;
+    /// Sets the size of the ticket's terminal. The caller has clamped it.
+    fn resize(&self, ticket: TicketId, size: Size) -> Result<(), RunnerError>;
+}
+
+/// A live run, as far as reaching it goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RunnerState {
+    /// Its Stop hook reports to Toknila.
+    pub hooks: bool,
+    /// It has printed nothing for a while: it waits at its prompt.
+    pub idle: bool,
 }
 
 /// The runner of a host that has none: every start is refused.
@@ -82,6 +105,14 @@ impl Runner for NoRunner {
     fn stop(&self, _: TicketId) {}
 
     fn write(&self, _: TicketId, _: &[u8]) -> Result<(), RunnerError> {
+        Err(RunnerError::Unavailable)
+    }
+
+    fn state(&self, _: TicketId) -> Option<RunnerState> {
+        None
+    }
+
+    fn resize(&self, _: TicketId, _: Size) -> Result<(), RunnerError> {
         Err(RunnerError::Unavailable)
     }
 }

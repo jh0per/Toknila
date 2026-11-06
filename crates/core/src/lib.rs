@@ -8,6 +8,7 @@ pub mod dag;
 pub mod events;
 pub mod graph;
 pub mod hook;
+pub mod instructions;
 pub mod machine;
 pub mod model;
 pub mod plan;

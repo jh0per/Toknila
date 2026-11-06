@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use serde_json::Value;
+use toknila_app::runner::RunBrief;
 use toknila_core::hook::HOOKS;
 use toknila_core::{AgentProfile, RunId};
 
@@ -13,6 +14,7 @@ struct Rig {
     bin: PathBuf,
     key: TicketKey,
     run: RunId,
+    brief: RunBrief,
 }
 
 impl Rig {
@@ -22,6 +24,11 @@ impl Rig {
             bin: PathBuf::from("/opt/toknila/bin/toknila"),
             key: "DEMO-1".parse().expect("key"),
             run: RunId::new(),
+            brief: RunBrief {
+                title: "Wire it".to_owned(),
+                prompt: "Wire the instructions.".to_owned(),
+                acceptance: vec!["It is wired".to_owned()],
+            },
         }
     }
 
@@ -33,6 +40,7 @@ impl Rig {
             token: TOKEN,
             url: Some("http://127.0.0.1:4242"),
             bin: &self.bin,
+            brief: &self.brief,
         };
         prepare(profile, &cx).expect("prepare")
     }
@@ -50,13 +58,54 @@ fn the_built_in_profile_gets_both_files_and_the_flags_that_point_at_them() {
     let w = rig.prepare(&AgentProfile::claude_code());
     let (mcp_path, _) = rig.file("mcp.json");
     let (settings_path, _) = rig.file("settings.json");
+    let (instructions_path, _) = rig.file("instructions.md");
     let want = [
         "--mcp-config".to_owned(),
         mcp_path.display().to_string(),
         "--settings".to_owned(),
         settings_path.display().to_string(),
+        "--append-system-prompt-file".to_owned(),
+        instructions_path.display().to_string(),
     ];
     assert_eq!(w.args, want);
+}
+
+#[test]
+fn the_instructions_file_holds_the_task_and_lives_outside_the_worktree() {
+    // The agent runs in a worktree that has its own CLAUDE.md; wiring never touches it and the
+    // generated file sits under the data home.
+    let rig = Rig::new();
+    let ship = rig.dir.path().join("ship");
+    std::fs::create_dir_all(&ship).expect("ship");
+    std::fs::write(ship.join("CLAUDE.md"), "project rules").expect("claude.md");
+    rig.prepare(&AgentProfile::claude_code());
+    let (path, text) = rig.file("instructions.md");
+    assert!(text.contains("# Toknila: ticket DEMO-1, Wire it"));
+    assert!(text.contains("Wire the instructions."));
+    assert!(text.contains("- [ ] It is wired"));
+    assert!(!path.starts_with(&ship));
+    assert_eq!(
+        std::fs::read_to_string(ship.join("CLAUDE.md")).expect("read"),
+        "project rules"
+    );
+    assert_eq!(std::fs::read_dir(&ship).expect("ls").count(), 1);
+}
+
+#[test]
+fn a_profile_without_an_instructions_flag_gets_no_instructions_file() {
+    let rig = Rig::new();
+    let mut profile = AgentProfile::claude_code();
+    profile.instructions_flag = None;
+    let w = rig.prepare(&profile);
+    assert!(!w.args.iter().any(|a| a.ends_with("instructions.md")));
+    assert!(
+        !rig.dir
+            .path()
+            .join("runs")
+            .join("t1")
+            .join("instructions.md")
+            .exists()
+    );
 }
 
 #[test]
@@ -112,6 +161,7 @@ fn a_profile_without_wiring_gets_no_files_and_no_flags() {
     let mut profile = AgentProfile::claude_code();
     profile.mcp.enabled = false;
     profile.hooks.enabled = false;
+    profile.instructions_flag = None;
     let w = rig.prepare(&profile);
     assert!(w.args.is_empty());
     assert!(!rig.dir.path().join("runs").join("t1").exists());

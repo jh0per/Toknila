@@ -5,6 +5,7 @@
 //! - `pwd`: print the working directory.
 //! - `env <NAME>`: print `NAME=<value>`.
 //! - `echo`: read one line from the terminal and print `got:<line>`.
+//! - `size`: print `size=<cols>x<rows>`, the terminal's size at that moment.
 //! - `sleep <ms>`: wait.
 //! - `hold`: wait until killed.
 //! - `exit <code>`: exit with that code.
@@ -39,6 +40,15 @@ fn main() {
                 let mut line = String::new();
                 let _ = std::io::stdin().lock().read_line(&mut line);
                 say(&format!("got:{}", line.trim()));
+            }
+            "size" => {
+                let size = terminal_size::terminal_size();
+                say(&match size {
+                    Some((terminal_size::Width(cols), terminal_size::Height(rows))) => {
+                        format!("size={cols}x{rows}")
+                    }
+                    None => "size=unknown".to_owned(),
+                });
             }
             "sleep" => {
                 let ms = args.next().and_then(|s| s.parse().ok()).unwrap_or(0);

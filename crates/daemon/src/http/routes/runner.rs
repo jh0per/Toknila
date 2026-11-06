@@ -1,10 +1,12 @@
 //! The runner's HTTP routes: the scrollback of a ticket's terminal and typing into it. The live
 //! output is the WebSocket `/tickets/{ticket}/runner/stream` (`crate::runner::stream`).
 
+use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
+use toknila_api_types::TerminalSize;
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
 use toknila_app::{resolve, runs};
 use toknila_core::Actor;
@@ -59,5 +61,24 @@ pub async fn runner_input(
         .await??;
     // A person's action: this route is for people, agents use the event contract.
     runs::send_input(&*state.runners, Actor::Human, &t, &body)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(post, path = "/tickets/{ticket}/runner/size", tag = "runner",
+    params(("ticket" = String, Path, description = "Ticket id or key")),
+    request_body = TerminalSize,
+    responses((status = 204, description = "Resized; sizes outside 20x5..500x200 are brought into that range"), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// The size of the panel that shows the agent's terminal. The agent is a full-screen terminal
+/// program, so its terminal follows the panel.
+pub async fn runner_size(
+    State(state): State<AppState>,
+    Path(ticket): Path<String>,
+    Json(size): Json<TerminalSize>,
+) -> ApiResult<StatusCode> {
+    let t = state
+        .store
+        .read(move |repo| Ok(resolve::ticket(repo, &ticket)))
+        .await??;
+    runs::resize(&*state.runners, Actor::Human, &t, size.cols, size.rows)?;
     Ok(StatusCode::NO_CONTENT)
 }
