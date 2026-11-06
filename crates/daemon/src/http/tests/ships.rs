@@ -72,6 +72,8 @@ async fn start_makes_the_worktree_and_merged_removes_it_but_keeps_the_branch() {
         .post("/v1/chains/auth/tickets", json!({ "title": "Login" }))
         .await;
     assert_eq!(d["ticket"]["status"], "running");
+    // The answer is the committed state; the ship follows as its own event.
+    let d = api.get("/v1/tickets/DEMO-1").await;
     let ship = &d["ship"];
     assert_eq!(ship["branch"], "ship/auth/demo-1-login");
     let path = Path::new(ship["path"].as_str().expect("path")).to_owned();
@@ -97,6 +99,7 @@ async fn start_makes_the_worktree_and_merged_removes_it_but_keeps_the_branch() {
         .post("/v1/tickets/DEMO-1/actions/accept", json!({}))
         .await;
     assert_eq!(d["ticket"]["status"], "merged");
+    let d = api.get("/v1/tickets/DEMO-1").await;
     assert_eq!(d["ship"], Value::Null);
     assert!(!path.exists());
     assert!(
@@ -123,6 +126,11 @@ async fn a_ship_that_cannot_be_made_blocks_the_ticket_with_ship_failed() {
     let d = api
         .post("/v1/chains/auth/tickets", json!({ "title": "Login" }))
         .await;
+    assert_eq!(
+        d["ticket"]["status"], "running",
+        "blocked only after the commit"
+    );
+    let d = api.get("/v1/tickets/DEMO-1").await;
     assert_eq!(d["ticket"]["status"], "blocked");
     assert_eq!(
         d["ticket"]["status_reason"]["reason"],
@@ -146,4 +154,76 @@ async fn a_project_without_a_repository_starts_tickets_without_ships() {
     assert_eq!(d["ticket"]["status"], "running");
     assert_eq!(d["ship"], Value::Null);
     assert!(!tmp.path().join("ships").exists());
+}
+
+/// A git shipyard that notes which thread each call ran on.
+#[derive(Debug)]
+struct ThreadSpy {
+    inner: GitShipyard,
+    threads: Arc<std::sync::Mutex<Vec<Option<String>>>>,
+}
+
+impl ThreadSpy {
+    fn note(&self) {
+        let name = std::thread::current().name().map(str::to_owned);
+        self.threads.lock().expect("lock").push(name);
+    }
+}
+
+impl toknila_app::Shipyard for ThreadSpy {
+    fn prepare(&self, spec: &toknila_core::ShipSpec) -> Result<String, toknila_app::ShipError> {
+        self.note();
+        self.inner.prepare(spec)
+    }
+
+    fn remove(&self, repo: &str, ship: &toknila_core::Ship) -> Result<(), toknila_app::ShipError> {
+        self.note();
+        self.inner.remove(repo, ship)
+    }
+}
+
+#[tokio::test]
+async fn git_runs_after_the_commit_and_never_on_the_store_thread() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let repo = repo(tmp.path());
+    let threads = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let spy = ThreadSpy {
+        inner: GitShipyard::new(tmp.path().join("ships")),
+        threads: threads.clone(),
+    };
+    let api = Api::with_yard(Some(Arc::new(spy)));
+    project(&api, &repo).await;
+    api.post("/v1/chains/auth/tickets", json!({ "title": "Login" }))
+        .await;
+    let seen = threads.lock().expect("lock").clone();
+    assert_eq!(seen.len(), 1, "one prepare: {seen:?}");
+    assert_ne!(
+        seen[0].as_deref(),
+        Some("toknila-store"),
+        "git ran on the store's transaction thread"
+    );
+}
+
+#[tokio::test]
+async fn a_worktree_that_cannot_be_removed_is_journaled_and_the_accept_stands() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let repo = repo(tmp.path());
+    let api = Api::with_yard(Some(Arc::new(GitShipyard::new(tmp.path().join("ships")))));
+    project(&api, &repo).await;
+    api.post("/v1/chains/auth/tickets", json!({ "title": "Login" }))
+        .await;
+    api.post(
+        "/v1/tickets/DEMO-1/events",
+        json!({ "event": "finished", "summary": "done" }),
+    )
+    .await;
+    // The repository disappears under the ship: git cannot remove the worktree from it.
+    std::fs::remove_dir_all(&repo).expect("delete the repository");
+    let d = api
+        .post("/v1/tickets/DEMO-1/actions/accept", json!({}))
+        .await;
+    assert_eq!(d["ticket"]["status"], "merged");
+    assert_eq!(journal(&api).await, ["ship_created", "ship_remove_failed"]);
+    let d = api.get("/v1/tickets/DEMO-1").await;
+    assert_ne!(d["ship"], Value::Null, "the path stays recorded");
 }

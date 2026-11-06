@@ -38,6 +38,7 @@ fn repo(dir: &Path) -> String {
 
 fn spec(repo: &str) -> ShipSpec {
     ShipSpec {
+        key: "DEMO-1".parse().expect("key"),
         repo: repo.to_owned(),
         base: "develop".to_owned(),
         branch: "ship/auth/demo-1-login".to_owned(),

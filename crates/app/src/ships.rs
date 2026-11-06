@@ -1,12 +1,15 @@
 //! Ships: the worktree and branch a ticket works in. Core decides when one is needed (the
 //! `PrepareShip` and `RemoveShip` effects) and what it is called ([`ShipSpec`]); a [`Shipyard`]
-//! port makes and removes them; this module orders the two inside the chain unit of work.
+//! port makes and removes them after the command committed ([`crate::external`]); this module
+//! queues that work and records what came of it.
 
 use toknila_core::events::DomainEvent;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{BlockedReason, Ship, ShipSpec, TicketId};
 
-use crate::{AppError, AppResult, ChainTx};
+use crate::external::ExternalEffect;
+
+use crate::{AppError, AppResult, ChainTx, ErrorKind, UnitOfWork, with_chain};
 
 /// Why a ship could not be made or removed. The text lands in the ticket's blocked reason.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -42,79 +45,123 @@ pub trait Shipyard: std::fmt::Debug {
     fn remove(&self, repo: &str, ship: &Ship) -> Result<(), ShipError>;
 }
 
-fn spec_for<U: crate::UnitOfWork + ?Sized>(
+fn spec_for<U: UnitOfWork + ?Sized>(
     uow: &U,
     ctx: &ChainTx,
     ticket: TicketId,
-) -> AppResult<Option<(ShipSpec, toknila_core::TicketKey)>> {
+) -> AppResult<Option<ShipSpec>> {
     let Some(t) = ctx.view.tickets.iter().find(|t| t.id == ticket) else {
         return Ok(None);
     };
     let project = uow
         .project(ctx.view.chain.project_id)?
         .ok_or_else(|| AppError::not_found(format!("project of chain {}", ctx.view.chain.name)))?;
-    Ok(ShipSpec::for_ticket(&project, &ctx.view.chain, t).map(|s| (s, t.key.clone())))
+    Ok(ShipSpec::for_ticket(&project, &ctx.view.chain, t))
 }
 
-/// `PrepareShip`: make (or reuse) the ticket's ship and remember it. A failure blocks the ticket
-/// through the state machine with `ship_failed`.
-pub(crate) fn prepare<U: crate::UnitOfWork + ?Sized>(
-    uow: &mut U,
-    ctx: &mut ChainTx,
-    ticket: TicketId,
-) -> AppResult<()> {
-    let Some((spec, key)) = spec_for(uow, ctx, ticket)? else {
-        return Ok(());
-    };
-    let Some(yard) = uow.shipyard() else {
-        return Ok(());
-    };
-    match yard.prepare(&spec) {
-        Ok(path) => {
-            let ship = Ship {
-                ticket_id: ticket,
-                key,
-                branch: spec.branch,
-                path,
-            };
-            if uow.ship(ticket)?.as_ref() == Some(&ship) {
-                return Ok(());
-            }
-            uow.save_ship(&ship)?;
-            uow.emit(&DomainEvent::ShipCreated { ship: ship.clone() })?;
-            ctx.edit_ticket(ticket, |t| t.branch = Some(ship.branch.clone()))?;
-        }
-        Err(e) => ctx.ticket_event(
-            ticket,
-            TicketEvent::Block {
-                reason: BlockedReason::ShipFailed {
-                    detail: e.to_string(),
-                },
-            },
-        )?,
+/// The ship a spec stands for once the shipyard gave it a path.
+pub(crate) fn ship_of(ticket: TicketId, spec: &ShipSpec, path: String) -> Ship {
+    Ship {
+        ticket_id: ticket,
+        key: spec.key.clone(),
+        branch: spec.branch.clone(),
+        path,
     }
-    Ok(())
 }
 
-/// `RemoveShip`: take the worktree away, keep the branch, forget the path. A ticket without a
-/// ship is left alone; a worktree that cannot be removed fails the command.
-pub(crate) fn remove<U: crate::UnitOfWork + ?Sized>(
+/// `PrepareShip`: queue making (or reusing) the ticket's ship for after the commit.
+pub(crate) fn queue_prepare<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     ctx: &ChainTx,
     ticket: TicketId,
 ) -> AppResult<()> {
-    let Some(ship) = uow.ship(ticket)? else {
-        return Ok(());
-    };
-    let Some((spec, _)) = spec_for(uow, ctx, ticket)? else {
-        return Ok(());
-    };
-    let Some(yard) = uow.shipyard() else {
-        return Ok(());
-    };
-    yard.remove(&spec.repo, &ship)
-        .map_err(|e| AppError::conflict(format!("cannot remove the ship of {}: {e}", ship.key)))?;
-    uow.delete_ship(ticket)?;
-    uow.emit(&DomainEvent::ShipRemoved { ship })?;
+    if let Some(spec) = spec_for(uow, ctx, ticket)? {
+        uow.defer(ExternalEffect::PrepareShip { ticket, spec });
+    }
     Ok(())
+}
+
+/// `RemoveShip`: queue taking the worktree away for after the commit; a ticket without a ship is
+/// left alone.
+pub(crate) fn queue_remove<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ctx: &ChainTx,
+    ticket: TicketId,
+) -> AppResult<()> {
+    let (Some(ship), Some(spec)) = (uow.ship(ticket)?, spec_for(uow, ctx, ticket)?) else {
+        return Ok(());
+    };
+    uow.defer(ExternalEffect::RemoveShip {
+        repo: spec.repo,
+        ship,
+    });
+    Ok(())
+}
+
+/// Feeds an outcome to the ticket through the machine. A ticket that has moved on meanwhile
+/// refuses the event; that is not an error of the outcome.
+fn tell_ticket<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    event: TicketEvent,
+) -> AppResult<()> {
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(());
+    };
+    match with_chain(uow, t.chain_id, |tx| {
+        tx.ticket_event(ticket, event).map_err(AppError::from)
+    }) {
+        Err(e) if e.kind == ErrorKind::Conflict => Ok(()),
+        other => other,
+    }
+}
+
+/// The shipyard made the ship: remember it, journal it, tell the ticket its branch.
+pub(crate) fn ready<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    ship: Ship,
+) -> AppResult<()> {
+    if uow.ship(ticket)?.as_ref() == Some(&ship) {
+        return Ok(());
+    }
+    uow.save_ship(&ship)?;
+    uow.emit(&DomainEvent::ShipCreated { ship: ship.clone() })?;
+    tell_ticket(
+        uow,
+        ticket,
+        TicketEvent::ShipReady {
+            branch: ship.branch,
+        },
+    )
+}
+
+/// The shipyard could not make the ship: the ticket is blocked with `ship_failed`.
+pub(crate) fn failed<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    error: &ShipError,
+) -> AppResult<()> {
+    let reason = BlockedReason::ShipFailed {
+        detail: error.to_string(),
+    };
+    tell_ticket(uow, ticket, TicketEvent::Block { reason })
+}
+
+/// The worktree is gone: forget its path and journal it. The branch stays.
+pub(crate) fn removed<U: UnitOfWork + ?Sized>(uow: &mut U, ship: Ship) -> AppResult<()> {
+    uow.delete_ship(ship.ticket_id)?;
+    uow.emit(&DomainEvent::ShipRemoved { ship })
+}
+
+/// The worktree could not be removed: the journal says so; the ticket and its accept stand.
+pub(crate) fn remove_failed<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ship: Ship,
+    error: &ShipError,
+) -> AppResult<()> {
+    uow.emit(&DomainEvent::ShipRemoveFailed {
+        ship,
+        detail: error.to_string(),
+    })
 }

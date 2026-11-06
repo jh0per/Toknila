@@ -5,6 +5,7 @@
 //! events are then published to subscribers (the WebSocket stream).
 
 mod codec;
+mod external;
 mod notes;
 mod ports;
 mod schema;
@@ -20,6 +21,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use toknila_app::Shipyard;
+use toknila_app::external::ExternalEffect;
 use toknila_core::events::DomainEvent;
 use toknila_core::{Actor, Timestamp};
 
@@ -49,7 +51,7 @@ pub struct WriteTx<'c> {
     actor: Actor,
     now: Timestamp,
     events: Vec<EventRecord>,
-    yard: Option<Yard>,
+    deferred: Vec<ExternalEffect>,
 }
 
 /// Where a command's ships are made; shared by every command of the store.
@@ -179,7 +181,8 @@ impl Store {
     }
 
     /// Runs `f` as one transaction. On `Ok` the state and the emitted events commit together and
-    /// the events are published; on `Err` or panic nothing is written.
+    /// the events are published; on `Err` or panic nothing is written. Work the command queued
+    /// for the host runs after the commit (see [`Store::after_commit`]).
     pub async fn write<T, E, F>(
         &self,
         actor: Actor,
@@ -191,8 +194,39 @@ impl Store {
         E: From<StoreError> + Send + 'static,
         F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
     {
+        let (value, emitted, queued) = self.commit_with_effects(actor, now, f).await?;
+        self.after_commit(queued).await;
+        Ok((value, emitted))
+    }
+
+    /// Like [`Store::write`] for a command that queues nothing for the host.
+    pub(super) async fn commit<T, E, F>(
+        &self,
+        actor: Actor,
+        now: Timestamp,
+        f: F,
+    ) -> Result<(T, Vec<EventRecord>), E>
+    where
+        T: Send + 'static,
+        E: From<StoreError> + Send + 'static,
+        F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
+    {
+        let (value, emitted, _) = self.commit_with_effects(actor, now, f).await?;
+        Ok((value, emitted))
+    }
+
+    async fn commit_with_effects<T, E, F>(
+        &self,
+        actor: Actor,
+        now: Timestamp,
+        f: F,
+    ) -> Result<(T, Vec<EventRecord>, Vec<ExternalEffect>), E>
+    where
+        T: Send + 'static,
+        E: From<StoreError> + Send + 'static,
+        F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
+    {
         let events = self.events.clone();
-        let yard = self.yard.clone();
         let outcome = self
             .run(move |conn| {
                 let tx = match conn.transaction() {
@@ -204,7 +238,7 @@ impl Store {
                     actor,
                     now,
                     events: Vec::new(),
-                    yard,
+                    deferred: Vec::new(),
                 };
                 let value = match catch_unwind(AssertUnwindSafe(|| f(&mut w))) {
                     Ok(Ok(v)) => v,
@@ -214,6 +248,7 @@ impl Store {
                 let WriteTx {
                     tx,
                     events: emitted,
+                    deferred,
                     ..
                 } = w;
                 if let Err(e) = tx.commit() {
@@ -223,7 +258,7 @@ impl Store {
                     // No subscribers is fine.
                     let _ = events.send(e.clone());
                 }
-                Ok(Ok((value, emitted)))
+                Ok(Ok((value, emitted, deferred)))
             })
             .await;
         match outcome {

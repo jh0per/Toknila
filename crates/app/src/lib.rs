@@ -8,6 +8,7 @@ pub mod agent;
 pub mod chain;
 pub mod chains;
 pub mod error;
+pub mod external;
 pub mod notes;
 pub mod ports;
 pub mod projects;

@@ -119,10 +119,8 @@ impl UnitOfWork for WriteTx<'_> {
         Ok(self.repo().delete_ship(ticket)?)
     }
 
-    fn shipyard(&self) -> Option<&dyn toknila_app::Shipyard> {
-        self.yard
-            .as_deref()
-            .map(|y| y as &dyn toknila_app::Shipyard)
+    fn defer(&mut self, effect: toknila_app::external::ExternalEffect) {
+        self.deferred.push(effect);
     }
 
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {

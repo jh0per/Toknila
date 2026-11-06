@@ -33,6 +33,8 @@ struct Mem {
     versions: Vec<ThreadVersion>,
     ships: Vec<Ship>,
     yard: ships::FakeYard,
+    /// Work queued for after the command, as the daemon collects it.
+    deferred: Vec<crate::external::ExternalEffect>,
     events: Vec<DomainEvent>,
     now: Timestamp,
     taken: u32,
@@ -97,6 +99,7 @@ impl Mem {
             versions: vec![],
             ships: vec![],
             yard: ships::FakeYard::default(),
+            deferred: vec![],
             events: vec![],
             now,
             taken: 2,
@@ -273,8 +276,8 @@ impl UnitOfWork for Mem {
         self.ships.retain(|s| s.ticket_id != ticket);
         Ok(())
     }
-    fn shipyard(&self) -> Option<&dyn crate::Shipyard> {
-        Some(&self.yard)
+    fn defer(&mut self, effect: crate::external::ExternalEffect) {
+        self.deferred.push(effect);
     }
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {
         self.events.push(event.clone());

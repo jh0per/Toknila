@@ -17,6 +17,7 @@ pub struct Ship {
 /// What a shipyard needs to make a ship: decided here, executed by an adapter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShipSpec {
+    pub key: TicketKey,
     /// The project's repository on the host.
     pub repo: String,
     /// Branch the ship starts from (the project's work branch).
@@ -61,6 +62,7 @@ impl ShipSpec {
         let chain = slugify(&chain.name);
         let slug = slugify(&format!("{} {}", ticket.key, ticket.title));
         Some(Self {
+            key: ticket.key.clone(),
             repo: repo.to_owned(),
             base: project.work_branch.clone(),
             branch: format!("ship/{chain}/{slug}"),

@@ -82,10 +82,8 @@ pub trait UnitOfWork: Reader {
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()>;
     /// Forgets a ticket's ship.
     fn delete_ship(&mut self, ticket: TicketId) -> AppResult<()>;
-    /// Where ships are made; `None` runs tickets without ships (no host to make them on).
-    fn shipyard(&self) -> Option<&dyn crate::Shipyard> {
-        None
-    }
+    /// Queues work on the host for after this command commits (see [`crate::external`]).
+    fn defer(&mut self, effect: crate::external::ExternalEffect);
     /// Journals a domain event.
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()>;
 }

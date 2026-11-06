@@ -61,6 +61,11 @@ pub enum DomainEvent {
     ShipRemoved {
         ship: Ship,
     },
+    /// The worktree could not be removed (the ticket stays Merged); the path is still recorded.
+    ShipRemoveFailed {
+        ship: Ship,
+        detail: String,
+    },
     ReleaseCreated {
         release: Release,
     },
@@ -180,7 +185,8 @@ impl DomainEvent {
             | Self::TicketApproved { .. }
             | Self::TicketRejected { .. }
             | Self::ShipCreated { .. }
-            | Self::ShipRemoved { .. } => "ticket",
+            | Self::ShipRemoved { .. }
+            | Self::ShipRemoveFailed { .. } => "ticket",
             Self::ReleaseCreated { .. } | Self::ReleaseStateChanged { .. } => "release",
             Self::CommentAdded { .. } | Self::CommentDelivered { .. } => "comment",
             Self::SubtaskAdded { .. } | Self::SubtaskUpdated { .. } => "subtask",
@@ -204,7 +210,9 @@ impl DomainEvent {
             | Self::TicketProposed { ticket }
             | Self::TicketApproved { ticket, .. }
             | Self::TicketRejected { ticket, .. } => ticket.id.to_string(),
-            Self::ShipCreated { ship } | Self::ShipRemoved { ship } => ship.ticket_id.to_string(),
+            Self::ShipCreated { ship }
+            | Self::ShipRemoved { ship }
+            | Self::ShipRemoveFailed { ship, .. } => ship.ticket_id.to_string(),
             Self::ReleaseCreated { release } | Self::ReleaseStateChanged { release, .. } => {
                 release.id.to_string()
             }
@@ -238,6 +246,7 @@ impl DomainEvent {
             Self::CommentDelivered { .. } => "delivered",
             Self::ShipCreated { .. } => "ship_created",
             Self::ShipRemoved { .. } => "ship_removed",
+            Self::ShipRemoveFailed { .. } => "ship_remove_failed",
             Self::TicketProposed { .. } => "proposed",
             Self::TicketApproved { .. } => "approved",
             Self::TicketRejected { .. } => "rejected",

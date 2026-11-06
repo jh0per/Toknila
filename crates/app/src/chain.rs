@@ -173,20 +173,18 @@ fn round<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Result<bool,
         uow.emit(&event)?;
     }
     record_effects(uow, ctx)?;
-    // A ship that could not be made blocks its ticket: that is more to save and journal.
-    let more = !ctx.events.is_empty() || !ctx.effects.is_empty();
-    Ok(deliver_to_sim(uow, ctx)? || more)
+    deliver_to_sim(uow, ctx)
 }
 
 fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Result<(), AppError> {
     for (ticket, effect) in std::mem::take(&mut ctx.effects) {
         let (author, kind, text) = match effect {
             Effect::PrepareShip => {
-                ships::prepare(uow, ctx, ticket)?;
+                ships::queue_prepare(uow, ctx, ticket)?;
                 continue;
             }
             Effect::RemoveShip => {
-                ships::remove(uow, ctx, ticket)?;
+                ships::queue_remove(uow, ctx, ticket)?;
                 continue;
             }
             Effect::RecordReport { summary } => (Actor::Agent, CommentKind::Report, summary),

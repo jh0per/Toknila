@@ -301,6 +301,30 @@ fn unblock_to_running_prepares_the_ship_again() {
 }
 
 #[test]
+fn ship_ready_tells_an_active_ticket_its_branch_without_moving_it() {
+    for from in [TicketStatus::Running, TicketStatus::Waiting] {
+        let tr = ok(
+            from,
+            TicketEvent::ShipReady {
+                branch: "ship/demo/demo-1-a".to_owned(),
+            },
+        );
+        assert_eq!(tr.ticket.status, from);
+        assert_eq!(tr.ticket.branch.as_deref(), Some("ship/demo/demo-1-a"));
+        assert_eq!(tr.ticket.status_since, T0);
+        assert!(tr.effects.is_empty());
+    }
+    let late = apply(
+        &ticket_in(TicketStatus::Review),
+        &TicketEvent::ShipReady {
+            branch: "b".to_owned(),
+        },
+        NOW,
+    );
+    assert!(matches!(late, Err(TransitionError::NotAllowed { .. })));
+}
+
+#[test]
 fn cancel_leaves_the_ship_alone() {
     for from in [TicketStatus::Running, TicketStatus::Review] {
         let tr = ok(
@@ -643,6 +667,9 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(TicketEvent::DepsSatisfied),
         Just(TicketEvent::DepsUnsatisfied),
         Just(TicketEvent::Start),
+        Just(TicketEvent::ShipReady {
+            branch: "b".to_owned()
+        }),
         Just(TicketEvent::AskHuman {
             reason: WaitingReason::Silent
         }),
