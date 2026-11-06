@@ -378,7 +378,7 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
   send every event but `review_verdict`, a reviewer's only `review_verdict`
   (`Principal::may_send`, `403` otherwise).
 - **Who is calling.** `server/auth.rs` turns the bearer token into a `Principal` (`Person` or
-  `Agent(grant)`) for the handlers. An agent may call only `AGENT_ROUTES` (events, activity and
+  `Agent(grant)`) for the handlers. An agent may call only `AGENT_ROUTES` (events, activity, the plan quota and
   the instruction claim of its own ticket); everything else is `403`. The ownership rule is `toknila_app::agent::ensure_granted`
   (`ErrorKind::Forbidden`, `403`). Business rules stay in core: `person_only` still guards the
   use cases, the allowlist keeps agents from reaching them.
@@ -387,7 +387,7 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
   (never the worktree, never the user's own Claude settings) and appends `--mcp-config <file>` and
   `--settings <file>` to the command. Neither file holds a token; both name environment variables.
   The files run the `toknila` binary of the daemon (`current_exe`) as `toknila mcp` and
-  `toknila hook <name>`.
+  `toknila hook <name>`; the settings file also names `toknila statusline` as the status line (see "Usage").
 - **Instructions file.** For a profile with `instructions_flag` (the built-in `claude-code` has
   `--append-system-prompt-file`) the runner also writes `runs/<ticket id>/instructions.md` and
   passes it by that flag. It holds the ticket's title, task and acceptance, the comment template,
@@ -536,6 +536,61 @@ A silent agent (Waiting, `silent`) is not an inbox item yet.
   the dismissal survives restarts.
 
 The stream refreshes the inbox: every journal event that refreshes a chain also reloads it.
+
+## Usage
+
+How many tokens the agents used and what that would cost at API list prices. Numbers only: the
+UI and the API never carry prompt or message content. Every cost is an **estimate**; on a
+subscription the real cost differs. The rules are core's (`toknila_core::usage`: parsing,
+deduplication, price table, sums); the daemon (`daemon/src/usage/`) reads the files.
+
+- **Attribution.** Claude Code's hook input carries `session_id` and `transcript_path`.
+  `tok hook` forwards both on the activity call (`NewActivity`), the daemon ties the session to
+  the run (`usage_sessions`: session, ticket, run, role) for worker and reviewer runs, and reads
+  that transcript at once. The path comes from the agent's process, so it is accepted only when it
+  is an absolute `.jsonl` path inside the agent's own folder (`~/.claude/projects`, or
+  `$CLAUDE_CONFIG_DIR/projects`) with no `.` or `..` part (`usage::accepted_transcript`); anything
+  else is ignored.
+- **Collector.** One `Source` per agent kind: a `TranscriptFormat` (core) and the folders it
+  writes to. Only Claude Code exists; Codex (`~/.codex/sessions`) is one more source and format.
+  A pass reads each file from its stored byte offset (`usage_files`), parses complete lines only
+  (a half-written last line waits for the next pass), and saves one row per model call
+  (`usage_records`). Passes run when a hook arrives (the first time a session is seen and on every
+  Stop), every 30 seconds (`usage::watch`), and when the Usage page is read. A file that shrank is
+  read again from the top.
+- **Format.** An `assistant` line carries `message.usage` (`input_tokens`,
+  `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens`) and `message.model`.
+  Claude Code writes one line per content block and while streaming, all with the same
+  `message.id` and `requestId`; those lines are one call, keyed `<message id>/<request id>`, and the
+  largest number of each field counts. A row is keyed globally, so a call that also appears in a
+  second file (sub-agent files under `<session>/subagents/`, resumed sessions) counts once.
+  `<synthetic>` models and API-error lines are not usage.
+- **Machine-wide view.** On by default, switchable in the Usage page
+  (`PUT /v1/usage/settings`, stored in `app_settings`): every `.jsonl` under the agent's folder is
+  read, and sessions that are not Toknila runs are grouped by their workspace folder (`cwd`). It is
+  local only. Off, the page counts only attributed runs (rows already read are kept but hidden).
+- **Prices.** `core/src/usage/prices.toml` is the shipped table with its source URL and the date
+  it was taken from Anthropic's pricing page. `<home>/usage-prices.toml` overrides it per model id
+  (same `[[model]]` format; an unreadable file is reported in the answer and the shipped prices
+  stay). A model matches by id, ignoring a date suffix or `[1m]`; a model without a price is
+  counted in tokens, not in cost, and is listed in `unpriced_models`. Cost is
+  `tokens x price / 1M` for input, cache writes (the 5-minute rate), cache reads and output.
+  Cache savings are the cached reads priced as plain input minus what they cost; cache writes are
+  not credited. Days are UTC.
+- **API.** `GET /v1/usage?days=7|30|90` returns totals (processed tokens, cached share, uncached
+  input, output, estimated cost, cache savings), a series with one entry per day, breakdowns by
+  model, project, chain, card and workspace (project, chain and card cover Toknila runs only), the
+  price source, and the quota. `TicketDetail.usage` is the card's figures; `ChainDetail.usage`
+  maps each card's key to its figures, for the chips.
+- **Quota.** Claude Code documents one source of plan limits: the `rate_limits` field
+  (`five_hour` and `seven_day`, each `used_percentage` and `resets_at`) of the JSON a status line
+  command receives, for Pro and Max subscribers, after the session's first reply
+  ([status line](https://code.claude.com/docs/en/statusline)). The generated hook settings
+  therefore also set `statusLine` to `toknila statusline`, which passes the windows to
+  `POST /v1/usage/quota` (an agent route) and prints nothing. The page shows the last report until a
+  window's `resets_at` passes. Without a report (not a subscriber, or no agent has replied yet) it
+  says "not available" with that reason. The monitoring metrics (OpenTelemetry) count
+  consumption, not what is left, and nothing else is read: no keychain, no undocumented endpoint.
 
 ## Presentation: MVI
 
