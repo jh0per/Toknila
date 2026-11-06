@@ -244,3 +244,43 @@ fn ship_events_belong_to_the_ticket_and_carry_branch_and_path() {
         }})
     );
 }
+
+#[test]
+fn runner_events_belong_to_the_ticket_and_carry_the_run() {
+    use crate::{ProcessExit, Run, RunId};
+    let run = Run {
+        id: "01JBQ7ZJ0000000000000000R1".parse::<RunId>().expect("id"),
+        ticket_id: "01JBQ7ZJ0000000000000000T1"
+            .parse::<TicketId>()
+            .expect("id"),
+        key: "DEMO-1".parse().expect("key"),
+        profile: "claude-code".into(),
+        dir: "/h/ships/demo/demo/demo-1-a".into(),
+    };
+    let started = DomainEvent::RunnerStarted { run: run.clone() };
+    let exited = DomainEvent::RunnerExited {
+        run,
+        exit: ProcessExit {
+            code: Some(101),
+            signal: None,
+        },
+    };
+    assert_eq!(
+        (started.entity(), started.kind(), exited.kind()),
+        ("ticket", "runner_started", "runner_exited")
+    );
+    assert_eq!(exited.entity_id(), "01JBQ7ZJ0000000000000000T1");
+    assert_eq!(
+        payload(&exited),
+        json!({
+            "run": {
+                "id": "01JBQ7ZJ0000000000000000R1",
+                "ticket_id": "01JBQ7ZJ0000000000000000T1",
+                "key": "DEMO-1",
+                "profile": "claude-code",
+                "dir": "/h/ships/demo/demo/demo-1-a",
+            },
+            "exit": { "code": 101, "signal": null },
+        })
+    );
+}

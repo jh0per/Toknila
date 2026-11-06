@@ -21,6 +21,9 @@ pub enum ProjectCmd {
         /// Branch ships start from (default: develop).
         #[arg(long)]
         base: Option<String>,
+        /// Agent profile tickets run with unless they name one (default: sim).
+        #[arg(long)]
+        profile: Option<String>,
     },
     /// List projects.
     Ls,
@@ -33,12 +36,14 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             name,
             repo,
             base,
+            profile,
         } => {
             let p = c.create_project(&NewProject {
                 key: key.to_uppercase(),
                 name: Some(name.unwrap_or(key)),
                 repo_path: repo,
                 work_branch: base,
+                default_profile: profile,
                 ..NewProject::default()
             })?;
             emit(json_out, &p, |p| println!("project {} created", p.key));

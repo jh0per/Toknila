@@ -8,8 +8,7 @@ use toknila_core::{
 };
 
 use crate::notes::{add_comment, body_from_text, deliver_to_sim};
-use crate::ships;
-use crate::{AppError, UnitOfWork};
+use crate::{AppError, AppResult, ErrorKind, UnitOfWork, runs, ships};
 
 /// A chain being changed by one command. Every step is journaled by the graph
 /// ([`ChainView::record`]) so each transition, including intermediate ones
@@ -164,6 +163,24 @@ where
     Err(AppError::from(GraphError::NoFixpoint(MAX_ROUNDS)).into())
 }
 
+/// Feeds an outcome that came back from the host to the ticket through the machine. A ticket
+/// that has moved on meanwhile refuses the event; that is not an error of the outcome.
+pub(crate) fn tell_ticket<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    event: TicketEvent,
+) -> AppResult<()> {
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(());
+    };
+    match with_chain(uow, t.chain_id, |tx| {
+        tx.ticket_event(ticket, event).map_err(AppError::from)
+    }) {
+        Err(e) if e.kind == ErrorKind::Conflict => Ok(()),
+        other => other,
+    }
+}
+
 /// One settle-save-journal-deliver round; `true` if delivery changed something.
 fn round<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Result<bool, AppError> {
     ctx.settle()?;
@@ -189,7 +206,14 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
             }
             Effect::RecordReport { summary } => (Actor::Agent, CommentKind::Report, summary),
             Effect::RecordInstruction { text } => (Actor::Human, CommentKind::Instruction, text),
-            // Sim needs no process started or stopped; the PTY runner arrives next.
+            Effect::EnsureRunner => {
+                runs::queue_start(uow, ctx, ticket)?;
+                continue;
+            }
+            Effect::StopRunner => {
+                runs::queue_stop(uow, ticket);
+                continue;
+            }
             _ => continue,
         };
         add_comment(uow, &ctx.view, ticket, author, kind, body_from_text(&text))?;

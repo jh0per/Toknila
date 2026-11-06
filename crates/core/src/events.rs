@@ -5,8 +5,8 @@
 use serde::Serialize;
 
 use crate::{
-    Actor, ArtifactFormat, Chain, Comment, Edge, Project, Release, ReleaseState, Ship,
-    StatusReason, Subtask, Thread, ThreadId, ThreadMessage, Ticket, TicketKey, TicketStatus,
+    Actor, ArtifactFormat, Chain, Comment, Edge, ProcessExit, Project, Release, ReleaseState, Run,
+    Ship, StatusReason, Subtask, Thread, ThreadId, ThreadMessage, Ticket, TicketKey, TicketStatus,
 };
 
 /// One change. Serialises as its payload: the variant's fields, without a tag.
@@ -65,6 +65,15 @@ pub enum DomainEvent {
     ShipRemoveFailed {
         ship: Ship,
         detail: String,
+    },
+    /// A runner process started for the ticket.
+    RunnerStarted {
+        run: Run,
+    },
+    /// The runner's process ended, on its own or because it was stopped.
+    RunnerExited {
+        run: Run,
+        exit: ProcessExit,
     },
     ReleaseCreated {
         release: Release,
@@ -186,7 +195,9 @@ impl DomainEvent {
             | Self::TicketRejected { .. }
             | Self::ShipCreated { .. }
             | Self::ShipRemoved { .. }
-            | Self::ShipRemoveFailed { .. } => "ticket",
+            | Self::ShipRemoveFailed { .. }
+            | Self::RunnerStarted { .. }
+            | Self::RunnerExited { .. } => "ticket",
             Self::ReleaseCreated { .. } | Self::ReleaseStateChanged { .. } => "release",
             Self::CommentAdded { .. } | Self::CommentDelivered { .. } => "comment",
             Self::SubtaskAdded { .. } | Self::SubtaskUpdated { .. } => "subtask",
@@ -213,6 +224,9 @@ impl DomainEvent {
             Self::ShipCreated { ship }
             | Self::ShipRemoved { ship }
             | Self::ShipRemoveFailed { ship, .. } => ship.ticket_id.to_string(),
+            Self::RunnerStarted { run } | Self::RunnerExited { run, .. } => {
+                run.ticket_id.to_string()
+            }
             Self::ReleaseCreated { release } | Self::ReleaseStateChanged { release, .. } => {
                 release.id.to_string()
             }
@@ -247,6 +261,8 @@ impl DomainEvent {
             Self::ShipCreated { .. } => "ship_created",
             Self::ShipRemoved { .. } => "ship_removed",
             Self::ShipRemoveFailed { .. } => "ship_remove_failed",
+            Self::RunnerStarted { .. } => "runner_started",
+            Self::RunnerExited { .. } => "runner_exited",
             Self::TicketProposed { .. } => "proposed",
             Self::TicketApproved { .. } => "approved",
             Self::TicketRejected { .. } => "rejected",

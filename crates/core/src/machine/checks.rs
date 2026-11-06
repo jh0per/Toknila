@@ -4,7 +4,7 @@ use super::TransitionError;
 use crate::Actor;
 
 /// Wildcard decisions belong to a person; an agent or the system cannot make them.
-pub(super) fn person_only(by: Actor, event: &'static str) -> Result<(), TransitionError> {
+pub fn person_only(by: Actor, event: &'static str) -> Result<(), TransitionError> {
     if by == Actor::Human {
         Ok(())
     } else {

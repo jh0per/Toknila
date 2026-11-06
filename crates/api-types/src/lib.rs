@@ -3,6 +3,8 @@
 //! in `toknila-app` and are re-exported here; this crate adds the read models, errors and journal
 //! entries.
 
+pub mod runner;
+
 use serde::{Deserialize, Serialize};
 use toknila_core::graph::{ChainSummary, ChainView};
 use toknila_core::profile::{Catalog, ListedProfile, ProfileProblem};

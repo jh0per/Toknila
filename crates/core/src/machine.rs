@@ -383,7 +383,8 @@ fn run_on_ship(effects: &mut Vec<Effect>) {
 }
 
 mod checks;
-use checks::{non_empty, person_only};
+use checks::non_empty;
+pub use checks::person_only;
 mod invariants;
 
 pub use invariants::check_invariants;

@@ -13,6 +13,10 @@ use toknila_api_types::{
 };
 use toknila_core::Project;
 
+mod runner;
+
+pub use runner::Scrollback;
+
 /// A failed call.
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
@@ -95,14 +99,7 @@ impl Client {
                 let text = if text.is_empty() { "null" } else { &text };
                 serde_json::from_str(text).map_err(|e| ClientError::Decode(e.to_string()))
             }
-            Err(ureq::Error::Status(status, r)) => {
-                let body = r.into_json().unwrap_or_else(|_| ErrorBody {
-                    error: format!("HTTP {status}"),
-                    code: String::new(),
-                });
-                Err(ClientError::Api { status, body })
-            }
-            Err(e) => Err(ClientError::Transport(e.to_string())),
+            Err(e) => Err(transport_error(e)),
         }
     }
 
@@ -344,6 +341,20 @@ impl Client {
     pub fn shutdown(&self) -> ClientResult<()> {
         self.call::<serde_json::Value>("POST", "/shutdown", NO_BODY)
             .map(|_| ())
+    }
+}
+
+/// A failed `ureq` call as a [`ClientError`]: the daemon's error body, or the transport failure.
+fn transport_error(e: ureq::Error) -> ClientError {
+    match e {
+        ureq::Error::Status(status, r) => {
+            let body = r.into_json().unwrap_or_else(|_| ErrorBody {
+                error: format!("HTTP {status}"),
+                code: String::new(),
+            });
+            ClientError::Api { status, body }
+        }
+        e => ClientError::Transport(e.to_string()),
     }
 }
 

@@ -20,6 +20,7 @@ async fn spawn_test_server() -> (
         token: token.clone().into(),
         shutdown: shutdown.clone(),
         profiles: PathBuf::new(),
+        runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
     };
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await

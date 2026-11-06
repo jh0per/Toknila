@@ -61,6 +61,7 @@ async fn reconnect_gets_exactly_the_missed_events() {
         token: "tkn".into(),
         shutdown: Arc::new(Notify::new()),
         profiles: PathBuf::new(),
+        runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
     };
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await

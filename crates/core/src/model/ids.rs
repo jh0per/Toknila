@@ -71,6 +71,10 @@ id_type!(
 );
 
 id_type!(
+    /// Identifies a [`crate::Run`] of a runner process.
+    RunId
+);
+id_type!(
     /// Identifies a [`crate::Thread`].
     ThreadId
 );

@@ -5,6 +5,7 @@ pub mod info;
 pub mod paths;
 pub mod profiles;
 pub mod recovery;
+pub mod runner;
 pub mod server;
 pub mod shipyard;
 pub mod store;

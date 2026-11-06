@@ -2,6 +2,7 @@
 //! JSON answer. One module per command group; no business rules here.
 
 mod chain;
+mod logs;
 mod profile;
 mod project;
 mod release;
@@ -114,6 +115,13 @@ pub enum Command {
     },
     /// Show one ticket with its subtasks and comments.
     Show { ticket: String },
+    /// Print what a ticket's agent has written to its terminal; `--follow` keeps going live.
+    Logs {
+        ticket: String,
+        /// Keep printing as the agent writes, until its run ends.
+        #[arg(long, short)]
+        follow: bool,
+    },
     /// Print every change live; resumes after a reconnect.
     Watch {
         /// Start after this event seq (0 = from the beginning).
@@ -194,6 +202,7 @@ pub fn run(cmd: Command, json_out: bool) -> Result<()> {
         Command::Sim { target, action } => sim::run(&c, &target, action, json_out),
         Command::Ls { needs_human, chain } => ticket::ls(&c, needs_human, chain, json_out),
         Command::Show { ticket } => ticket::run(&c, TicketCmd::Show { ticket }, json_out),
+        Command::Logs { ticket, follow } => logs::run(&c, &ticket, follow),
         Command::Watch { since } => watch::run(&c, &paths, since),
         Command::Open => {
             let info = daemon_cmd::running(&paths)?.context("daemon is not running")?;
