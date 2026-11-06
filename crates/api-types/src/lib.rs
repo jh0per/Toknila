@@ -14,8 +14,9 @@ use toknila_core::machine::TicketAction;
 use toknila_core::profile::{Catalog, ListedProfile, ProfileProblem};
 use toknila_core::schedule::Plan;
 use toknila_core::{
-    Actor, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Project, ProjectId, Release, ReleaseId,
-    Ship, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
+    Actor, AgentRole, Chain, Comment, Edge, EdgeKind, NodeRef, Phase, Project, ProjectId, Release,
+    ReleaseId, Ship, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
+    question::AnswerKind,
 };
 
 pub use toknila_app::chains::NewChain;
@@ -256,6 +257,72 @@ pub struct NewActivity {
     /// The session's transcript file, from the hook's input.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<String>,
+    /// A `PreToolUse` hook: the summary of the tool call that is about to run (the command or the
+    /// file, at most 300 characters), kept to say what a later permission prompt is about.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
+    /// A permission prompt notification: its message. The ticket's worker then waits for the
+    /// person; a reviewer's prompt is listed in the inbox.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+}
+
+impl NewActivity {
+    /// A bare sign of life.
+    pub fn signal(signal: impl Into<String>) -> Self {
+        Self {
+            signal: signal.into(),
+            session_id: None,
+            transcript_path: None,
+            tool: None,
+            prompt: None,
+        }
+    }
+}
+
+/// Body of `POST /v1/tickets/{ticket}/permission`: an agent's `PermissionRequest` hook, which
+/// waits for the person's decision.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PermissionAsk {
+    /// Summary of the tool call that needs permission (the command or the file); the daemon
+    /// uses the last one it was told when this is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
+}
+
+/// What the person decided.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PermissionDecision {
+    Allow,
+    Deny,
+    /// Nobody decided in time: the agent shows its own dialog.
+    Ask,
+}
+
+/// Answer of `POST /v1/tickets/{ticket}/permission`.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PermissionReply {
+    pub decision: PermissionDecision,
+    /// Why it was denied, for the agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Body of `POST /v1/tickets/{ticket}/runner/answer`: a person's answer to what an agent asks.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct NewAnswer {
+    /// Whose question: the ticket's `worker` (the default) or its `reviewer`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<AgentRole>,
+    pub answer: AnswerKind,
+    /// The text of a `text` answer; the optional comment of a `deny`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
 }
 
 /// Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it

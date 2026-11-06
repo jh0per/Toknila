@@ -29,7 +29,8 @@
           "max_nudges": 3,
           "window_secs": 900,
           "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done."
-        }
+        },
+        "startup_secs": 20
       },
       "file": null
     },
@@ -74,7 +75,8 @@
           "max_nudges": 3,
           "window_secs": 900,
           "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done."
-        }
+        },
+        "startup_secs": 20
       },
       "file": null
     },
@@ -107,7 +109,8 @@
           "max_nudges": 3,
           "window_secs": 900,
           "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done."
-        }
+        },
+        "startup_secs": 20
       },
       "file": null
     },
@@ -158,7 +161,8 @@
           "max_nudges": 3,
           "window_secs": 900,
           "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done."
-        }
+        },
+        "startup_secs": 20
       },
       "file": null
     },
@@ -196,7 +200,8 @@
           "max_nudges": 1,
           "window_secs": 600,
           "message": "Report, please."
-        }
+        },
+        "startup_secs": 20
       },
       "file": "my-agent.toml"
     }

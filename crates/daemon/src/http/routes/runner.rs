@@ -49,12 +49,13 @@ pub async fn scrollback(
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/runner/input", tag = "runner",
-    params(("ticket" = String, Path, description = "Ticket id or key")),
+    params(("ticket" = String, Path, description = "Ticket id or key"), RunnerQuery),
     request_body(content = Vec<u8>, content_type = "application/octet-stream", description = "Bytes typed into the agent's terminal, as they are"),
     responses((status = 204, description = "Written"), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
 pub async fn runner_input(
     State(state): State<AppState>,
     Path(ticket): Path<String>,
+    Query(q): Query<RunnerQuery>,
     body: Bytes,
 ) -> ApiResult<StatusCode> {
     let t = state
@@ -62,7 +63,8 @@ pub async fn runner_input(
         .read(move |repo| Ok(resolve::ticket(repo, &ticket)))
         .await??;
     // A person's action: this route is for people, agents use the event contract.
-    runs::send_input(&*state.runners, Actor::Human, &t, &body)?;
+    let role = q.role.unwrap_or(AgentRole::Worker);
+    runs::send_input(&*state.runners, Actor::Human, &t, role, &body)?;
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -237,9 +237,9 @@ fn deliver(runner: &dyn Runner, ticket: TicketId, comment: &Comment) -> bool {
     let line = instructions::typed(comment);
     // The text, then Enter as a separate keystroke: a terminal application takes a newline that
     // arrives with the text as part of a paste.
-    runner.write(ticket, line.as_bytes()).is_ok() && {
+    runner.write(ticket, AgentRole::Worker, line.as_bytes()).is_ok() && {
         std::thread::sleep(ENTER_DELAY);
-        runner.write(ticket, b"\r").is_ok()
+        runner.write(ticket, AgentRole::Worker, b"\r").is_ok()
     }
 }
 

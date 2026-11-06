@@ -277,7 +277,7 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
             follow,
             reviewer,
         } => logs::run(&c, &ticket, follow, reviewer),
-        Command::Watch { since } => watch::run(&c, &paths, since),
+        Command::Watch { since } => watch::run(&c, &paths, since, json_out),
         Command::Open => {
             let info = daemon_cmd::running(&paths)?.context("daemon is not running")?;
             let url = format!("{}/?token={}", info.base_url(), info.token);

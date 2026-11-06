@@ -86,8 +86,8 @@ pub trait Runner: std::fmt::Debug {
     fn stop_role(&self, ticket: TicketId, role: AgentRole);
     /// Every runner process that is alive, by ticket and role.
     fn live_runners(&self) -> Vec<(TicketId, AgentRole)>;
-    /// Writes bytes to the ticket's worker terminal. The reviewer's terminal is read-only.
-    fn write(&self, ticket: TicketId, bytes: &[u8]) -> Result<(), RunnerError>;
+    /// Writes bytes to the terminal of the ticket's runner of `role`.
+    fn write(&self, ticket: TicketId, role: AgentRole, bytes: &[u8]) -> Result<(), RunnerError>;
     /// What a live run is like, for choosing how to reach it; `None` without a live process.
     fn state(&self, ticket: TicketId) -> Option<RunnerState>;
     /// Sets the size of the ticket's terminal. The caller has clamped it.
@@ -124,7 +124,7 @@ impl Runner for NoRunner {
         Vec::new()
     }
 
-    fn write(&self, _: TicketId, _: &[u8]) -> Result<(), RunnerError> {
+    fn write(&self, _: TicketId, _: AgentRole, _: &[u8]) -> Result<(), RunnerError> {
         Err(RunnerError::Unavailable)
     }
 

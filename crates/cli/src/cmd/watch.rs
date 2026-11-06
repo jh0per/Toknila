@@ -1,5 +1,7 @@
-//! `tok watch`: print every journal entry live, resuming after a reconnect.
+//! `tok watch`: print every journal entry live, resuming after a reconnect. With `--json` each
+//! entry is one line of JSON (the journal record as the API gives it).
 
+use std::io::Write;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -9,7 +11,7 @@ use toknila_daemon::paths::Paths;
 
 use crate::{daemon_cmd, output};
 
-pub(super) fn run(c: &Client, paths: &Paths, since: Option<i64>) -> Result<()> {
+pub(super) fn run(c: &Client, paths: &Paths, since: Option<i64>, json_out: bool) -> Result<()> {
     let mut last = match since {
         Some(s) => s,
         // Default: only what happens from now on.
@@ -28,7 +30,13 @@ pub(super) fn run(c: &Client, paths: &Paths, since: Option<i64>) -> Result<()> {
                         Ok(tungstenite::Message::Text(t)) => {
                             let e: EventRecord = serde_json::from_str(t.as_str())?;
                             last = e.seq;
-                            println!("{}", output::event(&e));
+                            if json_out {
+                                println!("{}", serde_json::to_string(&e)?);
+                            } else {
+                                println!("{}", output::event(&e));
+                            }
+                            // A pipe reader (a script, a test) sees each entry as it happens.
+                            std::io::stdout().flush()?;
                         }
                         Ok(tungstenite::Message::Close(_)) | Err(_) => break,
                         Ok(_) => {}

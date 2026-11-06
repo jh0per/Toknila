@@ -157,19 +157,20 @@ pub fn mark_lost<U: UnitOfWork + ?Sized>(
     Ok(lost)
 }
 
-/// A person types into the ticket's terminal (an answer, a nudge, an instruction). Only a person
-/// does; the agent and the system have the event contract instead.
+/// A person types into the terminal of the ticket's runner of `role` (an answer, a nudge, an
+/// instruction). Only a person does; the agent and the system have the event contract instead.
 pub fn send_input(
     runner: &dyn Runner,
     actor: Actor,
     ticket: &Ticket,
+    role: AgentRole,
     bytes: &[u8],
 ) -> AppResult<()> {
     person_only(actor, "write to the agent's terminal")?;
     if bytes.is_empty() {
         return Err(AppError::bad_request("nothing to write"));
     }
-    runner.write(ticket.id, bytes).map_err(|e| {
+    runner.write(ticket.id, role, bytes).map_err(|e| {
         let kind = match e {
             RunnerError::NotRunning => ErrorKind::Conflict,
             _ => ErrorKind::Internal,

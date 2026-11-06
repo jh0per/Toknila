@@ -5,7 +5,7 @@
 use std::io::Read;
 
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
-use toknila_api_types::{InstructionClaim, TerminalSize};
+use toknila_api_types::{InstructionClaim, NewAnswer, PermissionAsk, PermissionReply, TerminalSize};
 use toknila_core::{AgentRole, RunId};
 
 use crate::{Client, ClientError, ClientResult, NO_BODY, enc, transport_error};
@@ -68,9 +68,19 @@ impl Client {
         })
     }
 
-    /// `POST /tickets/{ticket}/runner/input`: types `bytes` into the agent's terminal.
+    /// `POST /tickets/{ticket}/runner/input`: types `bytes` into the worker's terminal.
     pub fn runner_input(&self, ticket: &str, bytes: &[u8]) -> ClientResult<()> {
-        let url = format!("{}/v1/tickets/{}/runner/input", self.base, enc(ticket));
+        self.runner_input_of(ticket, AgentRole::Worker, bytes)
+    }
+
+    /// Types `bytes` into the terminal of the ticket's runner of `role`.
+    pub fn runner_input_of(&self, ticket: &str, role: AgentRole, bytes: &[u8]) -> ClientResult<()> {
+        let url = format!(
+            "{}/v1/tickets/{}/runner/input{}",
+            self.base,
+            enc(ticket),
+            role_query(role, '?')
+        );
         self.agent
             .post(&url)
             .set("Authorization", &format!("Bearer {}", self.token))
@@ -121,6 +131,37 @@ impl Client {
             &format!("/tickets/{}/instructions/claim", enc(ticket)),
             NO_BODY,
         )
+    }
+
+    /// `POST /tickets/{ticket}/runner/answer`: a person's answer to what the agent asks.
+    pub fn answer(&self, ticket: &str, a: &NewAnswer) -> ClientResult<()> {
+        self.call(
+            "POST",
+            &format!("/tickets/{}/runner/answer", enc(ticket)),
+            Some(a),
+        )
+    }
+
+    /// `POST /tickets/{ticket}/permission`: the agent's permission hook asks and waits (up to
+    /// `wait`) for the person's decision.
+    pub fn permission(
+        &self,
+        ticket: &str,
+        ask: &PermissionAsk,
+        wait: std::time::Duration,
+    ) -> ClientResult<PermissionReply> {
+        let url = format!("{}/v1/tickets/{}/permission", self.base, enc(ticket));
+        let json = serde_json::to_value(ask).map_err(|e| ClientError::Decode(e.to_string()))?;
+        let text = self
+            .agent
+            .post(&url)
+            .timeout(wait)
+            .set("Authorization", &format!("Bearer {}", self.token))
+            .send_json(json)
+            .map_err(transport_error)?
+            .into_string()
+            .map_err(|e| ClientError::Decode(e.to_string()))?;
+        serde_json::from_str(&text).map_err(|e| ClientError::Decode(e.to_string()))
     }
 
     /// `POST /tickets/{ticket}/runner/size`: the size of the panel showing the terminal.

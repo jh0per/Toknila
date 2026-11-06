@@ -253,6 +253,13 @@ impl Active {
         }
     }
 
+    /// The last `max` bytes of the run's retained output.
+    pub fn tail(&self, max: usize) -> Vec<u8> {
+        let state = lock(&self.state);
+        let from = state.scrollback.end().saturating_sub(max as u64);
+        state.scrollback.from(from).1.to_vec()
+    }
+
     pub fn write(&self, bytes: &[u8]) -> Result<(), RunnerError> {
         let mut writer = lock(&self.writer);
         writer

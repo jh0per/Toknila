@@ -30,6 +30,7 @@ pub fn watch(store: Store, runners: Arc<Runners>) -> JoinHandle<()> {
 
 /// One round at time `at`: the runs that are quiet are nudged or given up on.
 pub async fn tick(store: &Store, runners: &Arc<Runners>, at: Timestamp) {
+    super::screens::tick(store, runners, at).await;
     for ticket in runners.live() {
         if let Err(error) = look(store, runners, ticket, at).await {
             tracing::warn!(%ticket, %error, "the silence check failed");

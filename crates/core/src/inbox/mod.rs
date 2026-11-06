@@ -4,7 +4,7 @@
 //! | Kind | A card (or thread) is listed while |
 //! |---|---|
 //! | `proposal` | a wildcard card is Proposed |
-//! | `question` | the agent is Waiting with a question or a permission prompt |
+//! | `question` | the agent is Waiting with a question or a permission prompt; a reviewer (or any run) shows a permission dialog; or a run showed no sign of life for `startup_secs` after its spawn and waits on its screen (see [`crate::question`]) |
 //! | `blocked` | the card is Blocked (the item carries the reason) |
 //! | `review` | the card is in Review and it is the person's turn (`review.turn`; while the reviewer agent has it, or the merge is running, the card is not listed; a failed merge is a `blocked` item) |
 //! | `thread` | a thread is open and its newest version came after the person's last request |
@@ -20,9 +20,10 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
+use crate::question::{self, AnswerKind, PendingPermission, QuestionKind, RunFacts};
 use crate::{
-    ChainId, ReviewTurn, StatusReason, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket,
-    TicketKey, TicketStatus, Timestamp, WaitingReason, machine::TicketAction, thread,
+    AgentRole, ChainId, ReviewTurn, StatusReason, Subtask, Thread, ThreadMessage, ThreadVersion,
+    Ticket, TicketKey, TicketStatus, Timestamp, WaitingReason, machine::TicketAction, thread,
 };
 
 /// What kind of thing waits on the person; the order is the order clients group them in.
@@ -71,6 +72,17 @@ pub struct InboxItem {
     /// What a person may do to the card now, as the state machine allows it; the window offers
     /// no other card action.
     pub allowed_actions: Vec<TicketAction>,
+    /// Whose question it is (`question` items): the card's worker or its reviewer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<AgentRole>,
+    /// How the question can be answered, as core allows it (`question` items; empty for an
+    /// `ask_human` question, which a comment answers).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub answers: Vec<AnswerKind>,
+    /// The last lines of the agent's screen, ANSI removed (`question` items of an agent that
+    /// waits on its screen).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lines: Vec<String>,
 }
 
 /// A thread with what the rule needs to know about it.
@@ -84,12 +96,31 @@ pub struct ThreadFacts {
 
 /// What the inbox is computed from: the project's cards and the facts of its threads and
 /// subtasks.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct InboxData {
+    /// The time the list is computed for (the startup rule needs it).
+    pub now: Timestamp,
     pub tickets: Vec<Ticket>,
     /// Subtasks of the cards that were left behind (`done_out_of_order.behind`).
     pub subtasks: Vec<Subtask>,
     pub threads: Vec<ThreadFacts>,
+    /// Permission dialogs that runs reported and no card status shows.
+    pub permissions: Vec<PendingPermission>,
+    /// The live runs.
+    pub runs: Vec<RunFacts>,
+}
+
+impl Default for InboxData {
+    fn default() -> Self {
+        Self {
+            now: Timestamp(0),
+            tickets: Vec::new(),
+            subtasks: Vec::new(),
+            threads: Vec::new(),
+            permissions: Vec::new(),
+            runs: Vec::new(),
+        }
+    }
 }
 
 /// The inbox of a project, newest first (ties by key).
@@ -101,6 +132,7 @@ pub fn compute(data: &InboxData) -> Vec<InboxItem> {
             .filter_map(|f| thread_item(f, &data.tickets)),
     );
     items.extend(leftover_items(data));
+    items.extend(question_items(data));
     items.sort_by(|a, b| b.since.cmp(&a.since).then_with(|| a.ticket.cmp(&b.ticket)));
     items
 }
@@ -122,6 +154,9 @@ fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxIte
             .filter(|_| t.status == TicketStatus::Blocked)
             .map(|p| p.url.clone()),
         allowed_actions: TicketAction::allowed(t),
+        role: None,
+        answers: Vec::new(),
+        lines: Vec::new(),
     }
 }
 
@@ -152,7 +187,57 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
         (TicketStatus::Review, _) => (InboxKind::Review, String::new()),
         _ => return None,
     };
-    Some(item(kind, t, t.status_since, text))
+    let mut i = item(kind, t, t.status_since, text);
+    if kind == InboxKind::Question {
+        i.role = Some(AgentRole::Worker);
+        i.answers = match &t.status_reason {
+            Some(StatusReason::Waiting(WaitingReason::Permission { .. })) => {
+                QuestionKind::Permission.answers()
+            }
+            _ => QuestionKind::Question.answers(),
+        };
+    }
+    Some(i)
+}
+
+/// The questions that no card status shows: a permission dialog a run reported, and a run that
+/// waits on its screen.
+fn question_items(data: &InboxData) -> Vec<InboxItem> {
+    let card = |id| data.tickets.iter().find(|t| t.id == id);
+    let mut items = Vec::new();
+    for p in &data.permissions {
+        let Some(t) = card(p.ticket) else { continue };
+        // The worker's dialog already makes the card Waiting, and the card lists it.
+        if p.role == AgentRole::Worker && t.status == TicketStatus::Waiting {
+            continue;
+        }
+        let mut i = item(InboxKind::Question, t, p.since, p.text.clone());
+        i.role = Some(p.role);
+        i.answers = QuestionKind::Permission.answers();
+        items.push(i);
+    }
+    for run in data.runs.iter().filter(|r| r.waits_on_screen(data.now)) {
+        let Some(t) = card(run.ticket) else { continue };
+        let working = matches!(t.status, TicketStatus::Running | TicketStatus::Review);
+        let asking = data
+            .permissions
+            .iter()
+            .any(|p| p.ticket == run.ticket && p.role == run.role);
+        if !working || asking {
+            continue;
+        }
+        let since = Timestamp(
+            run.spawned
+                .0
+                .saturating_add(i64::try_from(run.startup_secs.saturating_mul(1000)).unwrap_or(0)),
+        );
+        let mut i = item(InboxKind::Question, t, since, question::SCREEN_TEXT.to_owned());
+        i.role = Some(run.role);
+        i.answers = QuestionKind::Screen.answers();
+        i.lines = question::last_lines(&run.tail, question::SCREEN_LINES);
+        items.push(i);
+    }
+    items
 }
 
 fn thread_item(f: &ThreadFacts, tickets: &[Ticket]) -> Option<InboxItem> {

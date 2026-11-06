@@ -285,3 +285,48 @@ fn runner_events_belong_to_the_ticket_and_carry_the_run() {
         })
     );
 }
+
+#[test]
+fn question_events_carry_the_ticket_the_role_and_what_was_asked_or_answered() {
+    use crate::AgentRole;
+    use crate::question::{AnswerKind, QuestionKind};
+    let key: TicketKey = "DEMO-1".parse().expect("key");
+    let ticket: TicketId = "01JBQ7ZJ0000000000000000T1".parse().expect("id");
+    let raised = DomainEvent::QuestionRaised {
+        key: key.clone(),
+        ticket,
+        role: AgentRole::Reviewer,
+        kind: QuestionKind::Permission,
+    };
+    let cleared = DomainEvent::QuestionCleared {
+        key: key.clone(),
+        ticket,
+        role: AgentRole::Worker,
+    };
+    let answered = DomainEvent::QuestionAnswered {
+        key,
+        ticket,
+        role: AgentRole::Reviewer,
+        answer: AnswerKind::Deny,
+    };
+    for (e, kind) in [
+        (&raised, "question_raised"),
+        (&cleared, "question_cleared"),
+        (&answered, "question_answered"),
+    ] {
+        assert_eq!((e.entity(), e.kind()), ("ticket", kind));
+        assert_eq!(e.entity_id(), "01JBQ7ZJ0000000000000000T1");
+    }
+    assert_eq!(
+        payload(&raised),
+        json!({"key": "DEMO-1", "ticket": "01JBQ7ZJ0000000000000000T1", "role": "reviewer", "kind": "permission"})
+    );
+    assert_eq!(
+        payload(&cleared),
+        json!({"key": "DEMO-1", "ticket": "01JBQ7ZJ0000000000000000T1", "role": "worker"})
+    );
+    assert_eq!(
+        payload(&answered),
+        json!({"key": "DEMO-1", "ticket": "01JBQ7ZJ0000000000000000T1", "role": "reviewer", "answer": "deny"})
+    );
+}

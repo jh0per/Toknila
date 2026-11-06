@@ -17,6 +17,7 @@ mod inbox;
 mod merges;
 mod parallel;
 mod profiles;
+mod questions;
 mod resume;
 mod reviews;
 mod settings;
@@ -774,6 +775,8 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/events",
             "/tickets/{ticket}/instructions/claim",
             "/tickets/{ticket}/leftovers/{action}",
+            "/tickets/{ticket}/permission",
+            "/tickets/{ticket}/runner/answer",
             "/tickets/{ticket}/runner/input",
             "/tickets/{ticket}/runner/scrollback",
             "/tickets/{ticket}/runner/size",

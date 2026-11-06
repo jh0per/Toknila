@@ -10,7 +10,7 @@ use toknila_core::inbox::InboxItem;
 use super::{ApiResult, read, ticket_write};
 use crate::http::dto::TicketDetail;
 use crate::http::error::ErrorBody;
-use crate::server::AppState;
+use crate::server::{AppState, now};
 
 #[utoipa::path(get, path = "/projects/{project}/inbox", tag = "projects",
     params(("project" = String, Path, description = "Project id or key")),
@@ -20,9 +20,11 @@ pub async fn get_inbox(
     State(state): State<AppState>,
     Path(project): Path<String>,
 ) -> ApiResult<Json<Vec<InboxItem>>> {
+    // The live runs are read first, outside the store: their output is not the store's business.
+    let live = state.runners.facts(now());
     let items = read(&state, move |repo| {
         let p = resolve::project(repo, &project)?;
-        Ok(inbox::load(repo, p.id)?)
+        Ok(inbox::load_with(repo, p.id, &live)?)
     })
     .await?;
     Ok(Json(items))
