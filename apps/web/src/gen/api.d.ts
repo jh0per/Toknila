@@ -332,7 +332,7 @@ export interface paths {
         put?: never;
         /**
          * A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;
-         *     nothing about the ticket changes.
+         *     nothing about the ticket changes unless the signal shows work and the ticket waits.
          */
         post: operations["ticket_activity"];
         delete?: never;
@@ -982,21 +982,27 @@ export interface components {
         Nudge: {
             /**
              * Format: int64
-             * @description Seconds without output before a nudge.
-             * @default 300
+             * @description Seconds without a sign of life before a nudge.
+             * @default 120
              */
             idle_secs: number;
             /**
              * Format: int32
-             * @description Nudges sent before the ticket is blocked.
+             * @description Nudges sent within `window_secs` before the ticket goes to Waiting (silent).
              * @default 3
              */
             max_nudges: number;
             /**
              * @description Text sent to the agent.
-             * @default Continue, or report with the finished event.
+             * @default Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done.
              */
             message: string;
+            /**
+             * Format: int64
+             * @description The sliding window, in seconds, in which `max_nudges` count.
+             * @default 900
+             */
+            window_secs: number;
         };
         /** @description The mark of a card that was done out of order: the earlier cards that were still open. */
         OutOfOrder: {

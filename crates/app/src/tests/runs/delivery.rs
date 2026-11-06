@@ -45,6 +45,7 @@ fn an_instruction_for_an_idle_agent_is_typed_and_marked_delivered_once() {
     mem.runner.reach.set(RunnerState {
         hooks: true,
         idle: true,
+        ..Default::default()
     });
     instruct(&mut mem, "use rustls");
     let written = mem.runner.written.borrow().clone();
@@ -64,6 +65,7 @@ fn an_instruction_for_a_working_agent_with_hooks_waits_for_the_stop_hook() {
     mem.runner.reach.set(RunnerState {
         hooks: true,
         idle: false,
+        ..Default::default()
     });
     instruct(&mut mem, "first");
     instruct(&mut mem, "second");
@@ -95,6 +97,7 @@ fn without_hooks_a_working_agent_is_typed_to() {
     mem.runner.reach.set(RunnerState {
         hooks: false,
         idle: false,
+        ..Default::default()
     });
     instruct(&mut mem, "now");
     assert_eq!(mem.runner.written.borrow().len(), 2);

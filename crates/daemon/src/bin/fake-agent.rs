@@ -8,6 +8,7 @@
 //! - `size`: print `size=<cols>x<rows>`, the terminal's size at that moment.
 //! - `sleep <ms>`: wait.
 //! - `hold`: wait until killed.
+//! - `child`: start a child process that holds until killed and print `child=<pid>`.
 //! - `exit <code>`: exit with that code.
 //!
 //! Without `exit` it exits with 0 after the last step. Built only to be run by the daemon's tests.
@@ -19,6 +20,23 @@ fn say(line: &str) {
     let mut out = std::io::stdout().lock();
     let _ = writeln!(out, "{line}");
     let _ = out.flush();
+}
+
+/// A command that holds until killed. On Unix it ignores the hangup that closing the terminal
+/// sends (as a dev server started with `nohup` does), so only a signal to the group ends it.
+#[cfg(unix)]
+fn child_command() -> std::process::Command {
+    let mut cmd = std::process::Command::new("sh");
+    cmd.args(["-c", "trap '' HUP; exec sleep 3600"]);
+    cmd
+}
+
+#[cfg(not(unix))]
+fn child_command() -> std::process::Command {
+    let exe = std::env::current_exe().expect("the program's own path");
+    let mut cmd = std::process::Command::new(exe);
+    cmd.arg("hold");
+    cmd
 }
 
 fn main() {
@@ -53,6 +71,12 @@ fn main() {
             "sleep" => {
                 let ms = args.next().and_then(|s| s.parse().ok()).unwrap_or(0);
                 std::thread::sleep(Duration::from_millis(ms));
+            }
+            "child" => {
+                // Left running on purpose: the test is that stopping the agent ends it.
+                #[allow(clippy::zombie_processes)]
+                let child = child_command().spawn().expect("the child starts");
+                say(&format!("child={}", child.id()));
             }
             "hold" => loop {
                 std::thread::sleep(Duration::from_secs(3600));

@@ -39,6 +39,8 @@ impl Default for RunnerState {
         RunnerState {
             hooks: true,
             idle: false,
+            quiet_ms: 0,
+            busy: false,
         }
     }
 }

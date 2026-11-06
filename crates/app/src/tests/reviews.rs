@@ -529,6 +529,7 @@ fn a_returns_comment_is_typed_to_the_live_worker_and_marked_delivered_once() {
     mem.runner.reach.set(crate::runner::RunnerState {
         hooks: true,
         idle: true,
+        ..Default::default()
     });
     let comment = "fix the look".to_owned();
     act(&mut mem, TicketEvent::Return { comment });
@@ -554,6 +555,7 @@ fn the_reviewers_remarks_wait_for_the_stop_hook_of_a_working_worker() {
     mem.runner.reach.set(crate::runner::RunnerState {
         hooks: true,
         idle: false,
+        ..Default::default()
     });
     verdict(&mut mem, Verdict::RequestChanges, "handle the empty list").expect("verdict");
     settle(&mut mem);

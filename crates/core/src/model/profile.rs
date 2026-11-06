@@ -64,10 +64,12 @@ impl Default for OutputRules {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Nudge {
-    /// Seconds without output before a nudge.
+    /// Seconds without a sign of life before a nudge.
     pub idle_secs: u64,
-    /// Nudges sent before the ticket is blocked.
+    /// Nudges sent within `window_secs` before the ticket goes to Waiting (silent).
     pub max_nudges: u32,
+    /// The sliding window, in seconds, in which `max_nudges` count.
+    pub window_secs: u64,
     /// Text sent to the agent.
     pub message: String,
 }
@@ -75,9 +77,12 @@ pub struct Nudge {
 impl Default for Nudge {
     fn default() -> Self {
         Self {
-            idle_secs: 300,
+            idle_secs: 120,
             max_nudges: 3,
-            message: "Continue, or report with the finished event.".to_owned(),
+            window_secs: 900,
+            message: "Report your state through the Toknila tools: call note with progress, \
+                      ask_human if you are stuck, or finished if you are done."
+                .to_owned(),
         }
     }
 }

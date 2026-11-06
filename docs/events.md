@@ -80,11 +80,20 @@ Claude Code hooks are a second source, conservative on purpose. The runner subsc
 Every hook is an activity signal: `POST /v1/tickets/{ticket}/activity` with `{"signal":
 "hook:stop"}` (`204`, no journal entry, nothing about the ticket changes). The daemon keeps the
 last signal of each ticket's agent in memory (`AgentTokens::last_activity`: its time and what it
-was); any other call made with the run's token counts as activity `api`. The nudge consumes this;
-nothing else reads it yet. A hook never gets in the agent's way: failures are one line on stderr
+was); any other call made with the run's token counts as activity `api`. The silence detector
+consumes this (see "Silence and nudges" in `architecture.md`). `post_tool_use` and
+`user_prompt_submit` also move a Waiting ticket back to Running; the other hooks change nothing. A hook never gets in the agent's way: failures are one line on stderr
 and exit code 0, and outside a Toknila run (no `TOKNILA_*` environment) it does nothing. The
 transition `ask_human` makes (Running -> Waiting) is refused with `409` in any other status; the
 hook reports that on stderr and carries on.
+
+## Waiting and back
+
+`ask_human` (a question, a permission prompt) moves Running to Waiting. A later `started`, `subtask_done`,
+`note` or `finished` event (not `ask_human`, `crashed`, `propose` or thread posts, which talk to
+the owner), or a `post_tool_use` / `user_prompt_submit` hook, moves it back to
+Running (machine event `agent_active`, no journal entry of its own beyond the status change). The
+same holds for Waiting (silent), which the silence detector sets after its nudges went unanswered.
 
 ## Agent tokens
 
@@ -167,7 +176,9 @@ is still looking. Both are recorded as rounds on the ticket (`review.rounds`) wi
 
 Everything a person tells an agent is a ticket comment first (`POST /v1/tickets/{ticket}/comments`,
 kind `instruction`). The runner delivers pending instructions and marks them `delivered_at`
-(journal `comment.delivered`); a Waiting ticket goes back to Running when one is delivered. The
+(journal `comment.delivered`); a Waiting ticket goes back to Running when one is delivered. A
+nudge to a silent agent is such an instruction, authored by `system`, so the card shows it and
+the journal records its delivery. The
 `sim` profile "reads" instantly: delivery happens in the same command for Running and Waiting sim
 tickets. A process agent gets it typed into its terminal, or, while it works and its Stop hook is
 wired, at its next stop: `POST /v1/tickets/{ticket}/instructions/claim` (agent token) answers

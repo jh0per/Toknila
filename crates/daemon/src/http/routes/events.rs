@@ -4,8 +4,8 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
 use toknila_app::{agent, instructions, resolve};
-use toknila_core::Actor;
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
+use toknila_core::{Actor, TicketStatus, nudge};
 
 use super::{ApiResult, chain_write, load_ticket_detail};
 use crate::http::dto::{ChainDetail, EventQuery, InstructionClaim, NewActivity, TicketDetail};
@@ -52,7 +52,7 @@ pub async fn agent_event(
     params(("ticket" = String, Path, description = "Ticket id or key")),
     responses((status = 204, description = "Recorded"), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
 /// A sign of life from the ticket's agent (a hook fired). Recorded as the run's last activity;
-/// nothing about the ticket changes.
+/// nothing about the ticket changes unless the signal shows work and the ticket waits.
 pub async fn ticket_activity(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -64,9 +64,20 @@ pub async fn ticket_activity(
         .read(move |repo| Ok(resolve::ticket(repo, &ticket)))
         .await??;
     principal.owns(&t)?;
-    // Only the worker's signs of life count: a reviewer beside it is not the worker working.
+    // Only the worker's signs of life count: a reviewer beside it is not the worker working, and
+    // never brings a waiting worker back to Running.
     if !matches!(principal, Principal::Agent(g) if g.role != toknila_core::AgentRole::Worker) {
-        state.runners.tokens().touch(t.id, now(), &input.signal);
+        let at = now();
+        state.runners.tokens().touch(t.id, at, &input.signal);
+        if t.status == TicketStatus::Waiting && nudge::resumes(&input.signal) {
+            let signal = input.signal;
+            state
+                .store
+                .write(Actor::Agent, at, move |tx| -> ApiResult<()> {
+                    Ok(agent::activity(tx, &t, &signal)?)
+                })
+                .await?;
+        }
     }
     Ok(StatusCode::NO_CONTENT)
 }

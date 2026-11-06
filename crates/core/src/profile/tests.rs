@@ -16,6 +16,7 @@ config_flag = "--mcp-config"
 [nudge]
 idle_secs = 60
 max_nudges = 1
+window_secs = 600
 message = "Report, please."
 "#;
 
@@ -43,7 +44,10 @@ fn a_profile_file_becomes_a_profile_named_after_the_file() {
         Some("--append-system-prompt-file")
     );
     assert!(p.mcp.enabled && !p.hooks.enabled);
-    assert_eq!((p.nudge.idle_secs, p.nudge.max_nudges), (60, 1));
+    assert_eq!(
+        (p.nudge.idle_secs, p.nudge.max_nudges, p.nudge.window_secs),
+        (60, 1, 600)
+    );
     assert!(p.output.strip_ansi, "unset sections take their defaults");
 }
 
@@ -52,6 +56,8 @@ fn only_the_command_is_required() {
     let p = parse("min", r#"command = ["agent"]"#).expect("valid");
     assert_eq!(p.role, AgentRole::Worker);
     assert_eq!(p.nudge, crate::Nudge::default());
+    let n = &p.nudge;
+    assert_eq!((n.idle_secs, n.max_nudges, n.window_secs), (120, 3, 900));
 }
 
 #[test]

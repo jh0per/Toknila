@@ -11,6 +11,7 @@ pub mod hook;
 pub mod instructions;
 pub mod machine;
 pub mod model;
+pub mod nudge;
 pub mod plan;
 pub mod profile;
 pub mod schedule;

@@ -11,6 +11,7 @@ pub mod error;
 pub mod external;
 pub mod instructions;
 pub mod notes;
+pub mod nudge;
 pub mod ports;
 pub mod projects;
 pub mod recovery;

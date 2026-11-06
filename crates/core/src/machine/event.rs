@@ -26,6 +26,8 @@ pub enum TicketEvent {
     AskHuman { reason: WaitingReason },
     /// A person's new comment reached the agent.
     InstructionDelivered,
+    /// Agent: shows life again after a wait (an MCP event, a tool ran): back to Running.
+    AgentActive,
     /// Agent: done, a diff is ready. The summary becomes a report comment.
     Finished {
         summary: String,
@@ -81,6 +83,7 @@ impl TicketEvent {
             Self::Start => "start",
             Self::AskHuman { .. } => "ask_human",
             Self::InstructionDelivered => "instruction_delivered",
+            Self::AgentActive => "agent_active",
             Self::Finished { .. } => "finished",
             Self::Block { .. } => "block",
             Self::Unblock => "unblock",

@@ -547,3 +547,89 @@ fn a_profile_that_asks_for_mcp_gets_a_config_file_under_the_data_home_and_the_fl
         "nothing is written into the worktree"
     );
 }
+
+/// Whether a process with this id is running (a zombie is not).
+fn alive(pid: u32) -> bool {
+    use sysinfo::{Pid, ProcessStatus, ProcessesToUpdate, System};
+    let mut sys = System::new().expect("process listing");
+    let pid = Pid::from_u32(pid);
+    sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+    sys.process(pid)
+        .is_some_and(|p| !matches!(p.status(), ProcessStatus::Zombie | ProcessStatus::Dead))
+}
+
+/// The process id the fake agent printed as `child=<pid>`.
+fn child_pid(output: &str) -> u32 {
+    let after = output.split("child=").nth(1).unwrap_or("");
+    after
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .parse()
+        .expect("pid")
+}
+
+fn wait_until(what: &str, mut done: impl FnMut() -> bool) {
+    let until = Instant::now() + WAIT;
+    while !done() {
+        assert!(Instant::now() < until, "{what}");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn a_live_child_of_the_agent_is_seen_and_an_agent_without_one_is_not() {
+    let rig = Rig::new();
+    rig.profile("fake", &["print", "up", "hold"], "");
+    rig.start("fake");
+    rig.wait_for("up");
+    let state = rig.runners.state(rig.ticket).expect("live");
+    assert!(!state.busy, "no child yet");
+    rig.runners.stop_all();
+
+    let rig = Rig::new();
+    rig.profile("fake", &["child", "hold"], "");
+    rig.start("fake");
+    let out = rig.wait_for("child=");
+    let child = child_pid(&out);
+    wait_until("the child is never seen", || {
+        rig.runners.state(rig.ticket).is_some_and(|s| s.busy)
+    });
+    rig.runners.stop_all();
+    wait_until("the child outlived the stop", || !alive(child));
+}
+
+#[test]
+fn stop_ends_the_whole_process_tree() {
+    let mut rig = Rig::new();
+    rig.profile("fake", &["child", "hold"], "");
+    rig.start("fake");
+    let out = rig.wait_for("child=");
+    let child = child_pid(&out);
+    assert!(alive(child), "the child runs before the stop");
+    rig.runners.stop(rig.ticket);
+    assert!(rig.wait_end().stopped);
+    wait_until("the agent's child survived the stop", || !alive(child));
+}
+
+#[test]
+fn stopping_a_reviewer_ends_its_process_tree_too() {
+    let mut rig = Rig::new();
+    rig.profile("fake-reviewer", &["child", "hold"], "");
+    rig.runners
+        .start(&rig.request_as("fake-reviewer", AgentRole::Reviewer))
+        .expect("start the reviewer");
+    let until = Instant::now() + WAIT;
+    let child = loop {
+        let out = rig.output_of(AgentRole::Reviewer);
+        if out.contains("child=") {
+            break child_pid(&out);
+        }
+        assert!(Instant::now() < until, "no child in {out:?}");
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    assert!(alive(child), "the child runs before the stop");
+    rig.runners.stop_role(rig.ticket, AgentRole::Reviewer);
+    assert!(rig.wait_end().stopped);
+    wait_until("the reviewer's child survived the stop", || !alive(child));
+}

@@ -238,8 +238,8 @@ async fn an_agent_token_moves_its_ticket_exactly_like_the_persons_sim_events() {
         [
             Some("running"),
             Some("waiting"),
-            Some("waiting"),
-            Some("waiting"),
+            Some("running"),
+            Some("running"),
             Some("review")
         ]
     );

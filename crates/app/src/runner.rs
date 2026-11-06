@@ -99,6 +99,10 @@ pub struct RunnerState {
     pub hooks: bool,
     /// It has printed nothing for a while: it waits at its prompt.
     pub idle: bool,
+    /// Milliseconds since it last printed.
+    pub quiet_ms: u64,
+    /// It has a live child process of its own (a build, tests), apart from Toknila's helpers.
+    pub busy: bool,
 }
 
 /// The runner of a host that has none: every start is refused.

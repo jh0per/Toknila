@@ -5,6 +5,8 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+use toknila_app::nudge::Reported;
+use toknila_core::nudge::{Source, source_of};
 use toknila_core::{AgentRole, RunId, TicketId, Timestamp};
 
 use crate::server::constant_time_eq;
@@ -26,10 +28,17 @@ pub struct Activity {
     pub signal: String,
 }
 
+/// What one ticket's agent has shown so far, by source.
+#[derive(Debug, Clone)]
+struct Seen {
+    last: Activity,
+    reported: Reported,
+}
+
 #[derive(Debug, Default)]
 struct Inner {
     grants: Vec<(String, Grant)>,
-    activity: HashMap<TicketId, Activity>,
+    activity: HashMap<TicketId, Seen>,
 }
 
 /// The tokens of the live runs.
@@ -52,9 +61,16 @@ impl AgentTokens {
         if grant.role == AgentRole::Worker {
             inner.activity.insert(
                 grant.ticket,
-                Activity {
-                    at,
-                    signal: "start".to_owned(),
+                Seen {
+                    last: Activity {
+                        at,
+                        signal: "start".to_owned(),
+                    },
+                    reported: Reported {
+                        started: at,
+                        mcp: None,
+                        hook: None,
+                    },
                 },
             );
         }
@@ -77,18 +93,29 @@ impl AgentTokens {
 
     /// Records a sign of life from the agent of `ticket`.
     pub fn touch(&self, ticket: TicketId, at: Timestamp, signal: &str) {
-        self.inner().activity.insert(
-            ticket,
-            Activity {
-                at,
-                signal: signal.to_owned(),
-            },
-        );
+        let mut inner = self.inner();
+        let Some(seen) = inner.activity.get_mut(&ticket) else {
+            return;
+        };
+        seen.last = Activity {
+            at,
+            signal: signal.to_owned(),
+        };
+        match source_of(signal) {
+            Some(Source::Mcp) => seen.reported.mcp = Some(at),
+            Some(Source::Hook) => seen.reported.hook = Some(at),
+            None => {}
+        }
     }
 
     /// The last sign of life of the ticket's agent: its run's start, or later.
     pub fn last_activity(&self, ticket: TicketId) -> Option<Activity> {
-        self.inner().activity.get(&ticket).cloned()
+        self.inner().activity.get(&ticket).map(|s| s.last.clone())
+    }
+
+    /// The ticket's agent's signs of life by source, for the silence rule.
+    pub fn reported(&self, ticket: TicketId) -> Option<Reported> {
+        self.inner().activity.get(&ticket).map(|s| s.reported)
     }
 }
 
@@ -127,6 +154,18 @@ mod tests {
         tokens.issue(g, Timestamp(10)).expect("token");
         let first = tokens.last_activity(g.ticket).map(|a| a.at);
         assert_eq!(first, Some(Timestamp(10)));
+        tokens.touch(g.ticket, Timestamp(25), "hook:stop");
+        let seen = tokens.reported(g.ticket).expect("reported");
+        assert_eq!(
+            (seen.started, seen.mcp, seen.hook),
+            (Timestamp(10), None, Some(Timestamp(25)))
+        );
+        tokens.touch(g.ticket, Timestamp(30), "api");
+        let seen = tokens.reported(g.ticket).expect("reported");
+        assert_eq!(
+            (seen.mcp, seen.hook),
+            (Some(Timestamp(30)), Some(Timestamp(25)))
+        );
         tokens.touch(g.ticket, Timestamp(25), "hook:stop");
         let last = tokens.last_activity(g.ticket).expect("activity");
         assert_eq!(

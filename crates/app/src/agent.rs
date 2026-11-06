@@ -3,6 +3,7 @@
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::graph::ChainView;
 use toknila_core::machine::TicketEvent;
+use toknila_core::nudge;
 use toknila_core::{
     Actor, BlockedReason, CommentBody, CommentKind, Release, Ticket, TicketId, TicketStatus,
 };
@@ -29,6 +30,15 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
     t: &Ticket,
     event: AgentEvent,
 ) -> AppResult<TicketId> {
+    // A report of work shows the agent is working again. A question, a crash, and talk with the
+    // owner (a proposal, a thread) do not: the card may well be waiting on the answer.
+    let resumed = match event {
+        AgentEvent::Started
+        | AgentEvent::SubtaskDone { .. }
+        | AgentEvent::Note { .. }
+        | AgentEvent::Finished { .. } => resume(uow, t)?,
+        _ => false,
+    };
     match event {
         AgentEvent::Propose(card) => {
             let (chain, from) = (t.chain_id.to_string(), t.key.to_string());
@@ -58,7 +68,7 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
         AgentEvent::Started => with_chain(uow, t.chain_id, |ctx| {
             if t.status == TicketStatus::Ready {
                 ctx.ticket_event(t.id, TicketEvent::Start)?;
-            } else if t.status != TicketStatus::Running {
+            } else if t.status != TicketStatus::Running && !resumed {
                 return Err(AppError::conflict(format!(
                     "cannot start a ticket in {:?}",
                     t.status
@@ -125,4 +135,27 @@ fn report<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, body: CommentBody) ->
         .chain_view(t.chain_id)?
         .ok_or_else(|| AppError::not_found("chain"))?;
     add_comment(uow, &view, t.id, Actor::Agent, CommentKind::Report, body).map(|_| ())
+}
+
+/// A sign of life from the agent (a hook fired). A card that waits goes back to Running when the
+/// signal shows work (`toknila_core::nudge::resumes`); otherwise nothing about the ticket changes.
+pub fn activity<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, signal: &str) -> AppResult<()> {
+    if nudge::resumes(signal) {
+        resume(uow, t)?;
+    }
+    Ok(())
+}
+
+/// A Waiting ticket whose agent is active again goes back to Running, through the machine.
+/// Returns whether it was Waiting.
+fn resume<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket) -> AppResult<bool> {
+    let waiting = uow
+        .ticket(t.id)?
+        .is_some_and(|t| t.status == TicketStatus::Waiting);
+    if waiting {
+        with_chain(uow, t.chain_id, |ctx| {
+            Ok::<_, AppError>(ctx.ticket_event(t.id, TicketEvent::AgentActive)?)
+        })?;
+    }
+    Ok(waiting)
 }
