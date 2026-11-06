@@ -1563,6 +1563,8 @@ export interface components {
         };
         /** @description A thread with its messages and artifact versions. */
         ThreadDetail: {
+            /** @description The thread is open and a person's request for changes has no newer version yet. */
+            changes_requested: boolean;
             /** @description Oldest first. */
             messages: components["schemas"]["ThreadMessage"][];
             thread: components["schemas"]["Thread"];

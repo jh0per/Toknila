@@ -61,6 +61,7 @@ async fn a_person_and_the_agent_settle_a_thread_and_the_hand_in_follows() {
     let th = &list["threads"][0];
     assert_eq!(th["messages"].as_array().map(Vec::len), Some(1));
     assert_eq!(th["versions"][0]["body"], "graph TD; A-->B");
+    assert_eq!(th["changes_requested"], false);
     let id = th["thread"]["id"].as_str().expect("id").to_owned();
 
     // A person asks for changes and approves; the thread can be addressed by number or id.
@@ -71,6 +72,9 @@ async fn a_person_and_the_agent_settle_a_thread_and_the_hand_in_follows() {
         )
         .await;
     assert_eq!(t["thread"]["state"], "open");
+    assert_eq!(t["changes_requested"], true);
+    // Timestamps are milliseconds; a version in the same one would not answer the request.
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
     ev(json!({ "event": "thread_version", "thread": id, "format": "mermaid", "body": "graph TD; A-->E" }))
         .await;
     let (s, v) = api
@@ -82,6 +86,11 @@ async fn a_person_and_the_agent_settle_a_thread_and_the_hand_in_follows() {
         .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["versions"].as_array().map(Vec::len), Some(3));
+    // New versions answered the request: still open, no longer waiting on changes.
+    assert_eq!(
+        (&v["thread"]["state"], &v["changes_requested"]),
+        (&json!("open"), &json!(false))
+    );
     let approved = api
         .post("/v1/tickets/DEMO-1/threads/1/approve", json!({}))
         .await;
@@ -92,6 +101,7 @@ async fn a_person_and_the_agent_settle_a_thread_and_the_hand_in_follows() {
         ),
         (&json!("approved"), &json!(3))
     );
+    assert_eq!(approved["changes_requested"], false);
     let (s, again) = api
         .call(Method::POST, "/v1/tickets/DEMO-1/threads/1/approve", None)
         .await;

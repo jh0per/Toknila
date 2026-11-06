@@ -5,13 +5,10 @@ import type { ThreadDetail, ThreadVersion } from "../api/types";
 
 export type ThreadStatus = "open" | "changes_requested" | "approved";
 
-/// Approved, or open; open with a request for changes nobody answered with a newer version yet.
+/// Approved, changes requested (the daemon's `changes_requested`), or plain open.
 export function threadStatus(t: ThreadDetail): ThreadStatus {
   if (t.thread.state === "approved") return "approved";
-  const asked = [...t.messages].reverse().find((m) => m.kind === "changes_requested");
-  if (!asked) return "open";
-  const answered = t.versions.some((v) => v.created_at > asked.created_at);
-  return answered ? "open" : "changes_requested";
+  return t.changes_requested ? "changes_requested" : "open";
 }
 
 /// How many threads still keep the card from being handed in.

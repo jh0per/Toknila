@@ -233,6 +233,24 @@ pub fn awaiting_person(
     asked.is_none_or(|at| newest > at).then_some(newest)
 }
 
+/// Whether an open thread has a person's request for changes that no newer version answered.
+/// An approved thread never does; a version posted at the instant of the request does not answer it.
+pub fn changes_requested(
+    thread: &Thread,
+    versions: &[ThreadVersion],
+    messages: &[ThreadMessage],
+) -> bool {
+    if thread.state != ThreadState::Open {
+        return false;
+    }
+    let asked = messages
+        .iter()
+        .filter(|m| m.kind == MessageKind::ChangesRequested)
+        .map(|m| m.created_at)
+        .max();
+    asked.is_some_and(|at| !versions.iter().any(|v| v.created_at > at))
+}
+
 /// The hand-in gate: refused, naming them, while any thread is open.
 pub fn require_none_open(ticket: &TicketKey, open: &[OpenThread]) -> Result<(), TransitionError> {
     if open.is_empty() {

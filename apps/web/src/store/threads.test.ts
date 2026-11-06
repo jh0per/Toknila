@@ -8,10 +8,10 @@ function thread(over: Partial<ThreadDetail> & { state?: "open" | "approved" } = 
     thread: { id: "th1", number: 1, kind: "design", title: "List", state, ticket_id: "t1" },
     messages: [],
     versions: [],
+    changes_requested: false,
     ...rest,
   } as unknown as ThreadDetail;
 }
-const msg = (kind: string, at: number) => ({ id: `m${at}`, kind, text: "x", created_at: at, author: "human" });
 const ver = (number: number, at: number) => ({ number, created_at: at, body: "b", format: "html", author: "agent" });
 
 describe("threadStatus", () => {
@@ -20,11 +20,10 @@ describe("threadStatus", () => {
     expect(threadStatus(thread({ state: "approved" }))).toBe("approved");
   });
 
-  it("is changes requested until a newer version arrives", () => {
-    const asked = thread({ messages: [msg("message", 1), msg("changes_requested", 5)] as never, versions: [ver(1, 2)] as never });
-    expect(threadStatus(asked)).toBe("changes_requested");
-    const answered = thread({ messages: asked.messages, versions: [ver(1, 2), ver(2, 9)] as never });
-    expect(threadStatus(answered)).toBe("open");
+  it("is changes requested when the daemon says so, and approved wins", () => {
+    expect(threadStatus(thread({ changes_requested: true }))).toBe("changes_requested");
+    expect(threadStatus(thread({ changes_requested: false }))).toBe("open");
+    expect(threadStatus(thread({ state: "approved", changes_requested: true }))).toBe("approved");
   });
 });
 

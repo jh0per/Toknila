@@ -244,3 +244,70 @@ fn phase_is_design_while_any_thread_is_open() {
     assert_eq!(phase(std::slice::from_ref(&approved)), Phase::Implement);
     assert_eq!(phase(&[approved, open_thread]), Phase::Design);
 }
+
+fn ask(at: i64) -> ThreadMessage {
+    let t = thread();
+    let kind = MessageKind::ChangesRequested;
+    message(
+        &t,
+        ThreadMessageId::new(),
+        Actor::Human,
+        kind,
+        "fix",
+        Timestamp(at),
+    )
+    .expect("msg")
+}
+
+fn plain(at: i64) -> ThreadMessage {
+    let t = thread();
+    let kind = MessageKind::Message;
+    message(
+        &t,
+        ThreadMessageId::new(),
+        Actor::Human,
+        kind,
+        "hi",
+        Timestamp(at),
+    )
+    .expect("msg")
+}
+
+fn version_at(at: i64) -> ThreadVersion {
+    let mut v = artifact(&thread(), 1, "graph TD").expect("version");
+    v.created_at = Timestamp(at);
+    v
+}
+
+#[test]
+fn changes_requested_is_false_without_messages() {
+    assert!(!changes_requested(&thread(), &[], &[]));
+    assert!(!changes_requested(&thread(), &[version_at(5)], &[plain(6)]));
+}
+
+#[test]
+fn changes_requested_holds_until_a_newer_version_answers() {
+    let asked = [plain(1), ask(5)];
+    assert!(changes_requested(&thread(), &[version_at(2)], &asked));
+    assert!(changes_requested(&thread(), &[], &asked));
+    assert!(!changes_requested(
+        &thread(),
+        &[version_at(2), version_at(9)],
+        &asked
+    ));
+    // A version posted at the same instant does not answer it.
+    assert!(changes_requested(&thread(), &[version_at(5)], &asked));
+}
+
+#[test]
+fn changes_requested_is_false_once_approved() {
+    let t = thread();
+    let approved = approve(&t, Actor::Human, Some(1)).expect("approve");
+    assert!(!changes_requested(&approved, &[version_at(2)], &[ask(5)]));
+}
+
+#[test]
+fn the_newest_request_decides() {
+    let msgs = [ask(3), ask(8)];
+    assert!(changes_requested(&thread(), &[version_at(5)], &msgs));
+}

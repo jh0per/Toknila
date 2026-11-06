@@ -161,6 +161,11 @@ open thread open or reopens an approved one. While any thread is open, `finished
 and the ticket stays Running. The ticket's `phase` in `TicketDetail` is `design` while any thread
 is open and `implement` otherwise; it is computed, never stored.
 
+Each thread in the answers carries `changes_requested` (bool): true while the thread is open and
+a person's request for changes has no newer artifact version yet. Core computes it
+(`thread::changes_requested`), the daemon only fills the field, and the web shows it as the
+"changes requested" status instead of deriving it.
+
 ## Review
 
 A card in Review waits for a verdict from a person, from the reviewer agent, or from both in turn,

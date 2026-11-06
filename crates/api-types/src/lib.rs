@@ -150,6 +150,8 @@ pub struct ThreadDetail {
     pub messages: Vec<ThreadMessage>,
     /// By number; immutable.
     pub versions: Vec<ThreadVersion>,
+    /// The thread is open and a person's request for changes has no newer version yet.
+    pub changes_requested: bool,
 }
 
 /// `GET /v1/tickets/{ticket}/threads`: every thread of a ticket and the ticket's phase.
