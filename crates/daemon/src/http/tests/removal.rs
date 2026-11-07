@@ -178,3 +178,113 @@ async fn deleting_is_refused_while_a_card_runs() {
     assert_eq!(api.status("DEMO-1").await, "running");
     assert_eq!(api.get("/v1/projects/DEMO").await["key"], "DEMO");
 }
+
+async fn delete_chain(api: &Api, uri: &str) -> (StatusCode, Value) {
+    api.call(Method::DELETE, uri, None).await
+}
+
+#[tokio::test]
+async fn deleting_a_chain_removes_its_cards_checkouts_and_run_files_and_keeps_the_rest() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let (api, repo, ship) = reviewed(tmp.path()).await;
+    api.post("/v1/projects/DEMO/chains", json!({ "name": "other" }))
+        .await;
+    api.post("/v1/chains/other/tickets", json!({ "title": "Stays" }))
+        .await;
+    let ticket = api.get("/v1/tickets/DEMO-1").await["ticket"]["id"]
+        .as_str()
+        .expect("id")
+        .to_owned();
+    let runs = api._dir.path().join("runs").join(&ticket);
+    std::fs::create_dir_all(&runs).expect("mkdir");
+    std::fs::write(runs.join("run.log"), "output\n").expect("log");
+
+    let (s, out) = delete_chain(&api, "/v1/chains/auth").await;
+    assert_eq!(s, StatusCode::OK, "{out}");
+    assert_eq!(out["chain"]["name"], "auth");
+    assert_eq!(out["project"], "DEMO");
+    assert_eq!(out["tickets"], 1);
+    assert_eq!(out["worktrees_removed"], json!([ship.to_string_lossy()]));
+    assert_eq!(out["warnings"], json!([]));
+
+    for uri in ["/v1/chains/auth", "/v1/tickets/DEMO-1"] {
+        assert!(gone(&api, uri).await, "{uri}");
+    }
+    assert!(!ship.exists(), "the checkout is removed");
+    assert!(!runs.exists(), "the run files are removed");
+    assert!(repo.join("README.md").is_file(), "the repository stays");
+    assert_eq!(
+        git(&repo, &["branch", "--list", "ship/auth/demo-1-login"]),
+        "ship/auth/demo-1-login"
+    );
+    assert_eq!(api.get("/v1/projects/DEMO").await["key"], "DEMO");
+    assert_eq!(api.get("/v1/chains/other").await["chain"]["name"], "other");
+
+    let events = api.get("/v1/events?since=0").await;
+    let events = events.as_array().expect("events");
+    assert!(
+        events.iter().all(|e| e["entity_id"] != ticket.as_str()),
+        "the card's journal entries went with it"
+    );
+    let last = events.last().expect("an event");
+    assert_eq!(
+        (last["entity"].as_str(), last["kind"].as_str()),
+        (Some("chain"), Some("deleted"))
+    );
+}
+
+#[tokio::test]
+async fn deleting_a_chain_is_refused_while_a_card_runs_and_names_it() {
+    let api = Api::new();
+    api.demo().await;
+    api.post("/v1/chains/demo/tickets", json!({ "title": "A" }))
+        .await;
+    let (s, e) = delete_chain(&api, "/v1/chains/demo").await;
+    assert_eq!(s, StatusCode::CONFLICT, "{e}");
+    assert_eq!(
+        e["error"],
+        "chain demo has agents working on DEMO-1; stop them before deleting the chain"
+    );
+    assert_eq!(api.status("DEMO-1").await, "running");
+}
+
+#[tokio::test]
+async fn a_chain_name_may_be_narrowed_to_a_project_and_an_unknown_one_is_not_found() {
+    let api = Api::new();
+    api.demo().await;
+    api.post("/v1/projects", json!({ "key": "TWO" })).await;
+    api.post("/v1/projects/TWO/chains", json!({ "name": "demo" }))
+        .await;
+    let (s, e) = delete_chain(&api, "/v1/chains/demo").await;
+    assert_eq!(s, StatusCode::CONFLICT, "{e}");
+    assert_eq!(e["error"], "2 chains are named demo; use the chain id");
+    let (s, out) = delete_chain(&api, "/v1/chains/demo?project=TWO").await;
+    assert_eq!(s, StatusCode::OK, "{out}");
+    assert_eq!(out["project"], "TWO");
+    let (s, _) = delete_chain(&api, "/v1/chains/nope").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert_eq!(api.get("/v1/chains/demo").await["chain"]["name"], "demo");
+}
+
+#[tokio::test]
+async fn what_a_started_card_waits_for_cannot_change_and_the_refusal_says_why() {
+    let api = Api::new();
+    api.demo().await;
+    for t in ["A", "B"] {
+        api.post("/v1/chains/demo/tickets", json!({ "title": t }))
+            .await;
+    }
+    assert_eq!(api.status("DEMO-2").await, "running");
+    let (s, e) = api
+        .call(
+            Method::POST,
+            "/v1/chains/demo/edges",
+            Some(json!({ "from": "DEMO-1", "to": "DEMO-2" })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{e}");
+    assert_eq!(
+        e["error"],
+        "DEMO-2 is already running; what it waits for can no longer change"
+    );
+}

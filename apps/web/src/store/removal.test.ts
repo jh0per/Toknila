@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ChainDetail, EventRecord, Project, ProjectDeletion } from "../api/types";
+import type { ChainDeletion, ChainDetail, EventRecord, Project, ProjectDeletion } from "../api/types";
 import type { Msg } from "./msg";
 import { reduce } from "./reduce";
 import { folderText, keyConfirmed } from "./removal";
@@ -76,6 +76,45 @@ describe("deleting a project", () => {
     expect(s.route).toEqual({ name: "chains" });
     expect(fx).toContainEqual({ type: "pushUrl", path: "/" });
     expect(run(s, { type: "closeDialog" }).removal.result).toBeUndefined();
+  });
+});
+
+describe("deleting a chain", () => {
+  const chainDeletion = (): ChainDeletion => ({
+    chain: { id: "c1", name: "plan", goal: "", autostart: false, project_id: "p1" } as ChainDeletion["chain"],
+    project: "APP", tickets: 1, worktrees_removed: [], warnings: [],
+  });
+
+  it("asks the daemon and shows a refusal that names the cards", () => {
+    const s0 = loaded({ name: "projectChain", project: "APP", chain: "plan" });
+    const [busy, fx] = reduce(s0, { type: "deleteChain", chain: "c1" });
+    expect(fx).toEqual([{ type: "deleteChain", chain: "c1" }]);
+    expect(busy.removal.busy).toBe(true);
+    const message = "chain plan has agents working on APP-1; stop them before deleting the chain";
+    const s = run(busy, { type: "deleteRefused", message, agentsWorking: true });
+    expect(s.removal.error).toEqual({ message, agentsWorking: true });
+    expect(s.chainOrder).toEqual(["c1", "c2"]);
+  });
+
+  it("drops only that chain, keeps the answer for the dialog and sends the page to its project", () => {
+    const s0 = run(
+      loaded({ name: "card", project: "APP", chain: "plan", key: "APP-1" }),
+      { type: "openDialog", dialog: { kind: "deleteChain", chain: "c1" } },
+    );
+    const [s, fx] = reduce(s0, { type: "chainDeleted", deletion: chainDeletion() });
+    expect(s.chainOrder).toEqual(["c2"]);
+    expect(s.projects).toHaveLength(2);
+    expect(s.removal.chainResult?.chain.name).toBe("plan");
+    expect(s.plan.dialog).toEqual({ kind: "deleteChain", chain: "c1" });
+    expect(s.route).toEqual({ name: "project", project: "APP" });
+    expect(fx).toContainEqual({ type: "loadInbox" });
+    expect(run(s, { type: "closeDialog" }).removal.chainResult).toBeUndefined();
+  });
+
+  it("leaves a page about another chain where it is", () => {
+    const at = loaded({ name: "projectChain", project: "OTHER", chain: "other" });
+    const s = run(at, { type: "chainDeleted", deletion: chainDeletion() });
+    expect(s.route).toEqual({ name: "projectChain", project: "OTHER", chain: "other" });
   });
 });
 

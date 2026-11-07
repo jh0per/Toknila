@@ -5,6 +5,7 @@ import type {
   ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
+import { runEdgeEffect } from "./edgeEffects";
 import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
 import { runSettingsEffect } from "./settingsEffects";
@@ -185,7 +186,13 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "loadPlans":
       case "importPlans":
       case "deleteProject":
+      case "deleteChain":
         runImportEffect(e, dispatch);
+        return;
+      case "addEdge":
+      case "moveEdge":
+      case "removeEdge":
+        runEdgeEffect(e, dispatch);
         return;
       case "watchUpdates":
         stopWatch = runUpdateEffect(e, dispatch);

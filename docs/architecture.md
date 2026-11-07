@@ -508,6 +508,25 @@ I/O.
   is read twice. The journal entries about the project and everything in it go too (by entity
   id: project, chains, cards, milestones, comments, subtasks, threads); then one `ChainDeleted`
   per chain and one `ProjectDeleted` are journaled. Sequence numbers are never reused.
+- **Chain deletion.** `DELETE /v1/chains/{chain}` (`?project=KEY` narrows a name two projects
+  share; `tok chain rm <chain> [--project KEY] [--yes]`, the window's chain context menu in the
+  sidebar with a dialog that names the chain and its cards). Same semantics for the one chain:
+  `toknila_app::removal::delete_chain` and `UnitOfWork::delete_chain` (the SQL is shared with the
+  project's, `Scope` in `daemon/src/store/removal.rs`) delete its cards, milestones, edges, notes,
+  threads, ships and agent sessions and the journal entries about them, then journal one
+  `ChainDeleted`; the project, its other chains and its ticket counter stay. Refused (409) while
+  an agent works on a card of the chain; the message names the cards
+  (`toknila_core::schedule::working_cards`, the same rule that counts slots). Afterwards the same
+  cleanup removes the ships' checkouts and run files (`after_chain_delete`); the repository folder
+  and `ship/*` branches stay. The answer is `ChainDeletion`.
+- **Dependencies from the diagram.** `POST`/`DELETE /v1/chains/{chain}/edges` are the only way
+  the window edits a dependency (drag from a card's handle onto another card, click a line and
+  press Delete or use the right-click menu, drag a selected line's end onto another card, or the
+  "Depends on" list in the card's Details). The window never decides: core refuses a cycle, an
+  unknown or proposed card, and a change to what a card waits for once it has started
+  (`ChainView::check_dependency_change`, `GraphError::DependencyLocked`), and the page shows the
+  daemon's message as it came. Moving a line is two requests, add the new place and then remove
+  the old one, and a failed removal takes the new line back.
 - **After the commit** (`daemon/src/cleanup.rs`, a blocking job outside any transaction): every
   ship the cards still had is removed through the shipyard (`git worktree remove --force`, then
   `git worktree prune`, against the repository); each card's run files go

@@ -4,7 +4,7 @@
 use toknila_core::{Ship, TicketStatus};
 
 use super::Mem;
-use crate::removal::delete_project;
+use crate::removal::{delete_chain, delete_project};
 use crate::{ErrorKind, UnitOfWork};
 
 #[test]
@@ -39,4 +39,47 @@ fn deleting_is_refused_while_an_agent_of_the_project_works() {
     );
     assert_eq!(mem.view.tickets.len(), 2, "nothing was deleted");
     assert!(mem.events.is_empty());
+}
+
+#[test]
+fn deleting_a_chain_hands_back_its_cards_and_ships_and_journals_the_chain_only() {
+    let mut mem = Mem::demo();
+    let a = mem.ticket_by_title("A");
+    let ship = Ship {
+        ticket_id: a.id,
+        key: a.key.clone(),
+        branch: "ship/demo/demo-1-a".to_owned(),
+        path: "/home/ships/demo/demo/demo-1-a".to_owned(),
+    };
+    mem.save_ship(&ship).expect("ship");
+    let removed = delete_chain(&mut mem, "demo", Some("DEMO")).expect("deleted");
+    assert_eq!(removed.project.key.to_string(), "DEMO");
+    assert_eq!(removed.chains.len(), 1);
+    assert_eq!(removed.tickets.len(), 2);
+    assert_eq!(removed.ships, [ship]);
+    assert_eq!(mem.kinds(), ["chain.deleted"]);
+    assert!(mem.view.tickets.is_empty());
+}
+
+#[test]
+fn deleting_a_chain_is_refused_while_an_agent_works_and_names_the_cards() {
+    let mut mem = Mem::demo();
+    mem.view.tickets[0].status = TicketStatus::Running;
+    mem.view.tickets[1].status = TicketStatus::Waiting;
+    let e = delete_chain(&mut mem, "demo", None).expect_err("refused");
+    assert_eq!(e.kind, ErrorKind::Conflict);
+    assert_eq!(
+        e.message,
+        "chain demo has agents working on DEMO-1, DEMO-2; stop them before deleting the chain"
+    );
+    assert_eq!(mem.view.tickets.len(), 2, "nothing was deleted");
+    assert!(mem.events.is_empty());
+}
+
+#[test]
+fn a_chain_is_found_within_the_named_project_only() {
+    let mut mem = Mem::demo();
+    let e = delete_chain(&mut mem, "demo", Some("OTHER")).expect_err("no such project");
+    assert_eq!(e.kind, ErrorKind::NotFound);
+    assert_eq!(mem.view.tickets.len(), 2);
 }
