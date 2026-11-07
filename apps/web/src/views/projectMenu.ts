@@ -1,6 +1,5 @@
-// What the right-click menu of the sidebar's projects offers. On a project row: its settings and
-// archiving (or bringing it back); everywhere: adding a project. Phase 2 adds "Delete project..."
-// to a row's entries here, next to Archive.
+// What the right-click menu of the sidebar's projects offers. On a project row: its settings,
+// archiving (or bringing it back) and deleting; everywhere: adding a project.
 
 import type { Project } from "../api/types";
 import type { Intent } from "../store/msg";
@@ -40,6 +39,12 @@ export function projectMenu(project: Project | undefined): ProjectMenuEntry[] {
         intent: { type: "archiveProject", project: project.key, archived: true },
         danger: true,
       },
+    {
+      label: "Delete project…",
+      testId: "menu-delete-project",
+      intent: { type: "openDialog", dialog: { kind: "deleteProject", project: project.key } },
+      danger: true,
+    },
     addProject,
   ];
 }

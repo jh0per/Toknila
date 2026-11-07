@@ -37,7 +37,7 @@ export function App() {
         ) : chain ? (
           <ChainScreen chain={chain} state={state} dispatch={dispatch} />
         ) : project && (r === "project" || r === "chains") ? (
-          <EmptyChains project={project} dispatch={dispatch} />
+          <EmptyChains project={project} state={state} dispatch={dispatch} />
         ) : (
           <p className="muted empty">
             Pick a chain in the sidebar.

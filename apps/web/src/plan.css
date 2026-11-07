@@ -26,3 +26,19 @@
 .plan-form { display: flex; flex-direction: column; gap: var(--s2); margin: 0 0 var(--s3); padding: var(--s3); max-width: 720px; background: var(--surface2); border: 1px solid var(--line); border-radius: var(--r-m); }
 .plan-form select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-s); padding: 3px var(--s2); }
 .top .btn { padding: 1px 9px; font-size: var(--fs-s); }
+.h-btns { display: inline-flex; gap: 2px; }
+.import-form { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; width: 100%; }
+.card-block .sub { margin: var(--s2) 0 0; font-size: var(--fs-m); font-weight: 600; }
+.import-result, .found { display: flex; flex-direction: column; gap: var(--s1); width: 100%; }
+.import-result p, .found p { margin: 0; }
+.import-result { padding: var(--s2) var(--s3); background: var(--surface2); border-radius: var(--r-s); }
+.found .plans { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); }
+.found .plans li { display: flex; flex-direction: column; gap: 2px; padding: var(--s1) var(--s2); background: var(--surface2); border-radius: var(--r-s); }
+.found .plans .key { font-size: var(--fs-s); }
+.found .row { flex-wrap: wrap; gap: var(--s2); }
+.empty-state .found { margin-top: var(--s2); }
+.trash-zone { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; width: 100%; margin-top: var(--s2); padding-top: var(--s3); border-top: 1px solid var(--line); }
+.trash-zone p, .modal .card-block > p { margin: 0; }
+.trash-zone code { overflow-wrap: anywhere; }
+.modal [data-testid=delete-error] p { margin: 0; }
+.warnings { margin: 0; padding-left: var(--s4); color: var(--block); font-size: var(--fs-s); }

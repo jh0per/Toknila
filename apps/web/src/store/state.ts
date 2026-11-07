@@ -3,7 +3,9 @@
 import type {
   ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads,
 } from "../api/types";
+import { type ImportState, initialImports } from "./imports";
 import { type PlanState, initialPlan } from "./plan";
+import { type RemovalState, initialRemoval } from "./removal";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
 import { type UsageState, initialUsage } from "./usage";
@@ -40,6 +42,10 @@ export interface State {
   settings: SettingsState;
   /// Planning from the window: the open dialog, a card being edited or moved, archived projects.
   plan: PlanState;
+  /// Imports from the window and the plans found in a repository.
+  imports: ImportState;
+  /// Deleting a project: the dialog's answer.
+  removal: RemovalState;
   /// The Usage page: window, metric and the daemon's answer.
   usage: UsageState;
 }
@@ -67,6 +73,8 @@ export function initialState(route: Route): State {
     tab: "details",
     settings: initialSettings,
     plan: initialPlan,
+    imports: initialImports,
+    removal: initialRemoval,
     usage: initialUsage,
   };
 }

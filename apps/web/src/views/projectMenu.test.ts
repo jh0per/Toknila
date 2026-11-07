@@ -12,14 +12,19 @@ describe("the projects menu", () => {
 
   it("offers a row's settings and archiving, then adding a project", () => {
     const entries = projectMenu(project);
-    expect(entries.map((e) => e.testId)).toEqual(["menu-project-settings", "menu-archive", "menu-add-project"]);
+    expect(entries.map((e) => e.testId)).toEqual([
+      "menu-project-settings", "menu-archive", "menu-delete-project", "menu-add-project",
+    ]);
     expect(entries[0].intent).toEqual({ type: "navigate", route: { name: "settings", project: "DEMO" } });
     expect(entries[1].intent).toEqual({ type: "archiveProject", project: "DEMO", archived: true });
+    expect(entries[2].intent).toEqual({ type: "openDialog", dialog: { kind: "deleteProject", project: "DEMO" } });
   });
 
   it("offers bringing an archived project back instead", () => {
     const entries = projectMenu({ ...project, archived: true });
-    expect(entries.map((e) => e.testId)).toEqual(["menu-project-settings", "menu-unarchive", "menu-add-project"]);
+    expect(entries.map((e) => e.testId)).toEqual([
+      "menu-project-settings", "menu-unarchive", "menu-delete-project", "menu-add-project",
+    ]);
     expect(entries[1].intent).toEqual({ type: "archiveProject", project: "DEMO", archived: false });
   });
 });

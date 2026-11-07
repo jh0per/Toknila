@@ -454,6 +454,18 @@ The web shows what the daemon says and keeps no rule of its own.
   `can_move` say so; a move is `POST /v1/chains/{c}/tickets/{t}/move`. Archived projects
   (`Project.archived`) leave the sidebar and come back through "Show archived"; archiving is
   refused while the project's agents work, and the refusal shows inline.
+- **Plans and deletion from the window** (`store/imports.ts`, `store/removal.ts`,
+  `store/importEffects.ts`). The Import dialog (from "No chains yet" and next to New chain in the
+  sidebar) takes a path (`import-path`) or pasted TOML (`import`), shows what each import made,
+  and lists the repository's plans on request. After Add project the page scans the repository
+  (`GET .../plans`); found plans open as a list, all ticked except those already imported, with
+  Import selected (one `import-path` per plan, in list order, each with its own outcome) and Skip;
+  none found, the page goes on. "No chains yet" shows the same list behind a Scan button. The
+  first imported chain opens. Delete project (right-click menu, Settings) has Remove from Toknila
+  and Remove and move the folder to Trash, the latter enabled once the key is typed; a 409 says to
+  stop the agents first (the window has no stop button; a card is cancelled from its actions).
+  The journal's `chain`/`project` `deleted` entries drop what the page held of them, and a page
+  that showed them goes home.
 - **Folder picker.** A text field with a paste-friendly path, not a native picker. The desktop
   window loads the daemon's page as a remote URL, so a dialog plugin would need the Tauri IPC
   opened to that page; and a browser file input never yields a path. Revisit if the shell ever
@@ -487,7 +499,9 @@ I/O.
   (`Runners::forget`, `<home>/runs/<ticket>`). The repository is otherwise untouched and its
   `ship/*` branches stay. With `trash_folder` the repository folder then goes to the system Trash
   through the `Trasher` port (`daemon/src/trash.rs`: the `trash` crate in production, a fake that
-  moves the folder into a test folder in tests), never `rm`, and only when core allows it
+  moves the folder into a test folder in tests; a daemon started with `TOKNILA_TRASH_DIR` set
+  moves folders into that folder instead, `DirTrash`, which only the browser tests use so they
+  never reach the person's Trash), never `rm`, and only when core allows it
   (`toknila_core::removal::may_trash`: an absolute path to an existing folder, not a disk root,
   not inside the data home nor holding it, not the home folder nor a folder above it). The answer
   (`ProjectDeletion`) says `folder`: `kept`, `trashed` or `none`, with `folder_error` when the

@@ -81,8 +81,8 @@ try {
   await expectPath("/projects/TOKNILA", "the project opens");
   await expectText(t("no-chains"), "No chains yet", "a project without chains says so");
   await t("empty-import").click();
-  await t("import-dialog").locator("[data-testid=chain-file]").waitFor({ timeout: 10_000 });
-  console.log("PASS Import opens the chain file import");
+  await t("import-dialog").locator("[data-testid=import-path]").waitFor({ timeout: 10_000 });
+  console.log("PASS Import opens the import dialog");
   await page.keyboard.press("Escape");
   await gone(t("import-dialog"), "Escape closes the dialog");
 

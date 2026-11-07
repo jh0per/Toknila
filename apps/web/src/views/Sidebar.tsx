@@ -23,12 +23,20 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
         <h2>
           Chains
           {project && (
-            <button
-              type="button" className="icon-btn" aria-label="New chain" title="New chain" data-testid="new-chain-plus"
-              onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: project.key } })}
-            >
-              +
-            </button>
+            <span className="h-btns">
+              <button
+                type="button" className="icon-btn" aria-label="Import a plan" title="Import a plan" data-testid="import-plus"
+                onClick={() => dispatch({ type: "openDialog", dialog: { kind: "import", project: project.key } })}
+              >
+                ↓
+              </button>
+              <button
+                type="button" className="icon-btn" aria-label="New chain" title="New chain" data-testid="new-chain-plus"
+                onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: project.key } })}
+              >
+                +
+              </button>
+            </span>
           )}
         </h2>
         <ul>

@@ -2,7 +2,9 @@ import { useCallback } from "react";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
 import { AddProject } from "./AddProject";
-import { ImportChain } from "./ImportChain";
+import { DeleteProject } from "./DeleteProject";
+import { FoundPlans } from "./FoundPlans";
+import { ImportDialog } from "./ImportDialog";
 import { Modal } from "./Modal";
 import { NewCard } from "./NewCard";
 import { NewChain } from "./NewChain";
@@ -34,15 +36,28 @@ export function Dialogs({ state, dispatch, inline }: { state: State; dispatch: (
         </Modal>
       ) : null;
     }
-    case "import": {
-      // Phase 1 offers the chain file; the import from a folder path and the list of found plans
-      // join this dialog later.
-      const project = state.projects.find((p) => p.key === d.project);
-      return project ? (
+    case "import":
+      return (
         <Modal label="Import" testId="import-dialog" onClose={close}>
-          <ImportChain project={project} state={state} dispatch={dispatch} />
+          <ImportDialog project={d.project} state={state} dispatch={dispatch} />
+        </Modal>
+      );
+    case "foundPlans": {
+      const project = state.imports.found?.project;
+      return project ? (
+        <Modal label="Plans in this repository" testId="found-plans-dialog" onClose={close}>
+          <div className="card-block form">
+            <h2>Plans in {project}'s repository</h2>
+            <FoundPlans project={project} state={state} dispatch={dispatch} />
+          </div>
         </Modal>
       ) : null;
     }
+    case "deleteProject":
+      return (
+        <Modal label="Delete a project" testId="delete-dialog" onClose={close}>
+          <DeleteProject project={d.project} state={state} dispatch={dispatch} />
+        </Modal>
+      );
   }
 }

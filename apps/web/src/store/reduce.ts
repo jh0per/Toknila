@@ -1,8 +1,10 @@
 // The page's state machine: reduce(state, msg) -> [state, effects]. Pure: no DOM, no network.
 
 import type { EventRecord } from "../api/types";
+import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
-import { reducePlan, withChain } from "./plan";
+import { type Dialog, reducePlan, withChain } from "./plan";
+import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
 import { loadUsage, reduceUsage } from "./usage";
@@ -82,16 +84,11 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [{ ...s, route: msg.route }, enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
-      const closed = { ...added, plan: { ...added.plan, dialog: undefined } };
-      return then(closed, fx, { name: "settings", project: msg.project.key });
+      // The new project's repository may hold plans; they are offered once the scan answers.
+      const scan: Effect = { type: "loadPlans", project: msg.project.key, reason: "added" };
+      return then(withDialog(added, undefined), [...fx, scan], { name: "settings", project: msg.project.key });
     }
-    case "chainImported": {
-      const [imported, fx] = reduceSettings(s, msg);
-      // Imported from the window's dialog: the dialog closes on the new chain.
-      if (s.plan.dialog?.kind !== "import") return [imported, fx];
-      const closed = { ...imported, plan: { ...imported.plan, dialog: undefined } };
-      return then(closed, fx, { name: "projectChain", project: msg.project, chain: msg.chain });
-    }
+    case "chainImported":
     case "recheck":
     case "installCli":
     case "cliLoaded":
@@ -123,7 +120,49 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return gone ? then(next, fx, { name: "chains" }) : [next, fx];
     }
     case "openDialog":
-    case "closeDialog":
+    case "closeDialog": {
+      const [next, fx] = reducePlan(s, msg);
+      // A dialog starts clean: no answer or refusal of the last one. The found plans go with a
+      // new dialog or their own; closing another dialog leaves them where they show.
+      const keep = msg.type === "closeDialog" && s.plan.dialog?.kind !== "foundPlans";
+      const found = keep ? next.imports.found : undefined;
+      return [{ ...next, imports: { ...initialImports, found }, removal: initialRemoval }, fx];
+    }
+    case "textImported":
+    case "importAnswered": {
+      const [next, fx] = reduceImports(s, msg);
+      const chain = msg.type === "textImported" ? msg.chain : msg.result.chains[0]?.chain;
+      return chain ? then(next, fx, { name: "projectChain", project: msg.project, chain: chain.chain.name }) : [next, fx];
+    }
+    case "plansImported": {
+      const [next, fx] = reduceImports(s, msg);
+      const f = next.imports.found;
+      if (!f) return [next, fx];
+      // The outcomes stay in sight: in the dialog they were picked in, else in the list's own
+      // (picked in an empty project, whose page turns into the first imported chain).
+      const shown = next.plan.dialog?.kind === "import" || next.plan.dialog?.kind === "foundPlans";
+      const open = shown ? next : withDialog(next, { kind: "foundPlans" });
+      const first = firstImported(f);
+      return first ? then(open, fx, { name: "projectChain", project: f.project, chain: first }) : [open, fx];
+    }
+    case "importText":
+    case "importPath":
+    case "importRefused":
+    case "scanPlans":
+    case "plansScanned":
+    case "scanFailed":
+    case "togglePlan":
+    case "importSelected":
+    case "planImported":
+    case "skipPlans":
+      return reduceImports(s, msg);
+    case "deleteProject":
+    case "deleteRefused":
+      return reduceRemoval(s, msg);
+    case "projectDeleted": {
+      const [next, fx] = reduceRemoval(s, msg);
+      return then(next, fx, { name: "chains" });
+    }
     case "hashChanged":
     case "createChain":
     case "createCard":
@@ -153,6 +192,8 @@ function go(s: State, route: Route): [State, Effect[]] {
   return [{ ...s, route, plan }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
 }
 
+const withDialog = (s: State, dialog: Dialog | undefined): State => ({ ...s, plan: { ...s.plan, dialog } });
+
 /// The effects of a command's answer, then the move it leads to.
 function then(s: State, fx: Effect[], route: Route): [State, Effect[]] {
   const [moved, more] = go(s, route);
@@ -174,6 +215,12 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq <= s.lastSeq) return [s, []];
   const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
+  if (e.kind === "deleted" && (e.entity === "chain" || e.entity === "project")) {
+    // A deleted project or chain is dropped; a page that showed it goes home.
+    const dropped = e.entity === "chain" ? dropChain(next, e.entity_id) : dropProject(next, e.entity_id);
+    const fx: Effect[] = [{ type: "loadInbox" }, { type: "loadAgents" }];
+    return routeGone(dropped) ? then(dropped, fx, { name: "chains" }) : [dropped, fx];
+  }
   if (e.entity === "project") return [next, [{ type: "loadProjects" }, { type: "loadAgents" }]];
   if (e.entity === "thread") return [next, threadEventEffects(s, ticketOfEvent(e))];
   const chain = chainOfEvent(s, e);

@@ -7,12 +7,14 @@ import type { Effect } from "./msg";
 import { upsert } from "./settings";
 import type { State } from "./state";
 
-/// A dialog over the window. Phase 2 adds kinds here (a project's delete confirmation).
+/// A dialog over the window. `foundPlans` shows the plans of `imports.found`.
 export type Dialog =
   | { kind: "addProject" }
   | { kind: "newChain"; project: string }
   | { kind: "newCard"; chain: string }
-  | { kind: "import"; project: string };
+  | { kind: "import"; project: string }
+  | { kind: "foundPlans" }
+  | { kind: "deleteProject"; project: string };
 
 /// The form a refusal belongs to.
 export type PlanForm = "chain" | "card" | "edit" | "move" | "archive";

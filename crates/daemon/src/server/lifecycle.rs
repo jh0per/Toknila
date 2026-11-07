@@ -84,7 +84,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         tools: Arc::new(crate::tools::SystemTools),
         usage,
         home: paths.home.clone(),
-        trash: Arc::new(crate::trash::SystemTrash),
+        trash: crate::trash::trasher_for(std::env::var_os(crate::trash::TRASH_DIR_ENV)),
     };
 
     let listener = match reuse.as_ref().map(|i| i.port).filter(|p| *p != 0) {

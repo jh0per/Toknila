@@ -4,8 +4,7 @@ import { planError } from "../store/plan";
 import type { State } from "../store/state";
 
 /// Archiving a project: out of the sidebar, its data kept, and back on request. The daemon refuses
-/// while the project's agents work; the refusal shows here. A "Delete project..." action joins
-/// this block later.
+/// while the project's agents work; the refusal shows here. Deleting it opens its own dialog.
 export function ArchiveProject({ project, state, dispatch }: { project: Project; state: State; dispatch: (i: Intent) => void }) {
   const archived = Boolean(project.archived);
   const refused = planError(state.plan, "archive");
@@ -24,6 +23,12 @@ export function ArchiveProject({ project, state, dispatch }: { project: Project;
           onClick={() => dispatch({ type: "archiveProject", project: project.key, archived: !archived })}
         >
           {archived ? "Unarchive project" : "Archive project"}
+        </button>
+        <button
+          type="button" className="btn danger" data-testid="delete-project-button"
+          onClick={() => dispatch({ type: "openDialog", dialog: { kind: "deleteProject", project: project.key } })}
+        >
+          Delete project…
         </button>
       </div>
       {refused && <p className="error" role="alert" data-testid="archive-error">{refused}</p>}

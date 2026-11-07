@@ -5,6 +5,7 @@ import type {
   ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
+import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
 import { runSettingsEffect } from "./settingsEffects";
 import { runUsageEffect } from "./usageEffects";
@@ -176,6 +177,13 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "archiveProject":
       case "clearHash":
         runPlanEffect(e, dispatch);
+        return;
+      case "importText":
+      case "importPath":
+      case "loadPlans":
+      case "importPlans":
+      case "deleteProject":
+        runImportEffect(e, dispatch);
         return;
       case "loadUsage":
       case "saveUsageSettings":
