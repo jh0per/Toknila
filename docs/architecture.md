@@ -689,6 +689,12 @@ deduplication, price table, sums); the daemon (`daemon/src/usage/`) reads the fi
   stay). A model matches by id, ignoring a date suffix or `[1m]`; a model without a price is
   counted in tokens, not in cost, and is listed in `unpriced_models`. Cost is
   `tokens x price / 1M` for input, cache writes (the 5-minute rate), cache reads and output.
+  A model may carry an optional `[model.long_prompt]` tier (`over_tokens` and the four prices);
+  Haiku 5.5 has one (over 100,000 tokens: 0.50 / 0.625 / 0.05 / 2.50). Per the pricing page the
+  prompt length of a call is its input plus cache writes plus cache reads (output not counted);
+  above the threshold the call is priced at the tier for all four kinds, output included, not
+  only the excess. Each stored call (row) is priced by its own prompt size, never by a sum over
+  calls. Cache savings use the same tier.
   Cache savings are the cached reads priced as plain input minus what they cost; cache writes are
   not credited. Days are UTC.
 - **API.** `GET /v1/usage?days=7|30|90` returns totals (processed tokens, cached share, uncached

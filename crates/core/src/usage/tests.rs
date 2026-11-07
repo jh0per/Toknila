@@ -190,6 +190,40 @@ fn cost_and_cache_savings_follow_the_price_table() {
 }
 
 #[test]
+fn a_call_over_the_long_prompt_threshold_is_priced_by_the_long_tier() {
+    let p = PriceTable::defaults();
+    let h = p.lookup("claude-haiku-5-5").expect("haiku 5.5");
+    // At the threshold (prompt counts cache reads and writes): base row.
+    let at = counts(50_000, 20_000, 30_000, 1_000_000);
+    // 5000*0.1 + 20000*0.125 + 30000*0.01 + 1M*0.5 per 1M... in USD:
+    let base = (50_000.0 * 0.1 + 20_000.0 * 0.125 + 30_000.0 * 0.01 + 1_000_000.0 * 0.5) / 1e6;
+    assert!((h.cost(&at) - base).abs() < 1e-9);
+    // One token over: the whole call, output included, at the long row.
+    let over = counts(50_001, 20_000, 30_000, 1_000_000);
+    let long = (50_001.0 * 0.5 + 20_000.0 * 0.625 + 30_000.0 * 0.05 + 1_000_000.0 * 2.5) / 1e6;
+    assert!((h.cost(&over) - long).abs() < 1e-9);
+    assert!((h.cache_savings(&over) - 30_000.0 * (0.5 - 0.05) / 1e6).abs() < 1e-9);
+    // Output alone does not count toward the prompt.
+    assert!((h.cost(&counts(0, 0, 0, 200_000)) - 0.1).abs() < 1e-9);
+
+    // Priced per call: two calls of 60k are base each, not 120k together.
+    let call = counts(60_000, 0, 0, 0);
+    let s = summarize(
+        &[
+            row("claude-haiku-5-5", T1, call),
+            row("claude-haiku-5-5", T1, call),
+        ],
+        &p,
+        ts(NOW),
+        7,
+    );
+    assert!((s.totals.cost_usd - 2.0 * 60_000.0 * 0.1 / 1e6).abs() < 1e-12);
+    // A model without a tier ignores size.
+    let o = p.lookup("claude-haiku-4-5").expect("haiku 4.5");
+    assert!((o.cost(&counts(500_000, 0, 0, 0)) - 0.5).abs() < 1e-9);
+}
+
+#[test]
 fn prices_match_by_id_with_a_date_suffix_and_overrides_win() {
     let p = prices();
     assert!(p.lookup("m-big-20251001").is_some());

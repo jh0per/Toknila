@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::Timestamp;
 
 pub use civil::{day_label, day_of, parse_rfc3339};
-pub use price::{ModelPrice, PriceError, PriceTable};
+pub use price::{LongPromptPrice, ModelPrice, PriceError, PriceTable};
 pub use summary::{
     DayUsage, Row, UsageFigures, UsageItem, UsageSummary, figures, figures_per_card, summarize,
 };
