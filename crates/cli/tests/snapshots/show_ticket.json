@@ -2,6 +2,8 @@
   "allowed_actions": [
     "reopen"
   ],
+  "can_edit": false,
+  "can_move": false,
   "chain": "demo",
   "comments": [
     {

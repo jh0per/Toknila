@@ -105,6 +105,10 @@ pub struct TicketDetail {
     pub review: ReviewView,
     /// What a person can do with the ticket now, computed by the state machine.
     pub allowed_actions: Vec<TicketAction>,
+    /// Can the title and description still be changed? Decided by core from the status.
+    pub can_edit: bool,
+    /// Can the card still be moved in the chain? Decided by core from the status.
+    pub can_move: bool,
     /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
     pub queue_position: Option<u32>,
     /// Tokens the card's agents used and their estimated cost at API list prices; all zero
@@ -211,6 +215,16 @@ pub struct EdgeInput {
     pub to: String,
     #[serde(default)]
     pub kind: EdgeKind,
+}
+
+/// `POST /v1/chains/{chain}/tickets/{ticket}/move`: put the card directly before or after
+/// another card of the chain.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MoveInput {
+    /// Ticket key of the card the moved card goes next to.
+    pub anchor: String,
+    pub place: toknila_core::graph::Place,
 }
 
 /// Body of ticket actions. `text` is required by block, return and cancel.

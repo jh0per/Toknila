@@ -3,6 +3,8 @@
     "pause",
     "cancel"
   ],
+  "can_edit": true,
+  "can_move": true,
   "chain": "demo",
   "comments": [],
   "in_status_ms": 0,

@@ -1,5 +1,7 @@
 {
   "allowed_actions": [],
+  "can_edit": false,
+  "can_move": false,
   "chain": "demo",
   "comments": [],
   "in_status_ms": 0,

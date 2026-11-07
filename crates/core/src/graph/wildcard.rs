@@ -67,7 +67,7 @@ impl ChainView {
     /// The state of a node that has already started (as its wire name), or `None` if it has
     /// not: a ticket still in Backlog or Ready, a milestone still planned. A card still proposed
     /// has not started either; [`Self::validate`] refuses edges to it.
-    fn started(&self, node: NodeRef) -> Option<String> {
+    pub(super) fn started(&self, node: NodeRef) -> Option<String> {
         match node {
             NodeRef::Ticket(id) => self
                 .ticket(id)

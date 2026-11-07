@@ -433,6 +433,74 @@
         }
       }
     },
+    "/chains/{chain}/tickets/{ticket}/move": {
+      "post": {
+        "tags": [
+          "chains"
+        ],
+        "summary": "Puts a card directly before or after another card; the dependencies around it are rewired.",
+        "operationId": "move_ticket",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain}/wildcards": {
       "post": {
         "tags": [
@@ -722,6 +790,55 @@
         }
       }
     },
+    "/projects/{project}/archive": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Hides the project from the sidebar and keeps its data. Refused while its agents work.",
+        "operationId": "archive_project",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}/chains": {
       "post": {
         "tags": [
@@ -874,6 +991,46 @@
                   "items": {
                     "$ref": "#/components/schemas/InboxItem"
                   }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/unarchive": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Brings an archived project back to the sidebar.",
+        "operationId": "unarchive_project",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
                 }
               }
             }
@@ -3885,6 +4042,23 @@
           "changes_requested"
         ]
       },
+      "MoveInput": {
+        "type": "object",
+        "description": "`POST /v1/chains/{chain}/tickets/{ticket}/move`: put the card directly before or after\nanother card of the chain.",
+        "required": [
+          "anchor",
+          "place"
+        ],
+        "properties": {
+          "anchor": {
+            "type": "string",
+            "description": "Ticket key of the card the moved card goes next to."
+          },
+          "place": {
+            "$ref": "#/components/schemas/Place"
+          }
+        }
+      },
       "NewActivity": {
         "type": "object",
         "description": "Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook.",
@@ -4207,6 +4381,10 @@
               "type": "string"
             },
             "description": "Dependencies: ticket keys or release versions of the same chain."
+          },
+          "at_end": {
+            "type": "boolean",
+            "description": "Put the card after the chain's last cards (what nothing waits for yet) when `after` is\nempty. Without it a card with no `after` has no dependencies and may start at once."
           },
           "needs_secrets": {
             "type": "boolean"
@@ -4661,6 +4839,14 @@
           "implement"
         ]
       },
+      "Place": {
+        "type": "string",
+        "description": "Where a card goes relative to another one.",
+        "enum": [
+          "before",
+          "after"
+        ]
+      },
       "PriceInfo": {
         "type": "object",
         "description": "Where the cost estimate's prices come from.",
@@ -4764,6 +4950,10 @@
           "merge"
         ],
         "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Hidden from the sidebar; its data is kept and it can be brought back."
+          },
           "check_command": {
             "type": [
               "string",
@@ -5159,6 +5349,20 @@
             "items": {
               "$ref": "#/components/schemas/RepoProblem"
             }
+          },
+          "suggested_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The project key the folder suggests; `null` when its name leaves no valid key."
+          },
+          "suggested_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The project name the folder suggests: its base name."
           }
         }
       },
@@ -6062,7 +6266,9 @@
           "in_status_ms",
           "phase",
           "review",
-          "allowed_actions"
+          "allowed_actions",
+          "can_edit",
+          "can_move"
         ],
         "properties": {
           "allowed_actions": {
@@ -6071,6 +6277,14 @@
               "$ref": "#/components/schemas/TicketAction"
             },
             "description": "What a person can do with the ticket now, computed by the state machine."
+          },
+          "can_edit": {
+            "type": "boolean",
+            "description": "Can the title and description still be changed? Decided by core from the status."
+          },
+          "can_move": {
+            "type": "boolean",
+            "description": "Can the card still be moved in the chain? Decided by core from the status."
           },
           "chain": {
             "type": "string"

@@ -16,6 +16,7 @@ mod agent_tokens;
 mod inbox;
 mod merges;
 mod parallel;
+mod planning;
 mod profiles;
 mod questions;
 mod resume;
@@ -755,14 +756,17 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/export",
             "/chains/{chain}/releases",
             "/chains/{chain}/tickets",
+            "/chains/{chain}/tickets/{ticket}/move",
             "/chains/{chain}/wildcards",
             "/events",
             "/profiles",
             "/projects",
             "/projects/{project}",
+            "/projects/{project}/archive",
             "/projects/{project}/chains",
             "/projects/{project}/import",
             "/projects/{project}/inbox",
+            "/projects/{project}/unarchive",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",
             "/repos/check",

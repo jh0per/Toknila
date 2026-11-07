@@ -1,6 +1,7 @@
 use super::*;
 use crate::{ChainId, ProjectId, WaitingReason};
 
+mod moves;
 mod wildcard;
 
 const T: Timestamp = Timestamp(1_000);

@@ -79,6 +79,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             .map_err(|e| AppError::bad_request(e.to_string()))?,
         merge: Default::default(),
         check_command: None,
+        archived: false,
     };
     uow.insert_project(&p)?;
     uow.emit(&DomainEvent::ProjectCreated { project: p.clone() })?;
@@ -133,5 +134,31 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     uow.update_project(&p)?;
     uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;
     crate::schedule::run(uow, p.id)?;
+    Ok(p)
+}
+
+/// Hides a project from the sidebar, or brings it back. Nothing is deleted. Archiving is refused
+/// while any agent of the project works (a card holds a slot or a runner is alive).
+pub fn set_archived<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    project: &str,
+    archived: bool,
+) -> AppResult<Project> {
+    let mut p = resolve::project(uow, project)?;
+    if p.archived == archived {
+        return Ok(p);
+    }
+    if archived {
+        let used = crate::schedule::plan_of(uow, &p)?.used;
+        if used > 0 {
+            return Err(AppError::conflict(format!(
+                "{} has {used} agent(s) working; stop them before archiving the project",
+                p.key
+            )));
+        }
+    }
+    p.archived = archived;
+    uow.update_project(&p)?;
+    uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;
     Ok(p)
 }

@@ -69,6 +69,10 @@ pub struct RepoCheck {
     /// Local branches of the repository, to offer when the base branch is missing; empty when
     /// the folder is not a repository.
     pub branches: Vec<String>,
+    /// The project key the folder suggests; `null` when its name leaves no valid key.
+    pub suggested_key: Option<String>,
+    /// The project name the folder suggests: its base name.
+    pub suggested_name: Option<String>,
 }
 
 impl RepoCheck {
@@ -111,10 +115,14 @@ fn path_problem(path: &str, facts: &RepoFacts) -> Option<(RepoProblemCode, Strin
 /// Judges the path text first, then what the host found there.
 pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
     let path = path.trim();
+    let suggested_key = crate::suggest::project_key(path);
+    let suggested_name = crate::suggest::project_name(path);
     if let Some((code, message)) = path_problem(path, facts) {
         return RepoCheck {
             problems: vec![problem(RepoField::RepoPath, code, message)],
             branches: Vec::new(),
+            suggested_key,
+            suggested_name,
         };
     }
     let GitState::Repo { branches } = &facts.git else {
@@ -133,6 +141,8 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
     RepoCheck {
         problems,
         branches: branches.clone(),
+        suggested_key,
+        suggested_name,
     }
 }
 
@@ -217,6 +227,16 @@ mod tests {
             "{}",
             c.problems[0].message
         );
+    }
+
+    #[test]
+    fn the_check_suggests_a_key_and_a_name_even_for_a_folder_that_is_not_usable() {
+        let gone = facts(PathKind::Missing, GitState::NotARepo);
+        let c = judge(ABS, "develop", &gone);
+        assert_eq!(c.suggested_key.as_deref(), Some("TOKNILA"));
+        assert_eq!(c.suggested_name.as_deref(), Some("toknila"));
+        let c = judge(ABS, "develop", &repo(&["develop"]));
+        assert_eq!(c.suggested_key.as_deref(), Some("TOKNILA"));
     }
 
     #[test]

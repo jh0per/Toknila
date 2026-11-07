@@ -124,6 +124,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chains/{chain}/tickets/{ticket}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Puts a card directly before or after another card; the dependencies around it are rewired. */
+        post: operations["move_ticket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chains/{chain}/wildcards": {
         parameters: {
             query?: never;
@@ -214,6 +231,23 @@ export interface paths {
         patch: operations["patch_project"];
         trace?: never;
     };
+    "/projects/{project}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hides the project from the sidebar and keeps its data. Refused while its agents work. */
+        post: operations["archive_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/chains": {
         parameters: {
             query?: never;
@@ -257,6 +291,23 @@ export interface paths {
         get: operations["get_inbox"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Brings an archived project back to the sidebar. */
+        post: operations["unarchive_project"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1249,6 +1300,15 @@ export interface components {
          * @enum {string}
          */
         MessageKind: "message" | "changes_requested";
+        /**
+         * @description `POST /v1/chains/{chain}/tickets/{ticket}/move`: put the card directly before or after
+         *     another card of the chain.
+         */
+        MoveInput: {
+            /** @description Ticket key of the card the moved card goes next to. */
+            anchor: string;
+            place: components["schemas"]["Place"];
+        };
         /** @description Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook. */
         NewActivity: {
             /**
@@ -1340,6 +1400,11 @@ export interface components {
             acceptance?: string[];
             /** @description Dependencies: ticket keys or release versions of the same chain. */
             after?: string[];
+            /**
+             * @description Put the card after the chain's last cards (what nothing waits for yet) when `after` is
+             *     empty. Without it a card with no `after` has no dependencies and may start at once.
+             */
+            at_end?: boolean;
             needs_secrets?: boolean;
             paused?: boolean;
             profile?: string | null;
@@ -1515,6 +1580,11 @@ export interface components {
          * @enum {string}
          */
         Phase: "design" | "implement";
+        /**
+         * @description Where a card goes relative to another one.
+         * @enum {string}
+         */
+        Place: "before" | "after";
         /** @description Where the cost estimate's prices come from. */
         PriceInfo: {
             /** @description Models whose price the person overrode in `usage-prices.toml`. */
@@ -1544,6 +1614,8 @@ export interface components {
         };
         /** @description One product: one monorepo, its chains, depot and settings. */
         Project: {
+            /** @description Hidden from the sidebar; its data is kept and it can be brought back. */
+            archived?: boolean;
             /**
              * @description The command that checks the project's work (`cargo xtask verify`). Both agent roles are
              *     told to use it, and may run it without asking. `None`: the project names none.
@@ -1696,6 +1768,10 @@ export interface components {
              */
             branches: string[];
             problems: components["schemas"]["RepoProblem"][];
+            /** @description The project key the folder suggests; `null` when its name leaves no valid key. */
+            suggested_key?: string | null;
+            /** @description The project name the folder suggests: its base name. */
+            suggested_name?: string | null;
         };
         /** @description `POST /v1/repos/check`: the folder a person is about to make a project of. */
         RepoCheckRequest: {
@@ -1975,6 +2051,10 @@ export interface components {
         TicketDetail: {
             /** @description What a person can do with the ticket now, computed by the state machine. */
             allowed_actions: components["schemas"]["TicketAction"][];
+            /** @description Can the title and description still be changed? Decided by core from the status. */
+            can_edit: boolean;
+            /** @description Can the card still be moved in the chain? Decided by core from the status. */
+            can_move: boolean;
             chain: string;
             comments: components["schemas"]["Comment"][];
             /**
@@ -2473,6 +2553,50 @@ export interface operations {
             };
         };
     };
+    move_ticket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+                /** @description Ticket key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     propose_wildcard: {
         parameters: {
             query?: never;
@@ -2688,6 +2812,44 @@ export interface operations {
             };
         };
     };
+    archive_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     create_chain: {
         parameters: {
             query?: never;
@@ -2798,6 +2960,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxItem"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    unarchive_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
                 };
             };
             404: {

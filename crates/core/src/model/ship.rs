@@ -150,6 +150,7 @@ mod tests {
             max_parallel: 2,
             merge: Default::default(),
             check_command: None,
+            archived: false,
         };
         let chain = Chain {
             id: ChainId::new(),

@@ -157,6 +157,7 @@ pub struct ChainSummary {
 }
 
 mod journal;
+mod moves;
 mod order;
 mod release;
 mod settle;
@@ -165,6 +166,7 @@ mod validate;
 mod wildcard;
 
 pub use journal::Settled;
+pub use moves::{MovePlan, Place};
 
 impl ChainView {
     /// Human label of a node: ticket key or `release <version>`.

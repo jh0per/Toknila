@@ -21,6 +21,7 @@ pub mod question;
 pub mod repo;
 pub mod schedule;
 pub mod spec;
+pub mod suggest;
 pub mod system;
 pub mod template;
 pub mod thread;

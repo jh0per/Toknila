@@ -54,6 +54,42 @@ pub async fn get_project(
     ))
 }
 
+async fn set_archived(
+    state: &AppState,
+    project: String,
+    archived: bool,
+) -> ApiResult<Json<Project>> {
+    let (p, _) = state
+        .store
+        .write(Actor::Human, now(), move |tx| -> ApiResult<Project> {
+            Ok(projects::set_archived(tx, &project, archived)?)
+        })
+        .await?;
+    Ok(Json(p))
+}
+
+#[utoipa::path(post, path = "/projects/{project}/archive", tag = "projects",
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Project), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Hides the project from the sidebar and keeps its data. Refused while its agents work.
+pub async fn archive_project(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+) -> ApiResult<Json<Project>> {
+    set_archived(&state, project, true).await
+}
+
+#[utoipa::path(post, path = "/projects/{project}/unarchive", tag = "projects",
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Project), (status = 404, body = ErrorBody)))]
+/// Brings an archived project back to the sidebar.
+pub async fn unarchive_project(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+) -> ApiResult<Json<Project>> {
+    set_archived(&state, project, false).await
+}
+
 #[utoipa::path(patch, path = "/projects/{project}", tag = "projects", request_body = PatchProject,
     params(("project" = String, Path, description = "Project id or key")),
     responses((status = 200, body = Project), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)))]

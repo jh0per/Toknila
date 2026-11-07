@@ -236,3 +236,34 @@ pub(crate) fn change<U: UnitOfWork + ?Sized>(
     with_chain(uow, c.id, f)?;
     Ok(c.id)
 }
+
+/// Moves a card directly before or after another one of its chain: the dependencies around it
+/// are rewired as core plans them, in one change. A card that has started cannot move, and
+/// nothing can be put before work that has started.
+pub fn move_ticket<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: &str,
+    ticket: &str,
+    anchor: &str,
+    place: toknila_core::graph::Place,
+) -> AppResult<ChainId> {
+    change(uow, chain, |ctx| {
+        let (card, anchor) = (
+            resolve::node(&ctx.view, ticket)?,
+            resolve::node(&ctx.view, anchor)?,
+        );
+        let (toknila_core::NodeRef::Ticket(card), toknila_core::NodeRef::Ticket(anchor)) =
+            (card, anchor)
+        else {
+            return Err(AppError::bad_request("only cards can be moved"));
+        };
+        let plan = ctx.view.plan_move(card, anchor, place)?;
+        for e in plan.remove {
+            ctx.remove_edge(e.from, e.to);
+        }
+        for e in plan.add {
+            ctx.add_edge(e)?;
+        }
+        Ok(())
+    })
+}
