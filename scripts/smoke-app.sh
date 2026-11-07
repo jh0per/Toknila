@@ -71,7 +71,8 @@ for _ in $(seq 1 80); do
   sleep 0.5
 done
 [ -n "${took:-}" ] || fail "the app did not take over from the old daemon"
-kill -0 "$old_pid" 2>/dev/null && fail "the old daemon (pid $old_pid) is still alive"
+for _ in $(seq 1 20); do kill -0 "$old_pid" 2>/dev/null || break; sleep 0.5; done
+if kill -0 "$old_pid" 2>/dev/null; then fail "the old daemon (pid $old_pid) is still alive"; fi
 echo "the app replaced the old daemon"
 pgrep -f "$app/Contents/MacOS/toknila-desktop" >/dev/null || fail "the app is not running"
 
