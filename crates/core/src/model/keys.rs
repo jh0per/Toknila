@@ -81,6 +81,12 @@ impl TicketKey {
         Ok(Self { project, number })
     }
 
+    /// The key a project's planner run carries (`DEMO-0`): a run label, never a card; cards
+    /// start at 1, so it cannot be one.
+    pub fn planner(project: ProjectKey) -> Self {
+        Self { project, number: 0 }
+    }
+
     /// The project part (`DEMO`).
     pub fn project(&self) -> &ProjectKey {
         &self.project

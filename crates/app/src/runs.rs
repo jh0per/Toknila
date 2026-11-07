@@ -45,6 +45,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 prompt: t.prompt.clone(),
                 acceptance: t.acceptance.clone(),
                 check_command: project.check_command.clone(),
+                project: None,
             },
         });
     }
@@ -85,6 +86,11 @@ pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<
     let RunEnded { run, exit, stopped } = ended;
     let ticket = run.ticket_id;
     let role = run.role;
+    if role == AgentRole::Planner {
+        // A project's planner is no card's agent: its end moves nothing, and the window learns of
+        // it from the terminal stream.
+        return Ok(());
+    }
     let reason = exit.block_reason();
     uow.emit(&DomainEvent::RunnerExited {
         run,

@@ -170,6 +170,57 @@
     },
     {
       "profile": {
+        "name": "claude-code-planner",
+        "role": "planner",
+        "command": [
+          "claude",
+          "--permission-mode",
+          "dontAsk",
+          "{kickoff}"
+        ],
+        "env": {},
+        "instructions_file": "CLAUDE.md",
+        "instructions_flag": "--append-system-prompt-file",
+        "mcp": {
+          "enabled": true,
+          "config_flag": "--mcp-config"
+        },
+        "hooks": {
+          "enabled": false,
+          "settings_flag": "--settings"
+        },
+        "permissions": {
+          "allow": [
+            "Read",
+            "Grep",
+            "Glob",
+            "Bash(git status *)",
+            "Bash(git diff *)",
+            "Bash(git log *)",
+            "Bash(git show *)",
+            "Bash(git ls-files *)",
+            "Bash(git merge-base *)",
+            "Bash(git rev-parse *)",
+            "mcp__toknila"
+          ]
+        },
+        "output": {
+          "strip_ansi": true,
+          "scrollback_lines": 10000,
+          "max_log_bytes": 20971520
+        },
+        "nudge": {
+          "idle_secs": 120,
+          "max_nudges": 3,
+          "window_secs": 900,
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done."
+        },
+        "startup_secs": 0
+      },
+      "file": null
+    },
+    {
+      "profile": {
         "name": "my-agent",
         "role": "reviewer",
         "command": [

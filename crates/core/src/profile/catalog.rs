@@ -41,12 +41,13 @@ pub struct Catalog {
     pub problems: Vec<ProfileProblem>,
 }
 
-fn builtin() -> [AgentProfile; 4] {
+fn builtin() -> [AgentProfile; 5] {
     [
         AgentProfile::sim(),
         AgentProfile::claude_code(),
         AgentProfile::sim_reviewer(),
         AgentProfile::claude_code_reviewer(),
+        AgentProfile::claude_code_planner(),
     ]
 }
 

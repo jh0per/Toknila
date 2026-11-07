@@ -16,13 +16,23 @@ pub(super) fn run(c: &Client, ticket: &str, follow: bool, reviewer: bool) -> Res
         AgentRole::Worker
     };
     let scrollback = c.runner_scrollback_of(ticket, role)?;
+    let url = c.runner_stream_url_of(ticket, role, Some((scrollback.run, scrollback.end)));
+    print_and_follow(&scrollback, &url, follow)
+}
+
+/// Prints `scrollback` and, with `follow`, keeps printing what the stream at `url` carries until
+/// the run ends.
+pub(super) fn print_and_follow(
+    scrollback: &toknila_client::Scrollback,
+    url: &str,
+    follow: bool,
+) -> Result<()> {
     let mut out = std::io::stdout().lock();
     out.write_all(&scrollback.bytes)?;
     out.flush()?;
     if !follow {
         return Ok(());
     }
-    let url = c.runner_stream_url_of(ticket, role, Some((scrollback.run, scrollback.end)));
     let (mut ws, _) = tungstenite::connect(url).context("cannot open the output stream")?;
     let mut run = scrollback.run;
     loop {

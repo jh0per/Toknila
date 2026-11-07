@@ -12,6 +12,7 @@ use toknila_api_types::{
     ThreadDetail, TicketDetail, TicketItem, TicketQuery, TicketThreads,
 };
 
+mod planner;
 mod projects;
 mod runner;
 mod settings;

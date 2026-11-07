@@ -96,6 +96,19 @@ impl Runner for FakeRunner {
         self.sized.borrow_mut().push(size);
         Ok(())
     }
+
+    fn resize_role(
+        &self,
+        ticket: TicketId,
+        role: AgentRole,
+        size: Size,
+    ) -> Result<(), RunnerError> {
+        if !self.live.borrow().contains(&(ticket, role)) {
+            return Err(RunnerError::NotRunning);
+        }
+        self.sized.borrow_mut().push(size);
+        Ok(())
+    }
 }
 
 pub(super) fn run_of(req: &RunRequest) -> Run {

@@ -13,6 +13,7 @@ use toknila_api_types::{AgentEvent, TicketDetail};
 use toknila_core::AgentRole;
 
 use super::agent::AgentEnv;
+use super::mcp_planner::{self, PlannerCall};
 use super::mcp_tools::{self, ToolError};
 
 /// The protocol revision answered when the client names none.
@@ -24,6 +25,16 @@ const INVALID_PARAMS: i64 = -32602;
 
 /// Forwards an event to the daemon and says in a line how the ticket stands, or why not.
 type Forward<'a> = dyn Fn(&AgentEvent) -> Result<String, String> + 'a;
+
+/// Sends a planner's call to the daemon and says in a few lines what came of it, or why not.
+type PlannerForward<'a> = dyn Fn(&PlannerCall) -> Result<String, String> + 'a;
+
+/// Where a role's tool calls go: a card's agent reports events, a planner edits the plan.
+#[derive(Clone, Copy)]
+struct Forwards<'a> {
+    event: &'a Forward<'a>,
+    planner: &'a PlannerForward<'a>,
+}
 
 fn reply(id: &Value, result: Value) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "result": result })
@@ -41,21 +52,24 @@ fn tool_result(text: &str, is_error: bool) -> Value {
 fn call_tool(
     role: AgentRole,
     params: &Value,
-    forward: &Forward<'_>,
+    forward: Forwards<'_>,
 ) -> Result<Value, (i64, String)> {
     let name = params["name"].as_str().unwrap_or_default();
-    match mcp_tools::event(role, name, &params["arguments"]) {
+    let outcome = if role == AgentRole::Planner {
+        mcp_planner::call(name, &params["arguments"]).map(|c| (forward.planner)(&c))
+    } else {
+        mcp_tools::event(role, name, &params["arguments"]).map(|e| (forward.event)(&e))
+    };
+    match outcome {
         Err(ToolError::Unknown) => Err((INVALID_PARAMS, format!("unknown tool {name:?}"))),
         Err(ToolError::BadArguments(e)) => Ok(tool_result(&format!("{name}: {e}"), true)),
-        Ok(event) => Ok(match forward(&event) {
-            Ok(line) => tool_result(&line, false),
-            Err(e) => tool_result(&e, true),
-        }),
+        Ok(Ok(line)) => Ok(tool_result(&line, false)),
+        Ok(Err(e)) => Ok(tool_result(&e, true)),
     }
 }
 
 /// The answer to one message, or none for a notification.
-fn handle(role: AgentRole, message: &Value, forward: &Forward<'_>) -> Option<Value> {
+fn handle(role: AgentRole, message: &Value, forward: Forwards<'_>) -> Option<Value> {
     let id = message.get("id")?;
     let params = &message["params"];
     let outcome = match message["method"].as_str().unwrap_or_default() {
@@ -65,6 +79,7 @@ fn handle(role: AgentRole, message: &Value, forward: &Forward<'_>) -> Option<Val
             "serverInfo": { "name": "toknila", "version": toknila_core::VERSION },
             "instructions": match role {
                 AgentRole::Reviewer => toknila_core::instructions::review_protocol(),
+                AgentRole::Planner => toknila_core::instructions::planner_protocol(),
                 _ => toknila_core::instructions::protocol(),
             },
         })),
@@ -87,7 +102,7 @@ fn serve(
     role: AgentRole,
     input: impl BufRead,
     mut output: impl Write,
-    forward: &Forward<'_>,
+    forward: Forwards<'_>,
 ) -> Result<()> {
     for line in input.lines() {
         let line = line.context("reading stdin")?;
@@ -128,11 +143,15 @@ pub(super) fn run() -> Result<()> {
             .map(|d| stands(&d))
             .map_err(|e| e.to_string())
     };
+    let planner = |call: &PlannerCall| mcp_planner::send(&agent.client, call);
     serve(
         agent.role,
         std::io::stdin().lock(),
         std::io::stdout().lock(),
-        &forward,
+        Forwards {
+            event: &forward,
+            planner: &planner,
+        },
     )
 }
 
@@ -140,10 +159,18 @@ pub(super) fn run() -> Result<()> {
 mod tests {
     use super::*;
 
+    fn no_planner(_: &PlannerCall) -> Result<String, String> {
+        Err("a worker has no planner tools".to_owned())
+    }
+
     fn exchange(lines: &[Value], forward: &Forward<'_>) -> Vec<Value> {
         let input: String = lines.iter().map(|l| format!("{l}\n")).collect();
         let mut out = Vec::new();
-        serve(AgentRole::Worker, input.as_bytes(), &mut out, forward).expect("serve");
+        let forwards = Forwards {
+            event: forward,
+            planner: &no_planner,
+        };
+        serve(AgentRole::Worker, input.as_bytes(), &mut out, forwards).expect("serve");
         String::from_utf8(out)
             .expect("utf-8")
             .lines()
@@ -235,7 +262,11 @@ mod tests {
     fn garbage_gets_a_parse_error_and_the_server_keeps_going() {
         let mut out = Vec::new();
         let input = "not json\n\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}\n";
-        serve(AgentRole::Worker, input.as_bytes(), &mut out, &ok).expect("serve");
+        let forwards = Forwards {
+            event: &ok,
+            planner: &no_planner,
+        };
+        serve(AgentRole::Worker, input.as_bytes(), &mut out, forwards).expect("serve");
         let lines: Vec<Value> = String::from_utf8(out)
             .expect("utf-8")
             .lines()

@@ -44,7 +44,7 @@ impl Api {
 
 /// Every route of the API as `(METHOD, path with parameters filled in)`: the documented ones,
 /// plus the three that are not in the OpenAPI document.
-fn every_route() -> Vec<(String, String)> {
+pub(super) fn every_route() -> Vec<(String, String)> {
     let mut routes: Vec<(String, String)> = Vec::new();
     let doc = serde_json::to_value(crate::http::v1().1).expect("openapi");
     for (path, item) in doc["paths"].as_object().expect("paths") {

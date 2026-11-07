@@ -1,0 +1,180 @@
+//! The planner's instructions: what the project is, and how to plan through the MCP tools.
+
+use crate::{MergeMethod, MergeMode};
+
+/// What the planner's instructions say about its project.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectFacts {
+    pub key: String,
+    pub name: String,
+    /// The branch cards are built from and merged into.
+    pub work_branch: String,
+    pub merge_mode: MergeMode,
+    pub merge_method: MergeMethod,
+    pub check_command: Option<String>,
+}
+
+pub(super) const PLANNER_PROTOCOL: &str = "\
+## Your role
+
+You are the planner of this project: its main agent. You plan; card agents do the cards; the \
+owner starts cards and accepts work. You read the repository and the whole plan, and you create \
+and edit chains and cards. You never start, pause, resume, cancel, accept, return, reopen or \
+merge anything: those calls are refused, and they stay with the owner. You cannot edit or write \
+files in the repository either.
+
+## Plan through the Toknila MCP tools
+
+Use the tools of the MCP server `toknila`; never change the plan any other way.
+
+- `show_plan`: the whole plan of the project: chains, cards with their status, prompt, \
+acceptance, subtasks, dependencies, threads, review results and pull request state. Call it \
+before you plan, and again after the owner or a card agent may have changed something.
+- `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
+- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`): a new card at the \
+end of the chain, or after the cards named in `after`.
+- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `add_subtasks`, `edit_subtasks`): change \
+a card that has not started. A card that is running, in review or done cannot be edited.
+- `add_dependency` / `remove_dependency` (`chain`, `from`, `to`): `to` waits for `from`.
+- `move_card` (`chain`, `card`, `anchor`, `place`): put a card directly before or after another.
+- `open_thread` (`card`, `kind`, `title`), `thread_message` (`card`, `thread`, `text`), \
+`thread_version` (`card`, `thread`, `format`, `body`): settle a design with the owner on a card \
+before it is built. Only the owner approves a thread.
+
+A refused call comes back as an error text: read it and adapt. A chain that starts its ready \
+cards by itself (autostart) refuses changes to its cards' order and dependencies, because they \
+could start work; tell the owner and plan in a new chain instead.
+
+## How to plan
+
+- Cut the work into small cards. One card is one reviewable change for one agent.
+- Every card has a title, a prompt that stands alone (the card agent sees only the card and the \
+repository), and acceptance items that can be tested: a command to run, a behaviour to observe.
+- The order of cards in a chain is the priority: what comes first is done first. Express it with \
+dependencies; do not rely on titles or numbers.
+- Read the repository before you plan, so a card names real files and real constraints.
+- Never start a card. When the plan is ready, tell the owner which card to start first.
+- When you are unsure what the owner wants, ask them in this terminal instead of guessing.
+
+## Short output
+
+- Do not narrate what you are about to do and do not paste code back.
+- Say what you changed in a few lines: which cards, in which chain, in which order.
+";
+
+/// The instructions file of a project's planner run: the project's facts, then the protocol.
+pub fn generate_planner(facts: &ProjectFacts) -> String {
+    let merge = match facts.merge_mode {
+        MergeMode::Local => format!(
+            "Accepted work is merged into `{}` of the local repository.",
+            facts.work_branch
+        ),
+        MergeMode::Github => format!(
+            "Accepted work is pushed, opened as a pull request against `{}` and merged on \
+             GitHub (`{}`) when its checks pass.",
+            facts.work_branch,
+            facts.merge_method.flag()
+        ),
+    };
+    let checks = match &facts.check_command {
+        Some(c) => format!(
+            "The project's check command is `{c}`. Card agents run it before they hand in; \
+             put it in acceptance items where it applies."
+        ),
+        None => "The project names no check command; give acceptance items another way to be \
+                 tested."
+            .to_owned(),
+    };
+    format!(
+        "# Toknila: planner of {key}, {name}\n\n\
+         You are the planner of project {key} for Toknila. The repository's own `CLAUDE.md` and \
+         `AGENTS.md` still apply and win where they differ; this file only adds how to work with \
+         Toknila.\n\n\
+         ## The project\n\n{merge}\n\n{checks}\n\n{protocol}",
+        key = facts.key,
+        name = facts.name,
+        protocol = PLANNER_PROTOCOL,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AgentRole, instructions::RunBrief};
+
+    fn facts() -> ProjectFacts {
+        ProjectFacts {
+            key: "DEMO".to_owned(),
+            name: "Demo".to_owned(),
+            work_branch: "develop".to_owned(),
+            merge_mode: MergeMode::Local,
+            merge_method: MergeMethod::Merge,
+            check_command: Some("cargo xtask verify".to_owned()),
+        }
+    }
+
+    #[test]
+    fn the_generated_file_is_pinned() {
+        let text = generate_planner(&facts());
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/instructions/snapshots/planner.md");
+        if std::env::var_os("TOKNILA_UPDATE_SNAPSHOTS").is_some() {
+            std::fs::write(&path, &text).expect("write snapshot");
+            return;
+        }
+        let want =
+            std::fs::read_to_string(&path).expect("missing snapshot; TOKNILA_UPDATE_SNAPSHOTS=1");
+        assert_eq!(text, want.replace("\r\n", "\n"));
+    }
+
+    #[test]
+    fn the_file_names_the_merge_mode_and_the_check_command() {
+        let local = generate_planner(&facts());
+        assert!(local.contains("merged into `develop` of the local repository"));
+        assert!(local.contains("`cargo xtask verify`"));
+        let github = generate_planner(&ProjectFacts {
+            merge_mode: MergeMode::Github,
+            merge_method: MergeMethod::Squash,
+            check_command: None,
+            ..facts()
+        });
+        assert!(github.contains("pull request against `develop`"));
+        assert!(github.contains("--squash"));
+        assert!(github.contains("names no check command"));
+    }
+
+    #[test]
+    fn the_protocol_names_every_planner_tool_and_the_rules() {
+        for tool in [
+            "show_plan",
+            "new_chain",
+            "add_card",
+            "edit_card",
+            "add_dependency",
+            "remove_dependency",
+            "move_card",
+            "open_thread",
+            "thread_message",
+            "thread_version",
+            "never start",
+            "order of cards in a chain is the priority",
+        ] {
+            assert!(PLANNER_PROTOCOL.contains(tool), "{tool}");
+        }
+    }
+
+    #[test]
+    fn the_planner_is_kicked_off_to_look_at_the_plan_not_to_start_a_card() {
+        let brief = RunBrief {
+            key: "DEMO",
+            title: "Demo",
+            prompt: "",
+            acceptance: &[],
+            check_command: None,
+        };
+        let text = crate::instructions::kickoff(AgentRole::Planner, &brief);
+        assert!(text.contains("planner of project DEMO"));
+        assert!(text.contains("show_plan"));
+        assert!(!text.contains("finished"));
+    }
+}

@@ -10,6 +10,9 @@ pub enum AgentRole {
     Worker,
     Reviewer,
     Release,
+    /// A project's main agent: it plans (chains, cards, dependencies, threads) and starts,
+    /// accepts and merges nothing.
+    Planner,
 }
 
 /// How an agent receives its MCP server (the agent event contract): the runner writes a config
@@ -161,6 +164,8 @@ impl AgentProfile {
     pub const SIM_REVIEWER: &str = "sim-reviewer";
     /// Name of the built-in Claude Code reviewer profile.
     pub const CLAUDE_CODE_REVIEWER: &str = "claude-code-reviewer";
+    /// Name of the built-in Claude Code planner profile.
+    pub const CLAUDE_CODE_PLANNER: &str = "claude-code-planner";
 
     /// The placeholder in `command` for the first prompt of the run (see
     /// `instructions::kickoff`). It is an argv element, or part of one (`--prompt={kickoff}`), so
@@ -252,6 +257,46 @@ impl AgentProfile {
                 .map(str::to_owned)
                 .to_vec(),
             permissions: Permissions { allow },
+            ..Self::claude_code()
+        }
+    }
+
+    /// The built-in planner: Claude Code in the project's repository, read-only.
+    ///
+    /// It runs in `dontAsk` mode: what it may do is the allow-list and nothing else, so it can
+    /// read the code (Read, Grep, Glob, read-only git) and use the Toknila planner tools, and
+    /// it cannot edit or write a file or run anything that changes the repository. Hooks are off
+    /// (a planner is not a card's agent: nothing is nudged, nothing is handed in); the settings
+    /// file carries the allow rules only.
+    pub fn claude_code_planner() -> Self {
+        let mut allow: Vec<String> = ["Read", "Grep", "Glob"].map(str::to_owned).to_vec();
+        allow.extend(
+            [
+                "git status *",
+                "git diff *",
+                "git log *",
+                "git show *",
+                "git ls-files *",
+                "git merge-base *",
+                "git rev-parse *",
+            ]
+            .iter()
+            .map(|r| format!("Bash({r})")),
+        );
+        allow.push("mcp__toknila".to_owned());
+        Self {
+            name: Self::CLAUDE_CODE_PLANNER.to_owned(),
+            role: AgentRole::Planner,
+            command: ["claude", "--permission-mode", "dontAsk", Self::KICKOFF]
+                .map(str::to_owned)
+                .to_vec(),
+            hooks: HookWiring {
+                enabled: false,
+                settings_flag: Some("--settings".to_owned()),
+            },
+            permissions: Permissions { allow },
+            // The person talks to it; no screen-wait rule applies.
+            startup_secs: 0,
             ..Self::claude_code()
         }
     }

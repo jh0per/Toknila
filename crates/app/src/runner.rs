@@ -33,12 +33,13 @@ pub enum RunnerError {
     Unavailable,
 }
 
-/// What to run: the ticket's agent in its working directory.
+/// What to run: the ticket's agent in its working directory. A planner run is keyed by its
+/// project's id (`toknila_core::planner::run_key`) and works in the project's repository.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunRequest {
     pub ticket: TicketId,
     pub key: TicketKey,
-    /// Worker or reviewer. A ticket has at most one live runner per role: the reviewer runs
+    /// Worker, reviewer or planner. A ticket has at most one live runner per role: the reviewer runs
     /// next to the worker and never replaces it.
     pub role: AgentRole,
     /// Name of the agent profile whose command runs.
@@ -56,6 +57,8 @@ pub struct RunBrief {
     pub acceptance: Vec<String>,
     /// The project's check command, named in the agent's instructions.
     pub check_command: Option<String>,
+    /// What a planner is told about its project; `None` for a card's agent.
+    pub project: Option<toknila_core::instructions::ProjectFacts>,
 }
 
 /// A runner now works for the ticket.
@@ -92,6 +95,9 @@ pub trait Runner: std::fmt::Debug {
     fn state(&self, ticket: TicketId) -> Option<RunnerState>;
     /// Sets the size of the ticket's terminal. The caller has clamped it.
     fn resize(&self, ticket: TicketId, size: Size) -> Result<(), RunnerError>;
+    /// Sets the size of the terminal of `ticket`'s runner of `role`. The caller has clamped it.
+    fn resize_role(&self, ticket: TicketId, role: AgentRole, size: Size)
+    -> Result<(), RunnerError>;
 }
 
 /// A live run, as far as reaching it goes.
@@ -133,6 +139,10 @@ impl Runner for NoRunner {
     }
 
     fn resize(&self, _: TicketId, _: Size) -> Result<(), RunnerError> {
+        Err(RunnerError::Unavailable)
+    }
+
+    fn resize_role(&self, _: TicketId, _: AgentRole, _: Size) -> Result<(), RunnerError> {
         Err(RunnerError::Unavailable)
     }
 }

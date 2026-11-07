@@ -53,6 +53,29 @@ pub async fn stream(
     }))
 }
 
+/// Upgrades to the runner stream of a project's planner.
+pub async fn planner_stream(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+    Query(q): Query<StreamQuery>,
+    ws: WebSocketUpgrade,
+) -> Result<Response, ApiError> {
+    let project = state
+        .store
+        .read(move |repo| Ok(resolve::project(repo, &project)))
+        .await??;
+    let which = (
+        toknila_core::planner::run_key(project.id),
+        AgentRole::Planner,
+    );
+    let cursor = q.run.zip(q.from);
+    Ok(ws.on_upgrade(move |socket| async move {
+        if let Err(e) = serve(socket, state.runners, which, cursor).await {
+            tracing::debug!(error = %e, "planner stream closed");
+        }
+    }))
+}
+
 async fn send(socket: &mut WebSocket, message: Message) -> Result<(), String> {
     socket.send(message).await.map_err(|e| e.to_string())
 }

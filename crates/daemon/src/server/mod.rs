@@ -20,7 +20,7 @@ mod lifecycle;
 mod logging;
 
 pub(crate) use auth::constant_time_eq;
-pub use auth::{AGENT_ROUTES, Principal};
+pub use auth::{AGENT_ROUTES, PLANNER_ROUTES, Principal};
 pub use lifecycle::{RunError, probe, run};
 pub use logging::init_logging;
 
@@ -84,6 +84,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/tickets/{ticket}/runner/stream",
             get(crate::runner::stream),
+        )
+        .route(
+            "/projects/{project}/planner/stream",
+            get(crate::runner::planner_stream),
         )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),

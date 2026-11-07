@@ -16,6 +16,7 @@ mod agent_tokens;
 mod inbox;
 mod merges;
 mod parallel;
+mod planner;
 mod planning;
 mod plans;
 mod profiles;
@@ -792,6 +793,15 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/tickets/{ticket}/move",
             "/chains/{chain}/wildcards",
             "/events",
+            "/planner/cards/{card}",
+            "/planner/cards/{card}/threads",
+            "/planner/cards/{card}/threads/{thread}/messages",
+            "/planner/cards/{card}/threads/{thread}/versions",
+            "/planner/chains",
+            "/planner/chains/{chain}/cards",
+            "/planner/chains/{chain}/cards/{card}/move",
+            "/planner/chains/{chain}/edges",
+            "/planner/plan",
             "/profiles",
             "/projects",
             "/projects/{project}",
@@ -801,6 +811,12 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/import",
             "/projects/{project}/import-path",
             "/projects/{project}/inbox",
+            "/projects/{project}/planner",
+            "/projects/{project}/planner/input",
+            "/projects/{project}/planner/scrollback",
+            "/projects/{project}/planner/size",
+            "/projects/{project}/planner/start",
+            "/projects/{project}/planner/stop",
             "/projects/{project}/plans",
             "/projects/{project}/unarchive",
             "/releases/{release}/actions/{action}",

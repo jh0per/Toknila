@@ -607,6 +607,623 @@
         }
       }
     },
+    "/planner/cards/{card}": {
+      "patch": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Edits a card of the planner's project that has not started.",
+        "operationId": "planner_edit_card",
+        "parameters": [
+          {
+            "name": "card",
+            "in": "path",
+            "description": "Card id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/cards/{card}/threads": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Opens a thread on a card of the planner's project.",
+        "operationId": "planner_open_thread",
+        "parameters": [
+          {
+            "name": "card",
+            "in": "path",
+            "description": "Card id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewThread"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/cards/{card}/threads/{thread}/messages": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Posts a message in a thread of a card of the planner's project.",
+        "operationId": "planner_thread_message",
+        "parameters": [
+          {
+            "name": "card",
+            "in": "path",
+            "description": "Card id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "description": "Thread number on the card (1, 2, ...) or thread id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/cards/{card}/threads/{thread}/versions": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Posts the next artifact version of a thread; an approved thread reopens.",
+        "operationId": "planner_thread_version",
+        "parameters": [
+          {
+            "name": "card",
+            "in": "path",
+            "description": "Card id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "description": "Thread number on the card (1, 2, ...) or thread id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/chains": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "A new chain in the planner's project. It never starts its cards by itself.",
+        "operationId": "planner_new_chain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPlanChain"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/chains/{chain}/cards": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "A new card in a chain of the planner's project.",
+        "operationId": "planner_add_card",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCard"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/chains/{chain}/cards/{card}/move": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Puts a card directly before or after another; the dependencies around it are rewired.",
+        "operationId": "planner_move_card",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "card",
+            "in": "path",
+            "description": "Card id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/chains/{chain}/edges": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Makes `to` wait for `from`.",
+        "operationId": "planner_add_dependency",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdgeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Removes the wait of `to` for `from`.",
+        "operationId": "planner_remove_dependency",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Ticket key or release version.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Ticket key or release version.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/EdgeKind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/plan": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "The whole plan of the planner's project: chains, cards in order, dependencies, threads.",
+        "operationId": "planner_plan",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanView"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/profiles": {
       "get": {
         "tags": [
@@ -1129,6 +1746,319 @@
                   "items": {
                     "$ref": "#/components/schemas/InboxItem"
                   }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/planner": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Whether the project's planner is running.",
+        "operationId": "get_planner",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerState"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/planner/input": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "operationId": "planner_input",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Bytes typed into the planner's terminal, as they are",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Written"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/planner/scrollback": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "operationId": "planner_scrollback",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Raw terminal output of the planner's newest run, last lines only (ANSI kept). Headers x-toknila-run, x-toknila-offset (of the first byte) and x-toknila-end (after the last; continue the stream from here).",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/planner/size": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "The size of the panel that shows the planner's terminal.",
+        "operationId": "planner_size",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalSize"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Resized; sizes outside 20x5..500x200 are brought into that range"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/planner/start": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Starts the project's planner in its repository (Claude Code, read-only, with the planner\ntools), or keeps the live one.",
+        "operationId": "start_planner",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPlanner"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerState"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/planner/stop": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Stops the project's planner; one that is not running is fine.",
+        "operationId": "stop_planner",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerState"
                 }
               }
             }
@@ -3167,7 +4097,8 @@
         "enum": [
           "worker",
           "reviewer",
-          "release"
+          "release",
+          "planner"
         ]
       },
       "AnswerKind": {
@@ -3443,6 +4374,47 @@
           }
         ],
         "description": "Why a ticket is Blocked."
+      },
+      "CardEdit": {
+        "type": "object",
+        "description": "What the planner may change on a card that has not started.",
+        "properties": {
+          "acceptance": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "add_subtasks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Checklist items to append."
+          },
+          "edit_subtasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubtaskEdit"
+            },
+            "description": "Checklist items to rename."
+          },
+          "prompt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
       "Chain": {
         "type": "object",
@@ -4489,6 +5461,41 @@
           }
         }
       },
+      "NewCard": {
+        "type": "object",
+        "description": "What the planner gives for a new card.",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "acceptance": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Cards (keys) or release versions of the chain it waits for. Empty: the end of the chain."
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Checklist items."
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "NewChain": {
         "type": "object",
         "description": "`POST /v1/projects/{project}/chains`.",
@@ -4572,6 +5579,24 @@
         ],
         "properties": {
           "text": {
+            "type": "string"
+          }
+        }
+      },
+      "NewPlanChain": {
+        "type": "object",
+        "description": "What the planner may give for a new chain; a chain it makes never starts cards by itself.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "goal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
             "type": "string"
           }
         }
@@ -5206,6 +6231,64 @@
           "after"
         ]
       },
+      "PlanCard": {
+        "type": "object",
+        "description": "A card with its place in the plan.",
+        "required": [
+          "ticket",
+          "after",
+          "subtasks",
+          "threads"
+        ],
+        "properties": {
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What it waits for: card keys and `release <version>` labels."
+          },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subtask"
+            }
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanThread"
+            }
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/Ticket",
+            "description": "The card with its status, prompt, acceptance, review rounds and pull request."
+          }
+        }
+      },
+      "PlanChain": {
+        "type": "object",
+        "description": "A chain with its cards in dependency order (the order is the priority).",
+        "required": [
+          "chain",
+          "summary",
+          "cards"
+        ],
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanCard"
+            }
+          },
+          "chain": {
+            "$ref": "#/components/schemas/Chain"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ChainSummary"
+          }
+        }
+      },
       "PlanKind": {
         "type": "string",
         "description": "What kind of plan an entry is.",
@@ -5232,6 +6315,80 @@
           "specify_dir": {
             "type": "boolean",
             "description": "The repository has a `.specify/` folder."
+          }
+        }
+      },
+      "PlanThread": {
+        "type": "object",
+        "description": "A thread of a card with what was said in it.",
+        "required": [
+          "thread",
+          "messages",
+          "versions"
+        ],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadMessage"
+            }
+          },
+          "thread": {
+            "$ref": "#/components/schemas/Thread"
+          },
+          "versions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many artifact versions it has; their bodies are read in the window.",
+            "minimum": 0
+          }
+        }
+      },
+      "PlanView": {
+        "type": "object",
+        "description": "`GET /v1/planner/plan`: the project and all of its chains.",
+        "required": [
+          "project",
+          "chains"
+        ],
+        "properties": {
+          "chains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanChain"
+            }
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          }
+        }
+      },
+      "PlannerState": {
+        "type": "object",
+        "description": "`GET /v1/projects/{project}/planner`: the project's planner.",
+        "required": [
+          "running",
+          "profile"
+        ],
+        "properties": {
+          "profile": {
+            "type": "string",
+            "description": "The profile it runs with (or, when it is not running, would start with)."
+          },
+          "run": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RunId",
+                "description": "The live run; `null` when it is not running."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "running": {
+            "type": "boolean",
+            "description": "Its process is alive."
           }
         }
       },
@@ -6090,6 +7247,10 @@
           }
         }
       },
+      "RunId": {
+        "type": "string",
+        "description": "Identifies a [`crate::Run`] of a runner process."
+      },
       "Ship": {
         "type": "object",
         "description": "The worktree and branch a ticket works in, once the shipyard has made them.",
@@ -6123,6 +7284,19 @@
           "auto",
           "manual"
         ]
+      },
+      "StartPlanner": {
+        "type": "object",
+        "description": "`POST /v1/projects/{project}/planner/start`.",
+        "properties": {
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A planner profile from `GET /v1/profiles`; unset: `claude-code-planner`."
+          }
+        }
       },
       "StatusReason": {
         "oneOf": [
@@ -6292,6 +7466,25 @@
           },
           "ticket_id": {
             "$ref": "#/components/schemas/TicketId"
+          }
+        }
+      },
+      "SubtaskEdit": {
+        "type": "object",
+        "description": "A rename of a checklist item.",
+        "required": [
+          "position",
+          "text"
+        ],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1-based position.",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string"
           }
         }
       },

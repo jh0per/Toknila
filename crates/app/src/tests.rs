@@ -23,6 +23,7 @@ mod leftovers;
 mod merges;
 mod nudge;
 mod parallel;
+mod planner;
 mod pull_requests;
 mod questions;
 mod resume;

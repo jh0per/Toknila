@@ -15,7 +15,7 @@ pub(super) enum ToolError {
     BadArguments(String),
 }
 
-fn tool(name: &str, description: &str, properties: Value, required: &[&str]) -> Value {
+pub(super) fn tool(name: &str, description: &str, properties: Value, required: &[&str]) -> Value {
     json!({
         "name": name,
         "description": description,
@@ -27,11 +27,11 @@ fn tool(name: &str, description: &str, properties: Value, required: &[&str]) -> 
     })
 }
 
-fn text(description: &str) -> Value {
+pub(super) fn text(description: &str) -> Value {
     json!({ "type": "string", "description": description })
 }
 
-fn list_of_text(description: &str) -> Value {
+pub(super) fn list_of_text(description: &str) -> Value {
     json!({ "type": "array", "items": { "type": "string" }, "description": description })
 }
 
@@ -39,6 +39,7 @@ fn list_of_text(description: &str) -> Value {
 pub(super) fn list(role: AgentRole) -> Vec<Value> {
     match role {
         AgentRole::Reviewer => vec![review_verdict()],
+        AgentRole::Planner => super::mcp_planner::list(),
         _ => worker_tools(),
     }
 }
