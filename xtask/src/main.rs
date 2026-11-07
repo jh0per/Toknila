@@ -8,14 +8,19 @@
 //! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
 //!   With `CI` set it first installs Chromium; locally it uses an installed one.
 //! - `dist <target>`: release archive for one target triple in `dist/` (web page embedded).
-//! - `app`: the macOS `Toknila.app` and `.dmg` for this Mac, ad-hoc signed (see [`app`]).
+//! - `app [--target <triple>]`: the macOS `Toknila.app`, `.dmg` and the signed update archive
+//!   (see [`app`] and [`updates`]).
+//! - `bump <X.Y.Z>`: set the version everywhere, regenerate locks and the API document.
+//! - `latest-json`, `release-notes`: the release's updater manifest and notes (CI uses them).
 //! - `desktop`: build the Tauri shell in `apps/desktop` with `toknila` as its sidecar, and run
 //!   clippy on it (needs the platform web view; CI runs it on macOS).
 
 use std::process::{Command, ExitCode};
 
 mod app;
+mod bump;
 mod guards;
+mod updates;
 mod versions;
 
 fn main() -> ExitCode {
@@ -28,8 +33,17 @@ fn main() -> ExitCode {
         "dist" => dist(std::env::args().nth(2)),
         "desktop" => desktop(),
         "app" => app::app(),
+        "bump" => bump::bump(std::env::args().nth(2)),
+        "latest-json" => updates::latest_json_cmd(&std::env::args().skip(2).collect::<Vec<_>>()),
+        "release-notes" => std::env::args()
+            .nth(2)
+            .ok_or_else(|| "usage: cargo xtask release-notes <tag>".to_owned())
+            .and_then(|tag| updates::release_notes(&tag))
+            .map(|notes| print!("{notes}")),
         _ => {
-            eprintln!("usage: cargo xtask <verify|guards|web|e2e-web|desktop|app|dist <target>>");
+            eprintln!(
+                "usage: cargo xtask <verify|guards|web|e2e-web|desktop|app [--target <triple>]|dist <target>|bump <X.Y.Z>|latest-json|release-notes <tag>>"
+            );
             return ExitCode::from(2);
         }
     };
@@ -60,13 +74,13 @@ fn verify() -> Result<(), String> {
 }
 
 fn guards() -> Result<(), String> {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let root = app::root()?;
     versions::check(&root)?;
     guards::run(&root)
 }
 
 fn web() -> Result<(), String> {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../apps/web");
+    let dir = app::root()?.join("apps/web");
     // npm is a .cmd script on Windows; Command does not add the extension itself.
     let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
     run(npm, &["ci", "--no-audit", "--no-fund"], &dir)?;
@@ -82,7 +96,7 @@ fn web() -> Result<(), String> {
 }
 
 fn e2e_web() -> Result<(), String> {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let root = app::root()?;
     let web = root.join("apps/web");
     cargo(&["build", "--locked", "--bin", "tok"])?;
     cargo(&[
@@ -147,10 +161,7 @@ fn platform(target: &str) -> Option<&'static str> {
 fn dist(target: Option<String>) -> Result<(), String> {
     let target = target.ok_or("usage: cargo xtask dist <target triple>")?;
     let platform = platform(&target).ok_or_else(|| format!("unsupported target {target}"))?;
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .canonicalize()
-        .map_err(|e| format!("repo root: {e}"))?;
+    let root = app::root()?;
     let version = output(&["pkgid", "-p", "toknila"])?
         .trim()
         .rsplit(['@', '#'])
@@ -209,7 +220,7 @@ fn desktop() -> Result<(), String> {
     // The window shows the page the daemon embeds.
     web()?;
     cargo(&["build", "--locked", "--bin", "toknila", "--bin", "tok"])?;
-    app::stage_sidecars(&root, "debug")?;
+    app::stage_sidecars(&root, "debug", None)?;
     let manifest = app::shell_dir(&root).join("Cargo.toml");
     let manifest = manifest.to_string_lossy();
     cargo(&["fmt", "--manifest-path", &manifest, "--check"])?;

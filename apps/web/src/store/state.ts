@@ -8,6 +8,7 @@ import { type PlanState, initialPlan } from "./plan";
 import { type RemovalState, initialRemoval } from "./removal";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
+import { type UpdatesState, initialUpdates } from "./updates";
 import { type UsageState, initialUsage } from "./usage";
 
 export type Link = "connecting" | "live" | "offline";
@@ -48,6 +49,8 @@ export interface State {
   removal: RemovalState;
   /// The Usage page: window, metric and the daemon's answer.
   usage: UsageState;
+  /// Updates of the desktop app (empty in a browser).
+  updates: UpdatesState;
 }
 
 export const FIRST_RETRY_MS = 500;
@@ -76,6 +79,7 @@ export function initialState(route: Route): State {
     imports: initialImports,
     removal: initialRemoval,
     usage: initialUsage,
+    updates: initialUpdates,
   };
 }
 

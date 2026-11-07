@@ -7,6 +7,7 @@ import { type Dialog, reducePlan, withChain } from "./plan";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
+import { reduceUpdates } from "./updates";
 import { loadUsage, reduceUsage } from "./usage";
 import {
   FIRST_RETRY_MS, MAX_RETRY_MS, type State, cardRoute, chainOfEvent, currentProject, ticketOfEvent,
@@ -15,7 +16,7 @@ import {
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
   switch (msg.type) {
     case "started":
-      return [s, [{ type: "fetchTail" }]];
+      return [s, [{ type: "fetchTail" }, { type: "watchUpdates" }]];
     case "journalTail":
       // The first load already has the state up to this event; the stream starts after it.
       return [
@@ -176,6 +177,14 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "cardMoved":
     case "planRejected":
       return reducePlan(s, msg);
+    case "checkForUpdates":
+    case "restartToUpdate":
+    case "restartAnyway":
+    case "updateLater":
+    case "updateViewLoaded":
+    case "updateWarned":
+    case "updateFailed":
+      return reduceUpdates(s, msg);
     case "setUsageDays":
     case "setUsageMetric":
     case "setMachineScan":

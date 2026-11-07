@@ -1,0 +1,5 @@
+/* The update note in the corner of the window. */
+.update-banner { position: fixed; right: var(--s4); bottom: var(--s4); z-index: 20; max-width: 320px; display: flex; flex-direction: column; gap: var(--s2); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); padding: var(--s3) var(--s4); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); font-size: var(--fs-m); }
+.update-banner .notes { margin: 0; white-space: pre-line; }
+.update-banner .hint { margin: 0; color: var(--block); font-size: var(--fs-s); }
+.update-banner .btns { display: flex; gap: var(--s2); }

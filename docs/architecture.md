@@ -886,8 +886,24 @@ Windows and Linux use WebView2 and WebKitGTK with the same code.
 The shell (`apps/desktop/src-tauri`) is its own Cargo workspace, because it needs the platform web
 view, which `cargo xtask verify` does not assume. It runs `toknila daemon start` and
 `toknila open --json` through the bundled sidecar, so starting, attaching and the token follow
-the CLI's rules, and opens one window on that address. The window gets no Tauri IPC
-capabilities: the page talks to the daemon over HTTP like in a browser.
+the CLI's rules, and opens one window on that address. The page talks to the daemon over HTTP like in a
+browser. The one thing it asks the shell is the update state, through three Tauri commands
+(`update_status`, `check_for_updates`, `restart_to_update`); the capability
+`capabilities/updates.json` allows exactly those for the daemon's loopback address and nothing
+else of Tauri.
+
+### Updates
+
+`tauri-plugin-updater` checks `latest.json` of the GitHub release at start and every 6 hours,
+downloads the archive in the background and verifies it against the public key in
+`tauri.conf.json`. Decisions are pure functions in `update.rs` with unit tests: when to check,
+what the banner shows (only a ready update), whether a restart must warn (agents running, counted
+from `tok ls --json`; not knowing counts as running; only a confirmed restart goes ahead). The
+page (`store/updates.ts`) keeps what the shell answered and sends the person's choice back; in a
+browser there is no shell and nothing shows. Installing replaces `Toknila.app` and restarts; the
+relaunched app takes over from the old daemon (`takeover.rs`). The release files are made by
+`cargo xtask app` and the Release workflow (`xtask/src/updates.rs`), the version by
+`cargo xtask bump`. See "Updates and releases" in `docs/install.md`.
 
 ## Rules the guards enforce
 

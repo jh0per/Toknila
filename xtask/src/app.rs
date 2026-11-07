@@ -1,16 +1,23 @@
 //! `cargo xtask app`: the macOS bundle (`Toknila.app` and a `.dmg`) for the host architecture,
 //! ad-hoc signed so it runs on the Mac that built it. No Developer ID, no notarisation: handing it
 //! to other people is a later job. The desktop shell, its sidecars and the staging are shared
-//! with `cargo xtask desktop`.
+//! with `cargo xtask desktop`. `--target <triple>` builds for another macOS architecture; the
+//! same step packs and signs the archive the in-app updater installs (see `updates.rs`).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::{cargo, run, versions, web};
+use crate::{cargo, run, updates, versions, web};
 
-/// The repository root, resolved.
+/// The repository root, resolved. The manifest folder is read from the environment cargo sets
+/// when it runs the task: the compiled-in path can belong to another checkout when several share
+/// one target directory (cargo reuses a build of identical sources), which would make a task
+/// edit the wrong tree.
 pub fn root() -> Result<PathBuf, String> {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
+    let manifest = std::env::var_os("CARGO_MANIFEST_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")));
+    manifest
         .join("..")
         .canonicalize()
         .map_err(|e| format!("repo root: {e}"))
@@ -28,6 +35,20 @@ pub fn shell_dir(root: &Path) -> PathBuf {
     root.join("apps/desktop/src-tauri")
 }
 
+/// Where cargo puts binaries: `<target>/<profile>`, or `<target>/<triple>/<profile>` when
+/// cross-building.
+fn built_dir(target_dir: &Path, triple: Option<&str>, profile: &str) -> PathBuf {
+    match triple {
+        Some(t) => target_dir.join(t).join(profile),
+        None => target_dir.join(profile),
+    }
+}
+
+/// The architecture name of a target triple (`aarch64-apple-darwin` is `aarch64`).
+fn arch_of(triple: &str) -> &str {
+    triple.split('-').next().unwrap_or(triple)
+}
+
 fn host_triple() -> Result<String, String> {
     let out = Command::new(std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_owned()))
         .arg("-vV")
@@ -40,14 +61,18 @@ fn host_triple() -> Result<String, String> {
 }
 
 /// Copies `toknila` and `tok` built under `profile` ("debug" or "release") to where Tauri looks
-/// for sidecars: `binaries/<name>-<host triple>` in the shell folder.
-pub fn stage_sidecars(root: &Path, profile: &str) -> Result<(), String> {
-    let host = host_triple()?;
+/// for sidecars: `binaries/<name>-<triple>` in the shell folder. `target` is the triple they
+/// were cross-built for; `None` means this machine's.
+pub fn stage_sidecars(root: &Path, profile: &str, target: Option<&str>) -> Result<(), String> {
+    let host = match target {
+        Some(t) => t.to_owned(),
+        None => host_triple()?,
+    };
     let exe = std::env::consts::EXE_SUFFIX;
     let binaries = shell_dir(root).join("binaries");
     std::fs::create_dir_all(&binaries).map_err(|e| format!("binaries/: {e}"))?;
     for name in ["toknila", "tok"] {
-        let from = target_dir(root).join(profile).join(format!("{name}{exe}"));
+        let from = built_dir(&target_dir(root), target, profile).join(format!("{name}{exe}"));
         let to = binaries.join(format!("{name}-{host}{exe}"));
         std::fs::copy(&from, &to).map_err(|e| format!("copy {}: {e}", from.display()))?;
     }
@@ -59,33 +84,34 @@ pub fn app() -> Result<(), String> {
     if !cfg!(target_os = "macos") {
         return Err("the app bundle is macOS only for now".to_owned());
     }
+    let triple = target_arg(std::env::args().skip(2))?;
+    let triple = triple.as_deref();
+    let arch = match triple {
+        Some(t) => arch_of(t).to_owned(),
+        None => arch_of(&host_triple()?).to_owned(),
+    };
     let root = root()?;
     let version = versions::current(&root)?;
     // The window shows the page the daemon embeds, so the web build comes first.
     web()?;
-    cargo(&[
-        "build",
-        "--release",
-        "--locked",
-        "--bin",
-        "toknila",
-        "--bin",
-        "tok",
-    ])?;
-    stage_sidecars(&root, "release")?;
+    let mut build = vec!["build", "--release", "--locked"];
+    build.extend(triple.iter().flat_map(|t| ["--target", t]));
+    build.extend(["--bin", "toknila", "--bin", "tok"]);
+    cargo(&build)?;
+    stage_sidecars(&root, "release", triple)?;
     let shell = shell_dir(&root);
     let manifest = shell.join("Cargo.toml");
     let manifest = manifest.to_string_lossy();
     // `custom-protocol` makes the shell serve its own start page instead of a dev server.
-    cargo(&[
-        "build",
-        "--release",
-        "--locked",
+    let mut build = vec!["build", "--release", "--locked"];
+    build.extend(triple.iter().flat_map(|t| ["--target", t]));
+    build.extend([
         "--manifest-path",
         &manifest,
         "--features",
         "custom-protocol",
-    ])?;
+    ]);
+    cargo(&build)?;
     let shell_target = std::env::var_os("CARGO_TARGET_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| shell.join("target"));
@@ -98,10 +124,10 @@ pub fn app() -> Result<(), String> {
     for d in [&macos, &resources] {
         std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
     }
-    let target = target_dir(&root).join("release");
+    let target = built_dir(&target_dir(&root), triple, "release");
     let copies = [
         (
-            shell_target.join("release/toknila-desktop"),
+            built_dir(&shell_target, triple, "release").join("toknila-desktop"),
             "toknila-desktop",
         ),
         (target.join("toknila"), "toknila"),
@@ -137,7 +163,7 @@ pub fn app() -> Result<(), String> {
         &out,
     )?;
     link_applications(&stage)?;
-    let dmg = out.join(format!("Toknila-{version}.dmg"));
+    let dmg = out.join(format!("Toknila-{version}-{arch}.dmg"));
     run(
         "hdiutil",
         &[
@@ -154,10 +180,26 @@ pub fn app() -> Result<(), String> {
         &out,
     )?;
     let _ = std::fs::remove_dir_all(&stage);
+    let archive = updates::package(&out, &version, &arch)?;
     eprintln!("xtask app: PASS");
     eprintln!("  app: {}", bundle.display());
     eprintln!("  dmg: {}", dmg.display());
+    eprintln!("  update archive: {}", archive.display());
     Ok(())
+}
+
+/// The value of `--target <triple>` among the arguments after the task name, if given.
+fn target_arg(mut args: impl Iterator<Item = String>) -> Result<Option<String>, String> {
+    match args.next().as_deref() {
+        None => Ok(None),
+        Some("--target") => args
+            .next()
+            .map(Some)
+            .ok_or_else(|| "--target needs a triple".to_owned()),
+        Some(other) => Err(format!(
+            "unknown argument {other}; usage: cargo xtask app [--target <triple>]"
+        )),
+    }
 }
 
 #[cfg(unix)]
@@ -233,6 +275,28 @@ fn icon(png: &Path, icns: &Path, work: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_target_argument_is_read() {
+        let args = |v: &[&str]| {
+            v.iter()
+                .map(|s| (*s).to_owned())
+                .collect::<Vec<_>>()
+                .into_iter()
+        };
+        assert_eq!(target_arg(args(&[])), Ok(None));
+        assert_eq!(
+            target_arg(args(&["--target", "x86_64-apple-darwin"])),
+            Ok(Some("x86_64-apple-darwin".to_owned()))
+        );
+        assert!(target_arg(args(&["--target"])).is_err());
+        assert!(target_arg(args(&["--bogus"])).is_err());
+        assert_eq!(arch_of("aarch64-apple-darwin"), "aarch64");
+        assert_eq!(
+            built_dir(Path::new("t"), Some("x86_64-apple-darwin"), "release"),
+            Path::new("t/x86_64-apple-darwin/release")
+        );
+    }
 
     #[test]
     fn plist_carries_the_version_and_the_shell_executable() {
