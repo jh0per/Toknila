@@ -232,4 +232,12 @@ pub(super) const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE projects ADD COLUMN check_command TEXT;
     "#,
+    // 10: archived projects. Hidden from the sidebar, data kept.
+    r#"
+    ALTER TABLE projects ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
+    "#,
+    // 11: where an imported chain came from: the spec folder or chain file, as an absolute path.
+    r#"
+    ALTER TABLE chains ADD COLUMN source TEXT;
+    "#,
 ];

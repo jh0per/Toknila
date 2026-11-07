@@ -1,14 +1,14 @@
 import type { Intent } from "../store/msg";
 import { type State, currentProject } from "../store/state";
 import { About } from "./About";
-import { AddProject } from "./AddProject";
+import { ArchiveProject } from "./ArchiveProject";
 import { Checks } from "./Checks";
 import { ImportChain } from "./ImportChain";
 import { ProjectSettings } from "./ProjectSettings";
 import { TrustNote } from "./TrustNote";
 
-/// Settings: the system checks, the settings of the project in focus, a chain file to import, and
-/// a form to add another project.
+/// Settings: the system checks, the settings of the project in focus, a chain file to import,
+/// archiving the project, and a way to add another project.
 export function Settings({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const project = currentProject(state);
   // The form restarts from the daemon's values whenever they change (after a save, after a restart).
@@ -23,7 +23,17 @@ export function Settings({ state, dispatch }: { state: State; dispatch: (i: Inte
       <TrustNote />
       {project && <ProjectSettings key={stamp} project={project} state={state} dispatch={dispatch} />}
       {project && <ImportChain project={project} state={state} dispatch={dispatch} />}
-      <AddProject state={state} dispatch={dispatch} />
+      {project && <ArchiveProject project={project} state={state} dispatch={dispatch} />}
+      <section className="card-block">
+        <h2>Another project</h2>
+        <p className="muted">Point Toknila at another repository; its key and name come from the folder.</p>
+        <button
+          type="button" className="btn" data-testid="open-add-project"
+          onClick={() => dispatch({ type: "openDialog", dialog: { kind: "addProject" } })}
+        >
+          Add a project…
+        </button>
+      </section>
       <About state={state} dispatch={dispatch} />
     </div>
   );

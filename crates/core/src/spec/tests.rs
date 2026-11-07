@@ -126,6 +126,30 @@ fn another_section_with_tasks_is_a_card_and_sub_headings_stay_in_their_phase() {
 }
 
 #[test]
+fn documents_list_the_usual_ones_first_then_the_rest_by_name() {
+    let names = [
+        "zeta.md",
+        "tasks.md",
+        ".hidden",
+        "contracts/",
+        "spec.md",
+        "notes/",
+        "plan.md",
+    ];
+    assert_eq!(
+        documents(names.map(str::to_owned)),
+        [
+            "spec.md",
+            "plan.md",
+            "contracts/",
+            "tasks.md",
+            "notes/",
+            "zeta.md"
+        ]
+    );
+}
+
+#[test]
 fn links_and_fenced_code_are_not_tasks() {
     let text =
         "## Phase 1: A\n\n- [docs](x) is a link\n```\n- [?] not a task\n```\n- [ ] T001 real\n";

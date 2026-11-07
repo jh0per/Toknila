@@ -2,6 +2,7 @@ import { KIND_TITLE, itemKey, itemRoute } from "../store/inbox";
 import type { Intent } from "../store/msg";
 import { type State, cardRoute, chainsOf, currentChain, currentProject, runningAgents } from "../store/state";
 import { NavLink } from "./Link";
+import { SidebarProjects } from "./SidebarProjects";
 import { UsageChip } from "./UsageChip";
 
 export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
@@ -16,26 +17,28 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
         <span className={`link l-${state.link}`} data-testid="link">{state.link}</span>
       </div>
 
-      <section className="sec" data-testid="projects">
-        <h2>Projects</h2>
-        <ul>
-          {state.projects.map((p) => (
-            <li key={p.id}>
-              <NavLink
-                route={{ name: "project", project: p.key }}
-                dispatch={dispatch}
-                className={`item${p.id === project?.id ? " sel" : ""}`}
-              >
-                <span className="key">{p.key}</span>
-                <span className="t">{p.name}</span>
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <SidebarProjects state={state} dispatch={dispatch} />
 
       <section className="sec" data-testid="chains">
-        <h2>Chains</h2>
+        <h2>
+          Chains
+          {project && (
+            <span className="h-btns">
+              <button
+                type="button" className="icon-btn" aria-label="Import a plan" title="Import a plan" data-testid="import-plus"
+                onClick={() => dispatch({ type: "openDialog", dialog: { kind: "import", project: project.key } })}
+              >
+                ↓
+              </button>
+              <button
+                type="button" className="icon-btn" aria-label="New chain" title="New chain" data-testid="new-chain-plus"
+                onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: project.key } })}
+              >
+                +
+              </button>
+            </span>
+          )}
+        </h2>
         <ul>
           {chainsOf(state, project).map((c) => (
             <li key={c.chain.id}>

@@ -71,6 +71,10 @@ pub trait UnitOfWork: Reader {
     fn insert_project(&mut self, project: &Project) -> AppResult<()>;
     /// Saves the changed settings of an existing project.
     fn update_project(&mut self, project: &Project) -> AppResult<()>;
+    /// Deletes a project and everything that belongs to it (chains, cards, milestones, edges,
+    /// notes, threads, ships, agent sessions) with their journal entries. Token usage records
+    /// stay, no longer tied to a card: the tokens were spent.
+    fn delete_project(&mut self, project: ProjectId) -> AppResult<()>;
     /// Inserts a new, empty chain.
     fn insert_chain(&mut self, chain: &Chain) -> AppResult<()>;
     /// Takes the next ticket number of a project; never handed out twice.

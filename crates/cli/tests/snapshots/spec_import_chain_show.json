@@ -5,7 +5,8 @@
     "id": "<id>",
     "name": "001-sample-feature",
     "project_id": "<id>",
-    "review_mode": null
+    "review_mode": null,
+    "source": "<path>"
   },
   "edges": [
     {

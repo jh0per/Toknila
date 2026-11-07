@@ -44,6 +44,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         autostart: input.autostart.unwrap_or(Chain::DEFAULT_AUTOSTART),
         review_mode: input.review_mode,
         reviewer: input.reviewer.filter(|r| !r.trim().is_empty()),
+        source: None,
     };
     uow.insert_chain(&c)?;
     uow.emit(&DomainEvent::ChainCreated { chain: c.clone() })?;
@@ -52,10 +53,12 @@ pub fn create<U: UnitOfWork + ?Sized>(
 
 /// Creates a chain from a chain file. Every node and edge goes through the same path as single
 /// edits, then the chain settles once (autostart); the whole import lands or nothing does.
+/// `source` is the spec folder or chain file the text was read from, kept on the chain.
 pub fn import<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     project: &str,
     toml: &str,
+    source: Option<String>,
 ) -> AppResult<ChainId> {
     let plan = toknila_core::plan::parse(toml).map_err(|e| AppError::bad_request(e.to_string()))?;
     let p = resolve::project(uow, project)?;
@@ -73,9 +76,10 @@ pub fn import<U: UnitOfWork + ?Sized>(
         );
     }
     let mut keys = keys.into_iter();
-    let (view, subtasks) = plan.instantiate(p.id, uow.now(), || {
+    let (mut view, subtasks) = plan.instantiate(p.id, uow.now(), || {
         keys.next().expect("one key was taken per ticket")
     });
+    view.chain.source = source;
     let (chain_id, chain) = (view.chain.id, view.chain.clone());
     uow.insert_chain(&chain)?;
     uow.emit(&DomainEvent::ChainCreated { chain })?;
@@ -235,4 +239,35 @@ pub(crate) fn change<U: UnitOfWork + ?Sized>(
     let c = resolve::chain(uow, chain)?;
     with_chain(uow, c.id, f)?;
     Ok(c.id)
+}
+
+/// Moves a card directly before or after another one of its chain: the dependencies around it
+/// are rewired as core plans them, in one change. A card that has started cannot move, and
+/// nothing can be put before work that has started.
+pub fn move_ticket<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: &str,
+    ticket: &str,
+    anchor: &str,
+    place: toknila_core::graph::Place,
+) -> AppResult<ChainId> {
+    change(uow, chain, |ctx| {
+        let (card, anchor) = (
+            resolve::node(&ctx.view, ticket)?,
+            resolve::node(&ctx.view, anchor)?,
+        );
+        let (toknila_core::NodeRef::Ticket(card), toknila_core::NodeRef::Ticket(anchor)) =
+            (card, anchor)
+        else {
+            return Err(AppError::bad_request("only cards can be moved"));
+        };
+        let plan = ctx.view.plan_move(card, anchor, place)?;
+        for e in plan.remove {
+            ctx.remove_edge(e.from, e.to);
+        }
+        for e in plan.add {
+            ctx.add_edge(e)?;
+        }
+        Ok(())
+    })
 }

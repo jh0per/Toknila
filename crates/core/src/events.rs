@@ -22,11 +22,20 @@ pub enum DomainEvent {
     ProjectUpdated {
         project: Project,
     },
+    /// A person deleted the project with everything in it; `project` is how it was. Its own
+    /// journal entries and those of its chains, cards and milestones went with it.
+    ProjectDeleted {
+        project: Project,
+    },
     ChainCreated {
         chain: Chain,
     },
     /// A chain's settings changed (its review mode or reviewer).
     ChainUpdated {
+        chain: Chain,
+    },
+    /// The chain went with its project, cards and milestones included; `chain` is how it was.
+    ChainDeleted {
         chain: Chain,
     },
     EdgeAdded {
@@ -215,9 +224,12 @@ impl DomainEvent {
     /// `subtask`, `thread`. Edge events belong to their chain.
     pub fn entity(&self) -> &'static str {
         match self {
-            Self::ProjectCreated { .. } | Self::ProjectUpdated { .. } => "project",
+            Self::ProjectCreated { .. }
+            | Self::ProjectUpdated { .. }
+            | Self::ProjectDeleted { .. } => "project",
             Self::ChainCreated { .. }
             | Self::ChainUpdated { .. }
+            | Self::ChainDeleted { .. }
             | Self::EdgeAdded { .. }
             | Self::EdgeRemoved { .. } => "chain",
             Self::TicketCreated { .. }
@@ -248,10 +260,12 @@ impl DomainEvent {
     /// Id of the entity the event is about.
     pub fn entity_id(&self) -> String {
         match self {
-            Self::ProjectCreated { project } | Self::ProjectUpdated { project } => {
-                project.id.to_string()
-            }
-            Self::ChainCreated { chain } | Self::ChainUpdated { chain } => chain.id.to_string(),
+            Self::ProjectCreated { project }
+            | Self::ProjectUpdated { project }
+            | Self::ProjectDeleted { project } => project.id.to_string(),
+            Self::ChainCreated { chain }
+            | Self::ChainUpdated { chain }
+            | Self::ChainDeleted { chain } => chain.id.to_string(),
             Self::EdgeAdded { edge } | Self::EdgeRemoved { edge } => edge.chain_id.to_string(),
             Self::TicketCreated { ticket }
             | Self::TicketStatusChanged { ticket, .. }
@@ -292,6 +306,7 @@ impl DomainEvent {
             | Self::ChainCreated { .. }
             | Self::TicketCreated { .. }
             | Self::ReleaseCreated { .. } => "created",
+            Self::ProjectDeleted { .. } | Self::ChainDeleted { .. } => "deleted",
             Self::EdgeAdded { .. } => "edge_added",
             Self::EdgeRemoved { .. } => "edge_removed",
             Self::TicketStatusChanged { .. } => "status_changed",

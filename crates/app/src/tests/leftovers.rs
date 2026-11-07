@@ -14,7 +14,7 @@ const TASKS: &str = "## Phase 1: Setup\n- [x] T001 init\n- [ ] T002 wire it\n- [
 fn imported() -> Mem {
     let imp = spec::import(TASKS, "folder", None, &[]).expect("spec");
     let mut mem = Mem::demo();
-    chains::import(&mut mem, "DEMO", &imp.toml).expect("imports");
+    chains::import(&mut mem, "DEMO", &imp.toml, None).expect("imports");
     mem
 }
 

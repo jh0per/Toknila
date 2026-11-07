@@ -9,7 +9,9 @@ use toknila_app::{chains, resolve, reviews};
 use toknila_core::Actor;
 
 use super::{ApiResult, chain_write, load_chain_detail, read, stamp};
-use crate::http::dto::{ChainDetail, ChainFile, ChainItem, EdgeInput, NewChain, ReviewSettings};
+use crate::http::dto::{
+    ChainDetail, ChainFile, ChainItem, EdgeInput, MoveInput, NewChain, ReviewSettings,
+};
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
 
@@ -37,7 +39,7 @@ pub async fn import_chain(
     Json(input): Json<ChainFile>,
 ) -> ApiResult<(StatusCode, Json<ChainDetail>)> {
     let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(chains::import(tx, &project, &input.toml)?)
+        Ok(chains::import(tx, &project, &input.toml, None)?)
     })
     .await?;
     Ok((StatusCode::CREATED, Json(detail)))
@@ -126,6 +128,24 @@ pub async fn add_edge(
 ) -> ApiResult<Json<ChainDetail>> {
     let detail = chain_write(&state, Actor::Human, move |tx| {
         Ok(chains::add_edge(tx, &chain, &e.from, &e.to, e.kind)?)
+    })
+    .await?;
+    Ok(Json(detail))
+}
+
+#[utoipa::path(post, path = "/chains/{chain}/tickets/{ticket}/move", tag = "chains", request_body = MoveInput,
+    params(("chain" = String, Path, description = "Chain id or name"), ("ticket" = String, Path, description = "Ticket key")),
+    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Puts a card directly before or after another card; the dependencies around it are rewired.
+pub async fn move_ticket(
+    State(state): State<AppState>,
+    Path((chain, ticket)): Path<(String, String)>,
+    Json(m): Json<MoveInput>,
+) -> ApiResult<Json<ChainDetail>> {
+    let detail = chain_write(&state, Actor::Human, move |tx| {
+        Ok(chains::move_ticket(
+            tx, &chain, &ticket, &m.anchor, m.place,
+        )?)
     })
     .await?;
     Ok(Json(detail))

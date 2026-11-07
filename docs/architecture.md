@@ -437,16 +437,89 @@ The web shows what the daemon says and keeps no rule of its own.
   repository, and a blank title template too.
 - **Window.** `/settings` and `/projects/{p}/settings` (`Settings.tsx`): checks, project settings,
   a chain-file import (the browser reads the file; `POST /v1/projects/{p}/import` is the existing
-  route), and a form to add another project. With no project the home page is onboarding
-  (`Onboarding.tsx`): the checks, then the add-project form, which opens the new project's
-  settings. The form first calls the folder check, so every problem shows next to its field. Store:
-  `store/settings.ts` (state, reducer) and `store/settingsEffects.ts` (network).
+  route), archiving the project, and a button that opens the add-project form. With no project the
+  home page is onboarding (`Onboarding.tsx`): the checks, then the add-project form, which opens the
+  new project's settings. The form first calls the folder check, so every problem shows next to its
+  field. While the person types a folder, a debounced folder check brings core's `suggested_key`
+  and `suggested_name`; they fill Key and Name until the person types into those fields, and an
+  empty Key is sent as the suggestion (`store/addForm.ts`). Store: `store/settings.ts` (state,
+  reducer) and `store/settingsEffects.ts` (network).
+- **Planning from the window** (`store/plan.ts`, `store/planEffects.ts`). Dialogs over the window:
+  add a project (from the "+" next to PROJECTS, the right-click menu of the sidebar's projects, the
+  desktop menu File > Add Project..., which sets the address hash `#/add-project`), new chain,
+  new card (at the end of the chain unless an "after" card is picked), import. A project without
+  chains shows "No chains yet" with New chain and Import; a project with chains and none picked
+  shows its most recently active chain (`defaultChain`: the chain of the newest journal entry, else
+  the first). The card's Details offer Edit and Move only when `TicketDetail.can_edit` and
+  `can_move` say so; a move is `POST /v1/chains/{c}/tickets/{t}/move`. Archived projects
+  (`Project.archived`) leave the sidebar and come back through "Show archived"; archiving is
+  refused while the project's agents work, and the refusal shows inline.
+- **Plans and deletion from the window** (`store/imports.ts`, `store/removal.ts`,
+  `store/importEffects.ts`). The Import dialog (from "No chains yet" and next to New chain in the
+  sidebar) takes a path (`import-path`) or pasted TOML (`import`), shows what each import made,
+  and lists the repository's plans on request. After Add project the page scans the repository
+  (`GET .../plans`); found plans open as a list, all ticked except those already imported, with
+  Import selected (one `import-path` per plan, in list order, each with its own outcome) and Skip;
+  none found, the page goes on. "No chains yet" shows the same list behind a Scan button. The
+  first imported chain opens. Delete project (right-click menu, Settings) has Remove from Toknila
+  and Remove and move the folder to Trash, the latter enabled once the key is typed; a 409 says to
+  stop the agents first (the window has no stop button; a card is cancelled from its actions).
+  The journal's `chain`/`project` `deleted` entries drop what the page held of them, and a page
+  that showed them goes home.
 - **Folder picker.** A text field with a paste-friendly path, not a native picker. The desktop
   window loads the daemon's page as a remote URL, so a dialog plugin would need the Tauri IPC
   opened to that page; and a browser file input never yields a path. Revisit if the shell ever
   serves the page itself.
-- **Spec folders** still import with `tok chain import <folder>`: reading a folder is a CLI
-  adapter (`cmd/spec.rs`) and the window offers the chain file only.
+- **Spec folders** import by path: the daemon reads them (see
+  [Archiving, deletion and plans](#archiving-deletion-and-plans)), so the window and
+  `tok chain import <path>` take the same way in.
+
+## Archiving, deletion and plans
+
+Keeping projects tidy. Each rule lives in one place; the daemon only gathers facts and does the
+I/O.
+
+- **Archiving.** `POST /v1/projects/{p}/archive` and `.../unarchive` set `Project::archived`
+  (hidden from the sidebar, data kept). Refused (409) while any agent of the project works:
+  `toknila_app::projects::ensure_idle` asks the schedule (`plan_of(..).used > 0`, cards Running or
+  Waiting and live runners), the same check deletion uses.
+- **Deletion.** `POST /v1/projects/{p}/delete` (`{"trash_folder": bool}`, `tok project rm KEY
+  [--trash-folder] [--yes]`). One transaction (`toknila_app::removal::delete_project`, the port
+  `UnitOfWork::delete_project`, SQL in `daemon/src/store/removal.rs`) deletes the project row
+  (its ticket-number counter with it), chains, cards, milestones, edges, release members,
+  subtasks, comments, threads with their messages and versions, ships and runner rows, and the
+  agent sessions of its cards. Token usage records stay, no longer tied to a card: the tokens
+  were spent and the machine's totals stay true; the transcripts' read offsets stay, so nothing
+  is read twice. The journal entries about the project and everything in it go too (by entity
+  id: project, chains, cards, milestones, comments, subtasks, threads); then one `ChainDeleted`
+  per chain and one `ProjectDeleted` are journaled. Sequence numbers are never reused.
+- **After the commit** (`daemon/src/cleanup.rs`, a blocking job outside any transaction): every
+  ship the cards still had is removed through the shipyard (`git worktree remove --force`, then
+  `git worktree prune`, against the repository); each card's run files go
+  (`Runners::forget`, `<home>/runs/<ticket>`). The repository is otherwise untouched and its
+  `ship/*` branches stay. With `trash_folder` the repository folder then goes to the system Trash
+  through the `Trasher` port (`daemon/src/trash.rs`: the `trash` crate in production, a fake that
+  moves the folder into a test folder in tests; a daemon started with `TOKNILA_TRASH_DIR` set
+  moves folders into that folder instead, `DirTrash`, which only the browser tests use so they
+  never reach the person's Trash), never `rm`, and only when core allows it
+  (`toknila_core::removal::may_trash`: an absolute path to an existing folder, not a disk root,
+  not inside the data home nor holding it, not the home folder nor a folder above it). The answer
+  (`ProjectDeletion`) says `folder`: `kept`, `trashed` or `none`, with `folder_error` when the
+  Trash refused or failed, and lists in `warnings` every cleanup step that failed; the deletion
+  stands either way.
+- **Import by path.** `POST /v1/projects/{p}/import-path` (`{"path"}`, absolute) reads a TOML
+  chain file, a spec folder (with `tasks.md`) or a folder of spec folders
+  (`daemon/src/plan_files/read.rs`, on a blocking thread), turns spec folders into chain files with
+  `toknila_core::spec`, and imports each through `toknila_app::chains::import` in its own
+  transaction, the same path as `POST /v1/projects/{p}/import`. The chain keeps the resolved path
+  as `Chain::source` (pasted text has none). One file or folder fails as a whole (400 or 409, the
+  message names the path and, for a `tasks.md`, the line); a parent folder imports what it can
+  and lists `skipped` (no `tasks.md`) and `failed` folders.
+- **Plans in the repository.** `GET /v1/projects/{p}/plans` lists `specs/*/tasks.md` and
+  `plans/*.toml` of the project's repository, one level deep and never the whole tree
+  (`daemon/src/plan_files/scan.rs`), with `specify_dir` when `.specify/` exists. Which entries are
+  plans, their card counts and whether one is `imported` (a chain of the project has that path as
+  its source) are `toknila_core::plans`. Importing a found plan is `import-path` with its `path`.
 
 ## Agent access
 

@@ -1,12 +1,17 @@
 // The page's state machine: reduce(state, msg) -> [state, effects]. Pure: no DOM, no network.
 
 import type { EventRecord } from "../api/types";
+import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
+import { type Dialog, reducePlan, withChain } from "./plan";
+import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
 import { reduceUpdates } from "./updates";
 import { loadUsage, reduceUsage } from "./usage";
-import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, chainOfTicket, ticketOfEvent } from "./state";
+import {
+  FIRST_RETRY_MS, MAX_RETRY_MS, type State, cardRoute, chainOfEvent, currentProject, ticketOfEvent,
+} from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
   switch (msg.type) {
@@ -36,17 +41,15 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
         error: "",
       };
       // First run: no project yet, so the window offers the checks and a form to add one.
-      return [next, [...enter(next.route, next), ...(msg.projects.length ? [] : setupLoads)]];
+      const first = !msg.projects.some((p) => !p.archived);
+      return [next, [...enter(next.route, next), ...(first ? setupLoads : [])]];
     }
     case "projectsLoaded":
       return [{ ...s, projects: msg.projects }, []];
     case "agentsLoaded":
       return [{ ...s, agents: msg.agents }, []];
-    case "chainLoaded": {
-      const id = msg.chain.chain.id;
-      const chainOrder = s.chainOrder.includes(id) ? s.chainOrder : [...s.chainOrder, id];
-      return [{ ...s, chains: { ...s.chains, [id]: msg.chain }, chainOrder, error: "" }, []];
-    }
+    case "chainLoaded":
+      return [{ ...withChain(s, msg.chain), error: "" }, []];
     case "inboxLoaded":
       return [{ ...s, inbox: msg.items }, []];
     case "detailLoaded":
@@ -82,23 +85,98 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [{ ...s, route: msg.route }, enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
-      const [moved, more] = go(added, { name: "settings", project: msg.project.key });
-      return [moved, [...fx, ...more]];
+      // The new project's repository may hold plans; they are offered once the scan answers.
+      const scan: Effect = { type: "loadPlans", project: msg.project.key, reason: "added" };
+      return then(withDialog(added, undefined), [...fx, scan], { name: "settings", project: msg.project.key });
     }
+    case "chainImported":
     case "recheck":
     case "installCli":
     case "cliLoaded":
     case "cliRejected":
-    case "addProject":
+    case "editDraft":
+    case "submitProject":
+    case "repoChecked":
     case "saveProject":
     case "importChain":
     case "checksLoaded":
     case "profilesLoaded":
     case "addRejected":
     case "projectSaved":
-    case "chainImported":
     case "settingsRejected":
       return reduceSettings(s, msg);
+    case "chainCreated": {
+      const [next, fx] = reducePlan(s, msg);
+      return then(next, fx, { name: "projectChain", project: msg.project, chain: msg.chain.chain.name });
+    }
+    case "cardCreated": {
+      const [next, fx] = reducePlan(s, msg);
+      const chain = next.chains[msg.detail.ticket.chain_id];
+      return chain ? then(next, fx, cardRoute(next, chain, msg.detail.ticket)) : [next, fx];
+    }
+    case "projectArchived": {
+      const [next, fx] = reducePlan(s, msg);
+      // The project in focus went out of sight: the page goes home, to the next one.
+      const gone = msg.project.archived && currentProject(s)?.id === msg.project.id;
+      return gone ? then(next, fx, { name: "chains" }) : [next, fx];
+    }
+    case "openDialog":
+    case "closeDialog": {
+      const [next, fx] = reducePlan(s, msg);
+      // A dialog starts clean: no answer or refusal of the last one. The found plans go with a
+      // new dialog or their own; closing another dialog leaves them where they show.
+      const keep = msg.type === "closeDialog" && s.plan.dialog?.kind !== "foundPlans";
+      const found = keep ? next.imports.found : undefined;
+      return [{ ...next, imports: { ...initialImports, found }, removal: initialRemoval }, fx];
+    }
+    case "textImported":
+    case "importAnswered": {
+      const [next, fx] = reduceImports(s, msg);
+      const chain = msg.type === "textImported" ? msg.chain : msg.result.chains[0]?.chain;
+      return chain ? then(next, fx, { name: "projectChain", project: msg.project, chain: chain.chain.name }) : [next, fx];
+    }
+    case "plansImported": {
+      const [next, fx] = reduceImports(s, msg);
+      const f = next.imports.found;
+      if (!f) return [next, fx];
+      // The outcomes stay in sight: in the dialog they were picked in, else in the list's own
+      // (picked in an empty project, whose page turns into the first imported chain).
+      const shown = next.plan.dialog?.kind === "import" || next.plan.dialog?.kind === "foundPlans";
+      const open = shown ? next : withDialog(next, { kind: "foundPlans" });
+      const first = firstImported(f);
+      return first ? then(open, fx, { name: "projectChain", project: f.project, chain: first }) : [open, fx];
+    }
+    case "importText":
+    case "importPath":
+    case "importRefused":
+    case "scanPlans":
+    case "plansScanned":
+    case "scanFailed":
+    case "togglePlan":
+    case "importSelected":
+    case "planImported":
+    case "skipPlans":
+      return reduceImports(s, msg);
+    case "deleteProject":
+    case "deleteRefused":
+      return reduceRemoval(s, msg);
+    case "projectDeleted": {
+      const [next, fx] = reduceRemoval(s, msg);
+      return then(next, fx, { name: "chains" });
+    }
+    case "hashChanged":
+    case "createChain":
+    case "createCard":
+    case "editCard":
+    case "saveCard":
+    case "pickPlace":
+    case "moveCard":
+    case "archiveProject":
+    case "showArchived":
+    case "cardSaved":
+    case "cardMoved":
+    case "planRejected":
+      return reducePlan(s, msg);
     case "checkForUpdates":
     case "restartToUpdate":
     case "restartAnyway":
@@ -116,9 +194,19 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
   }
 }
 
-/// Moves to a route: the URL changes by an effect, never by the reducer itself.
+/// Moves to a route: the URL changes by an effect, never by the reducer itself. A card's edit or
+/// move form stays with the screen it was opened on.
 function go(s: State, route: Route): [State, Effect[]] {
-  return [{ ...s, route }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+  const plan = { ...s.plan, editing: undefined, moving: undefined };
+  return [{ ...s, route, plan }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+}
+
+const withDialog = (s: State, dialog: Dialog | undefined): State => ({ ...s, plan: { ...s.plan, dialog } });
+
+/// The effects of a command's answer, then the move it leads to.
+function then(s: State, fx: Effect[], route: Route): [State, Effect[]] {
+  const [moved, more] = go(s, route);
+  return [moved, [...fx, ...more]];
 }
 
 /// What a screen needs fetched when it opens.
@@ -136,9 +224,15 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq <= s.lastSeq) return [s, []];
   const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
+  if (e.kind === "deleted" && (e.entity === "chain" || e.entity === "project")) {
+    // A deleted project or chain is dropped; a page that showed it goes home.
+    const dropped = e.entity === "chain" ? dropChain(next, e.entity_id) : dropProject(next, e.entity_id);
+    const fx: Effect[] = [{ type: "loadInbox" }, { type: "loadAgents" }];
+    return routeGone(dropped) ? then(dropped, fx, { name: "chains" }) : [dropped, fx];
+  }
   if (e.entity === "project") return [next, [{ type: "loadProjects" }, { type: "loadAgents" }]];
   if (e.entity === "thread") return [next, threadEventEffects(s, ticketOfEvent(e))];
-  const chain = chainOf(s, e);
+  const chain = chainOfEvent(s, e);
   if (!chain) return [next, [{ type: "loadAll" }]];
   const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadInbox" }, { type: "loadAgents" }];
   const ticket = ticketOfEvent(e);
@@ -154,24 +248,4 @@ function threadEventEffects(s: State, key: string | undefined): Effect[] {
     fx.push({ type: "loadThreads", key }, { type: "loadDetail", key });
   }
   return fx;
-}
-
-function chainOf(s: State, e: EventRecord): string | undefined {
-  const p = (e.payload ?? {}) as Record<string, Record<string, unknown> | undefined>;
-  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-  switch (e.entity) {
-    case "chain":
-      return str(p.chain?.id) ?? str(p.edge?.chain_id);
-    case "ticket":
-      return str(p.ticket?.chain_id);
-    case "release":
-      return str(p.release?.chain_id);
-    case "comment":
-    case "subtask": {
-      const ticket = ticketOfEvent(e);
-      return ticket && chainOfTicket(s, ticket);
-    }
-    default:
-      return undefined;
-  }
 }

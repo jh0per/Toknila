@@ -3,12 +3,13 @@
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use toknila_app::removal::{self, Removed};
 use toknila_app::{projects, resolve};
 use toknila_core::{Actor, Project};
 
 use super::system::{check_repo, first_problem};
 use super::{ApiResult, read};
-use crate::http::dto::{NewProject, PatchProject};
+use crate::http::dto::{DeleteProject, NewProject, PatchProject, ProjectDeletion};
 use crate::http::error::{ErrorBody, FormError};
 use crate::server::{AppState, now};
 
@@ -51,6 +52,67 @@ pub async fn get_project(
 ) -> ApiResult<Json<Project>> {
     Ok(Json(
         read(&state, move |repo| Ok(resolve::project(repo, &project)?)).await?,
+    ))
+}
+
+async fn set_archived(
+    state: &AppState,
+    project: String,
+    archived: bool,
+) -> ApiResult<Json<Project>> {
+    let (p, _) = state
+        .store
+        .write(Actor::Human, now(), move |tx| -> ApiResult<Project> {
+            Ok(projects::set_archived(tx, &project, archived)?)
+        })
+        .await?;
+    Ok(Json(p))
+}
+
+#[utoipa::path(post, path = "/projects/{project}/archive", tag = "projects",
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Project), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Hides the project from the sidebar and keeps its data. Refused while its agents work.
+pub async fn archive_project(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+) -> ApiResult<Json<Project>> {
+    set_archived(&state, project, true).await
+}
+
+#[utoipa::path(post, path = "/projects/{project}/unarchive", tag = "projects",
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Project), (status = 404, body = ErrorBody)))]
+/// Brings an archived project back to the sidebar.
+pub async fn unarchive_project(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+) -> ApiResult<Json<Project>> {
+    set_archived(&state, project, false).await
+}
+
+#[utoipa::path(post, path = "/projects/{project}/delete", tag = "projects", request_body = DeleteProject,
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = ProjectDeletion), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Deletes the project: its chains, cards, milestones and everything attached to them, with
+/// their journal entries, in one transaction; refused (409) while any of its agents works. Then
+/// the ships' worktrees are removed from the repository and the cards' run files deleted; with
+/// `trash_folder` the repository folder goes to the system Trash. Nothing else in the repository
+/// is touched: its `ship/*` branches stay. A cleanup step that fails is listed in `warnings` (or
+/// `folder_error`); the deletion stands either way.
+pub async fn delete_project(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+    Json(input): Json<DeleteProject>,
+) -> ApiResult<Json<ProjectDeletion>> {
+    let (removed, _) = state
+        .store
+        .write(Actor::Human, now(), move |tx| -> ApiResult<Removed> {
+            Ok(removal::delete_project(tx, &project)?)
+        })
+        .await?;
+    Ok(Json(
+        crate::cleanup::after_delete(&state, removed, input.trash_folder).await,
     ))
 }
 

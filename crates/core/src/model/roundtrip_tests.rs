@@ -62,6 +62,7 @@ fn project_roundtrips() {
         max_parallel: 2,
         merge: Default::default(),
         check_command: None,
+        archived: false,
     });
 }
 
@@ -75,6 +76,7 @@ fn chain_and_edges_roundtrip() {
         autostart: true,
         review_mode: None,
         reviewer: None,
+        source: None,
     };
     roundtrip(&chain);
     for kind in [EdgeKind::Normal, EdgeKind::AfterRelease] {

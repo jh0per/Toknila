@@ -3,6 +3,8 @@
     "approve",
     "reject"
   ],
+  "can_edit": true,
+  "can_move": false,
   "chain": "demo",
   "comments": [],
   "in_status_ms": 0,

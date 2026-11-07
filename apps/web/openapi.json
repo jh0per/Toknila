@@ -433,6 +433,74 @@
         }
       }
     },
+    "/chains/{chain}/tickets/{ticket}/move": {
+      "post": {
+        "tags": [
+          "chains"
+        ],
+        "summary": "Puts a card directly before or after another card; the dependencies around it are rewired.",
+        "operationId": "move_ticket",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain}/wildcards": {
       "post": {
         "tags": [
@@ -722,6 +790,55 @@
         }
       }
     },
+    "/projects/{project}/archive": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Hides the project from the sidebar and keeps its data. Refused while its agents work.",
+        "operationId": "archive_project",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}/chains": {
       "post": {
         "tags": [
@@ -755,6 +872,65 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/delete": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Deletes the project: its chains, cards, milestones and everything attached to them, with\ntheir journal entries, in one transaction; refused (409) while any of its agents works. Then\nthe ships' worktrees are removed from the repository and the cards' run files deleted; with\n`trash_folder` the repository folder goes to the system Trash. Nothing else in the repository\nis touched: its `ship/*` branches stay. A cleanup step that fails is listed in `warnings` (or\n`folder_error`); the deletion stands either way.",
+        "operationId": "delete_project",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteProject"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDeletion"
                 }
               }
             }
@@ -847,6 +1023,85 @@
         }
       }
     },
+    "/projects/{project}/import-path": {
+      "post": {
+        "tags": [
+          "chains"
+        ],
+        "summary": "Reads a path on this machine and imports what it holds through the ordinary chain import. A\nTOML chain file or a spec folder makes one chain, or fails as a whole with a message that\nnames the path (and, for a `tasks.md`, the line). A folder of spec folders makes one chain per\nspec folder, each on its own, and lists the subfolders it skipped and those that failed. Each\nchain keeps the path it was read from as its `source`.",
+        "operationId": "import_path",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPath"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A folder of spec folders none of which could be imported; see `failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPathResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "At least one chain was imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPathResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}/inbox": {
       "get": {
         "tags": [
@@ -874,6 +1129,86 @@
                   "items": {
                     "$ref": "#/components/schemas/InboxItem"
                   }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/plans": {
+      "get": {
+        "tags": [
+          "chains"
+        ],
+        "summary": "Lists the plans in the project's repository: `specs/*/tasks.md` and `plans/*.toml`, one level\ndeep and never the whole tree, each with its card count and whether a chain of the project\nwas imported from it, and whether the repository has a `.specify/` folder. A project without a\nrepository, or whose folder is gone, has none. Importing one is `import-path` with its `path`.",
+        "operationId": "list_plans",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanScan"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/unarchive": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Brings an archived project back to the sidebar.",
+        "operationId": "unarchive_project",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
                 }
               }
             }
@@ -3153,6 +3488,13 @@
               "null"
             ],
             "description": "Overrides the project's reviewer profile for every ticket that does not set its own."
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The spec folder or chain file the chain was imported from, as an absolute path; `null`\nfor a chain made in Toknila or imported from pasted text."
           }
         }
       },
@@ -3534,6 +3876,16 @@
           }
         }
       },
+      "DeleteProject": {
+        "type": "object",
+        "description": "`POST /v1/projects/{project}/delete`.",
+        "properties": {
+          "trash_folder": {
+            "type": "boolean",
+            "description": "Also move the repository folder to the system Trash. Without it the folder stays."
+          }
+        }
+      },
       "Edge": {
         "type": "object",
         "description": "Dependency edge: `to` cannot start before `from` is done.",
@@ -3648,6 +4000,77 @@
           }
         }
       },
+      "FolderFate": {
+        "type": "string",
+        "description": "What became of a deleted project's repository folder.",
+        "enum": [
+          "kept",
+          "trashed",
+          "none"
+        ]
+      },
+      "FolderNote": {
+        "type": "object",
+        "description": "A subfolder that was not imported.",
+        "required": [
+          "folder",
+          "path",
+          "reason"
+        ],
+        "properties": {
+          "folder": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "description": "Absolute."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why: `no tasks.md`, or the error, which names the file and, for a `tasks.md`, the line."
+          }
+        }
+      },
+      "FoundPlan": {
+        "type": "object",
+        "description": "A plan found in a project's repository.",
+        "required": [
+          "kind",
+          "name",
+          "path",
+          "relative",
+          "imported"
+        ],
+        "properties": {
+          "cards": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Cards an import would make (phases with tasks, or tickets); `null` when the file does not\nparse.",
+            "minimum": 0
+          },
+          "imported": {
+            "type": "boolean",
+            "description": "A chain of the project was imported from this path."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlanKind"
+          },
+          "name": {
+            "type": "string",
+            "description": "The folder's name, or the file's without `.toml`."
+          },
+          "path": {
+            "type": "string",
+            "description": "Absolute path: what `POST /v1/projects/{project}/import-path` takes, and what a chain\nimported from it records as its `source`."
+          },
+          "relative": {
+            "type": "string",
+            "description": "Relative to the repository, with `/`: `specs/001-login`, `plans/phase-1.toml`."
+          }
+        }
+      },
       "HookWiring": {
         "type": "object",
         "description": "How an agent reports through hooks, a second event source: the runner writes a settings file\nunder the data home and passes its path with `settings_flag`.",
@@ -3667,6 +4090,99 @@
           }
         },
         "additionalProperties": false
+      },
+      "ImportPath": {
+        "type": "object",
+        "description": "`POST /v1/projects/{project}/import-path`: what the daemon is to read and import.",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute path of a TOML chain file, of a spec folder (one with `tasks.md`), or of a folder\nwhose subfolders are spec folders."
+          }
+        }
+      },
+      "ImportPathResult": {
+        "type": "object",
+        "description": "Answer of `POST /v1/projects/{project}/import-path`. A chain file or a spec folder makes one\nchain or fails as a whole (400 or 409, the message names the path); a folder of spec folders\nimports each on its own and lists what it skipped and what failed.",
+        "required": [
+          "chains",
+          "skipped",
+          "failed"
+        ],
+        "properties": {
+          "chains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportedChain"
+            },
+            "description": "In folder order."
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FolderNote"
+            },
+            "description": "Spec folders that could not be imported; the others were."
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FolderNote"
+            },
+            "description": "Subfolders without a `tasks.md`."
+          }
+        }
+      },
+      "ImportedChain": {
+        "type": "object",
+        "description": "One chain an import made.",
+        "required": [
+          "folder",
+          "path",
+          "cards",
+          "tasks",
+          "done_cards",
+          "out_of_order",
+          "chain"
+        ],
+        "properties": {
+          "cards": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "chain": {
+            "$ref": "#/components/schemas/ChainDetail",
+            "description": "The new chain, as `POST /v1/projects/{project}/import` answers it."
+          },
+          "done_cards": {
+            "type": "integer",
+            "description": "Cards imported as Merged because all their tasks were checked.",
+            "minimum": 0
+          },
+          "folder": {
+            "type": "string",
+            "description": "The spec folder's or the chain file's name."
+          },
+          "out_of_order": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Done cards that sit behind a card with open tasks, one line each."
+          },
+          "path": {
+            "type": "string",
+            "description": "Where it was read from, absolute; the chain keeps it as its `source`."
+          },
+          "tasks": {
+            "type": "integer",
+            "description": "Subtasks of all cards.",
+            "minimum": 0
+          }
+        }
       },
       "InboxItem": {
         "type": "object",
@@ -3884,6 +4400,23 @@
           "message",
           "changes_requested"
         ]
+      },
+      "MoveInput": {
+        "type": "object",
+        "description": "`POST /v1/chains/{chain}/tickets/{ticket}/move`: put the card directly before or after\nanother card of the chain.",
+        "required": [
+          "anchor",
+          "place"
+        ],
+        "properties": {
+          "anchor": {
+            "type": "string",
+            "description": "Ticket key of the card the moved card goes next to."
+          },
+          "place": {
+            "$ref": "#/components/schemas/Place"
+          }
+        }
       },
       "NewActivity": {
         "type": "object",
@@ -4207,6 +4740,10 @@
               "type": "string"
             },
             "description": "Dependencies: ticket keys or release versions of the same chain."
+          },
+          "at_end": {
+            "type": "boolean",
+            "description": "Put the card after the chain's last cards (what nothing waits for yet) when `after` is\nempty. Without it a card with no `after` has no dependencies and may start at once."
           },
           "needs_secrets": {
             "type": "boolean"
@@ -4661,6 +5198,43 @@
           "implement"
         ]
       },
+      "Place": {
+        "type": "string",
+        "description": "Where a card goes relative to another one.",
+        "enum": [
+          "before",
+          "after"
+        ]
+      },
+      "PlanKind": {
+        "type": "string",
+        "description": "What kind of plan an entry is.",
+        "enum": [
+          "spec_folder",
+          "chain_file"
+        ]
+      },
+      "PlanScan": {
+        "type": "object",
+        "description": "`GET /v1/projects/{project}/plans`: the plans of the project's repository.",
+        "required": [
+          "plans",
+          "specify_dir"
+        ],
+        "properties": {
+          "plans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FoundPlan"
+            },
+            "description": "Sorted by `relative`."
+          },
+          "specify_dir": {
+            "type": "boolean",
+            "description": "The repository has a `.specify/` folder."
+          }
+        }
+      },
       "PriceInfo": {
         "type": "object",
         "description": "Where the cost estimate's prices come from.",
@@ -4764,6 +5338,10 @@
           "merge"
         ],
         "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Hidden from the sidebar; its data is kept and it can be brought back."
+          },
           "check_command": {
             "type": [
               "string",
@@ -4851,6 +5429,61 @@
             "format": "int32",
             "description": "Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.",
             "minimum": 0
+          }
+        }
+      },
+      "ProjectDeletion": {
+        "type": "object",
+        "description": "Answer of `POST /v1/projects/{project}/delete`: the records are gone; what became of the\nfiles around them.",
+        "required": [
+          "project",
+          "chains",
+          "tickets",
+          "worktrees_removed",
+          "folder",
+          "warnings"
+        ],
+        "properties": {
+          "chains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the deleted chains."
+          },
+          "folder": {
+            "$ref": "#/components/schemas/FolderFate",
+            "description": "What became of the repository folder: `kept`, `trashed`, or `none` (no folder)."
+          },
+          "folder_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the folder was not moved to the Trash when that was asked; `null` otherwise."
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project",
+            "description": "The project as it was."
+          },
+          "tickets": {
+            "type": "integer",
+            "description": "How many cards went with them.",
+            "minimum": 0
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Cleanup that failed after the records were deleted (a worktree or run logs left on disk).\nThe deletion stands either way."
+          },
+          "worktrees_removed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The ships' worktrees removed from the repository; their `ship/*` branches stay."
           }
         }
       },
@@ -5159,6 +5792,20 @@
             "items": {
               "$ref": "#/components/schemas/RepoProblem"
             }
+          },
+          "suggested_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The project key the folder suggests; `null` when its name leaves no valid key."
+          },
+          "suggested_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The project name the folder suggests: its base name."
           }
         }
       },
@@ -6062,7 +6709,9 @@
           "in_status_ms",
           "phase",
           "review",
-          "allowed_actions"
+          "allowed_actions",
+          "can_edit",
+          "can_move"
         ],
         "properties": {
           "allowed_actions": {
@@ -6071,6 +6720,14 @@
               "$ref": "#/components/schemas/TicketAction"
             },
             "description": "What a person can do with the ticket now, computed by the state machine."
+          },
+          "can_edit": {
+            "type": "boolean",
+            "description": "Can the title and description still be changed? Decided by core from the status."
+          },
+          "can_move": {
+            "type": "boolean",
+            "description": "Can the card still be moved in the chain? Decided by core from the status."
           },
           "chain": {
             "type": "string"

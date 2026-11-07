@@ -4,6 +4,9 @@ import type {
   AgentRole, AnswerKind, ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, TicketAction, TicketDetail,
   TicketThreads,
 } from "../api/types";
+import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
+import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
+import type { RemovalEffect, RemovalIntent, RemovalResult } from "./removal";
 import type { Route, Tab } from "./route";
 import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
 import type { UpdateEffect, UpdateIntent, UpdateResult } from "./updates";
@@ -20,6 +23,9 @@ export type Intent =
   | CardCommand
   | ThreadAction
   | SettingsIntent
+  | PlanIntent
+  | ImportIntent
+  | RemovalIntent
   | UpdateIntent
   | UsageIntent;
 
@@ -60,6 +66,9 @@ export type Msg =
   | { type: "event"; event: EventRecord }
   | { type: "urlChanged"; route: Route }
   | SettingsResult
+  | PlanResult
+  | ImportResult
+  | RemovalResult
   | UpdateResult
   | UsageResult;
 
@@ -76,6 +85,9 @@ export type Effect =
   | CardCommand
   | ThreadAction
   | SettingsEffect
+  | PlanEffect
+  | ImportEffect
+  | RemovalEffect
   | UpdateEffect
   | UsageEffect
   | { type: "connect"; since: number; delayMs: number }

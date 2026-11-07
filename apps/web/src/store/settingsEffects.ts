@@ -22,7 +22,7 @@ async function addProject(e: Extract<SettingsEffect, { type: "addProject" }>, di
     return;
   }
   const project = await post<Project>("/projects", {
-    key, name: name.trim() || undefined, repo_path, work_branch,
+    key, name: name || undefined, repo_path, work_branch,
   });
   dispatch({ type: "projectAdded", project });
 }
@@ -30,6 +30,12 @@ async function addProject(e: Extract<SettingsEffect, { type: "addProject" }>, di
 /// Runs one effect of these screens; failures become a `settingsRejected` message.
 export function runSettingsEffect(e: SettingsEffect, dispatch: Dispatch): void {
   switch (e.type) {
+    case "checkRepo":
+      // Only for the suggestion; a failure here shows when the form is sent.
+      post<RepoCheck>("/repos/check", { repo_path: e.repo_path, work_branch: e.work_branch })
+        .then((check) => dispatch({ type: "repoChecked", repo_path: e.repo_path, check }))
+        .catch(() => undefined);
+      return;
     case "loadChecks":
       get<SystemChecks>("/system/checks")
         .then((checks) => dispatch({ type: "checksLoaded", checks }))
@@ -61,7 +67,7 @@ export function runSettingsEffect(e: SettingsEffect, dispatch: Dispatch): void {
       return;
     case "importChain":
       post<ChainDetail>(`/projects/${encodeURIComponent(e.project)}/import`, { toml: e.toml })
-        .then((d) => dispatch({ type: "chainImported", chain: d.chain.name }))
+        .then((d) => dispatch({ type: "chainImported", project: e.project, chain: d.chain.name }))
         .catch((err) => reject(dispatch, err));
       return;
   }

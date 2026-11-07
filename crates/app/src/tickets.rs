@@ -34,6 +34,10 @@ pub struct NewTicket {
     pub needs_secrets: bool,
     #[serde(default)]
     pub paused: bool,
+    /// Put the card after the chain's last cards (what nothing waits for yet) when `after` is
+    /// empty. Without it a card with no `after` has no dependencies and may start at once.
+    #[serde(default)]
+    pub at_end: bool,
 }
 
 /// Adds a ticket to a chain. The ticket and its edges land together, then the chain settles
@@ -66,12 +70,20 @@ pub fn create<U: UnitOfWork + ?Sized>(
     };
     let t = Ticket::new_backlog(TicketId::new(), c.id, key, draft, uow.now());
     let id = t.id;
-    let after = input.after;
+    let (after, at_end) = (input.after, input.at_end);
     with_chain(uow, c.id, move |ctx| -> AppResult<()> {
-        let deps = after
+        let mut deps = after
             .iter()
             .map(|a| resolve::node(&ctx.view, a))
             .collect::<AppResult<Vec<_>>>()?;
+        if at_end && deps.is_empty() {
+            deps = ctx
+                .view
+                .tail_tickets()
+                .into_iter()
+                .map(NodeRef::Ticket)
+                .collect();
+        }
         ctx.add_ticket(t);
         for from in deps {
             ctx.add_edge(Edge {
@@ -94,6 +106,16 @@ pub fn create<U: UnitOfWork + ?Sized>(
 
 /// Changes a ticket's plain fields.
 pub fn edit<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, patch: TicketPatch) -> AppResult<()> {
+    if !t.status.can_edit() {
+        return Err(AppError::conflict(format!(
+            "{} is {}; a finished card cannot be edited",
+            t.key,
+            toknila_core::wire::wire_name(&t.status).unwrap_or_default()
+        )));
+    }
+    if patch.title.as_deref().is_some_and(|v| v.trim().is_empty()) {
+        return Err(AppError::bad_request("ticket title is empty"));
+    }
     with_chain(uow, t.chain_id, |ctx| {
         Ok(ctx.edit_ticket(t.id, |t| patch.apply(t))?)
     })

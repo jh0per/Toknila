@@ -5,6 +5,8 @@ import type {
   ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
+import { runImportEffect } from "./importEffects";
+import { runPlanEffect } from "./planEffects";
 import { runSettingsEffect } from "./settingsEffects";
 import { runUpdateEffect } from "./updatesEffects";
 import { runUsageEffect } from "./usageEffects";
@@ -13,6 +15,9 @@ type Dispatch = (msg: Msg) => void;
 
 /// Coalesces bursts of refreshes (one command journals several events).
 const DEBOUNCE_MS = 50;
+
+/// Waits for a pause in typing before the folder field asks for a suggestion.
+const TYPING_MS = 250;
 
 const ACTION_PATH = { message: "messages", changes: "changes", approve: "approve" } as const;
 
@@ -48,6 +53,16 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     }, ms);
     pending.set(key, t);
     timers.add(t);
+  };
+  /// Like `later`, but a new call replaces the waiting one, so the last arguments win.
+  const debounce = (key: string, f: () => void, ms: number) => {
+    const old = pending.get(key);
+    if (old !== undefined) {
+      clearTimeout(old);
+      timers.delete(old);
+      pending.delete(key);
+    }
+    later(key, f, ms);
   };
   const failed = (e: unknown) =>
     dispatch({ type: "loadFailed", error: String(e instanceof Error ? e.message : e) });
@@ -153,6 +168,24 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "saveProject":
       case "importChain":
         runSettingsEffect(e, dispatch);
+        return;
+      case "checkRepo":
+        debounce("checkRepo", () => runSettingsEffect(e, dispatch), TYPING_MS);
+        return;
+      case "createChain":
+      case "createCard":
+      case "saveCard":
+      case "moveCard":
+      case "archiveProject":
+      case "clearHash":
+        runPlanEffect(e, dispatch);
+        return;
+      case "importText":
+      case "importPath":
+      case "loadPlans":
+      case "importPlans":
+      case "deleteProject":
+        runImportEffect(e, dispatch);
         return;
       case "watchUpdates":
         stopWatch = runUpdateEffect(e, dispatch);

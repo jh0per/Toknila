@@ -5,6 +5,7 @@ pub mod agents;
 pub mod chains;
 pub mod events;
 pub mod inbox;
+pub mod plans;
 pub mod profiles;
 pub mod projects;
 pub mod questions;
@@ -69,6 +70,8 @@ fn load_ticket_detail(
         usage: figures(&rows, prices),
         review,
         allowed_actions: toknila_core::machine::TicketAction::allowed(&t),
+        can_edit: t.status.can_edit(),
+        can_move: t.status.can_move(),
         subtasks: repo.subtasks(t.id)?,
         comments: repo.comments(t.id)?,
         in_status_ms: at.millis_since(t.status_since),

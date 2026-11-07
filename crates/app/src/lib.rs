@@ -20,6 +20,7 @@ pub mod projects;
 pub mod questions;
 pub mod recovery;
 pub mod releases;
+pub mod removal;
 pub mod resolve;
 pub mod reviews;
 pub mod runner;

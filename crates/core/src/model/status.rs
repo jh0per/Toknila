@@ -72,6 +72,17 @@ impl TicketStatus {
         matches!(self, Self::Merged | Self::Released | Self::Cancelled)
     }
 
+    /// Can a person still change the card's title and description? Not once it is in the work
+    /// branch or dropped.
+    pub fn can_edit(self) -> bool {
+        !self.is_done()
+    }
+
+    /// Can a person still reorder the card or change what it waits for? Only before it starts.
+    pub fn can_move(self) -> bool {
+        matches!(self, Self::Backlog | Self::Ready)
+    }
+
     /// Statuses where the chain is waiting on a person (shown as "needs a human").
     pub fn needs_human(self) -> bool {
         matches!(

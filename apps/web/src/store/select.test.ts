@@ -47,8 +47,49 @@ describe("routes", () => {
     const [s, fx] = reduce(loaded(), { type: "navigate", route: { name: "chain", chain: "other" } });
     expect(fx).toEqual([{ type: "pushUrl", path: "/chains/other" }]);
     expect(currentChain(s)?.chain.id).toBe("c2");
-    const [back] = reduce(s, { type: "urlChanged", route: { name: "chains" } });
+    const [back] = reduce(s, { type: "urlChanged", route: { name: "inbox" } });
     expect(currentChain(back)).toBeUndefined();
+  });
+});
+
+describe("the chain shown without a pick", () => {
+  const at = (route: Parameters<typeof initialState>[0], events: EventRecord[] = []) => {
+    const [s] = reduce(initialState(route), {
+      type: "loaded",
+      projects,
+      chains: [chain("c1", "demo", "DEMO", ["t1", "t2"]), chain("c2", "other", "OTH", ["t3"])],
+    });
+    return { ...s, events };
+  };
+
+  it("is the project's first chain when the journal says nothing about them", () => {
+    expect(currentChain(at({ name: "project", project: "DEMO" }))?.chain.id).toBe("c1");
+    expect(currentChain(at({ name: "chains" }))?.chain.id).toBe("c1");
+  });
+
+  it("is the most recently active one: the chain of the newest journal entry", () => {
+    const events = [
+      event(1, "ticket", "status_changed", { ticket: { id: "t3", chain_id: "c2" } }),
+      event(2, "comment", "added", { comment: { ticket_id: "t3" } }),
+    ];
+    expect(currentChain(at({ name: "project", project: "DEMO" }, events))?.chain.id).toBe("c2");
+    const later = [...events, event(3, "chain", "updated", { chain: { id: "c1" } })];
+    expect(currentChain(at({ name: "project", project: "DEMO" }, later))?.chain.id).toBe("c1");
+  });
+
+  it("is none for a project without chains, and a picked chain wins", () => {
+    expect(currentChain(at({ name: "project", project: "OTHER" }))).toBeUndefined();
+    expect(currentChain(at({ name: "projectChain", project: "DEMO", chain: "other" }))?.chain.id).toBe("c2");
+  });
+
+  it("belongs to the first project that is not archived, at home", () => {
+    const [s] = reduce(initialState({ name: "chains" }), {
+      type: "loaded",
+      projects: [{ ...projects[0], archived: true }, projects[1]],
+      chains: [chain("c1", "demo", "DEMO", ["t1"])],
+    });
+    expect(currentProject(s)?.key).toBe("OTHER");
+    expect(currentChain(s)).toBeUndefined();
   });
 });
 

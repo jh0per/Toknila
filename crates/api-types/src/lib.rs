@@ -3,8 +3,11 @@
 //! in `toknila-app` and are re-exported here; this crate adds the read models, errors and journal
 //! entries.
 
+mod plans;
 pub mod questions;
+mod removal;
 pub mod runner;
+mod system;
 mod usage;
 
 use std::collections::BTreeMap;
@@ -19,7 +22,10 @@ use toknila_core::{
     Ship, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
 };
 
+pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedChain};
 pub use questions::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
+pub use removal::{DeleteProject, ProjectDeletion};
+pub use system::{CliLink, RepoCheckRequest};
 pub use toknila_app::chains::NewChain;
 pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;
@@ -29,6 +35,8 @@ pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;
 pub use toknila_core::TicketPatch as PatchTicket;
 pub use toknila_core::agent::{AgentEvent, Proposal, ReleaseEvent};
+pub use toknila_core::plans::{FoundPlan, PlanKind, PlanScan};
+pub use toknila_core::removal::FolderFate;
 pub use toknila_core::usage::UsageFigures;
 pub use usage::{PriceInfo, QuotaReport, UsageSettings, UsageView};
 
@@ -105,6 +113,10 @@ pub struct TicketDetail {
     pub review: ReviewView,
     /// What a person can do with the ticket now, computed by the state machine.
     pub allowed_actions: Vec<TicketAction>,
+    /// Can the title and description still be changed? Decided by core from the status.
+    pub can_edit: bool,
+    /// Can the card still be moved in the chain? Decided by core from the status.
+    pub can_move: bool,
     /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
     pub queue_position: Option<u32>,
     /// Tokens the card's agents used and their estimated cost at API list prices; all zero
@@ -213,6 +225,16 @@ pub struct EdgeInput {
     pub kind: EdgeKind,
 }
 
+/// `POST /v1/chains/{chain}/tickets/{ticket}/move`: put the card directly before or after
+/// another card of the chain.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MoveInput {
+    /// Ticket key of the card the moved card goes next to.
+    pub anchor: String,
+    pub place: toknila_core::graph::Place,
+}
+
 /// Body of ticket actions. `text` is required by block, return and cancel.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -306,14 +328,6 @@ impl From<(ReleaseId, TicketId)> for ReleaseMember {
     }
 }
 
-/// A chain file: body of `POST /v1/projects/{project}/import`, answer of
-/// `GET /v1/chains/{chain}/export`.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ChainFile {
-    pub toml: String,
-}
-
 impl ChainDetail {
     /// The read model of a chain at `at`: its graph, its summary and its nodes in order.
     pub fn from_view(view: ChainView, at: Timestamp) -> Self {
@@ -349,32 +363,6 @@ pub struct ErrorBody {
     /// is about one field; a form shows the message next to that field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
-}
-
-/// `POST /v1/repos/check`: the folder a person is about to make a project of.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RepoCheckRequest {
-    pub repo_path: String,
-    /// The base branch to look for; default `develop`.
-    pub work_branch: Option<String>,
-}
-
-/// `GET /v1/system/cli` and `POST /v1/system/cli/install`: the version of Toknila, the `tok`
-/// command that ships next to the daemon and whether it is linked into `~/.local/bin`.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CliLink {
-    /// Version of the running daemon.
-    pub version: String,
-    /// The `tok` binary next to the daemon, when there is one.
-    pub bundled: Option<String>,
-    /// Where the link goes (`~/.local/bin/tok`), when the home folder is known.
-    pub link: Option<String>,
-    /// The link exists and points at the bundled `tok`.
-    pub installed: bool,
-    /// The link's folder is on the daemon's `PATH`.
-    pub on_path: bool,
 }
 
 /// One journal entry. `seq` is increasing; clients resume from it.

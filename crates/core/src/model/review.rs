@@ -153,6 +153,7 @@ mod tests {
             max_parallel: 2,
             merge: Default::default(),
             check_command: None,
+            archived: false,
         };
         let chain = Chain {
             id: ChainId::new(),
@@ -162,6 +163,7 @@ mod tests {
             autostart: true,
             review_mode: None,
             reviewer: None,
+            source: None,
         };
         let ticket = Ticket::new_backlog(
             TicketId::new(),

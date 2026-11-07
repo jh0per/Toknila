@@ -68,6 +68,11 @@ impl Store {
 }
 
 impl Store {
+    /// The shipyard the store's commands make ships in; `None` when tickets run without ships.
+    pub fn shipyard(&self) -> Option<Yard> {
+        self.yard.clone()
+    }
+
     /// Looks at a ship's worktree on a blocking thread, outside any transaction, and judges it
     /// (`finished` is refused when the work is not committed). A store without a shipyard has no
     /// ships, so there is nothing to refuse.

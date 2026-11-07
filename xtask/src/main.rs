@@ -128,6 +128,8 @@ fn e2e_web() -> Result<(), String> {
     };
     run("node", &["e2e/smoke.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/settings.mjs", &exe("tok")], &web)?;
+    run("node", &["e2e/planning.mjs", &exe("tok")], &web)?;
+    run("node", &["e2e/plans.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/inbox.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/usage.mjs", &exe("tok")], &web)?;
     run(

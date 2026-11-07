@@ -1,6 +1,7 @@
 use super::*;
 use crate::{ChainId, ProjectId, WaitingReason};
 
+mod moves;
 mod wildcard;
 
 const T: Timestamp = Timestamp(1_000);
@@ -44,6 +45,7 @@ impl Builder {
             autostart,
             review_mode: None,
             reviewer: None,
+            source: None,
         };
         let view = ChainView {
             chain,

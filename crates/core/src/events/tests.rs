@@ -330,3 +330,50 @@ fn question_events_carry_the_ticket_the_role_and_what_was_asked_or_answered() {
         json!({"key": "DEMO-1", "ticket": "01JBQ7ZJ0000000000000000T1", "role": "reviewer", "answer": "deny"})
     );
 }
+
+#[test]
+fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
+    let project = crate::Project {
+        id: "01JBQ7ZJ0000000000000000P1".parse().expect("id"),
+        key: "DEMO".parse().expect("key"),
+        name: "Demo".to_owned(),
+        repo_path: Some("/w/demo".to_owned()),
+        work_branch: "develop".to_owned(),
+        release_branch: "main".to_owned(),
+        default_profile: "sim".to_owned(),
+        default_review_mode: crate::ReviewMode::Human,
+        default_reviewer: None,
+        max_parallel: 2,
+        merge: Default::default(),
+        check_command: None,
+        archived: false,
+    };
+    let chain = crate::Chain {
+        id: "01JBQ7ZJ0000000000000000C1".parse().expect("id"),
+        project_id: project.id,
+        name: "auth".to_owned(),
+        goal: String::new(),
+        autostart: true,
+        review_mode: None,
+        reviewer: None,
+        source: Some("/w/demo/specs/001-auth".to_owned()),
+    };
+    let gone = DomainEvent::ProjectDeleted {
+        project: project.clone(),
+    };
+    assert_eq!(
+        (gone.entity(), gone.kind(), gone.entity_id().as_str()),
+        ("project", "deleted", "01JBQ7ZJ0000000000000000P1")
+    );
+    assert_eq!(
+        payload(&gone),
+        json!({ "project": serde_json::to_value(&project).expect("project") })
+    );
+    let gone = DomainEvent::ChainDeleted { chain };
+    assert_eq!(
+        (gone.entity(), gone.kind(), gone.entity_id().as_str()),
+        ("chain", "deleted", "01JBQ7ZJ0000000000000000C1")
+    );
+    assert_eq!(payload(&gone)["chain"]["name"], "auth");
+    assert_eq!(payload(&gone)["chain"]["source"], "/w/demo/specs/001-auth");
+}

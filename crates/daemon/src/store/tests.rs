@@ -8,6 +8,8 @@ use toknila_core::{
 
 use super::*;
 
+mod removal;
+
 const NOW: Timestamp = Timestamp(42);
 
 fn project() -> Project {
@@ -24,6 +26,7 @@ fn project() -> Project {
         max_parallel: 2,
         merge: Default::default(),
         check_command: None,
+        archived: false,
     }
 }
 
@@ -36,6 +39,7 @@ fn chain(project: ProjectId) -> Chain {
         autostart: true,
         review_mode: Some(ReviewMode::Both),
         reviewer: None,
+        source: None,
     }
 }
 
@@ -496,7 +500,10 @@ async fn ticket_numbers_are_reserved_per_project() {
 async fn chain_view_saves_and_loads_without_loss() {
     let (_dir, store) = open_temp();
     let p = project();
-    let c = chain(p.id);
+    let c = Chain {
+        source: Some("/w/demo/specs/001-demo".to_owned()),
+        ..chain(p.id)
+    };
     let mut a = ticket(c.id, 1);
     a.status = TicketStatus::Merged;
     let mut b = ticket(c.id, 2);

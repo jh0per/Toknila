@@ -96,6 +96,8 @@ fn normalize(v: &mut Value) {
                     || k == "at";
                 if clock && x.is_number() {
                     *x = Value::from(0);
+                } else if k == "source" && x.is_string() {
+                    *x = Value::from("<path>");
                 } else {
                     normalize(x);
                 }
@@ -203,6 +205,9 @@ fn spec_folder_round_trip() {
     );
     let chain = tok.json(&["chain", "show", FOLDER]);
     assert_eq!(chain["chain"]["autostart"], false);
+    // The daemon read the folder, and the chain remembers which one.
+    let source = chain["chain"]["source"].as_str().expect("source");
+    assert!(source.ends_with(FOLDER), "{source}");
     snapshot("spec_import_chain_show", chain);
     let story = tok.json(&["show", "SPEC-3"]);
     assert_eq!(story["subtasks"][0]["done"], true);

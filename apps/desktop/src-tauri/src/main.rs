@@ -5,6 +5,7 @@
 // No console window next to the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod menu;
 mod path;
 mod takeover;
 mod update;
@@ -16,6 +17,8 @@ use tauri_plugin_shell::ShellExt;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .menu(menu::build)
+        .on_menu_event(|app, event| menu::on_event(app, event.id()))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             updater::update_status,

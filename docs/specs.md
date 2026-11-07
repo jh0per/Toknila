@@ -43,6 +43,11 @@ goes on after a failure; the command exits non-zero if any folder failed. Import
 chain already exists is refused. A malformed task line (`- [y] ...`, `- [ ]` without text) or a
 task under a later `#` heading is an error naming the file and line.
 
+The daemon reads the folders (`POST /v1/projects/{project}/import-path` with the absolute path),
+so the window imports the same way, and each chain remembers its folder as `source`.
+`GET /v1/projects/{project}/plans` lists the spec folders under `specs/` and the chain files under
+`plans/` of the project's repository and marks the ones already imported.
+
 ## Export
 
 `tok chain export <chain> --spec <folder>` patches `<folder>/tasks.md`, it does not rewrite it:

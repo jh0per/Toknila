@@ -90,7 +90,8 @@ impl Drop for Tok {
     }
 }
 
-/// Replaces what differs between runs (ids, clocks) with fixed values, keeping every key.
+/// Replaces what differs between runs (ids, clocks, the temporary folder an imported chain came
+/// from) with fixed values, keeping every key.
 fn normalize(v: &mut Value) {
     match v {
         Value::Object(m) => {
@@ -102,6 +103,8 @@ fn normalize(v: &mut Value) {
                     || k == "at";
                 if clock && x.is_number() {
                     *x = Value::from(0);
+                } else if k == "source" && x.is_string() {
+                    *x = Value::from("<path>");
                 } else {
                     normalize(x);
                 }
