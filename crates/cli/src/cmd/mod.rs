@@ -3,6 +3,7 @@
 
 mod agent;
 mod chain;
+mod chain_rm;
 mod hook;
 mod logs;
 mod mcp;

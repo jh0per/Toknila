@@ -234,3 +234,39 @@ async fn a_deleted_project_leaves_no_row_and_no_journal_entry_and_the_other_keep
         .expect("read");
     assert_eq!((count(&store, "usage_records").await, tied), (2, 1));
 }
+
+#[tokio::test]
+async fn a_deleted_chain_leaves_no_row_but_its_project_and_the_other_project_keeps_all() {
+    let (_dir, store) = open_temp();
+    store
+        .write(Actor::Human, NOW, |tx| {
+            fill(tx, "GONE")?;
+            fill(tx, "KEPT")
+        })
+        .await
+        .expect("fill");
+    let full = rows(&store).await;
+    let chain = store
+        .read(|repo| repo.chains_named("GONE-chain"))
+        .await
+        .expect("read")[0]
+        .id;
+    store
+        .write(Actor::Human, NOW, move |tx| tx.repo().delete_chain(chain))
+        .await
+        .expect("delete");
+    let after = rows(&store).await;
+    for ((table, before), (_, now)) in full.iter().zip(&after) {
+        let expected = if *table == "projects" {
+            *before
+        } else {
+            before / 2
+        };
+        assert_eq!(*now, expected, "{table}");
+    }
+    assert_eq!(
+        count(&store, "events").await,
+        9,
+        "the project's own entry stays with the kept project's eight"
+    );
+}

@@ -34,7 +34,8 @@ pub enum DomainEvent {
     ChainUpdated {
         chain: Chain,
     },
-    /// The chain went with its project, cards and milestones included; `chain` is how it was.
+    /// The chain was deleted (alone, or with its project), cards and milestones included; `chain`
+    /// is how it was.
     ChainDeleted {
         chain: Chain,
     },

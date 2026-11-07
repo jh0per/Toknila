@@ -28,6 +28,18 @@ impl ChainView {
         self.ticket(card).is_some_and(|t| t.status.can_move())
     }
 
+    /// May a person add or remove a dependency that ends at `to` (the node that waits)? What a
+    /// card waits for can only change before it starts; a milestone only while it is planned.
+    pub fn check_dependency_change(&self, to: NodeRef) -> Result<(), GraphError> {
+        match self.started(to) {
+            None => Ok(()),
+            Some(state) => Err(GraphError::DependencyLocked {
+                node: self.label(to),
+                state,
+            }),
+        }
+    }
+
     /// The cards a new card is appended after: the tickets nothing waits for, ignoring
     /// cancelled ones and cards still proposed.
     pub fn tail_tickets(&self) -> Vec<TicketId> {

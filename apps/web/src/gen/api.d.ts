@@ -50,7 +50,14 @@ export interface paths {
         get: operations["get_chain"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Deletes the chain with its cards, milestones and everything attached to them, and their
+         *     journal entries, in one transaction; refused (409) while an agent works on one of its cards,
+         *     naming them. Then the ships' checkouts are removed from the repository and the cards' run
+         *     files deleted. The repository folder and its `ship/*` branches stay. A cleanup step that
+         *     fails is listed in `warnings`; the deletion stands either way.
+         */
+        delete: operations["delete_chain"];
         options?: never;
         head?: never;
         /**
@@ -1097,6 +1104,22 @@ export interface components {
              *     for a chain made in Toknila or imported from pasted text.
              */
             source?: string | null;
+        };
+        /**
+         * @description Answer of `DELETE /v1/chains/{chain}`: the chain and its cards are gone; what became of the
+         *     files around them. The repository folder and the `ship/*` branches stay.
+         */
+        ChainDeletion: {
+            /** @description The chain as it was. */
+            chain: components["schemas"]["Chain"];
+            /** @description Key of the project it belonged to. */
+            project: string;
+            /** @description How many cards went with it. */
+            tickets: number;
+            /** @description Cleanup that failed after the records were deleted. The deletion stands either way. */
+            warnings: string[];
+            /** @description The ships' worktrees removed from the repository. */
+            worktrees_removed: string[];
         };
         /** @description A chain with its graph and computed status. */
         ChainDetail: {
@@ -2520,6 +2543,47 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_chain: {
+        parameters: {
+            query?: {
+                /** @description Project id or key, when two projects have a chain of this name */
+                project?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDeletion"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -267,6 +267,12 @@ impl UnitOfWork for Mem {
         }
         Ok(())
     }
+    fn delete_chain(&mut self, id: ChainId) -> AppResult<()> {
+        if self.view.chain.id == id {
+            self.delete_project(self.project.id)?;
+        }
+        Ok(())
+    }
     fn insert_chain(&mut self, c: &Chain) -> AppResult<()> {
         self.view = ChainView {
             chain: c.clone(),

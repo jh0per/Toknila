@@ -89,6 +89,10 @@ impl UnitOfWork for WriteTx<'_> {
         Ok(self.repo().delete_project(project)?)
     }
 
+    fn delete_chain(&mut self, chain: ChainId) -> AppResult<()> {
+        Ok(self.repo().delete_chain(chain)?)
+    }
+
     fn insert_chain(&mut self, chain: &Chain) -> AppResult<()> {
         Ok(self.repo().insert_chain(chain)?)
     }

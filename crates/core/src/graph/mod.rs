@@ -55,6 +55,8 @@ pub enum GraphError {
     StillProposed(String),
     #[error("{node} is already {state}; a card can only go before work that has not started")]
     BeforeStarted { node: String, state: String },
+    #[error("{node} is already {state}; what it waits for can no longer change")]
+    DependencyLocked { node: String, state: String },
     #[error("{0} is not a proposed card")]
     NotProposed(String),
 }

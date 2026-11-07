@@ -24,7 +24,7 @@ use toknila_core::{
 
 pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedChain};
 pub use questions::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
-pub use removal::{DeleteProject, ProjectDeletion};
+pub use removal::{ChainDeletion, DeleteProject, ProjectDeletion};
 pub use system::{CliLink, RepoCheckRequest};
 pub use toknila_app::chains::NewChain;
 pub use toknila_app::projects::{NewProject, PatchProject};

@@ -14,7 +14,8 @@ export type Dialog =
   | { kind: "newCard"; chain: string }
   | { kind: "import"; project: string }
   | { kind: "foundPlans" }
-  | { kind: "deleteProject"; project: string };
+  | { kind: "deleteProject"; project: string }
+  | { kind: "deleteChain"; chain: string };
 
 /// The form a refusal belongs to.
 export type PlanForm = "chain" | "card" | "edit" | "move" | "archive";

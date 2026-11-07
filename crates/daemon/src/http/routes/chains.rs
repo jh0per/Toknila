@@ -5,12 +5,14 @@ use std::collections::HashMap;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use toknila_app::removal::{self, Removed};
 use toknila_app::{chains, resolve, reviews};
 use toknila_core::Actor;
 
 use super::{ApiResult, chain_write, load_chain_detail, read, stamp};
 use crate::http::dto::{
-    ChainDetail, ChainFile, ChainItem, EdgeInput, MoveInput, NewChain, ReviewSettings,
+    ChainDeletion, ChainDetail, ChainFile, ChainItem, EdgeInput, MoveInput, NewChain,
+    ReviewSettings,
 };
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -116,6 +118,32 @@ pub async fn patch_chain(
     })
     .await?;
     Ok(Json(detail))
+}
+
+#[utoipa::path(delete, path = "/chains/{chain}", tag = "chains",
+    params(("chain" = String, Path, description = "Chain id or name"),
+        ("project" = Option<String>, Query, description = "Project id or key, when two projects have a chain of this name")),
+    responses((status = 200, body = ChainDeletion), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Deletes the chain with its cards, milestones and everything attached to them, and their
+/// journal entries, in one transaction; refused (409) while an agent works on one of its cards,
+/// naming them. Then the ships' checkouts are removed from the repository and the cards' run
+/// files deleted. The repository folder and its `ship/*` branches stay. A cleanup step that
+/// fails is listed in `warnings`; the deletion stands either way.
+pub async fn delete_chain(
+    State(state): State<AppState>,
+    Path(chain): Path<String>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<ChainDeletion>> {
+    let project = q.get("project").cloned();
+    let (removed, _) = state
+        .store
+        .write(Actor::Human, now(), move |tx| -> ApiResult<Removed> {
+            Ok(removal::delete_chain(tx, &chain, project.as_deref())?)
+        })
+        .await?;
+    Ok(Json(
+        crate::cleanup::after_chain_delete(&state, removed).await,
+    ))
 }
 
 #[utoipa::path(post, path = "/chains/{chain}/edges", tag = "chains", request_body = EdgeInput,

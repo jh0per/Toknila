@@ -102,3 +102,24 @@ fn the_tail_is_the_cards_nothing_waits_for() {
     b.view.tickets[2].status = TicketStatus::Cancelled;
     assert_eq!(b.view.tail_tickets(), [tid(x)]);
 }
+
+#[test]
+fn what_a_card_waits_for_can_change_only_before_it_starts() {
+    let mut b = Builder::new(false);
+    let c = line(&mut b, 3);
+    assert_eq!(b.view.check_dependency_change(c[1]), Ok(()));
+    b.view.tickets[1].status = TicketStatus::Running;
+    b.view.tickets[2].status = TicketStatus::Merged;
+    assert_eq!(
+        b.view.check_dependency_change(c[1]),
+        Err(GraphError::DependencyLocked {
+            node: "DEMO-2".to_owned(),
+            state: "running".to_owned()
+        })
+    );
+    assert!(matches!(
+        b.view.check_dependency_change(c[2]),
+        Err(GraphError::DependencyLocked { .. })
+    ));
+    assert_eq!(b.view.check_dependency_change(c[0]), Ok(()));
+}

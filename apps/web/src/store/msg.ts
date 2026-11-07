@@ -4,6 +4,7 @@ import type {
   AgentRole, AnswerKind, ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, TicketAction, TicketDetail,
   TicketThreads,
 } from "../api/types";
+import type { EdgeEffect, EdgeIntent, EdgeResult } from "./edges";
 import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
 import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
 import type { RemovalEffect, RemovalIntent, RemovalResult } from "./removal";
@@ -26,6 +27,7 @@ export type Intent =
   | PlanIntent
   | ImportIntent
   | RemovalIntent
+  | EdgeIntent
   | UpdateIntent
   | UsageIntent;
 
@@ -69,6 +71,7 @@ export type Msg =
   | PlanResult
   | ImportResult
   | RemovalResult
+  | EdgeResult
   | UpdateResult
   | UsageResult;
 
@@ -88,6 +91,7 @@ export type Effect =
   | PlanEffect
   | ImportEffect
   | RemovalEffect
+  | EdgeEffect
   | UpdateEffect
   | UsageEffect
   | { type: "connect"; since: number; delayMs: number }

@@ -1,6 +1,7 @@
 import { KIND_TITLE, itemKey, itemRoute } from "../store/inbox";
 import type { Intent } from "../store/msg";
 import { type State, cardRoute, chainsOf, currentChain, currentProject, runningAgents } from "../store/state";
+import { useChainMenu } from "./ChainMenu";
 import { NavLink } from "./Link";
 import { SidebarProjects } from "./SidebarProjects";
 import { UsageChip } from "./UsageChip";
@@ -10,6 +11,7 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
   const chain = currentChain(state);
   const waiting = state.inbox;
   const running = runningAgents(state);
+  const chainMenu = useChainMenu(dispatch);
   return (
     <nav className="sidebar" aria-label="Sidebar">
       <div className="brand">
@@ -41,7 +43,7 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
         </h2>
         <ul>
           {chainsOf(state, project).map((c) => (
-            <li key={c.chain.id}>
+            <li key={c.chain.id} data-chain-item={c.chain.name} onContextMenu={chainMenu.open(c)}>
               <NavLink
                 route={{ name: "projectChain", project: project?.key ?? "", chain: c.chain.name }}
                 dispatch={dispatch}
@@ -53,6 +55,7 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
             </li>
           ))}
         </ul>
+        {chainMenu.menu}
       </section>
 
       <section className="sec">

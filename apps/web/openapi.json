@@ -108,6 +108,62 @@
           }
         }
       },
+      "delete": {
+        "tags": [
+          "chains"
+        ],
+        "summary": "Deletes the chain with its cards, milestones and everything attached to them, and their\njournal entries, in one transaction; refused (409) while an agent works on one of its cards,\nnaming them. Then the ships' checkouts are removed from the repository and the cards' run\nfiles deleted. The repository folder and its `ship/*` branches stay. A cleanup step that\nfails is listed in `warnings`; the deletion stands either way.",
+        "operationId": "delete_chain",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "description": "Project id or key, when two projects have a chain of this name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDeletion"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "chains"
@@ -3529,6 +3585,46 @@
               "null"
             ],
             "description": "The spec folder or chain file the chain was imported from, as an absolute path; `null`\nfor a chain made in Toknila or imported from pasted text."
+          }
+        }
+      },
+      "ChainDeletion": {
+        "type": "object",
+        "description": "Answer of `DELETE /v1/chains/{chain}`: the chain and its cards are gone; what became of the\nfiles around them. The repository folder and the `ship/*` branches stay.",
+        "required": [
+          "chain",
+          "project",
+          "tickets",
+          "worktrees_removed",
+          "warnings"
+        ],
+        "properties": {
+          "chain": {
+            "$ref": "#/components/schemas/Chain",
+            "description": "The chain as it was."
+          },
+          "project": {
+            "type": "string",
+            "description": "Key of the project it belonged to."
+          },
+          "tickets": {
+            "type": "integer",
+            "description": "How many cards went with it.",
+            "minimum": 0
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Cleanup that failed after the records were deleted. The deletion stands either way."
+          },
+          "worktrees_removed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The ships' worktrees removed from the repository."
           }
         }
       },

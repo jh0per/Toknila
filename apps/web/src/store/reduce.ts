@@ -3,6 +3,7 @@
 import type { EventRecord } from "../api/types";
 import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
+import { reduceEdges } from "./edges";
 import { type Dialog, reducePlan, withChain } from "./plan";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
@@ -158,8 +159,22 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "skipPlans":
       return reduceImports(s, msg);
     case "deleteProject":
+    case "deleteChain":
     case "deleteRefused":
       return reduceRemoval(s, msg);
+    case "chainDeleted": {
+      const [next, fx] = reduceRemoval(s, msg);
+      // The chain on screen is gone: back to its project.
+      return routeGone(next) ? then(next, fx, { name: "project", project: msg.deletion.project }) : [next, fx];
+    }
+    case "selectEdge":
+    case "dismissEdgeError":
+    case "addEdge":
+    case "moveEdge":
+    case "removeEdge":
+    case "edgesChanged":
+    case "edgeRefused":
+      return reduceEdges(s, msg);
     case "projectDeleted": {
       const [next, fx] = reduceRemoval(s, msg);
       return then(next, fx, { name: "chains" });
