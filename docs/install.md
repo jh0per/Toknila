@@ -24,11 +24,13 @@ macOS quarantines it; right-click the app and choose Open once, or run
 Everything the app needs is inside it: the daemon and `tok` in `Contents/MacOS`, the web page and
 the price table inside the daemon binary. The hooks, the MCP server and the status line that
 Toknila writes for an agent call the daemon by its absolute path inside the app (paths with spaces
-are quoted), so after you move or replace the app, restart the daemon (see Updating).
+are quoted). A new build takes over by itself: see Updating.
 
 ### First run
 
-Opening the app starts the daemon (or attaches to one that runs) and opens its window. On an empty
+Opening the app starts the daemon and opens its window. If a daemon of the same version from this
+app's own binary already runs, the app attaches to it; if one of another version or from another
+copy of the app runs (after an update), the app stops it first and starts its own. On an empty
 data home the window shows onboarding: it checks `git`, `claude` and `gh`, each with a hint when
 something is missing, then asks for the repository of your first project and its base branch.
 After that, import a chain file or add cards, and set the limits and review mode in Settings. The
@@ -70,10 +72,12 @@ to `toknila.db` and start the app. A database written by a newer Toknila is refu
 
 ### Updating
 
-Pull the new version, run `cargo xtask app`, quit the app, stop its daemon (`tok daemon stop`) and
-replace `/Applications/Toknila.app` with the new one (drag from the new `.dmg` and choose
-Replace). The data home is kept; the new daemon migrates it on its first start, after the
-automatic backup above. Then start the app again.
+Pull the new version, run `cargo xtask app` and replace `/Applications/Toknila.app` with the new
+one (drag from the new `.dmg` and choose Replace). Then open it: the old daemon is stopped by the
+new app (it waits up to 10 seconds for the old one to exit) and the new one starts, so there is no
+step to do by hand. Agents the old daemon was running end with it. If the old daemon does not stop
+in time, the window says so and names it; run `tok daemon stop` and open the app again. The data
+home is kept; the new daemon migrates it on its first start, after the automatic backup above.
 
 ### Removing it
 

@@ -93,6 +93,7 @@ fn daemon_info_roundtrips_through_file() {
         token: new_token().expect("token"),
         version: "0.0.1".into(),
         started_at: 1,
+        exe: Some("/app/toknila".into()),
     };
     assert_eq!(info.token.len(), 64);
     info.write(&path).expect("write");

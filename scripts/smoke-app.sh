@@ -56,14 +56,23 @@ got="$("$tok" --version)"
 echo "$got"
 case "$got" in *"$want"*) ;; *) fail "expected version $want";; esac
 
-step "launch the app with TOKNILA_HOME=$home"
+step "an old daemon is running (same version, another binary), then launch the app"
+mkdir -p "$tmp/old"
+cp "$app/Contents/MacOS/toknila" "$tmp/old/toknila"
+TOKNILA_HOME="$home" "$tmp/old/toknila" daemon start
+old_pid="$(TOKNILA_HOME="$home" "$tok" daemon status --json | sed -n 's/.*"pid": *\([0-9]*\).*/\1/p')"
+[ -n "$old_pid" ] || fail "the old daemon did not start"
+echo "old daemon pid $old_pid from $tmp/old/toknila"
+echo "launch the app with TOKNILA_HOME=$home"
 open -n --env "TOKNILA_HOME=$home" "$app"
-
-for _ in $(seq 1 60); do
-  [ -f "$home/daemon.json" ] && break
+# The app must stop the old daemon and start its own, from the bundle.
+for _ in $(seq 1 80); do
+  if TOKNILA_HOME="$home" "$tok" daemon status --json 2>/dev/null | grep -qF "\"exe\":\"$app/Contents/MacOS/toknila\""; then took=1; break; fi
   sleep 0.5
 done
-[ -f "$home/daemon.json" ] || fail "the daemon did not start (no daemon.json in the temp home)"
+[ -n "${took:-}" ] || fail "the app did not take over from the old daemon"
+kill -0 "$old_pid" 2>/dev/null && fail "the old daemon (pid $old_pid) is still alive"
+echo "the app replaced the old daemon"
 pgrep -f "$app/Contents/MacOS/toknila-desktop" >/dev/null || fail "the app is not running"
 
 step "daemon status and /healthz"

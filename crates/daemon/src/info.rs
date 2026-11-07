@@ -13,6 +13,9 @@ pub struct DaemonInfo {
     pub token: String,
     pub version: String,
     pub started_at: i64,
+    /// Path of the daemon binary; absent in files written by versions before 0.2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exe: Option<String>,
 }
 
 impl DaemonInfo {
