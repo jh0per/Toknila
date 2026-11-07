@@ -668,6 +668,15 @@ every ship made from it. Onboarding (step 3) and Settings say so, as a one-time 
 person. A data-home folder such as `<home>/ships` would not do: a ship is itself a repository
 checkout, and trust is not inherited into a nested repository.
 
+*Windows gap in the tests.* The arrow keys are written to the terminal as the VT sequences
+`ESC [ A` and `ESC [ B`, which is what an agent that reads its input in VT mode (as Claude Code's
+interface does) receives from ConPTY. The fake agent reads a plain console line, and ConPTY turns
+those sequences into console key events that a line read never returns (the CI log showed
+`trust=no` after a Down and Enter). Reading key events needs the Windows console API, which means
+`unsafe` FFI outside the one audited file, so the runner test of the trust screen runs on Unix
+ptys only; core's tests cover the bytes each answer sends on every OS, and Windows with a real
+agent has not been exercised.
+
 **Leftovers.** One item per earlier card, naming the cards done before it. The decision is
 `POST /v1/tickets/{ticket}/leftovers/{move|close|leave}` on that earlier card; a person only, and
 `409` when nothing is left to decide. The rules are `inbox::leftovers` in core:
