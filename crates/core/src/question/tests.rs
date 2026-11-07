@@ -191,11 +191,10 @@ fn an_unchanged_screen_is_not_raised_again_until_the_grace_has_passed() {
 }
 
 #[test]
-fn a_changed_screen_counts_from_the_answer() {
+fn a_changed_screen_is_there_at_once_so_several_keys_can_follow() {
     let run = answered_run("Another dialog\n", "Trust this folder?\n");
-    assert!(!run.waits_on_screen(Timestamp(100_000 + 19_999)));
-    assert!(run.waits_on_screen(Timestamp(100_000 + 20_000)));
-    assert_eq!(run.waiting_since(), Timestamp(120_000));
+    assert!(run.waits_on_screen(Timestamp(100_001)));
+    assert_eq!(run.waiting_since(), Timestamp(100_000));
 }
 
 #[test]

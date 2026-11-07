@@ -121,19 +121,18 @@ try {
   await page.getByLabel("Type to QA-3").fill("yes");
   await row("QA-3").getByRole("button", { name: "Send" }).click();
   await until("the agent got the text", () => logs("QA-3").includes("got:yes"));
-  await row("QA-3").waitFor({ state: "detached", timeout: 10_000 });
+  await expectText(row("QA-3").locator("[data-testid=screen]"), "got:yes", "the changed screen is listed again");
   console.log("PASS text typed from the inbox reached the agent's terminal");
 
-  // The trust dialog's options are not numbered: the arrow quick key and Enter choose "Yes".
+  // The trust dialog's options are not numbered: the arrow quick key and Enter choose "Yes". The
+  // fake agent reads the arrow from a Unix pty only (a Windows console line read never sees it).
   await expectText(row("QA-4").locator("[data-testid=screen]"), "Yes, I trust this folder", "the trust dialog is shown");
-  await row("QA-4").locator("[data-testid=answer-down]").click();
-  await row("QA-4").locator("[data-testid=answer-enter]").click();
-  await until("the agent chose Yes", () => logs("QA-4").includes("trust=yes"));
-  await row("QA-4").waitFor({ state: "detached", timeout: 10_000 });
-  // The screen did not come back unchanged: the item stays away for a while.
-  await sleep(3_000);
-  if ((await row("QA-4").count()) !== 0) throw new Error("the answered screen item came back");
-  console.log("PASS the arrow quick key and Enter answered the trust dialog, and it stayed answered");
+  if (process.platform !== "win32") {
+    await row("QA-4").locator("[data-testid=answer-down]").click();
+    await row("QA-4").locator("[data-testid=answer-enter]").click();
+    await until("the agent chose Yes", () => logs("QA-4").includes("trust=yes"));
+    console.log("PASS the arrow quick key and Enter answered the trust dialog");
+  }
 
   // A reviewer that ends its turns without a verdict: the card goes to the person.
   tok("review-mode", "agent", "--ticket", "QA-5");
@@ -160,7 +159,9 @@ try {
   const res = await fetch(`${origin}/v1/events?since=0&limit=10000`, { headers: { Authorization: `Bearer ${token}` } });
   const answered = (await res.json()).filter((e) => e.kind === "question_answered");
   const seen = answered.map((e) => `${e.actor}:${e.payload.key}:${e.payload.role}:${e.payload.answer}`).sort();
-  const want = ["human:QA-1:worker:allow", "human:QA-2:worker:deny", "human:QA-3:worker:text", "human:QA-4:worker:down", "human:QA-4:worker:enter"];
+  const want = ["human:QA-1:worker:allow", "human:QA-2:worker:deny", "human:QA-3:worker:text"];
+  if (process.platform !== "win32") want.push("human:QA-4:worker:down", "human:QA-4:worker:enter");
+  want.sort();
   if (JSON.stringify(seen) !== JSON.stringify(want)) throw new Error(`journal: ${JSON.stringify(seen)}`);
   console.log("PASS the journal records who answered, for which role");
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);

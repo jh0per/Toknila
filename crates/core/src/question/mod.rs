@@ -183,22 +183,26 @@ impl RunFacts {
         let Some(answer) = self.answered else {
             return waits_on_screen(self.spawned, self.first_activity, now, self.startup_secs);
         };
-        // After an answer the wait starts over from it; and while the screen is still the one
-        // the answer was given to, the item stays quiet for a longer grace period.
+        // After an answer, a screen that is still the one it was given to is not raised again
+        // for a longer grace period (the keys changed nothing; do not nag). A screen that has
+        // changed is something new to look at, so the item is there at once: a person who
+        // answers with several keys (a Down, then Enter) must not wait between them.
         let unchanged = screen_hash(&self.tail) == answer.screen;
         let grace = ANSWER_GRACE_SECS.saturating_mul(1000);
         if unchanged && now.millis_since(answer.at) < grace {
             return false;
         }
-        waits_on_screen(answer.at, self.first_activity, now, self.startup_secs)
+        waits_on_screen(self.spawned, self.first_activity, now, self.startup_secs)
     }
 
-    /// When the item for this run began: the startup time after the spawn or the last answer.
+    /// When the item for this run began: the startup time after the spawn, or the last answer.
     pub fn waiting_since(&self) -> Timestamp {
-        let from = self.answered.map_or(self.spawned, |a| a.at);
-        Timestamp(
-            from.0
-                .saturating_add(i64::try_from(self.startup_secs.saturating_mul(1000)).unwrap_or(0)),
+        self.answered.map_or_else(
+            || {
+                let wait = i64::try_from(self.startup_secs.saturating_mul(1000)).unwrap_or(0);
+                Timestamp(self.spawned.0.saturating_add(wait))
+            },
+            |a| a.at,
         )
     }
 }

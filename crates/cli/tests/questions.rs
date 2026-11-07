@@ -224,8 +224,11 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
     wait_until("the agent to get the text", || {
         logs(&tok.home, "DEMO-1").contains("got:yes")
     });
-    assert!(
-        questions(&client).is_empty(),
-        "an answer starts the wait over"
-    );
+    // The screen changed with the answer and the agent still shows no sign of life: the new
+    // screen is listed at once (several keys can follow one another).
+    wait_until("the changed screen", || {
+        questions(&client)
+            .first()
+            .is_some_and(|q| q.lines.iter().any(|l| l.contains("got:yes")))
+    });
 }

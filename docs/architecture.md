@@ -651,8 +651,8 @@ last 15 lines of the run's output, ANSI removed (`question::last_lines`), for ei
 matches the text of the screen, so it is not specific to one agent. The item goes with the first
 sign of life. After an answer by keys the wait starts over from it (`RunFacts::answered`: when,
 and a hash of the screen it was given to, `question::screen_hash`), and while the screen is still
-that one the item stays away for `ANSWER_GRACE_SECS` (60 s); a changed screen counts from the
-answer as a new dialog. Core decides from `answered`, the screen hash and `now`. Toknila never
+that one the item stays away for `ANSWER_GRACE_SECS` (60 s); a changed screen is listed at once,
+so an answer of several keys (Down, then Enter) is not held up between them. Core decides from `answered`, the screen hash and `now`. Toknila never
 edits an agent's own configuration to skip such dialogs.
 
 **The folder trust dialog.** Its options are not numbered, so `1` and `2` do nothing and Enter
