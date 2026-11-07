@@ -15,7 +15,10 @@ cargo xtask app
 
 It builds the web page in release mode, the daemon (`toknila`) and the `tok` command in release
 mode and the window shell, then assembles `dist/app/Toknila.app` and
-`dist/app/Toknila-<version>.dmg` and prints both paths. To install, open the `.dmg` and drag
+`dist/app/Toknila-<version>-<arch>.dmg` (`aarch64` or `x86_64`) and prints both paths. It also
+packs the update archive (see Updates and releases below); without the signing key it says it
+skipped signing, and the build is otherwise the same. `cargo xtask app --target
+x86_64-apple-darwin` builds for the other architecture. To install, open the `.dmg` and drag
 Toknila onto Applications (or `cp -R` the `.app` there). Because the app was built here and never
 downloaded, macOS does not ask. If you copy the `.dmg` to another Mac through a browser or AirDrop,
 macOS quarantines it; right-click the app and choose Open once, or run
@@ -72,12 +75,14 @@ to `toknila.db` and start the app. A database written by a newer Toknila is refu
 
 ### Updating
 
-Pull the new version, run `cargo xtask app` and replace `/Applications/Toknila.app` with the new
-one (drag from the new `.dmg` and choose Replace). Then open it: the old daemon is stopped by the
-new app (it waits up to 10 seconds for the old one to exit) and the new one starts, so there is no
-step to do by hand. Agents the old daemon was running end with it. If the old daemon does not stop
-in time, the window says so and names it; run `tok daemon stop` and open the app again. The data
-home is kept; the new daemon migrates it on its first start, after the automatic backup above.
+An app installed from a release updates itself: see Updates and releases below. A build made
+with `cargo xtask app` updates by hand: run it again and replace `/Applications/Toknila.app` with
+the new one (drag from the new `.dmg` and choose Replace). Either way the new app, once opened,
+stops the old daemon (it waits up to 10 seconds for the old one to exit) and starts its own, so
+there is no step to do by hand. Agents the old daemon was running end with it. If the old daemon
+does not stop in time, the window says so and names it; run `tok daemon stop` and open the app
+again. The data home is kept; the new daemon migrates it on its first start, after the automatic
+backup above.
 
 ### Removing it
 
@@ -96,6 +101,82 @@ the worktree command of your version control tool, run in its repository.
 `scripts/smoke-app.sh` mounts the `.dmg`, copies the app to a temporary folder, launches it against
 a temporary data home, checks the daemon, the version, a project and a card made with the bundled
 `tok`, and that no process is left after quitting. It does not touch your data home.
+
+## Updates and releases
+
+### How the app updates
+
+The app looks for a newer version when it starts and every 6 hours after, at
+`https://github.com/jh0per/Toknila/releases/latest/download/latest.json`, and downloads it in the
+background. It installs only an archive whose signature verifies against the public key built into
+the app (`plugins.updater.pubkey` in `apps/desktop/src-tauri/tauri.conf.json`), so a changed
+address or a swapped file cannot make it install something that was not signed with the release
+key.
+
+When an update is downloaded, a quiet note appears in the corner of the window: "Toknila X.Y.Z is
+ready", with a short release note, **Restart to update** and **Later**. Later hides that version's
+note until the app is opened again or a newer one arrives. If agents are running, Restart first
+says "N agents are running; restarting stops them" and offers **Restart anyway** or **Later**. The
+app never restarts on its own while agents run. After the restart the new app replaces the old
+daemon (see Updating). Settings, About shows the current version, the time of the last check and a
+**Check for updates** button. Nothing is installed without a restart, and nothing is sent
+anywhere but a request for `latest.json` and the archive.
+
+An update replaces `Toknila.app` where it is. If that folder needs an administrator (for example
+`/Applications` owned by another user), macOS asks for the password.
+
+### Cutting a release
+
+Versions are `X.Y.Z`; a new one is cut after each batch of merged changes.
+
+```sh
+cargo xtask bump 0.2.1          # sets the version everywhere, refreshes the lock files and openapi.json
+git switch -c release-0.2.1 && git commit -am "Release 0.2.1"
+# open a pull request, wait for green, merge it; then on main:
+git tag v0.2.1 && git push origin v0.2.1
+```
+
+The tag starts the Release workflow. It checks that the tag equals the version, builds the command
+line archives for macOS (both architectures), Linux and Windows, builds the Mac app for Apple
+silicon and Intel, signs each `Toknila-<version>-<arch>.app.tar.gz` with the updater key from the
+repository secrets, writes `latest.json` and the release notes (the titles of the pull requests
+merged since the previous tag) and publishes the release with the `.dmg` files, the archives,
+the `.sig` files, `latest.json` and `SHA256SUMS.txt`. A release whose archives are not signed
+fails instead of publishing. Pushes to `main` only build; pull requests run `ci.yml` (the gate on
+three systems and the desktop build), not the release builds.
+
+`cargo xtask app` signs the update archive when `TAURI_SIGNING_PRIVATE_KEY` (and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) are set and skips it, saying so, when they are not. The
+signing itself is done by the official Tauri signer (`tauri signer sign`, a pinned version of
+`@tauri-apps/cli` run through `npx`), so the signature format is the one the app verifies.
+
+### Where the signing key lives
+
+The updater key pair was generated once with `tauri signer generate`. The private key and its
+password are in `~/.toknila-release/` on the maintainer's Mac (`updater.key`, `updater.password`;
+folder mode 700, files mode 600) and in the repository's Actions secrets
+`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Only the public key is in
+the repository. Back up the folder somewhere private; never commit it, paste it into an issue or
+print it in a log.
+
+If the key is lost or leaks: generate a new pair (`npx @tauri-apps/cli signer generate -w
+~/.toknila-release/updater.key`), replace both secrets with `gh secret set`, put the new public
+key in `tauri.conf.json` and cut a release. Apps that carry the old public key cannot verify
+anything signed with the new key, so every installed copy needs one manual reinstall from the new
+`.dmg`; after that updates work again. Until then, a leaked key lets its holder sign updates the
+old apps accept, so replace the secrets first.
+
+### Testing the updater
+
+`scripts/smoke-update.sh` builds version 9.0.0 and 9.0.1 from temporary copies of the working
+tree, signs 9.0.1 with a throwaway test key, serves it from a local server and runs 9.0.0 from a
+temporary folder with a temporary data home. It checks that a tampered archive is downloaded but
+not installed, and that the intact one is installed, the app relaunches as 9.0.1 and the new
+daemon replaces the old one. It never uses the release key and never touches `/Applications` or
+your data home. Two environment variables exist for it: `TOKNILA_UPDATE_ENDPOINT` replaces the
+release address (harmless in a release build: the signature is still checked against the built-in
+key, and plain `http` is refused unless the build allows it, which only the test builds do) and
+`TOKNILA_UPDATE_AUTO_RESTART=1` restarts once an update is ready and no agent runs.
 
 ## macOS, plain binaries
 

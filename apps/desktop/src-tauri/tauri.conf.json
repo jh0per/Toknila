@@ -7,6 +7,7 @@
     "frontendDist": "../static"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [],
     "security": {
       "csp": null
@@ -17,5 +18,11 @@
     "targets": "all",
     "icon": ["icons/icon.png"],
     "externalBin": ["binaries/toknila", "binaries/tok"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY4MzY1Q0EzQjI1MzQxOTEKUldTUlFWT3lvMXcyK0wxc1BURWd6SzFYT1FSU1VHYlFUSUVwVmhIQ1VIbGVYVmdZUFh5L1dVOSsK",
+      "endpoints": ["https://github.com/jh0per/Toknila/releases/latest/download/latest.json"]
+    }
   }
 }

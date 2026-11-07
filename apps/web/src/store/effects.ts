@@ -6,6 +6,7 @@ import type {
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { runSettingsEffect } from "./settingsEffects";
+import { runUpdateEffect } from "./updatesEffects";
 import { runUsageEffect } from "./usageEffects";
 
 type Dispatch = (msg: Msg) => void;
@@ -34,6 +35,7 @@ function cardRequest(e: CardCommand): [string, unknown] {
 export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; stop: () => void } {
   let ws: WebSocket | null = null;
   let stopped = false;
+  let stopWatch: (() => void) | undefined;
   const timers = new Set<number>();
   const pending = new Map<string, number>();
 
@@ -152,6 +154,13 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "importChain":
         runSettingsEffect(e, dispatch);
         return;
+      case "watchUpdates":
+        stopWatch = runUpdateEffect(e, dispatch);
+        return;
+      case "checkForUpdates":
+      case "restartToUpdate":
+        runUpdateEffect(e, dispatch);
+        return;
       case "loadUsage":
       case "saveUsageSettings":
         if (e.type === "loadUsage") later("usage", () => runUsageEffect(e, dispatch), DEBOUNCE_MS);
@@ -181,6 +190,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     stopped = true;
     for (const t of timers) clearTimeout(t);
     ws?.close();
+    stopWatch?.();
   };
   return { run, stop };
 }

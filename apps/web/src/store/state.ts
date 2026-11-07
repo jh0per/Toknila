@@ -5,6 +5,7 @@ import type {
 } from "../api/types";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
+import { type UpdatesState, initialUpdates } from "./updates";
 import { type UsageState, initialUsage } from "./usage";
 
 export type Link = "connecting" | "live" | "offline";
@@ -39,6 +40,8 @@ export interface State {
   settings: SettingsState;
   /// The Usage page: window, metric and the daemon's answer.
   usage: UsageState;
+  /// Updates of the desktop app (empty in a browser).
+  updates: UpdatesState;
 }
 
 export const FIRST_RETRY_MS = 500;
@@ -64,6 +67,7 @@ export function initialState(route: Route): State {
     tab: "details",
     settings: initialSettings,
     usage: initialUsage,
+    updates: initialUpdates,
   };
 }
 

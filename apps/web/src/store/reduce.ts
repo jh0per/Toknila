@@ -4,13 +4,14 @@ import type { EventRecord } from "../api/types";
 import type { Effect, Msg } from "./msg";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
+import { reduceUpdates } from "./updates";
 import { loadUsage, reduceUsage } from "./usage";
 import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, chainOfTicket, ticketOfEvent } from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
   switch (msg.type) {
     case "started":
-      return [s, [{ type: "fetchTail" }]];
+      return [s, [{ type: "fetchTail" }, { type: "watchUpdates" }]];
     case "journalTail":
       // The first load already has the state up to this event; the stream starts after it.
       return [
@@ -98,6 +99,14 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "chainImported":
     case "settingsRejected":
       return reduceSettings(s, msg);
+    case "checkForUpdates":
+    case "restartToUpdate":
+    case "restartAnyway":
+    case "updateLater":
+    case "updateViewLoaded":
+    case "updateWarned":
+    case "updateFailed":
+      return reduceUpdates(s, msg);
     case "setUsageDays":
     case "setUsageMetric":
     case "setMachineScan":
