@@ -12,6 +12,7 @@ use toknila_core::{Ship, ShipLook, ShipSpec};
 
 use crate::git::Git;
 
+mod base;
 mod inspect;
 
 /// Makes and removes ships with the `git` on the path.
@@ -92,10 +93,6 @@ impl Shipyard for GitShipyard {
         }
         // A worktree deleted by hand stays registered and would block the new one.
         self.git(repo, ["worktree", "prune"])?;
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| ShipError::Io(format!("cannot create {}: {e}", parent.display())))?;
-        }
         let branch_ref = format!("refs/heads/{}", spec.branch);
         let branch_exists =
             self.succeeds(repo, ["rev-parse", "--verify", "--quiet", &branch_ref])?;
@@ -116,12 +113,20 @@ impl Shipyard for GitShipyard {
             if !start_ok {
                 return Err(ShipError::BaseBranchMissing(start));
             }
+            if !spec.remote {
+                // Local mode starts from the local base: not from months-old code unnoticed.
+                self.check_base(spec)?;
+            }
             args.extend([
                 "-b".to_owned(),
                 spec.branch.clone(),
                 path_text(&path),
                 start,
             ]);
+        }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| ShipError::Io(format!("cannot create {}: {e}", parent.display())))?;
         }
         self.git(repo, &args)?;
         Ok(path_text(&path))
@@ -147,5 +152,7 @@ impl Shipyard for GitShipyard {
     }
 }
 
+#[cfg(test)]
+mod stale_tests;
 #[cfg(test)]
 mod tests;

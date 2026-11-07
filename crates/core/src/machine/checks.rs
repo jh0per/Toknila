@@ -1,7 +1,7 @@
 //! Small guards the transition table shares.
 
-use super::{Effect, TransitionError};
-use crate::{Actor, BlockedReason, StatusReason, Ticket, TicketStatus};
+use super::{Effect, TicketEvent, TransitionError};
+use crate::{Actor, BlockedReason, StalePolicy, StatusReason, Ticket, TicketStatus};
 
 /// Wildcard decisions belong to a person; an agent or the system cannot make them.
 pub fn person_only(by: Actor, event: &'static str) -> Result<(), TransitionError> {
@@ -33,6 +33,7 @@ pub(super) fn block(
         BlockedReason::Crashed { .. }
             | BlockedReason::RunnerLost
             | BlockedReason::ShipFailed { .. }
+            | BlockedReason::BaseBehind { .. }
             | BlockedReason::NoWorkingDir
     ) {
         effects.push(Effect::StopRunner);
@@ -48,6 +49,31 @@ pub(super) fn block(
             },
         }),
     ))
+}
+
+/// The policy a person's start decision gives, when the ticket is blocked because its base branch
+/// is behind and the decision is possible; `None` means the event does not apply.
+pub(super) fn stale_start(event: &TicketEvent, ticket: &Ticket) -> Option<StalePolicy> {
+    let Some(StatusReason::Blocked {
+        reason: BlockedReason::BaseBehind {
+            can_fast_forward, ..
+        },
+        ..
+    }) = &ticket.status_reason
+    else {
+        return None;
+    };
+    match event {
+        TicketEvent::StartAnyway => Some(StalePolicy::Allow),
+        TicketEvent::FastForwardStart if *can_fast_forward => Some(StalePolicy::FastForward),
+        _ => None,
+    }
+}
+
+/// [`run_on_ship`] after a person decided about a base branch that is behind.
+pub(super) fn run_on_ship_with(effects: &mut Vec<Effect>, stale: StalePolicy) {
+    effects.push(Effect::PrepareShipWith { stale });
+    effects.push(Effect::EnsureRunner);
 }
 
 /// The ticket works on its ship: make sure it exists, then (re)start the runner there.

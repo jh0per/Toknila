@@ -3,7 +3,9 @@
 
 use std::path::Path;
 
-use toknila_core::plans::{self, Content, PlanDir, PlanScan, SPECIFY_DIR};
+use toknila_core::plans::{self, Content, PlanDir, PlanScan, SPECIFY_DIR, WorkingCopyBehind};
+
+use crate::git::Git;
 
 use super::{canonical, text};
 
@@ -45,7 +47,31 @@ pub fn scan(repo: Option<&str>, sources: &[String]) -> PlanScan {
             ));
         }
     }
-    plans::scan(found, root.join(SPECIFY_DIR).is_dir())
+    let mut scan = plans::scan(found, root.join(SPECIFY_DIR).is_dir());
+    scan.behind = behind(&root);
+    scan
+}
+
+/// How far the working copy's branch is behind its upstream, from what was fetched last; `None`
+/// when it is not, has no upstream, or `git` cannot say. Nothing is fetched here.
+pub(crate) fn behind(root: &Path) -> Option<WorkingCopyBehind> {
+    let git = Git::new("git");
+    let repo = root.to_string_lossy();
+    let branch = git
+        .run(&repo, &["symbolic-ref", "--short", "-q", "HEAD"])
+        .ok()?;
+    let upstream = git
+        .run(&repo, &["rev-parse", "--abbrev-ref", "@{upstream}"])
+        .ok()?;
+    let count = git
+        .run(&repo, &["rev-list", "--count", "HEAD..@{upstream}"])
+        .ok()?;
+    let behind: u32 = count.parse().ok().filter(|n| *n > 0)?;
+    Some(WorkingCopyBehind {
+        branch,
+        upstream,
+        behind,
+    })
 }
 
 /// What is at a plan file: its text, or that it is missing or cannot be read.

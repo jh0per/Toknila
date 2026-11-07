@@ -78,8 +78,17 @@ pub enum Command {
     Resume { ticket: String },
     /// Block a ticket, with a reason.
     Block { ticket: String, reason: String },
-    /// Unblock a ticket; it returns to where it was.
-    Unblock { ticket: String },
+    /// Unblock a ticket; it returns to where it was. A card whose base branch is behind its
+    /// upstream can instead start after a fast-forward (`--fast-forward`) or as it is (`--anyway`).
+    Unblock {
+        ticket: String,
+        /// Fast-forward the base branch to its upstream, then start.
+        #[arg(long, conflicts_with = "anyway")]
+        fast_forward: bool,
+        /// Start from the base branch as it is.
+        #[arg(long)]
+        anyway: bool,
+    },
     /// Accept a ticket in Review: it becomes Merged (Done). Remarks are optional.
     Accept {
         ticket: String,
@@ -239,7 +248,18 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
         Command::Block { ticket, reason } => {
             ticket::act(&c, &ticket, "block", Some(&reason), json_out)
         }
-        Command::Unblock { ticket } => ticket::act(&c, &ticket, "unblock", None, json_out),
+        Command::Unblock {
+            ticket,
+            fast_forward,
+            anyway,
+        } => {
+            let action = match (fast_forward, anyway) {
+                (true, _) => "fast_forward_start",
+                (_, true) => "start_anyway",
+                _ => "unblock",
+            };
+            ticket::act(&c, &ticket, action, None, json_out)
+        }
         Command::Accept { ticket, comment } => {
             ticket::act(&c, &ticket, "accept", comment.as_deref(), json_out)
         }

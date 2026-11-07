@@ -35,7 +35,7 @@ pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;
 pub use toknila_core::TicketPatch as PatchTicket;
 pub use toknila_core::agent::{AgentEvent, Proposal, ReleaseEvent};
-pub use toknila_core::plans::{FoundPlan, PlanKind, PlanScan};
+pub use toknila_core::plans::{FoundPlan, PlanKind, PlanScan, WorkingCopyBehind};
 pub use toknila_core::removal::FolderFate;
 pub use toknila_core::usage::UsageFigures;
 pub use usage::{PriceInfo, QuotaReport, UsageSettings, UsageView};

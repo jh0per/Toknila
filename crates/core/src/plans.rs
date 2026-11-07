@@ -84,6 +84,35 @@ pub struct PlanScan {
     pub plans: Vec<FoundPlan>,
     /// The repository has a `.specify/` folder.
     pub specify_dir: bool,
+    /// The plans are read from the working copy; when its branch is behind its upstream they may
+    /// be older than the upstream's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub behind: Option<WorkingCopyBehind>,
+}
+
+/// The working copy's branch is behind its upstream (as of the last fetch).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkingCopyBehind {
+    pub branch: String,
+    /// `origin/main`.
+    pub upstream: String,
+    pub behind: u32,
+}
+
+impl WorkingCopyBehind {
+    /// "main is 133 commits behind origin/main".
+    pub fn note(&self) -> String {
+        let commits = if self.behind == 1 {
+            "commit"
+        } else {
+            "commits"
+        };
+        format!(
+            "{} is {} {commits} behind {}",
+            self.branch, self.behind, self.upstream
+        )
+    }
 }
 
 /// What the host found where an entry's plan text should be.
@@ -173,7 +202,11 @@ pub fn found(
 /// The answer of a scan: the plans sorted by their relative path.
 pub fn scan(mut plans: Vec<FoundPlan>, specify_dir: bool) -> PlanScan {
     plans.sort_by(|a, b| a.relative.cmp(&b.relative));
-    PlanScan { plans, specify_dir }
+    PlanScan {
+        plans,
+        specify_dir,
+        behind: None,
+    }
 }
 
 /// Do two absolute paths name the same place? A trailing separator does not count; the host

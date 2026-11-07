@@ -82,16 +82,28 @@ fn mcp_config(bin: &Path) -> Value {
     }}})
 }
 
-/// The settings file: the hooks and the status line of [`hook_settings`], and the profile's allow
-/// rules, when it has any for this project, are what the agent may do without asking.
+/// The permission rule that denies the tool which starts subagents (`Agent` in the permissions
+/// reference). A card is done by one agent, visible in its terminal.
+const DENY_SUBAGENTS: &str = "Agent";
+
+/// The environment switch for auto memory (the memory page), set next to the settings key.
+const AUTO_MEMORY_OFF: (&str, &str) = ("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1");
+
+/// The settings file of every role: auto memory off (a ship is a worktree of the person's own
+/// repository, whose personal notes were written for another session), the subagent tool denied,
+/// the hooks and the status line of [`hook_settings`], and the profile's allow rules, when it has
+/// any for this project, are what the agent may do without asking.
 fn settings(bin: &Path, hooks: bool, rules: &[String]) -> Value {
     let mut out = serde_json::Map::new();
     if hooks && let Value::Object(h) = hook_settings(bin) {
         out.extend(h);
     }
+    out.insert("autoMemoryEnabled".to_owned(), json!(false));
+    let mut permissions = json!({ "deny": [DENY_SUBAGENTS] });
     if !rules.is_empty() {
-        out.insert("permissions".to_owned(), json!({ "allow": rules }));
+        permissions["allow"] = json!(rules);
     }
+    out.insert("permissions".to_owned(), permissions);
     Value::Object(out)
 }
 
@@ -172,6 +184,12 @@ pub(super) fn prepare_with(
             .to_owned(),
         ),
     ]);
+    // Set here, after the scrub of inherited variables, so the owner's shell cannot turn it on.
+    if profile.hooks.settings_flag.is_some() {
+        wiring
+            .env
+            .push((AUTO_MEMORY_OFF.0.to_owned(), AUTO_MEMORY_OFF.1.to_owned()));
+    }
     let files = [
         (
             profile.mcp.enabled,
@@ -180,7 +198,7 @@ pub(super) fn prepare_with(
             mcp_config(cx.bin),
         ),
         (
-            profile.hooks.enabled || !rules.is_empty(),
+            true,
             profile.hooks.settings_flag.as_deref(),
             "settings.json",
             settings(cx.bin, profile.hooks.enabled, &rules),

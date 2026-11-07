@@ -243,7 +243,7 @@ fn merged(commit: &str) -> Step {
 }
 
 /// The path of the worktree that has `base_ref` checked out, from `git worktree list --porcelain`.
-fn checkout_of(listing: &str, base_ref: &str) -> Option<String> {
+pub(crate) fn checkout_of(listing: &str, base_ref: &str) -> Option<String> {
     let mut path = None;
     for line in listing.lines() {
         if let Some(p) = line.strip_prefix("worktree ") {
