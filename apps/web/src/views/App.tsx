@@ -7,6 +7,7 @@ import { Onboarding } from "./Onboarding";
 import { Panel } from "./Panel";
 import { Settings } from "./Settings";
 import { Sidebar } from "./Sidebar";
+import { UpdateBanner } from "./UpdateBanner";
 import { Usage } from "./Usage";
 
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
   return (
     <div className="ide">
       <Sidebar state={state} dispatch={dispatch} />
+      <UpdateBanner state={state} dispatch={dispatch} />
       <main className={showChain ? "" : "plain"}>
         {state.error && !showChain && <p className="error">{state.error}</p>}
         {!state.loaded ? <p className="muted">Loading…</p> : state.route.name === "settings" ? (

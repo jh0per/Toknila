@@ -8,6 +8,7 @@ import "./panel.css";
 import "./threads.css";
 import "./settings.css";
 import "./usage.css";
+import "./updates.css";
 
 const root = document.getElementById("root");
 if (root) {

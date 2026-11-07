@@ -48,7 +48,7 @@ function loaded(): State {
 describe("connection", () => {
   it("reads the journal tail, then connects after it", () => {
     const s0 = initialState({ name: "chains" });
-    expect(reduce(s0, { type: "started" })[1]).toEqual([{ type: "fetchTail" }]);
+    expect(reduce(s0, { type: "started" })[1]).toEqual([{ type: "fetchTail" }, { type: "watchUpdates" }]);
     const [s1, fx] = reduce(s0, { type: "journalTail", seq: 42, events: [] });
     expect(s1.lastSeq).toBe(42);
     expect(fx).toEqual([{ type: "connect", since: 42, delayMs: 0 }]);

@@ -7,6 +7,8 @@
 
 mod path;
 mod takeover;
+mod update;
+mod updater;
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_shell::ShellExt;
@@ -14,7 +16,15 @@ use tauri_plugin_shell::ShellExt;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            updater::update_status,
+            updater::check_for_updates,
+            updater::restart_to_update
+        ])
         .setup(|app| {
+            app.manage(updater::Updates::new(env!("CARGO_PKG_VERSION")));
+            updater::spawn_loop(app.handle().clone());
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = open(&handle).await {
@@ -85,7 +95,7 @@ async fn make_way_for_our_daemon(app: &AppHandle) -> Result<(), String> {
 
 /// Runs the bundled `toknila` binary and returns its standard output. A daemon it starts gets the
 /// person's `PATH`, so it finds `claude`, `git` and `gh` although Finder gave the app a bare one.
-async fn toknila(app: &AppHandle, args: &[&str]) -> Result<String, String> {
+pub(crate) async fn toknila(app: &AppHandle, args: &[&str]) -> Result<String, String> {
     let out = app
         .shell()
         .sidecar("toknila")
