@@ -20,6 +20,10 @@ pub enum TicketAction {
     /// Needs a text.
     Block,
     Unblock,
+    /// Move the base branch to its upstream, then start (a card blocked by a base that is behind).
+    FastForwardStart,
+    /// Start from the base branch as it is (a card blocked by a base that is behind).
+    StartAnyway,
     /// Merge the work; remarks are optional.
     Accept,
     /// Send the work back with a comment (a text is required).
@@ -53,12 +57,14 @@ impl FromStr for TicketAction {
 
 impl TicketAction {
     /// Every action, in the order a client shows them.
-    pub const ALL: [TicketAction; 12] = [
+    pub const ALL: [TicketAction; 14] = [
         Self::Start,
         Self::Pause,
         Self::Resume,
         Self::Block,
         Self::Unblock,
+        Self::FastForwardStart,
+        Self::StartAnyway,
         Self::Accept,
         Self::Return,
         Self::Reopen,
@@ -76,6 +82,8 @@ impl TicketAction {
             Self::Resume => "resume",
             Self::Block => "block",
             Self::Unblock => "unblock",
+            Self::FastForwardStart => "fast_forward_start",
+            Self::StartAnyway => "start_anyway",
             Self::Accept => "accept",
             Self::Return => "return",
             Self::Reopen => "reopen",
@@ -101,6 +109,8 @@ impl TicketAction {
                 },
             },
             Self::Unblock => TicketEvent::Unblock,
+            Self::FastForwardStart => TicketEvent::FastForwardStart,
+            Self::StartAnyway => TicketEvent::StartAnyway,
             Self::Accept => TicketEvent::Accept {
                 comment: text.clone(),
             },

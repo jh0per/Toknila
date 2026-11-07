@@ -235,7 +235,11 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
     for (ticket, effect) in std::mem::take(&mut ctx.effects) {
         let (author, kind, text) = match effect {
             Effect::PrepareShip => {
-                ships::queue_prepare(uow, ctx, ticket)?;
+                ships::queue_prepare(uow, ctx, ticket, Default::default())?;
+                continue;
+            }
+            Effect::PrepareShipWith { stale } => {
+                ships::queue_prepare(uow, ctx, ticket, stale)?;
                 continue;
             }
             Effect::Merge => {

@@ -1,7 +1,9 @@
 use proptest::prelude::*;
 
 use super::*;
-use crate::{BlockedReason, ChainId, NodeRef, TicketDraft, TicketId, TicketKey, Wildcard};
+use crate::{
+    BlockedReason, ChainId, NodeRef, StalePolicy, TicketDraft, TicketId, TicketKey, Wildcard,
+};
 
 const T0: Timestamp = Timestamp(1_000);
 const NOW: Timestamp = Timestamp(5_000);
@@ -887,3 +889,68 @@ proptest! {
 mod merge;
 mod out_of_order;
 mod review;
+
+fn base_behind(can_fast_forward: bool) -> TicketEvent {
+    TicketEvent::Block {
+        reason: BlockedReason::BaseBehind {
+            base: "main".to_owned(),
+            upstream: "origin/main".to_owned(),
+            behind: 133,
+            can_fast_forward,
+        },
+    }
+}
+
+#[test]
+fn a_base_behind_blocks_the_start_and_offers_the_two_decisions() {
+    let blocked = ok(TicketStatus::Running, base_behind(true));
+    assert_eq!(blocked.effects, vec![Effect::StopRunner]);
+    let names: Vec<_> = TicketAction::allowed(&blocked.ticket)
+        .into_iter()
+        .map(TicketAction::name)
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "pause",
+            "unblock",
+            "fast_forward_start",
+            "start_anyway",
+            "cancel"
+        ]
+    );
+
+    let ff = apply(&blocked.ticket, &TicketEvent::FastForwardStart, NOW).expect("ff");
+    assert_eq!(ff.ticket.status, TicketStatus::Running);
+    assert_eq!(
+        ff.effects,
+        vec![
+            Effect::PrepareShipWith {
+                stale: StalePolicy::FastForward
+            },
+            Effect::EnsureRunner
+        ]
+    );
+    let anyway = apply(&blocked.ticket, &TicketEvent::StartAnyway, NOW).expect("anyway");
+    assert_eq!(
+        anyway.effects[0],
+        Effect::PrepareShipWith {
+            stale: StalePolicy::Allow
+        }
+    );
+    let again = apply(&blocked.ticket, &TicketEvent::Unblock, NOW).expect("unblock");
+    assert_eq!(
+        again.effects,
+        vec![Effect::PrepareShip, Effect::EnsureRunner]
+    );
+}
+
+#[test]
+fn fast_forward_is_not_offered_when_it_is_not_possible_and_other_blocks_have_neither() {
+    let blocked = ok(TicketStatus::Running, base_behind(false));
+    assert!(apply(&blocked.ticket, &TicketEvent::FastForwardStart, NOW).is_err());
+    assert!(apply(&blocked.ticket, &TicketEvent::StartAnyway, NOW).is_ok());
+    let other = ticket_in(TicketStatus::Blocked);
+    assert!(apply(&other, &TicketEvent::StartAnyway, NOW).is_err());
+    assert!(apply(&other, &TicketEvent::FastForwardStart, NOW).is_err());
+}

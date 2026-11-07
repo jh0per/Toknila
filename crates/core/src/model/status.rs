@@ -139,6 +139,16 @@ pub enum BlockedReason {
     RunnerLost,
     /// The ship (worktree and branch) could not be prepared.
     ShipFailed { detail: String },
+    /// The base branch is behind its upstream (local merge mode), so the ship would start on old
+    /// code. Nothing was made. A person fast-forwards the base and starts, or starts anyway;
+    /// plain unblock looks again.
+    BaseBehind {
+        base: String,
+        upstream: String,
+        behind: u32,
+        /// The base can be moved to the upstream without losing anything.
+        can_fast_forward: bool,
+    },
     /// The runner has no directory to start in: the project has no repository, so the ticket has
     /// no ship. Unblocking starts the ship and the runner again.
     NoWorkingDir,
@@ -227,6 +237,21 @@ impl fmt::Display for BlockedReason {
             ),
             Self::RunnerLost => f.write_str("runner lost"),
             Self::ShipFailed { detail } => write!(f, "ship_failed: {detail}"),
+            Self::BaseBehind {
+                base,
+                upstream,
+                behind,
+                can_fast_forward,
+            } => write!(
+                f,
+                "base_behind: {}; {}start anyway, or unblock to look again",
+                crate::model::describe_base_behind(base, upstream, *behind),
+                if *can_fast_forward {
+                    "fast-forward it and start, "
+                } else {
+                    ""
+                }
+            ),
             Self::NoWorkingDir => f.write_str(
                 "no_working_dir: the project has no repository, so the ticket has no ship; give it one or use the sim profile",
             ),
@@ -339,6 +364,15 @@ mod tests {
             (
                 blocked(BlockedReason::ShipEmpty),
                 "ship_empty: the ship's branch has no commit of its own, so there is nothing to merge; the work has to be committed on the ship, then unblock",
+            ),
+            (
+                blocked(BlockedReason::BaseBehind {
+                    base: "main".into(),
+                    upstream: "origin/main".into(),
+                    behind: 133,
+                    can_fast_forward: true,
+                }),
+                "base_behind: base branch main is 133 commits behind origin/main; fast-forward it and start, start anyway, or unblock to look again",
             ),
             (blocked(BlockedReason::RunnerLost), "runner lost"),
             (

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{Chain, MergeMode, Project, Ticket, TicketId, TicketKey};
+use super::{Chain, MergeMode, Project, StalePolicy, Ticket, TicketId, TicketKey};
 use crate::pr::PrSpec;
 
 /// The worktree and branch a ticket works in, once the shipyard has made them.
@@ -26,6 +26,8 @@ pub struct ShipSpec {
     /// The ship starts from the remote's `base` (pull-request mode: the base moves on GitHub),
     /// fetched first, not from the local branch.
     pub remote: bool,
+    /// What a person said about a local base branch that is behind its upstream.
+    pub stale: StalePolicy,
     pub branch: String,
     /// Path-safe names under which the worktree lives: `<project>/<chain>/<slug>`.
     pub project: String,
@@ -123,6 +125,7 @@ impl ShipSpec {
             repo: repo.to_owned(),
             base: project.work_branch.clone(),
             remote: project.merge.mode == MergeMode::Github,
+            stale: StalePolicy::default(),
             branch: format!("ship/{chain}/{slug}"),
             project: slugify(&project.key.to_string()),
             chain,

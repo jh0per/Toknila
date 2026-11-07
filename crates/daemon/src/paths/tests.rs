@@ -82,3 +82,30 @@ fn fresh_install_uses_the_platform_place() {
         "created by the daemon on start, not by resolving"
     );
 }
+
+#[test]
+fn ships_go_to_a_folder_without_a_space_and_not_to_the_legacy_home() {
+    let user = Path::new("/r/Users/me");
+    let home = Path::new("/r/Users/me/Library/Application Support/toknila");
+    let root = ships_root(None, Some(user), home);
+    assert_eq!(root, user.join(".toknila-ships"));
+    assert!(!root.to_string_lossy().contains(' '));
+    assert_ne!(root, user.join(".toknila"));
+    assert!(!root.starts_with(user.join(".toknila")));
+}
+
+#[test]
+fn the_ships_override_wins_and_a_missing_user_home_falls_back_to_the_data_home() {
+    let home = Path::new("/h");
+    let over = PathBuf::from("/x/ships");
+    assert_eq!(
+        ships_root(Some(over.clone()), Some(Path::new("/u")), home),
+        over
+    );
+    assert_eq!(ships_root(None, None, home), home.join("ships"));
+}
+
+#[test]
+fn an_explicit_home_keeps_its_ships_inside_it() {
+    assert_eq!(Paths::at("/t/home").ships(), Path::new("/t/home/ships"));
+}

@@ -1323,6 +1323,15 @@ export interface components {
             /** @enum {string} */
             kind: "ship_failed";
         } | {
+            base: string;
+            /** Format: int32 */
+            behind: number;
+            /** @description The base can be moved to the upstream without losing anything. */
+            can_fast_forward: boolean;
+            /** @enum {string} */
+            kind: "base_behind";
+            upstream: string;
+        } | {
             /** @enum {string} */
             kind: "no_working_dir";
         };
@@ -2038,6 +2047,7 @@ export interface components {
         PlanKind: "spec_folder" | "chain_file";
         /** @description `GET /v1/projects/{project}/plans`: the plans of the project's repository. */
         PlanScan: {
+            behind?: components["schemas"]["WorkingCopyBehind"] | null;
             /** @description Sorted by `relative`. */
             plans: components["schemas"]["FoundPlan"][];
             /** @description The repository has a `.specify/` folder. */
@@ -2566,7 +2576,7 @@ export interface components {
          * @description What a person can do with a ticket.
          * @enum {string}
          */
-        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject" | "run_reviewer";
+        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "fast_forward_start" | "start_anyway" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject" | "run_reviewer";
         /** @description A ticket with everything attached to it. */
         TicketDetail: {
             /** @description What a person can do with the ticket now, computed by the state machine. */
@@ -2766,6 +2776,14 @@ export interface components {
             from?: components["schemas"]["TicketKey"] | null;
             /** @description Who proposed it. */
             proposed_by: components["schemas"]["Actor"];
+        };
+        /** @description The working copy's branch is behind its upstream (as of the last fetch). */
+        WorkingCopyBehind: {
+            /** Format: int32 */
+            behind: number;
+            branch: string;
+            /** @description `origin/main`. */
+            upstream: string;
         };
     };
     responses: never;

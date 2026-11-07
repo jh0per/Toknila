@@ -23,6 +23,8 @@ export interface PlanList {
   project: string;
   plans: FoundPlan[];
   specify_dir: boolean;
+  /// The working copy the plans are read from is behind its upstream.
+  behind: PlanScan["behind"];
   /// Paths ticked for import.
   selected: string[];
   outcomes: Record<string, PlanOutcome>;
@@ -78,6 +80,7 @@ export function listOf(project: string, scan: PlanScan): PlanList {
     project,
     plans: scan.plans,
     specify_dir: scan.specify_dir,
+    behind: scan.behind,
     selected: scan.plans.filter((p) => !p.imported).map((p) => p.path),
     outcomes: {},
   };
