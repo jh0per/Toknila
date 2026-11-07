@@ -1,8 +1,8 @@
 // The network side of imports and deletion. Called by the effect runner; it decides nothing: the
 // daemon's answers and refusals go to the reducer as they are.
 
-import { Refusal, get, post } from "../api/http";
-import type { ChainDetail, ImportPathResult, PlanScan, ProjectDeletion } from "../api/types";
+import { Refusal, del, get, post } from "../api/http";
+import type { ChainDeletion, ChainDetail, ImportPathResult, PlanScan, ProjectDeletion } from "../api/types";
 import type { ImportEffect, ImportSource } from "./imports";
 import type { Msg } from "./msg";
 import type { RemovalEffect } from "./removal";
@@ -24,6 +24,10 @@ async function importPlans(project: string, paths: string[], dispatch: Dispatch)
   }
   dispatch({ type: "plansImported", project });
 }
+
+/// A refused deletion: the daemon's words, and whether agents still work (409).
+const deleteRefused = (dispatch: Dispatch) => (err: unknown) =>
+  dispatch({ type: "deleteRefused", message: text(err), agentsWorking: err instanceof Refusal && err.code === "conflict" });
 
 /// Runs one effect of imports or deletion.
 export function runImportEffect(e: ImportEffect | RemovalEffect, dispatch: Dispatch): void {
@@ -50,12 +54,12 @@ export function runImportEffect(e: ImportEffect | RemovalEffect, dispatch: Dispa
     case "deleteProject":
       post<ProjectDeletion>(`/projects/${enc(e.project)}/delete`, { trash_folder: e.trash_folder })
         .then((deletion) => dispatch({ type: "projectDeleted", deletion }))
-        .catch((err) =>
-          dispatch({
-            type: "deleteRefused",
-            message: text(err),
-            agentsWorking: err instanceof Refusal && err.code === "conflict",
-          }));
+        .catch(deleteRefused(dispatch));
+      return;
+    case "deleteChain":
+      del<ChainDeletion>(`/chains/${enc(e.chain)}`)
+        .then((deletion) => dispatch({ type: "chainDeleted", deletion }))
+        .catch(deleteRefused(dispatch));
       return;
   }
 }

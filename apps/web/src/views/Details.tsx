@@ -4,6 +4,7 @@ import type { Intent } from "../store/msg";
 import { type State, currentChain, queuePosition } from "../store/state";
 import { CardPlan } from "./CardPlan";
 import { Comments } from "./Comments";
+import { DependsOn } from "./DependsOn";
 import { DetailsMeta } from "./DetailsMeta";
 import { Rounds } from "./Rounds";
 import { UsageChip } from "./UsageChip";
@@ -25,6 +26,7 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
         {card.status_reason ? ` · ${reasonText(card.status_reason)}` : ""}
       </p>
       <CardPlan state={state} card={card} detail={detail} chain={currentChain(state)} dispatch={dispatch} />
+      <DependsOn state={state} card={card} detail={detail} chain={currentChain(state)} dispatch={dispatch} />
       <DetailsMeta card={card} ship={detail?.ship} />
       <div className="cols">
         <section>

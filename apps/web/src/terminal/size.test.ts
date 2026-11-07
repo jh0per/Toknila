@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Size, sizeReporter, usable } from "./size";
+import { type Size, fitGrid, sizeReporter, usable } from "./size";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -16,6 +16,41 @@ describe("usable", () => {
     expect(usable({ cols: Number.NaN, rows: 24 })).toBe(false);
     expect(usable({ cols: 80.5, rows: 24 })).toBe(false);
     expect(usable({ cols: 80, rows: 24 })).toBe(true);
+  });
+});
+
+describe("fitGrid", () => {
+  const cell = { width: 7, height: 15 };
+
+  it("counts only the rows that fit whole, so the last one is never cut", () => {
+    expect(fitGrid({ width: 700, height: 300 }, cell)).toEqual({ cols: 100, rows: 20 });
+    expect(fitGrid({ width: 700, height: 314 }, cell)?.rows).toBe(20);
+    expect(fitGrid({ width: 700, height: 315 }, cell)?.rows).toBe(21);
+    expect(fitGrid({ width: 700, height: 301 }, cell)?.rows).toBe(20);
+  });
+
+  it("takes the scrollbar off the width before counting columns", () => {
+    expect(fitGrid({ width: 710, height: 300 }, cell, 10)?.cols).toBe(100);
+    expect(fitGrid({ width: 709, height: 300 }, cell, 10)?.cols).toBe(99);
+  });
+
+  it("never gives a grid larger than the box at any height", () => {
+    for (let h = 1; h < 900; h += 7) {
+      const g = fitGrid({ width: 640, height: h }, cell);
+      expect(g).not.toBeNull();
+      if (h >= cell.height) expect((g?.rows ?? 0) * cell.height).toBeLessThanOrEqual(h);
+    }
+  });
+
+  it("keeps the smallest grid for a box smaller than one cell", () => {
+    expect(fitGrid({ width: 5, height: 5 }, cell)).toEqual({ cols: 2, rows: 1 });
+  });
+
+  it("waits while the box or the cell is not measured", () => {
+    expect(fitGrid({ width: 0, height: 300 }, cell)).toBeNull();
+    expect(fitGrid({ width: 700, height: 0 }, cell)).toBeNull();
+    expect(fitGrid({ width: 700, height: 300 }, { width: 0, height: 15 })).toBeNull();
+    expect(fitGrid({ width: Number.NaN, height: 300 }, cell)).toBeNull();
   });
 });
 

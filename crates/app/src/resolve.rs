@@ -31,6 +31,22 @@ pub fn chain<R: Reader + ?Sized>(repo: &R, r: &str) -> AppResult<Chain> {
     )
 }
 
+/// A chain by id or name, looking only at the chains of `project` (id or key) when it is given:
+/// two projects may have a chain of the same name.
+pub fn chain_in<R: Reader + ?Sized>(repo: &R, project: Option<&str>, r: &str) -> AppResult<Chain> {
+    let Some(project) = project else {
+        return chain(repo, r);
+    };
+    let p = self::project(repo, project)?;
+    let mut found = repo.chains(Some(p.id))?;
+    found.retain(|c| c.id.to_string() == r || c.name == r);
+    unique(
+        found,
+        || format!("chain {r} in project {}", p.key),
+        |n| format!("{n} chains are named {r}; use the chain id"),
+    )
+}
+
 /// A ticket by id, key (any case) or unique title.
 pub fn ticket<R: Reader + ?Sized>(repo: &R, r: &str) -> AppResult<Ticket> {
     if let Ok(id) = r.parse()

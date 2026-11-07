@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
 import { AddProject } from "./AddProject";
+import { DeleteChain } from "./DeleteChain";
 import { DeleteProject } from "./DeleteProject";
 import { FoundPlans } from "./FoundPlans";
 import { ImportDialog } from "./ImportDialog";
@@ -53,6 +54,12 @@ export function Dialogs({ state, dispatch, inline }: { state: State; dispatch: (
         </Modal>
       ) : null;
     }
+    case "deleteChain":
+      return (
+        <Modal label="Delete a chain" testId="delete-chain-dialog" onClose={close}>
+          <DeleteChain chain={d.chain} state={state} dispatch={dispatch} />
+        </Modal>
+      );
     case "deleteProject":
       return (
         <Modal label="Delete a project" testId="delete-dialog" onClose={close}>

@@ -50,6 +50,10 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const { expectText } = checks(page);
+  const sizes = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().endsWith("/runner/size")) sizes.push(r.postDataJSON());
+  });
   const status = page.locator('a[data-key="WEB-1"] [data-testid=status]');
   const term = page.locator("[data-testid=term-host]");
   const tab = (name) => page.getByRole("tab", { name }).click();
@@ -81,6 +85,56 @@ try {
     return screen ? { width: screen.clientWidth, height: screen.clientHeight } : null;
   });
   if (`${cols}x${rows}` === "160x40") throw new Error(`the terminal kept the default size (${fitted && fitted.width}px wide)`);
+
+  // The whole grid is inside the panel, at two window heights and after resizing the window: the
+  // last row (where Claude Code draws its prompt and footer) is not cut by the panel's edge, and
+  // the agent's terminal got the same number of rows.
+  const grid = () =>
+    page.evaluate(() => {
+      const rows = [...document.querySelectorAll("[data-testid=term-host] .xterm-rows > div")];
+      const edge = (sel) => document.querySelector(sel).getBoundingClientRect();
+      const last = rows[rows.length - 1].getBoundingClientRect();
+      const screen = edge("[data-testid=term-host] .xterm-screen");
+      return {
+        rows: rows.length,
+        lastTop: last.top,
+        lastBottom: last.bottom,
+        panelBottom: edge("[data-testid=panel]").bottom,
+        hostBottom: edge("[data-testid=term-host]").bottom,
+        rowHeight: last.height,
+        padBottom: Number.parseFloat(getComputedStyle(document.querySelector("[data-testid=term-host]")).paddingBottom),
+        screenBottom: screen.bottom,
+        screenRight: screen.right,
+        hostRight: edge("[data-testid=term-host]").right,
+      };
+    });
+  for (const height of [720, 520, 900]) {
+    await page.setViewportSize({ width: 1280, height });
+    // The page settles on the new grid (the panel resized, the grid fitted, the daemon told).
+    let g;
+    const settled = () =>
+      g.lastBottom <= g.panelBottom + 0.5 &&
+      g.hostBottom - g.padBottom - g.lastBottom < g.rowHeight + 0.5 &&
+      sizes.length > 0 &&
+      sizes[sizes.length - 1].rows === g.rows;
+    for (const until = Date.now() + 8000; Date.now() < until; await page.waitForTimeout(100)) {
+      g = await grid();
+      if (settled()) break;
+    }
+    if (g.lastBottom > g.panelBottom + 0.5 || g.lastBottom > g.hostBottom + 0.5 || g.screenRight > g.hostRight + 0.5) {
+      throw new Error(`at window height ${height} the grid is cut: ${JSON.stringify(g)}`);
+    }
+    // Less than one row of room is left under the last row: no row that would fit was left out.
+    if (g.hostBottom - g.padBottom - g.lastBottom >= g.rowHeight + 0.5) {
+      throw new Error(`at window height ${height} a row was left out: ${JSON.stringify(g)}`);
+    }
+    const told = sizes[sizes.length - 1];
+    if (!told || told.rows !== g.rows) {
+      throw new Error(`at window height ${height} the page shows ${g.rows} rows but told the daemon ${JSON.stringify(told)}`);
+    }
+    console.log(`PASS at window height ${height} the last of ${g.rows} rows ends at ${g.lastBottom.toFixed(1)}, inside the panel (${g.panelBottom.toFixed(1)})`);
+    console.log(`PASS the daemon was told ${told.cols}x${told.rows} for ${g.rows} visible rows`);
+  }
 
   // A reload gets the same output from the scrollback.
   await page.reload();

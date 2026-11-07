@@ -60,6 +60,13 @@ export async function patch<T>(path: string, body: unknown): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+/// A deletion: DELETE, answer with the daemon's reply or throw its refusal.
+export async function del<T>(path: string): Promise<T> {
+  const r = await fetch(`/v1${path}`, { method: "DELETE", headers: auth() });
+  if (!r.ok) throw await refusal(r);
+  return r.json() as Promise<T>;
+}
+
 /// Raw bytes typed into a terminal, as they are.
 export async function postBytes(path: string, bytes: Uint8Array): Promise<void> {
   const r = await fetch(`/v1${path}`, {
