@@ -83,6 +83,15 @@ async fn system_checks_report_each_tool_with_a_hint() {
     assert_eq!(gh["hint"], "Run `gh auth login` and follow the prompts.");
 }
 
+/// The version is the build's and nothing is linked in a test run (whether a `tok` sits beside the
+/// test binary depends on the platform's build layout, so that is not asserted here).
+#[tokio::test]
+async fn cli_status_names_the_version_and_links_nothing() {
+    let body = Api::new().get("/v1/system/cli").await;
+    assert_eq!(body["version"], toknila_core::VERSION);
+    assert_eq!(body["installed"], false);
+}
+
 #[tokio::test]
 async fn system_checks_are_ok_when_every_tool_is() {
     let tools = FakeTools::default()

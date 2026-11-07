@@ -767,6 +767,8 @@ async fn openapi_describes_every_route() {
             "/releases/{release}/events",
             "/repos/check",
             "/system/checks",
+            "/system/cli",
+            "/system/cli/install",
             "/tickets",
             "/tickets/{ticket}",
             "/tickets/{ticket}/actions/{action}",

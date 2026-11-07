@@ -99,6 +99,9 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         token: token.to_string(),
         version: toknila_core::VERSION.to_owned(),
         started_at: now().0,
+        exe: std::env::current_exe()
+            .ok()
+            .map(|p| p.display().to_string()),
     };
     runners.set_daemon_url(info.base_url());
     info.write(&paths.daemon_json())?;

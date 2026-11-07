@@ -85,6 +85,9 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [moved, [...fx, ...more]];
     }
     case "recheck":
+    case "installCli":
+    case "cliLoaded":
+    case "cliRejected":
     case "addProject":
     case "saveProject":
     case "importChain":
@@ -111,7 +114,7 @@ function go(s: State, route: Route): [State, Effect[]] {
 
 /// What a screen needs fetched when it opens.
 function enter(route: Route, s: State): Effect[] {
-  if (route.name === "settings") return setupLoads;
+  if (route.name === "settings") return [...setupLoads, { type: "loadCli" }];
   if (route.name === "usage") return [loadUsage(s)];
   return route.name === "card"
     ? [{ type: "loadDetail", key: route.key }, { type: "loadThreads", key: route.key }]

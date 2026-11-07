@@ -145,6 +145,8 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "loadChecks":
       case "loadProfiles":
+      case "loadCli":
+      case "installCli":
       case "addProject":
       case "saveProject":
       case "importChain":

@@ -88,4 +88,16 @@ describe("saving settings", () => {
     const [plain] = reduce(ready([project()]), { type: "settingsRejected", field: undefined, message: "limit is 1 to 64" });
     expect(formError(plain.settings)).toBe("limit is 1 to 64");
   });
+
+  it("loads the tok command status with the page and installs it on request", () => {
+    const [, fx] = reduce(ready([project()]), { type: "navigate", route: { name: "settings", project: "DEMO" } });
+    expect(fx).toContainEqual({ type: "loadCli" });
+    const [asked, run] = reduce(ready([project()]), { type: "installCli" });
+    expect(run).toEqual([{ type: "installCli" }]);
+    const cli = { version: "0.2.0", bundled: "/app/tok", link: "/h/.local/bin/tok", installed: true, on_path: false };
+    const [done] = reduce(asked, { type: "cliLoaded", cli });
+    expect(done.settings.cli).toEqual(cli);
+    const [failed] = reduce(done, { type: "cliRejected", message: "exists and is not a link" });
+    expect(failed.settings.cliError).toBe("exists and is not a link");
+  });
 });

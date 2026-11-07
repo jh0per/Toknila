@@ -1,7 +1,9 @@
-//! `/system/checks` and `/repos/check`: what the window needs to set a project up.
+//! `/system/checks`, `/system/cli` and `/repos/check`: what the window needs to set a project up
+//! and to put `tok` on the person's command line.
 
 use axum::Json;
 use axum::extract::State;
+use toknila_api_types::CliLink;
 use toknila_core::Project;
 use toknila_core::repo::{RepoCheck, RepoProblem};
 use toknila_core::system::SystemChecks;
@@ -47,4 +49,41 @@ pub async fn repos_check(
         .work_branch
         .unwrap_or_else(|| Project::DEFAULT_WORK_BRANCH.to_owned());
     Ok(Json(check_repo(&state, input.repo_path, base).await?))
+}
+
+/// The daemon's own binary, the person's home folder and `PATH`, as the link needs them.
+fn environment() -> (
+    std::path::PathBuf,
+    Option<std::path::PathBuf>,
+    Option<std::ffi::OsString>,
+) {
+    (
+        std::env::current_exe().unwrap_or_default(),
+        dirs::home_dir(),
+        std::env::var_os("PATH"),
+    )
+}
+
+#[utoipa::path(get, path = "/system/cli", tag = "system",
+    responses((status = 200, body = CliLink)))]
+/// The Toknila version, the `tok` that ships next to the daemon and whether `~/.local/bin/tok`
+/// links to it.
+pub async fn cli_status() -> Json<CliLink> {
+    let (exe, home, path) = environment();
+    Json(crate::cli_link::status(
+        &exe,
+        home.as_deref(),
+        path.as_deref(),
+    ))
+}
+
+#[utoipa::path(post, path = "/system/cli/install", tag = "system",
+    responses((status = 200, body = CliLink)))]
+/// Links `~/.local/bin/tok` to the bundled `tok`. Only the person's home is written, never with
+/// elevated rights.
+pub async fn cli_install() -> ApiResult<Json<CliLink>> {
+    let (exe, home, path) = environment();
+    crate::cli_link::install(&exe, home.as_deref(), path.as_deref())
+        .map(Json)
+        .map_err(|e| toknila_app::AppError::conflict(e).into())
 }

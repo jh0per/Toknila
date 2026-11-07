@@ -332,6 +332,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/cli": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Toknila version, the `tok` that ships next to the daemon and whether `~/.local/bin/tok`
+         *     links to it.
+         */
+        get: operations["cli_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/cli/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Links `~/.local/bin/tok` to the bundled `tok`. Only the person's home is written, never with
+         *     elevated rights.
+         */
+        post: operations["cli_install"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets": {
         parameters: {
             query?: never;
@@ -996,6 +1036,22 @@ export interface components {
          * @enum {string}
          */
         CheckStatus: "ok" | "missing" | "outdated" | "not_logged_in" | "failed";
+        /**
+         * @description `GET /v1/system/cli` and `POST /v1/system/cli/install`: the version of Toknila, the `tok`
+         *     command that ships next to the daemon and whether it is linked into `~/.local/bin`.
+         */
+        CliLink: {
+            /** @description The `tok` binary next to the daemon, when there is one. */
+            bundled?: string | null;
+            /** @description The link exists and points at the bundled `tok`. */
+            installed: boolean;
+            /** @description Where the link goes (`~/.local/bin/tok`), when the home folder is known. */
+            link?: string | null;
+            /** @description The link's folder is on the daemon's `PATH`. */
+            on_path: boolean;
+            /** @description Version of the running daemon. */
+            version: string;
+        };
         /**
          * @description A permanent record in a ticket: an instruction from a person, an agent's report, or a decision.
          *     Everything said to an agent is stored here first and delivered after.
@@ -2865,6 +2921,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemChecks"];
+                };
+            };
+        };
+    };
+    cli_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CliLink"];
+                };
+            };
+        };
+    };
+    cli_install: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CliLink"];
                 };
             };
         };

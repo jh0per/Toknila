@@ -2,7 +2,7 @@
 // every refusal comes from the daemon and is handed to the reducer as it is.
 
 import { Refusal, get, patch, post } from "../api/http";
-import type { ChainDetail, ProfileList, Project, RepoCheck, SystemChecks } from "../api/types";
+import type { ChainDetail, CliLink, ProfileList, Project, RepoCheck, SystemChecks } from "../api/types";
 import type { Msg } from "./msg";
 import type { SettingsEffect } from "./settings";
 
@@ -34,6 +34,16 @@ export function runSettingsEffect(e: SettingsEffect, dispatch: Dispatch): void {
       get<SystemChecks>("/system/checks")
         .then((checks) => dispatch({ type: "checksLoaded", checks }))
         .catch((err) => reject(dispatch, err));
+      return;
+    case "loadCli":
+      get<CliLink>("/system/cli")
+        .then((cli) => dispatch({ type: "cliLoaded", cli }))
+        .catch(() => undefined);
+      return;
+    case "installCli":
+      post<CliLink>("/system/cli/install", {})
+        .then((cli) => dispatch({ type: "cliLoaded", cli }))
+        .catch((err) => dispatch({ type: "cliRejected", message: err instanceof Error ? err.message : String(err) }));
       return;
     case "loadProfiles":
       get<ProfileList>("/profiles")

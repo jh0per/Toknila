@@ -32,6 +32,9 @@ struct Status {
     port: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     version: Option<String>,
+    /// The daemon binary that runs; `None` for a daemon older than 0.2.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exe: Option<String>,
     home: String,
 }
 
@@ -69,6 +72,7 @@ fn print_status(paths: &Paths, info: Option<&DaemonInfo>, json: bool) {
         pid: info.map(|i| i.pid),
         port: info.map(|i| i.port),
         version: info.map(|i| i.version.clone()),
+        exe: info.and_then(|i| i.exe.clone()),
         home: paths.home.display().to_string(),
     };
     if json {

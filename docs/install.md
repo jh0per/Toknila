@@ -1,16 +1,110 @@
 # Install and first run
 
-Toknila 0.1.0 is phase 0: the model, the daemon, the CLI and a read-only web page, driven by a
-simulated agent (`sim` profile). No real agent runs yet.
+Toknila 0.2.0 runs on your Mac as an app (`Toknila.app`) that you build yourself, or as plain
+binaries (`tok` and `toknila`) from the release archives. This page starts with the app.
 
-## macOS
+## The Mac app (built locally)
+
+The app is built on the Mac that runs it, for that Mac's architecture. It is signed ad hoc (no
+Developer ID, not notarised), which is enough to run it where it was built. Needs the Rust
+toolchain, Node 22 and the Xcode command line tools.
+
+```sh
+cargo xtask app
+```
+
+It builds the web page in release mode, the daemon (`toknila`) and the `tok` command in release
+mode and the window shell, then assembles `dist/app/Toknila.app` and
+`dist/app/Toknila-<version>.dmg` and prints both paths. To install, open the `.dmg` and drag
+Toknila onto Applications (or `cp -R` the `.app` there). Because the app was built here and never
+downloaded, macOS does not ask. If you copy the `.dmg` to another Mac through a browser or AirDrop,
+macOS quarantines it; right-click the app and choose Open once, or run
+`xattr -dr com.apple.quarantine /Applications/Toknila.app`.
+
+Everything the app needs is inside it: the daemon and `tok` in `Contents/MacOS`, the web page and
+the price table inside the daemon binary. The hooks, the MCP server and the status line that
+Toknila writes for an agent call the daemon by its absolute path inside the app (paths with spaces
+are quoted). A new build takes over by itself: see Updating.
+
+### First run
+
+Opening the app starts the daemon and opens its window. If a daemon of the same version from this
+app's own binary already runs, the app attaches to it; if one of another version or from another
+copy of the app runs (after an update), the app stops it first and starts its own. On an empty
+data home the window shows onboarding: it checks `git`, `claude` and `gh`, each with a hint when
+something is missing, then asks for the repository of your first project and its base branch.
+After that, import a chain file or add cards, and set the limits and review mode in Settings. The
+app starts the daemon with the `PATH` of your login shell plus the usual folders such as
+`/opt/homebrew/bin`, so it finds `claude` and `gh` although Finder starts apps with a bare `PATH`.
+Closing the window leaves the daemon and its agents running; `tok daemon stop` stops them (use the
+command below, or `/Applications/Toknila.app/Contents/MacOS/tok daemon stop`).
+
+### The `tok` command
+
+Settings has an "About" box with the action "Install the tok command". It links the app's `tok` to
+`~/.local/bin/tok`. It writes only inside your home folder, never uses `sudo`, replaces only a link
+left by an earlier Toknila, and says when `~/.local/bin` is not on your `PATH` (add
+`export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc`). The same by hand:
+
+```sh
+mkdir -p ~/.local/bin
+ln -sf /Applications/Toknila.app/Contents/MacOS/tok ~/.local/bin/tok
+tok --version
+```
+
+The link points into the app, so it follows updates.
+
+### Where things live
+
+`~/Library/Application Support/toknila` holds everything: `toknila.db` (SQLite), `daemon.json`,
+the logs and the `backups` folder. `TOKNILA_HOME=<folder>`, set in the environment before the app
+or the daemon starts, uses another folder instead, for example
+`open -n --env TOKNILA_HOME=<folder> /Applications/Toknila.app`; that is how to try the app without
+touching your real data.
+
+### Backups
+
+Before the daemon moves the database to a newer layout (an update with a schema change), it copies
+the database to `backups/toknila-v<old version>-<UTC time>.sqlite` in the data home and keeps the
+newest five. That needs nothing from you; copy the data home yourself for backups of your own. To
+go back, stop the daemon, move `toknila.db` (and its `-wal` and `-shm` files) away, copy a backup
+to `toknila.db` and start the app. A database written by a newer Toknila is refused, not changed.
+
+### Updating
+
+Pull the new version, run `cargo xtask app` and replace `/Applications/Toknila.app` with the new
+one (drag from the new `.dmg` and choose Replace). Then open it: the old daemon is stopped by the
+new app (it waits up to 10 seconds for the old one to exit) and the new one starts, so there is no
+step to do by hand. Agents the old daemon was running end with it. If the old daemon does not stop
+in time, the window says so and names it; run `tok daemon stop` and open the app again. The data
+home is kept; the new daemon migrates it on its first start, after the automatic backup above.
+
+### Removing it
+
+```sh
+tok daemon stop                                  # first, so nothing keeps running
+rm -rf /Applications/Toknila.app
+rm -f ~/.local/bin/tok                           # only if you installed the command
+rm -rf ~/Library/Application\ Support/toknila    # only if you also want your data gone
+```
+
+Your project repositories are yours. The ships Toknila made in them are worktrees; remove one with
+the worktree command of your version control tool, run in its repository.
+
+### Check a build
+
+`scripts/smoke-app.sh` mounts the `.dmg`, copies the app to a temporary folder, launches it against
+a temporary data home, checks the daemon, the version, a project and a card made with the bundled
+`tok`, and that no process is left after quitting. It does not touch your data home.
+
+## macOS, plain binaries
 
 Pick the archive for your Mac: `macos-arm64` for Apple silicon (M1 and later), `macos-x86_64`
 for Intel. The binaries are not signed or notarised yet, so download with `curl` (it does not set
 the quarantine flag) or clear the flag after a browser download.
 
 ```sh
-V=0.1.0
+V=0.2.0
 ARCH=arm64            # or x86_64 on an Intel Mac
 curl -LO https://github.com/jh0per/Toknila/releases/download/v$V/toknila-$V-macos-$ARCH.tar.gz
 tar -xzf toknila-$V-macos-$ARCH.tar.gz
