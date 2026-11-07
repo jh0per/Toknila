@@ -646,3 +646,66 @@ fn a_recorded_verdict_stops_the_reviewer_and_its_slot_starts_the_next_card() {
         "the card itself waits for the person"
     );
 }
+
+fn nudges(mem: &Mem) -> usize {
+    mem.deferred
+        .iter()
+        .filter(|e| matches!(e, ExternalEffect::NudgeReviewer { .. }))
+        .count()
+}
+
+#[test]
+fn a_reviewer_that_stops_twice_without_a_verdict_is_nudged_once_then_a_person_decides() {
+    let mut mem = process_review(ReviewMode::Both);
+    let t = a(&mem);
+    let before = nudges(&mem);
+    reviews::stopped(&mut mem, t.id, vec!["first".to_owned()]).expect("stopped");
+    assert_eq!(nudges(&mem), before + 1, "one nudge for the host to type");
+    assert_eq!(
+        a(&mem).review.turn,
+        Some(ReviewTurn::Agent { decides: false })
+    );
+
+    reviews::stopped(&mut mem, t.id, vec!["I could not run it".to_owned()]).expect("stopped");
+    let t = a(&mem);
+    assert_eq!(nudges(&mem), before + 1, "no second nudge");
+    assert_eq!(t.review.turn, Some(ReviewTurn::Person));
+    assert_eq!(
+        t.review.note,
+        Some(toknila_core::ReviewNote::NoVerdict {
+            lines: vec!["I could not run it".to_owned()]
+        })
+    );
+    assert!(
+        mem.deferred
+            .iter()
+            .any(|e| matches!(e, ExternalEffect::StopReviewer { .. })),
+        "the reviewer's runner is stopped"
+    );
+}
+
+#[test]
+fn a_stop_after_the_verdict_is_ignored_and_the_reviewer_can_be_run_again() {
+    let mut mem = process_review(ReviewMode::Both);
+    let t = a(&mem);
+    verdict(&mut mem, Verdict::Approve, "fine").expect("verdict");
+    let before = a(&mem);
+    reviews::stopped(&mut mem, t.id, vec![]).expect("ignored");
+    assert_eq!(a(&mem), before);
+
+    // A reviewer that gave none: run it again from the person's turn.
+    let mut mem = process_review(ReviewMode::Both);
+    let t = a(&mem);
+    reviews::stopped(&mut mem, t.id, vec![]).expect("nudge");
+    reviews::stopped(&mut mem, t.id, vec![]).expect("hand over");
+    let started = reviewer_requests(&mem).len();
+    act(&mut mem, TicketEvent::RunReviewer);
+    settle(&mut mem);
+    let t = a(&mem);
+    assert_eq!(t.review.turn, Some(ReviewTurn::Agent { decides: false }));
+    assert_eq!(t.review.note, None);
+    assert!(
+        reviewer_requests(&mem).len() > started,
+        "a new reviewer run"
+    );
+}

@@ -109,6 +109,8 @@ pub enum Command {
     Return { ticket: String, comment: String },
     /// Reopen a Merged ticket for review.
     Reopen { ticket: String },
+    /// Run the reviewer again, after it gave no verdict.
+    RunReviewer { ticket: String },
     /// Cancel a ticket (won't do), with a reason.
     Cancel { ticket: String, reason: String },
     /// Propose a wildcard card: work nobody planned. It waits for a person's approval.
@@ -258,6 +260,7 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
             ticket::act(&c, &ticket, "return", Some(&comment), json_out)
         }
         Command::Reopen { ticket } => ticket::act(&c, &ticket, "reopen", None, json_out),
+        Command::RunReviewer { ticket } => ticket::act(&c, &ticket, "run_reviewer", None, json_out),
         Command::Cancel { ticket, reason } => {
             ticket::act(&c, &ticket, "cancel", Some(&reason), json_out)
         }

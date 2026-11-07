@@ -12,9 +12,11 @@
 
 mod active;
 mod drain;
+mod facts;
 mod logs;
 mod prompts;
 mod pty;
+mod reviewer;
 mod screens;
 mod scrollback;
 mod silence;
@@ -79,9 +81,6 @@ pub struct Runners {
     bin: OnceLock<PathBuf>,
 }
 
-/// How much of the end of a run's output the inbox reads to show its screen.
-const TAIL_BYTES: usize = 16 * 1024;
-
 impl Runners {
     /// Runners that keep logs under `root` and read profiles from `profiles`. The receiver gets
     /// every process end; [`supervise`] feeds it to the store.
@@ -125,46 +124,6 @@ impl Runners {
     pub fn set_permission_wait(&self, wait: Duration) {
         let ms = u64::try_from(wait.as_millis()).unwrap_or(u64::MAX);
         self.permission_wait_ms.store(ms, Ordering::Relaxed);
-    }
-
-    /// What the host knows of the live runs for the inbox at `now`: the open permission dialogs,
-    /// and each run's spawn time, first sign of life and the end of its output.
-    pub fn facts(&self, now: toknila_core::Timestamp) -> toknila_app::inbox::Live {
-        // A run whose process is known to be over asks nothing any more.
-        let over: std::collections::HashSet<(TicketId, AgentRole)> = self
-            .active()
-            .iter()
-            .filter(|(_, a)| a.is_over())
-            .map(|(key, _)| *key)
-            .collect();
-        let permissions = self
-            .prompts
-            .pending()
-            .into_iter()
-            .filter(|p| !over.contains(&(p.ticket, p.role)))
-            .collect();
-        let runs = self
-            .tokens
-            .spawn_facts()
-            .into_iter()
-            .filter(|s| !over.contains(&(s.ticket, s.role)))
-            .map(|s| {
-                let active = self.active().get(&(s.ticket, s.role)).cloned();
-                toknila_core::question::RunFacts {
-                    ticket: s.ticket,
-                    role: s.role,
-                    spawned: s.spawned,
-                    first_activity: s.first_activity,
-                    startup_secs: s.startup_secs,
-                    tail: active.map(|a| a.tail(TAIL_BYTES)).unwrap_or_default(),
-                }
-            })
-            .collect();
-        toknila_app::inbox::Live {
-            now: Some(now),
-            permissions,
-            runs,
-        }
     }
 
     /// Tells runners where the daemon listens, so agents can reach it. Set once.

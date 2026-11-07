@@ -266,6 +266,10 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
                 reviews::queue_stop(uow, ticket);
                 continue;
             }
+            Effect::NudgeReviewer { message } => {
+                reviews::queue_nudge(uow, ticket, message);
+                continue;
+            }
             Effect::RecordRemarks { text } => (Actor::Agent, CommentKind::Instruction, text),
             _ => continue,
         };

@@ -99,6 +99,22 @@ pub(crate) fn queue_stop<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: TicketId) 
     uow.defer(ExternalEffect::StopReviewer { ticket });
 }
 
+/// `NudgeReviewer`: queue telling the live reviewer to record its verdict.
+pub(crate) fn queue_nudge<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: TicketId, message: String) {
+    uow.defer(ExternalEffect::NudgeReviewer { ticket, message });
+}
+
+/// The reviewer ended a turn without recording a verdict (`screen` is the end of its screen,
+/// ANSI removed). Core decides: the first time it is nudged, the second time the card goes to a
+/// person with a note. A card that has moved on ignores it.
+pub fn stopped<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    screen: Vec<String>,
+) -> AppResult<()> {
+    tell_ticket(uow, ticket, TicketEvent::ReviewerStopped { screen })
+}
+
 /// The reviewer could not start, or ended without a verdict: the card is for a person.
 pub(crate) fn failed<U: UnitOfWork + ?Sized>(
     uow: &mut U,

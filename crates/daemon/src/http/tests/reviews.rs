@@ -324,3 +324,60 @@ async fn a_reviewers_output_is_read_through_the_role_selector_and_is_empty_witho
         );
     }
 }
+
+#[tokio::test]
+async fn a_reviewer_that_stops_twice_without_a_verdict_becomes_a_review_item_to_run_again() {
+    let api = Api::new();
+    api.demo_with(&["A"]).await;
+    api.call(
+        Method::PATCH,
+        "/v1/projects/DEMO",
+        Some(json!({ "review_mode": "agent" })),
+    )
+    .await;
+    finish(&api, "DEMO-1").await;
+    let (reviewer, _) = api.agent_token_as("DEMO-1", AgentRole::Reviewer).await;
+    let stop = || {
+        api.call_with(
+            &reviewer,
+            Method::POST,
+            "/v1/tickets/DEMO-1/activity",
+            Some(json!({ "signal": "hook:stop" })),
+        )
+    };
+    // The first Stop nudges: the card still waits for the reviewer and the inbox is empty.
+    let (s, _) = stop().await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let t = api.get("/v1/tickets/DEMO-1").await;
+    assert_eq!(
+        t["review"]["awaiting"],
+        json!({ "by": "agent", "decides": true })
+    );
+    let inbox = api.get("/v1/projects/DEMO/inbox").await;
+    assert!(inbox.as_array().expect("inbox").is_empty(), "{inbox}");
+
+    // The second one hands the card to a person, who is offered the three ways on.
+    let (s, _) = stop().await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let t = api.get("/v1/tickets/DEMO-1").await;
+    assert_eq!(t["review"]["awaiting"], json!({ "by": "person" }));
+    let inbox = api.get("/v1/projects/DEMO/inbox").await;
+    let item = &inbox.as_array().expect("inbox")[0];
+    assert_eq!(item["kind"], "review");
+    assert_eq!(item["text"], "The reviewer gave no verdict");
+    let offered = item["allowed_actions"].as_array().expect("actions");
+    for want in ["accept", "return", "run_reviewer"] {
+        assert!(offered.contains(&json!(want)), "{want} in {offered:?}");
+    }
+
+    // Run the reviewer again: the card waits for it once more.
+    let done = api
+        .post("/v1/tickets/DEMO-1/actions/run_reviewer", json!({}))
+        .await;
+    assert_eq!(
+        done["review"]["awaiting"],
+        json!({ "by": "agent", "decides": false })
+    );
+    let inbox = api.get("/v1/projects/DEMO/inbox").await;
+    assert!(inbox.as_array().expect("inbox").is_empty(), "{inbox}");
+}

@@ -8,8 +8,15 @@
 use super::checks::{non_empty, run_on_ship};
 use super::{Effect, TransitionError};
 use crate::{
-    Actor, ReviewMode, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp, Verdict,
+    Actor, ReviewMode, ReviewNote, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp,
+    Verdict,
 };
+
+/// What the reviewer is told when it ends its turn without a verdict.
+pub const NUDGE_MESSAGE: &str = "Record your verdict with review_verdict; if you could not run something, say so in the verdict.";
+
+/// The most lines of the reviewer's screen a note keeps.
+const NOTE_LINES: usize = crate::question::SCREEN_LINES;
 
 /// The card was handed in: it waits for whoever `mode` says. A reviewer agent is started when
 /// the agent's verdict comes first.
@@ -19,6 +26,8 @@ pub(super) fn enter(next: &mut Ticket, mode: ReviewMode, effects: &mut Vec<Effec
         effects.push(Effect::StartReviewer);
     }
     next.review.turn = Some(turn);
+    next.review.nudged = false;
+    next.review.note = None;
 }
 
 /// The card leaves Review: nobody is awaited any more.
@@ -27,6 +36,8 @@ pub(super) fn leave(next: &mut Ticket, effects: &mut Vec<Effect>) {
         effects.push(Effect::StopReviewer);
     }
     next.review.turn = None;
+    next.review.nudged = false;
+    next.review.note = None;
 }
 
 /// A person decides (accept or return), whatever the reviewer agent is doing: it is stopped
@@ -101,10 +112,60 @@ pub(super) fn agent_failed(
         });
     }
     next.review.turn = Some(ReviewTurn::Person);
+    next.review.note = Some(ReviewNote::NoVerdict { lines: Vec::new() });
     effects.push(Effect::StopReviewer);
     effects.push(Effect::RecordReport {
         summary: format!("The reviewer gave no verdict ({detail}); it is for a person to decide."),
     });
+    Ok((TicketStatus::Review, None))
+}
+
+/// The reviewer ended its turn while the card still waits for its verdict. The first time it is
+/// nudged (once, by the host); the second time the card goes to a person with a note that the
+/// reviewer gave no verdict and the last lines of its screen.
+pub(super) fn agent_stopped(
+    next: &mut Ticket,
+    screen: &[String],
+    effects: &mut Vec<Effect>,
+) -> Result<Outcome, TransitionError> {
+    if !matches!(next.review.turn, Some(ReviewTurn::Agent { .. })) {
+        return Err(TransitionError::NotAllowed {
+            event: "reviewer_stopped",
+            from: next.status,
+        });
+    }
+    if !next.review.nudged {
+        next.review.nudged = true;
+        effects.push(Effect::NudgeReviewer {
+            message: NUDGE_MESSAGE.to_owned(),
+        });
+        return Ok((TicketStatus::Review, None));
+    }
+    let from = screen.len().saturating_sub(NOTE_LINES);
+    next.review.turn = Some(ReviewTurn::Person);
+    next.review.note = Some(ReviewNote::NoVerdict {
+        lines: screen[from..].to_vec(),
+    });
+    effects.push(Effect::StopReviewer);
+    Ok((TicketStatus::Review, None))
+}
+
+/// A person asks for the reviewer again after it gave no verdict. The person still decides after
+/// the new verdict (both mode), so a second failure cannot merge anything on its own.
+pub(super) fn rerun(
+    next: &mut Ticket,
+    effects: &mut Vec<Effect>,
+) -> Result<Outcome, TransitionError> {
+    if next.review.turn != Some(ReviewTurn::Person) || next.review.note.is_none() {
+        return Err(TransitionError::NotAllowed {
+            event: "run_reviewer",
+            from: next.status,
+        });
+    }
+    next.review.turn = Some(ReviewTurn::Agent { decides: false });
+    next.review.nudged = false;
+    next.review.note = None;
+    effects.push(Effect::StartReviewer);
     Ok((TicketStatus::Review, None))
 }
 

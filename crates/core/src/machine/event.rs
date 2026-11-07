@@ -55,6 +55,11 @@ pub enum TicketEvent {
     ReviewVerdict { verdict: Verdict, comment: String },
     /// The reviewer agent could not start, or ended without a verdict: a person decides.
     ReviewerFailed { detail: String },
+    /// Host: the reviewer ended a turn (its Stop hook, or silence) while the card still waits for
+    /// its verdict. `screen` is the end of its screen, ANSI removed.
+    ReviewerStopped { screen: Vec<String> },
+    /// `tok run-reviewer`: a person asks for the reviewer again after it gave no verdict.
+    RunReviewer,
     /// Import: the work was already done although cards before this one are still open. The
     /// card is Merged and keeps the keys of those cards as its mark.
     DoneOutOfOrder { behind: Vec<TicketKey> },
@@ -101,6 +106,8 @@ impl TicketEvent {
             Self::Accept { .. } => "accept",
             Self::ReviewVerdict { .. } => "review_verdict",
             Self::ReviewerFailed { .. } => "reviewer_failed",
+            Self::ReviewerStopped { .. } => "reviewer_stopped",
+            Self::RunReviewer => "run_reviewer",
             Self::DoneOutOfOrder { .. } => "done_out_of_order",
             Self::MergeDone => "merge_done",
             Self::PrUpdated { .. } => "pr_updated",
@@ -136,6 +143,8 @@ pub enum Effect {
     StartReviewer,
     /// Stop the reviewer's runner, if any; the worker keeps running.
     StopReviewer,
+    /// Tell the live reviewer to record its verdict (it ended a turn without one).
+    NudgeReviewer { message: String },
     /// Store the agent's summary as a report comment.
     RecordReport { summary: String },
     /// Store a person's text as an instruction comment for the agent.

@@ -13,6 +13,8 @@ fn what_each_kind_offers() {
             AnswerKind::Enter,
             AnswerKind::One,
             AnswerKind::Two,
+            AnswerKind::Up,
+            AnswerKind::Down,
             AnswerKind::Escape,
             AnswerKind::Text
         ]
@@ -108,6 +110,7 @@ fn run_facts_apply_the_rule() {
         first_activity: None,
         startup_secs: 20,
         tail: Vec::new(),
+        answered: None,
     };
     assert!(facts.waits_on_screen(Timestamp(20_000)));
     assert!(!facts.waits_on_screen(Timestamp(1_000)));
@@ -136,4 +139,67 @@ fn at_most_the_screen_limit_of_lines_come_back() {
     let lines = last_lines(out.as_bytes(), SCREEN_LINES);
     assert_eq!(lines.len(), SCREEN_LINES);
     assert_eq!(lines.last().map(String::as_str), Some("line 39"));
+}
+
+#[test]
+fn arrow_answers_and_named_keys_are_keys() {
+    let keys = |a, t| deliver(a, t, false);
+    assert_eq!(
+        keys(AnswerKind::Down, None),
+        Ok(Delivery::Keys(b"\x1b[B".to_vec()))
+    );
+    assert_eq!(
+        keys(AnswerKind::Up, None),
+        Ok(Delivery::Keys(b"\x1b[A".to_vec()))
+    );
+    assert!(QuestionKind::Screen.accepts(AnswerKind::Down));
+    assert!(!QuestionKind::Permission.accepts(AnswerKind::Up));
+    assert_eq!(
+        keys(AnswerKind::Text, Some("{down}{enter}")),
+        Ok(Delivery::Keys(b"\x1b[B\r".to_vec())),
+        "named keys carry their own Enter"
+    );
+}
+
+fn answered_run(tail: &str, answer_screen: &str) -> RunFacts {
+    RunFacts {
+        ticket: TicketId::new(),
+        role: AgentRole::Worker,
+        spawned: Timestamp(0),
+        first_activity: None,
+        startup_secs: 20,
+        tail: tail.as_bytes().to_vec(),
+        answered: Some(ScreenAnswer {
+            at: Timestamp(100_000),
+            screen: screen_hash(answer_screen.as_bytes()),
+        }),
+    }
+}
+
+#[test]
+fn an_unchanged_screen_is_not_raised_again_until_the_grace_has_passed() {
+    let run = answered_run("Trust this folder?\n> Yes\n", "Trust this folder?\n> Yes\n");
+    assert!(
+        !run.waits_on_screen(Timestamp(100_000 + 20_000)),
+        "startup passed, screen same"
+    );
+    assert!(!run.waits_on_screen(Timestamp(100_000 + 59_999)));
+    assert!(
+        run.waits_on_screen(Timestamp(100_000 + 60_000)),
+        "the grace is over"
+    );
+}
+
+#[test]
+fn a_changed_screen_counts_from_the_answer() {
+    let run = answered_run("Another dialog\n", "Trust this folder?\n");
+    assert!(!run.waits_on_screen(Timestamp(100_000 + 19_999)));
+    assert!(run.waits_on_screen(Timestamp(100_000 + 20_000)));
+    assert_eq!(run.waiting_since(), Timestamp(120_000));
+}
+
+#[test]
+fn the_screen_hash_ignores_escape_codes_and_sees_text() {
+    assert_eq!(screen_hash(b"\x1b[1mhi\x1b[0m\n"), screen_hash(b"hi\n"));
+    assert_ne!(screen_hash(b"hi\n"), screen_hash(b"ho\n"));
 }

@@ -7,6 +7,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use toknila_app::nudge::Reported;
 use toknila_core::nudge::{Source, source_of};
+use toknila_core::question::ScreenAnswer;
 use toknila_core::{AgentRole, RunId, TicketId, Timestamp};
 
 use crate::server::constant_time_eq;
@@ -44,6 +45,8 @@ struct Spawn {
     at: Timestamp,
     startup_secs: u64,
     first_activity: Option<Timestamp>,
+    /// The last answer by keys to the run's screen.
+    answered: Option<ScreenAnswer>,
 }
 
 /// What the startup rule needs to know about one run (`toknila_core::question::RunFacts`
@@ -56,6 +59,7 @@ pub struct SpawnFacts {
     pub spawned: Timestamp,
     pub first_activity: Option<Timestamp>,
     pub startup_secs: u64,
+    pub answered: Option<ScreenAnswer>,
 }
 
 #[derive(Debug, Default)]
@@ -131,19 +135,21 @@ impl AgentTokens {
             at,
             startup_secs,
             first_activity: None,
+            answered: None,
         });
     }
 
-    /// A person answered a run that waits on its screen: the wait starts over from `at`, so the
-    /// next dialog (or the silence after this one) is counted from the answer.
-    pub fn rewait(&self, ticket: TicketId, role: AgentRole, at: Timestamp) {
+    /// A person answered a run that waits on its screen with keys: the answer is kept with a hash
+    /// of the screen it was given to (core's rule, `RunFacts::waits_on_screen`, decides when the
+    /// item may come back).
+    pub fn rewait(&self, ticket: TicketId, role: AgentRole, answer: ScreenAnswer) {
         let mut inner = self.inner();
         if let Some(s) = inner
             .spawns
             .iter_mut()
             .find(|s| s.ticket == ticket && s.role == role && s.first_activity.is_none())
         {
-            s.at = at;
+            s.answered = Some(answer);
         }
     }
 
@@ -175,6 +181,7 @@ impl AgentTokens {
                 spawned: s.at,
                 first_activity: s.first_activity,
                 startup_secs: s.startup_secs,
+                answered: s.answered,
             })
             .collect()
     }
@@ -252,19 +259,24 @@ mod tests {
         assert_eq!(find(AgentRole::Worker).first_activity, Some(Timestamp(300)));
         assert_eq!(find(AgentRole::Reviewer).first_activity, None);
         assert_eq!(find(AgentRole::Reviewer).spawned, Timestamp(200));
-        tokens.rewait(g.ticket, AgentRole::Reviewer, Timestamp(900));
-        tokens.rewait(g.ticket, AgentRole::Worker, Timestamp(900));
+        let answer = ScreenAnswer {
+            at: Timestamp(900),
+            screen: 7,
+        };
+        tokens.rewait(g.ticket, AgentRole::Reviewer, answer);
+        tokens.rewait(g.ticket, AgentRole::Worker, answer);
         let facts = tokens.spawn_facts();
         let find = |role| facts.iter().find(|f| f.role == role).copied().expect("run");
         assert_eq!(
-            find(AgentRole::Reviewer).spawned,
-            Timestamp(900),
-            "restarted"
+            find(AgentRole::Reviewer).answered,
+            Some(answer),
+            "the answer is kept"
         );
+        assert_eq!(find(AgentRole::Reviewer).spawned, Timestamp(200));
         assert_eq!(
-            find(AgentRole::Worker).spawned,
-            Timestamp(100),
-            "it showed life: kept"
+            find(AgentRole::Worker).answered,
+            None,
+            "it showed life: nothing to wait for"
         );
         tokens.revoke(g.run);
         assert_eq!(tokens.spawn_facts().len(), 1);

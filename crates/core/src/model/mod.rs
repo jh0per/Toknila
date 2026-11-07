@@ -29,7 +29,7 @@ pub use profile::{
 pub use project::{MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use review::{
-    Review, ReviewRound, ReviewTurn, Verdict, resolve_mode as resolve_review_mode,
+    Review, ReviewNote, ReviewRound, ReviewTurn, Verdict, resolve_mode as resolve_review_mode,
     resolve_reviewer, reviewer_profile,
 };
 pub use run::{ProcessExit, Run};

@@ -19,6 +19,8 @@
 //! | Review (merging) | same | `PrUpdated` (pull-request mode: the card's pull request and its checks) |
 //! | Review | Running / same | `ReviewVerdict` (the reviewer agent; see [`review`]) |
 //! | Review | same | `ReviewerFailed` (the card then waits for a person) |
+//! | Review | same | `ReviewerStopped` (the reviewer ended a turn without a verdict: nudged once, then the card waits for a person with a note) |
+//! | Review | same | `RunReviewer` (a person asks for the reviewer again after it gave no verdict) |
 //! | Backlog, Ready | Merged | `DoneOutOfOrder` (import only: work finished behind open cards) |
 //! | Merged | Released | `Released` |
 //! | Merged | Review | `Reopen` |
@@ -213,6 +215,10 @@ pub fn apply(
         (S::Review, TicketEvent::ReviewerFailed { detail }) => {
             review::agent_failed(&mut next, detail, &mut effects)?
         }
+        (S::Review, TicketEvent::ReviewerStopped { screen }) => {
+            review::agent_stopped(&mut next, screen, &mut effects)?
+        }
+        (S::Review, TicketEvent::RunReviewer) => review::rerun(&mut next, &mut effects)?,
         (S::Backlog | S::Ready, TicketEvent::DoneOutOfOrder { behind }) => {
             if behind.is_empty() {
                 return Err(TransitionError::NothingBehind);

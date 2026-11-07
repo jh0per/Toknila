@@ -6,6 +6,9 @@ import type { State } from "../store/state";
 import { itemRoute } from "../store/inbox";
 import { NavLink } from "./Link";
 
+/// The text of the item for a reviewer that gave no verdict (core's `NO_VERDICT_TEXT`).
+const NO_VERDICT = "The reviewer gave no verdict";
+
 /// One thing that waits on a person, with the action that settles it inline.
 export function InboxRow({ state, item, dispatch }: { state: State; item: InboxItem; dispatch: (i: Intent) => void }) {
   const route = itemRoute(state, item);
@@ -34,7 +37,7 @@ function Body({ item, route, dispatch }: { item: InboxItem; route: Route | undef
           )}
         </div>
       );
-    case "review": return <p className="muted">Your turn to review. Open the card to accept or return it.</p>;
+    case "review": return <Review item={item} dispatch={dispatch} />;
     case "thread":
       return (
         <div className="row-body">
@@ -87,7 +90,7 @@ function Proposal({ item, dispatch }: { item: InboxItem; dispatch: (i: Intent) =
 }
 
 const ANSWER_LABEL: Record<AnswerKind, string> = {
-  allow: "Allow", deny: "Deny", text: "Send", enter: "Enter", one: "1", two: "2", escape: "Esc",
+  allow: "Allow", deny: "Deny", text: "Send", enter: "Enter", one: "1", two: "2", up: "\u2191", down: "\u2193", escape: "Esc",
 };
 
 /// What the agent asks, and the answers core offers for it: allow or deny a permission (a deny
@@ -149,6 +152,44 @@ function Question({ item, dispatch }: { item: InboxItem; dispatch: (i: Intent) =
         <button type="submit" disabled={!text.trim()}>Reply</button>
       </form>
       ) : null}
+    </div>
+  );
+}
+
+/// A card for the person to review. When the reviewer gave no verdict, the item says so with the
+/// end of its screen, and offers Accept, Return and Run the reviewer again.
+function Review({ item, dispatch }: { item: InboxItem; dispatch: (i: Intent) => void }) {
+  const [comment, setComment] = useState("");
+  const act = (action: "accept" | "run_reviewer") => dispatch({ type: "ticketAction", key: item.ticket, action });
+  if (!item.lines || item.lines.length === 0) {
+    if (item.text !== NO_VERDICT) return <p className="muted">Your turn to review. Open the card to accept or return it.</p>;
+  }
+  return (
+    <div className="row-body" data-testid="no-verdict">
+      <blockquote data-testid="question">{item.text}</blockquote>
+      {item.lines && item.lines.length > 0 && <pre className="screen" data-testid="screen">{item.lines.join("\n")}</pre>}
+      <div className="btns">
+        {item.allowed_actions.includes("accept") && (
+          <button className="primary" data-testid="review-accept" onClick={() => act("accept")}>Accept</button>
+        )}
+        {item.allowed_actions.includes("run_reviewer") && (
+          <button data-testid="review-run-again" onClick={() => act("run_reviewer")}>Run the reviewer again</button>
+        )}
+      </div>
+      {item.allowed_actions.includes("return") && (
+        <form
+          className="compose"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!comment.trim()) return;
+            dispatch({ type: "ticketAction", key: item.ticket, action: "return", text: comment.trim() });
+            setComment("");
+          }}
+        >
+          <input aria-label={`What ${item.ticket} needs`} placeholder="Return it with a comment" value={comment} onChange={(e) => setComment(e.target.value)} />
+          <button type="submit" data-testid="review-return" disabled={!comment.trim()}>Return</button>
+        </form>
+      )}
     </div>
   );
 }

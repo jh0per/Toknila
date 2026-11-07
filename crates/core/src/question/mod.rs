@@ -7,15 +7,17 @@
 //! |---|---|---|
 //! | `question` | `ask_human` | none here: a comment is the answer |
 //! | `permission` | a permission dialog (hook or notification) | `allow`, `deny` |
-//! | `screen` | nothing for `startup_secs` after spawn | `enter`, `one`, `two`, `escape`, `text` |
+//! | `screen` | nothing for `startup_secs` after spawn | `enter`, `one`, `two`, `up`, `down`, `escape`, `text` (which may carry named keys like `{down}`) |
 
+mod keys;
 mod screen;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{AgentRole, TicketId, Timestamp};
 
-pub use screen::{SCREEN_LINES, last_lines};
+pub use keys::{expand_keys, has_named_keys};
+pub use screen::{SCREEN_LINES, last_lines, screen_hash};
 
 /// Seconds after spawn without a sign of life before an agent counts as waiting on its screen.
 pub const DEFAULT_STARTUP_SECS: u64 = 20;
@@ -55,6 +57,10 @@ pub enum AnswerKind {
     Two,
     /// The Escape key.
     Escape,
+    /// The Up arrow key.
+    Up,
+    /// The Down arrow key.
+    Down,
 }
 
 impl QuestionKind {
@@ -67,6 +73,8 @@ impl QuestionKind {
                 AnswerKind::Enter,
                 AnswerKind::One,
                 AnswerKind::Two,
+                AnswerKind::Up,
+                AnswerKind::Down,
                 AnswerKind::Escape,
                 AnswerKind::Text,
             ],
@@ -128,9 +136,16 @@ pub fn deliver(
         (AnswerKind::Two, _) => Delivery::Keys(b"2".to_vec()),
         (AnswerKind::Deny | AnswerKind::Escape, _) => Delivery::Keys(b"\x1b".to_vec()),
         (AnswerKind::Enter, _) => Delivery::Keys(b"\r".to_vec()),
+        (AnswerKind::Up, _) => Delivery::Keys(b"\x1b[A".to_vec()),
+        (AnswerKind::Down, _) => Delivery::Keys(b"\x1b[B".to_vec()),
         (AnswerKind::Text, _) => {
             let text = text.ok_or(AnswerError::EmptyText)?;
-            Delivery::Keys(format!("{text}\r").into_bytes())
+            // Named keys (`{down}{enter}`) are the whole answer: no Enter is added to them.
+            if has_named_keys(text) {
+                Delivery::Keys(expand_keys(text))
+            } else {
+                Delivery::Keys(format!("{text}\r").into_bytes())
+            }
         }
     })
 }
@@ -148,12 +163,43 @@ pub struct RunFacts {
     pub startup_secs: u64,
     /// The end of the run's output, raw (for the screen lines).
     pub tail: Vec<u8>,
+    /// The last time a person answered this run's screen with keys, and the screen then.
+    pub answered: Option<ScreenAnswer>,
 }
+
+/// A person's answer by keys to a run's screen: when, and a hash of the screen it was given to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScreenAnswer {
+    pub at: Timestamp,
+    pub screen: u64,
+}
+
+/// How long after an answer the same unchanged screen is not raised again, in seconds.
+pub const ANSWER_GRACE_SECS: u64 = 60;
 
 impl RunFacts {
     /// Whether the agent waits on its screen at `now`.
     pub fn waits_on_screen(&self, now: Timestamp) -> bool {
-        waits_on_screen(self.spawned, self.first_activity, now, self.startup_secs)
+        let Some(answer) = self.answered else {
+            return waits_on_screen(self.spawned, self.first_activity, now, self.startup_secs);
+        };
+        // After an answer the wait starts over from it; and while the screen is still the one
+        // the answer was given to, the item stays quiet for a longer grace period.
+        let unchanged = screen_hash(&self.tail) == answer.screen;
+        let grace = ANSWER_GRACE_SECS.saturating_mul(1000);
+        if unchanged && now.millis_since(answer.at) < grace {
+            return false;
+        }
+        waits_on_screen(answer.at, self.first_activity, now, self.startup_secs)
+    }
+
+    /// When the item for this run began: the startup time after the spawn or the last answer.
+    pub fn waiting_since(&self) -> Timestamp {
+        let from = self.answered.map_or(self.spawned, |a| a.at);
+        Timestamp(
+            from.0
+                .saturating_add(i64::try_from(self.startup_secs.saturating_mul(1000)).unwrap_or(0)),
+        )
     }
 }
 

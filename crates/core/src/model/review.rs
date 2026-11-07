@@ -45,6 +45,16 @@ pub enum ReviewTurn {
     Merging,
 }
 
+/// Why a card waits for a person in Review beyond the ordinary hand-in; shown in the inbox.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "note", rename_all = "snake_case")]
+pub enum ReviewNote {
+    /// The reviewer ended its turn (or its process) without a verdict, even after one nudge.
+    /// `lines` are the last lines of its screen, ANSI removed (at most 15; may be empty).
+    NoVerdict { lines: Vec<String> },
+}
+
 /// A ticket's review state: whose turn it is while in Review, and every round so far.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,12 +65,18 @@ pub struct Review {
     /// Oldest first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rounds: Vec<ReviewRound>,
+    /// The reviewer was already nudged for a verdict in this round of review.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub nudged: bool,
+    /// Why the card is for a person, when the reviewer gave no verdict.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<ReviewNote>,
 }
 
 impl Review {
     /// True before the first review: nothing to show or store.
     pub fn is_empty(&self) -> bool {
-        self.turn.is_none() && self.rounds.is_empty()
+        self.turn.is_none() && self.rounds.is_empty() && !self.nudged && self.note.is_none()
     }
 
     /// Adds a round by `reviewer`; its number follows the last one.

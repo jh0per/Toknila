@@ -31,6 +31,8 @@ pub enum TicketAction {
     Approve,
     /// Turn a wildcard card down, with a text.
     Reject,
+    /// Run the reviewer again, after it gave no verdict.
+    RunReviewer,
 }
 
 /// The name is not an action.
@@ -51,7 +53,7 @@ impl FromStr for TicketAction {
 
 impl TicketAction {
     /// Every action, in the order a client shows them.
-    pub const ALL: [TicketAction; 11] = [
+    pub const ALL: [TicketAction; 12] = [
         Self::Start,
         Self::Pause,
         Self::Resume,
@@ -63,6 +65,7 @@ impl TicketAction {
         Self::Cancel,
         Self::Approve,
         Self::Reject,
+        Self::RunReviewer,
     ];
 
     /// The name used in routes and commands.
@@ -79,6 +82,7 @@ impl TicketAction {
             Self::Cancel => "cancel",
             Self::Approve => "approve",
             Self::Reject => "reject",
+            Self::RunReviewer => "run_reviewer",
         }
     }
 
@@ -112,6 +116,7 @@ impl TicketAction {
                 reason: required("reject")?,
                 by,
             },
+            Self::RunReviewer => TicketEvent::RunReviewer,
         })
     }
 

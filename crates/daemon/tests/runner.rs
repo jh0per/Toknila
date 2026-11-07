@@ -768,3 +768,39 @@ fn typing_addressed_to_the_reviewer_reaches_the_reviewer_and_not_the_worker() {
     );
     rig.runners.stop(rig.ticket);
 }
+
+#[test]
+fn a_down_arrow_chooses_the_unnumbered_yes_of_a_trust_dialog_and_enter_alone_declines() {
+    use toknila_core::question::{self, AnswerKind, Delivery};
+    let keys = |answer| match question::deliver(answer, None, false) {
+        Ok(Delivery::Keys(bytes)) => bytes,
+        other => panic!("keys expected: {other:?}"),
+    };
+    for (name, sent, expect) in [
+        (
+            "down-then-enter",
+            [keys(AnswerKind::Down), keys(AnswerKind::Enter)].concat(),
+            "trust=yes",
+        ),
+        ("enter-only", keys(AnswerKind::Enter), "trust=no"),
+    ] {
+        let rig = Rig::new();
+        rig.profile("fake", &["trust", "hold"], "");
+        rig.start("fake");
+        rig.wait_for("Yes, I trust this folder");
+        // The screen the answer is given to is hashed before the keys change it.
+        let before =
+            rig.runners
+                .screen_answer(rig.ticket, AgentRole::Worker, toknila_core::Timestamp(1));
+        rig.runners
+            .write(rig.ticket, AgentRole::Worker, &sent)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let out = rig.wait_for("trust=");
+        assert!(out.contains(expect), "{name}: {out:?}");
+        let after =
+            rig.runners
+                .screen_answer(rig.ticket, AgentRole::Worker, toknila_core::Timestamp(2));
+        assert_ne!(before.screen, after.screen, "{name}: the screen changed");
+        rig.runners.stop(rig.ticket);
+    }
+}

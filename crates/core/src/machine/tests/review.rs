@@ -1,5 +1,6 @@
 use super::*;
-use crate::{ReviewMode, ReviewTurn, Verdict};
+use crate::machine::review;
+use crate::{ReviewMode, ReviewNote, ReviewTurn, Verdict, machine::TicketAction};
 
 fn finished(mode: ReviewMode) -> TicketEvent {
     TicketEvent::Finished {
@@ -269,4 +270,102 @@ fn every_recorded_verdict_stops_the_reviewer_and_never_the_worker() {
 fn a_refused_verdict_stops_nothing() {
     let t = in_review(ReviewTurn::Agent { decides: true });
     assert!(apply(&t, &verdict(Verdict::RequestChanges, " "), NOW).is_err());
+}
+
+fn stopped(lines: &[&str]) -> TicketEvent {
+    TicketEvent::ReviewerStopped {
+        screen: lines.iter().map(|l| (*l).to_owned()).collect(),
+    }
+}
+
+#[test]
+fn a_reviewer_that_ends_a_turn_without_a_verdict_is_nudged_once() {
+    let t = in_review(ReviewTurn::Agent { decides: false });
+    let tr = step(&t, &stopped(&["thinking"]));
+    assert_eq!(
+        tr.ticket.review.turn,
+        Some(ReviewTurn::Agent { decides: false })
+    );
+    assert!(tr.ticket.review.nudged);
+    assert_eq!(tr.ticket.review.note, None);
+    assert_eq!(
+        tr.effects,
+        [Effect::NudgeReviewer {
+            message: review::NUDGE_MESSAGE.to_owned()
+        }]
+    );
+    assert!(review::NUDGE_MESSAGE.contains("review_verdict"));
+}
+
+#[test]
+fn a_second_stop_without_a_verdict_hands_the_card_to_a_person_with_a_note() {
+    let mut t = in_review(ReviewTurn::Agent { decides: true });
+    t.review.nudged = true;
+    let screen: Vec<String> = (0..20).map(|i| format!("line {i}")).collect();
+    let tr = step(&t, &TicketEvent::ReviewerStopped { screen });
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+    let Some(ReviewNote::NoVerdict { lines }) = &tr.ticket.review.note else {
+        panic!("a note");
+    };
+    assert_eq!(lines.len(), 15, "at most 15 lines");
+    assert_eq!(lines.last().map(String::as_str), Some("line 19"));
+    assert_eq!(tr.effects, [Effect::StopReviewer]);
+}
+
+#[test]
+fn a_stop_after_the_verdict_or_outside_the_reviewers_turn_is_refused() {
+    for turn in [ReviewTurn::Person, ReviewTurn::Merging] {
+        let t = in_review(turn);
+        assert!(apply(&t, &stopped(&[]), NOW).is_err(), "{turn:?}");
+    }
+    let running = ticket_in(TicketStatus::Running);
+    assert!(apply(&running, &stopped(&[]), NOW).is_err());
+}
+
+#[test]
+fn a_person_can_run_the_reviewer_again_only_after_it_gave_no_verdict() {
+    let mut t = in_review(ReviewTurn::Person);
+    assert!(
+        apply(&t, &TicketEvent::RunReviewer, NOW).is_err(),
+        "no note"
+    );
+    assert!(!TicketAction::allowed(&t).contains(&TicketAction::RunReviewer));
+    t.review.note = Some(ReviewNote::NoVerdict { lines: vec![] });
+    assert!(TicketAction::allowed(&t).contains(&TicketAction::RunReviewer));
+    let tr = step(&t, &TicketEvent::RunReviewer);
+    assert_eq!(
+        tr.ticket.review.turn,
+        Some(ReviewTurn::Agent { decides: false })
+    );
+    assert_eq!(
+        (tr.ticket.review.nudged, tr.ticket.review.note),
+        (false, None)
+    );
+    assert_eq!(tr.effects, [Effect::StartReviewer]);
+}
+
+#[test]
+fn a_persons_decision_clears_the_note() {
+    let mut t = in_review(ReviewTurn::Person);
+    t.review.note = Some(ReviewNote::NoVerdict { lines: vec![] });
+    t.review.nudged = true;
+    let accept = TicketAction::Accept
+        .event(None, Actor::Human)
+        .expect("event");
+    let tr = step(&t, &accept);
+    assert_eq!(
+        (tr.ticket.review.nudged, tr.ticket.review.note),
+        (false, None)
+    );
+}
+
+#[test]
+fn a_reviewer_that_exits_gets_the_run_again_action_too() {
+    let t = in_review(ReviewTurn::Agent { decides: false });
+    let failed = TicketEvent::ReviewerFailed {
+        detail: "gone".to_owned(),
+    };
+    let tr = step(&t, &failed);
+    assert!(tr.ticket.review.note.is_some());
+    assert!(TicketAction::allowed(&tr.ticket).contains(&TicketAction::RunReviewer));
 }

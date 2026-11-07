@@ -84,6 +84,11 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
             with_chain(uow, t.chain_id, |ctx| {
                 Ok::<_, AppError>(ctx.ticket_event(t.id, TicketEvent::AskHuman { reason })?)
             })?;
+            // A permission request lives in the journal and the inbox; it is not a comment on
+            // the card (a question the agent asks is).
+            if permission {
+                return Ok(t.id);
+            }
             report(uow, t, body_from_text(&text))
         }
         AgentEvent::SubtaskDone { position } => {
