@@ -12,7 +12,7 @@ type Dispatch = (msg: Msg) => void;
 export function runPlannerEffect(e: PlannerEffect, dispatch: Dispatch): void {
   const base = `/projects/${encodeURIComponent(e.project)}/planner`;
   const request =
-    e.call === "load" ? get<PlannerState>(base) : post<PlannerState>(`${base}/${e.call}`, {});
+    e.call === "load" ? get<PlannerState>(base) : post<PlannerState>(`${base}/${e.call}`, e.call === "start" ? { profile: e.profile } : {});
   request
     .then((state) => dispatch({ type: "plannerLoaded", project: e.project, state }))
     .catch((err: unknown) =>

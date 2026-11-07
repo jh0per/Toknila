@@ -189,6 +189,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "startPlanner":
     case "stopPlanner":
     case "refreshPlanner":
+    case "pickPlannerProfile":
     case "plannerLoaded":
     case "plannerFailed":
       return reducePlanner(s, msg);
@@ -220,7 +221,7 @@ function then(s: State, fx: Effect[], route: Route): [State, Effect[]] {
 function enter(route: Route, s: State): Effect[] {
   if (route.name === "settings") return [...setupLoads, { type: "loadCli" }];
   if (route.name === "usage") return [loadUsage(s)];
-  if (route.name === "planner") return [loadPlanner(route.project)];
+  if (route.name === "planner") return [loadPlanner(route.project), { type: "loadProfiles" }];
   return route.name === "card"
     ? [{ type: "loadDetail", key: route.key }, { type: "loadThreads", key: route.key }]
     : [];

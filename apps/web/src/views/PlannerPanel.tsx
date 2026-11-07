@@ -106,6 +106,8 @@ function PlannerTerminal({ project, onEnded }: { project: string; onEnded: () =>
 export function PlannerPanel({ project, state, dispatch }: { project: Project; state: State; dispatch: (i: Intent) => void }) {
   const planner = plannerOf(state, project.key);
   const running = planner?.running ?? false;
+  // The profiles with the planner role; the built-in one is the default.
+  const profiles = state.settings.profiles.filter((l) => l.profile.role === "planner").map((l) => l.profile.name);
   return (
     <section className="panel" data-testid="panel">
       <div className="tabs">
@@ -121,12 +123,22 @@ export function PlannerPanel({ project, state, dispatch }: { project: Project; s
             Stop
           </button>
         ) : (
-          <button
-            type="button" className="btn primary" data-testid="planner-start" disabled={planner === undefined}
-            onClick={() => dispatch({ type: "startPlanner", project: project.key })}
-          >
-            Start
-          </button>
+          <>
+            {profiles.length > 1 && (
+              <select
+                aria-label="Planner profile" data-testid="planner-profile" value={state.planner.profile}
+                onChange={(e) => dispatch({ type: "pickPlannerProfile", profile: e.target.value })}
+              >
+                {profiles.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            )}
+            <button
+              type="button" className="btn primary" data-testid="planner-start" disabled={planner === undefined}
+              onClick={() => dispatch({ type: "startPlanner", project: project.key })}
+            >
+              Start
+            </button>
+          </>
         )}
       </div>
       {state.planner.error && <p className="error side-note" role="alert" data-testid="planner-error">{state.planner.error}</p>}

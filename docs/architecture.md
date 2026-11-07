@@ -650,6 +650,13 @@ the cards; the owner starts cards and accepts work.
   WebSocket `/planner/stream` (the same frames as a card's terminal), `POST /planner/input`,
   `/planner/size`, `/planner/start` and `/planner/stop`. All run as a person.
   `tok planner start|stop|logs <PROJECT>` is the CLI.
+- **Window.** A "Planner" entry at the top of the current project's section in the sidebar
+  (route `/projects/{project}/planner`, `store/planner.ts`: whether it runs, the profile Start
+  uses, the last refusal). Selecting it shows the project's most recently active chain above
+  (the diagram follows what the planner edits, from the journal) and the planner's terminal below
+  (`views/PlannerPanel.tsx`: Start/Stop, a profile pick when a project has more than one planner
+  profile, xterm over the scrollback and the stream; typing goes to the planner). The terminal
+  connection is `terminal/connect.ts` with the project's routes (`openPlannerTerminal`).
 - **Tools and routes.** `tok mcp` with `TOKNILA_ROLE=planner` offers `show_plan`, `new_chain`,
   `add_card`, `edit_card`, `add_dependency`, `remove_dependency`, `move_card`, `open_thread`,
   `thread_message` and `thread_version` (`cmd/mcp_planner`), each a call to `/v1/planner/...`
