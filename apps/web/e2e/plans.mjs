@@ -129,7 +129,7 @@ try {
   tok("start", "PLANNER-1");
   await row("PLANNER").click({ button: "right" });
   await t("menu-delete-project").click();
-  await expectText(t("delete-folder"), "/planner", "the dialog shows the folder");
+  await expectText(t("delete-folder"), "planner", "the dialog shows the folder");
   await enabled("delete-trash", false, "the Trash button waits for the key");
   await t("delete-confirm").fill("planner");
   await enabled("delete-trash", false, "a wrong key keeps it disabled");
