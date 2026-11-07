@@ -1,4 +1,5 @@
-import { type ReactNode, useState } from "react";
+import type { ChangeEvent, ReactNode } from "react";
+import type { DraftField } from "../store/addForm";
 import type { Intent } from "../store/msg";
 import { fieldError, formError } from "../store/settings";
 import type { State } from "../store/state";
@@ -14,45 +15,55 @@ export function Field({ label, name, error, children }: { label: string; name: s
 }
 
 /// Add a project from a folder. A text field takes the path (paste-friendly); the daemon says what
-/// is wrong with it and, when the base branch is missing, which branches the repository has.
-export function AddProject({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
-  const [key, setKey] = useState("");
-  const [name, setName] = useState("");
-  const [path, setPath] = useState("");
-  const [branch, setBranch] = useState("develop");
+/// is wrong with it and, when the base branch is missing, which branches the repository has. Key
+/// and name follow what the folder suggests until the person types into them (the store decides).
+export function AddProject({ state, dispatch, focus = false }: {
+  state: State;
+  dispatch: (i: Intent) => void;
+  /// Put the cursor in the folder field (in a dialog, not on the onboarding page).
+  focus?: boolean;
+}) {
   const s = state.settings;
+  const d = s.add.draft;
+  const edit = (field: DraftField) => (e: ChangeEvent<HTMLInputElement>) =>
+    dispatch({ type: "editDraft", field, value: e.target.value });
   return (
     <form
       className="card-block form"
       data-testid="add-project"
       onSubmit={(e) => {
         e.preventDefault();
-        dispatch({ type: "addProject", draft: { key: key.trim(), name, repo_path: path.trim(), work_branch: branch.trim() } });
+        dispatch({ type: "submitProject" });
       }}
     >
       <h2>Add a project</h2>
       <Field label="Folder of the repository" name="repo_path" error={fieldError(s, "repo_path")}>
         <input
-          data-testid="repo-path" value={path} placeholder="/Users/you/Work/my-repo" spellCheck={false}
-          onChange={(e) => setPath(e.target.value)}
+          data-testid="repo-path" value={d.repo_path} placeholder="/Users/you/Work/my-repo" spellCheck={false}
+          autoFocus={focus} onChange={edit("repo_path")}
         />
       </Field>
       <Field label="Base branch" name="work_branch" error={fieldError(s, "work_branch")}>
-        <input data-testid="work-branch" value={branch} spellCheck={false} onChange={(e) => setBranch(e.target.value)} />
+        <input data-testid="work-branch" value={d.work_branch} spellCheck={false} onChange={edit("work_branch")} />
       </Field>
       {s.branches.length > 0 && fieldError(s, "work_branch") && (
         <p className="branches" data-testid="branches">
           Branches in this repository:{" "}
           {s.branches.map((b) => (
-            <button type="button" className="btn" key={b} data-branch={b} onClick={() => setBranch(b)}>{b}</button>
+            <button
+              type="button" className="btn" key={b} data-branch={b}
+              onClick={() => dispatch({ type: "editDraft", field: "work_branch", value: b })}
+            >
+              {b}
+            </button>
           ))}
         </p>
       )}
       <Field label="Key (prefix of ticket keys)" name="key" error={fieldError(s, "key")}>
-        <input data-testid="project-key" value={key} placeholder="TOKNILA" spellCheck={false} onChange={(e) => setKey(e.target.value)} />
+        <input data-testid="project-key" value={d.key} placeholder="from the folder's name" spellCheck={false} onChange={edit("key")} />
       </Field>
-      <Field label="Name (optional)" name="name" error={undefined}>
-        <input value={name} onChange={(e) => setName(e.target.value)} />
+      <Field label="Name" name="name" error={fieldError(s, "name")}>
+        <input data-testid="project-name" value={d.name} placeholder="the folder's name" onChange={edit("name")} />
       </Field>
       {formError(s) && <p className="error" role="alert">{formError(s)}</p>}
       <button className="btn primary" type="submit" disabled={s.busy} data-testid="add-project-submit">Add project</button>

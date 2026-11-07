@@ -2,17 +2,15 @@
 // changing its settings. The daemon judges every input; this only keeps what it answered so the
 // views can show it next to the field it is about.
 
-import type { CliLink, ListedProfile, PatchProject, Project, RepoProblem, SystemChecks } from "../api/types";
+import type { CliLink, ListedProfile, PatchProject, Project, RepoCheck, RepoProblem, SystemChecks } from "../api/types";
+import {
+  type AddForm, type DraftField, type ProjectDraft, applyCheck, editDraft, initialAddForm, mustWait, needsCheck,
+  resolvedDraft,
+} from "./addForm";
 import type { Effect } from "./msg";
 import type { State } from "./state";
 
-/// What a person types to add a project.
-export interface ProjectDraft {
-  key: string;
-  name: string;
-  repo_path: string;
-  work_branch: string;
-}
+export type { ProjectDraft } from "./addForm";
 
 export interface SettingsState {
   checks: SystemChecks | undefined;
@@ -30,6 +28,8 @@ export interface SettingsState {
   saved: boolean;
   /// Name of the chain the last import made.
   imported: string | undefined;
+  /// The add-a-project form, kept here so the folder's suggestion can follow it.
+  add: AddForm;
 }
 
 export const initialSettings: SettingsState = {
@@ -43,13 +43,15 @@ export const initialSettings: SettingsState = {
   busy: false,
   saved: false,
   imported: undefined,
+  add: initialAddForm,
 };
 
 /// What the person did on these screens.
 export type SettingsIntent =
   | { type: "recheck" }
   | { type: "installCli" }
-  | { type: "addProject"; draft: ProjectDraft }
+  | { type: "editDraft"; field: DraftField; value: string }
+  | { type: "submitProject" }
   | { type: "saveProject"; project: string; patch: PatchProject }
   | { type: "importChain"; project: string; toml: string };
 
@@ -59,21 +61,24 @@ export type SettingsResult =
   | { type: "cliLoaded"; cli: CliLink }
   | { type: "cliRejected"; message: string }
   | { type: "profilesLoaded"; profiles: ListedProfile[] }
+  | { type: "repoChecked"; repo_path: string; check: RepoCheck }
   | { type: "addRejected"; problems: RepoProblem[]; branches: string[] }
   | { type: "projectAdded"; project: Project }
   | { type: "projectSaved"; project: Project }
-  | { type: "chainImported"; chain: string }
+  | { type: "chainImported"; project: string; chain: string }
   | { type: "settingsRejected"; field: string | undefined; message: string };
 
 export type SettingsMsg = SettingsIntent | SettingsResult;
 
-/// Side effects of these screens: the loads and the three commands.
+/// Side effects of these screens: the loads, the folder check behind the suggestion, the commands.
 export type SettingsEffect =
   | { type: "loadChecks" }
   | { type: "loadProfiles" }
   | { type: "loadCli" }
   | { type: "installCli" }
-  | Extract<SettingsIntent, { type: "addProject" | "saveProject" | "importChain" }>;
+  | { type: "checkRepo"; repo_path: string; work_branch: string }
+  | { type: "addProject"; draft: ProjectDraft }
+  | Extract<SettingsIntent, { type: "saveProject" | "importChain" }>;
 
 /// What the screens need fetched when they open.
 export const setupLoads: Effect[] = [{ type: "loadChecks" }, { type: "loadProfiles" }];
@@ -88,22 +93,43 @@ export function formError(s: SettingsState): string | undefined {
   return s.error && !s.error.field ? s.error.message : undefined;
 }
 
-const upsert = (projects: Project[], p: Project): Project[] =>
+export const upsert = (projects: Project[], p: Project): Project[] =>
   projects.some((x) => x.id === p.id) ? projects.map((x) => (x.id === p.id ? p : x)) : [...projects, p];
 
 const start = (s: State): SettingsState => ({
   ...s.settings, problems: [], branches: [], error: undefined, busy: true, saved: false, imported: undefined,
 });
 
+const checkOf = (f: AddForm): Effect => ({
+  type: "checkRepo", repo_path: f.draft.repo_path.trim(), work_branch: f.draft.work_branch.trim(),
+});
+
+const addOf = (f: AddForm): Effect => ({ type: "addProject", draft: resolvedDraft(f) });
+
 /// The reducer of these screens; `projectAdded` also moves the page, which `reduce` does.
 export function reduceSettings(s: State, msg: SettingsMsg): [State, Effect[]] {
   const set = (settings: Partial<SettingsState>, projects = s.projects): State => ({
     ...s, projects, settings: { ...s.settings, ...settings },
   });
+  const sending = (add: AddForm): State => ({ ...s, settings: { ...start(s), add } });
   switch (msg.type) {
     case "recheck":
       return [set({ checks: undefined }), [{ type: "loadChecks" }]];
-    case "addProject":
+    case "editDraft": {
+      const add = editDraft(s.settings.add, msg.field, msg.value);
+      return [set({ add }), needsCheck(s.settings.add, msg.field, msg.value) ? [checkOf(add)] : []];
+    }
+    case "repoChecked": {
+      const add = applyCheck(s.settings.add, msg.repo_path, msg.check);
+      // A form sent before the suggestion came goes out now, with it.
+      if (!s.settings.add.waiting || add === s.settings.add) return [set({ add }), []];
+      return [sending({ ...add, waiting: false }), [addOf(add)]];
+    }
+    case "submitProject": {
+      const add = s.settings.add;
+      if (mustWait(add)) return [sending({ ...add, waiting: true }), [checkOf(add)]];
+      return [sending({ ...add, waiting: false }), [addOf(add)]];
+    }
     case "saveProject":
     case "importChain":
       return [{ ...s, settings: start(s) }, [msg]];
@@ -117,15 +143,19 @@ export function reduceSettings(s: State, msg: SettingsMsg): [State, Effect[]] {
       return [set({ checks: msg.checks }), []];
     case "profilesLoaded":
       return [set({ profiles: msg.profiles }), []];
-    case "addRejected":
-      return [set({ problems: msg.problems, branches: msg.branches, busy: false }), []];
+    case "addRejected": {
+      const add = { ...s.settings.add, waiting: false };
+      return [set({ problems: msg.problems, branches: msg.branches, busy: false, add }), []];
+    }
     case "projectAdded":
-      return [set({ busy: false }, upsert(s.projects, msg.project)), [{ type: "loadAgents" }]];
+      return [set({ busy: false, add: initialAddForm }, upsert(s.projects, msg.project)), [{ type: "loadAgents" }]];
     case "projectSaved":
       return [set({ busy: false, saved: true }, upsert(s.projects, msg.project)), [{ type: "loadAgents" }]];
     case "chainImported":
       return [set({ busy: false, imported: msg.chain }), [{ type: "loadAll" }]];
-    case "settingsRejected":
-      return [set({ busy: false, error: { field: msg.field, message: msg.message } }), []];
+    case "settingsRejected": {
+      const add = { ...s.settings.add, waiting: false };
+      return [set({ busy: false, error: { field: msg.field, message: msg.message }, add }), []];
+    }
   }
 }

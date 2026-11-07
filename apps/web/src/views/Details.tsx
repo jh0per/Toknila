@@ -1,7 +1,8 @@
 import type { Ticket } from "../api/types";
 import { reasonText } from "../format";
 import type { Intent } from "../store/msg";
-import { type State, queuePosition } from "../store/state";
+import { type State, currentChain, queuePosition } from "../store/state";
+import { CardPlan } from "./CardPlan";
 import { Comments } from "./Comments";
 import { DetailsMeta } from "./DetailsMeta";
 import { Rounds } from "./Rounds";
@@ -23,6 +24,7 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
         {queuePosition(state, card.id) !== undefined ? ` · queued #${queuePosition(state, card.id)}` : ""}
         {card.status_reason ? ` · ${reasonText(card.status_reason)}` : ""}
       </p>
+      <CardPlan state={state} card={card} detail={detail} chain={currentChain(state)} dispatch={dispatch} />
       <DetailsMeta card={card} ship={detail?.ship} />
       <div className="cols">
         <section>

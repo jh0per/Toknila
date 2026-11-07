@@ -7,11 +7,17 @@ import { fieldError, formError } from "./settings";
 const project = (over: Partial<Project> = {}) =>
   ({ id: "p1", key: "DEMO", name: "Demo", max_parallel: 2, ...over }) as Project;
 
-const draft = { key: "DEMO", name: "", repo_path: "/work/demo", work_branch: "develop" };
+const draft = { key: "DEMO", name: "Demo", repo_path: "/work/demo", work_branch: "develop" };
 
 function ready(projects: Project[]): State {
   const [s] = reduce(initialState({ name: "chains" }), { type: "loaded", projects, chains: [] });
   return s;
+}
+
+/// The form with every field typed in by the person.
+function typed(s: State): State {
+  const fields = ["repo_path", "key", "name"] as const;
+  return fields.reduce((at, field) => reduce(at, { type: "editDraft", field, value: draft[field] })[0], s);
 }
 
 describe("first run", () => {
@@ -41,14 +47,14 @@ describe("first run", () => {
 
 describe("adding a project", () => {
   it("asks the daemon and marks the form busy", () => {
-    const [s, fx] = reduce(ready([]), { type: "addProject", draft });
+    const [s, fx] = reduce(typed(ready([])), { type: "submitProject" });
     expect(s.settings.busy).toBe(true);
     expect(fx).toEqual([{ type: "addProject", draft }]);
   });
 
   it("keeps each problem for its own field, and the branches to pick", () => {
     const problems = [{ field: "work_branch", code: "branch_missing", message: "no branch" }] as RepoProblem[];
-    const [busy] = reduce(ready([]), { type: "addProject", draft });
+    const [busy] = reduce(typed(ready([])), { type: "submitProject" });
     const [s] = reduce(busy, { type: "addRejected", problems, branches: ["main", "trunk"] });
     expect(fieldError(s.settings, "work_branch")).toBe("no branch");
     expect(fieldError(s.settings, "repo_path")).toBeUndefined();
@@ -58,9 +64,18 @@ describe("adding a project", () => {
 
   it("a new attempt clears the old problems", () => {
     const problems = [{ field: "repo_path", code: "path_missing", message: "gone" }] as RepoProblem[];
-    const [rejected] = reduce(ready([]), { type: "addRejected", problems, branches: [] });
-    const [again] = reduce(rejected, { type: "addProject", draft });
+    const [rejected] = reduce(typed(ready([])), { type: "addRejected", problems, branches: [] });
+    const [again] = reduce(rejected, { type: "submitProject" });
     expect(again.settings.problems).toEqual([]);
+  });
+
+  it("an added project empties the form and closes its dialog", () => {
+    const [open] = reduce(typed(ready([project({ id: "p0", key: "OLD" })])), {
+      type: "openDialog", dialog: { kind: "addProject" },
+    });
+    const [s] = reduce(open, { type: "projectAdded", project: project() });
+    expect(s.settings.add.draft).toEqual({ key: "", name: "", repo_path: "", work_branch: "develop" });
+    expect(s.plan.dialog).toBeUndefined();
   });
 
   it("an added project joins the list, the page moves to its settings and the agents reload", () => {

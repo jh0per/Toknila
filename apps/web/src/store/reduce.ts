@@ -2,10 +2,13 @@
 
 import type { EventRecord } from "../api/types";
 import type { Effect, Msg } from "./msg";
+import { reducePlan, withChain } from "./plan";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
 import { loadUsage, reduceUsage } from "./usage";
-import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, chainOfTicket, ticketOfEvent } from "./state";
+import {
+  FIRST_RETRY_MS, MAX_RETRY_MS, type State, cardRoute, chainOfEvent, currentProject, ticketOfEvent,
+} from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
   switch (msg.type) {
@@ -35,17 +38,15 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
         error: "",
       };
       // First run: no project yet, so the window offers the checks and a form to add one.
-      return [next, [...enter(next.route, next), ...(msg.projects.length ? [] : setupLoads)]];
+      const first = !msg.projects.some((p) => !p.archived);
+      return [next, [...enter(next.route, next), ...(first ? setupLoads : [])]];
     }
     case "projectsLoaded":
       return [{ ...s, projects: msg.projects }, []];
     case "agentsLoaded":
       return [{ ...s, agents: msg.agents }, []];
-    case "chainLoaded": {
-      const id = msg.chain.chain.id;
-      const chainOrder = s.chainOrder.includes(id) ? s.chainOrder : [...s.chainOrder, id];
-      return [{ ...s, chains: { ...s.chains, [id]: msg.chain }, chainOrder, error: "" }, []];
-    }
+    case "chainLoaded":
+      return [{ ...withChain(s, msg.chain), error: "" }, []];
     case "inboxLoaded":
       return [{ ...s, inbox: msg.items }, []];
     case "detailLoaded":
@@ -81,23 +82,61 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [{ ...s, route: msg.route }, enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
-      const [moved, more] = go(added, { name: "settings", project: msg.project.key });
-      return [moved, [...fx, ...more]];
+      const closed = { ...added, plan: { ...added.plan, dialog: undefined } };
+      return then(closed, fx, { name: "settings", project: msg.project.key });
+    }
+    case "chainImported": {
+      const [imported, fx] = reduceSettings(s, msg);
+      // Imported from the window's dialog: the dialog closes on the new chain.
+      if (s.plan.dialog?.kind !== "import") return [imported, fx];
+      const closed = { ...imported, plan: { ...imported.plan, dialog: undefined } };
+      return then(closed, fx, { name: "projectChain", project: msg.project, chain: msg.chain });
     }
     case "recheck":
     case "installCli":
     case "cliLoaded":
     case "cliRejected":
-    case "addProject":
+    case "editDraft":
+    case "submitProject":
+    case "repoChecked":
     case "saveProject":
     case "importChain":
     case "checksLoaded":
     case "profilesLoaded":
     case "addRejected":
     case "projectSaved":
-    case "chainImported":
     case "settingsRejected":
       return reduceSettings(s, msg);
+    case "chainCreated": {
+      const [next, fx] = reducePlan(s, msg);
+      return then(next, fx, { name: "projectChain", project: msg.project, chain: msg.chain.chain.name });
+    }
+    case "cardCreated": {
+      const [next, fx] = reducePlan(s, msg);
+      const chain = next.chains[msg.detail.ticket.chain_id];
+      return chain ? then(next, fx, cardRoute(next, chain, msg.detail.ticket)) : [next, fx];
+    }
+    case "projectArchived": {
+      const [next, fx] = reducePlan(s, msg);
+      // The project in focus went out of sight: the page goes home, to the next one.
+      const gone = msg.project.archived && currentProject(s)?.id === msg.project.id;
+      return gone ? then(next, fx, { name: "chains" }) : [next, fx];
+    }
+    case "openDialog":
+    case "closeDialog":
+    case "hashChanged":
+    case "createChain":
+    case "createCard":
+    case "editCard":
+    case "saveCard":
+    case "pickPlace":
+    case "moveCard":
+    case "archiveProject":
+    case "showArchived":
+    case "cardSaved":
+    case "cardMoved":
+    case "planRejected":
+      return reducePlan(s, msg);
     case "setUsageDays":
     case "setUsageMetric":
     case "setMachineScan":
@@ -107,9 +146,17 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
   }
 }
 
-/// Moves to a route: the URL changes by an effect, never by the reducer itself.
+/// Moves to a route: the URL changes by an effect, never by the reducer itself. A card's edit or
+/// move form stays with the screen it was opened on.
 function go(s: State, route: Route): [State, Effect[]] {
-  return [{ ...s, route }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+  const plan = { ...s.plan, editing: undefined, moving: undefined };
+  return [{ ...s, route, plan }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+}
+
+/// The effects of a command's answer, then the move it leads to.
+function then(s: State, fx: Effect[], route: Route): [State, Effect[]] {
+  const [moved, more] = go(s, route);
+  return [moved, [...fx, ...more]];
 }
 
 /// What a screen needs fetched when it opens.
@@ -129,7 +176,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
   if (e.entity === "project") return [next, [{ type: "loadProjects" }, { type: "loadAgents" }]];
   if (e.entity === "thread") return [next, threadEventEffects(s, ticketOfEvent(e))];
-  const chain = chainOf(s, e);
+  const chain = chainOfEvent(s, e);
   if (!chain) return [next, [{ type: "loadAll" }]];
   const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadInbox" }, { type: "loadAgents" }];
   const ticket = ticketOfEvent(e);
@@ -145,24 +192,4 @@ function threadEventEffects(s: State, key: string | undefined): Effect[] {
     fx.push({ type: "loadThreads", key }, { type: "loadDetail", key });
   }
   return fx;
-}
-
-function chainOf(s: State, e: EventRecord): string | undefined {
-  const p = (e.payload ?? {}) as Record<string, Record<string, unknown> | undefined>;
-  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-  switch (e.entity) {
-    case "chain":
-      return str(p.chain?.id) ?? str(p.edge?.chain_id);
-    case "ticket":
-      return str(p.ticket?.chain_id);
-    case "release":
-      return str(p.release?.chain_id);
-    case "comment":
-    case "subtask": {
-      const ticket = ticketOfEvent(e);
-      return ticket && chainOfTicket(s, ticket);
-    }
-    default:
-      return undefined;
-  }
 }
