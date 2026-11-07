@@ -1,0 +1,62 @@
+# Web trackers: new work travels between Toknila and Jira or Trello; the plan stays in Toknila.
+# Design: docs/adr/0004-web-trackers.md. Not before the move-in work is done.
+# Import: in the window, Import on the TOKNILA project; or
+#         tok chain import plans/trackers.toml --project TOKNILA
+
+[chain]
+name = "trackers"
+goal = "A project can take new tasks from Jira or Trello and show its new cards there, without losing or duplicating anything"
+autostart = false
+
+[[ticket]]
+id = "tracker-core"
+title = "Tracker port, link table and outbox"
+prompt = "Build the tracker-independent part of ADR 0004: the core rules (a remote item to a card draft and back, what is new, nothing travels back to its origin), the Tracker port in the app, the link table and the outbox in the daemon's store, and a fake tracker adapter for tests. No real tracker yet."
+acceptance = [
+  "Core tests cover the mapping both ways and the no-echo rule",
+  "App tests with the fake tracker cover pull, push, an outbox retry and the duplicate check after a crash",
+  "The link table and outbox survive a restart (migration test)",
+]
+
+[[ticket]]
+id = "pull-new"
+title = "New tasks from the tracker arrive as wildcard cards"
+prompt = "Poll the connected tracker for new items matching the project's filter and turn each into a wildcard card (ADR 0002) waiting in the Inbox. Approve puts it at the end of a chain the person picks; reject cancels it and it is not pulled again. Polling runs on an interval, survives being offline and never starts work."
+acceptance = [
+  "A new remote item shows in the Inbox once, approved it becomes a card linked to the item",
+  "A rejected or already linked item is never pulled again",
+  "Offline polling reports the error in project settings and recovers by itself",
+]
+after = ["tracker-core"]
+
+[[ticket]]
+id = "push-new"
+title = "New cards appear in the tracker"
+prompt = "When push is on, a card created in Toknila is created in the tracker after its commit, through the outbox: title, prompt as description, acceptance and subtasks as a checklist. The card shows the tracker key and link. Cards that came from the tracker are not pushed back."
+acceptance = [
+  "A card created in the window, by the CLI, by import and by the planner each appears once in the fake tracker",
+  "A retry after a crash finds its marker and does not create a duplicate",
+  "The card's key and link show in Details",
+]
+after = ["tracker-core"]
+
+[[ticket]]
+id = "jira"
+title = "Jira adapter: Cloud and Data Center"
+prompt = "Implement the Tracker port for Jira: Cloud (email and API token) and Data Center (personal access token); the filter is a JQL query or an epic. Check every call against Atlassian's official REST documentation. Credentials live in the operating system's credential store. Project settings get Connect, the filter, pull and push switches and the last poll."
+acceptance = [
+  "Adapter tests against recorded responses cover search, create with sub-tasks and the marker lookup",
+  "Credentials never reach the data home, logs or the journal (test)",
+  "An e2e test connects a fake Jira in project settings",
+]
+after = ["pull-new", "push-new"]
+
+[[ticket]]
+id = "trello"
+title = "Trello adapter"
+prompt = "Implement the Tracker port for Trello: a board and the lists to pull from, key and token in the operating system's credential store, subtasks as a checklist. Check every call against Trello's official REST documentation."
+acceptance = [
+  "Adapter tests against recorded responses cover the change feed, create with a checklist and the marker lookup",
+  "An e2e test connects a fake Trello board in project settings",
+]
+after = ["pull-new", "push-new"]
