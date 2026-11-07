@@ -64,6 +64,8 @@ async fn reconnect_gets_exactly_the_missed_events() {
         runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
         tools: std::sync::Arc::new(crate::tools::SystemTools),
         usage: Arc::new(crate::usage::Usage::disabled()),
+        home: dir.path().to_owned(),
+        trash: Arc::new(crate::trash::NoTrash),
     };
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await

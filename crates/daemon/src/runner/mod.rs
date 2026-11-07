@@ -175,6 +175,24 @@ impl Runners {
         }
     }
 
+    /// Forgets a deleted card: its ended runs and its folder of run logs and generated files
+    /// (`runs/<ticket>`). A card whose process is still alive is kept as it is.
+    pub fn forget(&self, ticket: TicketId) -> std::io::Result<()> {
+        let mut active = self.active();
+        if active
+            .iter()
+            .any(|((t, _), a)| *t == ticket && !a.is_over())
+        {
+            return Err(std::io::Error::other("its agent is still running"));
+        }
+        active.retain(|(t, _), _| *t != ticket);
+        drop(active);
+        match std::fs::remove_dir_all(self.root.join(ticket.to_string())) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        }
+    }
+
     fn profile(&self, name: &str) -> Result<AgentProfile, RunnerError> {
         crate::profiles::load(&self.profiles)
             .profiles

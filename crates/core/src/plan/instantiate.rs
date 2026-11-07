@@ -39,6 +39,7 @@ impl Plan {
             autostart: self.chain.autostart,
             review_mode: self.chain.review_mode,
             reviewer: None,
+            source: None,
         };
         let tickets: Vec<Ticket> = self
             .tickets

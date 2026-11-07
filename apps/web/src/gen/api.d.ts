@@ -264,6 +264,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deletes the project: its chains, cards, milestones and everything attached to them, with
+         *     their journal entries, in one transaction; refused (409) while any of its agents works. Then
+         *     the ships' worktrees are removed from the repository and the cards' run files deleted; with
+         *     `trash_folder` the repository folder goes to the system Trash. Nothing else in the repository
+         *     is touched: its `ship/*` branches stay. A cleanup step that fails is listed in `warnings` (or
+         *     `folder_error`); the deletion stands either way.
+         */
+        post: operations["delete_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/import": {
         parameters: {
             query?: never;
@@ -280,6 +304,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/import-path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reads a path on this machine and imports what it holds through the ordinary chain import. A
+         *     TOML chain file or a spec folder makes one chain, or fails as a whole with a message that
+         *     names the path (and, for a `tasks.md`, the line). A folder of spec folders makes one chain per
+         *     spec folder, each on its own, and lists the subfolders it skipped and those that failed. Each
+         *     chain keeps the path it was read from as its `source`.
+         */
+        post: operations["import_path"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/inbox": {
         parameters: {
             query?: never;
@@ -289,6 +336,28 @@ export interface paths {
         };
         /** Everything in the project that waits on a person, newest first, as core computes it. */
         get: operations["get_inbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the plans in the project's repository: `specs/*\/tasks.md` and `plans/*.toml`, one level
+         *     deep and never the whole tree, each with its card count and whether a chain of the project
+         *     was imported from it, and whether the repository has a `.specify/` folder. A project without a
+         *     repository, or whose folder is gone, has none. Importing one is `import-path` with its `path`.
+         */
+        get: operations["list_plans"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1014,6 +1083,11 @@ export interface components {
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Overrides the project's reviewer profile for every ticket that does not set its own. */
             reviewer?: string | null;
+            /**
+             * @description The spec folder or chain file the chain was imported from, as an absolute path; `null`
+             *     for a chain made in Toknila or imported from pasted text.
+             */
+            source?: string | null;
         };
         /** @description A chain with its graph and computed status. */
         ChainDetail: {
@@ -1139,6 +1213,11 @@ export interface components {
             day: string;
             figures: components["schemas"]["UsageFigures"];
         };
+        /** @description `POST /v1/projects/{project}/delete`. */
+        DeleteProject: {
+            /** @description Also move the repository folder to the system Trash. Without it the folder stays. */
+            trash_folder?: boolean;
+        };
         /** @description Dependency edge: `to` cannot start before `from` is done. */
         Edge: {
             chain_id: components["schemas"]["ChainId"];
@@ -1183,6 +1262,39 @@ export interface components {
             seq: number;
         };
         /**
+         * @description What became of a deleted project's repository folder.
+         * @enum {string}
+         */
+        FolderFate: "kept" | "trashed" | "none";
+        /** @description A subfolder that was not imported. */
+        FolderNote: {
+            folder: string;
+            /** @description Absolute. */
+            path: string;
+            /** @description Why: `no tasks.md`, or the error, which names the file and, for a `tasks.md`, the line. */
+            reason: string;
+        };
+        /** @description A plan found in a project's repository. */
+        FoundPlan: {
+            /**
+             * @description Cards an import would make (phases with tasks, or tickets); `null` when the file does not
+             *     parse.
+             */
+            cards?: number | null;
+            /** @description A chain of the project was imported from this path. */
+            imported: boolean;
+            kind: components["schemas"]["PlanKind"];
+            /** @description The folder's name, or the file's without `.toml`. */
+            name: string;
+            /**
+             * @description Absolute path: what `POST /v1/projects/{project}/import-path` takes, and what a chain
+             *     imported from it records as its `source`.
+             */
+            path: string;
+            /** @description Relative to the repository, with `/`: `specs/001-login`, `plans/phase-1.toml`. */
+            relative: string;
+        };
+        /**
          * @description How an agent reports through hooks, a second event source: the runner writes a settings file
          *     under the data home and passes its path with `settings_flag`.
          */
@@ -1197,6 +1309,43 @@ export interface components {
              * @default null
              */
             settings_flag: string | null;
+        };
+        /** @description `POST /v1/projects/{project}/import-path`: what the daemon is to read and import. */
+        ImportPath: {
+            /**
+             * @description Absolute path of a TOML chain file, of a spec folder (one with `tasks.md`), or of a folder
+             *     whose subfolders are spec folders.
+             */
+            path: string;
+        };
+        /**
+         * @description Answer of `POST /v1/projects/{project}/import-path`. A chain file or a spec folder makes one
+         *     chain or fails as a whole (400 or 409, the message names the path); a folder of spec folders
+         *     imports each on its own and lists what it skipped and what failed.
+         */
+        ImportPathResult: {
+            /** @description In folder order. */
+            chains: components["schemas"]["ImportedChain"][];
+            /** @description Spec folders that could not be imported; the others were. */
+            failed: components["schemas"]["FolderNote"][];
+            /** @description Subfolders without a `tasks.md`. */
+            skipped: components["schemas"]["FolderNote"][];
+        };
+        /** @description One chain an import made. */
+        ImportedChain: {
+            cards: number;
+            /** @description The new chain, as `POST /v1/projects/{project}/import` answers it. */
+            chain: components["schemas"]["ChainDetail"];
+            /** @description Cards imported as Merged because all their tasks were checked. */
+            done_cards: number;
+            /** @description The spec folder's or the chain file's name. */
+            folder: string;
+            /** @description Done cards that sit behind a card with open tasks, one line each. */
+            out_of_order: string[];
+            /** @description Where it was read from, absolute; the chain keeps it as its `source`. */
+            path: string;
+            /** @description Subtasks of all cards. */
+            tasks: number;
         };
         /** @description One entry of the inbox. */
         InboxItem: {
@@ -1585,6 +1734,18 @@ export interface components {
          * @enum {string}
          */
         Place: "before" | "after";
+        /**
+         * @description What kind of plan an entry is.
+         * @enum {string}
+         */
+        PlanKind: "spec_folder" | "chain_file";
+        /** @description `GET /v1/projects/{project}/plans`: the plans of the project's repository. */
+        PlanScan: {
+            /** @description Sorted by `relative`. */
+            plans: components["schemas"]["FoundPlan"][];
+            /** @description The repository has a `.specify/` folder. */
+            specify_dir: boolean;
+        };
         /** @description Where the cost estimate's prices come from. */
         PriceInfo: {
             /** @description Models whose price the person overrode in `usage-prices.toml`. */
@@ -1661,6 +1822,29 @@ export interface components {
              * @description Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
              */
             used: number;
+        };
+        /**
+         * @description Answer of `POST /v1/projects/{project}/delete`: the records are gone; what became of the
+         *     files around them.
+         */
+        ProjectDeletion: {
+            /** @description Names of the deleted chains. */
+            chains: string[];
+            /** @description What became of the repository folder: `kept`, `trashed`, or `none` (no folder). */
+            folder: components["schemas"]["FolderFate"];
+            /** @description Why the folder was not moved to the Trash when that was asked; `null` otherwise. */
+            folder_error?: string | null;
+            /** @description The project as it was. */
+            project: components["schemas"]["Project"];
+            /** @description How many cards went with them. */
+            tickets: number;
+            /**
+             * @description Cleanup that failed after the records were deleted (a worktree or run logs left on disk).
+             *     The deletion stands either way.
+             */
+            warnings: string[];
+            /** @description The ships' worktrees removed from the repository; their `ship/*` branches stay. */
+            worktrees_removed: string[];
         };
         /** @description Identifies a [`crate::Project`]. */
         ProjectId: string;
@@ -2892,6 +3076,48 @@ export interface operations {
             };
         };
     };
+    delete_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteProject"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDeletion"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     import_chain: {
         parameters: {
             query?: never;
@@ -2942,6 +3168,66 @@ export interface operations {
             };
         };
     };
+    import_path: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportPath"];
+            };
+        };
+        responses: {
+            /** @description A folder of spec folders none of which could be imported; see `failed` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPathResult"];
+                };
+            };
+            /** @description At least one chain was imported */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPathResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     get_inbox: {
         parameters: {
             query?: never;
@@ -2960,6 +3246,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxItem"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_plans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanScan"];
                 };
             };
             404: {

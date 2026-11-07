@@ -17,8 +17,10 @@ mod inbox;
 mod merges;
 mod parallel;
 mod planning;
+mod plans;
 mod profiles;
 mod questions;
+mod removal;
 mod resume;
 mod reviews;
 mod settings;
@@ -33,6 +35,28 @@ struct Api {
     _dir: tempfile::TempDir,
     app: axum::Router,
     runners: Arc<crate::runner::Runners>,
+    /// What this daemon moved to the Trash: folders land in `trash` of the test's folder.
+    trash: Arc<FakeTrash>,
+}
+
+/// A Trash that moves a folder into a folder of the test's own and remembers it.
+#[derive(Debug)]
+struct FakeTrash {
+    bin: std::path::PathBuf,
+    moved: std::sync::Mutex<Vec<std::path::PathBuf>>,
+}
+
+impl crate::trash::Trasher for FakeTrash {
+    fn trash(&self, path: &std::path::Path) -> Result<(), String> {
+        let name = path.file_name().ok_or("a folder without a name")?;
+        std::fs::create_dir_all(&self.bin).map_err(|e| e.to_string())?;
+        std::fs::rename(path, self.bin.join(name)).map_err(|e| e.to_string())?;
+        self.moved
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(path.to_owned());
+        Ok(())
+    }
 }
 
 impl Api {
@@ -68,6 +92,10 @@ impl Api {
         }
         let (runners, _) =
             crate::runner::Runners::new(dir.path().join("runs"), dir.path().join("profiles"));
+        let trash = Arc::new(FakeTrash {
+            bin: dir.path().join("trash"),
+            moved: Default::default(),
+        });
         let state = AppState {
             store,
             token: TOKEN.into(),
@@ -83,17 +111,22 @@ impl Api {
                     roots: vec![dir.path().join("claude").join("projects")],
                 }],
             )),
+            home: dir.path().to_owned(),
+            trash: trash.clone(),
         };
         Self {
             _dir: dir,
             app: router(state),
             runners,
+            trash,
         }
     }
 
     /// Stops this daemon and starts another over the same database.
     fn restart(self) -> Self {
-        let Self { _dir, app, runners } = self;
+        let Self {
+            _dir, app, runners, ..
+        } = self;
         drop((app, runners));
         Self::open(_dir, None, Arc::new(crate::tools::SystemTools))
     }
@@ -764,8 +797,11 @@ async fn openapi_describes_every_route() {
             "/projects/{project}",
             "/projects/{project}/archive",
             "/projects/{project}/chains",
+            "/projects/{project}/delete",
             "/projects/{project}/import",
+            "/projects/{project}/import-path",
             "/projects/{project}/inbox",
+            "/projects/{project}/plans",
             "/projects/{project}/unarchive",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",

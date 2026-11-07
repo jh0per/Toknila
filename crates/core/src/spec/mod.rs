@@ -17,7 +17,7 @@ mod patch;
 mod report;
 
 pub use deps::phase_deps;
-pub use import::{SpecImport, import, markdown_title};
+pub use import::{SpecImport, documents, import, markdown_title};
 pub use parse::{SpecPhase, SpecTask, SpecTasks, parse};
 pub use patch::{ExportCard, ExportSubtask, patch};
 pub use report::{OpenBefore, OutOfOrderCard};

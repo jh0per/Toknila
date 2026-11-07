@@ -149,6 +149,7 @@ fn view(tickets: Vec<Ticket>, edges: &[(usize, usize)]) -> ChainView {
         autostart: false,
         review_mode: None,
         reviewer: None,
+        source: None,
     };
     let edges = edges
         .iter()

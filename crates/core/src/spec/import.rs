@@ -133,6 +133,26 @@ pub fn markdown_title(text: &str) -> Option<String> {
         .filter(|t| !t.is_empty())
 }
 
+/// The documents of a spec folder in the order the chain's goal lists them: the usual ones first,
+/// in their usual order, then the rest by name. `names` are the folder's entries by relative path,
+/// folders ending in `/`; hidden ones are left out.
+pub fn documents(names: impl IntoIterator<Item = String>) -> Vec<String> {
+    const USUAL: [&str; 7] = [
+        "spec.md",
+        "plan.md",
+        "research.md",
+        "data-model.md",
+        "contracts/",
+        "quickstart.md",
+        "tasks.md",
+    ];
+    let mut found: Vec<String> = names.into_iter().filter(|n| !n.starts_with('.')).collect();
+    found.sort();
+    let rank = |n: &String| USUAL.iter().position(|u| u == n).unwrap_or(USUAL.len());
+    found.sort_by_key(rank);
+    found
+}
+
 /// The tasks title, then the documents of the folder.
 fn goal(title: Option<&str>, docs: &[String]) -> String {
     let mut out = title.unwrap_or_default().to_owned();

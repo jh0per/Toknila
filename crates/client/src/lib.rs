@@ -7,13 +7,12 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_api_types::{
     ActionInput, AgentEvent, ChainDetail, ChainFile, ChainItem, EdgeInput, ErrorBody, EventRecord,
-    NewActivity, NewChain, NewComment, NewMessage, NewProject, NewRelease, NewSubtask, NewThread,
-    NewTicket, NewVersion, NewWildcard, PatchProject, PatchSubtask, PatchTicket, ProfileList,
-    ProjectAgents, ReleaseEvent, ThreadDetail, TicketDetail, TicketItem, TicketQuery,
-    TicketThreads,
+    NewActivity, NewChain, NewComment, NewMessage, NewRelease, NewSubtask, NewThread, NewTicket,
+    NewVersion, NewWildcard, PatchSubtask, PatchTicket, ProfileList, ProjectAgents, ReleaseEvent,
+    ThreadDetail, TicketDetail, TicketItem, TicketQuery, TicketThreads,
 };
-use toknila_core::Project;
 
+mod projects;
 mod runner;
 mod settings;
 mod usage;
@@ -104,23 +103,6 @@ impl Client {
             }
             Err(e) => Err(transport_error(e)),
         }
-    }
-
-    // ---- projects ----
-
-    /// `GET /projects`.
-    pub fn projects(&self) -> ClientResult<Vec<Project>> {
-        self.call("GET", "/projects", NO_BODY)
-    }
-
-    /// `POST /projects`.
-    pub fn create_project(&self, p: &NewProject) -> ClientResult<Project> {
-        self.call("POST", "/projects", Some(p))
-    }
-
-    /// `PATCH /projects/{project}`.
-    pub fn patch_project(&self, project: &str, p: &PatchProject) -> ClientResult<Project> {
-        self.call("PATCH", &format!("/projects/{}", enc(project)), Some(p))
     }
 
     /// `GET /agents`.

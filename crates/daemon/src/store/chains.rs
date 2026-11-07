@@ -6,7 +6,7 @@ use toknila_core::{Chain, ChainId, ProjectId};
 use super::StoreError;
 use super::codec::{Repo, opt_enum, opt_enum_from, parse};
 
-/// A chain row: id, project, name, goal, autostart, review mode and reviewer.
+/// A chain row: id, project, name, goal, autostart, review mode, reviewer and source.
 type ChainRow = (
     String,
     String,
@@ -15,9 +15,10 @@ type ChainRow = (
     bool,
     Option<String>,
     Option<String>,
+    Option<String>,
 );
 
-const CHAIN_COLS: &str = "id, project_id, name, goal, autostart, review_mode, reviewer";
+const CHAIN_COLS: &str = "id, project_id, name, goal, autostart, review_mode, reviewer, source";
 
 impl Repo<'_> {
     /// Reserves the next ticket number of a project.
@@ -34,7 +35,7 @@ impl Repo<'_> {
 
     pub fn insert_chain(&self, c: &Chain) -> Result<(), StoreError> {
         self.conn.execute(
-            &format!("INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"),
+            &format!("INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"),
             params![
                 c.id.to_string(),
                 c.project_id.to_string(),
@@ -42,7 +43,8 @@ impl Repo<'_> {
                 c.goal,
                 c.autostart,
                 opt_enum(&c.review_mode)?,
-                c.reviewer
+                c.reviewer,
+                c.source
             ],
         )?;
         Ok(())
@@ -72,6 +74,7 @@ impl Repo<'_> {
             r.get(4)?,
             r.get(5)?,
             r.get(6)?,
+            r.get(7)?,
         ))
     }
 
@@ -84,6 +87,7 @@ impl Repo<'_> {
             autostart: t.4,
             review_mode: opt_enum_from(t.5)?,
             reviewer: t.6,
+            source: t.7,
         })
     }
 

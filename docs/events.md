@@ -241,3 +241,10 @@ the kinds `opened` (`{"ticket","thread"}`), `message_posted` (`{"ticket","messag
 `version_posted` (`{"ticket","thread","number","format","author","bytes"}`; the body is not
 journaled), `approved` and `reopened` (`{"ticket","thread"}`). A change of review settings is
 `project`/`chain` kind `updated` (`{"project"}` / `{"chain"}`).
+
+Deleting a project (`POST /v1/projects/{project}/delete`) first removes the journal entries
+about the project and everything in it (its chains, cards, milestones, comments, subtasks and
+threads), then journals one `chain` kind `deleted` (`{"chain"}`, the chain as it was) per chain
+and one `project` kind `deleted` (`{"project"}`, the project as it was). A client drops what it
+holds of them. Sequence numbers are never reused, so a client that resumes from an older `seq`
+simply receives fewer entries.

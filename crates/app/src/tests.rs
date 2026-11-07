@@ -17,6 +17,7 @@ use crate::{
     AppError, AppResult, ErrorKind, Reader, UnitOfWork, agent, chains, resolve, tickets, with_chain,
 };
 
+mod deletion;
 mod import_done;
 mod leftovers;
 mod merges;
@@ -81,6 +82,7 @@ impl Mem {
             autostart: true,
             review_mode: None,
             reviewer: None,
+            source: None,
         };
         let now = Timestamp(1_000);
         let tickets: Vec<Ticket> = ["A", "B"]
@@ -252,6 +254,17 @@ impl UnitOfWork for Mem {
     }
     fn update_project(&mut self, p: &Project) -> AppResult<()> {
         self.project = p.clone();
+        Ok(())
+    }
+    fn delete_project(&mut self, id: ProjectId) -> AppResult<()> {
+        if self.project.id == id {
+            self.view.tickets.clear();
+            self.view.edges.clear();
+            self.view.releases.clear();
+            self.view.release_tickets.clear();
+            (self.comments, self.subtasks, self.ships) = (vec![], vec![], vec![]);
+            (self.threads, self.messages, self.versions) = (vec![], vec![], vec![]);
+        }
         Ok(())
     }
     fn insert_chain(&mut self, c: &Chain) -> AppResult<()> {
@@ -458,7 +471,7 @@ fn export_then_import_conflicts_on_the_same_name() {
         toml.contains("id = \"DEMO-2\"\ntitle = \"B\"\nafter = [\"DEMO-1\"]"),
         "{toml}"
     );
-    let e = chains::import(&mut mem, "DEMO", &toml).expect_err("same name");
+    let e = chains::import(&mut mem, "DEMO", &toml, None).expect_err("same name");
     assert_eq!(
         (e.kind, e.message.as_str()),
         (ErrorKind::Conflict, "chain demo already exists in DEMO")

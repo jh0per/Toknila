@@ -12,6 +12,7 @@ mod external;
 mod notes;
 mod ports;
 mod projects;
+mod removal;
 mod schema;
 mod ships;
 mod threads;

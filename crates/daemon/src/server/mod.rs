@@ -38,6 +38,10 @@ pub struct AppState {
     pub tools: Arc<dyn crate::tools::Tools>,
     /// Token usage: transcripts, prices and the page's numbers.
     pub usage: Arc<crate::usage::Usage>,
+    /// The data home (`Paths::home`): nothing in it is ever moved to the Trash.
+    pub home: PathBuf,
+    /// Where a deleted project's folder goes when the person asks (`SystemTrash`; tests a fake).
+    pub trash: Arc<dyn crate::trash::Trasher>,
 }
 
 /// Current wall-clock time.

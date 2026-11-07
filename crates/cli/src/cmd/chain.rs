@@ -94,10 +94,8 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
             return super::spec::import(c, &file, project, json_out);
         }
         ChainCmd::Import { file, project } => {
-            let text = std::fs::read_to_string(&file)
-                .with_context(|| format!("read {}", file.display()))?;
-            let p = default_project(c, project)?;
-            emit(json_out, &c.import_chain(&p, text)?, output::chain);
+            let detail = super::spec::import_file(c, &file, project)?;
+            emit(json_out, &detail, output::chain);
         }
         ChainCmd::Export {
             chain,

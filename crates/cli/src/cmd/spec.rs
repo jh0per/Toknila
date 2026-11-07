@@ -1,17 +1,19 @@
-//! Spec folders for `tok chain import|export`: reads and writes the files, the pure rules live in
-//! `toknila_core::spec`.
+//! Imports by path for `tok chain import` (the daemon reads the chain file or the spec folders)
+//! and spec folder export for `tok chain export --spec` (patching `tasks.md` here). The pure
+//! rules live in `toknila_core::spec`.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
-use toknila_client::Client;
+use toknila_api_types::{ChainDetail, FolderNote, ImportPathResult};
+use toknila_client::{Client, ClientError};
 use toknila_core::spec::{self, ExportCard, ExportSubtask};
 use toknila_core::{NodeRef, TicketStatus};
 
 use super::{default_project, emit};
 
-const TASKS: &str = "tasks.md";
+const TASKS: &str = toknila_core::plans::TASKS_FILE;
 
 /// What importing one folder did.
 #[derive(Debug, Serialize)]
@@ -32,15 +34,15 @@ struct Outcome {
 }
 
 impl Outcome {
-    fn new(folder: &Path, result: &'static str) -> Self {
+    fn note(n: FolderNote, result: &'static str) -> Self {
         Self {
-            folder: folder_name(folder),
+            folder: n.folder,
             result,
             cards: 0,
             tasks: 0,
             done_cards: 0,
             out_of_order: Vec::new(),
-            error: None,
+            error: Some(n.reason),
         }
     }
 
@@ -60,27 +62,71 @@ impl Outcome {
     }
 }
 
-/// Imports one spec folder, or every spec folder inside a parent folder, as chains. Reports each
-/// folder and goes on after a failure; the command fails when any folder did.
+/// A path given on the command line made absolute, as the daemon takes it.
+fn absolute(path: &Path) -> Result<String> {
+    let abs = std::path::absolute(path).with_context(|| format!("resolve {}", path.display()))?;
+    Ok(abs.to_string_lossy().into_owned())
+}
+
+/// Imports a chain file; the daemon reads it and the chain remembers it as its source.
+pub(super) fn import_file(c: &Client, file: &Path, project: Option<String>) -> Result<ChainDetail> {
+    let project = default_project(c, project)?;
+    let result = c.import_path(&project, &absolute(file)?)?;
+    match result.chains.into_iter().next() {
+        Some(imported) => Ok(imported.chain),
+        None => bail!("{} made no chain", file.display()),
+    }
+}
+
+/// Imports one spec folder, or every spec folder inside a parent folder, as chains; the daemon
+/// reads them. Reports each folder; the command fails when any folder did.
 pub(super) fn import(
     c: &Client,
     dir: &Path,
     project: Option<String>,
     json_out: bool,
 ) -> Result<()> {
-    let folders = if dir.join(TASKS).is_file() {
-        vec![dir.to_path_buf()]
-    } else {
-        subfolders(dir)?
-    };
-    if folders.is_empty() {
-        bail!("no subfolders in {}", dir.display());
-    }
     let project = default_project(c, project)?;
-    let outcomes: Vec<Outcome> = folders
-        .iter()
-        .map(|f| import_folder(c, f, &project))
+    let path = absolute(dir)?;
+    let result = match c.import_path(&project, &path) {
+        Ok(r) => r,
+        // A single folder that fails is reported like one of many.
+        Err(ClientError::Api { body, .. }) => ImportPathResult {
+            failed: vec![FolderNote {
+                folder: dir
+                    .file_name()
+                    .map_or_else(|| path.clone(), |n| n.to_string_lossy().into_owned()),
+                path,
+                reason: body.error,
+            }],
+            ..ImportPathResult::default()
+        },
+        Err(e) => return Err(e.into()),
+    };
+    let imported = result.chains.into_iter().map(|i| Outcome {
+        folder: i.folder,
+        result: "imported",
+        cards: i.cards,
+        tasks: i.tasks,
+        done_cards: i.done_cards,
+        out_of_order: i.out_of_order,
+        error: None,
+    });
+    let mut outcomes: Vec<Outcome> = imported
+        .chain(
+            result
+                .skipped
+                .into_iter()
+                .map(|n| Outcome::note(n, "skipped")),
+        )
+        .chain(
+            result
+                .failed
+                .into_iter()
+                .map(|n| Outcome::note(n, "failed")),
+        )
         .collect();
+    outcomes.sort_by(|a, b| a.folder.cmp(&b.folder));
     emit(json_out, &outcomes, |all| {
         all.iter().for_each(|o| println!("{}", o.line()));
         let n = |r: &str| all.iter().filter(|o| o.result == r).count();
@@ -96,42 +142,6 @@ pub(super) fn import(
         bail!("{failed} of {} folders failed to import", outcomes.len());
     }
     Ok(())
-}
-
-fn import_folder(c: &Client, dir: &Path, project: &str) -> Outcome {
-    let tasks = dir.join(TASKS);
-    let text = match std::fs::read(&tasks) {
-        Ok(bytes) => String::from_utf8(bytes).map_err(|_| "not UTF-8 text".to_owned()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let mut o = Outcome::new(dir, "skipped");
-            o.error = Some(format!("no {TASKS}"));
-            return o;
-        }
-        Err(e) => Err(e.to_string()),
-    };
-    let fail = |message: String| {
-        let mut o = Outcome::new(dir, "failed");
-        o.error = Some(message);
-        o
-    };
-    let text = match text {
-        Ok(t) => t,
-        Err(e) => return fail(format!("{}: {e}", tasks.display())),
-    };
-    let title = std::fs::read_to_string(dir.join("spec.md"))
-        .ok()
-        .and_then(|t| spec::markdown_title(&t));
-    let imp = match spec::import(&text, &folder_name(dir), title.as_deref(), &documents(dir)) {
-        Ok(i) => i,
-        Err(e) => return fail(format!("{}:{}: {}", tasks.display(), e.line, e.kind)),
-    };
-    if let Err(e) = c.import_chain(project, imp.toml) {
-        return fail(e.to_string());
-    }
-    let mut o = Outcome::new(dir, "imported");
-    (o.cards, o.tasks, o.done_cards) = (imp.cards, imp.tasks, imp.done_cards);
-    o.out_of_order = imp.out_of_order.iter().map(ToString::to_string).collect();
-    o
 }
 
 /// Patches `<folder>/tasks.md` from the chain: checkboxes follow the subtasks, cards that are
@@ -175,56 +185,4 @@ pub(super) fn export(c: &Client, chain: &str, dir: &Path) -> Result<()> {
         eprintln!("updated {}", path.display());
     }
     Ok(())
-}
-
-/// The chain name: the folder's own name.
-fn folder_name(dir: &Path) -> String {
-    let name = |p: &Path| p.file_name().map(|n| n.to_string_lossy().into_owned());
-    name(dir)
-        .or_else(|| dir.canonicalize().ok().and_then(|p| name(&p)))
-        .unwrap_or_default()
-}
-
-/// Folders directly inside `dir`, sorted by name.
-fn subfolders(dir: &Path) -> Result<Vec<PathBuf>> {
-    let entries = std::fs::read_dir(dir).with_context(|| format!("read {}", dir.display()))?;
-    let mut out: Vec<PathBuf> = entries
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.is_dir())
-        .filter(|p| !folder_name(p).starts_with('.'))
-        .collect();
-    out.sort();
-    Ok(out)
-}
-
-/// The folder's documents by relative path: the usual ones first, in their usual order, then the
-/// rest by name; folders end in `/`.
-fn documents(dir: &Path) -> Vec<String> {
-    const USUAL: [&str; 7] = [
-        "spec.md",
-        "plan.md",
-        "research.md",
-        "data-model.md",
-        "contracts/",
-        "quickstart.md",
-        "tasks.md",
-    ];
-    let mut found: Vec<String> = std::fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .filter_map(|e| e.ok())
-        .map(|e| {
-            let name = e.file_name().to_string_lossy().into_owned();
-            if e.path().is_dir() {
-                format!("{name}/")
-            } else {
-                name
-            }
-        })
-        .filter(|n| !n.starts_with('.'))
-        .collect();
-    found.sort();
-    let rank = |n: &String| USUAL.iter().position(|u| u == n).unwrap_or(USUAL.len());
-    found.sort_by_key(rank);
-    found
 }

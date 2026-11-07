@@ -18,6 +18,10 @@ pub struct Chain {
     /// Overrides the project's reviewer profile for every ticket that does not set its own.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reviewer: Option<String>,
+    /// The spec folder or chain file the chain was imported from, as an absolute path; `null`
+    /// for a chain made in Toknila or imported from pasted text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 impl Chain {

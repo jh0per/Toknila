@@ -106,6 +106,8 @@ impl Rig {
             runners,
             tools: Arc::new(toknila_daemon::tools::SystemTools),
             usage: Arc::new(toknila_daemon::usage::Usage::disabled()),
+            home: tmp.path().to_owned(),
+            trash: Arc::new(toknila_daemon::trash::NoTrash),
         });
         let rig = Rig {
             _tmp: tmp,

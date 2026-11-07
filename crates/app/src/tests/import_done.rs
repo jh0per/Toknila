@@ -34,7 +34,7 @@ done = true
 
 fn imported() -> Mem {
     let mut mem = Mem::demo();
-    chains::import(&mut mem, "DEMO", FILE).expect("imports");
+    chains::import(&mut mem, "DEMO", FILE, None).expect("imports");
     mem
 }
 
@@ -79,7 +79,7 @@ fn a_chain_imported_from_a_spec_folder_with_a_gap_has_no_card_left_behind() {
     let text = "## Phase 1: A\n- [x] T001 a\n\n## Phase 2: B\n- [ ] T002 b\n\n## Phase 3: C\n- [x] T003 c\n";
     let imp = spec::import(text, "gap", None, &[]).expect("spec");
     let mut mem = Mem::demo();
-    chains::import(&mut mem, "DEMO", &imp.toml).expect("imports");
+    chains::import(&mut mem, "DEMO", &imp.toml, None).expect("imports");
     let statuses: Vec<_> = ["A", "B", "C"]
         .iter()
         .map(|t| card(&mem, t).status)

@@ -31,6 +31,12 @@ fn gate_0() {
         ]
     );
     assert_eq!(tok.chain()["summary"]["status"], "running");
+    // The daemon read the file, and the chain remembers where from.
+    let source = tok.chain()["chain"]["source"].clone();
+    assert!(
+        source.as_str().is_some_and(|s| s.ends_with("demo.toml")),
+        "{source}"
+    );
     snapshot("chain_show_imported", tok.chain());
 
     // 2. The agent works through its checklist and hands in; a person returns it once.

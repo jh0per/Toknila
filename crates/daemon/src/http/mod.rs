@@ -34,8 +34,8 @@ impl Modify for BearerAuth {
 /// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
-        agents::*, chains::*, events::*, inbox::*, profiles::*, projects::*, questions::*,
-        releases::*, runner::*, system::*, threads::*, tickets::*, usage::*,
+        agents::*, chains::*, events::*, inbox::*, plans::*, profiles::*, projects::*,
+        questions::*, releases::*, runner::*, system::*, threads::*, tickets::*, usage::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -60,6 +60,9 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(move_ticket))
         .routes(routes!(archive_project))
         .routes(routes!(unarchive_project))
+        .routes(routes!(delete_project))
+        .routes(routes!(import_path))
+        .routes(routes!(list_plans))
         .routes(routes!(create_release))
         .routes(routes!(create_ticket))
         .routes(routes!(propose_wildcard))

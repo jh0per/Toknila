@@ -6,7 +6,7 @@ use toknila_core::{
     AgentProfile, MergeMethod, MergeMode, Project, ProjectId, ReviewMode, schedule,
 };
 
-use crate::{AppError, AppResult, UnitOfWork, resolve};
+use crate::{AppError, AppResult, Reader, UnitOfWork, resolve};
 
 /// `POST /v1/projects`: a new project; unset fields take the project defaults.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -149,16 +149,23 @@ pub fn set_archived<U: UnitOfWork + ?Sized>(
         return Ok(p);
     }
     if archived {
-        let used = crate::schedule::plan_of(uow, &p)?.used;
-        if used > 0 {
-            return Err(AppError::conflict(format!(
-                "{} has {used} agent(s) working; stop them before archiving the project",
-                p.key
-            )));
-        }
+        ensure_idle(uow, &p, "archiving")?;
     }
     p.archived = archived;
     uow.update_project(&p)?;
     uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;
     Ok(p)
+}
+
+/// Refuses `doing` (archiving, deleting) the project while any of its agents works: a card holds
+/// a slot or a runner is alive. The person is told to stop them first.
+pub(crate) fn ensure_idle<R: Reader + ?Sized>(r: &R, p: &Project, doing: &str) -> AppResult<()> {
+    let used = crate::schedule::plan_of(r, p)?.used;
+    if used > 0 {
+        return Err(AppError::conflict(format!(
+            "{} has {used} agent(s) working; stop them before {doing} the project",
+            p.key
+        )));
+    }
+    Ok(())
 }

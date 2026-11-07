@@ -39,7 +39,7 @@ pub async fn import_chain(
     Json(input): Json<ChainFile>,
 ) -> ApiResult<(StatusCode, Json<ChainDetail>)> {
     let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(chains::import(tx, &project, &input.toml)?)
+        Ok(chains::import(tx, &project, &input.toml, None)?)
     })
     .await?;
     Ok((StatusCode::CREATED, Json(detail)))

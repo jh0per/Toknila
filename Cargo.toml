@@ -47,6 +47,8 @@ terminal_size = "0.4"
 sysinfo = { version = "=0.40.1", default-features = false, features = ["system"] }
 nix = { version = "=0.28.0", default-features = false, features = ["signal", "fs"] }
 ureq = { version = "2.12", default-features = false, features = ["json"] }
+# The platform's own Trash: a deleted project's folder goes there when asked, never to an `rm`.
+trash = "5.3"
 
 [workspace.lints.rust]
 # deny, not forbid: one audited FFI call on Windows (crates/cli/src/win.rs) allows it locally.

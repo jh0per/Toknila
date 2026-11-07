@@ -45,6 +45,7 @@ impl Builder {
             autostart,
             review_mode: None,
             reviewer: None,
+            source: None,
         };
         let view = ChainView {
             chain,

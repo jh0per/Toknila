@@ -163,6 +163,7 @@ mod tests {
             autostart: true,
             review_mode: None,
             reviewer: None,
+            source: None,
         };
         let ticket = Ticket::new_backlog(
             TicketId::new(),

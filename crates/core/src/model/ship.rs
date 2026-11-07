@@ -160,6 +160,7 @@ mod tests {
             autostart: true,
             review_mode: None,
             reviewer: None,
+            source: None,
         };
         let draft = TicketDraft {
             title: "Add login: OAuth".into(),
