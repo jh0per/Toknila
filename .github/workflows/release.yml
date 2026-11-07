@@ -1,25 +1,30 @@
 name: Release
 
-# Push a tag like v0.1.0 (or run by hand with that tag) to build every platform and publish a
-# GitHub release with the archives and their SHA-256 sums. On a pull request it only builds the
-# archives (downloadable from the run's artifacts), so a release can never be the first build.
+# Push a tag like v0.2.1 (or run by hand with that tag) to build every platform and publish a
+# GitHub release: the CLI archives, the macOS app (`.dmg`) and the files the in-app updater reads
+# (`.app.tar.gz`, `.sig`, `latest.json`). On main it only builds, so a release is never the first
+# build. Pull requests do not run these heavy builds; `ci.yml` covers them.
 on:
   push:
     tags: ["v*"]
-  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to release, e.g. v0.1.0
+        description: Existing tag to release, e.g. v0.2.1
         required: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 env:
   CARGO_TERM_COLOR: always
   TAG: ${{ inputs.tag || github.ref_name }}
-  RELEASE: ${{ github.event_name != 'pull_request' }}
+  RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
 
 jobs:
   build:
@@ -33,11 +38,11 @@ jobs:
           - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
           - { os: windows-latest, target: x86_64-pc-windows-msvc }
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.sha || env.TAG }}
+          ref: ${{ env.RELEASE == 'true' && env.TAG || github.sha }}
 
       - name: Install toolchain
         run: |
@@ -47,6 +52,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+          workspaces: |
+            . -> target
+            apps/desktop/src-tauri -> target
 
       - uses: actions/setup-node@v4
         with:
@@ -65,6 +73,15 @@ jobs:
       - name: cargo xtask dist
         run: cargo xtask dist ${{ matrix.target }}
 
+      # The Mac app and its update archive. The archive is signed with the updater key on a
+      # release only; on main there is no key in the build and the step says it skipped signing.
+      - name: cargo xtask app
+        if: runner.os == 'macOS'
+        run: cargo xtask app --target ${{ matrix.target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.RELEASE == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.RELEASE == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
@@ -73,21 +90,43 @@ jobs:
             dist/*.zip
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: app-${{ matrix.target }}
+          path: |
+            dist/app/*.dmg
+            dist/app/*.app.tar.gz
+            dist/app/*.app.tar.gz.sig
+          if-no-files-found: error
+
   publish:
     needs: build
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      # Full history: the notes are the pull requests merged since the previous tag.
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - name: Install toolchain
+        run: rustup toolchain install stable --profile minimal
 
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+
+      - name: Release notes and latest.json
+        run: |
+          cargo xtask release-notes "$TAG" > notes.md
+          cat notes.md
+          cargo xtask latest-json dist "${TAG#v}" notes.md
+          cat dist/latest.json
 
       - name: Checksums
         working-directory: dist
@@ -97,19 +136,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes=$(mktemp)
+          body=$(mktemp)
           {
-            echo "Phase 0 of Toknila: the model, the daemon, the CLI and a read-only live web page, driven by a simulated agent profile. No real agent runs yet."
+            echo "## What changed"
             echo
-            echo "Install and first run (macOS, Linux, Windows): [docs/install.md](https://github.com/${{ github.repository }}/blob/$TAG/docs/install.md)"
+            cat notes.md
             echo
-            echo "| Platform | Archive |"
-            echo "|---|---|"
-            echo "| macOS, Apple silicon | \`toknila-${TAG#v}-macos-arm64.tar.gz\` |"
-            echo "| macOS, Intel | \`toknila-${TAG#v}-macos-x86_64.tar.gz\` |"
-            echo "| Linux x86_64 | \`toknila-${TAG#v}-linux-x86_64.tar.gz\` |"
-            echo "| Windows x86_64 | \`toknila-${TAG#v}-windows-x86_64.zip\` |"
+            echo "## Install"
             echo
-            echo "The binaries are not signed yet; on macOS download with curl or run \`xattr -dr com.apple.quarantine .\` in the unpacked folder."
-          } > "$notes"
-          gh release create "$TAG" dist/* --title "Toknila $TAG" --notes-file "$notes" --verify-tag
+            echo "The Mac app is \`Toknila-${TAG#v}-aarch64.dmg\` (Apple silicon) or \`Toknila-${TAG#v}-x86_64.dmg\` (Intel). Installed apps update themselves."
+            echo "The command-line archives are \`toknila-${TAG#v}-<platform>\`. Steps: [docs/install.md](https://github.com/${{ github.repository }}/blob/$TAG/docs/install.md)"
+            echo
+            echo "The binaries are not notarised; on macOS download with curl or run \`xattr -dr com.apple.quarantine .\` in the unpacked folder."
+          } > "$body"
+          gh release create "$TAG" dist/* --title "Toknila $TAG" --notes-file "$body" --verify-tag
