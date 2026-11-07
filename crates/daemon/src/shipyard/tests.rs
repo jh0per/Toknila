@@ -2,13 +2,13 @@
 
 use std::path::Path;
 
-use toknila_core::TicketId;
+use toknila_core::{StalePolicy, TicketId};
 
 use super::*;
 use crate::git::testing::git;
 
 /// A repository whose only branch is `develop`, with one commit.
-fn repo(dir: &Path) -> String {
+pub(super) fn repo(dir: &Path) -> String {
     let repo = dir.join("the repo");
     std::fs::create_dir_all(&repo).expect("mkdir");
     git(&repo, &["init", "--quiet"]);
@@ -19,12 +19,13 @@ fn repo(dir: &Path) -> String {
     repo.to_string_lossy().into_owned()
 }
 
-fn spec(repo: &str) -> ShipSpec {
+pub(super) fn spec(repo: &str) -> ShipSpec {
     ShipSpec {
         key: "DEMO-1".parse().expect("key"),
         repo: repo.to_owned(),
         base: "develop".to_owned(),
         remote: false,
+        stale: StalePolicy::default(),
         branch: "ship/auth/demo-1-login".to_owned(),
         project: "demo".to_owned(),
         chain: "auth".to_owned(),
@@ -42,7 +43,7 @@ fn ship_of(spec: &ShipSpec, path: String) -> Ship {
 }
 
 /// A shipyard under a folder with a space in its name, as a user's home may have.
-fn yard(dir: &Path) -> GitShipyard {
+pub(super) fn yard(dir: &Path) -> GitShipyard {
     GitShipyard::new(dir.join("home dir").join("ships"))
 }
 

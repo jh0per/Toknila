@@ -133,11 +133,25 @@ is the committed state, so the ship shows up in the next read and on the stream.
 - Needs a project with `repo_path` (`tok project new KEY --repo <path> [--base develop]`; the base
   is the project's `work_branch`, default `develop`). Without a repo the ticket runs without a
   ship, as sim tickets do.
-- Worktrees live under `<home>/ships/<project>/<chain>/<slug>`. The path is stored in the `ships`
+- Worktrees live under `<ships root>/<project>/<chain>/<slug>`. The root is `~/.toknila-ships` (a
+  path without whitespace: a space makes agents backslash-escape paths, and Claude Code then asks
+  permission for every such command); `TOKNILA_SHIPS_DIR` overrides it, and with an explicit
+  `TOKNILA_HOME` it is `<home>/ships`. Ships made before keep the path recorded. The path is stored in the `ships`
   table (one row per ticket), so a daemon restart keeps track; `TicketDetail.ship` exposes it and
   the journal has `ticket.ship_created`, `ticket.ship_removed` and `ticket.ship_remove_failed`.
 - Idempotent: an existing worktree is reused, an existing branch is checked out as it is, a
   worktree deleted by hand is pruned and made again.
+- In local merge mode a ship starts from the local base branch, after a best-effort `git fetch`. If
+  the base is behind its upstream the start is refused: the card is Blocked with `base_behind`
+  ("base branch main is N commits behind origin/main"). The card offers `fast_forward_start`
+  (only when the base has no commits of its own and its checkout has no local changes) and
+  `start_anyway`; `unblock` looks again. In `tok`: `tok unblock KEY --fast-forward` or `--anyway`.
+  The plan scan shows the same note for the working copy it reads. The decision is core's
+  (`BaseBehind::course`); the shipyard only reports facts.
+- Every agent run gets a settings file with `autoMemoryEnabled: false` and a deny rule for the
+  `Agent` tool (no subagents: a card is done by one agent, visible in its terminal), and the
+  environment variable `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, set after the inherited variables are
+  scrubbed. A ship is a worktree of the person's repository, whose auto memory is theirs.
 - In pull-request mode a ship starts from `origin/<base>` after `git fetch origin` (see
   [Pull-request mode](#pull-request-mode)).
 - Merged removes the worktree after the commit (forced; the work is merged) and keeps the

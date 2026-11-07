@@ -4,8 +4,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Actor, BlockedReason, NodeRef, PullRequest, ReviewMode, TicketKey, Verdict, WaitingReason,
-    thread::OpenThread,
+    Actor, BlockedReason, NodeRef, PullRequest, ReviewMode, StalePolicy, TicketKey, Verdict,
+    WaitingReason, thread::OpenThread,
 };
 
 /// Something that happened to a ticket.
@@ -46,6 +46,11 @@ pub enum TicketEvent {
     Block { reason: BlockedReason },
     /// `tok unblock`.
     Unblock,
+    /// A card blocked because its base branch is behind: move the base to its upstream, then
+    /// start. Only when the block says it can.
+    FastForwardStart,
+    /// A card blocked because its base branch is behind: start from the base as it is.
+    StartAnyway,
     /// `tok return` with a comment for the agent.
     Return { comment: String },
     /// `tok accept`, with remarks if the person has any.
@@ -102,6 +107,8 @@ impl TicketEvent {
             Self::Finished { .. } => "finished",
             Self::Block { .. } => "block",
             Self::Unblock => "unblock",
+            Self::FastForwardStart => "fast_forward_start",
+            Self::StartAnyway => "start_anyway",
             Self::Return { .. } => "return",
             Self::Accept { .. } => "accept",
             Self::ReviewVerdict { .. } => "review_verdict",
@@ -132,6 +139,9 @@ pub enum Effect {
     EnsureRunner,
     /// Make sure the ticket has its ship (worktree and branch); reuse it if it exists.
     PrepareShip,
+    /// [`Effect::PrepareShip`] after a person decided what to do about a base branch that is
+    /// behind its upstream.
+    PrepareShipWith { stale: StalePolicy },
     /// Merge the ticket's ship branch into the project's base branch. The outcome comes back as
     /// `MergeDone` or as a block (`merge_conflict`, `base_checkout_dirty`, `merge_failed`).
     Merge,

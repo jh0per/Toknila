@@ -6,7 +6,9 @@
 use toknila_core::events::DomainEvent;
 use toknila_core::guard::{self, ShipProblem, ShipState};
 use toknila_core::machine::TicketEvent;
-use toknila_core::{BlockedReason, Chain, Ship, ShipLook, ShipSpec, Ticket, TicketId};
+use toknila_core::{
+    BaseBehind, BlockedReason, Chain, Ship, ShipLook, ShipSpec, StalePolicy, Ticket, TicketId,
+};
 
 use crate::external::ExternalEffect;
 
@@ -25,6 +27,10 @@ pub enum ShipError {
     /// The branch ships start from does not exist in the repository.
     #[error("base branch {0} does not exist in the repository")]
     BaseBranchMissing(String),
+    /// Local merge mode: the base branch is behind its upstream, so the ship would start on old
+    /// code. The start is refused until a person decides.
+    #[error("{0}")]
+    BaseBehind(BaseBehind),
     /// The ship's path is taken by something that is not this ship's worktree.
     #[error("{0} exists but is not the worktree of this ship")]
     PathTaken(String),
@@ -133,8 +139,10 @@ pub(crate) fn queue_prepare<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     ctx: &ChainTx,
     ticket: TicketId,
+    stale: StalePolicy,
 ) -> AppResult<()> {
-    if let Some(spec) = spec_for(uow, ctx, ticket)? {
+    if let Some(mut spec) = spec_for(uow, ctx, ticket)? {
+        spec.stale = stale;
         uow.defer(ExternalEffect::PrepareShip { ticket, spec });
     }
     Ok(())
@@ -183,8 +191,16 @@ pub(crate) fn failed<U: UnitOfWork + ?Sized>(
     ticket: TicketId,
     error: &ShipError,
 ) -> AppResult<()> {
-    let reason = BlockedReason::ShipFailed {
-        detail: error.to_string(),
+    let reason = match error {
+        ShipError::BaseBehind(b) => BlockedReason::BaseBehind {
+            base: b.base.clone(),
+            upstream: b.upstream.clone(),
+            behind: b.behind,
+            can_fast_forward: b.can_fast_forward,
+        },
+        _ => BlockedReason::ShipFailed {
+            detail: error.to_string(),
+        },
     };
     tell_ticket(uow, ticket, TicketEvent::Block { reason })
 }

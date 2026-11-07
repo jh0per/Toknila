@@ -44,6 +44,11 @@ export function FoundPlans({ project, state, dispatch }: { project: string; stat
       <p data-testid="found-count">
         {n === 0 ? "No plans in this repository (specs/*/tasks.md, plans/*.toml)." : `Found ${n} plan${n === 1 ? "" : "s"} in this repository`}
       </p>
+      {f.behind && (
+        <p className="muted" data-testid="behind-note">
+          {f.behind.branch} is {f.behind.behind} commit{f.behind.behind === 1 ? "" : "s"} behind {f.behind.upstream}: these plans are read from your working copy, which may be older than the upstream's.
+        </p>
+      )}
       {f.specify_dir && (
         <p className="muted" data-testid="specify-note">The repository has a .specify/ folder: its spec folders under specs/ are listed here.</p>
       )}

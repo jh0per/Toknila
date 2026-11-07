@@ -247,3 +247,43 @@ fn cancel_keeps_worktree_and_branch() {
     assert!(mem.ships.iter().any(|s| s.ticket_id == a.id));
     assert!(mem.yard.removed.borrow().is_empty());
 }
+
+#[test]
+fn a_base_behind_blocks_with_the_typed_reason_and_each_decision_reaches_the_yard() {
+    use toknila_core::{BaseBehind, StalePolicy};
+    let behind = BaseBehind {
+        base: "main".to_owned(),
+        upstream: "origin/main".to_owned(),
+        behind: 133,
+        can_fast_forward: true,
+    };
+    let mut mem = with_repo();
+    *mem.yard.fail_prepare.borrow_mut() = Some(ShipError::BaseBehind(behind));
+    recover(&mut mem).expect("settle");
+    settle_ships(&mut mem);
+    let a = mem.ticket_by_title("A");
+    assert_eq!(a.status, TicketStatus::Blocked);
+    let Some(StatusReason::Blocked { reason, .. }) = a.status_reason else {
+        panic!("blocked ticket has a blocked reason");
+    };
+    assert_eq!(
+        reason,
+        BlockedReason::BaseBehind {
+            base: "main".to_owned(),
+            upstream: "origin/main".to_owned(),
+            behind: 133,
+            can_fast_forward: true,
+        }
+    );
+
+    *mem.yard.fail_prepare.borrow_mut() = None;
+    act_on_a(&mut mem, TicketEvent::FastForwardStart).expect("fast-forward and start");
+    settle_ships(&mut mem);
+    assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Running);
+    let prepared = mem.yard.prepared.borrow();
+    assert_eq!(
+        prepared.last().map(|s| s.stale),
+        Some(StalePolicy::FastForward)
+    );
+    assert_eq!(prepared.len(), 1, "only the decided start reached the yard");
+}

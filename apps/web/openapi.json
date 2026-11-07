@@ -4359,6 +4359,40 @@
           },
           {
             "type": "object",
+            "description": "The base branch is behind its upstream (local merge mode), so the ship would start on old\ncode. Nothing was made. A person fast-forwards the base and starts, or starts anyway;\nplain unblock looks again.",
+            "required": [
+              "base",
+              "upstream",
+              "behind",
+              "can_fast_forward",
+              "kind"
+            ],
+            "properties": {
+              "base": {
+                "type": "string"
+              },
+              "behind": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "can_fast_forward": {
+                "type": "boolean",
+                "description": "The base can be moved to the upstream without losing anything."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "base_behind"
+                ]
+              },
+              "upstream": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "The runner has no directory to start in: the project has no repository, so the ticket has\nno ship. Unblocking starts the ship and the runner again.",
             "required": [
               "kind"
@@ -6305,6 +6339,17 @@
           "specify_dir"
         ],
         "properties": {
+          "behind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WorkingCopyBehind",
+                "description": "The plans are read from the working copy; when its branch is behind its upstream they may\nbe older than the upstream's."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "plans": {
             "type": "array",
             "items": {
@@ -7882,6 +7927,8 @@
           "resume",
           "block",
           "unblock",
+          "fast_forward_start",
+          "start_anyway",
           "accept",
           "return",
           "reopen",
@@ -8399,6 +8446,29 @@
           "proposed_by": {
             "$ref": "#/components/schemas/Actor",
             "description": "Who proposed it."
+          }
+        }
+      },
+      "WorkingCopyBehind": {
+        "type": "object",
+        "description": "The working copy's branch is behind its upstream (as of the last fetch).",
+        "required": [
+          "branch",
+          "upstream",
+          "behind"
+        ],
+        "properties": {
+          "behind": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "branch": {
+            "type": "string"
+          },
+          "upstream": {
+            "type": "string",
+            "description": "`origin/main`."
           }
         }
       }

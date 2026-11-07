@@ -18,28 +18,51 @@ fn instruction(gist: &str, what: Option<&str>) -> Comment {
     }
 }
 
+fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
+    RunBrief {
+        key: "DEMO-3",
+        title: "Generated instructions",
+        prompt: "Generate the instructions for the run.\n",
+        acceptance,
+        check_command: None,
+    }
+}
+
+fn assert_pinned(text: &str, name: &str) {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/instructions/snapshots")
+        .join(name);
+    if std::env::var_os("TOKNILA_UPDATE_SNAPSHOTS").is_some() {
+        std::fs::write(&path, text).expect("write snapshot");
+        return;
+    }
+    let want =
+        std::fs::read_to_string(&path).expect("missing snapshot; TOKNILA_UPDATE_SNAPSHOTS=1");
+    assert_eq!(text, want.replace("\r\n", "\n"));
+}
+
 #[test]
 fn the_generated_file_is_pinned() {
     let acceptance = vec![
         "The generated file is pinned by a snapshot test".to_owned(),
         "An instruction comment is delivered and marked delivered".to_owned(),
     ];
-    let text = generate(&RunBrief {
-        key: "DEMO-3",
-        title: "Generated instructions",
-        prompt: "Generate the instructions for the run.\n",
-        acceptance: &acceptance,
-        check_command: None,
-    });
-    let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/instructions/snapshots/run.md");
-    if std::env::var_os("TOKNILA_UPDATE_SNAPSHOTS").is_some() {
-        std::fs::write(&path, &text).expect("write snapshot");
-        return;
+    assert_pinned(&generate(&pinned_brief(&acceptance)), "run.md");
+}
+
+#[test]
+fn the_review_file_is_pinned() {
+    let acceptance = vec!["The review file is pinned by a snapshot test".to_owned()];
+    assert_pinned(&generate_review(&pinned_brief(&acceptance)), "review.md");
+}
+
+#[test]
+fn both_roles_are_told_to_work_alone_and_to_quote_paths() {
+    for text in [protocol(), review_protocol()] {
+        assert!(text.contains("Do not start subagents or background agents"));
+        assert!(text.contains("Quote every path in a shell command with double quotes"));
+        assert!(text.contains("never backslash-escape a space"));
     }
-    let want =
-        std::fs::read_to_string(&path).expect("missing snapshot; TOKNILA_UPDATE_SNAPSHOTS=1");
-    assert_eq!(text, want.replace("\r\n", "\n"));
 }
 
 #[test]

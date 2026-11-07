@@ -17,6 +17,8 @@ const LABEL: Record<TicketAction, Omit<ActionSpec, "action">> = {
   resume: { label: "Resume" },
   block: { label: "Block" },
   unblock: { label: "Unblock" },
+  fast_forward_start: { label: "Fast-forward and start" },
+  start_anyway: { label: "Start anyway" },
   accept: { label: "Accept" },
   return: { label: "Return", needsText: true },
   reopen: { label: "Reopen" },

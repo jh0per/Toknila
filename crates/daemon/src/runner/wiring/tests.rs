@@ -199,10 +199,12 @@ fn a_profile_without_wiring_gets_no_files_and_no_flags() {
     let mut profile = AgentProfile::claude_code();
     profile.mcp.enabled = false;
     profile.hooks.enabled = false;
+    profile.hooks.settings_flag = None;
     profile.instructions_flag = None;
     profile.permissions.allow.clear();
     let w = rig.prepare(&profile);
     assert!(w.args.is_empty());
+    assert!(!w.env.iter().any(|(k, _)| k.contains("AUTO_MEMORY")));
     assert!(!rig.dir.path().join("runs").join("t1").exists());
 
     // Enabled but with no flag to pass the file by: nothing is written either.
@@ -336,13 +338,45 @@ fn the_settings_hold_hooks_and_rules_side_by_side() {
 }
 
 #[test]
-fn a_profile_without_rules_and_hooks_writes_no_settings() {
+fn a_profile_without_rules_and_hooks_still_gets_the_isolation_settings() {
     let rig = Rig::new();
     let mut profile = AgentProfile::claude_code();
     profile.hooks.enabled = false;
     profile.permissions.allow.clear();
     let w = rig.prepare(&profile);
-    assert!(!w.args.iter().any(|a| a == "--settings"), "{:?}", w.args);
+    assert!(w.args.iter().any(|a| a == "--settings"), "{:?}", w.args);
+    let (_, text) = rig.file("settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    assert_eq!(
+        v,
+        json!({ "autoMemoryEnabled": false, "permissions": { "deny": ["Agent"] } }),
+        "{text}"
+    );
+}
+
+#[test]
+fn every_role_runs_without_auto_memory_and_without_the_subagent_tool() {
+    let rig = Rig::new();
+    for (role, dir, profile) in [
+        (AgentRole::Worker, "worker", AgentProfile::claude_code()),
+        (
+            AgentRole::Reviewer,
+            "reviewer",
+            AgentProfile::claude_code_reviewer(),
+        ),
+    ] {
+        let w = rig.prepare_as(&profile, role);
+        let (_, text) = rig.file_of(dir, "settings.json");
+        let v: Value = serde_json::from_str(&text).expect("json");
+        assert_eq!(v["autoMemoryEnabled"], false, "{dir}: {text}");
+        assert_eq!(v["permissions"]["deny"], json!(["Agent"]), "{dir}: {text}");
+        assert!(
+            w.env
+                .contains(&("CLAUDE_CODE_DISABLE_AUTO_MEMORY".to_owned(), "1".to_owned())),
+            "{dir}: {:?}",
+            w.env
+        );
+    }
 }
 
 #[test]
