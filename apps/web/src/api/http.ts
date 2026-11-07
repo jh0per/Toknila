@@ -96,3 +96,9 @@ export function runnerStreamUrl(
     (role === "reviewer" ? "role=reviewer&" : "");
   return `${wsBase()}/tickets/${encodeURIComponent(key)}/runner/stream?${q}token=${encodeURIComponent(token())}`;
 }
+
+/// A project's planner terminal stream, continuing after `from` of `run` when the page has that.
+export function plannerStreamUrl(project: string, cursor: { run: string; from: number } | null): string {
+  const q = cursor ? `run=${encodeURIComponent(cursor.run)}&from=${cursor.from}&` : "";
+  return `${wsBase()}/projects/${encodeURIComponent(project)}/planner/stream?${q}token=${encodeURIComponent(token())}`;
+}

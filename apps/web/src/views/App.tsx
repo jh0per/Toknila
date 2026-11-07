@@ -6,6 +6,7 @@ import { Dialogs } from "./Dialogs";
 import { EmptyChains } from "./EmptyChains";
 import { Inbox } from "./Inbox";
 import { Onboarding } from "./Onboarding";
+import { PlannerScreen } from "./PlannerScreen";
 import { Settings } from "./Settings";
 import { Sidebar } from "./Sidebar";
 import { UpdateBanner } from "./UpdateBanner";
@@ -19,7 +20,9 @@ export function App() {
   const r = state.route.name;
   const chain = currentChain(state);
   const project = currentProject(state);
-  const showChain = Boolean(chain) && state.loaded && r !== "inbox" && r !== "settings" && r !== "usage";
+  // The planner's screen has the chain layout (a diagram above, a panel below), chain or not.
+  const planning = r === "planner" && Boolean(project) && state.loaded;
+  const showChain = (Boolean(chain) || planning) && state.loaded && r !== "inbox" && r !== "settings" && r !== "usage";
   // No project to show yet: the main area is the onboarding, with the add-a-project form on it.
   const onboarding = state.loaded && r !== "settings" && activeProjects(state).length === 0 && !project;
   return (
@@ -36,6 +39,8 @@ export function App() {
           <Usage state={state} dispatch={dispatch} />
         ) : r === "inbox" ? (
           <Inbox state={state} dispatch={dispatch} />
+        ) : planning && project ? (
+          <PlannerScreen project={project} state={state} dispatch={dispatch} />
         ) : chain ? (
           <ChainScreen chain={chain} state={state} dispatch={dispatch} />
         ) : project && (r === "project" || r === "chains") ? (

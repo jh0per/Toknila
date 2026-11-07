@@ -6,6 +6,7 @@ import type {
 } from "../api/types";
 import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
 import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
+import type { PlannerEffect, PlannerIntent, PlannerResult } from "./planner";
 import type { RemovalEffect, RemovalIntent, RemovalResult } from "./removal";
 import type { Route, Tab } from "./route";
 import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
@@ -24,6 +25,7 @@ export type Intent =
   | ThreadAction
   | SettingsIntent
   | PlanIntent
+  | PlannerIntent
   | ImportIntent
   | RemovalIntent
   | UpdateIntent
@@ -67,6 +69,7 @@ export type Msg =
   | { type: "urlChanged"; route: Route }
   | SettingsResult
   | PlanResult
+  | PlannerResult
   | ImportResult
   | RemovalResult
   | UpdateResult
@@ -86,6 +89,7 @@ export type Effect =
   | ThreadAction
   | SettingsEffect
   | PlanEffect
+  | PlannerEffect
   | ImportEffect
   | RemovalEffect
   | UpdateEffect

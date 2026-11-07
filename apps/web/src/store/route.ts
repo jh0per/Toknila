@@ -9,6 +9,7 @@ export type Route =
   | { name: "usage" }
   | { name: "settings"; project?: string }
   | { name: "project"; project: string }
+  | { name: "planner"; project: string }
   | { name: "projectChain"; project: string; chain: string }
   | { name: "card"; project: string; chain: string; key: string };
 
@@ -27,6 +28,7 @@ export function parseRoute(pathname: string): Route {
   if (p[0] === "projects" && p.length === 3 && p[2] === "settings") return { name: "settings", project: p[1] };
   if (p[0] === "projects") {
     if (p.length === 2) return { name: "project", project: p[1] };
+    if (p.length === 3 && p[2] === "planner") return { name: "planner", project: p[1] };
     if (p.length === 4 && p[2] === "chains") return { name: "projectChain", project: p[1], chain: p[3] };
     if (p.length === 6 && p[2] === "chains" && p[4] === "cards") {
       return { name: "card", project: p[1], chain: p[3], key: p[5] };
@@ -44,6 +46,7 @@ export function routePath(route: Route): string {
     case "usage": return "/usage";
     case "settings": return route.project ? `/projects/${e(route.project)}/settings` : "/settings";
     case "project": return `/projects/${e(route.project)}`;
+    case "planner": return `/projects/${e(route.project)}/planner`;
     case "projectChain": return `/projects/${e(route.project)}/chains/${e(route.chain)}`;
     case "card": return `/projects/${e(route.project)}/chains/${e(route.chain)}/cards/${e(route.key)}`;
   }
