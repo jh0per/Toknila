@@ -36,6 +36,7 @@ fn the_planner_gets_the_role_the_token_and_no_ticket() {
     assert_eq!(env("TOKNILA_ROLE"), Some("planner"));
     assert_eq!(env("TOKNILA_RUN_TOKEN"), Some(TOKEN));
     assert_eq!(env("TOKNILA_TICKET"), None, "a planner has no card");
+    assert_eq!(env("CLAUDE_CODE_DISABLE_AUTO_MEMORY"), Some("1"));
     // The first prompt names the project, not a card.
     let kickoff = w.command.last().expect("kickoff");
     assert!(kickoff.contains("planner of project DEMO"), "{kickoff}");
@@ -83,6 +84,9 @@ fn the_planner_settings_allow_reading_and_its_tools_and_name_no_hooks() {
         "a planner is not a card's agent: {text}"
     );
     assert!(v.get("statusLine").is_none());
+    // A planner is a normal role: it gets what every role gets (auto memory off, no subagents).
+    assert_eq!(v["autoMemoryEnabled"], false);
+    assert_eq!(v["permissions"]["deny"], serde_json::json!(["Agent"]));
     let allow: Vec<&str> = v["permissions"]["allow"]
         .as_array()
         .expect("allow")
