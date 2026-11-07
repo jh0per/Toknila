@@ -8,7 +8,7 @@ the code does not match it yet, the refactoring plan below says which step fixes
 Decision records: [ADR 0001](adr/0001-layered-architecture-and-mvi.md),
 [ADR 0002](adr/0002-wildcard-cards.md) (wildcard cards),
 [ADR 0003](adr/0003-card-threads.md) (threads on a card),
-[ADR 0004](adr/0004-planner.md) (the planner, a project's main agent).
+[ADR 0005](adr/0005-planner.md) (the planner, a project's main agent).
 
 ## Layers
 
@@ -624,7 +624,7 @@ on ConPTY without a shell.
 
 ## The planner
 
-A project's main agent ([ADR 0004](adr/0004-planner.md)): a Claude Code session that plans and
+A project's main agent ([ADR 0005](adr/0005-planner.md)): a Claude Code session that plans and
 starts nothing. Planner, card agents and owner divide the work: the planner plans; card agents do
 the cards; the owner starts cards and accepts work.
 
