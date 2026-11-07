@@ -85,7 +85,40 @@ fn planner_logs(tok: &Tok) -> String {
         .env("TOKNILA_HOME", &tok.home)
         .output()
         .expect("run tok planner logs");
-    String::from_utf8_lossy(&out.stdout).into_owned()
+    plain(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// A terminal's text without its escape sequences: ConPTY draws a line with cursor moves and
+/// colour codes around the text, a Unix pty passes the text through.
+fn plain(raw: &str) -> String {
+    let mut out = String::new();
+    let mut chars = raw.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '\u{1b}' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            // CSI: parameters, then a final byte from @ to ~.
+            Some('[') => {
+                for n in chars.by_ref() {
+                    if ('@'..='~').contains(&n) {
+                        break;
+                    }
+                }
+            }
+            // OSC: up to a BEL or ESC \.
+            Some(']') => {
+                while let Some(n) = chars.next() {
+                    if n == '\u{7}' || (n == '\u{1b}' && chars.next() == Some('\\')) {
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out.replace('\r', "")
 }
 
 fn wait_for(tok: &Tok, what: &str, mut ok: impl FnMut() -> bool) {
