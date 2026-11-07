@@ -84,10 +84,12 @@ pub async fn runner_answer(
             }
         }
         Delivery::Keys(bytes) => {
+            // The screen the answer is given to, taken before the keys change it.
+            let screen = runners.screen_answer(t.id, role, at);
             runs::send_input(&*runners, Actor::Human, &t, role, &bytes)?;
             runners.prompts().clear(t.id, role);
             runners.prompts().unflag_screen(t.id, role);
-            runners.tokens().rewait(t.id, role, at);
+            runners.tokens().rewait(t.id, role, screen);
         }
     }
     let answer = body.answer;

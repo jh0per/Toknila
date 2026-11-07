@@ -2845,7 +2845,9 @@
           "enter",
           "one",
           "two",
-          "escape"
+          "escape",
+          "up",
+          "down"
         ]
       },
       "ArtifactFormat": {
@@ -5224,6 +5226,21 @@
         "type": "object",
         "description": "A ticket's review state: whose turn it is while in Review, and every round so far.",
         "properties": {
+          "note": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewNote",
+                "description": "Why the card is for a person, when the reviewer gave no verdict."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nudged": {
+            "type": "boolean",
+            "description": "The reviewer was already nudged for a verdict in this round of review."
+          },
           "rounds": {
             "type": "array",
             "items": {
@@ -5252,6 +5269,33 @@
           "agent",
           "both"
         ]
+      },
+      "ReviewNote": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The reviewer ended its turn (or its process) without a verdict, even after one nudge.\n`lines` are the last lines of its screen, ANSI removed (at most 15; may be empty).",
+            "required": [
+              "lines",
+              "note"
+            ],
+            "properties": {
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "note": {
+                "type": "string",
+                "enum": [
+                  "no_verdict"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Why a card waits for a person in Review beyond the ordinary hand-in; shown in the inbox."
       },
       "ReviewRound": {
         "type": "object",
@@ -6003,7 +6047,8 @@
           "reopen",
           "cancel",
           "approve",
-          "reject"
+          "reject",
+          "run_reviewer"
         ]
       },
       "TicketDetail": {

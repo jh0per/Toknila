@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Comment, CommentKind, Ticket, TicketDetail } from "../api/types";
 import type { Intent } from "../store/msg";
+import { isPermissionReport } from "./permissionReports";
 
 const KINDS: CommentKind[] = ["instruction", "report", "decision"];
 
@@ -10,6 +11,7 @@ export function Comments(
 ) {
   const [kind, setKind] = useState<CommentKind>("instruction");
   const [text, setText] = useState("");
+  const shown = (detail?.comments ?? []).filter((c) => !isPermissionReport(c));
   const send = () => {
     if (!text.trim()) return;
     dispatch({ type: "addComment", key: card.key, kind, text: text.trim() });
@@ -18,8 +20,8 @@ export function Comments(
   return (
     <section className="comments" data-testid="comments">
       <h4>Comments</h4>
-      {!detail ? <p className="muted">Loading…</p> : detail.comments.length === 0 ? <p className="muted">None.</p> : (
-        <ul>{detail.comments.map((c) => <CommentItem key={c.id} c={c} />)}</ul>
+      {!detail ? <p className="muted">Loading…</p> : shown.length === 0 ? <p className="muted">None.</p> : (
+        <ul>{shown.map((c) => <CommentItem key={c.id} c={c} />)}</ul>
       )}
       <form className="compose" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <select aria-label="Kind" value={kind} onChange={(e) => setKind(e.target.value as CommentKind)}>

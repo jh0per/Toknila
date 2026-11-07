@@ -13,7 +13,7 @@ for `propose` it is the new card.
 | `event` | Fields | Effect | Allowed from |
 |---|---|---|---|
 | `started` | | Ready -> Running; no-op if already Running | Ready, Running |
-| `ask_human` | `text`, `permission` (bool, default false) | -> Waiting with the question or permission request as reason; the text is stored as an agent report comment | Running |
+| `ask_human` | `text`, `permission` (bool, default false) | -> Waiting with the question or permission request as reason; the text is stored as an agent report comment, except for a permission request (`permission: true`), which stays in the journal and the Inbox and leaves no comment | Running |
 | `subtask_done` | `position` (1-based) | ticks the checklist item, `done_by: "agent"` | any |
 | `note` | `body` (comment template fields: `gist`, `what`, `why`, `how_to_verify`, `alternatives`, `consequences`) | stores an agent report comment | any |
 | `finished` | `summary` | -> Review; summary stored as an agent report comment. Refused with `409` while the ticket has an open thread, and while its ship has changes that are not committed (tracked or untracked, not ignored) or no commit of its own on top of its starting point: the error text tells the agent to commit and call `finished` again, and the card stays Running | Running |
@@ -77,7 +77,7 @@ Claude Code hooks are a second source, conservative on purpose. The runner subsc
 |---|---|---|---|
 | `Notification` with `notification_type: "permission_prompt"` | `notification` | yes | the activity carries `prompt` (the message); the daemon asks the person: a worker's card goes Waiting (`ask_human` with `permission: true`, text = the message plus the last tool summary), a reviewer's dialog is an inbox `question` |
 | `Notification` of any other type (`idle_prompt`, ...) | `notification` | yes | none |
-| `Stop` | `stop` | yes | none: it fires after every reply, so it is **not** `finished` |
+| `Stop` | `stop` | yes | none for a worker: it fires after every reply, so it is **not** `finished`. A reviewer's Stop while its verdict is missing is the machine event `reviewer_stopped` (see "Review") |
 | `SubagentStop` | `subagent_stop` | yes | none |
 | `UserPromptSubmit` | `user_prompt_submit` | yes | none |
 | `PostToolUse` | `post_tool_use` | yes | none |
@@ -97,8 +97,9 @@ hook reports that on stderr and carries on.
 ## Questions and answers
 
 A person answers what an agent asks with `POST /v1/tickets/{ticket}/runner/answer`
-(`{"role": "worker"|"reviewer", "answer": "allow"|"deny"|"text"|"enter"|"one"|"two"|"escape",
-"text": ...}`; a person's token only). Core says which answers a question takes; an answer goes to
+(`{"role": "worker"|"reviewer", "answer": "allow"|"deny"|"text"|"enter"|"one"|"two"|"up"|"down"|"escape",
+"text": ...}`; a `text` answer may carry named keys in braces (`{down}`, `{up}`, `{left}`, `{right}`,
+`{enter}`, `{esc}`, `{tab}`, `{space}`): with any, the whole text is keys and no Enter is added; a person's token only). Core says which answers a question takes; an answer goes to
 the agent's waiting permission hook, else to the role's terminal as keys. Journal entries (entity
 `ticket`): `question_raised` (`key`, `ticket`, `role`, `kind`: a reviewer's permission dialog, or a
 run that waits on its screen), `question_cleared` (`key`, `ticket`, `role`: it went away without
@@ -195,7 +196,18 @@ is still looking. Both are recorded as rounds on the ticket (`review.rounds`) wi
 `review_verdict` rounds. `PATCH /v1/projects/{p}` and `PATCH /v1/chains/{c}` take
 `{"review_mode": "human|agent|both", "reviewer": "<profile>"}` (either may be left out; a blank
 `reviewer` clears it); `PATCH /v1/tickets/{t}` takes the same two fields. `TicketDetail` carries
-`review` (`mode`, `reviewer`, `awaiting`, `rounds`) and `allowed_actions`.
+`review` (`mode`, `reviewer`, `awaiting`, `rounds`, `nudged`, `note`) and `allowed_actions`.
+
+A reviewer that ends a turn without recording a verdict (its Stop hook, or silence for `idle_secs`
+when its profile has no hooks) is the machine event `reviewer_stopped` (`screen`: the last lines of
+its screen). Core nudges it once (effect `nudge_reviewer`: "Record your verdict with
+`review_verdict`; if you could not run something, say so in the verdict.", typed into its terminal);
+a second time the card waits for a person (`review.awaiting` is `person`) with
+`review.note = {"note": "no_verdict", "lines": [...]}` (at most 15 lines, ANSI removed) and the
+reviewer is stopped. The inbox lists it as a `review` item ("The reviewer gave no verdict", `lines`)
+and the ticket action `run_reviewer` (`tok run-reviewer`) is allowed: it starts the reviewer again
+(`awaiting` is `agent` with `decides: false`). A reviewer whose process ends without a verdict gets
+the same note (no lines) and action.
 
 ## Instructions back to the agent
 

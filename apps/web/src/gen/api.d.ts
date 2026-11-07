@@ -891,7 +891,7 @@ export interface components {
          * @description One way a person answers a question.
          * @enum {string}
          */
-        AnswerKind: "allow" | "deny" | "text" | "enter" | "one" | "two" | "escape";
+        AnswerKind: "allow" | "deny" | "text" | "enter" | "one" | "two" | "escape" | "up" | "down";
         /**
          * @description How an artifact body is to be read.
          * @enum {string}
@@ -1721,6 +1721,9 @@ export interface components {
         RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing";
         /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
         Review: {
+            note?: components["schemas"]["ReviewNote"] | null;
+            /** @description The reviewer was already nudged for a verdict in this round of review. */
+            nudged?: boolean;
             /** @description Oldest first. */
             rounds?: components["schemas"]["ReviewRound"][];
             turn?: components["schemas"]["ReviewTurn"] | null;
@@ -1730,6 +1733,12 @@ export interface components {
          * @enum {string}
          */
         ReviewMode: "human" | "agent" | "both";
+        /** @description Why a card waits for a person in Review beyond the ordinary hand-in; shown in the inbox. */
+        ReviewNote: {
+            lines: string[];
+            /** @enum {string} */
+            note: "no_verdict";
+        };
         /**
          * @description One verdict on a ticket. Numbers count from 1 over every verdict, a person's and the
          *     reviewer agent's, in the order they were given.
@@ -1961,7 +1970,7 @@ export interface components {
          * @description What a person can do with a ticket.
          * @enum {string}
          */
-        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject";
+        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject" | "run_reviewer";
         /** @description A ticket with everything attached to it. */
         TicketDetail: {
             /** @description What a person can do with the ticket now, computed by the state machine. */

@@ -10,6 +10,11 @@
 //!   would, and print `post=<status> <body>`. `{ticket}` in the path is the run's ticket key. The
 //!   daemon's address, the token and the ticket come from the `TOKNILA_*` environment the runner
 //!   sets. This is how a test plays the hooks of a real agent (`/activity`, `/permission`).
+//! - `stop`: post the `hook:stop` activity, as an agent's Stop hook does when a turn ends (a
+//!   reviewer that ends a turn without a verdict).
+//! - `trust`: show a folder trust dialog whose options are not numbered, with "No" preselected, and
+//!   read one line of keys: a Down arrow before Enter prints `trust=yes`, anything else
+//!   `trust=no`.
 //! - `sleep <ms>`: wait.
 //! - `hold`: wait until killed.
 //! - `child`: start a child process that holds until killed and print `child=<pid>`.
@@ -105,6 +110,26 @@ fn main() {
                 let path = args.next().unwrap_or_default();
                 let json = args.next().unwrap_or_default();
                 say(&post(&path, &json));
+            }
+            "stop" => say(&post(
+                "/tickets/{ticket}/activity",
+                r#"{"signal":"hook:stop"}"#,
+            )),
+            "trust" => {
+                for line in [
+                    "Do you trust the files in this folder?",
+                    "> No, exit",
+                    "  Yes, I trust this folder",
+                ] {
+                    say(line);
+                }
+                let mut keys = String::new();
+                let _ = std::io::stdin().lock().read_line(&mut keys);
+                say(if keys.contains("\x1b[B") {
+                    "trust=yes"
+                } else {
+                    "trust=no"
+                });
             }
             "sleep" => {
                 let ms = args.next().and_then(|s| s.parse().ok()).unwrap_or(0);

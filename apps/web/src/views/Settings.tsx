@@ -5,6 +5,7 @@ import { AddProject } from "./AddProject";
 import { Checks } from "./Checks";
 import { ImportChain } from "./ImportChain";
 import { ProjectSettings } from "./ProjectSettings";
+import { TrustNote } from "./TrustNote";
 
 /// Settings: the system checks, the settings of the project in focus, a chain file to import, and
 /// a form to add another project.
@@ -19,6 +20,7 @@ export function Settings({ state, dispatch }: { state: State; dispatch: (i: Inte
     <div className="settings" data-testid="settings">
       <h1>Settings</h1>
       <Checks state={state} dispatch={dispatch} />
+      <TrustNote />
       {project && <ProjectSettings key={stamp} project={project} state={state} dispatch={dispatch} />}
       {project && <ImportChain project={project} state={state} dispatch={dispatch} />}
       <AddProject state={state} dispatch={dispatch} />

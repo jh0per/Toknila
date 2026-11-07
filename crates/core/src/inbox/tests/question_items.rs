@@ -21,6 +21,7 @@ fn run(t: &Ticket, role: AgentRole, tail: &str) -> RunFacts {
         first_activity: None,
         startup_secs: 20,
         tail: tail.as_bytes().to_vec(),
+        answered: None,
     }
 }
 
@@ -114,6 +115,8 @@ fn a_run_with_no_sign_of_life_after_its_startup_time_waits_on_its_screen() {
             AnswerKind::Enter,
             AnswerKind::One,
             AnswerKind::Two,
+            AnswerKind::Up,
+            AnswerKind::Down,
             AnswerKind::Escape,
             AnswerKind::Text
         ]
@@ -189,4 +192,42 @@ fn no_screen_item_for_a_card_that_is_not_working_or_already_asks() {
         ],
         "no screen item beside a question, a blocked card or a dialog"
     );
+}
+
+#[test]
+fn a_reviewer_without_a_verdict_is_a_review_item_with_its_screen_and_run_again() {
+    let mut t = ticket(1, TicketStatus::Review, 5);
+    t.review.turn = Some(crate::ReviewTurn::Person);
+    t.review.note = Some(crate::ReviewNote::NoVerdict {
+        lines: vec![
+            "I could not run cargo".into(),
+            "what I need from you".into(),
+        ],
+    });
+    let got = compute(&data(vec![t], 9));
+    assert_eq!(got.len(), 1);
+    let i = &got[0];
+    assert_eq!(
+        (i.kind, i.text.as_str()),
+        (InboxKind::Review, NO_VERDICT_TEXT)
+    );
+    assert_eq!(i.lines, ["I could not run cargo", "what I need from you"]);
+    assert!(i.allowed_actions.contains(&TicketAction::RunReviewer));
+    assert!(i.allowed_actions.contains(&TicketAction::Accept));
+    assert!(i.allowed_actions.contains(&TicketAction::Return));
+}
+
+#[test]
+fn a_screen_answered_by_keys_stays_quiet_while_it_is_unchanged() {
+    let t = ticket(1, TicketStatus::Running, 5);
+    let mut r = run(&t, AgentRole::Worker, "Trust this folder?\n> Yes\n");
+    r.answered = Some(crate::question::ScreenAnswer {
+        at: Timestamp(30_000),
+        screen: crate::question::screen_hash(&r.tail),
+    });
+    let mut d = data(vec![t], 60_000);
+    d.runs = vec![r];
+    assert!(compute(&d).is_empty(), "30 s after the answer, same screen");
+    d.now = Timestamp(90_000);
+    assert_eq!(compute(&d).len(), 1, "the grace has passed");
 }

@@ -70,3 +70,16 @@ fn skip_escape(chars: &mut Peekable<Chars<'_>>, out: &mut String) {
         _ => {}
     }
 }
+
+/// A hash of what the screen shows (its last [`SCREEN_LINES`] lines, ANSI removed), to tell
+/// whether it changed. Stable across runs (FNV-1a).
+pub fn screen_hash(output: &[u8]) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for line in last_lines(output, SCREEN_LINES) {
+        for b in line.bytes().chain(std::iter::once(b'\n')) {
+            hash ^= u64::from(b);
+            hash = hash.wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    hash
+}

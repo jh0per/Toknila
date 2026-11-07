@@ -3,7 +3,7 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
-use toknila_app::{agent, instructions, questions, resolve, ships};
+use toknila_app::{agent, instructions, questions, resolve, reviews, ships};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::question::QuestionKind;
 use toknila_core::{Actor, AgentRole, TicketStatus, hook, nudge};
@@ -131,6 +131,17 @@ pub async fn ticket_activity(
     let resume = worker && t.status == TicketStatus::Waiting && nudge::resumes(&input.signal);
     let raised = asked.filter(|(fresh, _)| *fresh).map(|(_, text)| text);
     let reviewer_gone = (screen_gone || dialog_gone) && !worker;
+    // A reviewer's turn ended: if its verdict is still missing, core nudges it or hands the card
+    // to a person (a card that has moved on refuses the event).
+    if !worker && input.signal == "hook:stop" && t.status == TicketStatus::Review {
+        let (id, screen) = (t.id, state.runners.reviewer_screen(t.id));
+        state
+            .store
+            .write(Actor::Agent, at, move |tx| -> ApiResult<()> {
+                Ok(reviews::stopped(tx, id, screen)?)
+            })
+            .await?;
+    }
     if resume || raised.is_some() || screen_gone || reviewer_gone {
         let signal = input.signal;
         state
@@ -171,6 +182,13 @@ pub async fn claim_instructions(
     Path(ticket): Path<String>,
 ) -> ApiResult<Json<InstructionClaim>> {
     let at = now();
+    // The Stop hook of a reviewer asks too; the pending instructions are the worker's.
+    if matches!(&principal, Principal::Agent(g) if g.role == AgentRole::Reviewer) {
+        return Ok(Json(InstructionClaim {
+            count: 0,
+            reason: String::new(),
+        }));
+    }
     let (claimed, _) = state
         .store
         .write(

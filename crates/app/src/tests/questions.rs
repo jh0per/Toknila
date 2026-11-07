@@ -97,3 +97,23 @@ fn raising_and_clearing_are_journaled_for_the_role() {
         ["ticket.question_raised", "ticket.question_cleared"]
     );
 }
+
+#[test]
+fn a_permission_request_leaves_no_comment_on_the_card_but_a_question_does() {
+    let mut mem = running();
+    ask(&mut mem);
+    assert!(
+        mem.comments.is_empty(),
+        "a permission request is not a card comment: {:?}",
+        mem.comments
+    );
+    let t = a(&mem);
+    questions::answered(&mut mem, &t, AgentRole::Worker, AnswerKind::Allow).expect("answered");
+    let t = a(&mem);
+    let event = AgentEvent::AskHuman {
+        text: "which database?".to_owned(),
+        permission: false,
+    };
+    agent::ticket_event(&mut mem, &t, event).expect("ask_human");
+    assert_eq!(mem.comments.len(), 1, "an ask_human question is kept");
+}

@@ -31,6 +31,17 @@ pub fn watch(store: Store, runners: Arc<Runners>) -> JoinHandle<()> {
 /// One round at time `at`: the runs that are quiet are nudged or given up on.
 pub async fn tick(store: &Store, runners: &Arc<Runners>, at: Timestamp) {
     super::screens::tick(store, runners, at).await;
+    for ticket in runners.idle_reviewers() {
+        let screen = runners.reviewer_screen(ticket);
+        let done = store
+            .write(Actor::System, at, move |tx| -> Result<(), AppError> {
+                toknila_app::reviews::stopped(tx, ticket, screen)
+            })
+            .await;
+        if let Err(error) = done {
+            tracing::warn!(%ticket, %error, "the idle reviewer check failed");
+        }
+    }
     for ticket in runners.live() {
         if let Err(error) = look(store, runners, ticket, at).await {
             tracing::warn!(%ticket, %error, "the silence check failed");

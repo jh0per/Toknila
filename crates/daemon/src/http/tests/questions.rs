@@ -247,7 +247,7 @@ async fn an_agent_that_waits_on_its_screen_is_listed_until_its_first_sign_of_lif
     assert_eq!(q[0]["role"], "reviewer");
     assert_eq!(
         q[0]["answers"],
-        json!(["enter", "one", "two", "escape", "text"])
+        json!(["enter", "one", "two", "up", "down", "escape", "text"])
     );
     assert!(q[0]["lines"].is_null(), "no output yet: no lines");
     // A worker's sign of life does not end the reviewer's wait.

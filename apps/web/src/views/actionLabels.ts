@@ -23,6 +23,7 @@ const LABEL: Record<TicketAction, Omit<ActionSpec, "action">> = {
   cancel: { label: "Cancel", danger: true },
   approve: { label: "Approve" },
   reject: { label: "Reject", danger: true },
+  run_reviewer: { label: "Run the reviewer again" },
 };
 
 /// Actions that need a reason or a text the bar has no field for; the daemon would refuse them.

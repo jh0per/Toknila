@@ -370,6 +370,22 @@ the agent hands in and passes it to the machine in the `Finished` event.
   hands the card to a person (`ReviewerFailed`; a report comment says why). The simulated
   reviewer (`sim-reviewer`) has no process: a person sends `tok sim <ticket> review
   approve|request-changes [comment]`.
+- **A reviewer that ends a turn without a verdict.** Its Stop hook (`hook:stop` with the reviewer's
+  token) tells the daemon a turn ended; when the profile has no hooks, silence for the profile's
+  `idle_secs` with nothing running under it does (`runner/reviewer.rs`, the silence ticker). The
+  daemon only detects: it sends the machine event `ReviewerStopped { screen }` with the last lines
+  of the reviewer's screen (`question::last_lines`, at most 15, ANSI removed) and core decides
+  (`machine/review.rs`, `agent_stopped`). The first time, `review.nudged` is set and the effect
+  `NudgeReviewer` has the host type "Record your verdict with review_verdict; if you could not run
+  something, say so in the verdict." into the reviewer's terminal (the same typed delivery a worker's
+  nudge uses; the reviewer's Stop hook claims no instructions, those are the worker's). The second
+  time the card goes to a person: `review.turn = person`, `review.note = NoVerdict { lines }`, and
+  the reviewer is stopped. The note makes the inbox item ("The reviewer gave no verdict" with the
+  lines) and allows the action `run_reviewer` (`tok run-reviewer`, `TicketEvent::RunReviewer`):
+  it starts the reviewer again with `decides: false`, so a person still decides. A reviewer whose
+  process ends without a verdict (`ReviewerFailed`) gets the same note, without lines. A Stop
+  after the verdict, or when the card is not waiting for the agent, is refused by the machine and
+  ignored.
 - **The worker is not replaced.** A worker session that is still alive in Review keeps its
   context: a `return` (a person's, or the reviewer's remarks) goes to that same session (the
   runner is kept, and the comment is an instruction comment like any other: it is typed to the idle session or claimed by its Stop hook, and marked delivered once, see `app::instructions`; the reviewer's remarks take the same path). If the
@@ -589,7 +605,9 @@ the kind uses them).
 | `thread` | a thread is open and its newest version came after the person's last request for changes (`thread::awaiting_person`) | open the thread |
 | `leftovers` | a card was done out of order (`Ticket::done_out_of_order`) and an earlier card in its `behind` list still has open subtasks that nobody dismissed | the three decisions below |
 
-A silent agent (Waiting, `silent`) is not an inbox item yet.
+A silent agent (Waiting, `silent`) is not an inbox item yet. A `review` item whose reviewer gave
+no verdict carries the text "The reviewer gave no verdict", the reviewer's last screen lines
+(`lines`) and the actions `accept`, `return` and `run_reviewer`.
 
 ### Answering an agent
 
@@ -602,7 +620,7 @@ file, at most 300 characters, never the contents of a prompt or a file) and whic
 |---|---|---|
 | `ask_human` | none: the reply is an instruction comment | the agent's MCP call |
 | permission | `allow`, `deny` (a deny may carry a comment for the agent) | the agent's `PermissionRequest` hook, else its permission `Notification` |
-| the agent waits on its screen | `enter`, `one`, `two`, `escape`, `text` | the startup rule below |
+| the agent waits on its screen | `enter`, `one`, `two`, `up`, `down`, `escape`, `text` (named keys such as `{down}{enter}` are keys, not typed) | the startup rule below |
 
 **Which mechanism answers a permission.** Claude Code documents a `PermissionRequest` hook
 ("Hooks reference", code.claude.com/docs/en/hooks, section PermissionRequest): it runs when the
@@ -631,8 +649,33 @@ now, startup_secs)` is true when the run has shown no sign of life (any hook, an
 token) that long after its spawn. The inbox then lists "The agent waits on its screen" with the
 last 15 lines of the run's output, ANSI removed (`question::last_lines`), for either role; nothing
 matches the text of the screen, so it is not specific to one agent. The item goes with the first
-sign of life, and an answer by keys starts the wait over (the next dialog is counted from the
-answer). Toknila never edits an agent's own configuration to skip such dialogs.
+sign of life. After an answer by keys the wait starts over from it (`RunFacts::answered`: when,
+and a hash of the screen it was given to, `question::screen_hash`), and while the screen is still
+that one the item stays away for `ANSWER_GRACE_SECS` (60 s); a changed screen is listed at once,
+so an answer of several keys (Down, then Enter) is not held up between them. Core decides from `answered`, the screen hash and `now`. Toknila never
+edits an agent's own configuration to skip such dialogs.
+
+**The folder trust dialog.** Its options are not numbered, so `1` and `2` do nothing and Enter
+takes the preselected "No"; the quick keys `up` and `down` (and a text answer such as
+`{down}{enter}`) answer it. Whether it can be avoided was researched in Claude Code's own
+documentation (Permissions, "Project allow rules and workspace trust"; Security, "Trust
+verification"): there is no setting or flag that pre-accepts it, and the only documented way to
+pre-trust by hand is to set `projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json`, a file
+Claude Code writes for itself, which Toknila never touches. But the trust it saves is keyed on the
+repository root, and "in a worktree, it uses the main checkout's root". A ship is a worktree of
+the project's repository, so accepting the dialog once in the project's own repository covers
+every ship made from it. Onboarding (step 3) and Settings say so, as a one-time step for the
+person. A data-home folder such as `<home>/ships` would not do: a ship is itself a repository
+checkout, and trust is not inherited into a nested repository.
+
+*Windows gap in the tests.* The arrow keys are written to the terminal as the VT sequences
+`ESC [ A` and `ESC [ B`, which is what an agent that reads its input in VT mode (as Claude Code's
+interface does) receives from ConPTY. The fake agent reads a plain console line, and ConPTY turns
+those sequences into console key events that a line read never returns (the CI log showed
+`trust=no` after a Down and Enter). Reading key events needs the Windows console API, which means
+`unsafe` FFI outside the one audited file, so the runner test of the trust screen runs on Unix
+ptys only; core's tests cover the bytes each answer sends on every OS, and Windows with a real
+agent has not been exercised.
 
 **Leftovers.** One item per earlier card, naming the cards done before it. The decision is
 `POST /v1/tickets/{ticket}/leftovers/{move|close|leave}` on that earlier card; a person only, and

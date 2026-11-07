@@ -5,7 +5,10 @@
 // Three cards run: two play an agent's permission hook (the call waits for the person), one shows
 // a screen and no sign of life. From the inbox: Allow one permission, Deny the other with a
 // comment (the hook gets each decision, the cards are Running at once), and answer the waiting
-// screen with typed text (the agent receives it).
+// screen with typed text (the agent receives it). Two more: a folder trust dialog with unnumbered
+// options is answered with the arrow quick key and Enter (the agent reads "trust=yes"), and a
+// reviewer that ends its turns without a verdict becomes a review item with its screen, from which
+// the person can Run the reviewer again.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -61,12 +64,24 @@ try {
     `command = ['${fakeAgent}', ${steps("print", "Do you trust this folder?", "print", "1. Yes  2. No", "echo", "hold")}]\n` +
       "startup_secs = 1\n[hooks]\nenabled = true\n",
   );
+  writeFileSync(
+    join(home, "profiles", "trust.toml"),
+    `command = ['${fakeAgent}', ${steps("trust", "hold")}]\nstartup_secs = 1\n[hooks]\nenabled = true\n`,
+  );
+  // A worker that only holds, and a reviewer that ends two turns (the Stop hook) without a verdict.
+  writeFileSync(join(home, "profiles", "plain.toml"), `command = ['${fakeAgent}', ${steps("print", "working", "hold")}]\n`);
+  writeFileSync(
+    join(home, "profiles", "plain-reviewer.toml"),
+    `command = ['${fakeAgent}', ${steps("print", "I could not run the checks", "stop", "sleep", "300", "stop", "hold")}]\n`,
+  );
   tok("project", "new", "QA", "--repo", repo, "--base", "develop", "--profile", "allow");
-  tok("project", "set", "QA", "--parallel", "3");
+  tok("project", "set", "QA", "--parallel", "6");
   tok("chain", "new", "work", "--project", "QA");
   tok("ticket", "new", "work", "Allowed");
   tok("ticket", "new", "work", "Denied", "--profile", "deny");
   tok("ticket", "new", "work", "Silent", "--profile", "screen");
+  tok("ticket", "new", "work", "Trusting", "--profile", "trust");
+  tok("ticket", "new", "work", "Reviewed", "--profile", "plain");
   const { url } = JSON.parse(tok("open", "--json"));
 
   browser = await launch();
@@ -106,8 +121,37 @@ try {
   await page.getByLabel("Type to QA-3").fill("yes");
   await row("QA-3").getByRole("button", { name: "Send" }).click();
   await until("the agent got the text", () => logs("QA-3").includes("got:yes"));
-  await row("QA-3").waitFor({ state: "detached", timeout: 10_000 });
+  await expectText(row("QA-3").locator("[data-testid=screen]"), "got:yes", "the changed screen is listed again");
   console.log("PASS text typed from the inbox reached the agent's terminal");
+
+  // The trust dialog's options are not numbered: the arrow quick key and Enter choose "Yes". The
+  // fake agent reads the arrow from a Unix pty only (a Windows console line read never sees it).
+  await expectText(row("QA-4").locator("[data-testid=screen]"), "Yes, I trust this folder", "the trust dialog is shown");
+  if (process.platform !== "win32") {
+    await row("QA-4").locator("[data-testid=answer-down]").click();
+    await row("QA-4").locator("[data-testid=answer-enter]").click();
+    await until("the agent chose Yes", () => logs("QA-4").includes("trust=yes"));
+    console.log("PASS the arrow quick key and Enter answered the trust dialog");
+  }
+
+  // A reviewer that ends its turns without a verdict: the card goes to the person.
+  tok("review-mode", "agent", "--ticket", "QA-5");
+  await until("QA-5 running", () => status("QA-5") === "running");
+  const ship = JSON.parse(tok("show", "QA-5", "--json")).ship.path;
+  writeFileSync(join(ship, "work.txt"), "work\n");
+  git(ship, "add", "work.txt");
+  git(ship, "commit", "--quiet", "-m", "work");
+  tok("sim", "QA-5", "finish", "done");
+  const review = inbox.locator('li[data-kind=review][data-key="QA-5"]');
+  await expectText(review, "The reviewer gave no verdict", "the inbox says the reviewer gave no verdict");
+  await expectText(review.locator("[data-testid=screen]"), "I could not run the checks", "with the reviewer's screen");
+  for (const id of ["review-accept", "review-run-again", "review-return"]) {
+    await review.locator(`[data-testid=${id}]`).waitFor({ timeout: 10_000 });
+  }
+  console.log("PASS Accept, Return and Run the reviewer again are offered");
+  await review.locator("[data-testid=review-run-again]").click();
+  await until("the reviewer runs again", () => JSON.parse(tok("show", "QA-5", "--json")).review.awaiting?.by === "agent");
+  await expectText(review, "The reviewer gave no verdict", "and gives no verdict again");
 
   // The journal says who answered and for which role.
   const origin = new URL(url).origin;
@@ -116,6 +160,8 @@ try {
   const answered = (await res.json()).filter((e) => e.kind === "question_answered");
   const seen = answered.map((e) => `${e.actor}:${e.payload.key}:${e.payload.role}:${e.payload.answer}`).sort();
   const want = ["human:QA-1:worker:allow", "human:QA-2:worker:deny", "human:QA-3:worker:text"];
+  if (process.platform !== "win32") want.push("human:QA-4:worker:down", "human:QA-4:worker:enter");
+  want.sort();
   if (JSON.stringify(seen) !== JSON.stringify(want)) throw new Error(`journal: ${JSON.stringify(seen)}`);
   console.log("PASS the journal records who answered, for which role");
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);

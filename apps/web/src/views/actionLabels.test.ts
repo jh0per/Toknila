@@ -13,6 +13,12 @@ describe("specsFor", () => {
     expect(specs.filter((a) => a.danger).map((a) => a.action)).toEqual(["cancel"]);
   });
 
+  it("words the reviewer re-run", () => {
+    expect(specsFor(["accept", "return", "run_reviewer"]).map((a) => a.label)).toEqual([
+      "Accept", "Return", "Run the reviewer again",
+    ]);
+  });
+
   it("leaves out what the bar has no field for", () => {
     expect(specsFor(["pause", "block", "cancel"]).map((a) => a.action)).toEqual(["pause", "cancel"]);
   });

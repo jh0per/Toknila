@@ -52,6 +52,8 @@ pub enum ExternalEffect {
     },
     /// Stop the reviewer's runner only.
     StopReviewer { ticket: TicketId },
+    /// Type a message to the live reviewer: it ended a turn without recording its verdict.
+    NudgeReviewer { ticket: TicketId, message: String },
     /// Get a person's instruction to the ticket's live agent (see [`crate::instructions`]).
     DeliverInstruction { ticket: TicketId, comment: Comment },
 }
@@ -205,6 +207,11 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
             ExternalEffect::StopReviewer { ticket } => {
                 host.runner.stop_role(ticket, AgentRole::Reviewer);
             }
+            ExternalEffect::NudgeReviewer { ticket, message } => {
+                // The reviewer's turn has just ended; give its terminal a moment to settle.
+                std::thread::sleep(ENTER_DELAY);
+                type_line(host.runner, ticket, AgentRole::Reviewer, &message);
+            }
             ExternalEffect::DeliverInstruction { .. } => {}
         }
     }
@@ -234,16 +241,21 @@ fn deliver(runner: &dyn Runner, ticket: TicketId, comment: &Comment) -> bool {
     if instructions::route(state.hooks, state.idle) != Route::Type {
         return false;
     }
-    let line = instructions::typed(comment);
-    // The text, then Enter as a separate keystroke: a terminal application takes a newline that
-    // arrives with the text as part of a paste.
-    runner
-        .write(ticket, AgentRole::Worker, line.as_bytes())
-        .is_ok()
-        && {
-            std::thread::sleep(ENTER_DELAY);
-            runner.write(ticket, AgentRole::Worker, b"\r").is_ok()
-        }
+    type_line(
+        runner,
+        ticket,
+        AgentRole::Worker,
+        &instructions::typed(comment),
+    )
+}
+
+/// The text, then Enter as a separate keystroke: a terminal application takes a newline that
+/// arrives with the text as part of a paste. Returns whether both were written.
+fn type_line(runner: &dyn Runner, ticket: TicketId, role: AgentRole, line: &str) -> bool {
+    runner.write(ticket, role, line.as_bytes()).is_ok() && {
+        std::thread::sleep(ENTER_DELAY);
+        runner.write(ticket, role, b"\r").is_ok()
+    }
 }
 
 /// Records the outcomes: state and journal, with ticket changes going through the machine.

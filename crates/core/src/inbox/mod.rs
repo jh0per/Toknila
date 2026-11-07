@@ -22,8 +22,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::question::{self, AnswerKind, PendingPermission, QuestionKind, RunFacts};
 use crate::{
-    AgentRole, ChainId, ReviewTurn, StatusReason, Subtask, Thread, ThreadMessage, ThreadVersion,
-    Ticket, TicketKey, TicketStatus, Timestamp, WaitingReason, machine::TicketAction, thread,
+    AgentRole, ChainId, ReviewNote, ReviewTurn, StatusReason, Subtask, Thread, ThreadMessage,
+    ThreadVersion, Ticket, TicketKey, TicketStatus, Timestamp, WaitingReason,
+    machine::TicketAction, thread,
 };
 
 /// What kind of thing waits on the person; the order is the order clients group them in.
@@ -84,6 +85,9 @@ pub struct InboxItem {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lines: Vec<String>,
 }
+
+/// The text of the `review` item for a card whose reviewer gave no verdict.
+pub const NO_VERDICT_TEXT: &str = "The reviewer gave no verdict";
 
 /// A thread with what the rule needs to know about it.
 #[derive(Debug, Clone)]
@@ -188,6 +192,12 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
         _ => return None,
     };
     let mut i = item(kind, t, t.status_since, text);
+    if kind == InboxKind::Review
+        && let Some(ReviewNote::NoVerdict { lines }) = &t.review.note
+    {
+        NO_VERDICT_TEXT.clone_into(&mut i.text);
+        i.lines.clone_from(lines);
+    }
     if kind == InboxKind::Question {
         i.role = Some(AgentRole::Worker);
         i.answers = match &t.status_reason {
@@ -226,11 +236,7 @@ fn question_items(data: &InboxData) -> Vec<InboxItem> {
         if !working || asking {
             continue;
         }
-        let since = Timestamp(
-            run.spawned
-                .0
-                .saturating_add(i64::try_from(run.startup_secs.saturating_mul(1000)).unwrap_or(0)),
-        );
+        let since = run.waiting_since();
         let mut i = item(
             InboxKind::Question,
             t,
