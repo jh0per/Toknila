@@ -4,6 +4,7 @@ import type { Intent } from "../store/msg";
 import { plannerOf } from "../store/planner";
 import type { State } from "../store/state";
 import { type TermStatus, openPlannerTerminal } from "../terminal/connect";
+import { fitTerminal } from "../terminal/fit";
 import { type SizeReporter, sizeReporter } from "../terminal/size";
 import { exitText } from "../terminal/wire";
 
@@ -30,11 +31,7 @@ function PlannerTerminal({ project, onEnded }: { project: string; onEnded: () =>
     let dispose = () => {};
     let cancelled = false;
     void (async () => {
-      const [{ Terminal }, { FitAddon }] = await Promise.all([
-        import("@xterm/xterm"),
-        import("@xterm/addon-fit"),
-        import("@xterm/xterm/css/xterm.css"),
-      ]);
+      const [{ Terminal }] = await Promise.all([import("@xterm/xterm"), import("@xterm/xterm/css/xterm.css")]);
       const el = host.current;
       if (cancelled || !el) return;
       const css = getComputedStyle(document.documentElement);
@@ -43,12 +40,14 @@ function PlannerTerminal({ project, onEnded }: { project: string; onEnded: () =>
         fontSize: 12,
         theme: { background: css.getPropertyValue("--term-bg").trim(), foreground: css.getPropertyValue("--term-fg").trim() },
       });
-      const fit = new FitAddon();
-      term.loadAddon(fit);
       term.open(el);
-      fit.fit();
-      const resize = new ResizeObserver(() => fit.fit());
+      // The grid follows the host's box: on every resize of the panel or the window, and once the
+      // font is loaded (the cell size is known only then).
+      const fit = () => fitTerminal(el, term);
+      fit();
+      const resize = new ResizeObserver(fit);
       resize.observe(el);
+      void document.fonts?.ready.then(() => !cancelled && fit());
       // The planner draws for the grid the person sees: tell the daemon the panel's size when it
       // changes, and again whenever the stream goes live (a new run starts at the default size).
       let sizes: SizeReporter | null = null;
