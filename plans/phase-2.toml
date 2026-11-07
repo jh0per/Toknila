@@ -1,0 +1,128 @@
+# Phase 2: daily use after move-in. Toknila's own next chain, kept as data.
+# Import: in the window, Import on the TOKNILA project; or
+#         tok chain import plans/phase-2.toml --project TOKNILA
+#
+# What hurt or was left open in the first weeks of developing Toknila in Toknila.app. Cards that
+# do not depend on each other can run in parallel; the order is the priority.
+
+[chain]
+name = "phase-2"
+goal = "Daily use: no card waits forever, nothing is left behind, the reviewer can check what it reviews, and the paths not yet seen in a real run are proven with Claude Code"
+autostart = false
+
+[[ticket]]
+id = "no-checks"
+title = "GitHub mode: a pull request with no checks does not wait forever"
+prompt = "In github merge mode a card waits for the pull request's checks. A repository without CI never reports any, so the card waits forever. After a project-level timeout (default 10 minutes) with no checks reported, list an inbox question: merge now, keep waiting, or block. Read gh results from exit codes and JSON output, not from English error text (\"no pull requests found\", auth errors)."
+acceptance = [
+  "A pull request with no checks raises the inbox question after the timeout; each answer does what it says",
+  "A repository with required checks never gets the question",
+  "gh failures are told apart without matching message text, covered by tests with a fake gh",
+]
+
+[[ticket]]
+id = "cancel-cleanup"
+title = "Cancelled cards leave nothing behind"
+prompt = "Cancelling a card keeps its ship (worktree) and branch today. On cancel, remove the worktree after the commit; keep the branch only when it has commits not in the base, and say so on the card. Settings lists leftover ships and branches of cancelled or deleted cards with a Clean up action."
+acceptance = [
+  "Cancel removes the worktree; an empty branch is deleted, a branch with work is kept and named on the card",
+  "The leftovers list shows and cleans worktrees and branches no live card owns",
+]
+
+[[ticket]]
+id = "takeover-ask"
+title = "Replacing the daemon asks while agents run"
+prompt = "When a newer app starts and finds an older daemon with live runners, it stops them today. Ask first in the window: replace now (stops N agents) or later (keep using the running daemon until it is idle, then replace it)."
+acceptance = [
+  "With live runners the window asks before replacing; with none it replaces as today",
+  "Later replaces the daemon on its own once no runner is live, and says so",
+]
+
+[[ticket]]
+id = "reviewer-web"
+title = "The reviewer can read the sources a card names"
+prompt = "The built-in reviewer runs in dontAsk mode, so web reads are denied and a card that cites a page gets an unverified review. Add a per-project list of domains the reviewer may read (WebFetch domain rules, as documented for Claude Code permissions), empty by default, editable in project settings."
+acceptance = [
+  "Domains in the list reach the reviewer's permission rules; others stay denied",
+  "The setting survives a restart and is covered by an e2e test",
+]
+
+[[ticket]]
+id = "usage-polish"
+title = "Usage: live page, status line, agent chips"
+prompt = "Three follow-ups of usage stats. The Usage page refreshes when the collector saves new rows, not only on journal events. The agent's status line inside Toknila prints the model and context use instead of nothing. The usage chip in the Agents list gets an e2e test."
+acceptance = [
+  "The page shows new usage within a minute without a reload",
+  "The status line prints model and context percentage and still reports quota to the daemon",
+  "An e2e test covers the Agents-list chip",
+]
+
+[[ticket]]
+id = "spec-writeback"
+title = "Spec folders: write back what changed in Toknila"
+prompt = "Subtasks added in Toknila are not written back to the spec folder's tasks.md, and the TOML export drops subtask state. Export with --spec appends new subtasks under the right card and keeps checkboxes in sync; the TOML export carries each subtask's state."
+acceptance = [
+  "A subtask added in Toknila appears in tasks.md after export, nothing is deleted",
+  "Export then import of a chain keeps subtask states",
+]
+
+[[ticket]]
+id = "watch-time"
+title = "tok watch prints when things happened"
+prompt = "tok watch prints changes without timestamps, so a run's timeline has to be rebuilt from /v1/events. Print the local time on each line, and the event time in --json."
+acceptance = [
+  "Each watch line starts with the time; --json carries the event time",
+  "Snapshot tests pin both formats",
+]
+
+[[ticket]]
+id = "profile-errors"
+title = "Profile errors point at the right line"
+prompt = "An invalid idle_secs in a profile is located by searching the text, which can point at the wrong line. Use the TOML parser's spans for every field error."
+acceptance = [
+  "Every profile field error names the right line and column, covered by tests",
+]
+
+[[ticket]]
+id = "flaky"
+title = "No flaky tests"
+prompt = "Stabilise the tests seen failing under load: e2e smoke temp-dir cleanup (ENOTEMPTY on macOS), a_profile_that_asks_for_mcp_gets_a_config_file..., the_scrollback_keeps_the_last_lines_..., after_a_restart_the_newest_log_is_the_scrollback_and_how_it_ended_is_unknown. Find the cause of each; no retries or longer sleeps as the fix."
+acceptance = [
+  "Each test passes 50 runs in a row under parallel load on macOS, with the cause named in the PR",
+]
+
+[[ticket]]
+id = "windows-agents"
+title = "Claude Code on Windows"
+prompt = "Unverified on Windows: finding claude.cmd on PATH, hooks running under Git Bash, and arrow keys reaching the agent through ConPTY (the trust dialog's quick keys). Check each in CI where possible and document what needs a real Windows machine."
+acceptance = [
+  "claude.cmd is found and launched in a Windows CI test with a fake agent",
+  "Hook commands run under Git Bash in Windows CI",
+  "The ConPTY key gap is either fixed or documented with the manual check",
+]
+
+[[ticket]]
+id = "home-in-repo"
+title = "Warn when the data home sits inside a repository"
+prompt = "A data home inside a git repository makes Claude Code ask about external CLAUDE.md imports on every run. Onboarding and Settings warn when TOKNILA_HOME is inside a git work tree."
+acceptance = [
+  "The warning shows for a data home inside a repository and not otherwise",
+]
+
+[[ticket]]
+id = "ci-screens"
+title = "CI keeps the e2e screenshots"
+prompt = "Upload the Playwright screenshots and traces as CI artifacts on failure and on main, so a failing UI test can be seen without rerunning it locally."
+acceptance = [
+  "A failing e2e job has its screenshots attached as an artifact",
+]
+
+[[ticket]]
+id = "third-run"
+title = "Third real run: the paths not seen yet"
+prompt = "Run Claude Code for real on two small cards from this chain, the way docs/runs/claude-code-e2e-2.md did, and exercise what runs 1 and 2 did not: a Deny, a Return round, finished refused without a commit, a reviewer permission prompt, a pull request with no checks. Record it in docs/runs/claude-code-e2e-3.md with findings ranked by how much they hurt daily use."
+acceptance = [
+  "Each path above is seen once in a real session and recorded",
+  "New findings are ranked and become cards",
+]
+after = ["no-checks", "cancel-cleanup", "reviewer-web"]
