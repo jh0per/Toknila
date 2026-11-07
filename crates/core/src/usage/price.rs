@@ -30,21 +30,66 @@ pub struct ModelPrice {
     pub cache_write: f64,
     pub cache_read: f64,
     pub output: f64,
+    /// Higher prices for a call whose prompt is over `over_tokens`; absent when there is no tier.
+    #[serde(default)]
+    pub long_prompt: Option<LongPromptPrice>,
+}
+
+/// The prices of a call whose prompt is longer than `over_tokens`, USD per million tokens.
+/// They replace the base prices for the whole call, output included.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct LongPromptPrice {
+    /// The tier applies when the call's prompt (input, cache writes and cache reads) is over this.
+    pub over_tokens: u64,
+    pub input: f64,
+    pub cache_write: f64,
+    pub cache_read: f64,
+    pub output: f64,
+}
+
+/// The four rates that price one call.
+struct Rates {
+    input: f64,
+    cache_write: f64,
+    cache_read: f64,
+    output: f64,
 }
 
 impl ModelPrice {
-    /// The estimated cost of `t` in USD.
+    /// The rates for a call with these tokens: the long-prompt tier when its prompt is over the
+    /// threshold, otherwise the base prices. Each call is priced by its own prompt size.
+    fn rates(&self, t: &TokenCounts) -> Rates {
+        match &self.long_prompt {
+            Some(l) if t.input + t.cache_write + t.cache_read > l.over_tokens => Rates {
+                input: l.input,
+                cache_write: l.cache_write,
+                cache_read: l.cache_read,
+                output: l.output,
+            },
+            _ => Rates {
+                input: self.input,
+                cache_write: self.cache_write,
+                cache_read: self.cache_read,
+                output: self.output,
+            },
+        }
+    }
+
+    /// The estimated cost of one call's tokens `t` in USD.
     pub fn cost(&self, t: &TokenCounts) -> f64 {
-        (t.input as f64 * self.input
-            + t.cache_write as f64 * self.cache_write
-            + t.cache_read as f64 * self.cache_read
-            + t.output as f64 * self.output)
+        let r = self.rates(t);
+        (t.input as f64 * r.input
+            + t.cache_write as f64 * r.cache_write
+            + t.cache_read as f64 * r.cache_read
+            + t.output as f64 * r.output)
             / PER
     }
 
-    /// What the cache saved on `t`: its cached reads priced as plain input, minus what they cost.
+    /// What the cache saved on one call `t`: its cached reads priced as plain input, minus what
+    /// they cost.
     pub fn cache_savings(&self, t: &TokenCounts) -> f64 {
-        t.cache_read as f64 * (self.input - self.cache_read) / PER
+        let r = self.rates(t);
+        t.cache_read as f64 * (r.input - r.cache_read) / PER
     }
 }
 
@@ -70,7 +115,10 @@ impl PriceTable {
         let table: PriceTable =
             toml::from_str(text).map_err(|e| PriceError::Invalid(e.message().to_owned()))?;
         for m in &table.models {
-            let prices = [m.input, m.cache_write, m.cache_read, m.output];
+            let mut prices = vec![m.input, m.cache_write, m.cache_read, m.output];
+            if let Some(l) = &m.long_prompt {
+                prices.extend([l.input, l.cache_write, l.cache_read, l.output]);
+            }
             if prices.iter().any(|p| *p < 0.0 || !p.is_finite()) {
                 return Err(PriceError::Negative(m.id.clone()));
             }
