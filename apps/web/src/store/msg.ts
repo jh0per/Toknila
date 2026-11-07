@@ -4,6 +4,7 @@ import type {
   AgentRole, AnswerKind, ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, TicketAction, TicketDetail,
   TicketThreads,
 } from "../api/types";
+import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
 import type { Route, Tab } from "./route";
 import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
 import type { UsageEffect, UsageIntent, UsageResult } from "./usage";
@@ -19,6 +20,7 @@ export type Intent =
   | CardCommand
   | ThreadAction
   | SettingsIntent
+  | PlanIntent
   | UsageIntent;
 
 /// What a person decides about the open subtasks left behind a card done out of order.
@@ -58,6 +60,7 @@ export type Msg =
   | { type: "event"; event: EventRecord }
   | { type: "urlChanged"; route: Route }
   | SettingsResult
+  | PlanResult
   | UsageResult;
 
 /// A side effect for the runner; the reducer only describes it.
@@ -73,6 +76,7 @@ export type Effect =
   | CardCommand
   | ThreadAction
   | SettingsEffect
+  | PlanEffect
   | UsageEffect
   | { type: "connect"; since: number; delayMs: number }
   | { type: "pushUrl"; path: string };

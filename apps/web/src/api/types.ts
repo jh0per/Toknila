@@ -54,3 +54,7 @@ export type UsageFigures = Schemas["UsageFigures"];
 export type UsageItem = Schemas["UsageItem"];
 export type DayUsage = Schemas["DayUsage"];
 export type QuotaWindow = Schemas["QuotaWindow"];
+export type NewChain = Schemas["NewChain"];
+export type NewTicket = Schemas["NewTicket"];
+export type PatchTicket = Schemas["PatchTicket"];
+export type Place = Schemas["Place"];

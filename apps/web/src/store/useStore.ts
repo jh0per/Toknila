@@ -22,10 +22,15 @@ export function useStore(): [State, (intent: Intent) => void] {
   useEffect(() => {
     runner.current = effectRunner(dispatch);
     const onPop = () => dispatch({ type: "urlChanged", route: parseRoute(window.location.pathname) });
+    // The desktop menu asks for a form through the address hash (`#/add-project`).
+    const onHash = () => dispatch({ type: "hashChanged", hash: window.location.hash });
     window.addEventListener("popstate", onPop);
+    window.addEventListener("hashchange", onHash);
     dispatch({ type: "started" });
+    if (window.location.hash) onHash();
     return () => {
       window.removeEventListener("popstate", onPop);
+      window.removeEventListener("hashchange", onHash);
       runner.current?.stop();
       runner.current = null;
     };

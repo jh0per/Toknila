@@ -1,0 +1,28 @@
+/* Planning from the window: dialogs, the right-click menu, the empty chain state, card editing. */
+.modal-back { position: fixed; inset: 0; background: rgb(0 0 0 / 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 8vh var(--s4) var(--s4); z-index: 20; }
+.modal { position: relative; width: min(560px, 100%); max-height: 84vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); box-shadow: 0 12px 40px rgb(0 0 0 / 0.35); }
+.modal > .card-block { border: 0; padding-right: 40px; }
+.modal > .card-block > p.error, .plan-form p.error { margin: 0; }
+.modal-close { position: absolute; top: var(--s2); right: var(--s2); width: 26px; height: 26px; border: 1px solid transparent; border-radius: var(--r-s); background: none; color: var(--muted); font-size: 18px; line-height: 1; }
+.modal-close:hover { background: var(--surface2); color: var(--fg); }
+.field textarea { font: inherit; font-size: var(--fs-m); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-s); padding: 5px var(--s2); width: 100%; resize: vertical; }
+.check { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-s); }
+.btn.danger { color: var(--danger); }
+.btn.mini { padding: 0 6px; font-size: var(--fs-xs); }
+.icon-btn { border: 1px solid transparent; background: none; color: var(--muted); border-radius: var(--r-s); width: 18px; height: 18px; padding: 0; font-size: 14px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn:hover { background: var(--surface2); color: var(--fg); border-color: var(--line); }
+.link-btn { border: 0; background: none; color: var(--muted); font-size: var(--fs-s); text-align: left; padding: 2px var(--s2); }
+.link-btn:hover { color: var(--fg); text-decoration: underline; }
+.sec li.archived { display: flex; align-items: center; gap: var(--s1); }
+.sec li.archived .item { flex: 1; opacity: 0.6; }
+.ctx-menu { position: fixed; z-index: 30; min-width: 180px; display: flex; flex-direction: column; padding: var(--s1); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); }
+.ctx-menu button { border: 0; background: none; text-align: left; padding: 5px var(--s2); border-radius: var(--r-s); }
+.ctx-menu button:hover, .ctx-menu button:focus-visible { background: var(--surface2); outline: none; }
+.ctx-menu button.danger { color: var(--danger); }
+.empty-state { max-width: 520px; margin: 10vh auto 0; display: flex; flex-direction: column; gap: var(--s3); align-items: flex-start; }
+.empty-state h2 { margin: 0; font-size: 20px; font-weight: 600; }
+.empty-state p { margin: 0; }
+.plan-btns { display: flex; gap: var(--s2); margin: 0 0 var(--s3); }
+.plan-form { display: flex; flex-direction: column; gap: var(--s2); margin: 0 0 var(--s3); padding: var(--s3); max-width: 720px; background: var(--surface2); border: 1px solid var(--line); border-radius: var(--r-m); }
+.plan-form select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-s); padding: 3px var(--s2); }
+.top .btn { padding: 1px 9px; font-size: var(--fs-s); }

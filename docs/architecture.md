@@ -437,10 +437,23 @@ The web shows what the daemon says and keeps no rule of its own.
   repository, and a blank title template too.
 - **Window.** `/settings` and `/projects/{p}/settings` (`Settings.tsx`): checks, project settings,
   a chain-file import (the browser reads the file; `POST /v1/projects/{p}/import` is the existing
-  route), and a form to add another project. With no project the home page is onboarding
-  (`Onboarding.tsx`): the checks, then the add-project form, which opens the new project's
-  settings. The form first calls the folder check, so every problem shows next to its field. Store:
-  `store/settings.ts` (state, reducer) and `store/settingsEffects.ts` (network).
+  route), archiving the project, and a button that opens the add-project form. With no project the
+  home page is onboarding (`Onboarding.tsx`): the checks, then the add-project form, which opens the
+  new project's settings. The form first calls the folder check, so every problem shows next to its
+  field. While the person types a folder, a debounced folder check brings core's `suggested_key`
+  and `suggested_name`; they fill Key and Name until the person types into those fields, and an
+  empty Key is sent as the suggestion (`store/addForm.ts`). Store: `store/settings.ts` (state,
+  reducer) and `store/settingsEffects.ts` (network).
+- **Planning from the window** (`store/plan.ts`, `store/planEffects.ts`). Dialogs over the window:
+  add a project (from the "+" next to PROJECTS, the right-click menu of the sidebar's projects, the
+  desktop menu File > Add Project..., which sets the address hash `#/add-project`), new chain,
+  new card (at the end of the chain unless an "after" card is picked), import. A project without
+  chains shows "No chains yet" with New chain and Import; a project with chains and none picked
+  shows its most recently active chain (`defaultChain`: the chain of the newest journal entry, else
+  the first). The card's Details offer Edit and Move only when `TicketDetail.can_edit` and
+  `can_move` say so; a move is `POST /v1/chains/{c}/tickets/{t}/move`. Archived projects
+  (`Project.archived`) leave the sidebar and come back through "Show archived"; archiving is
+  refused while the project's agents work, and the refusal shows inline.
 - **Folder picker.** A text field with a paste-friendly path, not a native picker. The desktop
   window loads the daemon's page as a remote URL, so a dialog plugin would need the Tauri IPC
   opened to that page; and a browser file input never yields a path. Revisit if the shell ever
