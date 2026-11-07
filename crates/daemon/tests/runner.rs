@@ -769,6 +769,9 @@ fn typing_addressed_to_the_reviewer_reaches_the_reviewer_and_not_the_worker() {
     rig.runners.stop(rig.ticket);
 }
 
+// ConPTY turns input escape sequences into console key events that a line read never sees, so
+// the fake agent can only tell the arrow apart on a Unix pty.
+#[cfg(unix)]
 #[test]
 fn a_down_arrow_chooses_the_unnumbered_yes_of_a_trust_dialog_and_enter_alone_declines() {
     use toknila_core::question::{self, AnswerKind, Delivery};
