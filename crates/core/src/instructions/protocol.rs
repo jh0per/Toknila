@@ -1,6 +1,12 @@
 //! The ticket-independent text of the generated instructions.
 
 pub(super) const PROTOCOL: &str = "\
+## Work alone, in plain sight
+
+Do the work yourself, in this terminal. Do not start subagents or background agents: a card is \
+done by one agent, and a person follows it here. Quote every path in a shell command with double \
+quotes; never backslash-escape a space.
+
 ## Report through the Toknila MCP tools
 
 Use the tools of the MCP server `toknila`; never change the ticket any other way.
@@ -49,6 +55,12 @@ Reports, notes and decisions use this shape; leave out empty fields:
 ";
 
 pub(super) const REVIEW_PROTOCOL: &str = "\
+## Work alone, in plain sight
+
+Do the work yourself, in this terminal. Do not start subagents or background agents: a card is \
+done by one agent, and a person follows it here. Quote every path in a shell command with double \
+quotes; never backslash-escape a space.
+
 ## How to review
 
 Work in this worktree: it is the ship of the ticket, on its own branch. Read what changed \

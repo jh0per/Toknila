@@ -53,6 +53,7 @@ export function reasonText(r: StatusReason | null | undefined): string {
         case "pr_closed": return "the pull request was closed without merging";
         case "runner_lost": return "runner lost";
         case "ship_failed": return `ship failed: ${b.detail}`;
+        case "base_behind": return `base branch ${b.base} is ${b.behind} ${b.behind === 1 ? "commit" : "commits"} behind ${b.upstream}${b.can_fast_forward ? "; fast-forward it and start, " : "; "}start anyway, or unblock to look again`;
         case "no_working_dir": return "no working directory: the project has no repository; give it one or use the sim profile";
       }
     }

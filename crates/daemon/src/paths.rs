@@ -4,16 +4,42 @@
 //! directory: `~/Library/Application Support/toknila` on macOS, `%APPDATA%\toknila` on Windows,
 //! and `~/.toknila` on Linux. A macOS home from before 0.2 (`~/.toknila`) is moved to the new
 //! place on first use, unless a daemon may still be using it.
+//!
+//! Ships (worktrees) do not live in the data home: its path has a space on macOS, which makes
+//! agents backslash-escape paths. They go to `~/.toknila-ships` (never `~/.toknila`, which is the
+//! legacy data home), or to `TOKNILA_SHIPS_DIR`. With an explicit `TOKNILA_HOME` they stay under
+//! that home, so a test or a second instance never writes into the person's real ships.
 
 use std::path::{Path, PathBuf};
 
 /// Environment variable that overrides the home directory.
 pub const HOME_ENV: &str = "TOKNILA_HOME";
 
+/// Environment variable that overrides the folder of the ships.
+pub const SHIPS_ENV: &str = "TOKNILA_SHIPS_DIR";
+
+/// Folder name of the default ships root, next to the person's home (no space in it).
+const SHIPS_DIR_NAME: &str = ".toknila-ships";
+
 /// The files under one Toknila home.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Paths {
     pub home: PathBuf,
+    /// Where new ships are made; recorded ships keep the path they were made with.
+    pub ships: PathBuf,
+}
+
+/// The ships root: the override, else `~/.toknila-ships`, else (no home folder known) under
+/// `home`.
+pub(crate) fn ships_root(over: Option<PathBuf>, user_home: Option<&Path>, home: &Path) -> PathBuf {
+    over.or_else(|| user_home.map(|h| h.join(SHIPS_DIR_NAME)))
+        .unwrap_or_else(|| home.join("ships"))
+}
+
+fn env_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
 }
 
 /// Where the home of this platform is, and the older place it may still be in.
@@ -73,10 +99,9 @@ pub(crate) fn settle_home(layout: &Layout) -> std::io::Result<PathBuf> {
 impl Paths {
     /// Resolves the home directory from the environment and the platform.
     pub fn resolve() -> Result<Paths, String> {
-        if let Some(home) = std::env::var_os(HOME_ENV).filter(|v| !v.is_empty()) {
-            return Ok(Paths {
-                home: PathBuf::from(home),
-            });
+        if let Some(home) = env_path(HOME_ENV) {
+            let ships = env_path(SHIPS_ENV).unwrap_or_else(|| home.join("ships"));
+            return Ok(Paths { home, ships });
         }
         let layout = layout(std::env::consts::OS, dirs::home_dir(), dirs::data_dir())
             .ok_or_else(|| "cannot find the home directory".to_owned())?;
@@ -87,13 +112,16 @@ impl Paths {
                 layout.home.display()
             )
         })?;
-        Ok(Paths { home })
+        let ships = ships_root(env_path(SHIPS_ENV), dirs::home_dir().as_deref(), &home);
+        Ok(Paths { home, ships })
     }
 
     /// Uses an explicit directory.
     pub fn at(home: impl AsRef<Path>) -> Paths {
+        let home = home.as_ref().to_owned();
         Paths {
-            home: home.as_ref().to_owned(),
+            ships: home.join("ships"),
+            home,
         }
     }
 
@@ -117,9 +145,9 @@ impl Paths {
         self.home.join("profiles")
     }
 
-    /// Worktrees of ships: `ships/<project>/<chain>/<slug>`.
+    /// Worktrees of ships: `<ships root>/<project>/<chain>/<slug>`.
     pub fn ships(&self) -> PathBuf {
-        self.home.join("ships")
+        self.ships.clone()
     }
 
     /// Output of agent runs: `runs/<ticket id>/<run id>.log`.

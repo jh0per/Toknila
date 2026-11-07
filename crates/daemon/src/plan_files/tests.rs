@@ -163,3 +163,23 @@ fn no_repository_or_a_missing_one_has_no_plans() {
     assert_eq!(scan(Some(&gone), &[]), Default::default());
     assert_eq!(scan(Some("relative/repo"), &[]), Default::default());
 }
+
+#[test]
+fn a_working_copy_behind_its_upstream_says_so_and_one_that_is_not_says_nothing() {
+    use crate::git::testing::{commit_file, git};
+    let tmp = tempfile::tempdir().expect("tmp");
+    let origin = tmp.path().join("origin");
+    std::fs::create_dir_all(&origin).expect("mkdir");
+    git(&origin, &["init", "--quiet"]);
+    git(&origin, &["symbolic-ref", "HEAD", "refs/heads/main"]);
+    commit_file(&origin, "a.txt", "a\n", "a");
+    git(tmp.path(), &["clone", "--quiet", &text(&origin), "clone"]);
+    let clone = tmp.path().join("clone");
+    assert_eq!(scan(Some(&text(&clone)), &[]).behind, None);
+
+    commit_file(&origin, "b.txt", "b\n", "b");
+    commit_file(&origin, "c.txt", "c\n", "c");
+    git(&clone, &["fetch", "--quiet"]);
+    let note = scan(Some(&text(&clone)), &[]).behind.expect("behind");
+    assert_eq!(note.note(), "main is 2 commits behind origin/main");
+}

@@ -59,8 +59,9 @@ The link points into the app, so it follows updates.
 
 ### Where things live
 
-`~/Library/Application Support/toknila` holds everything: `toknila.db` (SQLite), `daemon.json`,
-the logs and the `backups` folder. `TOKNILA_HOME=<folder>`, set in the environment before the app
+`~/Library/Application Support/toknila` holds the data: `toknila.db` (SQLite), `daemon.json`,
+the logs and the `backups` folder. New ships (worktrees) go to `~/.toknila-ships`, a path without a
+space. `TOKNILA_HOME=<folder>`, set in the environment before the app
 or the daemon starts, uses another folder instead, for example
 `open -n --env TOKNILA_HOME=<folder> /Applications/Toknila.app`; that is how to try the app without
 touching your real data.
@@ -272,6 +273,7 @@ Spec-driven projects (`specs/<n>-<name>/tasks.md`) import and export the same wa
 | What | Where |
 |---|---|
 | Data, `daemon.json`, logs | `~/Library/Application Support/toknila` on macOS, `~/.toknila` on Linux, `%APPDATA%\toknila` on Windows; `TOKNILA_HOME` overrides. A macOS `~/.toknila` from an earlier version moves to the new place on the first start after the daemon was stopped |
+| Ships (worktrees) | `~/.toknila-ships` for new ships, a path without a space; `TOKNILA_SHIPS_DIR` overrides it. Ships made before keep their place |
 | Database | `toknila.db` (SQLite) in that folder |
 | Stop the daemon | `tok daemon stop` |
 | Start over | stop the daemon, delete the folder |

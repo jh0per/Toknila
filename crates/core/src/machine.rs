@@ -171,6 +171,11 @@ pub fn apply(
                 (other, _) => (other, None),
             }
         }
+        (S::Blocked, TicketEvent::FastForwardStart | TicketEvent::StartAnyway) => {
+            let stale = stale_start(event, ticket).ok_or_else(refuse)?;
+            run_on_ship_with(&mut effects, stale);
+            (S::Running, None)
+        }
         (S::Review, TicketEvent::Return { comment }) => {
             review::not_merging(&next, event)?;
             non_empty(comment, "return")?;
@@ -313,7 +318,7 @@ pub fn apply(
 mod checks;
 mod review;
 pub use checks::person_only;
-use checks::{block, non_empty, run_on_ship};
+use checks::{block, non_empty, run_on_ship, run_on_ship_with, stale_start};
 mod invariants;
 
 pub use invariants::check_invariants;

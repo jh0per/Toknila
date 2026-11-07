@@ -10,6 +10,7 @@ mod release;
 mod review;
 mod run;
 mod ship;
+mod stale;
 mod status;
 mod thread;
 mod ticket;
@@ -34,6 +35,7 @@ pub use review::{
 };
 pub use run::{ProcessExit, Run};
 pub use ship::{MergeSpec, Ship, ShipLook, ShipSpec, slugify};
+pub use stale::{BaseBehind, BaseCourse, StalePolicy, describe as describe_base_behind};
 pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};
 pub use thread::{
     ArtifactFormat, MessageKind, Phase, Thread, ThreadKind, ThreadMessage, ThreadState,

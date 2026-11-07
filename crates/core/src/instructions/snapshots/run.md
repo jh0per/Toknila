@@ -13,6 +13,10 @@ Done means every item holds, each with evidence:
 - [ ] The generated file is pinned by a snapshot test
 - [ ] An instruction comment is delivered and marked delivered
 
+## Work alone, in plain sight
+
+Do the work yourself, in this terminal. Do not start subagents or background agents: a card is done by one agent, and a person follows it here. Quote every path in a shell command with double quotes; never backslash-escape a space.
+
 ## Report through the Toknila MCP tools
 
 Use the tools of the MCP server `toknila`; never change the ticket any other way.
