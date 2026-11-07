@@ -99,7 +99,11 @@ pub async fn stop_planner(
     Path(project): Path<String>,
 ) -> ApiResult<Json<PlannerState>> {
     let p = project_of(&state, project).await?;
-    planner::stop(&*state.runners, Actor::Human, &p)?;
+    // Ending the process tree waits for a grace period; not on an async worker.
+    let (runners, target) = (state.runners.clone(), p.clone());
+    tokio::task::spawn_blocking(move || planner::stop(&*runners, Actor::Human, &target))
+        .await
+        .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))??;
     Ok(Json(state_of(&state, &p)))
 }
 
