@@ -42,6 +42,17 @@ pub enum ChainCmd {
     Show { chain: String },
     /// List chains with their status.
     Ls,
+    /// Delete a chain with its cards, threads and ships' checkouts (the repository folder and
+    /// the `ship/*` branches stay). Refused while an agent works on one of its cards.
+    Rm {
+        chain: String,
+        /// The project, when two projects have a chain of this name.
+        #[arg(long)]
+        project: Option<String>,
+        /// Do not ask for confirmation.
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -111,6 +122,11 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
                 None => print!("{toml}"),
             }
         }
+        ChainCmd::Rm {
+            chain,
+            project,
+            yes,
+        } => return super::chain_rm::run(c, &chain, project.as_deref(), yes, json_out),
         ChainCmd::Show { chain } => emit(json_out, &c.chain(&chain)?, output::chain),
         ChainCmd::Ls => {
             emit(json_out, &c.chains()?, |items| {

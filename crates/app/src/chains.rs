@@ -208,7 +208,9 @@ pub fn add_edge<U: UnitOfWork + ?Sized>(
             to: resolve::node(&ctx.view, to)?,
             kind,
         };
-        Ok(ctx.add_edge(edge)?)
+        // The graph rules (unknown node, cycle) answer first; a refusal drops the whole change.
+        ctx.add_edge(edge)?;
+        Ok(ctx.view.check_dependency_change(edge.to)?)
     })
 }
 
@@ -224,6 +226,7 @@ pub fn remove_edge<U: UnitOfWork + ?Sized>(
             resolve::node(&ctx.view, from)?,
             resolve::node(&ctx.view, to)?,
         );
+        ctx.view.check_dependency_change(b)?;
         ctx.remove_edge(a, b)
             .map(|_| ())
             .ok_or_else(|| AppError::not_found(format!("edge {from} -> {to}")))

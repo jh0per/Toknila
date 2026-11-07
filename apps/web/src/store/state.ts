@@ -3,6 +3,7 @@
 import type {
   ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads,
 } from "../api/types";
+import { type EdgesState, initialEdges } from "./edges";
 import { type ImportState, initialImports } from "./imports";
 import { type PlanState, initialPlan } from "./plan";
 import { type PlannerSlice, initialPlanner } from "./planner";
@@ -48,8 +49,10 @@ export interface State {
   planner: PlannerSlice;
   /// Imports from the window and the plans found in a repository.
   imports: ImportState;
-  /// Deleting a project: the dialog's answer.
+  /// Deleting a project or a chain: the dialog's answer.
   removal: RemovalState;
+  /// Editing dependencies: the selected line and the daemon's last refusal.
+  edges: EdgesState;
   /// The Usage page: window, metric and the daemon's answer.
   usage: UsageState;
   /// Updates of the desktop app (empty in a browser).
@@ -82,6 +85,7 @@ export function initialState(route: Route): State {
     planner: initialPlanner,
     imports: initialImports,
     removal: initialRemoval,
+    edges: initialEdges,
     usage: initialUsage,
     updates: initialUpdates,
   };

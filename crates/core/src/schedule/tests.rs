@@ -217,3 +217,23 @@ fn a_live_worker_and_reviewer_of_a_card_in_review_each_hold_a_slot() {
     ];
     assert_eq!(plan(&w.chains, 5, &same).used, 1);
 }
+
+#[test]
+fn working_cards_are_those_that_hold_a_slot_or_have_a_live_runner_in_review() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let running = w.card(c, TicketStatus::Running, false);
+    let waiting = w.card(c, TicketStatus::Waiting, false);
+    let reviewed = w.card(c, TicketStatus::Review, false);
+    let idle_review = w.card(c, TicketStatus::Review, false);
+    let _ready = w.card(c, TicketStatus::Ready, false);
+    let live = [
+        (reviewed, AgentRole::Reviewer),
+        (TicketId::new(), AgentRole::Worker),
+    ];
+    assert_eq!(
+        working_cards(&w.chains, &live),
+        [running, waiting, reviewed]
+    );
+    assert!(!working_cards(&w.chains, &[]).contains(&idle_review));
+}

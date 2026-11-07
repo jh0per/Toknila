@@ -11,6 +11,24 @@ export function usable(s: Size): boolean {
   return Number.isInteger(s.cols) && Number.isInteger(s.rows) && s.cols >= 2 && s.rows >= 1;
 }
 
+export interface Px {
+  width: number;
+  height: number;
+}
+
+/// The grid that fits entirely in `box` (the host's content box, padding already taken off) when
+/// a cell is `cell` pixels and a scrollbar takes `scrollbar` pixels of width. Always rounds down,
+/// so no row or column is ever cut by the edge. `null` while the box or the cell is not measured
+/// yet (hidden, laying out, font not loaded). A box smaller than one cell still gets the smallest
+/// grid a terminal can have.
+export function fitGrid(box: Px, cell: Px, scrollbar = 0): Size | null {
+  const ok = (n: number) => Number.isFinite(n) && n > 0;
+  if (!ok(box.width) || !ok(box.height) || !ok(cell.width) || !ok(cell.height)) return null;
+  const cols = Math.floor((box.width - Math.max(0, scrollbar)) / cell.width);
+  const rows = Math.floor(box.height / cell.height);
+  return { cols: Math.max(2, cols), rows: Math.max(1, rows) };
+}
+
 export interface SizeReporter {
   /// The panel is now this size. Sent after the panel has been still for the delay, and only when
   /// it differs from what the daemon was last told.

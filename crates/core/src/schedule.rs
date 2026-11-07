@@ -73,6 +73,21 @@ impl Plan {
 /// A runner process that is alive, by the ticket it works for and its role.
 pub type LiveRunner = (TicketId, AgentRole);
 
+/// The cards of `chains` that hold a slot: each working or waiting card (its worker), and each
+/// card with a live runner that is working or in review, in chain order.
+pub fn working_cards(chains: &[ChainView], live: &[LiveRunner]) -> Vec<TicketId> {
+    chains
+        .iter()
+        .flat_map(|c| &c.tickets)
+        .filter(|t| {
+            holds_slot(t)
+                || (matches!(t.status, TicketStatus::Review)
+                    && live.iter().any(|(id, _)| *id == t.id))
+        })
+        .map(|t| t.id)
+        .collect()
+}
+
 /// Slots held in `chains`: each working or waiting card (its worker), and each live runner of a
 /// card of these chains, counted once.
 pub fn slots_used(chains: &[ChainView], live: &[LiveRunner]) -> u32 {

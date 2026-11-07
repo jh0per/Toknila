@@ -2,7 +2,7 @@
 // chain (after the command, or when its journal events arrive). The daemon deletes, refuses while
 // agents work, and says what became of the folder; this keeps its answer for the dialog.
 
-import type { Project, ProjectDeletion } from "../api/types";
+import type { ChainDeletion, Project, ProjectDeletion } from "../api/types";
 import type { Effect } from "./msg";
 import { type State, chainOfEvent } from "./state";
 
@@ -14,14 +14,21 @@ export interface RemovalState {
   trashAsked: boolean;
   /// The answer of the last deletion, shown until the dialog closes.
   result: ProjectDeletion | undefined;
+  /// The answer of the last chain deletion, shown until the dialog closes.
+  chainResult: ChainDeletion | undefined;
 }
 
-export const initialRemoval: RemovalState = { busy: false, error: undefined, trashAsked: false, result: undefined };
+export const initialRemoval: RemovalState = {
+  busy: false, error: undefined, trashAsked: false, result: undefined, chainResult: undefined,
+};
 
-export type RemovalIntent = { type: "deleteProject"; project: string; trash_folder: boolean };
+export type RemovalIntent =
+  | { type: "deleteProject"; project: string; trash_folder: boolean }
+  | { type: "deleteChain"; chain: string };
 
 export type RemovalResult =
   | { type: "projectDeleted"; deletion: ProjectDeletion }
+  | { type: "chainDeleted"; deletion: ChainDeletion }
   | { type: "deleteRefused"; message: string; agentsWorking: boolean };
 
 export type RemovalMsg = RemovalIntent | RemovalResult;
@@ -93,6 +100,13 @@ export function reduceRemoval(s: State, msg: RemovalMsg): [State, Effect[]] {
   switch (msg.type) {
     case "deleteProject":
       return [set({ busy: true, error: undefined, result: undefined, trashAsked: msg.trash_folder }), [msg]];
+    case "deleteChain":
+      return [set({ busy: true, error: undefined, chainResult: undefined }), [msg]];
+    case "chainDeleted":
+      return [
+        set({ busy: false, chainResult: msg.deletion }, dropChain(s, msg.deletion.chain.id)),
+        [{ type: "loadInbox" }, { type: "loadAgents" }],
+      ];
     case "projectDeleted":
       return [
         set({ busy: false, result: msg.deletion }, dropProject(s, msg.deletion.project.id)),

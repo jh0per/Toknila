@@ -132,6 +132,8 @@ fn e2e_web() -> Result<(), String> {
     run("node", &["e2e/plans.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/inbox.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/usage.mjs", &exe("tok")], &web)?;
+    run("node", &["e2e/edges.mjs", &exe("tok")], &web)?;
+    run("node", &["e2e/chain-delete.mjs", &exe("tok")], &web)?;
     run(
         "node",
         &["e2e/terminal.mjs", &exe("tok"), &exe("fake-agent")],

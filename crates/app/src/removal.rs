@@ -1,11 +1,12 @@
-//! Deleting a project. The records and their journal entries go in one command; what lies on disk
+//! Deleting a chain or a project. The records and their journal entries go in one command; what lies on disk
 //! (the ships' worktrees, the run logs, the repository folder) is the host's to clean up after the
 //! commit, from what [`delete_project`] returns. The repository's `ship/*` branches stay.
 
 use toknila_core::events::DomainEvent;
+use toknila_core::schedule::working_cards;
 use toknila_core::{Chain, Project, Ship, Ticket};
 
-use crate::{AppResult, UnitOfWork, resolve};
+use crate::{AppError, AppResult, UnitOfWork, resolve};
 
 /// What a deletion removed, for the host's cleanup after the commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +18,50 @@ pub struct Removed {
     pub tickets: Vec<Ticket>,
     /// The ships the cards still had; their worktrees go too.
     pub ships: Vec<Ship>,
+}
+
+/// Deletes one chain (found by id or name, within `project` when given) with its cards,
+/// milestones and everything attached to them, and their journal entries. The journal then tells
+/// of the deletion with one `ChainDeleted`. Refused while an agent works on one of its cards; the
+/// refusal names the cards. The project and its other chains are untouched.
+pub fn delete_chain<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: &str,
+    project: Option<&str>,
+) -> AppResult<Removed> {
+    let c = resolve::chain_in(uow, project, chain)?;
+    let p = uow
+        .project(c.project_id)?
+        .ok_or_else(|| AppError::not_found(format!("project of chain {}", c.name)))?;
+    let tickets = uow.tickets(Some(c.id))?;
+    if let Some(view) = uow.chain_view(c.id)? {
+        let live = uow.live_runners()?;
+        let working = working_cards(std::slice::from_ref(&view), &live);
+        if !working.is_empty() {
+            let keys: Vec<String> = tickets
+                .iter()
+                .filter(|t| working.contains(&t.id))
+                .map(|t| t.key.to_string())
+                .collect();
+            return Err(AppError::conflict(format!(
+                "chain {} has agents working on {}; stop them before deleting the chain",
+                c.name,
+                keys.join(", ")
+            )));
+        }
+    }
+    let mut ships = Vec::new();
+    for t in &tickets {
+        ships.extend(uow.ship(t.id)?);
+    }
+    uow.delete_chain(c.id)?;
+    uow.emit(&DomainEvent::ChainDeleted { chain: c.clone() })?;
+    Ok(Removed {
+        project: p,
+        chains: vec![c],
+        tickets,
+        ships,
+    })
 }
 
 /// Deletes a project with its chains, cards, milestones and everything attached to them, and

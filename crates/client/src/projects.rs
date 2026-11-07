@@ -2,8 +2,8 @@
 //! by path, and the plans of a repository.
 
 use toknila_api_types::{
-    ChainDetail, DeleteProject, ImportPath, ImportPathResult, MoveInput, NewProject, PatchProject,
-    PlanScan, ProjectDeletion,
+    ChainDeletion, ChainDetail, DeleteProject, ImportPath, ImportPathResult, MoveInput, NewProject,
+    PatchProject, PlanScan, ProjectDeletion,
 };
 use toknila_core::Project;
 
@@ -54,6 +54,16 @@ impl Client {
             &format!("/projects/{}/delete", enc(project)),
             Some(d),
         )
+    }
+
+    /// `DELETE /chains/{chain}`: the chain and its cards go; the answer says what became of the
+    /// ships and run files. `project` narrows the chain's name to one project.
+    pub fn delete_chain(&self, chain: &str, project: Option<&str>) -> ClientResult<ChainDeletion> {
+        let mut path = format!("/chains/{}", enc(chain));
+        if let Some(p) = project {
+            path = format!("{path}?project={}", enc(p));
+        }
+        self.call("DELETE", &path, NO_BODY)
     }
 
     /// `POST /chains/{chain}/tickets/{ticket}/move`.
