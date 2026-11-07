@@ -38,6 +38,10 @@ fn session(d: &Daemon, token: &str, ticket: &str, lines: &[Value]) -> Vec<Value>
         .env("TOKNILA_TICKET", ticket)
         // Nothing of the data home is needed: the daemon is found through the environment.
         .env("TOKNILA_HOME", "/nonexistent-toknila-home")
+        // The test may itself run inside an agent's session (a reviewer runs the check command):
+        // the role and run of that session must not leak into the server under test.
+        .env_remove("TOKNILA_ROLE")
+        .env_remove("TOKNILA_RUN")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
