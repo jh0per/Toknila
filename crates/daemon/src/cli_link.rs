@@ -114,6 +114,7 @@ mod tests {
     use super::*;
 
     /// A fake app folder with `toknila` and `tok`, and a fake home.
+    #[cfg(unix)]
     fn setup() -> (tempfile::TempDir, PathBuf, PathBuf) {
         let dir = tempfile::tempdir().expect("temp dir");
         let app = dir.path().join("My Apps/Toknila.app/Contents/MacOS");
