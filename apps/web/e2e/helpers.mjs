@@ -21,7 +21,17 @@ export function checks(page) {
     });
     console.log(`PASS ${what}: ${path}`);
   };
-  return { expectText, expectPath };
+  /// The window's connection to the daemon: the sidebar says "Offline" while it is lost and says
+  /// nothing while it works (`data-link` carries the state).
+  const expectLink = async (state, what) => {
+    await page.locator(`nav[aria-label=Sidebar][data-link=${state}]`).waitFor({ timeout: 10_000 }).catch(() => {
+      throw new Error(`${what}: expected the link to be ${state}`);
+    });
+    const badge = await page.locator("[data-testid=link]").count();
+    if (state === "offline" ? badge !== 1 : badge !== 0) throw new Error(`${what}: the Offline badge count is ${badge} while ${state}`);
+    console.log(`PASS ${what}: ${state}`);
+  };
+  return { expectText, expectPath, expectLink };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
