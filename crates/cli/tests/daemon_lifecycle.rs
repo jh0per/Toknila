@@ -4,13 +4,13 @@ use std::process::Command;
 
 use serde_json::Value;
 
+mod common;
+
 fn tok(home: &std::path::Path, args: &[&str]) -> Value {
-    let out = Command::new(env!("CARGO_BIN_EXE_tok"))
-        .args(args)
-        .arg("--json")
-        .env("TOKNILA_HOME", home)
-        .output()
-        .expect("run tok");
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_tok"));
+    cmd.args(args).arg("--json").env("TOKNILA_HOME", home);
+    common::isolate(&mut cmd, home);
+    let out = cmd.output().expect("run tok");
     assert!(
         out.status.success(),
         "tok {args:?} failed: {}\n{}",
@@ -33,23 +33,12 @@ fn status_code(r: Result<ureq::Response, ureq::Error>) -> u16 {
     }
 }
 
-/// Stops the daemon even when an assertion fails, so a red test does not leak a process.
-struct StopOnDrop<'a>(&'a std::path::Path);
-
-impl Drop for StopOnDrop<'_> {
-    fn drop(&mut self) {
-        let _ = Command::new(env!("CARGO_BIN_EXE_tok"))
-            .args(["daemon", "stop"])
-            .env("TOKNILA_HOME", self.0)
-            .output();
-    }
-}
-
 #[test]
 fn start_status_auth_stop() {
     let home = tempfile::tempdir().expect("tempdir");
     let h = home.path();
-    let _stop = StopOnDrop(h);
+    // Stops the daemon even when an assertion fails or the run is interrupted.
+    let _stop = common::DaemonGuard::new(h);
 
     assert_eq!(tok(h, &["daemon", "status"])["running"], false);
 

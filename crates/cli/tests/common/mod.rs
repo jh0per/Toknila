@@ -8,6 +8,8 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::{Mutex, Once, PoisonError};
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use toknila_client::Client;
@@ -21,15 +23,16 @@ pub struct Tok {
 impl Tok {
     /// A `tok` whose data folder is `<dir>/home`.
     pub fn in_dir(dir: &Path) -> Self {
-        Self {
-            home: dir.join("home"),
-        }
+        let home = dir.join("home");
+        track(&home);
+        Self { home }
     }
 
     /// `tok <args>` against this data folder, not yet run.
     fn command(&self, args: &[&str]) -> Command {
         let mut c = Command::new(env!("CARGO_BIN_EXE_tok"));
         c.args(args).env("TOKNILA_HOME", &self.home);
+        isolate(&mut c, &self.home);
         c
     }
 
@@ -192,8 +195,115 @@ pub fn call(id: u32, name: &str, arguments: Value) -> Value {
 
 impl Drop for Tok {
     fn drop(&mut self) {
-        let _ = self.command(&["daemon", "stop"]).output();
+        reap(&self.home);
     }
+}
+
+/// Keeps a daemon started by `cmd` off the developer's real Claude transcripts: its usage ticker
+/// reads `$CLAUDE_CONFIG_DIR/projects` (else `~/.claude/projects`) and, in a fresh data folder,
+/// parses all of it from the top, which keeps every test daemon busy for as long as it lives.
+/// A folder that does not exist has no transcripts.
+pub fn isolate(cmd: &mut Command, home: &Path) {
+    cmd.env("CLAUDE_CONFIG_DIR", home.join("no-claude-config"));
+}
+
+/// The data folders whose daemon this test binary may have started.
+static HOMES: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+static HANDLER: Once = Once::new();
+
+fn homes() -> std::sync::MutexGuard<'static, Vec<PathBuf>> {
+    HOMES.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Remembers `home`, so an interrupt (Ctrl-C, SIGTERM, SIGHUP) of the test binary stops its
+/// daemon too: a detached daemon outlives its test process, and `Drop` does not run on a signal.
+pub fn track(home: &Path) {
+    HANDLER.call_once(|| {
+        let _ = ctrlc::set_handler(|| {
+            let all: Vec<PathBuf> = homes().drain(..).collect();
+            for home in all {
+                reap(&home);
+            }
+            std::process::exit(130);
+        });
+    });
+    let mut all = homes();
+    if !all.iter().any(|h| h == home) {
+        all.push(home.to_owned());
+    }
+}
+
+/// Stops the daemon of `home` and does not return before its process is gone: asks it to stop,
+/// waits, and kills it by the pid in this folder's own `daemon.json` if it is still there.
+/// Never matches processes by name.
+pub fn reap(home: &Path) {
+    homes().retain(|h| h != home);
+    let pid = DaemonInfo::read(&home.join("daemon.json"))
+        .ok()
+        .flatten()
+        .map(|i| i.pid);
+    let _ = Command::new(env!("CARGO_BIN_EXE_tok"))
+        .args(["daemon", "stop"])
+        .env("TOKNILA_HOME", home)
+        .output();
+    let Some(pid) = pid else { return };
+    let until = Instant::now() + Duration::from_secs(10);
+    while pid_alive(pid) && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    if pid_alive(pid) {
+        kill_pid(pid);
+        let until = Instant::now() + Duration::from_secs(5);
+        while pid_alive(pid) && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+}
+
+/// Stops the daemon of a data folder when dropped, whether the test passed, failed or was
+/// interrupted. For tests that do not use [`Tok`].
+pub struct DaemonGuard(PathBuf);
+
+impl DaemonGuard {
+    pub fn new(home: &Path) -> Self {
+        track(home);
+        Self(home.to_owned())
+    }
+}
+
+impl Drop for DaemonGuard {
+    fn drop(&mut self) {
+        reap(&self.0);
+    }
+}
+
+#[cfg(unix)]
+fn pid_alive(pid: u32) -> bool {
+    Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+#[cfg(unix)]
+fn kill_pid(pid: u32) {
+    let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+}
+
+#[cfg(windows)]
+fn pid_alive(pid: u32) -> bool {
+    Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+        .output()
+        .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
+}
+
+#[cfg(windows)]
+fn kill_pid(pid: u32) {
+    let _ = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F"])
+        .status();
 }
 
 /// `fake-agent` is built by the daemon's own tests; build it here if this test runs alone.

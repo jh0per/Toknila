@@ -48,6 +48,8 @@ terminal_size = "0.4"
 sysinfo = { version = "=0.40.1", default-features = false, features = ["system"] }
 nix = { version = "=0.28.0", default-features = false, features = ["signal", "fs"] }
 ureq = { version = "2.12", default-features = false, features = ["json"] }
+# Test helper: reaps the daemons a test started when the test binary is interrupted.
+ctrlc = { version = "3.5", features = ["termination"] }
 # The platform's own Trash: a deleted project's folder goes there when asked, never to an `rm`.
 trash = "5.3"
 

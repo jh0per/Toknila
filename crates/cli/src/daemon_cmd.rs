@@ -107,7 +107,11 @@ fn run_foreground(paths: Paths) -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    rt.block_on(toknila_daemon::server::run(paths))?;
+    let result = rt.block_on(toknila_daemon::server::run(paths));
+    // Dropping the runtime would wait for every blocking task (a transcript scan, a git call) to
+    // finish, so a stopped daemon would linger; give them a moment, then leave.
+    rt.shutdown_timeout(std::time::Duration::from_secs(1));
+    result?;
     Ok(())
 }
 
