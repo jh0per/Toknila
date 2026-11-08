@@ -75,6 +75,7 @@ try {
   await value("project-name", "Toknila", "the folder suggests the name");
   await t("add-project-submit").click();
   await expectPath("/projects/TOKNILA/settings", "the new project opens its settings");
+  await t("settings-back").click();
 
   // 2. No chains yet: the window says so and offers New chain and Import.
   await row("TOKNILA").locator("a").click();
@@ -100,14 +101,25 @@ try {
   // 4. Two cards at the end of the chain.
   for (const [n, title] of [[1, "First card"], [2, "Second card"]]) {
     await t("new-card").click();
-    await t("card-title").fill(title);
-    await t("card-prompt").fill(`Do the **${title.toLowerCase()}** thing.`);
+    await t("card-prompt").fill(`${title}\nDo the **${title.toLowerCase()}** thing.`);
+    // The title follows the first line of the task until it is written over.
+    await value("card-title", title, "the new card's title is taken from the first line");
+    if (n === 2) {
+      await t("card-title").fill("Second, renamed");
+      await t("card-prompt").fill(`${title}, and more\nDo it.`);
+      await value("card-title", "Second, renamed", "a title the person wrote stays when the task changes");
+      await t("card-title").fill(title);
+    }
+    await t("card-acceptance").fill("- It works\n\nIt is tested");
     await t("create-card").click();
     await expectPath(`/projects/TOKNILA/chains/plan/cards/TOKNILA-${n}`, `card ${n} is added and opens`);
     await expectText(card(`TOKNILA-${n}`), title, `card ${n} is on the canvas`);
   }
   if (!(await leftOf("TOKNILA-1", "TOKNILA-2"))) throw new Error("the second card should follow the first");
   console.log("PASS the second card goes after the first (at the end)");
+  // The acceptance items of the form are the card's criteria, one per line.
+  await card("TOKNILA-1").click();
+  await expectText(t("details"), "It is tested", "the acceptance lines became the card's criteria");
 
   // 5. Edit the first card's title and description.
   await card("TOKNILA-1").click();
@@ -157,6 +169,7 @@ try {
   await t("add-project-submit").click();
   await expectPath("/projects/SPAREREPO/settings", "the second project opens its settings");
   await gone(t("add-project-dialog"), "the dialog closes after adding");
+  await t("settings-back").click();
 
   // 8. Archive from the right-click menu and from Settings; bring both back.
   await row("SPAREREPO").click({ button: "right" });
@@ -165,8 +178,10 @@ try {
   await row("TOKNILA").click({ button: "right" });
   await t("menu-project-settings").click();
   await expectPath("/projects/TOKNILA/settings", "the menu opens the project's settings");
-  await t("settings-nav-danger").click();
-  await expectPath("/projects/TOKNILA/settings/danger", "the danger zone has its own address");
+  await t("settings-nav-advanced").click();
+  await expectPath("/projects/TOKNILA/settings/advanced", "Advanced has its own address");
+  if (await t("archive-project-button").isVisible()) throw new Error("the danger zone should be folded");
+  await t("danger-zone").locator("summary").click();
   await t("archive-project-button").click();
   await gone(row("TOKNILA"), "a project archived in Settings leaves the sidebar");
   await expectText(t("show-archived"), "Show archived (2)", "the sidebar offers the archived projects");
