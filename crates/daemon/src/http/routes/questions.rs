@@ -19,6 +19,7 @@ use super::ApiResult;
 use crate::http::error::ErrorBody;
 use crate::runner::Runners;
 use crate::server::{AppState, Principal, now};
+use crate::store::WriteTx;
 
 /// The question the run of `role` has open for a person, if any.
 fn open_question(
@@ -176,20 +177,31 @@ pub(super) async fn raise(
         .store
         .write(Actor::Agent, at, move |tx| -> ApiResult<()> {
             let t = resolve::ticket(&*tx, &t.key.to_string())?;
-            if role == AgentRole::Worker {
-                if t.status == TicketStatus::Running {
-                    let event = AgentEvent::AskHuman {
-                        text,
-                        permission: true,
-                    };
-                    agent::ticket_event(tx, &t, event)?;
-                }
-            } else {
-                questions::raised(tx, &t, role, QuestionKind::Permission)?;
-            }
-            Ok(())
+            ask_person(tx, &t, role, text)
         })
         .await?;
+    Ok(())
+}
+
+/// The permission dialog of `role`'s agent, inside a command: a worker's card that is running
+/// goes to Waiting with the question; a reviewer's dialog is only journaled.
+pub(super) fn ask_person(
+    tx: &mut WriteTx<'_>,
+    t: &Ticket,
+    role: AgentRole,
+    text: String,
+) -> ApiResult<()> {
+    if role == AgentRole::Worker {
+        if t.status == TicketStatus::Running {
+            let event = AgentEvent::AskHuman {
+                text,
+                permission: true,
+            };
+            agent::ticket_event(tx, t, event)?;
+        }
+    } else {
+        questions::raised(tx, t, role, QuestionKind::Permission)?;
+    }
     Ok(())
 }
 

@@ -5,9 +5,9 @@ use axum::http::StatusCode;
 use axum::{Extension, Json};
 use toknila_app::{agent, instructions, questions, resolve, reviews, ships};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
-use toknila_core::question::QuestionKind;
 use toknila_core::{Actor, AgentRole, TicketStatus, hook, nudge};
 
+use super::questions::ask_person;
 use super::{ApiResult, chain_write, load_ticket_detail, stamp};
 use crate::http::dto::{ChainDetail, EventQuery, InstructionClaim, NewActivity, TicketDetail};
 use crate::http::error::ErrorBody;
@@ -151,15 +151,7 @@ pub async fn ticket_activity(
                     agent::activity(tx, &t, &signal)?;
                 }
                 if let Some(text) = raised {
-                    if worker && t.status == TicketStatus::Running {
-                        let event = AgentEvent::AskHuman {
-                            text,
-                            permission: true,
-                        };
-                        agent::ticket_event(tx, &t, event)?;
-                    } else if !worker {
-                        questions::raised(tx, &t, role, QuestionKind::Permission)?;
-                    }
+                    ask_person(tx, &t, role, text)?;
                 }
                 if screen_gone || reviewer_gone {
                     questions::cleared(tx, &t, role)?;
