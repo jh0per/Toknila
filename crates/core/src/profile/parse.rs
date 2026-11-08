@@ -34,8 +34,18 @@ struct Raw {
     #[serde(default)]
     output: OutputRules,
     #[serde(default)]
-    nudge: Nudge,
+    nudge: RawNudge,
     startup_secs: Option<u64>,
+}
+
+/// The `[nudge]` table with the span of `idle_secs`, so a bad value is reported where it stands.
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawNudge {
+    idle_secs: Option<Spanned<u64>>,
+    max_nudges: Option<u32>,
+    window_secs: Option<u64>,
+    message: Option<String>,
 }
 
 /// Whether `name` can name a profile: lowercase letters, digits, `-` and `_`, starting with a
@@ -90,10 +100,23 @@ pub fn parse(name: &str, text: &str) -> Result<AgentProfile, ProfileError> {
             ));
         }
     }
-    if raw.nudge.idle_secs == 0 {
-        let offset = text.find("idle_secs").unwrap_or(0);
-        return Err(at(offset, "nudge.idle_secs must be at least 1".to_owned()));
-    }
+    let defaults = Nudge::default();
+    let idle_secs = match &raw.nudge.idle_secs {
+        Some(v) if *v.get_ref() == 0 => {
+            return Err(at(
+                v.span().start,
+                "nudge.idle_secs must be at least 1".to_owned(),
+            ));
+        }
+        Some(v) => *v.get_ref(),
+        None => defaults.idle_secs,
+    };
+    let nudge = Nudge {
+        idle_secs,
+        max_nudges: raw.nudge.max_nudges.unwrap_or(defaults.max_nudges),
+        window_secs: raw.nudge.window_secs.unwrap_or(defaults.window_secs),
+        message: raw.nudge.message.unwrap_or(defaults.message),
+    };
     Ok(AgentProfile {
         name: name.to_owned(),
         role: raw.role.unwrap_or(AgentRole::Worker),
@@ -109,7 +132,7 @@ pub fn parse(name: &str, text: &str) -> Result<AgentProfile, ProfileError> {
         hooks: raw.hooks,
         permissions: raw.permissions,
         output: raw.output,
-        nudge: raw.nudge,
+        nudge,
         startup_secs: raw
             .startup_secs
             .unwrap_or(crate::question::DEFAULT_STARTUP_SECS),
