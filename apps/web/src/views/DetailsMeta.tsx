@@ -27,7 +27,7 @@ export function TechnicalDetails({ card, ship, projectDefault }: {
   return (
     <details className="fold technical" data-testid="technical-details">
       <summary>Technical details</summary>
-      <dl className="facts ship" data-testid="ship">
+      <dl className="facts" data-testid="ship">
         {ship && (
           <>
             <dt>Workspace</dt><dd data-testid="ship-path"><code>{ship.path}</code></dd>

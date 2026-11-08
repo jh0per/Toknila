@@ -116,3 +116,22 @@ describe("saving settings", () => {
     expect(failed.settings.cliError).toBe("exists and is not a link");
   });
 });
+
+describe("the folder picker and the Save bar's notes", () => {
+  it("Browse asks the shell for a folder, and a chosen path is typed into the folder field", () => {
+    const [, fx] = reduce(ready([]), { type: "browseFolder" });
+    expect(fx).toEqual([{ type: "pickFolder" }]);
+    // The shell's answer arrives as the folder field being edited, which asks for the suggestion.
+    const [s, next] = reduce(ready([]), { type: "editDraft", field: "repo_path", value: "/work/demo" });
+    expect(s.settings.add.draft.repo_path).toBe("/work/demo");
+    expect(next).toContainEqual({ type: "checkRepo", repo_path: "/work/demo", work_branch: "" });
+  });
+
+  it("Discard clears a refusal and the Saved note", () => {
+    const [refused] = reduce(ready([project()]), { type: "settingsRejected", field: "max_parallel", message: "between 1 and 64" });
+    const [saved] = reduce(refused, { type: "projectSaved", project: project() });
+    const [cleared] = reduce(saved, { type: "dismissSettingsNotes" });
+    expect(fieldError(cleared.settings, "max_parallel")).toBeUndefined();
+    expect(cleared.settings.saved).toBe(false);
+  });
+});
