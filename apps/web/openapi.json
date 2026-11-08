@@ -5939,6 +5939,13 @@
             "type": "boolean",
             "description": "Put the card after the chain's last cards (what nothing waits for yet) when `after` is\nempty. Without it a card with no `after` has no dependencies and may start at once."
           },
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Cards or milestones of the same chain that wait for the new card: it becomes a\ndependency of each. Refused, with nothing created, when one of them has started."
+          },
           "needs_secrets": {
             "type": "boolean"
           },

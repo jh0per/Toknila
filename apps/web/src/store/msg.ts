@@ -8,6 +8,7 @@ import type { AutostartEffect, AutostartIntent, AutostartResult } from "./autost
 import type { EdgeEffect, EdgeIntent, EdgeResult } from "./edges";
 import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
 import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
+import type { QuickIntent } from "./quick";
 import type { PlannerEffect, PlannerIntent, PlannerResult } from "./planner";
 import type { RemovalEffect, RemovalIntent, RemovalResult } from "./removal";
 import type { Route, Tab } from "./route";
@@ -32,6 +33,7 @@ export type Intent =
   | RemovalIntent
   | EdgeIntent
   | AutostartIntent
+  | QuickIntent
   | UpdateIntent
   | UsageIntent;
 

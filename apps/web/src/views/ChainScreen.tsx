@@ -1,7 +1,7 @@
 import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, runningAgents, slotsOf } from "../store/state";
-import { AUTOSTART_HINT } from "../store/autostart";
+import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
 import { Canvas } from "./Canvas";
 import { PanelDivider } from "./PanelDivider";
 import { Panel } from "./Panel";
@@ -23,6 +23,12 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
           onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newCard", chain: chain.chain.id } })}
         >
           New card
+        </button>
+        <button
+          type="button" className={`btn${chain.chain.autostart ? " on" : ""}`} data-testid="run-chain" title={RUN_CHAIN_HINT}
+          onClick={() => dispatch({ type: "setAutostart", chain: chain.chain.id, autostart: !chain.chain.autostart })}
+        >
+          {chain.chain.autostart ? "Stop chain" : "Run chain"}
         </button>
         <label className="autostart" title={AUTOSTART_HINT}>
           <input

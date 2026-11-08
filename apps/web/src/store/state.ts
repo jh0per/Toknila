@@ -6,6 +6,7 @@ import type {
 import { type EdgesState, initialEdges } from "./edges";
 import { type ImportState, initialImports } from "./imports";
 import { type PlanState, initialPlan } from "./plan";
+import { type QuickState, initialQuick } from "./quick";
 import { type PlannerSlice, initialPlanner } from "./planner";
 import { type RemovalState, initialRemoval } from "./removal";
 import { type Route, type Tab, routePath } from "./route";
@@ -53,6 +54,8 @@ export interface State {
   removal: RemovalState;
   /// Editing dependencies: the selected line and the daemon's last refusal.
   edges: EdgesState;
+  /// The quick new-card field and the card menu on the diagram.
+  quick: QuickState;
   /// The Usage page: window, metric and the daemon's answer.
   usage: UsageState;
   /// Updates of the desktop app (empty in a browser).
@@ -86,6 +89,7 @@ export function initialState(route: Route): State {
     imports: initialImports,
     removal: initialRemoval,
     edges: initialEdges,
+    quick: initialQuick,
     usage: initialUsage,
     updates: initialUpdates,
   };
