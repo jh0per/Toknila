@@ -15,6 +15,7 @@ const DEMO: &str = include_str!("../../../examples/demo.toml");
 fn tok_cmd(home: &Path, args: &[&str]) -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_tok"));
     c.args(args).env("TOKNILA_HOME", home);
+    common::isolate(&mut c, home);
     c
 }
 

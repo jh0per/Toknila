@@ -32,6 +32,7 @@ impl Tok {
     fn command(&self, args: &[&str]) -> Command {
         let mut c = Command::new(env!("CARGO_BIN_EXE_tok"));
         c.args(args).env("TOKNILA_HOME", &self.home);
+        isolate(&mut c, &self.home);
         c
     }
 
@@ -196,6 +197,14 @@ impl Drop for Tok {
     fn drop(&mut self) {
         reap(&self.home);
     }
+}
+
+/// Keeps a daemon started by `cmd` off the developer's real Claude transcripts: its usage ticker
+/// reads `$CLAUDE_CONFIG_DIR/projects` (else `~/.claude/projects`) and, in a fresh data folder,
+/// parses all of it from the top, which keeps every test daemon busy for as long as it lives.
+/// A folder that does not exist has no transcripts.
+pub fn isolate(cmd: &mut Command, home: &Path) {
+    cmd.env("CLAUDE_CONFIG_DIR", home.join("no-claude-config"));
 }
 
 /// The data folders whose daemon this test binary may have started.

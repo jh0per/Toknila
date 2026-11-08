@@ -7,12 +7,10 @@ use serde_json::Value;
 mod common;
 
 fn tok(home: &std::path::Path, args: &[&str]) -> Value {
-    let out = Command::new(env!("CARGO_BIN_EXE_tok"))
-        .args(args)
-        .arg("--json")
-        .env("TOKNILA_HOME", home)
-        .output()
-        .expect("run tok");
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_tok"));
+    cmd.args(args).arg("--json").env("TOKNILA_HOME", home);
+    common::isolate(&mut cmd, home);
+    let out = cmd.output().expect("run tok");
     assert!(
         out.status.success(),
         "tok {args:?} failed: {}\n{}",
