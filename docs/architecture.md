@@ -448,12 +448,33 @@ The web shows what the daemon says and keeps no rule of its own.
   the optional `check_command` (`cargo xtask verify`: named in both roles' instructions and
   kickoff, and allowed without asking in both allow-lists; `tok project set KEY --check-command`,
   an empty text clears it; one line without parentheses, since it goes into a permission rule);
+  and the optional `worker_model`, `reviewer_model` and `planner_model` (the Claude model of card
+  agents, reviewers and the planner: an alias such as `sonnet` or a full name; `Project::model_for`
+  picks by the run's role, and `AgentProfile::model_args` passes `--model <model>` only to a
+  profile whose program is `claude`, and not when the profile's own command already names
+  `--model`; empty clears one and leaves the choice to the person's Claude Code;
+  `tok project set KEY --worker-model/--reviewer-model/--planner-model`);
   all of them live in the project row, so they survive a daemon restart. The page shows the title and the
   method only while the mode is `github`. `github` is refused (400) for a project without a
   repository, and a blank title template too.
-- **Window.** `/settings` and `/projects/{p}/settings` (`Settings.tsx`): checks, project settings,
-  a chain-file import (the browser reads the file; `POST /v1/projects/{p}/import` is the existing
-  route), archiving the project, and a button that opens the add-project form. With no project the
+- **Smart defaults.** The folder check also returns `suggested_check_command` and
+  `suggested_merge_mode`. The daemon looks at the folder (`daemon/src/tools/traits.rs`: `Cargo.toml`,
+  an `xtask` that names `verify`, `package.json` with a `test` script and the lock file that names
+  the manager, a Makefile `test:` target, a Python project with tests, the remotes, `gh auth status`
+  when a remote is GitHub's) and hands the facts (`RepoTraits`) to core, which decides
+  (`defaults::check_command`: `cargo xtask verify`, else `cargo test`, else `npm|pnpm|yarn test`,
+  else `make test`, else `pytest`, else none; `defaults::merge_mode`: `github` with a GitHub remote
+  and a `gh` login, else `local`). The add-project form and `tok project new` prefill them; a value
+  the person typed is kept, and `POST /v1/projects` takes `check_command` and `merge_mode`.
+  `GET /v1/system/places` names the data folder, the ships folder and the profiles folder.
+- **Window.** Settings is a section list and a section: `/settings` (App: checks, the trust note,
+  version and updates, the `tok` command, where things live, add a project) and `/settings/profiles`
+  (the profile list and its folder), and for the project in focus `/projects/{p}/settings` (General),
+  `.../agents`, `.../review`, `.../plans` (the repository's plans, a chain-file import) and
+  `.../danger` (archive, delete); `/projects/{p}/settings/app` and `.../profiles` keep the project in
+  focus while showing the app's sections (`Settings.tsx`, `SettingsNav.tsx`, `store/route.ts`). Each
+  project section is its own form and saves its own fields. Adding a project opens its General
+  section, and the plans found in its repository are offered at once. With no project the
   home page is onboarding (`Onboarding.tsx`): the checks, then the add-project form, which opens the
   new project's settings. The form first calls the folder check, so every problem shows next to its
   field. While the person types a folder, a debounced folder check brings core's `suggested_key`

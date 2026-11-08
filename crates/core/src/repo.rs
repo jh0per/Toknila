@@ -3,6 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::MergeMode;
+use crate::defaults::{self, RepoTraits};
+
 /// What the host found at the path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PathKind {
@@ -65,6 +68,8 @@ pub fn default_base(state: &GitState) -> Result<String, NoDefaultBase> {
 pub struct RepoFacts {
     pub path: PathKind,
     pub git: GitState,
+    /// What the folder and the machine show about checks and GitHub (see `defaults`).
+    pub traits: RepoTraits,
 }
 
 /// Which input a problem belongs to, so a client can show it next to that field.
@@ -114,6 +119,12 @@ pub struct RepoCheck {
     /// The base branch the repository suggests (where HEAD is, else the remote's default);
     /// `null` when it suggests none.
     pub suggested_branch: Option<String>,
+    /// The check command the repository suggests (`cargo xtask verify`, `npm test`, ...); `null`
+    /// when it suggests none.
+    pub suggested_check_command: Option<String>,
+    /// Where accepted work should land: `github` for a GitHub remote with a working `gh` login,
+    /// else `local`; `null` when the folder is not a usable repository.
+    pub suggested_merge_mode: Option<MergeMode>,
 }
 
 impl RepoCheck {
@@ -165,6 +176,8 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
             suggested_key,
             suggested_name,
             suggested_branch: None,
+            suggested_check_command: None,
+            suggested_merge_mode: None,
         };
     }
     let GitState::Repo { branches, .. } = &facts.git else {
@@ -186,6 +199,8 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
         suggested_key,
         suggested_name,
         suggested_branch: default_base(&facts.git).ok(),
+        suggested_check_command: defaults::check_command(&facts.traits),
+        suggested_merge_mode: Some(defaults::merge_mode(&facts.traits)),
     }
 }
 
@@ -194,7 +209,11 @@ mod tests {
     use super::*;
 
     fn facts(path: PathKind, git: GitState) -> RepoFacts {
-        RepoFacts { path, git }
+        RepoFacts {
+            path,
+            git,
+            traits: RepoTraits::default(),
+        }
     }
 
     fn repo(branches: &[&str]) -> RepoFacts {
@@ -307,6 +326,29 @@ mod tests {
         );
         let c = judge(ABS, "main", &facts(PathKind::Dir, both));
         assert_eq!(c.suggested_branch.as_deref(), Some("next"));
+    }
+
+    #[test]
+    fn the_check_suggests_a_check_command_and_a_merge_mode_from_the_traits() {
+        let mut f = repo(&["main"]);
+        let c = judge(ABS, "main", &f);
+        assert_eq!(c.suggested_check_command, None);
+        assert_eq!(c.suggested_merge_mode, Some(MergeMode::Local));
+        f.traits = RepoTraits {
+            cargo: true,
+            xtask_verify: true,
+            github_remote: true,
+            gh_logged_in: true,
+            ..RepoTraits::default()
+        };
+        let c = judge(ABS, "main", &f);
+        assert_eq!(
+            c.suggested_check_command.as_deref(),
+            Some("cargo xtask verify")
+        );
+        assert_eq!(c.suggested_merge_mode, Some(MergeMode::Github));
+        let gone = facts(PathKind::Missing, GitState::NotARepo);
+        assert_eq!(judge(ABS, "main", &gone).suggested_merge_mode, None);
     }
 
     #[test]

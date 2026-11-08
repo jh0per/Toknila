@@ -89,7 +89,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "selectCard":
       return go(s, { name: "card", project: msg.project, chain: msg.chain, key: msg.key });
     case "urlChanged":
-      return [{ ...s, route: msg.route }, enter(msg.route, s)];
+      return [calm({ ...s, route: msg.route }), enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
       // The new project's repository may hold plans; they are offered once the scan answers.
@@ -108,6 +108,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "importChain":
     case "checksLoaded":
     case "profilesLoaded":
+    case "placesLoaded":
     case "addRejected":
     case "projectSaved":
     case "settingsRejected":
@@ -236,7 +237,13 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
 /// move form stays with the screen it was opened on.
 function go(s: State, route: Route): [State, Effect[]] {
   const plan = { ...s.plan, editing: undefined, moving: undefined };
-  return [{ ...s, route, plan }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+  return [{ ...calm({ ...s, route, plan }) }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+}
+
+/// A settings section starts without the last section's "Saved" or refusal.
+function calm(s: State): State {
+  if (s.route.name !== "settings") return s;
+  return { ...s, settings: { ...s.settings, saved: false, error: undefined, problems: [], branches: [], imported: undefined } };
 }
 
 const withDialog = (s: State, dialog: Dialog | undefined): State => ({ ...s, plan: { ...s.plan, dialog } });

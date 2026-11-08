@@ -7,7 +7,7 @@ import { fieldError, formError } from "./settings";
 const project = (over: Partial<Project> = {}) =>
   ({ id: "p1", key: "DEMO", name: "Demo", max_parallel: 2, ...over }) as Project;
 
-const draft = { key: "DEMO", name: "Demo", repo_path: "/work/demo", work_branch: "develop" };
+const draft = { key: "DEMO", name: "Demo", repo_path: "/work/demo", work_branch: "develop", check_command: "", merge_mode: "local" as const };
 
 function ready(projects: Project[]): State {
   const [s] = reduce(initialState({ name: "chains" }), { type: "loaded", projects, chains: [] });
@@ -16,14 +16,14 @@ function ready(projects: Project[]): State {
 
 /// The form with every field typed in by the person.
 function typed(s: State): State {
-  const fields = ["repo_path", "key", "name", "work_branch"] as const;
+  const fields = ["repo_path", "key", "name", "work_branch", "check_command", "merge_mode"] as const;
   return fields.reduce((at, field) => reduce(at, { type: "editDraft", field, value: draft[field] })[0], s);
 }
 
 describe("first run", () => {
   it("loads the checks and the profiles when there is no project", () => {
     const [, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: [], chains: [] });
-    expect(fx).toEqual([{ type: "loadChecks" }, { type: "loadProfiles" }]);
+    expect(fx).toEqual([{ type: "loadChecks" }, { type: "loadProfiles" }, { type: "loadPlaces" }]);
   });
 
   it("loads nothing extra at home once there are projects", () => {
@@ -74,7 +74,7 @@ describe("adding a project", () => {
       type: "openDialog", dialog: { kind: "addProject" },
     });
     const [s] = reduce(open, { type: "projectAdded", project: project() });
-    expect(s.settings.add.draft).toEqual({ key: "", name: "", repo_path: "", work_branch: "" });
+    expect(s.settings.add.draft).toEqual({ key: "", name: "", repo_path: "", work_branch: "", check_command: "", merge_mode: "local" });
     expect(s.plan.dialog).toBeUndefined();
   });
 

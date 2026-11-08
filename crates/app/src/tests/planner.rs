@@ -334,3 +334,19 @@ fn starting_the_planner_is_a_persons_action_in_the_repository_with_a_planner_pro
     .expect_err("no repository");
     assert_eq!(e.kind, ErrorKind::Conflict);
 }
+
+#[test]
+fn the_planner_is_started_on_the_planner_model_of_its_project() {
+    let mut mem = Mem::demo();
+    mem.project.repo_path = Some("/work/demo".to_owned());
+    mem.project.worker_model = Some("sonnet".to_owned());
+    let profile = AgentProfile::claude_code_planner();
+    let req = planner::request(&mem.project, &profile).expect("request");
+    assert_eq!(
+        req.brief.model, None,
+        "the worker's model is not the planner's"
+    );
+    mem.project.planner_model = Some("opus".to_owned());
+    let req = planner::request(&mem.project, &profile).expect("request");
+    assert_eq!(req.brief.model.as_deref(), Some("opus"));
+}

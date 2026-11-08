@@ -233,6 +233,29 @@ fn reviewer_requests(mem: &Mem) -> Vec<RunRequest> {
         .collect()
 }
 
+#[test]
+fn the_worker_and_the_reviewer_are_started_on_the_models_the_project_names_for_them() {
+    let mut mem = with_agents();
+    mem.project.default_review_mode = ReviewMode::Agent;
+    mem.project.worker_model = Some("sonnet".to_owned());
+    mem.project.reviewer_model = Some("opus".to_owned());
+    mem.project.planner_model = Some("haiku".to_owned());
+    recover(&mut mem).expect("settle");
+    settle(&mut mem);
+    finish(&mut mem, "done".to_owned());
+    settle(&mut mem);
+    let started = mem.runner.started.borrow().clone();
+    let model = |role| {
+        let found: Vec<_> = started.iter().filter(|r| r.role == role).collect();
+        let [req] = found.as_slice() else {
+            panic!("one {role:?} run: {started:?}");
+        };
+        req.brief.model.clone()
+    };
+    assert_eq!(model(AgentRole::Worker).as_deref(), Some("sonnet"));
+    assert_eq!(model(AgentRole::Reviewer).as_deref(), Some("opus"));
+}
+
 fn ended(mem: &Mem, role: AgentRole, code: i32, stopped: bool) -> RunEnded {
     let t = a(mem);
     RunEnded {

@@ -40,6 +40,8 @@ pub struct AppState {
     pub usage: Arc<crate::usage::Usage>,
     /// The data home (`Paths::home`): nothing in it is ever moved to the Trash.
     pub home: PathBuf,
+    /// Where new ships (worktrees) are made (`Paths::ships`).
+    pub ships: PathBuf,
     /// Where a deleted project's folder goes when the person asks (`SystemTrash`; tests a fake).
     pub trash: Arc<dyn crate::trash::Trasher>,
 }
@@ -100,7 +102,12 @@ pub fn router(state: AppState) -> Router {
         .route("/inbox", get(crate::web::index))
         .route("/settings", get(crate::web::index))
         .route("/usage", get(crate::web::index))
+        .route("/settings/profiles", get(crate::web::index))
         .route("/projects/{project}/settings", get(crate::web::index))
+        .route(
+            "/projects/{project}/settings/{section}",
+            get(crate::web::index),
+        )
         .route("/projects/{project}", get(crate::web::index))
         .route("/projects/{project}/planner", get(crate::web::index))
         .route("/projects/{project}/chains/{chain}", get(crate::web::index))

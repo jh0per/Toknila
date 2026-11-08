@@ -3,7 +3,7 @@
 
 use axum::Json;
 use axum::extract::State;
-use toknila_api_types::CliLink;
+use toknila_api_types::{CliLink, Places};
 use toknila_core::Project;
 use toknila_core::repo::{NoDefaultBase, RepoCheck, RepoProblem};
 use toknila_core::system::SystemChecks;
@@ -77,6 +77,18 @@ fn environment() -> (
         dirs::home_dir(),
         std::env::var_os("PATH"),
     )
+}
+
+#[utoipa::path(get, path = "/system/places", tag = "system",
+    responses((status = 200, body = Places)))]
+/// Where the data home, the ships and the profiles folder are on this machine.
+pub async fn system_places(State(state): State<AppState>) -> Json<Places> {
+    let text = |p: &std::path::Path| p.display().to_string();
+    Json(Places {
+        home: text(&state.home),
+        ships: text(&state.ships),
+        profiles: text(&state.profiles),
+    })
 }
 
 #[utoipa::path(get, path = "/system/cli", tag = "system",

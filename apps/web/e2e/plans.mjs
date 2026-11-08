@@ -152,6 +152,7 @@ try {
   // 5. Remove from Toknila only: the folder stays.
   await t("onboarding").waitFor({ timeout: 10_000 });
   await addProject(keeper, "KEEPER");
+  await t("settings-nav-danger").click();
   await t("delete-project-button").click();
   await t("delete-remove").click();
   await expectText(t("delete-folder-note"), "stays where it is", "removing from Toknila keeps the folder");

@@ -240,4 +240,10 @@ pub(super) const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE chains ADD COLUMN source TEXT;
     "#,
+    // 12: the Claude model of a project's card agents, reviewers and planner.
+    r#"
+    ALTER TABLE projects ADD COLUMN worker_model TEXT;
+    ALTER TABLE projects ADD COLUMN reviewer_model TEXT;
+    ALTER TABLE projects ADD COLUMN planner_model TEXT;
+    "#,
 ];

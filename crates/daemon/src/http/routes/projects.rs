@@ -28,6 +28,17 @@ pub async fn create_project(
     State(state): State<AppState>,
     Json(mut input): Json<NewProject>,
 ) -> Result<(StatusCode, Json<Project>), FormError> {
+    if let Some(Err(e)) = input
+        .check_command
+        .as_deref()
+        .map(Project::clean_check_command)
+    {
+        return Err(FormError::field(
+            "check_command",
+            "check_command_invalid",
+            e,
+        ));
+    }
     if let Some(path) = input.repo_path.clone() {
         // No base named: the branch the repository is on, else its remote's default.
         if input
@@ -166,6 +177,15 @@ pub async fn patch_project(
             "check_command_invalid",
             e,
         ));
+    }
+    for (field, text) in [
+        ("worker_model", &patch.worker_model),
+        ("reviewer_model", &patch.reviewer_model),
+        ("planner_model", &patch.planner_model),
+    ] {
+        if let Some(Err(e)) = text.as_deref().map(Project::clean_model) {
+            return Err(FormError::field(field, "model_invalid", e));
+        }
     }
     if let Some(profile) = &patch.default_profile {
         let catalog = crate::profiles::load(&state.profiles);

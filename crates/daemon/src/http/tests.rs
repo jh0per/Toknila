@@ -28,6 +28,7 @@ mod reviews;
 mod settings;
 mod ship_guard;
 mod ships;
+mod smart_defaults;
 mod threads;
 mod usage;
 
@@ -114,6 +115,7 @@ impl Api {
                 }],
             )),
             home: dir.path().to_owned(),
+            ships: dir.path().join("ships"),
             trash: trash.clone(),
         };
         Self {
@@ -826,6 +828,7 @@ async fn openapi_describes_every_route() {
             "/system/checks",
             "/system/cli",
             "/system/cli/install",
+            "/system/places",
             "/tickets",
             "/tickets/{ticket}",
             "/tickets/{ticket}/actions/{action}",
@@ -1142,6 +1145,19 @@ async fn page_routes_serve_the_page_and_nothing_else_does() {
     assert_eq!(status("/chains/demo").await, html);
     assert_eq!(status("/inbox").await, html);
     assert_eq!(status("/projects/DEMO").await, html);
+    // Every settings section has an address of its own.
+    for page in [
+        "/settings",
+        "/settings/profiles",
+        "/projects/DEMO/settings",
+        "/projects/DEMO/settings/agents",
+    ] {
+        assert_eq!(status(page).await, html, "{page}");
+    }
+    assert_eq!(
+        status("/projects/DEMO/settings/agents/extra").await.0,
+        StatusCode::NOT_FOUND
+    );
     assert_eq!(status("/projects/DEMO/chains/demo").await, html);
     assert_eq!(
         status("/projects/DEMO/chains/demo/cards/DEMO-1").await,

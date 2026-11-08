@@ -361,3 +361,27 @@ fn claude_code_variables_are_dropped_unless_the_profile_sets_them() {
         ]
     );
 }
+
+#[test]
+fn the_model_flag_goes_only_to_a_profile_that_runs_claude_code_and_names_none_itself() {
+    let model = Some("opus");
+    let argv = |m: &str| vec!["--model".to_owned(), m.to_owned()];
+    for cmd in ["claude", "/usr/local/bin/claude", r"C:\bin\claude.exe"] {
+        let p = AgentProfile::new("x", AgentRole::Worker, vec![cmd.to_owned()]);
+        assert_eq!(p.model_args(model), argv("opus"), "{cmd}");
+    }
+    let claude = AgentProfile::claude_code();
+    assert!(claude.model_args(None).is_empty());
+    assert!(claude.model_args(Some("  ")).is_empty());
+    assert_eq!(claude.model_args(Some(" haiku ")), argv("haiku"));
+    assert!(AgentProfile::sim().model_args(model).is_empty());
+    let other = AgentProfile::new("o", AgentRole::Worker, vec!["my-agent".to_owned()]);
+    assert!(other.model_args(model).is_empty());
+    for own in [
+        ["claude", "--model", "sonnet"],
+        ["claude", "--model=sonnet", "x"],
+    ] {
+        let p = AgentProfile::new("own", AgentRole::Worker, own.map(str::to_owned).to_vec());
+        assert!(p.model_args(model).is_empty(), "{own:?}");
+    }
+}

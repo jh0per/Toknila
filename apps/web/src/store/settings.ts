@@ -2,7 +2,7 @@
 // changing its settings. The daemon judges every input; this only keeps what it answered so the
 // views can show it next to the field it is about.
 
-import type { CliLink, ListedProfile, PatchProject, Project, RepoCheck, RepoProblem, SystemChecks } from "../api/types";
+import type { CliLink, ListedProfile, PatchProject, Places, Project, RepoCheck, RepoProblem, SystemChecks } from "../api/types";
 import {
   type AddForm, type DraftField, type ProjectDraft, applyCheck, editDraft, initialAddForm, mustWait, needsCheck,
   resolvedDraft,
@@ -19,6 +19,10 @@ export interface SettingsState {
   /// Why the last "install the tok command" was refused.
   cliError: string | undefined;
   profiles: ListedProfile[];
+  /// The folder profile files go in.
+  profilesFolder: string;
+  /// Where the data, the ships and the profiles are on this machine.
+  places: Places | undefined;
   /// Why the last "add project" was refused, per field, and the branches to pick from.
   problems: RepoProblem[];
   branches: string[];
@@ -37,6 +41,8 @@ export const initialSettings: SettingsState = {
   cli: undefined,
   cliError: undefined,
   profiles: [],
+  profilesFolder: "",
+  places: undefined,
   problems: [],
   branches: [],
   error: undefined,
@@ -60,7 +66,8 @@ export type SettingsResult =
   | { type: "checksLoaded"; checks: SystemChecks }
   | { type: "cliLoaded"; cli: CliLink }
   | { type: "cliRejected"; message: string }
-  | { type: "profilesLoaded"; profiles: ListedProfile[] }
+  | { type: "profilesLoaded"; profiles: ListedProfile[]; folder: string }
+  | { type: "placesLoaded"; places: Places }
   | { type: "repoChecked"; repo_path: string; check: RepoCheck }
   | { type: "addRejected"; problems: RepoProblem[]; branches: string[] }
   | { type: "projectAdded"; project: Project }
@@ -74,6 +81,7 @@ export type SettingsMsg = SettingsIntent | SettingsResult;
 export type SettingsEffect =
   | { type: "loadChecks" }
   | { type: "loadProfiles" }
+  | { type: "loadPlaces" }
   | { type: "loadCli" }
   | { type: "installCli" }
   | { type: "checkRepo"; repo_path: string; work_branch: string }
@@ -81,7 +89,7 @@ export type SettingsEffect =
   | Extract<SettingsIntent, { type: "saveProject" | "importChain" }>;
 
 /// What the screens need fetched when they open.
-export const setupLoads: Effect[] = [{ type: "loadChecks" }, { type: "loadProfiles" }];
+export const setupLoads: Effect[] = [{ type: "loadChecks" }, { type: "loadProfiles" }, { type: "loadPlaces" }];
 
 /// The first problem or refusal about `field`, as text.
 export function fieldError(s: SettingsState, field: string): string | undefined {
@@ -142,7 +150,9 @@ export function reduceSettings(s: State, msg: SettingsMsg): [State, Effect[]] {
     case "checksLoaded":
       return [set({ checks: msg.checks }), []];
     case "profilesLoaded":
-      return [set({ profiles: msg.profiles }), []];
+      return [set({ profiles: msg.profiles, profilesFolder: msg.folder }), []];
+    case "placesLoaded":
+      return [set({ places: msg.places }), []];
     case "addRejected": {
       const add = { ...s.settings.add, waiting: false };
       return [set({ problems: msg.problems, branches: msg.branches, busy: false, add }), []];

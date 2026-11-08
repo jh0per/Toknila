@@ -104,6 +104,16 @@ pub struct Project {
     /// told to use it, and may run it without asking. `None`: the project names none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_command: Option<String>,
+    /// The Claude model of the project's card agents (`--model`: an alias such as `sonnet`, or a
+    /// full model name). `None`: the person's own Claude Code default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worker_model: Option<String>,
+    /// The Claude model of the project's reviewer agents; `None`: the person's default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewer_model: Option<String>,
+    /// The Claude model of the project's planner; `None`: the person's default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub planner_model: Option<String>,
     /// Hidden from the sidebar; its data is kept and it can be brought back.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub archived: bool,
@@ -124,6 +134,26 @@ impl Project {
             return Err("the check command is one line without parentheses");
         }
         Ok(Some(text.to_owned()).filter(|c| !c.is_empty()))
+    }
+
+    /// The model name as a person typed it: trimmed, `None` when empty (it clears the setting).
+    /// One word without whitespace or control characters, since it is one argument of a command.
+    pub fn clean_model(text: &str) -> Result<Option<String>, &'static str> {
+        let text = text.trim();
+        if text.chars().any(|c| c.is_whitespace() || c.is_control()) || text.starts_with('-') {
+            return Err("the model is one word, such as sonnet or a full model name");
+        }
+        Ok(Some(text.to_owned()).filter(|m| !m.is_empty()))
+    }
+
+    /// The model the project names for an agent of `role` (a release agent works like a card's).
+    pub fn model_for(&self, role: super::AgentRole) -> Option<&str> {
+        use super::AgentRole::*;
+        match role {
+            Worker | Release => self.worker_model.as_deref(),
+            Reviewer => self.reviewer_model.as_deref(),
+            Planner => self.planner_model.as_deref(),
+        }
     }
 
     /// Name of the agent profile `ticket` runs with: its own, else the project's default.
@@ -150,8 +180,20 @@ mod tests {
     }
 
     #[test]
+    fn a_model_is_trimmed_cleared_when_empty_and_refused_when_it_is_not_one_word() {
+        assert_eq!(
+            Project::clean_model(" opus[1m] "),
+            Ok(Some("opus[1m]".to_owned()))
+        );
+        assert_eq!(Project::clean_model("  "), Ok(None));
+        for bad in ["two words", "a\nb", "--effort"] {
+            assert!(Project::clean_model(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
     fn a_ticket_profile_overrides_the_project_default() {
-        let project = Project {
+        let mut project = Project {
             id: ProjectId::new(),
             key: "DEMO".parse().expect("key"),
             name: "Demo".into(),
@@ -164,6 +206,9 @@ mod tests {
             max_parallel: crate::schedule::DEFAULT_LIMIT,
             merge: Default::default(),
             check_command: None,
+            worker_model: None,
+            reviewer_model: None,
+            planner_model: None,
             archived: false,
         };
         let mut t = Ticket::new_backlog(
@@ -176,5 +221,17 @@ mod tests {
         assert_eq!(project.profile_for(&t), "sim");
         t.profile = Some("claude-code".into());
         assert_eq!(project.profile_for(&t), "claude-code");
+
+        // Each role gets the model the project names for it; a release agent works like a card's.
+        use crate::AgentRole::*;
+        let all = [Worker, Reviewer, Planner, Release];
+        assert_eq!(all.map(|r| project.model_for(r)), [None; 4]);
+        project.worker_model = Some("sonnet".into());
+        project.reviewer_model = Some("haiku".into());
+        project.planner_model = Some("opus".into());
+        assert_eq!(
+            all.map(|r| project.model_for(r)),
+            [Some("sonnet"), Some("haiku"), Some("opus"), Some("sonnet")]
+        );
     }
 }
