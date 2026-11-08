@@ -1778,7 +1778,7 @@ dependencies = [
 
 [[package]]
 name = "toknila"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1798,7 +1798,7 @@ dependencies = [
 
 [[package]]
 name = "toknila-api-types"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "toknila-app"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -1820,7 +1820,7 @@ dependencies = [
 
 [[package]]
 name = "toknila-client"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -1832,7 +1832,7 @@ dependencies = [
 
 [[package]]
 name = "toknila-core"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "proptest",
  "serde",
@@ -1845,7 +1845,7 @@ dependencies = [
 
 [[package]]
 name = "toknila-daemon"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "axum",
  "dirs",
@@ -2468,7 +2468,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.2.5"
+version = "0.2.6"
 
 [[package]]
 name = "yoke"
