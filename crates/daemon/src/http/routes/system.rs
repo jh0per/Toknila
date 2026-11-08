@@ -27,8 +27,9 @@ pub async fn system_checks(State(state): State<AppState>) -> ApiResult<Json<Syst
             .collect::<Vec<_>>())
     })
     .await?;
+    let home = state.home.clone();
     let checks =
-        tokio::task::spawn_blocking(move || tools::system_checks_for(t.as_ref(), &commands))
+        tokio::task::spawn_blocking(move || tools::system_checks_for(t.as_ref(), &commands, &home))
             .await?;
     Ok(Json(checks))
 }

@@ -5045,7 +5045,8 @@
           "missing",
           "outdated",
           "not_logged_in",
-          "failed"
+          "failed",
+          "warning"
         ]
       },
       "CliLink": {
@@ -8753,7 +8754,8 @@
           "git",
           "claude",
           "gh",
-          "check_command"
+          "check_command",
+          "data_home"
         ]
       },
       "UsageFigures": {

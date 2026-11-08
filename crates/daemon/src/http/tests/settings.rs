@@ -28,6 +28,11 @@ impl FakeTools {
 
 impl Tools for FakeTools {
     fn run(&self, program: &str, args: &[&str], _timeout: Duration) -> Probe {
+        // `git -C <folder> ...` is answered as `git ...`: the folder is a temporary one.
+        let args = match args {
+            ["-C", _, rest @ ..] => rest,
+            all => all,
+        };
         let call = std::iter::once(program)
             .chain(args.iter().copied())
             .collect::<Vec<_>>();
@@ -101,6 +106,34 @@ async fn system_checks_are_ok_when_every_tool_is() {
         .with("gh auth status", ran(0, ""));
     let api = Api::with_tools(Arc::new(tools));
     assert_eq!(api.get("/v1/system/checks").await["ok"], true);
+}
+
+#[tokio::test]
+async fn the_data_home_warning_shows_only_inside_a_repository() {
+    let base = FakeTools::default().with("git --version", ran(0, "git version 2.43.0\n"));
+    let outside = Api::with_tools(Arc::new(base))
+        .get("/v1/system/checks")
+        .await;
+    assert!(
+        outside["checks"]
+            .as_array()
+            .is_some_and(|all| all.iter().all(|c| c["tool"] != "data_home")),
+        "{outside}"
+    );
+    let inside = FakeTools::default()
+        .with("git --version", ran(0, "git version 2.43.0\n"))
+        .with("git rev-parse --is-inside-work-tree", ran(0, "true\n"));
+    let body = Api::with_tools(Arc::new(inside))
+        .get("/v1/system/checks")
+        .await;
+    let line = check(&body, "data_home");
+    assert_eq!(line["status"], "warning");
+    assert!(
+        line["detail"]
+            .as_str()
+            .is_some_and(|d| d.contains("inside a git repository")),
+        "{line}"
+    );
 }
 
 /// A repository whose only branch is `develop`, with one commit.

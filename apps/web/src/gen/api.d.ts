@@ -1557,7 +1557,7 @@ export interface components {
          * @description The verdict on one tool.
          * @enum {string}
          */
-        CheckStatus: "ok" | "missing" | "outdated" | "not_logged_in" | "failed";
+        CheckStatus: "ok" | "missing" | "outdated" | "not_logged_in" | "failed" | "warning";
         /**
          * @description `GET /v1/system/cli` and `POST /v1/system/cli/install`: the version of Toknila, the `tok`
          *     command that ships next to the daemon and whether it is linked into `~/.local/bin`.
@@ -2900,7 +2900,7 @@ export interface components {
          * @description Which tool a check is about.
          * @enum {string}
          */
-        Tool: "git" | "claude" | "gh" | "check_command";
+        Tool: "git" | "claude" | "gh" | "check_command" | "data_home";
         /** @description The numbers of one group of calls. */
         UsageFigures: {
             /**
