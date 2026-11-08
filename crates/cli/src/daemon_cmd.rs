@@ -35,7 +35,19 @@ struct Status {
     /// The daemon binary that runs; `None` for a daemon older than 0.2.
     #[serde(skip_serializing_if = "Option::is_none")]
     exe: Option<String>,
+    /// Agent slots in use across all projects (working cards and live runners); the desktop app
+    /// asks before replacing a daemon that has any. Absent when the daemon does not answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agents: Option<u32>,
     home: String,
+}
+
+/// Agent slots in use on the running daemon, read through its own API (any version has it).
+fn agents_in_use(info: &DaemonInfo) -> Option<u32> {
+    let all = Client::new(info.base_url(), info.token.clone())
+        .agents()
+        .ok()?;
+    Some(all.iter().map(|p| p.used).sum())
 }
 
 pub fn run(cmd: DaemonCmd, json: bool) -> Result<()> {
@@ -73,6 +85,7 @@ fn print_status(paths: &Paths, info: Option<&DaemonInfo>, json: bool) {
         port: info.map(|i| i.port),
         version: info.map(|i| i.version.clone()),
         exe: info.and_then(|i| i.exe.clone()),
+        agents: info.and_then(agents_in_use),
         home: paths.home.display().to_string(),
     };
     if json {
