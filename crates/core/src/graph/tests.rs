@@ -80,6 +80,7 @@ impl Builder {
             done_out_of_order: None,
             pr: None,
             review: crate::Review::default(),
+            pos: None,
         };
         self.next += 1;
         let id = t.id;

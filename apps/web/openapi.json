@@ -222,6 +222,46 @@
         }
       }
     },
+    "/chains/{chain}/arrange": {
+      "post": {
+        "tags": [
+          "chains"
+        ],
+        "summary": "Clears the places a person put the chain's cards at, so the automatic layout draws them.",
+        "operationId": "arrange_chain",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain}/edges": {
       "post": {
         "tags": [
@@ -6534,6 +6574,17 @@
               "null"
             ]
           },
+          "pos": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Pos",
+                "description": "Where the card sits on the canvas: a place, `null` to hand it back to the automatic\nlayout, left out to keep it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "profile": {
             "type": [
               "string",
@@ -6834,6 +6885,24 @@
           "running": {
             "type": "boolean",
             "description": "Its process is alive."
+          }
+        }
+      },
+      "Pos": {
+        "type": "object",
+        "description": "A place on a chain's canvas, in whole canvas pixels.",
+        "required": [
+          "x",
+          "y"
+        ],
+        "properties": {
+          "x": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "y": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -8344,6 +8413,17 @@
           "paused": {
             "type": "boolean",
             "description": "Paused tickets stay in Backlog and are skipped by autostart."
+          },
+          "pos": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Pos",
+                "description": "Where a person put the card on its chain's canvas (canvas pixels); `None` leaves the card\nto the automatic layout. Only the window reads it: it is not in chain files."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "pr": {
             "oneOf": [

@@ -132,7 +132,8 @@ pub fn create<U: UnitOfWork + ?Sized>(
 
 /// Changes a ticket's plain fields.
 pub fn edit<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, patch: TicketPatch) -> AppResult<()> {
-    if !t.status.can_edit() {
+    // Moving a card on the canvas is not an edit of the work: a finished card can be moved too.
+    if !t.status.can_edit() && !patch.only_moves() {
         return Err(AppError::conflict(format!(
             "{} is {}; a finished card cannot be edited",
             t.key,
