@@ -18,7 +18,7 @@ export function DeleteChain({ chain: id, state, dispatch }: { chain: string; sta
       <h2>Delete chain {chain.chain.name}</h2>
       <p data-testid="delete-chain-what">
         Deletes the chain <b>{chain.chain.name}</b> and its <b>{cards(n)}</b> from Toknila, with their threads, journal
-        entries, run files and ships (worktrees). The repository folder and its ship/* branches stay untouched.
+        entries, run files and workspaces. The project folder and the branches Toknila made for the cards stay untouched.
       </p>
       {r.error && (
         <div className="error" role="alert" data-testid="delete-chain-error">
@@ -44,7 +44,7 @@ function Deleted({ d, dispatch }: { d: ChainDeletion; dispatch: (i: Intent) => v
       <h2>{d.chain.name} was deleted</h2>
       <p>
         {cards(d.tickets)} deleted
-        {d.worktrees_removed.length > 0 ? `; worktrees removed: ${d.worktrees_removed.join(", ")}` : ""}.
+        {d.worktrees_removed.length > 0 ? `; workspaces removed: ${d.worktrees_removed.join(", ")}` : ""}.
       </p>
       {d.warnings.length > 0 && (
         <ul className="warnings" data-testid="delete-chain-warnings">

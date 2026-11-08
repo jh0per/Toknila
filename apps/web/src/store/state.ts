@@ -42,6 +42,8 @@ export interface State {
   /// Delay before the next reconnect attempt, doubled on each failure.
   retryMs: number;
   route: Route;
+  /// The page the settings were opened from, for "Back to work".
+  settingsFrom: Route | undefined;
   tab: Tab;
   /// Settings and onboarding: checks, profiles, the answers of the last form.
   settings: SettingsState;
@@ -85,6 +87,7 @@ export function initialState(route: Route): State {
     lastSeq: 0,
     retryMs: FIRST_RETRY_MS,
     route,
+    settingsFrom: undefined,
     tab: "details",
     settings: initialSettings,
     plan: initialPlan,

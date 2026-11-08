@@ -1,37 +1,36 @@
 import type { Intent } from "../store/msg";
-import { settingsSection } from "../store/route";
+import { isProjectSection, settingsSection } from "../store/route";
 import { type State, currentProject } from "../store/state";
-import { AppSettings } from "./AppSettings";
-import { PlansSection, DangerSection } from "./PlansSection";
-import { AgentsSection, GeneralSection, ReviewSection } from "./ProjectSections";
+import { About } from "./About";
+import { Checks } from "./Checks";
 import { ProfilesSettings } from "./ProfilesSettings";
-import { SettingsNav } from "./SettingsNav";
+import { ProjectSettings } from "./ProjectSettings";
+import { TrustNote } from "./TrustNote";
+import { UpdatesSettings } from "./UpdatesSettings";
 
-/// Settings: a section list on the left (App, Profiles, and the focused project's General, Agents,
-/// Review and merge, Plans, Danger zone) and the section on the right. Each section has its own
-/// address (`/settings`, `/projects/KEY/settings/agents`, ...).
+const TITLE = { projects: "Projects", profiles: "Agents", updates: "Updates", about: "About", checks: "System checks" } as const;
+
+/// Settings: one page of the flat list (Projects, Agents, Updates, About, System checks), shown
+/// beside the settings sidebar. Each page and each project section has an address of its own
+/// (`/settings`, `/settings/updates`, `/projects/KEY/settings/review`, ...).
 export function Settings({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const project = currentProject(state);
-  const section = state.route.name === "settings" ? settingsSection(state.route) : "app";
-  // The form restarts from the daemon's values whenever they change (after a save, after a restart).
-  const stamp = project && [
-    project.id, project.default_profile, project.max_parallel, project.default_review_mode, project.default_reviewer,
-    project.work_branch, project.check_command, project.worker_model, project.reviewer_model, project.planner_model, project.merge.mode, project.merge.pr_title,
-    project.merge.method, state.settings.profiles.length,
-  ].join("|");
-  const form = { key: stamp, state, dispatch };
+  const section = state.route.name === "settings" ? settingsSection(state.route) : "general";
+  const page = isProjectSection(section) ? "projects" : section;
   return (
     <div className="settings-screen" data-testid="settings">
-      <SettingsNav state={state} dispatch={dispatch} project={project} />
       <div className="settings-body" data-section={section}>
-        <h1>Settings</h1>
-        {section === "app" && <AppSettings state={state} dispatch={dispatch} />}
-        {section === "profiles" && <ProfilesSettings state={state} />}
-        {project && section === "general" && <GeneralSection project={project} {...form} />}
-        {project && section === "agents" && <AgentsSection project={project} {...form} />}
-        {project && section === "review" && <ReviewSection project={project} {...form} />}
-        {project && section === "plans" && <PlansSection project={project} state={state} dispatch={dispatch} />}
-        {project && section === "danger" && <DangerSection project={project} state={state} dispatch={dispatch} />}
+        <h1>{TITLE[page]}</h1>
+        {isProjectSection(section) && <ProjectSettings state={state} dispatch={dispatch} project={project} section={section} />}
+        {section === "profiles" && <ProfilesSettings state={state} dispatch={dispatch} />}
+        {section === "updates" && <UpdatesSettings state={state} dispatch={dispatch} />}
+        {section === "about" && <About state={state} dispatch={dispatch} />}
+        {section === "checks" && (
+          <>
+            <Checks state={state} dispatch={dispatch} title={false} />
+            <TrustNote />
+          </>
+        )}
       </div>
     </div>
   );

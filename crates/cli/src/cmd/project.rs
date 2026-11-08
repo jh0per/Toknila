@@ -19,22 +19,23 @@ pub enum ProjectCmd {
         key: String,
         #[arg(long)]
         name: Option<String>,
-        /// Path of the project's git repository; tickets get a worktree in it.
+        /// Folder of the project's git repository; every ticket gets its own workspace (a copy of it).
         #[arg(long)]
         repo: Option<String>,
-        /// Branch ships start from (default: the branch the repository is on, else the remote's
-        /// default branch).
+        /// The main branch: workspaces start from it and approved work lands on it (default: the
+        /// branch the repository is on, else the remote's default branch).
         #[arg(long)]
         base: Option<String>,
         /// Agent profile tickets run with unless they name one (default: sim).
         #[arg(long)]
         profile: Option<String>,
-        /// The command that checks the work (default: detected from the repository, e.g.
-        /// `cargo xtask verify`, `npm test`; an empty text names none).
+        /// The test command, optional: agents run it before they hand in (default: detected from the
+        /// repository, e.g. `cargo xtask verify`, `npm test`; an empty text names none).
         #[arg(long)]
         check_command: Option<String>,
-        /// Where accepted work lands: `local` or `github` (default: `github` when the repository
-        /// has a GitHub remote and `gh auth status` succeeds, else `local`).
+        /// What happens when a card is approved: `local` (merge into the main branch) or `github`
+        /// (open a pull request); default: `github` when the repository has a GitHub remote and
+        /// `gh auth status` succeeds, else `local`.
         #[arg(long)]
         merge: Option<String>,
     },
@@ -44,8 +45,8 @@ pub enum ProjectCmd {
         /// Most agents working at once (1 to 64, default 2); more started cards wait in a queue.
         #[arg(long)]
         parallel: Option<u32>,
-        /// Where accepted work lands: `local` (merge into the base branch) or `github` (open a
-        /// pull request, merge it there when its checks pass).
+        /// What happens when a card is approved: `local` (merge into the main branch) or `github`
+        /// (open a pull request, merge it there when its checks pass).
         #[arg(long)]
         merge: Option<String>,
         /// Pull request title; {key} and {title} are the card's (default: "{key}: {title}").
@@ -54,7 +55,7 @@ pub enum ProjectCmd {
         /// How a pull request merges: merge, squash or rebase (default: merge).
         #[arg(long)]
         merge_method: Option<String>,
-        /// The command that checks the work (e.g. `cargo xtask verify`); agents are told to run it
+        /// The test command, optional (e.g. `cargo xtask verify`): agents run it before they hand in,
         /// and may without asking. An empty text clears it.
         #[arg(long)]
         check_command: Option<String>,
@@ -72,8 +73,8 @@ pub enum ProjectCmd {
     },
     /// List projects.
     Ls,
-    /// Delete a project with its chains, cards and everything attached to them. The ships'
-    /// worktrees and run files go too; the repository folder and its `ship/*` branches stay.
+    /// Delete a project with its chains, cards and everything attached to them. The workspaces
+    /// and run files go too; the project folder and the branches made for its cards stay.
     Rm {
         key: String,
         /// Also move the repository folder to the system Trash; asks you to type the project key.
@@ -111,7 +112,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 if check_command.is_none()
                     && let Some(cmd) = found.suggested_check_command
                 {
-                    detected.push(format!("check command: {cmd} (detected)"));
+                    detected.push(format!("test command: {cmd} (detected)"));
                     check_command = Some(cmd);
                 }
                 if merge_mode.is_none() {
@@ -179,7 +180,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     p.merge.pr_title
                 );
                 if let Some(c) = &p.check_command {
-                    println!("check command: {c}");
+                    println!("test command: {c}");
                 }
                 for (what, model) in [
                     ("worker", &p.worker_model),
@@ -255,7 +256,7 @@ fn deleted(d: &ProjectDeletion) {
         d.tickets
     );
     for w in &d.worktrees_removed {
-        println!("removed worktree {w}");
+        println!("removed workspace {w}");
     }
     let folder = d.project.repo_path.as_deref().unwrap_or_default();
     match d.folder {

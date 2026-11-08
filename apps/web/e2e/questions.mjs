@@ -145,7 +145,7 @@ try {
   const review = inbox.locator('li[data-kind=review][data-key="QA-5"]');
   await expectText(review, "The reviewer gave no verdict", "the inbox says the reviewer gave no verdict");
   await expectText(review.locator("[data-testid=screen]"), "I could not run the checks", "with the reviewer's screen");
-  for (const id of ["review-accept", "review-run-again", "review-return"]) {
+  for (const id of ["review-accept", "review-run-again", "review-return-open"]) {
     await review.locator(`[data-testid=${id}]`).waitFor({ timeout: 10_000 });
   }
   console.log("PASS Accept, Return and Run the reviewer again are offered");

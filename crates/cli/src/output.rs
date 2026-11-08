@@ -119,7 +119,7 @@ pub fn chain(d: &ChainDetail) {
         if d.chain.autostart {
             ""
         } else {
-            "  (autostart off)"
+            "  (cards start only when you start them)"
         }
     );
     if let Some(stop) = &s.stopped_at {
@@ -242,7 +242,7 @@ pub fn ticket(d: &TicketDetail) {
         t.profile.as_deref().unwrap_or("(project default)")
     );
     if let Some(s) = &d.ship {
-        println!("ship: {}  ({})", s.path, s.branch);
+        println!("workspace: {}  ({})", s.path, s.branch);
     }
     if let Some(pr) = &t.pr {
         let checks: Vec<String> = pr

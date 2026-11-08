@@ -52,14 +52,6 @@ code, pre, .key { font-family: var(--mono); }
 .btn.on { border-color: var(--accent); color: var(--accent); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
 .btn:disabled { opacity: 0.45; cursor: default; }
-.inbox h2 { margin: 0 0 var(--s2); font-size: var(--fs-l); }
-.inbox ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); }
-.inbox li { display: flex; flex-direction: column; gap: var(--s1); padding: 6px var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); }
-.inbox h3 { margin: var(--s3) 0 var(--s1); font-size: var(--fs-m, 14px); }
-.inbox .row-head { display: flex; gap: var(--s2); align-items: baseline; }
-.inbox .row-body { display: flex; flex-direction: column; gap: var(--s1); }
-.inbox blockquote { margin: 0; padding-left: var(--s2); border-left: 3px solid var(--line); }
-.inbox .btns { display: flex; gap: var(--s1); flex-wrap: wrap; }
 @media (max-width: 760px) {
   html, body, #root { height: auto; }
   .ide { grid-template-columns: minmax(0, 1fr); height: auto; }
@@ -70,5 +62,3 @@ code, pre, .key { font-family: var(--mono); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 .side-note { margin: 2px var(--s2); }
 
-.inbox .screen { margin: var(--s1) 0; padding: var(--s2); background: var(--term-bg); color: var(--term-fg); font-family: var(--mono); font-size: 12px; overflow-x: auto; }
-.inbox .row-body input { flex: 1; min-width: 12em; }

@@ -1,0 +1,20 @@
+/* The inbox: one card per thing that waits on a person. Title first, what is asked as a muted
+   second line, then the actions: a primary button for the likely answer, plain ones beside it. */
+.inbox { width: min(820px, 100%); margin: 0 auto; }
+.inbox h2 { margin: 0 0 var(--s3); font-size: 22px; font-weight: 600; }
+.inbox h3 { margin: var(--s4) 0 var(--s2); font-size: var(--fs-m); font-weight: 600; color: var(--muted); }
+.inbox ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.inbox li { display: flex; flex-direction: column; gap: 2px; padding: var(--s3) var(--s4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); }
+.inbox .row-head { display: flex; gap: var(--s2); align-items: baseline; justify-content: space-between; }
+.inbox .row-head .t { font-weight: 600; font-size: var(--fs-l); min-width: 0; overflow-wrap: anywhere; }
+.inbox .row-head .key { font-size: var(--fs-xs); color: var(--muted); }
+.inbox .row-kind { margin-bottom: var(--s1); }
+.inbox .row-body { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; }
+.inbox blockquote, .answer blockquote { margin: 0; padding-left: var(--s2); border-left: 3px solid var(--line); }
+.inbox .btns, .answer .btns { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
+.inbox .btn { flex: none; align-self: flex-start; padding: 5px 14px; }
+.inbox .compose, .answer .compose { width: 100%; }
+.inbox .screen, .answer .screen { margin: var(--s1) 0; padding: var(--s2); width: 100%; background: var(--term-bg); color: var(--term-fg); font-family: var(--mono); font-size: 12px; overflow-x: auto; }
+.inbox .row-body input, .answer input { flex: 1; min-width: 12em; }
+.inbox .row-body .btns input, .answer .btns input { flex: 1 1 14em; }
+.answer { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; width: 100%; }

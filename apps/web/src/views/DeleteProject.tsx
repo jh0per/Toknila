@@ -3,7 +3,7 @@ import type { ProjectDeletion } from "../api/types";
 import type { Intent } from "../store/msg";
 import { folderText, keyConfirmed } from "../store/removal";
 import type { State } from "../store/state";
-import { Field } from "./AddProject";
+import { Field } from "./Field";
 
 /// Deleting a project: only its records, or its records and its repository folder (to the Trash,
 /// once the person typed the key). Afterwards: what became of everything.
@@ -19,7 +19,7 @@ export function DeleteProject({ project: key, state, dispatch }: { project: stri
       <h2>Delete {project.key}</h2>
       <p>
         Removes {project.key} from Toknila: its chains, cards, threads, journal and the links of its usage records, its
-        run files and its ships (worktrees). The repository folder and its ship/* branches stay untouched.
+        run files and its workspaces. The project folder and the branches Toknila made for its cards stay untouched.
       </p>
       <button type="button" className="btn danger" disabled={r.busy} data-testid="delete-remove" onClick={() => remove(false)}>
         Remove from Toknila
@@ -62,7 +62,7 @@ function Deleted({ d, trashAsked, dispatch }: { d: ProjectDeletion; trashAsked: 
       <h2>{d.project.key} was removed</h2>
       <p>
         {d.chains.length} chain{d.chains.length === 1 ? "" : "s"} and {d.tickets} card{d.tickets === 1 ? "" : "s"} deleted
-        {d.worktrees_removed.length > 0 ? `; worktrees removed: ${d.worktrees_removed.join(", ")}` : ""}.
+        {d.worktrees_removed.length > 0 ? `; workspaces removed: ${d.worktrees_removed.join(", ")}` : ""}.
       </p>
       <p className={d.folder === "kept" && trashAsked ? "error" : ""} data-testid="delete-folder-note">{folderText(d, trashAsked)}</p>
       {d.warnings.length > 0 && (

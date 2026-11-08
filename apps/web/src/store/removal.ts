@@ -50,7 +50,7 @@ export function folderText(d: ProjectDeletion, trashAsked: boolean): string {
     case "kept":
       return trashAsked
         ? `The folder stayed where it was: ${d.folder_error ?? "the Trash did not take it"}`
-        : `The folder ${path} stays where it is, with its ship/* branches.`;
+        : `The folder ${path} stays where it is, with the branches Toknila made for its cards.`;
   }
 }
 

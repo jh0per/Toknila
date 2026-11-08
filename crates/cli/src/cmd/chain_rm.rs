@@ -36,7 +36,7 @@ fn confirm(input: &mut impl BufRead, terminal: bool, name: &str) -> Result<()> {
             "not deleting chain {name}: it needs a confirmation and stdin is not a terminal; pass --yes"
         );
     }
-    eprintln!("This deletes chain {name} with its cards, threads and ships' checkouts.");
+    eprintln!("This deletes chain {name} with its cards, threads and workspaces.");
     eprint!("Type the chain name ({name}) to go on: ");
     let mut line = String::new();
     input.read_line(&mut line)?;
@@ -53,7 +53,7 @@ fn deleted(d: &ChainDeletion) {
         d.chain.name, d.project, d.tickets
     );
     for w in &d.worktrees_removed {
-        println!("removed worktree {w}");
+        println!("removed workspace {w}");
     }
     for w in &d.warnings {
         println!("warning: {w}");

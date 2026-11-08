@@ -47,7 +47,7 @@ describe("deleting a project", () => {
 
   it("says what became of the folder, plainly when the Trash did not take it", () => {
     expect(folderText(deletion({ folder: "trashed" }), true)).toBe("The folder /work/app is in the Trash.");
-    expect(folderText(deletion(), false)).toBe("The folder /work/app stays where it is, with its ship/* branches.");
+    expect(folderText(deletion(), false)).toBe("The folder /work/app stays where it is, with the branches Toknila made for its cards.");
     expect(folderText(deletion({ folder_error: "the Trash is full" }), true))
       .toBe("The folder stayed where it was: the Trash is full");
     expect(folderText(deletion(), true)).toBe("The folder stayed where it was: the Trash did not take it");

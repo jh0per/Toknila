@@ -10,3 +10,9 @@ const PERMISSION = /^Claude (Code )?(asks for|needs your) permission/i;
 export function isPermissionReport(c: Comment): boolean {
   return c.kind === "report" && c.author === "agent" && PERMISSION.test(c.body.gist);
 }
+
+/// The agent's last written report that is not a permission request: what it says it did when it
+/// handed in (or why a reviewer could not decide).
+export function finishReport(comments: Comment[]): Comment | undefined {
+  return [...comments].reverse().find((c) => c.kind === "report" && c.author === "agent" && !isPermissionReport(c));
+}

@@ -5,6 +5,10 @@
 .divider:hover, .divider:focus-visible { background: var(--accent-soft); outline: none; }
 .divider:hover::after, .divider:focus-visible::after { background: var(--accent); opacity: 1; }
 .panel.empty { padding: var(--s3) var(--s4); }
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--line); }
+.panel-head .tabs { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.panel-head .actions { padding: var(--s1) var(--s3); flex: 0 1 auto; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.panel-head .actions > :not(.btns) { flex-basis: 100%; }
 .tabs { display: flex; gap: 2px; padding: 0 var(--s2); border-bottom: 1px solid var(--line); align-items: center; overflow-x: auto; }
 .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 7px 11px; color: var(--muted); white-space: nowrap; }
 .tabs button.sel { color: var(--fg); border-bottom-color: var(--accent); font-weight: 500; }
@@ -19,13 +23,10 @@
 .details section { min-width: 0; }
 .details p { margin: 0; max-width: 65ch; }
 .prompt { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; font: inherit; max-width: 65ch; }
-.ship { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--s3); margin: 0; font-size: var(--fs-s); }
-.ship dt { color: var(--muted); }
 .pr { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-s); }
 .pr .checks { margin: 0; padding-left: var(--s3); }
 .pr li[data-state=failed] { color: var(--danger); }
 .pr li[data-state=passed] { color: var(--done); }
-.ship dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
 .ck { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .ck li { display: flex; gap: 7px; }
 .ck li::before { content: "\25A1"; color: var(--muted); font-family: var(--mono); }
@@ -39,7 +40,7 @@
 .details-meta { margin: var(--s2) 0 var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
 .tag-note { margin: 0; width: fit-content; }
 .details > p.muted { margin-bottom: var(--s3); }
-.actions { padding: var(--s2) 14px 0; display: flex; flex-direction: column; gap: var(--s2); }
+.actions { display: flex; flex-direction: column; gap: var(--s2); }
 .actions .btns { display: flex; gap: var(--s2); flex-wrap: wrap; }
 .actions button.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
 .actions button.danger { color: var(--danger); }

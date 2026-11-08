@@ -1,19 +1,16 @@
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
-import { lastCheckText } from "../store/updates";
 
 /// About: the version, and the action that links the bundled `tok` command into `~/.local/bin`.
 export function About({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const { cli, cliError } = state.settings;
   return (
     <section className="card-block" data-testid="about">
-      <h2>About</h2>
       <p data-testid="version">Toknila {cli?.version ?? "…"}</p>
-      <UpdateLine state={state} dispatch={dispatch} />
+      <h3 className="sub">The <code>tok</code> command</h3>
+      <p className="muted">A command for the terminal that does what this window does: list cards, start them, answer them.</p>
       {cli && !cli.bundled && (
-        <p className="muted">
-          The <code>tok</code> command ships inside the Toknila app; this daemon has none next to it.
-        </p>
+        <p className="muted">The <code>tok</code> command comes with the Toknila app; this daemon has none next to it.</p>
       )}
       {cli?.bundled && cli.installed && (
         <p data-testid="cli-installed">
@@ -39,21 +36,5 @@ export function About({ state, dispatch }: { state: State; dispatch: (i: Intent)
       )}
       {cliError && <p className="field-error" data-testid="cli-error">{cliError}</p>}
     </section>
-  );
-}
-
-/// The update line of About, only inside the desktop app (a browser has no shell to ask).
-function UpdateLine({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
-  const { view, error } = state.updates;
-  if (!view) return null;
-  const failure = error ?? view.error;
-  return (
-    <>
-      <p className="muted" data-testid="last-check">{lastCheckText(view.last_check)}</p>
-      <button className="btn" data-testid="check-updates" disabled={view.busy} onClick={() => dispatch({ type: "checkForUpdates" })}>
-        {view.busy ? "Checking…" : "Check for updates"}
-      </button>
-      {failure && <p className="field-error" data-testid="update-error">{failure}</p>}
-    </>
   );
 }
