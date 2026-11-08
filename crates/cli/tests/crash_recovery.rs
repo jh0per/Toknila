@@ -127,14 +127,6 @@ impl Lcg {
     }
 }
 
-struct StopOnDrop<'a>(&'a Path);
-
-impl Drop for StopOnDrop<'_> {
-    fn drop(&mut self) {
-        let _ = tok_cmd(self.0, &["daemon", "stop"]).output();
-    }
-}
-
 fn run(home: &Path, args: &[String]) -> Child {
     tok_cmd(home, &args.iter().map(String::as_str).collect::<Vec<_>>())
         .stdout(Stdio::null())
@@ -153,7 +145,7 @@ fn kill_9_at_20_points_loses_nothing_and_mixes_nothing() {
 
     // Reference: the same steps without kills, the state after each one.
     let clean = work.path().join("clean");
-    let _stop_clean = StopOnDrop(&clean);
+    let _stop_clean = common::DaemonGuard::new(&clean);
     let mut reference = vec![state(&clean)];
     for s in &steps {
         tok_ok(&clean, &s.iter().map(String::as_str).collect::<Vec<_>>());
@@ -187,7 +179,7 @@ fn kill_9_at_20_points_loses_nothing_and_mixes_nothing() {
     }
 
     let home = work.path().join("killed");
-    let _stop = StopOnDrop(&home);
+    let _stop = common::DaemonGuard::new(&home);
     tok_ok(&home, &["daemon", "start"]);
     let mut rng = Lcg(0x70_6b_6e_69_6c_61);
     let mut kills = 0;
