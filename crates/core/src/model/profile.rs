@@ -117,7 +117,8 @@ impl Default for Nudge {
             max_nudges: 3,
             window_secs: 900,
             message: "Report your state through the Toknila tools: call note with progress, \
-                      ask_human if you are stuck, or finished if you are done."
+                      ask_human if you are stuck or have a question (only ask_human gets an \
+                      answer), or finished if you are done."
                 .to_owned(),
         }
     }

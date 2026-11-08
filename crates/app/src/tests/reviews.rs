@@ -51,7 +51,13 @@ fn human_mode_waits_for_a_person_who_accepts_with_remarks() {
     let t = a(&mem);
     assert_eq!(t.status, TicketStatus::Review);
     assert_eq!(t.review.turn, Some(ReviewTurn::Person));
-    assert!(mem.deferred.is_empty(), "no reviewer in human mode");
+    assert!(
+        mem.deferred
+            .iter()
+            .all(|e| matches!(e, ExternalEffect::StopWorker { .. })),
+        "no reviewer in human mode: {:?}",
+        mem.deferred
+    );
     // The agent's verdict is not wanted when nobody asked for it.
     assert!(verdict(&mut mem, Verdict::Approve, "").is_err());
 
@@ -286,8 +292,8 @@ fn the_reviewer_runs_next_to_the_worker_on_the_same_ship() {
     assert_eq!(req.dir, "/ships/demo/demo/demo-1-a", "the worker's ship");
     assert_eq!(
         live(&mem.runner),
-        [AgentRole::Worker, AgentRole::Reviewer],
-        "the worker's runner stays alive during review"
+        [AgentRole::Reviewer],
+        "the hand-in ended the worker's run"
     );
     assert_eq!(
         mem.runner
@@ -318,11 +324,11 @@ fn a_review_profile_setting_chooses_the_reviewer() {
 fn human_mode_starts_no_reviewer() {
     let mem = process_review(ReviewMode::Human);
     assert!(reviewer_requests(&mem).is_empty());
-    assert_eq!(live(&mem.runner), [AgentRole::Worker]);
+    assert!(live(&mem.runner).is_empty(), "the hand-in ended the worker");
 }
 
 #[test]
-fn a_return_goes_to_the_live_worker_session_and_ends_the_reviewer_only() {
+fn a_return_after_a_reviewers_request_starts_a_new_worker_run() {
     let mut mem = process_review(ReviewMode::Agent);
     let id = a(&mem).id;
     verdict(&mut mem, Verdict::RequestChanges, "fix the look").expect("verdict");
@@ -335,8 +341,8 @@ fn a_return_goes_to_the_live_worker_session_and_ends_the_reviewer_only() {
             .iter()
             .filter(|r| r.role == AgentRole::Worker)
             .count(),
-        1,
-        "the live worker is kept, not started again"
+        2,
+        "the first run ended at the hand-in; a second run replaces it"
     );
     assert!(live(&mem.runner).contains(&AgentRole::Worker));
     assert!(
@@ -370,7 +376,7 @@ fn a_return_starts_a_new_worker_run_when_the_worker_has_exited() {
 }
 
 #[test]
-fn a_person_deciding_while_the_reviewer_runs_stops_it_and_not_the_worker() {
+fn a_person_deciding_while_the_reviewer_runs_stops_it_and_not_the_new_worker() {
     let mut mem = process_review(ReviewMode::Both);
     let t = a(&mem);
     let comment = "no".to_owned();
@@ -378,7 +384,8 @@ fn a_person_deciding_while_the_reviewer_runs_stops_it_and_not_the_worker() {
     settle(&mut mem);
     assert_eq!(
         mem.runner.stopped_roles.borrow().as_slice(),
-        [(t.id, AgentRole::Reviewer)]
+        [(t.id, AgentRole::Worker), (t.id, AgentRole::Reviewer)],
+        "the hand-in stopped the worker, the decision the reviewer"
     );
     assert!(mem.runner.stopped.borrow().is_empty());
     assert!(live(&mem.runner).contains(&AgentRole::Worker));
@@ -530,12 +537,12 @@ fn a_card_in_review_with_worker_and_reviewer_alive_holds_two_slots() {
     assert_eq!(card(&mem, 1).status, TicketStatus::Review);
     assert_eq!(
         live(&mem.runner).len(),
-        3,
-        "worker and reviewer of 1, worker of 2"
+        2,
+        "reviewer of 1 (its worker ended at the hand-in), worker of 2"
     );
 
-    // Limit 2: the review card's two runners and the running card pass it, so a third card
-    // that a person starts stays queued.
+    // Limit 2: the reviewer and the running card fill it, so a third card that a person
+    // starts stays queued.
     let three = card(&mem, 3);
     tickets::act(&mut mem, &three, TicketEvent::Request).expect("request");
     settle(&mut mem);
@@ -614,12 +621,9 @@ fn a_recorded_verdict_stops_the_reviewer_and_its_slot_starts_the_next_card() {
     };
     agent::ticket_event(&mut mem, &one, finished).expect("finished");
     settle(&mut mem);
-    assert_eq!(
-        live(&mem.runner).len(),
-        3,
-        "worker and reviewer of 1, worker of 2"
-    );
+    assert_eq!(live(&mem.runner).len(), 2, "reviewer of 1, worker of 2");
     let three = card(&mem, 3);
+    mem.project.max_parallel = 2;
     tickets::act(&mut mem, &three, TicketEvent::Request).expect("request");
     settle(&mut mem);
     assert!(card(&mem, 3).queued, "the three slots are taken");
@@ -640,10 +644,9 @@ fn a_recorded_verdict_stops_the_reviewer_and_its_slot_starts_the_next_card() {
     settle(&mut mem);
     assert_eq!(
         mem.runner.stopped_roles.borrow().as_slice(),
-        [(one.id, AgentRole::Reviewer)]
+        [(one.id, AgentRole::Worker), (one.id, AgentRole::Reviewer)]
     );
-    assert!(live(&mem.runner).contains(&AgentRole::Worker));
-    assert_eq!(live(&mem.runner).len(), 2, "worker of 1, worker of 2");
+    assert_eq!(live(&mem.runner).len(), 1, "only the worker of 2");
 
     // The process is gone: the host reports its end, which frees the slot for card 3.
     let req = RunRequest {

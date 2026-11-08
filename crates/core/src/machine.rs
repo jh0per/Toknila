@@ -129,6 +129,8 @@ pub fn apply(
             effects.push(Effect::RecordReport {
                 summary: summary.clone(),
             });
+            // The hand-in ends the worker's run: a Return starts a replacement run.
+            effects.push(Effect::StopWorker);
             review::enter(&mut next, *mode, &mut effects);
             (S::Review, None)
         }

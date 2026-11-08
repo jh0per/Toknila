@@ -98,7 +98,19 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
         AgentEvent::SubtaskDone { position } => {
             update_subtask(uow, t, position, Some(true), None).map(|_| ())
         }
-        AgentEvent::Note { body } => report(uow, t, body),
+        AgentEvent::Note { body } => match note_question(uow, t, &body)? {
+            Some(text) => ticket_event(
+                uow,
+                t,
+                AgentEvent::AskHuman {
+                    text,
+                    permission: false,
+                    detail: None,
+                },
+            )
+            .map(|_| ()),
+            None => report(uow, t, body),
+        },
         AgentEvent::Finished { summary } => {
             if summary.trim().is_empty() {
                 return Err(AppError::bad_request("finished needs a summary"));
@@ -124,6 +136,32 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
         }),
     }
     .map(|()| t.id)
+}
+
+/// The question a running card's note really is; `None` for a plain note, or a card that is not
+/// Running (it cannot start waiting).
+fn note_question<U: UnitOfWork + ?Sized>(
+    uow: &U,
+    t: &Ticket,
+    body: &CommentBody,
+) -> AppResult<Option<String>> {
+    let running = uow
+        .ticket(t.id)?
+        .is_some_and(|t| t.status == TicketStatus::Running);
+    Ok(running.then(|| AgentEvent::note_question(body)).flatten())
+}
+
+/// Whether `event` from `t` is a note that [`ticket_event`] turns into a question, so the caller
+/// can tell the agent to use `ask_human`.
+pub fn turns_into_question<U: UnitOfWork + ?Sized>(
+    uow: &U,
+    t: &Ticket,
+    event: &AgentEvent,
+) -> AppResult<bool> {
+    match event {
+        AgentEvent::Note { body } => Ok(note_question(uow, t, body)?.is_some()),
+        _ => Ok(false),
+    }
 }
 
 /// Applies one event a release agent reported about `r`.

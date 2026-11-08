@@ -285,27 +285,34 @@ fn a_runner_that_cannot_start_blocks_the_ticket_as_crashed() {
 }
 
 #[test]
-fn cancel_and_accept_queue_a_stop_and_an_unchanged_runner_is_kept_on_return() {
+fn the_hand_in_stops_the_worker_a_return_starts_a_new_run_and_cancel_stops_it() {
     let mut mem = with_agents();
     recover(&mut mem).expect("settle");
     settle(&mut mem);
     let id = a(&mem).id;
     let summary = "done".to_owned();
     finish(&mut mem, summary);
+    settle(&mut mem);
+    assert_eq!(
+        mem.runner.stopped_roles.borrow().as_slice(),
+        [(id, AgentRole::Worker)],
+        "the hand-in ends the worker's run"
+    );
+    assert!(mem.runner.live.borrow().is_empty(), "no process is left");
     let comment = "again".to_owned();
     act(&mut mem, TicketEvent::Return { comment });
     settle(&mut mem);
     assert_eq!(
         mem.runner.started.borrow().len(),
-        1,
-        "the live runner is kept, not started twice"
+        2,
+        "a Return starts a replacement run"
     );
     assert_eq!(
         mem.kinds()
             .iter()
             .filter(|k| *k == "ticket.runner_started")
             .count(),
-        1
+        2
     );
 
     let reason = "no".to_owned();
