@@ -31,6 +31,8 @@ pub enum Tool {
     Git,
     Claude,
     Gh,
+    /// The first word of a project check command.
+    CheckCommand,
 }
 
 /// The verdict on one tool.

@@ -2762,7 +2762,7 @@ export interface components {
          * @description Which tool a check is about.
          * @enum {string}
          */
-        Tool: "git" | "claude" | "gh";
+        Tool: "git" | "claude" | "gh" | "check_command";
         /** @description The numbers of one group of calls. */
         UsageFigures: {
             /**

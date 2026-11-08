@@ -69,8 +69,9 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
 fn checks_section(brief: &RunBrief<'_>, who: &str) -> String {
     match brief.check_command {
         Some(c) => format!(
-            "\n## Checks\n\nThe project's check command is `{c}`. {who} You may run it without \
-             asking.\n"
+            "\n## Checks\n\nThe project's check command is `{c}`. {who} Run it exactly as \
+             given, with no `cd` or `export` in front, so that it is approved without asking; \
+             the ship is already your working directory.\n"
         ),
         None => String::new(),
     }

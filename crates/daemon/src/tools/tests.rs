@@ -14,6 +14,24 @@ fn me() -> String {
 }
 
 #[test]
+fn a_check_command_whose_program_is_not_on_the_agents_path_is_reported() {
+    let commands = vec!["no-such-program-p208 --all".to_owned()];
+    let checks = system_checks_for(&SystemTools, &commands).checks;
+    let line = checks
+        .iter()
+        .find(|c| c.tool == system::Tool::CheckCommand)
+        .expect("a check command line");
+    assert_eq!(line.status, system::CheckStatus::Missing);
+    assert!(line.detail.contains("`no-such-program-p208`"), "{line:?}");
+    assert!(
+        system_checks_for(&SystemTools, &[])
+            .checks
+            .iter()
+            .all(|c| c.tool != system::Tool::CheckCommand)
+    );
+}
+
+#[test]
 fn a_program_that_is_not_installed_is_missing() {
     let probe = SystemTools.run("toknila-no-such-program", &[], Duration::from_secs(5));
     assert_eq!(probe, Probe::Missing);

@@ -8406,7 +8406,8 @@
         "enum": [
           "git",
           "claude",
-          "gh"
+          "gh",
+          "check_command"
         ]
       },
       "UsageFigures": {

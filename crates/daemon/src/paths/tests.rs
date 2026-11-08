@@ -109,3 +109,30 @@ fn the_ships_override_wins_and_a_missing_user_home_falls_back_to_the_data_home()
 fn an_explicit_home_keeps_its_ships_inside_it() {
     assert_eq!(Paths::at("/t/home").ships(), Path::new("/t/home/ships"));
 }
+
+#[test]
+fn the_default_home_passed_explicitly_gets_the_default_ships() {
+    let user = Path::new("/u");
+    let def = Path::new("/u/Library/Application Support/toknila");
+    assert_eq!(
+        explicit_ships(None, def, Some(def), Some(user)),
+        user.join(".toknila-ships")
+    );
+    let over = PathBuf::from("/o");
+    assert_eq!(
+        explicit_ships(Some(over.clone()), def, Some(def), Some(user)),
+        over
+    );
+}
+
+#[test]
+fn another_explicit_home_keeps_its_ships_inside_it() {
+    let user = Path::new("/u");
+    let def = Path::new("/u/.toknila");
+    let tmp = Path::new("/t/home");
+    assert_eq!(
+        explicit_ships(None, tmp, Some(def), Some(user)),
+        tmp.join("ships")
+    );
+    assert_eq!(explicit_ships(None, tmp, None, None), tmp.join("ships"));
+}
