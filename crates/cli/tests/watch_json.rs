@@ -38,5 +38,12 @@ fn watch_json_prints_each_journal_entry_as_one_json_line() {
         .unwrap_or_else(|e| panic!("watch --json printed non-JSON ({e}): {line}"));
     assert_eq!(entry["entity"], "project");
     assert_eq!(entry["kind"], "created");
+    // The event time is real (epoch ms, near now); the snapshot below zeroes it.
+    let at = entry["at"].as_i64().expect("at is epoch milliseconds");
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_millis() as i64;
+    assert!((now - at).abs() < 10 * 60 * 1000, "at={at} now={now}");
     snapshot("watch_json_first_entry", entry);
 }

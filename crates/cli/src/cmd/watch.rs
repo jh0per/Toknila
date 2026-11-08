@@ -1,5 +1,7 @@
 //! `tok watch`: print every journal entry live, resuming after a reconnect. With `--json` each
-//! entry is one line of JSON (the journal record as the API gives it).
+//! entry is one line of JSON (the journal record as the API gives it,
+//! `at` being the event time in milliseconds since the Unix epoch, UTC). Plain lines start with the
+//! event's local time..
 
 use std::io::Write;
 use std::time::Duration;
@@ -33,7 +35,7 @@ pub(super) fn run(c: &Client, paths: &Paths, since: Option<i64>, json_out: bool)
                             if json_out {
                                 println!("{}", serde_json::to_string(&e)?);
                             } else {
-                                println!("{}", output::event(&e));
+                                println!("{}", output::event(&e, output::local_offset(&e)));
                             }
                             // A pipe reader (a script, a test) sees each entry as it happens.
                             std::io::stdout().flush()?;
