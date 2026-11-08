@@ -22,7 +22,8 @@ pub enum ProjectCmd {
         /// Path of the project's git repository; tickets get a worktree in it.
         #[arg(long)]
         repo: Option<String>,
-        /// Branch ships start from (default: develop).
+        /// Branch ships start from (default: the branch the repository is on, else the remote's
+        /// default branch).
         #[arg(long)]
         base: Option<String>,
         /// Agent profile tickets run with unless they name one (default: sim).

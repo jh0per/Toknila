@@ -12,7 +12,7 @@ use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
 use toknila_api_types::{PlannerState, StartPlanner, TerminalSize};
 use toknila_app::planner;
 use toknila_app::resolve;
-use toknila_core::{Actor, AgentProfile, AgentRole, Project, planner as rules};
+use toknila_core::{Actor, AgentProfile, AgentRole, PlannerSpec, Project, planner as rules};
 
 use super::ApiResult;
 use crate::http::error::{ApiError, ErrorBody};
@@ -79,11 +79,22 @@ pub async fn start_planner(
         .find(|prof| prof.name == name)
         .ok_or_else(|| ApiError::bad_request(format!("agent profile {name} does not exist")))?;
     let runners = state.runners.clone();
+    // A live planner is kept as it is: its checkout is not moved under it.
+    let yard = if state_of(&state, &p).running {
+        None
+    } else {
+        state.store.shipyard()
+    };
     let started = {
         let p = p.clone();
-        tokio::task::spawn_blocking(move || planner::start(&*runners, Actor::Human, &p, &profile))
-            .await
-            .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))??
+        tokio::task::spawn_blocking(move || {
+            // Fetches (bounded) and prepares the place the planner reads the code from.
+            let site = yard
+                .and_then(|yard| PlannerSpec::for_project(&p).map(|spec| yard.planner_site(&spec)));
+            planner::start(&*runners, Actor::Human, &p, &profile, site)
+        })
+        .await
+        .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))??
     };
     let mut answer = state_of(&state, &p);
     answer.run = Some(started.run.id);

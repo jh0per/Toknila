@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use toknila_api_types::{ChainDeletion, ProjectDeletion};
 use toknila_app::removal::Removed;
+use toknila_core::PlannerSpec;
 use toknila_core::removal::{FolderFate, may_trash};
 use toknila_core::repo::PathKind;
 
@@ -147,6 +148,12 @@ fn clean_cards(host: &Host, removed: &Removed) -> (Vec<String>, Vec<String>) {
                 ship.key, ship.path
             )),
         }
+    }
+    if let (Some(yard), Some(repo)) = (&host.yard, repo)
+        && let Some(spec) = PlannerSpec::for_project(&removed.project)
+        && let Err(e) = yard.remove_planner_site(repo, &spec.project)
+    {
+        warnings.push(format!("the planner's checkout stays: {e}"));
     }
     for t in &removed.tickets {
         if let Err(e) = host.runners.forget(t.id) {

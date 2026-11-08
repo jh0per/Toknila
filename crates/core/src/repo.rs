@@ -18,8 +18,46 @@ pub enum GitState {
     GitMissing,
     /// A folder, but not a work tree.
     NotARepo,
-    /// A repository with these local branches.
-    Repo { branches: Vec<String> },
+    /// A repository with these local branches. `head` is the branch HEAD is on (none when
+    /// detached) and `remote_default` the branch `origin` names as its default, when known.
+    Repo {
+        branches: Vec<String>,
+        head: Option<String>,
+        remote_default: Option<String>,
+    },
+}
+
+/// No base branch can be told from the repository.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "cannot tell the base branch: HEAD is not on a branch and the remote names no default; \
+     pass one of the repository's branches ({})",
+    branches.join(", ")
+)]
+pub struct NoDefaultBase {
+    pub branches: Vec<String>,
+}
+
+/// The base branch of a project nobody named one for: the branch HEAD is on, else the remote's
+/// default branch, else an error that names the choices.
+pub fn default_base(state: &GitState) -> Result<String, NoDefaultBase> {
+    match state {
+        GitState::Repo {
+            branches,
+            head,
+            remote_default,
+        } => head
+            .iter()
+            .chain(remote_default)
+            .find(|b| !b.trim().is_empty())
+            .cloned()
+            .ok_or_else(|| NoDefaultBase {
+                branches: branches.clone(),
+            }),
+        _ => Err(NoDefaultBase {
+            branches: Vec::new(),
+        }),
+    }
 }
 
 /// Everything [`judge`] needs to know.
@@ -73,6 +111,9 @@ pub struct RepoCheck {
     pub suggested_key: Option<String>,
     /// The project name the folder suggests: its base name.
     pub suggested_name: Option<String>,
+    /// The base branch the repository suggests (where HEAD is, else the remote's default);
+    /// `null` when it suggests none.
+    pub suggested_branch: Option<String>,
 }
 
 impl RepoCheck {
@@ -123,9 +164,10 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
             branches: Vec::new(),
             suggested_key,
             suggested_name,
+            suggested_branch: None,
         };
     }
-    let GitState::Repo { branches } = &facts.git else {
+    let GitState::Repo { branches, .. } = &facts.git else {
         unreachable!("path_problem accepts only a repository");
     };
     let base = base.trim();
@@ -143,6 +185,7 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
         branches: branches.clone(),
         suggested_key,
         suggested_name,
+        suggested_branch: default_base(&facts.git).ok(),
     }
 }
 
@@ -159,6 +202,8 @@ mod tests {
             PathKind::Dir,
             GitState::Repo {
                 branches: branches.iter().map(|b| (*b).to_owned()).collect(),
+                head: branches.first().map(|b| (*b).to_owned()),
+                remote_default: None,
             },
         )
     }
@@ -237,6 +282,31 @@ mod tests {
         assert_eq!(c.suggested_name.as_deref(), Some("toknila"));
         let c = judge(ABS, "develop", &repo(&["develop"]));
         assert_eq!(c.suggested_key.as_deref(), Some("TOKNILA"));
+    }
+
+    fn state(branches: &[&str], head: Option<&str>, remote: Option<&str>) -> GitState {
+        GitState::Repo {
+            branches: branches.iter().map(|b| (*b).to_owned()).collect(),
+            head: head.map(str::to_owned),
+            remote_default: remote.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn the_default_base_is_head_then_the_remote_default_then_an_error_naming_the_choices() {
+        let both = state(&["main", "next"], Some("next"), Some("main"));
+        assert_eq!(default_base(&both), Ok("next".to_owned()));
+        let detached = state(&["main", "next"], None, Some("main"));
+        assert_eq!(default_base(&detached), Ok("main".to_owned()));
+        let neither = state(&["main", "next"], None, None);
+        let err = default_base(&neither).expect_err("none");
+        assert_eq!(
+            err.to_string(),
+            "cannot tell the base branch: HEAD is not on a branch and the remote names no \
+             default; pass one of the repository's branches (main, next)"
+        );
+        let c = judge(ABS, "main", &facts(PathKind::Dir, both));
+        assert_eq!(c.suggested_branch.as_deref(), Some("next"));
     }
 
     #[test]

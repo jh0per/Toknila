@@ -90,15 +90,24 @@ fn mcp_config(bin: &Path, role: AgentRole) -> Value {
     }}})
 }
 
-/// The permission rule that denies the tool which starts subagents (`Agent` in the permissions
-/// reference). A card is done by one agent, visible in its terminal.
-const DENY_SUBAGENTS: &str = "Agent";
+/// The tools denied to every role, by the names of the tools reference. A card is done by one
+/// agent, visible in its terminal, inside its own ship: so no tool that starts subagents (`Agent`,
+/// `Workflow`), leaves the ship (`EnterWorktree`) or schedules work outside the card
+/// (`CronCreate`, `CronDelete`, `RemoteTrigger`).
+const DENIED_TOOLS: [&str; 6] = [
+    "Agent",
+    "Workflow",
+    "EnterWorktree",
+    "CronCreate",
+    "CronDelete",
+    "RemoteTrigger",
+];
 
 /// The environment switch for auto memory (the memory page), set next to the settings key.
 const AUTO_MEMORY_OFF: (&str, &str) = ("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1");
 
 /// The settings file of every role: auto memory off (a ship is a worktree of the person's own
-/// repository, whose personal notes were written for another session), the subagent tool denied,
+/// repository, whose personal notes were written for another session), the tools of [`DENIED_TOOLS`] denied,
 /// the hooks and the status line of [`hook_settings`], and the profile's allow rules, when it has
 /// any for this project, are what the agent may do without asking.
 fn settings(bin: &Path, hooks: bool, rules: &[String]) -> Value {
@@ -107,7 +116,7 @@ fn settings(bin: &Path, hooks: bool, rules: &[String]) -> Value {
         out.extend(h);
     }
     out.insert("autoMemoryEnabled".to_owned(), json!(false));
-    let mut permissions = json!({ "deny": [DENY_SUBAGENTS] });
+    let mut permissions = json!({ "deny": DENIED_TOOLS });
     if !rules.is_empty() {
         permissions["allow"] = json!(rules);
     }

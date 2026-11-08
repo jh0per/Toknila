@@ -16,17 +16,18 @@ export type DraftField = keyof ProjectDraft;
 
 export interface AddForm {
   draft: ProjectDraft;
-  /// Key and name the person typed into: the folder's suggestion no longer replaces them.
-  edited: { key: boolean; name: boolean };
+  /// Key, name and base branch the person typed into: the folder's suggestion no longer replaces them.
+  edited: { key: boolean; name: boolean; work_branch: boolean };
   /// What the daemon suggested for a folder, and which folder (trimmed) it was for.
-  suggested: { repo_path: string; key: string; name: string } | undefined;
+  suggested: { repo_path: string; key: string; name: string; work_branch: string } | undefined;
   /// Sent before the folder's suggestion came: the form goes out when the check answers.
   waiting: boolean;
 }
 
 export const initialAddForm: AddForm = {
-  draft: { key: "", name: "", repo_path: "", work_branch: "develop" },
-  edited: { key: false, name: false },
+  // The base branch is the repository's own (the branch it is on): the folder's check fills it in.
+  draft: { key: "", name: "", repo_path: "", work_branch: "" },
+  edited: { key: false, name: false, work_branch: false },
   suggested: undefined,
   waiting: false,
 };
@@ -35,12 +36,17 @@ export const initialAddForm: AddForm = {
 /// theirs (even when they empty it); an emptied folder clears the fields that followed it.
 export function editDraft(f: AddForm, field: DraftField, value: string): AddForm {
   const draft = { ...f.draft, [field]: value };
-  if (field === "key" || field === "name") return { ...f, draft, edited: { ...f.edited, [field]: true } };
+  if (field === "key" || field === "name" || field === "work_branch") return { ...f, draft, edited: { ...f.edited, [field]: true } };
   if (field === "repo_path" && !value.trim()) {
     return {
       ...f,
       suggested: undefined,
-      draft: { ...draft, key: f.edited.key ? draft.key : "", name: f.edited.name ? draft.name : "" },
+      draft: {
+        ...draft,
+        key: f.edited.key ? draft.key : "",
+        name: f.edited.name ? draft.name : "",
+        work_branch: f.edited.work_branch ? draft.work_branch : "",
+      },
     };
   }
   return { ...f, draft };
@@ -57,13 +63,15 @@ export function applyCheck(f: AddForm, repoPath: string, check: RepoCheck): AddF
   if (repoPath !== f.draft.repo_path.trim()) return f;
   const key = check.suggested_key ?? "";
   const name = check.suggested_name ?? "";
+  const work_branch = check.suggested_branch ?? "";
   return {
     ...f,
-    suggested: { repo_path: repoPath, key, name },
+    suggested: { repo_path: repoPath, key, name, work_branch },
     draft: {
       ...f.draft,
       key: f.edited.key ? f.draft.key : key,
       name: f.edited.name ? f.draft.name : name,
+      work_branch: f.edited.work_branch ? f.draft.work_branch : work_branch,
     },
   };
 }

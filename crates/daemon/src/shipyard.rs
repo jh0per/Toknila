@@ -8,12 +8,13 @@ use std::path::{Path, PathBuf};
 
 use toknila_app::{ShipError, Shipyard};
 use toknila_core::guard::ShipState;
-use toknila_core::{Ship, ShipLook, ShipSpec};
+use toknila_core::{PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec};
 
 use crate::git::Git;
 
 mod base;
 mod inspect;
+mod planner;
 
 /// Makes and removes ships with the `git` on the path.
 #[derive(Debug, Clone)]
@@ -104,7 +105,7 @@ impl Shipyard for GitShipyard {
             // copy. A fetch that fails is not the end: the copy we have may do, and if there is
             // none the check below says so.
             if spec.remote {
-                let _ = self.git(repo, ["fetch", "origin"]);
+                let _ = self.git.fetch(repo, &["origin"]);
             }
             let start = spec.start_point();
             let commit = format!("{start}^{{commit}}");
@@ -150,8 +151,18 @@ impl Shipyard for GitShipyard {
     fn inspect(&self, look: &ShipLook) -> Result<ShipState, ShipError> {
         self.look(look)
     }
+
+    fn planner_site(&self, spec: &PlannerSpec) -> PlannerSite {
+        self.site_for(spec)
+    }
+
+    fn remove_planner_site(&self, repo: &str, project: &str) -> Result<(), ShipError> {
+        self.remove_site(repo, project)
+    }
 }
 
+#[cfg(test)]
+mod planner_tests;
 #[cfg(test)]
 mod stale_tests;
 #[cfg(test)]

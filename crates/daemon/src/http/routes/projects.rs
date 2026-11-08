@@ -5,9 +5,10 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use toknila_app::removal::{self, Removed};
 use toknila_app::{projects, resolve};
+use toknila_core::repo::RepoField;
 use toknila_core::{Actor, Project};
 
-use super::system::{check_repo, first_problem};
+use super::system::{check_repo, default_base, first_problem};
 use super::{ApiResult, read};
 use crate::http::dto::{DeleteProject, NewProject, PatchProject, ProjectDeletion};
 use crate::http::error::{ErrorBody, FormError};
@@ -25,13 +26,34 @@ pub async fn list_projects(State(state): State<AppState>) -> ApiResult<Json<Vec<
 /// refusal names the field.
 pub async fn create_project(
     State(state): State<AppState>,
-    Json(input): Json<NewProject>,
+    Json(mut input): Json<NewProject>,
 ) -> Result<(StatusCode, Json<Project>), FormError> {
     if let Some(path) = input.repo_path.clone() {
-        let base = input
+        // No base named: the branch the repository is on, else its remote's default.
+        if input
             .work_branch
-            .clone()
-            .unwrap_or_else(|| Project::DEFAULT_WORK_BRANCH.to_owned());
+            .as_deref()
+            .is_none_or(|b| b.trim().is_empty())
+        {
+            let found = default_base(&state, path.clone()).await?;
+            // A folder that is no repository is that field's problem, not the branch's.
+            let tried = found
+                .clone()
+                .unwrap_or_else(|_| Project::DEFAULT_WORK_BRANCH.to_owned());
+            let check = check_repo(&state, path.clone(), tried).await?;
+            if let Some(p) = check
+                .problems
+                .into_iter()
+                .find(|p| p.field == RepoField::RepoPath)
+            {
+                return Err(p.into());
+            }
+            input.work_branch =
+                Some(found.map_err(|e| {
+                    FormError::field("work_branch", "branch_missing", e.to_string())
+                })?);
+        }
+        let base = input.work_branch.clone().unwrap_or_default();
         first_problem(check_repo(&state, path, base).await?)?;
     }
     let (p, _) = state
