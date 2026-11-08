@@ -60,6 +60,10 @@ pub struct InboxItem {
     pub since: Timestamp,
     /// The question, the blocking reason, or the thread's title; empty otherwise.
     pub text: String,
+    /// The whole command of a permission request, when `text` carries only its summary (cut for
+    /// lists); absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
     /// The thread's number on the card (`thread` items).
     pub thread: Option<u32>,
     /// The open subtasks, verbatim (`leftovers` items).
@@ -149,6 +153,7 @@ fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxIte
         title: t.title.clone(),
         since,
         text,
+        detail: None,
         thread: None,
         subtasks: Vec::new(),
         done_cards: Vec::new(),
@@ -171,7 +176,7 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
         (
             TicketStatus::Waiting,
             Some(StatusReason::Waiting(
-                WaitingReason::Question { text } | WaitingReason::Permission { text },
+                WaitingReason::Question { text } | WaitingReason::Permission { text, .. },
             )),
         ) => (InboxKind::Question, text.clone()),
         (TicketStatus::Blocked, reason) => (
@@ -206,6 +211,11 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
             }
             _ => QuestionKind::Question.answers(),
         };
+        if let Some(StatusReason::Waiting(WaitingReason::Permission { detail, .. })) =
+            &t.status_reason
+        {
+            i.detail.clone_from(detail);
+        }
     }
     Some(i)
 }
@@ -223,6 +233,7 @@ fn question_items(data: &InboxData) -> Vec<InboxItem> {
         }
         let mut i = item(InboxKind::Question, t, p.since, p.text.clone());
         i.role = Some(p.role);
+        i.detail.clone_from(&p.detail);
         i.answers = QuestionKind::Permission.answers();
         items.push(i);
     }

@@ -190,7 +190,10 @@ fn waiting_to_running_when_the_agent_is_active_again() {
 fn waiting_to_running_at_once_when_a_person_answers() {
     for reason in [
         WaitingReason::Question { text: "q".into() },
-        WaitingReason::Permission { text: "p".into() },
+        WaitingReason::Permission {
+            text: "p".into(),
+            detail: None,
+        },
         WaitingReason::Silent,
     ] {
         let mut t = ticket_in(TicketStatus::Waiting);

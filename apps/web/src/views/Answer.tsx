@@ -24,6 +24,12 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
         {role === "reviewer" && <strong>Reviewer: </strong>}
         {item.text}
       </blockquote>
+      {item.detail && (
+        <details className="detail" data-testid="question-detail">
+          <summary>Show the full command</summary>
+          <pre>{item.detail}</pre>
+        </details>
+      )}
       {item.lines && item.lines.length > 0 && <pre className="screen" data-testid="screen">{item.lines.join("\n")}</pre>}
       {answers.includes("allow") && (
         <div className="btns">

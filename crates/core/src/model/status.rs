@@ -79,7 +79,13 @@ pub enum WaitingReason {
     /// The agent asked a question (`ask_human`).
     Question { text: String },
     /// The agent wants permission for an action.
-    Permission { text: String },
+    Permission {
+        text: String,
+        /// The whole command or path when `text` had to be cut short for lists; absent when
+        /// `text` already says everything.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
+    },
     /// The agent stopped responding to nudges.
     Silent,
 }
@@ -178,7 +184,7 @@ impl fmt::Display for WaitingReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Question { text } => write!(f, "question: {text}"),
-            Self::Permission { text } => write!(f, "permission: {text}"),
+            Self::Permission { text, .. } => write!(f, "permission: {text}"),
             Self::Silent => f.write_str("silent"),
         }
     }
@@ -293,7 +299,10 @@ mod tests {
                 "question: which?",
             ),
             (
-                StatusReason::Waiting(WaitingReason::Permission { text: "rm".into() }),
+                StatusReason::Waiting(WaitingReason::Permission {
+                    text: "rm".into(),
+                    detail: None,
+                }),
                 "permission: rm",
             ),
             (StatusReason::Waiting(WaitingReason::Silent), "silent"),

@@ -14,6 +14,9 @@
 .inbox .btns, .answer .btns { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
 .inbox .btn { flex: none; align-self: flex-start; padding: 5px 14px; }
 .inbox .compose, .answer .compose { width: 100%; }
+.answer .detail { margin: var(--s1) 0; font-size: var(--fs-s); }
+.answer .detail summary { cursor: pointer; color: var(--muted); }
+.answer .detail pre { margin: var(--s1) 0 0; padding: var(--s2); background: var(--surface2); border-radius: var(--r-s); overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); max-height: 40vh; overflow-y: auto; }
 .inbox .screen, .answer .screen { margin: var(--s1) 0; padding: var(--s2); width: 100%; background: var(--term-bg); color: var(--term-fg); font-family: var(--mono); font-size: 12px; overflow-x: auto; }
 .inbox .row-body input, .answer input { flex: 1; min-width: 12em; }
 .inbox .row-body .btns input, .answer .btns input { flex: 1 1 14em; }

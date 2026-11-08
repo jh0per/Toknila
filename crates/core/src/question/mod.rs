@@ -227,6 +227,8 @@ pub struct PendingPermission {
     pub role: AgentRole,
     /// What is asked, with the tool and its summary.
     pub text: String,
+    /// The whole command when `text` carries only its summary.
+    pub detail: Option<String>,
     pub since: Timestamp,
 }
 

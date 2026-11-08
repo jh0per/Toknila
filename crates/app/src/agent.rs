@@ -76,11 +76,15 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
             }
             Ok(())
         }),
-        AgentEvent::AskHuman { text, permission } => {
+        AgentEvent::AskHuman {
+            text,
+            permission,
+            detail,
+        } => {
             if text.trim().is_empty() {
                 return Err(AppError::bad_request("ask_human needs a text"));
             }
-            let reason = AgentEvent::waiting_reason(&text, permission);
+            let reason = AgentEvent::waiting_reason(&text, permission, detail);
             with_chain(uow, t.chain_id, |ctx| {
                 Ok::<_, AppError>(ctx.ticket_event(t.id, TicketEvent::AskHuman { reason })?)
             })?;

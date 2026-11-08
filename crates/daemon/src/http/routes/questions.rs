@@ -127,13 +127,16 @@ pub async fn agent_permission(
     };
     let at = now();
     let prompts = state.runners.prompts();
-    let tool = ask
-        .tool
-        .map(|s| hook::cap_summary(&s))
-        .or_else(|| prompts.last_tool(t.id, role));
-    let text = hook::permission_text(None, tool.as_deref());
-    let (_, rx) = prompts.begin(t.id, role, text.clone(), at, true);
-    raise(&state, t.clone(), role, text, at).await?;
+    let (summary, detail) =
+        ask.tool
+            .or_else(|| prompts.last_tool(t.id, role))
+            .map_or((None, None), |full| {
+                let (summary, detail) = hook::summary_and_detail(&full);
+                (Some(summary), detail)
+            });
+    let text = hook::permission_text(None, summary.as_deref());
+    let (_, rx) = prompts.begin(t.id, role, text.clone(), detail.clone(), at, true);
+    raise(&state, t.clone(), role, (text, detail), at).await?;
     let reply = match rx {
         Some(rx) => match tokio::time::timeout(state.runners.permission_wait(), rx).await {
             Ok(Ok(Decision::Allow)) => PermissionReply {
@@ -170,14 +173,14 @@ pub(super) async fn raise(
     state: &AppState,
     t: Ticket,
     role: AgentRole,
-    text: String,
+    (text, detail): (String, Option<String>),
     at: Timestamp,
 ) -> ApiResult<()> {
     state
         .store
         .write(Actor::Agent, at, move |tx| -> ApiResult<()> {
             let t = resolve::ticket(&*tx, &t.key.to_string())?;
-            ask_person(tx, &t, role, text)
+            ask_person(tx, &t, role, text, detail)
         })
         .await?;
     Ok(())
@@ -190,12 +193,14 @@ pub(super) fn ask_person(
     t: &Ticket,
     role: AgentRole,
     text: String,
+    detail: Option<String>,
 ) -> ApiResult<()> {
     if role == AgentRole::Worker {
         if t.status == TicketStatus::Running {
             let event = AgentEvent::AskHuman {
                 text,
                 permission: true,
+                detail,
             };
             agent::ticket_event(tx, t, event)?;
         }

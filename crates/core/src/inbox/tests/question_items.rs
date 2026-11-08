@@ -37,6 +37,7 @@ fn a_workers_question_says_whose_it_is_and_what_answers_it_takes() {
         ticket(2, TicketStatus::Running, 6),
         WaitingReason::Permission {
             text: "Bash: ls".into(),
+            detail: None,
         },
     );
     let got = compute(&data(vec![q, p], 9));
@@ -60,6 +61,7 @@ fn a_reviewers_permission_dialog_is_listed_with_allow_and_deny() {
         ticket: t.id,
         role: AgentRole::Reviewer,
         text: "Claude needs your permission: Bash: git diff".into(),
+        detail: None,
         since: Timestamp(50),
     });
     let got = compute(&d);
@@ -76,13 +78,17 @@ fn a_reviewers_permission_dialog_is_listed_with_allow_and_deny() {
 fn the_workers_permission_is_not_listed_twice_while_its_card_is_waiting() {
     let t = waiting(
         ticket(1, TicketStatus::Running, 5),
-        WaitingReason::Permission { text: "p".into() },
+        WaitingReason::Permission {
+            text: "p".into(),
+            detail: None,
+        },
     );
     let mut d = data(vec![t.clone()], 100);
     d.permissions.push(PendingPermission {
         ticket: t.id,
         role: AgentRole::Worker,
         text: "p".into(),
+        detail: None,
         since: Timestamp(5),
     });
     assert_eq!(compute(&d).len(), 1);
@@ -173,6 +179,7 @@ fn no_screen_item_for_a_card_that_is_not_working_or_already_asks() {
         ticket: running.id,
         role: AgentRole::Worker,
         text: "p".into(),
+        detail: None,
         since: Timestamp(1),
     });
     let shown: Vec<_> = compute(&d)

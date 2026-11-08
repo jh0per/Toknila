@@ -115,6 +115,7 @@ fn tickets_roundtrip_in_every_status_and_reason() {
         }),
         StatusReason::Waiting(WaitingReason::Permission {
             text: "rm -rf build".to_owned(),
+            detail: None,
         }),
         StatusReason::Waiting(WaitingReason::Silent),
         StatusReason::Blocked {

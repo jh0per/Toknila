@@ -233,6 +233,44 @@ async fn a_long_tool_summary_is_capped() {
         "{}",
         q[0]["text"]
     );
+    assert_eq!(
+        q[0]["detail"],
+        format!("Bash: {long}").replace("Bash: ", ""),
+        "the full text travels with the question"
+    );
+}
+
+#[tokio::test]
+async fn a_multiline_request_keeps_its_lines_for_the_worker_and_the_reviewer_and_a_short_one_has_none()
+ {
+    let (api, token) = setup().await;
+    let script = "python3 - <<'EOF'\nprint('hi')\nEOF";
+    let tool = format!("Bash: {script}");
+    let hook = permission(&api, &token, &tool);
+    let person = async {
+        let q = wait_for(&api, 1).await;
+        assert_eq!(
+            q[0]["text"],
+            "Claude Code asks for permission: Bash: python3 - <<'EOF' print('hi') EOF"
+        );
+        assert_eq!(q[0]["detail"], format!("Bash: {script}"));
+        let shown = api.get("/v1/tickets/DEMO-1").await;
+        assert_eq!(
+            shown["ticket"]["status_reason"]["detail"],
+            format!("Bash: {script}")
+        );
+        answer(&api, json!({ "answer": "allow" })).await;
+    };
+    tokio::join!(hook, person);
+
+    let (reviewer, _) = api.agent_token_as("DEMO-1", AgentRole::Reviewer).await;
+    let hook = permission(&api, &reviewer, "Bash: ls");
+    let person = async {
+        let q = wait_for(&api, 1).await;
+        assert!(q[0]["detail"].is_null(), "{}", q[0]);
+        answer(&api, json!({ "role": "reviewer", "answer": "allow" })).await;
+    };
+    tokio::join!(hook, person);
 }
 
 #[tokio::test]

@@ -39,6 +39,9 @@ pub enum AgentEvent {
         text: String,
         #[serde(default)]
         permission: bool,
+        /// The whole command a permission request is about, when `text` is only its summary.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
     },
     /// The agent ticked a checklist item (1-based position).
     SubtaskDone { position: u32 },
@@ -78,10 +81,11 @@ impl AgentEvent {
     }
 
     /// The question as a Waiting reason, for `AskHuman`.
-    pub fn waiting_reason(text: &str, permission: bool) -> WaitingReason {
+    pub fn waiting_reason(text: &str, permission: bool, detail: Option<String>) -> WaitingReason {
         if permission {
             WaitingReason::Permission {
                 text: text.to_owned(),
+                detail,
             }
         } else {
             WaitingReason::Question {
@@ -112,6 +116,7 @@ mod tests {
                 AgentEvent::AskHuman {
                     text: "який фреймворк?".into(),
                     permission: false,
+                    detail: None,
                 },
                 r#"{"event":"ask_human","text":"який фреймворк?","permission":false}"#,
             ),
@@ -196,7 +201,8 @@ mod tests {
             ask,
             AgentEvent::AskHuman {
                 text: "?".into(),
-                permission: false
+                permission: false,
+                detail: None
             },
             "permission defaults to false"
         );

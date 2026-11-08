@@ -58,7 +58,7 @@ try {
       "hold",
     );
   writeFileSync(join(home, "profiles", "allow.toml"), `command = ['${fakeAgent}', ${ask("Bash: cargo test -p core")}]\n`);
-  writeFileSync(join(home, "profiles", "deny.toml"), `command = ['${fakeAgent}', ${ask("Bash: rm -rf build")}]\n`);
+  writeFileSync(join(home, "profiles", "deny.toml"), `command = ['${fakeAgent}', ${ask("Bash: rm -rf build\nrm -rf dist")}]\n`);
   writeFileSync(
     join(home, "profiles", "screen.toml"),
     `command = ['${fakeAgent}', ${steps("print", "Do you trust this folder?", "print", "1. Yes  2. No", "echo", "hold")}]\n` +
@@ -97,6 +97,14 @@ try {
   // What is asked is shown with the tool, not just "needs your permission".
   await expectText(row("QA-1"), "Bash: cargo test -p core", "the permission names the command");
   await expectText(row("QA-2"), "Bash: rm -rf build", "the second permission names its command");
+  // The list line is one line; the whole command, with its lines, is behind a disclosure.
+  const detail = row("QA-2").locator("[data-testid=question-detail]");
+  await detail.locator("summary").click();
+  await expectText(detail.locator("pre"), "rm -rf build\nrm -rf dist", "the full command keeps its lines");
+  await expectText(detail.locator("summary"), "Show the full command", "the disclosure is worded plainly");
+  if ((await row("QA-1").locator("[data-testid=question-detail]").count()) !== 0) {
+    throw new Error("a one-line command has no disclosure");
+  }
   await expectText(row("QA-3"), "The agent waits on its screen", "the silent agent is listed");
   await expectText(row("QA-3").locator("[data-testid=screen]"), "Do you trust this folder?", "its screen lines are shown");
 

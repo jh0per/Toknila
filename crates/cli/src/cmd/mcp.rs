@@ -223,7 +223,8 @@ mod tests {
             *seen.borrow(),
             [AgentEvent::AskHuman {
                 text: "which?".into(),
-                permission: true
+                permission: true,
+                detail: None
             }]
         );
         assert_eq!(answers[0]["id"], 7);
