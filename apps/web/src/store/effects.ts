@@ -24,6 +24,9 @@ const DEBOUNCE_MS = 50;
 /// Waits for a pause in typing before the folder field asks for a suggestion.
 const TYPING_MS = 250;
 
+/// How often the open Usage page asks again (the collector reads transcripts every 30 seconds).
+const USAGE_POLL_MS = 20_000;
+
 const ACTION_PATH = { message: "messages", changes: "changes", approve: "approve" } as const;
 
 function threadPath(e: ThreadAction): string {
@@ -219,6 +222,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "checkForUpdates":
       case "restartToUpdate":
         runUpdateEffect(e, dispatch);
+        return;
+      case "pollUsage":
+        later("usagePoll", () => run({ type: "loadUsage", days: e.days }), USAGE_POLL_MS);
         return;
       case "loadUsage":
       case "saveUsageSettings":

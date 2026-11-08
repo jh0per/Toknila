@@ -15,6 +15,12 @@ use crate::store::{FileState, Store, StoreError};
 /// How many files are saved in one command, so the writer is never held for long.
 const BATCH: usize = 40;
 
+/// How many bytes of transcripts one pass over the machine reads before it stops.
+const BUDGET: u64 = 8 * 1024 * 1024;
+
+/// The pause after each file read, so a first start over years of transcripts stays light.
+const PAUSE: std::time::Duration = std::time::Duration::from_millis(5);
+
 /// What to bring up to date.
 #[derive(Debug, Clone)]
 pub enum Scope {
@@ -35,8 +41,9 @@ impl Source {
 }
 
 impl Usage {
-    /// Reads what is new in the transcripts in `scope` and saves it. One run at a time.
-    pub async fn refresh(&self, store: &Store, scope: Scope) -> Result<(), StoreError> {
+    /// Reads what is new in the transcripts in `scope` and saves it. One run at a time. `true`
+    /// when the budget of a pass left more to read.
+    pub async fn refresh(&self, store: &Store, scope: Scope) -> Result<bool, StoreError> {
         let _one_at_a_time = self.gate.lock().await;
         let (machine, attributed, files) = store
             .read(|repo| {
@@ -49,18 +56,32 @@ impl Usage {
             .await?;
         let offsets: HashMap<String, u64> = files.into_iter().map(|f| (f.path, f.offset)).collect();
         let sources = self.sources.clone();
-        let reads = tokio::task::spawn_blocking(move || {
+        let bounded = matches!(scope, Scope::All);
+        let (reads, more) = tokio::task::spawn_blocking(move || {
             let mut reads: Vec<(usize, FileRead)> = Vec::new();
+            let mut spent = 0u64;
+            let mut more = false;
             for (i, path) in candidates(&sources, &scope, machine, &attributed) {
+                // A pass over the whole machine takes a small budget; the rest follows next tick.
+                if bounded && spent >= BUDGET {
+                    more = true;
+                    break;
+                }
                 let offset = offsets
                     .get(&path.display().to_string())
                     .copied()
                     .unwrap_or(0);
                 if let Some(read) = scan::read_new(sources[i].format.as_ref(), &path, offset) {
+                    spent += read.chunk.consumed as u64;
+                    more |= read.more;
                     reads.push((i, read));
+                    // Low priority: leave the cores to the agents between files.
+                    if bounded {
+                        std::thread::sleep(PAUSE);
+                    }
                 }
             }
-            reads
+            (reads, more)
         })
         .await
         .map_err(|e| StoreError::Panicked(e.to_string()))?;
@@ -77,7 +98,7 @@ impl Usage {
                 })
                 .await?;
         }
-        Ok(())
+        Ok(more)
     }
 }
 
