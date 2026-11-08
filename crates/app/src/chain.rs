@@ -252,6 +252,10 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
                 ships::queue_remove(uow, ctx, ticket)?;
                 continue;
             }
+            Effect::RetireShip => {
+                ships::queue_retire(uow, ctx, ticket)?;
+                continue;
+            }
             Effect::RecordReport { summary } => (Actor::Agent, CommentKind::Report, summary),
             Effect::RecordInstruction { text } => (Actor::Human, CommentKind::Instruction, text),
             Effect::EnsureRunner => {

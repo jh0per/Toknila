@@ -6,8 +6,9 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use toknila_app::{ShipError, Shipyard};
+use toknila_app::{BranchFate, ShipError, Shipyard};
 use toknila_core::guard::ShipState;
+use toknila_core::strays::Stray;
 use toknila_core::{PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec};
 
 use crate::git::Git;
@@ -15,6 +16,8 @@ use crate::git::Git;
 mod base;
 mod inspect;
 mod planner;
+mod retire;
+mod strays;
 
 /// Makes and removes ships with the `git` on the path.
 #[derive(Debug, Clone)]
@@ -146,6 +149,18 @@ impl Shipyard for GitShipyard {
             }
         }
         Ok(())
+    }
+
+    fn retire(&self, repo: &str, ship: &Ship, start: &str) -> Result<BranchFate, ShipError> {
+        self.retire_ship(repo, ship, start)
+    }
+
+    fn found(&self, repo: &str, base: &str) -> Result<Vec<Stray>, ShipError> {
+        self.find_strays(repo, base)
+    }
+
+    fn discard(&self, repo: &str, stray: &Stray) -> Result<(), ShipError> {
+        self.discard_stray(repo, stray)
     }
 
     fn inspect(&self, look: &ShipLook) -> Result<ShipState, ShipError> {

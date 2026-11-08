@@ -5,6 +5,7 @@ import type { State } from "../store/state";
 import { ArchiveProject } from "./ArchiveProject";
 import { Field } from "./Field";
 import type { FormProps } from "./ProjectSections";
+import { Strays } from "./Strays";
 
 /// One model field: free text with the documented aliases offered.
 function ModelField({ label, name, testId, form, set, state }: FormProps & {
@@ -57,6 +58,7 @@ export function AdvancedSection({ project, state, form, set, dispatch }: FormPro
         Leave empty to use your Claude Code default. Names you can type: {MODEL_ALIASES.join(", ")}, or a full model name.
       </p>
       <Places state={state} />
+      <Strays project={project.key} />
       <details className="fold danger-fold" data-testid="danger-zone">
         <summary>Danger zone</summary>
         <ArchiveProject project={project} state={state} dispatch={dispatch} />

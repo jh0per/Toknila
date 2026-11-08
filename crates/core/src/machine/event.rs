@@ -147,6 +147,9 @@ pub enum Effect {
     Merge,
     /// Take the ticket's worktree away; the branch stays.
     RemoveShip,
+    /// The ticket was cancelled: take its worktree away, delete its branch when it holds no
+    /// commits of its own, keep it (and say so on the card) when it does.
+    RetireShip,
     /// Stop the ticket's runners, worker and reviewer, if any.
     StopRunner,
     /// Run the reviewer agent next to the worker (its own runner, on the same ship).

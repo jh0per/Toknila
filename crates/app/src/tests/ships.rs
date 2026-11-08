@@ -13,13 +13,15 @@ use super::runs::settle as settle_ships;
 use crate::GitError;
 use crate::external::ExternalEffect;
 use crate::recovery::recover;
-use crate::{AppResult, ShipError, Shipyard, agent, tickets};
+use crate::{AppResult, BranchFate, ShipError, Shipyard, agent, tickets};
 
 /// A shipyard that remembers what it was asked and can be told to fail.
 #[derive(Debug)]
 pub(super) struct FakeYard {
     prepared: RefCell<Vec<ShipSpec>>,
     pub(super) removed: RefCell<Vec<Ship>>,
+    /// What `retire` says happened to the branch.
+    pub(super) fate: RefCell<BranchFate>,
     pub(super) fail_prepare: RefCell<Option<ShipError>>,
     fail_remove: RefCell<Option<ShipError>>,
     /// What `inspect` finds: a clean ship with one commit unless a test says otherwise.
@@ -32,6 +34,7 @@ impl Default for FakeYard {
         Self {
             prepared: RefCell::default(),
             removed: RefCell::default(),
+            fate: RefCell::new(BranchFate::Deleted),
             fail_prepare: RefCell::default(),
             fail_remove: RefCell::default(),
             found: RefCell::new(Ok(ShipState {
@@ -61,6 +64,11 @@ impl Shipyard for FakeYard {
         }
         self.removed.borrow_mut().push(ship.clone());
         Ok(())
+    }
+
+    fn retire(&self, repo: &str, ship: &Ship, _start: &str) -> Result<BranchFate, ShipError> {
+        self.remove(repo, ship)?;
+        Ok(*self.fate.borrow())
     }
 
     fn inspect(&self, look: &ShipLook) -> Result<ShipState, ShipError> {
@@ -236,17 +244,61 @@ fn an_outcome_for_a_ticket_that_moved_on_does_not_fail() {
 }
 
 #[test]
-fn cancel_keeps_worktree_and_branch() {
+fn cancel_removes_the_worktree_and_an_empty_branch_leaves_no_comment() {
     let mut mem = with_repo();
     recover(&mut mem).expect("settle");
     settle_ships(&mut mem);
+    let a = mem.ticket_by_title("A");
+    assert!(mem.ships.iter().any(|s| s.ticket_id == a.id));
+    let reason = "not needed".to_owned();
+    act_on_a(&mut mem, TicketEvent::Cancel { reason }).expect("cancel");
+    assert!(
+        mem.yard.removed.borrow().is_empty(),
+        "nothing is removed inside the command"
+    );
+    settle_ships(&mut mem);
+    assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Cancelled);
+    assert_eq!(mem.yard.removed.borrow().len(), 1);
+    assert!(mem.ships.iter().all(|s| s.ticket_id != a.id));
+    assert_eq!(count(&mem, "ticket.ship_removed"), 1);
+    assert!(mem.comments.is_empty(), "an empty branch needs no word");
+}
+
+#[test]
+fn cancel_keeps_a_branch_with_work_and_names_it_on_the_card() {
+    let mut mem = with_repo();
+    recover(&mut mem).expect("settle");
+    settle_ships(&mut mem);
+    *mem.yard.fate.borrow_mut() = BranchFate::Kept { ahead: 3 };
+    let reason = "not needed".to_owned();
+    act_on_a(&mut mem, TicketEvent::Cancel { reason }).expect("cancel");
+    settle_ships(&mut mem);
+    assert_eq!(mem.yard.removed.borrow().len(), 1);
+    let a = mem.ticket_by_title("A");
+    let notes: Vec<_> = mem
+        .comments
+        .iter()
+        .filter(|c| c.ticket_id == a.id)
+        .collect();
+    assert_eq!(notes.len(), 1);
+    assert!(
+        notes[0].body.gist.contains("ship/demo/demo-1-a") && notes[0].body.gist.contains("3"),
+        "{:?}",
+        notes[0].body
+    );
+}
+
+#[test]
+fn a_cancel_whose_retirement_fails_is_journaled_and_the_cancel_stands() {
+    let mut mem = with_repo();
+    recover(&mut mem).expect("settle");
+    settle_ships(&mut mem);
+    *mem.yard.fail_remove.borrow_mut() = Some(ShipError::Io("locked".to_owned()));
     let reason = "not needed".to_owned();
     act_on_a(&mut mem, TicketEvent::Cancel { reason }).expect("cancel");
     settle_ships(&mut mem);
     assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Cancelled);
-    let a = mem.ticket_by_title("A");
-    assert!(mem.ships.iter().any(|s| s.ticket_id == a.id));
-    assert!(mem.yard.removed.borrow().is_empty());
+    assert_eq!(count(&mem, "ticket.ship_remove_failed"), 1);
 }
 
 #[test]

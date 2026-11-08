@@ -632,6 +632,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/strays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the ships' worktrees and `ship/*` branches in the project's repository that no live
+         *     card owns: what cancelled or deleted cards left behind. Nothing is changed.
+         */
+        get: operations["list_strays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/strays/clean": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Removes what `GET .../strays` lists, looked at again now: stray worktrees first (their
+         *     checkouts are discarded), then stray branches, whatever commits they hold. A step that fails
+         *     is named in `warnings` and that leftover stays.
+         */
+        post: operations["clean_strays"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/unarchive": {
         parameters: {
             query?: never;
@@ -2530,6 +2571,41 @@ export interface components {
             ticket: components["schemas"]["TicketKey"];
             /** Format: int64 */
             waiting_ms: number;
+        };
+        /** @description One worktree or branch the host found under Toknila's ships. */
+        Stray: {
+            /**
+             * Format: int32
+             * @description For a branch, its commits that the project's base branch does not have; deleting it
+             *     loses them. `None` when the host could not count.
+             */
+            ahead?: number | null;
+            /** @description For a worktree, the branch checked out in it. */
+            branch?: string | null;
+            kind: components["schemas"]["StrayKind"];
+            /** @description The worktree's path, or the branch's name. */
+            name: string;
+        };
+        /**
+         * @description What kind of leftover.
+         * @enum {string}
+         */
+        StrayKind: "worktree" | "branch";
+        /**
+         * @description Answer of `GET /v1/projects/{project}/strays`: the worktrees and `ship/*` branches in the
+         *     project's repository that no live card owns, left by cancelled or deleted cards.
+         */
+        Strays: {
+            /** @description Worktrees first, then branches. */
+            items: components["schemas"]["Stray"][];
+        };
+        /**
+         * @description Answer of `POST /v1/projects/{project}/strays/clean`: what was removed, and the steps that
+         *     failed (those leftovers stay listed).
+         */
+        StraysCleaned: {
+            removed: components["schemas"]["Stray"][];
+            warnings: string[];
         };
         /** @description A checklist item inside a ticket. Subtasks have no runners of their own. */
         Subtask: {
@@ -4453,6 +4529,82 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_strays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Strays"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    clean_strays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StraysCleaned"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

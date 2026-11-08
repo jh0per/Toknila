@@ -28,6 +28,7 @@ pub mod runner;
 pub mod runs;
 pub mod schedule;
 pub mod ships;
+pub mod strays;
 pub mod threads;
 pub mod tickets;
 pub mod wildcards;
@@ -37,7 +38,7 @@ pub use error::{AppError, AppResult, ErrorKind, GitError};
 pub use merges::{MergeError, MergeOutcome, Merger};
 pub use ports::{Reader, UnitOfWork};
 pub use runner::{Runner, RunnerError};
-pub use ships::{ShipError, Shipyard};
+pub use ships::{BranchFate, ShipError, Shipyard};
 
 #[cfg(test)]
 mod tests;

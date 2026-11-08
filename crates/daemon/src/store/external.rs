@@ -103,6 +103,15 @@ impl Shipyard for NoYard {
     fn remove(&self, _repo: &str, _ship: &Ship) -> Result<(), ShipError> {
         Ok(())
     }
+
+    fn retire(
+        &self,
+        _repo: &str,
+        _ship: &Ship,
+        _start: &str,
+    ) -> Result<toknila_app::BranchFate, ShipError> {
+        Ok(toknila_app::BranchFate::Deleted)
+    }
 }
 
 /// The merger of a store that has none.

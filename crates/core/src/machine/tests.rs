@@ -447,7 +447,7 @@ fn ship_ready_tells_an_active_ticket_its_branch_without_moving_it() {
 }
 
 #[test]
-fn cancel_leaves_the_ship_alone() {
+fn cancel_retires_the_ship() {
     for from in [TicketStatus::Running, TicketStatus::Review] {
         let tr = ok(
             from,
@@ -455,6 +455,7 @@ fn cancel_leaves_the_ship_alone() {
                 reason: "dup".to_owned(),
             },
         );
+        assert!(tr.effects.contains(&Effect::RetireShip), "{from:?}");
         assert!(!tr.effects.contains(&Effect::RemoveShip), "{from:?}");
         assert!(!tr.effects.contains(&Effect::PrepareShip), "{from:?}");
     }
