@@ -8,37 +8,11 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use common::Tok;
-
-fn git(dir: &Path, args: &[&str]) {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@example.com"])
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .output()
-        .expect("git runs");
-    assert!(out.status.success(), "git {args:?}: {out:?}");
-}
-
-/// A repository whose only branch is `develop`, with one commit.
-fn repo(dir: &Path) -> PathBuf {
-    let repo = dir.join("repo");
-    std::fs::create_dir_all(&repo).expect("mkdir");
-    git(&repo, &["init", "--quiet"]);
-    git(&repo, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
-    std::fs::write(repo.join("README.md"), "hi\n").expect("write");
-    git(&repo, &["add", "README.md"]);
-    git(&repo, &["commit", "--quiet", "-m", "init"]);
-    repo
-}
+use common::{Tok, repo};
 
 /// Project DEMO on a fresh repository, with chain `auth` and one card that has not started.
 fn planned(dir: &Path) -> (Tok, PathBuf) {
-    let tok = Tok {
-        home: dir.join("home"),
-    };
+    let tok = Tok::in_dir(dir);
     let repo = repo(dir);
     let path = repo.to_str().expect("utf-8 path");
     tok.run(&["project", "new", "DEMO", "--repo", path]);

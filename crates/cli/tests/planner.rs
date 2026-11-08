@@ -6,78 +6,14 @@
 
 mod common;
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::path::PathBuf;
+use std::process::Command;
 use std::time::{Duration, Instant};
 
-use common::Tok;
+use common::{Tok, call, mcp_session, repo};
 use serde_json::{Value, json};
-use toknila_client::Client;
-use toknila_daemon::info::DaemonInfo;
 
 const WAIT: Duration = Duration::from_secs(30);
-
-/// `fake-agent` is built by the daemon's own tests; build it here if this test runs alone.
-fn fake_agent() -> PathBuf {
-    let exe = format!("fake-agent{}", std::env::consts::EXE_SUFFIX);
-    let path = Path::new(env!("CARGO_BIN_EXE_tok"))
-        .parent()
-        .expect("target dir")
-        .join(exe);
-    if !path.exists() {
-        let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
-        let status = Command::new(cargo)
-            .args([
-                "build",
-                "--locked",
-                "-p",
-                "toknila-daemon",
-                "--bin",
-                "fake-agent",
-            ])
-            .status()
-            .expect("run cargo");
-        assert!(status.success(), "cannot build fake-agent");
-    }
-    path
-}
-
-fn git(dir: &Path, args: &[&str]) {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@example.com"])
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .output()
-        .expect("git runs");
-    assert!(out.status.success(), "git {args:?}: {out:?}");
-}
-
-/// A repository whose only branch is `develop`, with one commit.
-fn repo(dir: &Path) -> PathBuf {
-    let repo = dir.join("repo");
-    std::fs::create_dir_all(&repo).expect("mkdir");
-    git(&repo, &["init", "--quiet"]);
-    git(&repo, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
-    std::fs::write(repo.join("README.md"), "hi\n").expect("write");
-    git(&repo, &["add", "README.md"]);
-    git(&repo, &["commit", "--quiet", "-m", "init"]);
-    repo
-}
-
-/// `<home>/profiles/<name>.toml`: a planner profile running the fake agent with `steps`.
-fn planner_profile(tok: &Tok, name: &str, steps: &[&str]) {
-    let args: String = steps.iter().map(|s| format!(", '{s}'")).collect();
-    let folder = tok.home.join("profiles");
-    std::fs::create_dir_all(&folder).expect("mkdir");
-    let text = format!(
-        "role = 'planner'\ncommand = ['{}'{args}]\nstartup_secs = 0\n",
-        fake_agent().display()
-    );
-    std::fs::write(folder.join(format!("{name}.toml")), text).expect("profile");
-}
 
 fn planner_logs(tok: &Tok) -> String {
     let out = Command::new(env!("CARGO_BIN_EXE_tok"))
@@ -133,21 +69,16 @@ fn wait_for(tok: &Tok, what: &str, mut ok: impl FnMut() -> bool) {
     }
 }
 
-fn client(tok: &Tok) -> Client {
-    let info = DaemonInfo::read(&tok.home.join("daemon.json"))
-        .expect("daemon.json")
-        .expect("daemon runs");
-    Client::new(info.base_url(), info.token)
-}
-
 /// A project DEMO whose repository is real, and a planner profile with `steps`.
 fn setup(steps: &[&str]) -> (tempfile::TempDir, Tok, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
-    planner_profile(&tok, "fake-planner", steps);
+    tok.profile(
+        "fake-planner",
+        steps,
+        "role = 'planner'\nstartup_secs = 0\n",
+    );
     tok.run(&["project", "new", "DEMO", "--repo", &repo.to_string_lossy()]);
     (dir, tok, repo)
 }
@@ -239,7 +170,7 @@ fn a_planner_plans_with_its_token_and_is_refused_everything_that_starts_or_accep
         "planner of DEMO stopped\n"
     );
     wait_for(&tok, "the planner to stop", || {
-        !client(&tok).planner("DEMO").expect("state").running
+        !tok.client().planner("DEMO").expect("state").running
     });
     assert_eq!(
         tok.text(&["planner", "stop", "DEMO"]),
@@ -259,48 +190,7 @@ fn only_a_planner_profile_in_a_project_with_a_repository_starts_a_planner() {
     tok.run(&["project", "new", "BARE"]);
     let msg = tok.fails(&["planner", "start", "BARE", "--profile", "fake-planner"]);
     assert!(msg.contains("no repository"), "{msg}");
-    assert!(!client(&tok).planner("DEMO").expect("state").running);
-}
-
-/// One `tok mcp` session as a planner: the lines are sent, stdin closed, every answer returned.
-fn mcp(tok: &Tok, token: &str, lines: &[Value]) -> Vec<Value> {
-    let info = DaemonInfo::read(&tok.home.join("daemon.json"))
-        .expect("daemon.json")
-        .expect("daemon runs");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_tok"))
-        .arg("mcp")
-        .env("TOKNILA_URL", info.base_url())
-        .env("TOKNILA_RUN_TOKEN", token)
-        .env("TOKNILA_ROLE", "planner")
-        .env_remove("TOKNILA_TICKET")
-        .env("TOKNILA_HOME", "/nonexistent-toknila-home")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn tok mcp");
-    {
-        let mut stdin = child.stdin.take().expect("stdin");
-        for line in lines {
-            writeln!(stdin, "{line}").expect("write");
-        }
-    }
-    let out = child.wait_with_output().expect("wait");
-    assert!(
-        out.status.success(),
-        "tok mcp: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8(out.stdout)
-        .expect("utf-8")
-        .lines()
-        .map(|l| serde_json::from_str(l).unwrap_or_else(|e| panic!("line {l:?}: {e}")))
-        .collect()
-}
-
-fn call(id: u32, name: &str, arguments: Value) -> Value {
-    json!({ "jsonrpc": "2.0", "id": id, "method": "tools/call",
-        "params": { "name": name, "arguments": arguments } })
+    assert!(!tok.client().planner("DEMO").expect("state").running);
 }
 
 fn text_of(answer: &Value) -> String {
@@ -396,7 +286,12 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         call(17, "accept", json!({ "card": "DEMO-1" })),
         call(18, "finished", json!({ "summary": "x" })),
     ];
-    let answers = mcp(&tok, &token, &lines);
+    let answers = mcp_session(
+        &tok.info().base_url(),
+        &token,
+        &[("TOKNILA_ROLE", "planner")],
+        &lines,
+    );
     lines.clear();
     let by_id = |id: u64| {
         answers

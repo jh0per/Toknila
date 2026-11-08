@@ -28,9 +28,7 @@ profile = "sim"
 #[test]
 fn wildcard_cards_wait_for_the_owner() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, CHAIN).expect("write chain");
     tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
