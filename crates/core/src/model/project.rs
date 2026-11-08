@@ -114,6 +114,13 @@ pub struct Project {
     /// The Claude model of the project's planner; `None`: the person's default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub planner_model: Option<String>,
+    /// When a card's agent wants to run a command.
+    #[serde(default)]
+    pub command_policy: super::CommandPolicy,
+    /// Rules a person remembered with "Allow always" (`Bash(cargo test *)`): they go into every
+    /// later run's allow list, and a prompt one covers is answered without asking.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_commands: Vec<String>,
     /// Hidden from the sidebar; its data is kept and it can be brought back.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub archived: bool,
@@ -154,6 +161,25 @@ impl Project {
             Reviewer => self.reviewer_model.as_deref(),
             Planner => self.planner_model.as_deref(),
         }
+    }
+
+    /// Whether a remembered rule covers the Bash call `tool` (the call's text, `Bash: <command>`).
+    pub fn allows_tool(&self, tool: &str) -> bool {
+        super::command_policy::bash_command(tool).is_some_and(|command| {
+            self.allowed_commands
+                .iter()
+                .any(|rule| super::command_policy::rule_covers(rule, command))
+        })
+    }
+
+    /// Remembers the rule for the Bash call `tool`. Returns the rule, or `None` when the call is
+    /// not a Bash call or gives no rule; a rule already remembered is kept once.
+    pub fn remember_tool(&mut self, tool: &str) -> Option<String> {
+        let rule = super::command_policy::rule_for(super::command_policy::bash_command(tool)?)?;
+        if !self.allowed_commands.contains(&rule) {
+            self.allowed_commands.push(rule.clone());
+        }
+        Some(rule)
     }
 
     /// Name of the agent profile `ticket` runs with: its own, else the project's default.
@@ -209,6 +235,8 @@ mod tests {
             worker_model: None,
             reviewer_model: None,
             planner_model: None,
+            command_policy: Default::default(),
+            allowed_commands: Vec::new(),
             archived: false,
         };
         let mut t = Ticket::new_backlog(

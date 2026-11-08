@@ -48,4 +48,9 @@ pub struct NewAnswer {
     /// The text of a `text` answer; the optional comment of a `deny`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
+    /// With `allow` on a worker's Bash prompt: also remember a rule for the command in the
+    /// project ("Allow always"), so later runs and prompts of running agents it covers are allowed
+    /// without asking. Ignored for any other answer or tool.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub always: bool,
 }

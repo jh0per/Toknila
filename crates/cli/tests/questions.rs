@@ -86,6 +86,7 @@ fn the_permission_hook_waits_for_allow_from_the_window_and_the_card_resumes_at_o
                 role: None,
                 answer: AnswerKind::Allow,
                 text: None,
+                always: false,
             },
         )
         .expect("answer");
@@ -138,6 +139,7 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
                 role: None,
                 answer: AnswerKind::Text,
                 text: Some("yes".to_owned()),
+                always: false,
             },
         )
         .expect("answer");

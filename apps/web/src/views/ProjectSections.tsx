@@ -4,6 +4,7 @@ import { listProfile } from "../store/profiles";
 import { fieldError } from "../store/settings";
 import type { State } from "../store/state";
 import { Field } from "./Field";
+import { CommandsFields } from "./ProjectCommands";
 
 export type FormProps = {
   project: Project;
@@ -70,6 +71,7 @@ export function AgentsSection({ state, form, set }: FormProps) {
       <Field label="Test command (optional)" name="check_command" error={fieldError(s, "check_command")} hint="Agents run it before they hand in.">
         <input data-testid="check-command" value={form.check_command} spellCheck={false} onChange={(e) => set("check_command", e.target.value)} />
       </Field>
+      <CommandsFields form={form} set={set} />
     </div>
   );
 }

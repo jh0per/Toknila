@@ -1,6 +1,7 @@
 //! Domain types. Plain data with serde; rules that change them live in sibling modules.
 
 mod chain;
+pub mod command_policy;
 mod comment;
 mod ids;
 mod keys;
@@ -18,6 +19,7 @@ mod time;
 
 pub use crate::pr::{CheckRun, CheckState, PullRequest};
 pub use chain::{Chain, Edge, EdgeKind, NodeRef};
+pub use command_policy::CommandPolicy;
 pub use comment::{Actor, Comment, CommentBody, CommentKind};
 pub use ids::{
     ChainId, CommentId, ProjectId, ReleaseId, RunId, SubtaskId, ThreadId, ThreadMessageId,

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
 use toknila_core::{
-    AgentProfile, MergeMethod, MergeMode, Project, ProjectId, ReviewMode, schedule,
+    AgentProfile, CommandPolicy, MergeMethod, MergeMode, Project, ProjectId, ReviewMode, schedule,
 };
 
 use crate::{AppError, AppResult, Reader, UnitOfWork, resolve};
@@ -28,6 +28,8 @@ pub struct NewProject {
     pub check_command: Option<String>,
     /// Where accepted work lands; default `local`.
     pub merge_mode: Option<MergeMode>,
+    /// When the agent of a card wants to run a command; default `auto`.
+    pub command_policy: Option<CommandPolicy>,
 }
 
 /// `PATCH /v1/projects/{project}`: the settings to change; unset fields stay.
@@ -60,6 +62,12 @@ pub struct PatchProject {
     pub reviewer_model: Option<String>,
     /// The Claude model of the project's planner; an empty text clears it.
     pub planner_model: Option<String>,
+    /// When the agent of a card wants to run a command: `ask` (the person answers each prompt),
+    /// `auto` (Claude Code's auto mode decides) or `trust` (never asked).
+    pub command_policy: Option<CommandPolicy>,
+    /// The commands remembered with "Allow always" (`Bash(cargo test *)`); the list replaces the
+    /// remembered ones, so a rule is removed by sending the list without it.
+    pub allowed_commands: Option<Vec<String>>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -109,6 +117,8 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
         worker_model: None,
         reviewer_model: None,
         planner_model: None,
+        command_policy: draft.command_policy.unwrap_or(CommandPolicy::NEW_PROJECT),
+        allowed_commands: Vec::new(),
         archived: false,
     };
     uow.insert_project(&p)?;
@@ -156,6 +166,13 @@ pub fn patch<U: UnitOfWork + ?Sized>(
             *field = Project::clean_model(&m).map_err(AppError::bad_request)?;
         }
     }
+    if let Some(c) = patch.command_policy {
+        p.command_policy = c;
+    }
+    if let Some(rules) = patch.allowed_commands {
+        p.allowed_commands =
+            toknila_core::command_policy::clean_rules(rules).map_err(AppError::bad_request)?;
+    }
     if let Some(m) = patch.merge_mode {
         if m == MergeMode::Github && p.repo_path.as_deref().is_none_or(|r| r.trim().is_empty()) {
             return Err(AppError::bad_request(
@@ -174,6 +191,35 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;
     crate::schedule::run(uow, p.id)?;
     Ok(p)
+}
+
+/// The project `t` belongs to (through its chain).
+pub fn of_ticket<R: Reader + ?Sized>(r: &R, t: &toknila_core::Ticket) -> AppResult<Project> {
+    let chain = r
+        .chain(t.chain_id)?
+        .ok_or_else(|| AppError::not_found("chain of the ticket"))?;
+    r.project(chain.project_id)?
+        .ok_or_else(|| AppError::not_found("project of the chain"))
+}
+
+/// "Allow always": remembers in the project of `t` the rule for the Bash call `tool` (its text,
+/// `Bash: <command>`), so later runs allow it and a running agent's prompt it covers is answered
+/// without asking. Returns the rule; `None` (nothing changes) for a call that gives none.
+pub fn remember_command<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    t: &toknila_core::Ticket,
+    tool: &str,
+) -> AppResult<Option<String>> {
+    let mut p = of_ticket(uow, t)?;
+    let known = p.allowed_commands.len();
+    let Some(rule) = p.remember_tool(tool) else {
+        return Ok(None);
+    };
+    if p.allowed_commands.len() != known {
+        uow.update_project(&p)?;
+        uow.emit(&DomainEvent::ProjectUpdated { project: p })?;
+    }
+    Ok(Some(rule))
 }
 
 /// Hides a project from the sidebar, or brings it back. Nothing is deleted. Archiving is refused

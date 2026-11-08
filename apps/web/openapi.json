@@ -5045,6 +5045,15 @@
           }
         }
       },
+      "CommandPolicy": {
+        "type": "string",
+        "description": "When the agent of a card wants to run a command.",
+        "enum": [
+          "ask",
+          "auto",
+          "trust"
+        ]
+      },
       "Comment": {
         "type": "object",
         "description": "A permanent record in a ticket: an instruction from a person, an agent's report, or a decision.\nEverything said to an agent is stored here first and delivered after.",
@@ -5758,6 +5767,10 @@
           "answer"
         ],
         "properties": {
+          "always": {
+            "type": "boolean",
+            "description": "With `allow` on a worker's Bash prompt: also remember a rule for the command in the\nproject (\"Allow always\"), so later runs and prompts of running agents it covers are allowed\nwithout asking. Ignored for any other answer or tool."
+          },
           "answer": {
             "$ref": "#/components/schemas/AnswerKind"
           },
@@ -5934,6 +5947,17 @@
               "null"
             ],
             "description": "The command that checks the work; an empty text names none."
+          },
+          "command_policy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CommandPolicy",
+                "description": "When the agent of a card wants to run a command; default `auto`."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "default_profile": {
             "type": [
@@ -6352,12 +6376,33 @@
         "type": "object",
         "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
         "properties": {
+          "allowed_commands": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The commands remembered with \"Allow always\" (`Bash(cargo test *)`); the list replaces the\nremembered ones, so a rule is removed by sending the list without it."
+          },
           "check_command": {
             "type": [
               "string",
               "null"
             ],
             "description": "The command that checks the work (`cargo xtask verify`); agents are told to run it and may\nwithout asking. An empty text clears it."
+          },
+          "command_policy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CommandPolicy",
+                "description": "When the agent of a card wants to run a command: `ask` (the person answers each prompt),\n`auto` (Claude Code's auto mode decides) or `trust` (never asked)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "default_profile": {
             "type": [
@@ -6895,6 +6940,13 @@
           "merge"
         ],
         "properties": {
+          "allowed_commands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Rules a person remembered with \"Allow always\" (`Bash(cargo test *)`): they go into every\nlater run's allow list, and a prompt one covers is answered without asking."
+          },
           "archived": {
             "type": "boolean",
             "description": "Hidden from the sidebar; its data is kept and it can be brought back."
@@ -6905,6 +6957,10 @@
               "null"
             ],
             "description": "The command that checks the project's work (`cargo xtask verify`). Both agent roles are\ntold to use it, and may run it without asking. `None`: the project names none."
+          },
+          "command_policy": {
+            "$ref": "#/components/schemas/CommandPolicy",
+            "description": "When a card's agent wants to run a command."
           },
           "default_profile": {
             "type": "string"

@@ -2,7 +2,7 @@
 // typed it, compared with the daemon's project to know whether anything changed (the Save bar
 // shows only then) and turned into the one patch that Save sends. The daemon judges the values.
 
-import type { MergeMethod, MergeMode, PatchProject, Project, ReviewMode } from "../api/types";
+import type { CommandPolicy, MergeMethod, MergeMode, PatchProject, Project, ReviewMode } from "../api/types";
 import type { ProjectSection } from "./route";
 
 export interface ProjectForm {
@@ -18,6 +18,8 @@ export interface ProjectForm {
   merge_mode: MergeMode;
   pr_title: string;
   merge_method: MergeMethod;
+  command_policy: CommandPolicy;
+  allowed_commands: string[];
 }
 
 /// The form as the project has it now.
@@ -35,6 +37,8 @@ export function formOf(p: Project): ProjectForm {
     merge_mode: p.merge.mode,
     pr_title: p.merge.pr_title,
     merge_method: p.merge.method,
+    command_policy: p.command_policy ?? "ask",
+    allowed_commands: p.allowed_commands ?? [],
   };
 }
 
@@ -63,6 +67,8 @@ export function patchOf(f: ProjectForm): PatchProject {
     merge_mode: t.merge_mode,
     pr_title: t.pr_title,
     merge_method: t.merge_method,
+    command_policy: t.command_policy,
+    allowed_commands: t.allowed_commands,
   };
 }
 
@@ -70,7 +76,7 @@ export function patchOf(f: ProjectForm): PatchProject {
 export function isDirty(f: ProjectForm, p: Project): boolean {
   const now = tidy(formOf(p));
   const then = tidy(f);
-  return (Object.keys(now) as (keyof ProjectForm)[]).some((k) => now[k] !== then[k]);
+  return (Object.keys(now) as (keyof ProjectForm)[]).some((k) => JSON.stringify(now[k]) !== JSON.stringify(then[k]));
 }
 
 /// The section a daemon refusal about `field` belongs to, so the Save bar can say where to look.
@@ -79,6 +85,8 @@ export function sectionOfField(field: string): ProjectSection {
     case "default_profile":
     case "max_parallel":
     case "check_command":
+    case "command_policy":
+    case "allowed_commands":
       return "agents";
     case "review_mode":
     case "reviewer":

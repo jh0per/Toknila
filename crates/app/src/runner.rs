@@ -62,6 +62,10 @@ pub struct RunBrief {
     pub earlier: Vec<String>,
     /// The project's Claude model (`--model`), for a profile that runs Claude Code.
     pub model: Option<String>,
+    /// The project's setting for when a card's agent wants to run a command (a worker only).
+    pub command_policy: toknila_core::CommandPolicy,
+    /// The rules a person remembered in the project with "Allow always" (a worker only).
+    pub allowed_commands: Vec<String>,
     /// What a planner is told about its project; `None` for a card's agent.
     pub project: Option<toknila_core::instructions::ProjectFacts>,
 }

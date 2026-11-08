@@ -16,6 +16,8 @@ type Key = (TicketId, AgentRole);
 struct Pending {
     text: String,
     detail: Option<String>,
+    /// The whole tool call the dialog is about (`Bash: <command>`), when it is known.
+    tool: Option<String>,
     since: Timestamp,
     /// The permission hook that waits for the person's decision, if one does.
     waiter: Option<oneshot::Sender<Decision>>,
@@ -80,12 +82,38 @@ impl Prompts {
                 Pending {
                     text,
                     detail,
+                    tool: None,
                     since,
                     waiter,
                 },
             )
             .is_none();
         (fresh, rx)
+    }
+
+    /// Records the tool call the open dialog of the run is about, as the hook told it.
+    pub fn note_dialog_tool(&self, ticket: TicketId, role: AgentRole, tool: String) {
+        if let Some(p) = self.inner().pending.get_mut(&(ticket, role)) {
+            p.tool = Some(tool);
+        }
+    }
+
+    /// The tool call the open dialog of the run is about, if the dialog and the call are known.
+    pub fn dialog_tool(&self, ticket: TicketId, role: AgentRole) -> Option<String> {
+        self.inner().pending.get(&(ticket, role))?.tool.clone()
+    }
+
+    /// The worker dialogs a permission hook holds open, with the tool call each is about.
+    pub fn worker_hook_dialogs(&self) -> Vec<(TicketId, String)> {
+        let inner = self.inner();
+        inner
+            .pending
+            .iter()
+            .filter(|((_, role), p)| {
+                *role == AgentRole::Worker && p.waiter.as_ref().is_some_and(|w| !w.is_closed())
+            })
+            .filter_map(|((ticket, _), p)| Some((*ticket, p.tool.clone()?)))
+            .collect()
     }
 
     /// Whether a permission hook of the run waits for a decision.

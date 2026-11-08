@@ -38,10 +38,24 @@ pub enum ProjectCmd {
         /// `gh auth status` succeeds, else `local`.
         #[arg(long)]
         merge: Option<String>,
+        /// When a card's agent wants to run a command: `auto` (default; Claude Code decides and
+        /// asks only about risky actions), `ask` (you answer each prompt) or `trust` (never asked).
+        #[arg(long)]
+        commands: Option<String>,
     },
+    /// Show a project's settings, including the commands remembered with "Allow always".
+    Show { key: String },
     /// Change a project's settings.
     Set {
         key: String,
+        /// When a card's agent wants to run a command: `ask` (you answer each prompt), `auto`
+        /// (Claude Code decides and asks only about risky actions) or `trust` (never asked).
+        #[arg(long)]
+        commands: Option<String>,
+        /// Forget a command remembered with "Allow always", e.g. `--forget-command "Bash(cargo test *)"`
+        /// (repeat for more).
+        #[arg(long)]
+        forget_command: Vec<String>,
         /// Most agents working at once (1 to 64, default 2); more started cards wait in a queue.
         #[arg(long)]
         parallel: Option<u32>,
@@ -96,6 +110,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             profile,
             check_command,
             merge,
+            commands,
         } => {
             let mut merge_mode = merge
                 .as_deref()
@@ -132,6 +147,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 default_profile: profile,
                 check_command,
                 merge_mode,
+                command_policy: commands.as_deref().map(policy).transpose()?,
                 ..NewProject::default()
             })?;
             emit(json_out, &p, |p| {
@@ -141,8 +157,17 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 }
             });
         }
+        ProjectCmd::Show { key } => {
+            let p = c.project(&key)?;
+            emit(json_out, &p, |p| {
+                println!("project {}: {}", p.key, p.name);
+                print_commands(p);
+            });
+        }
         ProjectCmd::Set {
             key,
+            commands,
+            forget_command,
             parallel,
             merge,
             pr_title,
@@ -152,7 +177,21 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             reviewer_model,
             planner_model,
         } => {
+            let allowed_commands = if forget_command.is_empty() {
+                None
+            } else {
+                let mut rules = c.project(&key)?.allowed_commands;
+                for gone in &forget_command {
+                    if !rules.iter().any(|r| r == gone) {
+                        bail!("{gone:?} is not remembered by {key} (see `tok project show {key}`)");
+                    }
+                }
+                rules.retain(|r| !forget_command.contains(r));
+                Some(rules)
+            };
             let patch = PatchProject {
+                command_policy: commands.as_deref().map(policy).transpose()?,
+                allowed_commands,
                 max_parallel: parallel,
                 merge_mode: merge
                     .as_deref()
@@ -182,6 +221,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 if let Some(c) = &p.check_command {
                     println!("test command: {c}");
                 }
+                print_commands(p);
                 for (what, model) in [
                     ("worker", &p.worker_model),
                     ("reviewer", &p.reviewer_model),
@@ -226,6 +266,26 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// The word of `--commands` as a setting.
+fn policy(text: &str) -> Result<toknila_core::CommandPolicy> {
+    from_wire_name(text).ok_or_else(|| anyhow!("--commands is ask, auto or trust, not {text:?}"))
+}
+
+/// What a project does when an agent wants to run a command, and the commands it remembers.
+fn print_commands(p: &toknila_core::Project) {
+    let what = match p.command_policy {
+        toknila_core::CommandPolicy::Ask => "you answer each prompt",
+        toknila_core::CommandPolicy::Auto => {
+            "Claude Code decides and asks only about risky actions"
+        }
+        toknila_core::CommandPolicy::Trust => "agents are never asked",
+    };
+    println!("commands: {} ({what})", output::w(&p.command_policy));
+    for rule in &p.allowed_commands {
+        println!("allowed always: {rule}");
+    }
 }
 
 /// Asks the person to type the project's key before its folder goes to the Trash. Refuses when

@@ -91,6 +91,21 @@ A new agent is a new file, not new code.
   and why the filters are listed; `mcp__toknila` allows every tool of that MCP server. Allow-list
   and mode are set with documented flags and settings only (`--permission-mode`, `--settings`
   with `permissions.allow`).
+  The project's `command_policy` changes a **worker's** run only (`AgentProfile::under_policy`;
+  reviewer and planner keep `dontAsk`): `ask` is the profile as above (what projects had before
+  the setting); `auto` swaps `acceptEdits` for `--permission-mode auto`, Claude Code's own mode,
+  which asks only about risky actions (checked with a probe: `claude -p --permission-mode auto`
+  runs a harmless command under the per-run `settings.json` without a prompt); `trust` keeps
+  `acceptEdits` and adds the allow rules `Bash`, `WebFetch` and `WebSearch`. `permissions.deny`
+  (`DENIED_TOOLS`) is written in every mode. New projects start on `auto`, existing ones on `ask`.
+  **Allow always** (`NewAnswer.always`, a worker's Bash prompt): the answer is allow, and core
+  derives a rule from the command (`command_policy::rule_for`: the first word, plus the second
+  after a launcher such as `cargo`, `npm` or `git`; leading `cd "<path>";` and `export X=y;`
+  parts are dropped; a shell or `sudo` is remembered only as the exact command) and stores it in
+  the project's `allowed_commands`. The rules go into the allow list of every later worker run,
+  and the daemon answers a prompt a rule covers (`rule_covers`: one simple command only, never a
+  list, pipe, redirect or substitution) without asking, also for agents already running, and
+  answers the same kind of prompt other cards of the project already show.
 - **Environment.** The agent's process gets the daemon's environment minus `CLAUDECODE` and
   `CLAUDE_CODE_*` (they describe the session that started the daemon: the child-session marker
   turns transcript saving off), unless the profile's own `env` sets the variable

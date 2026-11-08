@@ -47,6 +47,8 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 check_command: project.check_command.clone(),
                 earlier: toknila_core::instructions::earlier(&uow.comments(ticket)?),
                 model: project.worker_model.clone(),
+                command_policy: project.command_policy,
+                allowed_commands: project.allowed_commands.clone(),
                 project: None,
             },
         });

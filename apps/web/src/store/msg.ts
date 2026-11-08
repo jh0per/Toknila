@@ -48,7 +48,7 @@ export type CardCommand =
   | { type: "ticketAction"; key: string; action: TicketAction; text?: string }
   | { type: "leftovers"; key: string; action: LeftoverAction }
   | { type: "addComment"; key: string; kind: CommentKind; text: string }
-  | { type: "answer"; key: string; role: AgentRole; answer: AnswerKind; text?: string };
+  | { type: "answer"; key: string; role: AgentRole; answer: AnswerKind; text?: string; always?: boolean };
 
 /// What a person does in a thread; `text` is the message or the comment of a request for changes.
 export type ThreadAction = {
