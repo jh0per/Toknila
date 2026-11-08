@@ -210,7 +210,7 @@ pub fn system_checks_for(tools: &dyn Tools, commands: &[String], home: &Path) ->
     let home_text = home.to_string_lossy();
     checks.extend(system::data_home(
         &home_text,
-        &git(tools, &home_text, &["rev-parse", "--show-toplevel"]),
+        &git(tools, &home_text, &["rev-parse", "--is-inside-work-tree"]),
     ));
     let dirs = crate::agent_path::agent_dirs();
     let verdicts: Vec<_> = commands

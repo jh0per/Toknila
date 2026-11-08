@@ -201,27 +201,26 @@ pub fn git(probe: &Probe) -> Check {
 }
 
 /// The warning for a data home inside a git work tree, judged from `git rev-parse
-/// --show-toplevel` run in `home`; `None` when `home` is not inside one (git failing or missing
-/// counts as not inside).
-pub fn data_home(home: &str, toplevel: &Probe) -> Option<Check> {
+/// --is-inside-work-tree` run in `home`; `None` when `home` is not inside one (git failing or
+/// missing counts as not inside).
+pub fn data_home(home: &str, inside: &Probe) -> Option<Check> {
     let Probe::Ran {
         code: Some(0),
         stdout,
         ..
-    } = toplevel
+    } = inside
     else {
         return None;
     };
-    let root = stdout.trim();
-    if root.is_empty() {
+    if stdout.trim() != "true" {
         return None;
     }
     Some(check(
         Tool::DataHome,
         CheckStatus::Warning,
         None,
-        format!("the data home {home} is inside the git repository {root}"),
-        "Claude Code asks about external CLAUDE.md imports on every run when the data home sits inside a repository. Point TOKNILA_HOME at a folder outside any repository, or leave it unset.",
+        format!("the data home {home} is inside a git repository"),
+        "Move the data home out of the repository: set TOKNILA_HOME to a folder outside any git repository (or unset it to use the default), then restart Toknila. Inside a repository, Claude Code asks about external CLAUDE.md imports on every run.",
     ))
 }
 
@@ -327,12 +326,12 @@ mod tests {
 
     #[test]
     fn a_data_home_inside_a_work_tree_warns_and_one_outside_does_not() {
-        let c = data_home("/work/repo/.toknila", &ran(0, "/work/repo\n")).expect("warning");
+        let c = data_home("/work/repo/.toknila", &ran(0, "true\n")).expect("warning");
         assert_eq!((c.tool, c.status), (Tool::DataHome, CheckStatus::Warning));
         assert!(c.detail.contains("/work/repo/.toknila"), "{}", c.detail);
         assert!(c.hint.contains("TOKNILA_HOME"), "{}", c.hint);
         assert_eq!(data_home("/h", &ran(128, "")), None);
-        assert_eq!(data_home("/h", &ran(0, "\n")), None);
+        assert_eq!(data_home("/h", &ran(0, "false\n")), None);
         assert_eq!(data_home("/h", &Probe::Missing), None);
     }
 

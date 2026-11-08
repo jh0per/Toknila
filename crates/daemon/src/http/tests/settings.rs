@@ -122,7 +122,7 @@ async fn the_data_home_warning_shows_only_inside_a_repository() {
     );
     let inside = FakeTools::default()
         .with("git --version", ran(0, "git version 2.43.0\n"))
-        .with("git rev-parse --show-toplevel", ran(0, "/work/repo\n"));
+        .with("git rev-parse --is-inside-work-tree", ran(0, "true\n"));
     let body = Api::with_tools(Arc::new(inside))
         .get("/v1/system/checks")
         .await;
@@ -131,7 +131,7 @@ async fn the_data_home_warning_shows_only_inside_a_repository() {
     assert!(
         line["detail"]
             .as_str()
-            .is_some_and(|d| d.contains("/work/repo")),
+            .is_some_and(|d| d.contains("inside a git repository")),
         "{line}"
     );
 }

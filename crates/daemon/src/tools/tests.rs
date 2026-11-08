@@ -46,10 +46,7 @@ fn a_data_home_inside_a_repository_warns_and_one_outside_does_not() {
     };
     let line = warn(&inside).expect("a data home warning");
     assert_eq!(line.status, system::CheckStatus::Warning);
-    assert!(
-        line.detail.contains("inside the git repository"),
-        "{line:?}"
-    );
+    assert!(line.detail.contains("inside a git repository"), "{line:?}");
     let plain = tempfile::tempdir().expect("tmp");
     assert_eq!(warn(plain.path()), None);
 }
