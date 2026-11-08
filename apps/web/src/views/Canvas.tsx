@@ -196,7 +196,10 @@ export function Canvas({ chain, state, dispatch }: {
                 {t.profile && <span className="runner">{t.profile}</span>}
               </span>
               <span className="row">
-                <span className="st" data-testid="status">{statusText(t.status)}</span>
+                <span className="st" data-testid="status">
+                  {t.status === "running" && <span className="dot pulse" data-testid="live" />}
+                  {statusText(t.status)}
+                </span>
                 <UsageChip figures={chain.usage?.[t.key]} />
                 <span className="key">{t.key}</span>
               </span>
