@@ -21,6 +21,7 @@ fn ask(mem: &mut Mem, text: &str, permission: bool) {
     let event = AgentEvent::AskHuman {
         text: text.to_owned(),
         permission,
+        detail: None,
     };
     agent::ticket_event(mem, &t, event).expect("ask_human");
 }
@@ -52,6 +53,7 @@ fn asking_again_while_waiting_keeps_it_waiting() {
     let event = AgentEvent::AskHuman {
         text: "second".to_owned(),
         permission: false,
+        detail: None,
     };
     // Still waiting; the second question is refused by the machine, not turned into a resume.
     assert!(agent::ticket_event(&mut mem, &t, event).is_err());

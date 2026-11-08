@@ -3889,6 +3889,13 @@
               "event"
             ],
             "properties": {
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The whole command a permission request is about, when `text` is only its summary."
+              },
               "event": {
                 "type": "string",
                 "enum": [
@@ -4246,6 +4253,25 @@
                 "type": "string",
                 "enum": [
                   "crashed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The agent's process was ended from outside (terminated or killed by another tool or the\nuser); `detail` says how. Unblocking starts it again.",
+            "required": [
+              "detail",
+              "kind"
+            ],
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "terminated"
                 ]
               }
             }
@@ -5376,6 +5402,13 @@
           },
           "chain": {
             "$ref": "#/components/schemas/ChainId"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The whole command of a permission request, when `text` carries only its summary (cut for\nlists); absent otherwise."
           },
           "done_cards": {
             "type": "array",
@@ -8623,6 +8656,13 @@
               "kind"
             ],
             "properties": {
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The whole command or path when `text` had to be cut short for lists; absent when\n`text` already says everything."
+              },
               "kind": {
                 "type": "string",
                 "enum": [

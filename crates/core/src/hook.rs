@@ -35,6 +35,9 @@ pub const PERMISSION_WAIT_SECS: u64 = 570;
 /// The longest summary of a tool call that is kept, in characters.
 pub const SUMMARY_MAX: usize = 300;
 
+/// The longest full text of a tool call that is kept for the person to read, in characters.
+pub const DETAIL_MAX: usize = 4000;
+
 /// The fields of a hook's JSON input that Toknila reads; everything else is ignored.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default)]
@@ -57,6 +60,12 @@ pub struct HookInput {
 /// command, the file path, the pattern or the URL is kept, never the contents of a file or a
 /// prompt, and the whole is cut at [`SUMMARY_MAX`] characters.
 pub fn tool_summary(input: &HookInput) -> Option<String> {
+    tool_text(input).map(|full| cap_summary(&full))
+}
+
+/// The same account of a tool call with nothing but the length cut ([`DETAIL_MAX`]): lines and
+/// indentation of a command stay, so a person can read what they are asked to allow.
+pub fn tool_text(input: &HookInput) -> Option<String> {
     let name = input
         .tool_name
         .as_deref()
@@ -82,8 +91,17 @@ pub fn tool_summary(input: &HookInput) -> Option<String> {
         Some(d) => format!("{name}: {d}"),
         None => name.to_owned(),
     };
-    let one_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    Some(cut(&one_line, SUMMARY_MAX))
+    Some(cut(text.trim(), DETAIL_MAX))
+}
+
+/// A tool text some client sent, split into the summary lists show ([`cap_summary`]) and the full
+/// text, which is present only when the summary lost something (it was cut, or its lines were
+/// joined) and is itself cut at [`DETAIL_MAX`] characters.
+pub fn summary_and_detail(full: &str) -> (String, Option<String>) {
+    let summary = cap_summary(full);
+    let full = cut(full.trim(), DETAIL_MAX);
+    let detail = (full != summary).then_some(full);
+    (summary, detail)
 }
 
 /// A tool summary some client sent, brought to a single line of at most [`SUMMARY_MAX`] characters.
@@ -324,5 +342,42 @@ mod tests {
         );
         let empty: HookInput = serde_json::from_str("{}").expect("parse");
         assert_eq!(empty, HookInput::default());
+    }
+
+    fn bash(command: &str) -> HookInput {
+        HookInput {
+            tool_name: Some("Bash".to_owned()),
+            tool_input: Some(serde_json::json!({ "command": command })),
+            ..HookInput::default()
+        }
+    }
+
+    #[test]
+    fn the_summary_is_one_line_cut_at_300_and_the_text_keeps_the_whole_command() {
+        let script = format!("python3 - <<'EOF'\n{}\nEOF", "print(1)\n".repeat(80));
+        let i = bash(&script);
+        let summary = tool_summary(&i).expect("summary");
+        assert_eq!(summary.chars().count(), SUMMARY_MAX);
+        assert!(summary.ends_with('…') && !summary.contains('\n'));
+        let text = tool_text(&i).expect("text");
+        assert_eq!(text, format!("Bash: {}", script.trim()));
+    }
+
+    #[test]
+    fn a_detail_exists_only_when_the_summary_lost_something() {
+        assert_eq!(
+            summary_and_detail("Bash: cargo test"),
+            ("Bash: cargo test".to_owned(), None)
+        );
+        let (summary, detail) = summary_and_detail("Bash: a\n  b");
+        assert_eq!(summary, "Bash: a b");
+        assert_eq!(detail.as_deref(), Some("Bash: a\n  b"));
+        let long = format!("Bash: {}", "x".repeat(1000));
+        let (summary, detail) = summary_and_detail(&long);
+        assert_eq!(summary.chars().count(), SUMMARY_MAX);
+        assert_eq!(detail, Some(long));
+        let huge = "y".repeat(DETAIL_MAX * 2);
+        let detail = summary_and_detail(&huge).1.expect("detail");
+        assert_eq!(detail.chars().count(), DETAIL_MAX);
     }
 }

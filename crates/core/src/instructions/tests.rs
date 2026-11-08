@@ -25,6 +25,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         prompt: "Generate the instructions for the run.\n",
         acceptance,
         check_command: None,
+        earlier: &[],
     }
 }
 
@@ -87,6 +88,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         prompt: "p",
         acceptance: &[],
         check_command: None,
+        earlier: &[],
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -166,6 +168,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         prompt: "p",
         acceptance: &[],
         check_command: check,
+        earlier: &[],
     }
 }
 
@@ -212,4 +215,52 @@ fn both_roles_instructions_name_the_check_command_only_when_there_is_one() {
     for text in [generate(&without), generate_review(&without)] {
         assert!(!text.contains("## Checks"), "{text}");
     }
+}
+
+fn sent(gist: &str, at: i64, delivered: bool) -> Comment {
+    Comment {
+        created_at: Timestamp(at),
+        delivered_at: delivered.then_some(Timestamp(at + 1)),
+        ..instruction(gist, Some("do it"))
+    }
+}
+
+#[test]
+fn only_delivered_instructions_count_as_earlier_oldest_first() {
+    let mut report = sent("a report", 1, true);
+    report.kind = CommentKind::Report;
+    let comments = [
+        sent("second", 3, true),
+        sent("pending", 4, false),
+        report,
+        sent("first", 2, true),
+    ];
+    let texts = earlier(&comments);
+    assert_eq!(texts.len(), 2);
+    assert!(texts[0].contains("first") && texts[1].contains("second"));
+}
+
+#[test]
+fn only_the_newest_earlier_instructions_are_kept() {
+    let comments: Vec<Comment> = (0..15)
+        .map(|i| sent(&format!("n{i:02}"), i, true))
+        .collect();
+    let texts = earlier(&comments);
+    assert_eq!(texts.len(), 10);
+    assert!(texts[0].contains("n05") && texts[9].contains("n14"));
+}
+
+#[test]
+fn the_instructions_of_a_replacement_run_carry_the_earlier_ones_and_the_kickoff_says_so() {
+    let acceptance = vec!["The earlier instruction is in the file".to_owned()];
+    let texts = earlier(&[sent("use the Edit tool", 2, true)]);
+    let brief = RunBrief {
+        earlier: &texts,
+        ..pinned_brief(&acceptance)
+    };
+    assert_pinned(&generate(&brief), "run_replacement.md");
+    assert!(kickoff(crate::AgentRole::Worker, &brief).contains("given earlier"));
+    assert!(!kickoff(crate::AgentRole::Worker, &pinned_brief(&acceptance)).contains("earlier"));
+    assert!(!generate(&pinned_brief(&acceptance)).contains("given earlier"));
+    assert!(!generate_review(&brief).contains("given earlier"));
 }

@@ -14,7 +14,7 @@ mod screen;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{AgentRole, TicketId, Timestamp};
+use crate::{AgentRole, TicketId, TicketStatus, Timestamp};
 
 pub use keys::{expand_keys, has_named_keys};
 pub use screen::{SCREEN_LINES, last_lines, screen_hash};
@@ -95,6 +95,19 @@ pub enum Decision {
     Deny {
         message: String,
     },
+}
+
+/// What the worker's permission hook is told when it asks after the hand-in.
+pub const HANDED_IN_DENIAL: &str = "This card is handed in and waits for review. Nothing more should run, so this is refused automatically; stop here and do not verify again, unless the card is returned to you.";
+
+/// The answer a permission request gets without asking a person: a worker whose card is in
+/// Review has handed in (`finished` was accepted), so anything it still wants to run, such as a
+/// second verification, is refused with a reason. A returned card is Running again and asks as
+/// usual. Anything else is for a person to decide.
+pub fn auto_decision(role: AgentRole, status: TicketStatus) -> Option<Decision> {
+    (role == AgentRole::Worker && status == TicketStatus::Review).then(|| Decision::Deny {
+        message: HANDED_IN_DENIAL.to_owned(),
+    })
 }
 
 /// How an answer reaches the agent.
@@ -227,6 +240,8 @@ pub struct PendingPermission {
     pub role: AgentRole,
     /// What is asked, with the tool and its summary.
     pub text: String,
+    /// The whole command when `text` carries only its summary.
+    pub detail: Option<String>,
     pub since: Timestamp,
 }
 

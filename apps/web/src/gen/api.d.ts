@@ -1204,6 +1204,8 @@ export interface components {
             /** @enum {string} */
             event: "started";
         } | {
+            /** @description The whole command a permission request is about, when `text` is only its summary. */
+            detail?: string | null;
             /** @enum {string} */
             event: "ask_human";
             permission?: boolean;
@@ -1309,6 +1311,10 @@ export interface components {
             detail: string;
             /** @enum {string} */
             kind: "crashed";
+        } | {
+            detail: string;
+            /** @enum {string} */
+            kind: "terminated";
         } | {
             dependency: components["schemas"]["TicketKey"];
             /** @enum {string} */
@@ -1693,6 +1699,11 @@ export interface components {
              */
             answers?: components["schemas"]["AnswerKind"][];
             chain: components["schemas"]["ChainId"];
+            /**
+             * @description The whole command of a permission request, when `text` carries only its summary (cut for
+             *     lists); absent otherwise.
+             */
+            detail?: string | null;
             /** @description The cards done out of order that these subtasks are behind (`leftovers` items). */
             done_cards: components["schemas"]["TicketKey"][];
             kind: components["schemas"]["InboxKind"];
@@ -2849,6 +2860,11 @@ export interface components {
             kind: "question";
             text: string;
         } | {
+            /**
+             * @description The whole command or path when `text` had to be cut short for lists; absent when
+             *     `text` already says everything.
+             */
+            detail?: string | null;
             /** @enum {string} */
             kind: "permission";
             text: string;

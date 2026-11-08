@@ -31,6 +31,7 @@ impl Rig {
                 prompt: "Wire the instructions.".to_owned(),
                 acceptance: vec!["It is wired".to_owned()],
                 check_command: None,
+                earlier: Vec::new(),
                 model: None,
                 project: None,
             },

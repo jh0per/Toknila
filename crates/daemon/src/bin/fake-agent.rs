@@ -15,6 +15,9 @@
 //! - `trust`: show a folder trust dialog whose options are not numbered, with "No" preselected, and
 //!   read one line of keys: a Down arrow before Enter prints `trust=yes`, anything else
 //!   `trust=no`.
+//! - `pid`: print `pid=<own process id>`, so a test can end the agent from outside.
+//! - `flagfile <flag>`: read the file named by the argument after `<flag>` in this process's
+//!   whole command line, last occurrence (the instructions file a runner appends) and print each line as `file:<line>`.
 //! - `sleep <ms>`: wait.
 //! - `hold`: wait until killed.
 //! - `child`: start a child process that holds until killed and print `child=<pid>`.
@@ -115,6 +118,16 @@ fn main() {
                 "/tickets/{ticket}/activity",
                 r#"{"signal":"hook:stop"}"#,
             )),
+            "pid" => say(&format!("pid={}", std::process::id())),
+            "flagfile" => {
+                let flag = args.next().unwrap_or_default();
+                let all: Vec<String> = std::env::args().collect();
+                let path = all.windows(2).rfind(|w| w[0] == flag).map(|w| w[1].clone());
+                let text = path.and_then(|p| std::fs::read_to_string(p).ok());
+                for line in text.unwrap_or_default().lines() {
+                    say(&format!("file:{line}"));
+                }
+            }
             "trust" => {
                 for line in [
                     "Do you trust the files in this folder?",

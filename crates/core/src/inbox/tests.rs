@@ -95,6 +95,7 @@ fn a_question_carries_its_text_and_a_permission_prompt_counts_too() {
         ticket(2, TicketStatus::Running, 6),
         WaitingReason::Permission {
             text: "run rm -rf build?".to_owned(),
+            detail: None,
         },
     );
     let silent = waiting(ticket(3, TicketStatus::Running, 7), WaitingReason::Silent);

@@ -79,7 +79,13 @@ pub enum WaitingReason {
     /// The agent asked a question (`ask_human`).
     Question { text: String },
     /// The agent wants permission for an action.
-    Permission { text: String },
+    Permission {
+        text: String,
+        /// The whole command or path when `text` had to be cut short for lists; absent when
+        /// `text` already says everything.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
+    },
     /// The agent stopped responding to nudges.
     Silent,
 }
@@ -93,6 +99,9 @@ pub enum BlockedReason {
     Manual { text: String },
     /// The runner process crashed.
     Crashed { detail: String },
+    /// The agent's process was ended from outside (terminated or killed by another tool or the
+    /// user); `detail` says how. Unblocking starts it again.
+    Terminated { detail: String },
     /// A dependency was reopened after it had merged.
     DependencyReopened { dependency: TicketKey },
     /// Merging into the base branch conflicted; `detail` names the files.
@@ -175,7 +184,7 @@ impl fmt::Display for WaitingReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Question { text } => write!(f, "question: {text}"),
-            Self::Permission { text } => write!(f, "permission: {text}"),
+            Self::Permission { text, .. } => write!(f, "permission: {text}"),
             Self::Silent => f.write_str("silent"),
         }
     }
@@ -186,6 +195,10 @@ impl fmt::Display for BlockedReason {
         match self {
             Self::Manual { text } => write!(f, "manual: {text}"),
             Self::Crashed { detail } => write!(f, "crashed: {detail}"),
+            Self::Terminated { detail } => write!(
+                f,
+                "terminated: the agent was terminated from outside ({detail}); unblock starts it again"
+            ),
             Self::DependencyReopened { dependency } => {
                 write!(f, "dependency {dependency} reopened")
             }
@@ -286,7 +299,10 @@ mod tests {
                 "question: which?",
             ),
             (
-                StatusReason::Waiting(WaitingReason::Permission { text: "rm".into() }),
+                StatusReason::Waiting(WaitingReason::Permission {
+                    text: "rm".into(),
+                    detail: None,
+                }),
                 "permission: rm",
             ),
             (StatusReason::Waiting(WaitingReason::Silent), "silent"),
@@ -301,6 +317,12 @@ mod tests {
                     detail: "exit 1".into(),
                 }),
                 "crashed: exit 1",
+            ),
+            (
+                blocked(BlockedReason::Terminated {
+                    detail: "exit 143, SIGTERM".into(),
+                }),
+                "terminated: the agent was terminated from outside (exit 143, SIGTERM); unblock starts it again",
             ),
             (
                 blocked(BlockedReason::DependencyReopened { dependency: dep }),

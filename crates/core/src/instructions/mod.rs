@@ -35,16 +35,72 @@ pub struct RunBrief<'a> {
     pub acceptance: &'a [String],
     /// The project's check command, named in both roles' instructions.
     pub check_command: Option<&'a str>,
+    /// Instructions a person gave to an earlier run of this card ([`earlier`]), as quoted text.
+    pub earlier: &'a [String],
+}
+
+/// How many earlier instructions a replacement run is shown, the newest ones.
+const EARLIER_MAX: usize = 10;
+
+/// The instructions an earlier run of this card was given, for the run that replaces it: every
+/// instruction comment that was delivered (a person's, a Return's, the reviewer's), oldest first,
+/// the last [`EARLIER_MAX`] of them, each rendered in the comment template. A comment that is still
+/// pending is not here: it reaches the agent the usual way.
+pub fn earlier(comments: &[Comment]) -> Vec<String> {
+    let mut sent: Vec<&Comment> = comments
+        .iter()
+        .filter(|c| c.kind == CommentKind::Instruction && c.delivered_at.is_some())
+        .collect();
+    sent.sort_by_key(|c| c.created_at);
+    let skip = sent.len().saturating_sub(EARLIER_MAX);
+    sent.into_iter()
+        .skip(skip)
+        .map(|c| template::render(c.kind, &c.body).trim_end().to_owned())
+        .collect()
+}
+
+/// The section of the instructions file that carries `earlier`; empty when there are none.
+fn earlier_section(brief: &RunBrief<'_>) -> String {
+    if brief.earlier.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        "\n## Instructions you were given earlier\n\n\
+         A person gave these to the run of this card before you. They were delivered, and they \
+         still apply: some may be done already in the commits on this branch, so look at what is \
+         there, then carry on and follow the rest. Oldest first:\n",
+    );
+    for text in brief.earlier {
+        out.push('\n');
+        for line in text.lines() {
+            out.push_str(line_quoted(line).as_str());
+        }
+    }
+    out
+}
+
+/// One line of a quoted block.
+fn line_quoted(line: &str) -> String {
+    if line.is_empty() {
+        ">\n".to_owned()
+    } else {
+        format!("> {line}\n")
+    }
 }
 
 /// The first message of a run, passed to the agent when it starts (the profile's `{kickoff}`
 /// placeholder), because an agent that starts at an empty prompt waits for someone to tell it to
 /// begin. Short and one line: the details are in the instructions file the agent already has.
 pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
-    let checks = brief
+    let mut checks = brief
         .check_command
         .map(|c| format!(" Run `{c}` before you hand in."))
         .unwrap_or_default();
+    if !brief.earlier.is_empty() {
+        checks.push_str(
+            " The instructions you were given earlier are in your Toknila instructions; follow them too.",
+        );
+    }
     match role {
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
@@ -99,6 +155,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
+    out.push_str(&earlier_section(brief));
     out.push_str(&checks_section(
         brief,
         "Run it before you call `finished`; the work is not done while it fails.",

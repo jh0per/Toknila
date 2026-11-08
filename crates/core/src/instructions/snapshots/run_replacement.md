@@ -1,0 +1,65 @@
+# Toknila: ticket DEMO-3, Generated instructions
+
+You work on ticket DEMO-3 for Toknila. The repository's own `CLAUDE.md` and `AGENTS.md` still apply and win where they differ; this file only adds how to work with Toknila.
+
+## Task
+
+Generate the instructions for the run.
+
+## Acceptance
+
+Done means every item holds, each with evidence:
+
+- [ ] The earlier instruction is in the file
+
+## Instructions you were given earlier
+
+A person gave these to the run of this card before you. They were delivered, and they still apply: some may be done already in the commits on this branch, so look at what is there, then carry on and follow the rest. Oldest first:
+
+> # [instruction] use the Edit tool
+>
+> **What:** do it
+
+## Work alone, in plain sight
+
+Do the work yourself, in this terminal. Do not start subagents or background agents: a card is done by one agent, and a person follows it here. Quote every path in a shell command with double quotes; never backslash-escape a space. Change files with the Edit and Write tools: they are approved without asking in this session, while shell edits (python, sed, perl) stop for a permission answer every time.
+
+## Report through the Toknila MCP tools
+
+Use the tools of the MCP server `toknila`; never change the ticket any other way.
+
+- `started`: you begin working.
+- `subtask_done` (`position`): a checklist item is done.
+- `note` (comment template fields): progress, a decision, a finding.
+- `ask_human` (`text`): you need an answer; then stop and wait.
+- `finished` (`summary`): the work is complete and every acceptance item holds. Not before. Commit your work on this branch first: Toknila pushes the branch, so uncommitted changes never reach the pull request.
+- `crashed` (`detail`): you cannot continue.
+- `propose` (`title`, `prompt`, `acceptance`): work you found that nobody planned. It becomes a card a person approves; do not do it yourself.
+- `open_thread`, `thread_message`, `thread_version`: settle a design with the person before you build it; `finished` is refused while a thread is open.
+
+Only a person accepts, returns, approves or cancels. A refused call comes back as an error text: read it and adapt.
+
+## Instructions from a person
+
+They arrive as a new message that starts with `# [instruction]`. Follow it before anything else. If it conflicts with the task, say so with `note` and ask with `ask_human`.
+
+## Comment template
+
+Reports, notes and decisions use this shape; leave out empty fields:
+
+```markdown
+# [instruction | report | decision] <one-line gist>
+
+**What:** what to do or what was done
+**Why:** context and reason, one or two sentences
+**How to verify:** criterion or command
+**Alternatives:** what was rejected and why (decisions)
+**Consequences / risks:** what changes next (decisions)
+```
+
+## Short output
+
+- Do not narrate what you are about to do and do not paste code back.
+- Report each check as PASS, FAIL, NOT_RUN or BLOCKED, with one line of evidence.
+- Say what the tests do not cover, and mark local-only evidence as such.
+- Keep every note and summary to the template fields, a few lines each.

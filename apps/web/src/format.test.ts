@@ -14,6 +14,12 @@ describe("outOfOrderText", () => {
 
 describe("reasonText", () => {
   const blocked = (reason: object) => ({ status: "blocked", resume_to: "review", reason }) as StatusReason;
+
+  it("says an agent ended from outside was terminated and that unblock starts it again", () => {
+    expect(reasonText(blocked({ kind: "terminated", detail: "exit 143, SIGTERM" }))).toBe(
+      "the agent was terminated from outside (exit 143, SIGTERM); unblock starts it again",
+    );
+  });
   it("names the failing checks and says a closed pull request was not merged", () => {
     expect(reasonText(blocked({ kind: "ci_failed", url: "https://x/pull/1", checks: ["verify (ubuntu)", "desktop"] }))).toBe(
       "checks failed: verify (ubuntu), desktop",

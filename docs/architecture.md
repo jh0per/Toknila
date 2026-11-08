@@ -314,7 +314,9 @@ worker; the reviewer's output is read, never written, with `?role=reviewer`.
 - **Exit.** The process's end comes back as `runs::ended` in one unit of work: it journals
   `ticket.runner_exited` (`{run, exit: {code, signal}}`) and, if the ticket's agent was still
   working (Running or Waiting) and the host did not stop it, feeds the machine
-  `Block(crashed)`: non-zero code and signals say so (`exit 101`, `killed by signal ...`), and a
+  `Block(crashed)`: non-zero code and signals say so (`exit 101`, `killed by signal ...`); an end
+  that came from outside (SIGTERM, SIGKILL, hang-up, interrupt, exit 143 and 137, Windows' terminated
+  status) is `Block(terminated)` instead, worded "terminated from outside, unblock starts it again"; a
   zero exit without a `finished` event is a crash too (`exited without a finished event`), since
   the work cannot be taken as done; `tok unblock` starts the runner again. After the hand-in
   (Review) an exit changes nothing.
@@ -804,7 +806,12 @@ no verdict carries the text "The reviewer gave no verdict", the reviewer's last 
 A `question` item says whose it is (`role`: the card's worker or its reviewer), what is asked
 (`text`; for a permission it ends with the tool and a summary of the call, the command or the
 file, at most 300 characters, never the contents of a prompt or a file) and which answers it takes
-(`answers`, from `toknila_core::question::QuestionKind::answers`):
+(`answers`, from `toknila_core::question::QuestionKind::answers`). When the summary lost something
+(it was cut, or the command had several lines) the item also carries `detail`: the whole text of
+the call, lines kept, at most 4000 characters (`hook::summary_and_detail`); the window shows it
+behind "Show the full command" and `tok show` prints it under "the full request". A worker whose
+card is in Review has handed in: its permission requests are refused at once with a reason
+(`question::auto_decision`), nobody is asked, and the card is asked about again only after a Return.
 
 | Question | Answers | Source |
 |---|---|---|

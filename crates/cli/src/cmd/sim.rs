@@ -98,7 +98,11 @@ pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> R
     }
     let event = match action {
         SimCmd::Start => AgentEvent::Started,
-        SimCmd::Ask { text, permission } => AgentEvent::AskHuman { text, permission },
+        SimCmd::Ask { text, permission } => AgentEvent::AskHuman {
+            text,
+            permission,
+            detail: None,
+        },
         SimCmd::Subtask { position, .. } => AgentEvent::SubtaskDone { position },
         SimCmd::Note { text } => AgentEvent::Note {
             body: CommentBody {

@@ -233,6 +233,44 @@ async fn a_long_tool_summary_is_capped() {
         "{}",
         q[0]["text"]
     );
+    assert_eq!(
+        q[0]["detail"],
+        format!("Bash: {long}").replace("Bash: ", ""),
+        "the full text travels with the question"
+    );
+}
+
+#[tokio::test]
+async fn a_multiline_request_keeps_its_lines_for_the_worker_and_the_reviewer_and_a_short_one_has_none()
+ {
+    let (api, token) = setup().await;
+    let script = "python3 - <<'EOF'\nprint('hi')\nEOF";
+    let tool = format!("Bash: {script}");
+    let hook = permission(&api, &token, &tool);
+    let person = async {
+        let q = wait_for(&api, 1).await;
+        assert_eq!(
+            q[0]["text"],
+            "Claude Code asks for permission: Bash: python3 - <<'EOF' print('hi') EOF"
+        );
+        assert_eq!(q[0]["detail"], format!("Bash: {script}"));
+        let shown = api.get("/v1/tickets/DEMO-1").await;
+        assert_eq!(
+            shown["ticket"]["status_reason"]["detail"],
+            format!("Bash: {script}")
+        );
+        answer(&api, json!({ "answer": "allow" })).await;
+    };
+    tokio::join!(hook, person);
+
+    let (reviewer, _) = api.agent_token_as("DEMO-1", AgentRole::Reviewer).await;
+    let hook = permission(&api, &reviewer, "Bash: ls");
+    let person = async {
+        let q = wait_for(&api, 1).await;
+        assert!(q[0]["detail"].is_null(), "{}", q[0]);
+        answer(&api, json!({ "role": "reviewer", "answer": "allow" })).await;
+    };
+    tokio::join!(hook, person);
 }
 
 #[tokio::test]
@@ -308,4 +346,33 @@ async fn a_key_for_a_dialog_without_a_hook_goes_to_the_terminal_or_is_refused() 
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
     assert_eq!(api.status("DEMO-1").await, "waiting");
     assert_eq!(questions(&api).await.len(), 1);
+}
+
+#[tokio::test]
+async fn a_worker_that_handed_in_gets_a_denial_at_once_and_the_card_stays_in_review() {
+    let (api, token) = setup().await;
+    api.call_with(
+        &token,
+        Method::POST,
+        "/v1/tickets/DEMO-1/events",
+        Some(json!({ "event": "finished", "summary": "done" })),
+    )
+    .await;
+    assert_eq!(api.status("DEMO-1").await, "review");
+    let (status, reply) = permission(&api, &token, "Bash: cargo xtask verify").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(reply["decision"], "deny");
+    assert_eq!(
+        reply["message"],
+        toknila_core::question::HANDED_IN_DENIAL,
+        "{reply}"
+    );
+    assert_eq!(api.status("DEMO-1").await, "review", "nobody was asked");
+    assert!(questions(&api).await.is_empty());
+
+    // A reviewer's dialog is not refused: it is the person's to decide.
+    let (reviewer, _) = api.agent_token_as("DEMO-1", AgentRole::Reviewer).await;
+    api.runners.set_permission_wait(Duration::from_millis(60));
+    let (_, reply) = permission(&api, &reviewer, "Bash: ls").await;
+    assert_eq!(reply, json!({ "decision": "ask" }));
 }

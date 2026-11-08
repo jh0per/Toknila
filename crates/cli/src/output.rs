@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 use toknila_api_types::{ChainDetail, EventRecord, TicketDetail, TicketItem};
 use toknila_core::wire::wire_name;
-use toknila_core::{Actor, CommentKind, NodeRef, StatusReason};
+use toknila_core::{Actor, CommentKind, NodeRef, StatusReason, WaitingReason};
 
 /// `90_000` ms -> `1m30s`.
 pub fn duration(ms: u64) -> String {
@@ -235,6 +235,13 @@ pub fn ticket(d: &TicketDetail) {
     let r = reason(t.status_reason.as_ref());
     if !r.is_empty() {
         println!("reason: {r}");
+    }
+    if let Some(StatusReason::Waiting(WaitingReason::Permission {
+        detail: Some(full), ..
+    })) = &t.status_reason
+    {
+        println!("the full request:");
+        full.lines().for_each(|line| println!("  {line}"));
     }
     println!(
         "chain: {}  profile: {}",

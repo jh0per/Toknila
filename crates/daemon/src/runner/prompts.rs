@@ -15,6 +15,7 @@ type Key = (TicketId, AgentRole);
 #[derive(Debug)]
 struct Pending {
     text: String,
+    detail: Option<String>,
     since: Timestamp,
     /// The permission hook that waits for the person's decision, if one does.
     waiter: Option<oneshot::Sender<Decision>>,
@@ -38,12 +39,12 @@ impl Prompts {
         self.inner.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Remembers the summary of the tool call the run is about to make.
-    pub fn remember_tool(&self, ticket: TicketId, role: AgentRole, summary: String) {
-        self.inner().tools.insert((ticket, role), summary);
+    /// Remembers the tool call the run is about to make, as the hook told it (the whole text).
+    pub fn remember_tool(&self, ticket: TicketId, role: AgentRole, tool: String) {
+        self.inner().tools.insert((ticket, role), tool);
     }
 
-    /// The summary of the run's last tool call.
+    /// The run's last tool call, as the hook told it.
     pub fn last_tool(&self, ticket: TicketId, role: AgentRole) -> Option<String> {
         self.inner().tools.get(&(ticket, role)).cloned()
     }
@@ -57,6 +58,7 @@ impl Prompts {
         ticket: TicketId,
         role: AgentRole,
         text: String,
+        detail: Option<String>,
         since: Timestamp,
         hook: bool,
     ) -> (bool, Option<oneshot::Receiver<Decision>>) {
@@ -77,6 +79,7 @@ impl Prompts {
                 key,
                 Pending {
                     text,
+                    detail,
                     since,
                     waiter,
                 },
@@ -126,6 +129,7 @@ impl Prompts {
                 ticket: *ticket,
                 role: *role,
                 text: p.text.clone(),
+                detail: p.detail.clone(),
                 since: p.since,
             })
             .collect()
@@ -168,7 +172,7 @@ mod tests {
     fn a_decision_reaches_the_waiting_hook_once() {
         let prompts = Prompts::default();
         let (t, r) = ids();
-        let (fresh, rx) = prompts.begin(t, r, "Bash: ls".into(), Timestamp(1), true);
+        let (fresh, rx) = prompts.begin(t, r, "Bash: ls".into(), None, Timestamp(1), true);
         assert!(fresh);
         let mut rx = rx.expect("receiver");
         assert!(prompts.hook_waiting(t, r));
@@ -182,7 +186,7 @@ mod tests {
     fn a_dialog_without_a_hook_is_open_but_nothing_waits_for_it() {
         let prompts = Prompts::default();
         let (t, r) = ids();
-        let (fresh, rx) = prompts.begin(t, r, "p".into(), Timestamp(1), false);
+        let (fresh, rx) = prompts.begin(t, r, "p".into(), None, Timestamp(1), false);
         assert!(fresh && rx.is_none());
         assert!(prompts.is_pending(t, r) && !prompts.hook_waiting(t, r));
         assert!(!prompts.resolve(t, r, Decision::Allow));
@@ -197,9 +201,15 @@ mod tests {
     fn a_notification_does_not_replace_the_dialog_a_hook_holds() {
         let prompts = Prompts::default();
         let (t, r) = ids();
-        let (_, rx) = prompts.begin(t, r, "from the hook".into(), Timestamp(1), true);
-        let (fresh, none) =
-            prompts.begin(t, r, "from the notification".into(), Timestamp(9), false);
+        let (_, rx) = prompts.begin(t, r, "from the hook".into(), None, Timestamp(1), true);
+        let (fresh, none) = prompts.begin(
+            t,
+            r,
+            "from the notification".into(),
+            None,
+            Timestamp(9),
+            false,
+        );
         assert!(!fresh && none.is_none());
         assert!(prompts.hook_waiting(t, r));
         let open = prompts.pending();

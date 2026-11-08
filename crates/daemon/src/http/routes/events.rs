@@ -112,15 +112,19 @@ pub async fn ticket_activity(
     let (tokens, prompts) = (state.runners.tokens(), state.runners.prompts());
     tokens.mark_active(t.id, role, at);
     if let Some(tool) = &input.tool {
-        prompts.remember_tool(t.id, role, hook::cap_summary(tool));
+        prompts.remember_tool(t.id, role, tool.clone());
     }
     let screen_gone = prompts.unflag_screen(t.id, role);
     let dialog_gone = hook::clears_prompt(&input.signal) && prompts.clear(t.id, role);
     // A prompt that the permission hook already holds is the same dialog.
     let asked = input.prompt.as_deref().map(|message| {
-        let text = hook::permission_text(Some(message), prompts.last_tool(t.id, role).as_deref());
-        let (fresh, _) = prompts.begin(t.id, role, text.clone(), at, false);
-        (fresh, text)
+        let (summary, detail) = prompts.last_tool(t.id, role).map_or((None, None), |full| {
+            let (summary, detail) = hook::summary_and_detail(&full);
+            (Some(summary), detail)
+        });
+        let text = hook::permission_text(Some(message), summary.as_deref());
+        let (fresh, _) = prompts.begin(t.id, role, text.clone(), detail.clone(), at, false);
+        (fresh, (text, detail))
     });
     // Only the worker's signs of life count for the nudge and bring a waiting card back: a
     // reviewer beside it is not the worker working.
@@ -129,7 +133,7 @@ pub async fn ticket_activity(
         tokens.touch(t.id, at, &input.signal);
     }
     let resume = worker && t.status == TicketStatus::Waiting && nudge::resumes(&input.signal);
-    let raised = asked.filter(|(fresh, _)| *fresh).map(|(_, text)| text);
+    let raised = asked.filter(|(fresh, _)| *fresh).map(|(_, asked)| asked);
     let reviewer_gone = (screen_gone || dialog_gone) && !worker;
     // A reviewer's turn ended: if its verdict is still missing, core nudges it or hands the card
     // to a person (a card that has moved on refuses the event).
@@ -150,8 +154,8 @@ pub async fn ticket_activity(
                 if resume {
                     agent::activity(tx, &t, &signal)?;
                 }
-                if let Some(text) = raised {
-                    ask_person(tx, &t, role, text)?;
+                if let Some((text, detail)) = raised {
+                    ask_person(tx, &t, role, text, detail)?;
                 }
                 if screen_gone || reviewer_gone {
                     questions::cleared(tx, &t, role)?;

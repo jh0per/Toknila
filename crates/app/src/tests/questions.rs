@@ -22,12 +22,14 @@ fn ask(mem: &mut Mem) {
     let event = AgentEvent::AskHuman {
         text: "may I run rm?".to_owned(),
         permission: true,
+        detail: None,
     };
     agent::ticket_event(mem, &t, event).expect("ask_human");
     assert_eq!(
         a(mem).status_reason,
         Some(StatusReason::Waiting(WaitingReason::Permission {
-            text: "may I run rm?".to_owned()
+            text: "may I run rm?".to_owned(),
+            detail: None
         }))
     );
 }
@@ -113,6 +115,7 @@ fn a_permission_request_leaves_no_comment_on_the_card_but_a_question_does() {
     let event = AgentEvent::AskHuman {
         text: "which database?".to_owned(),
         permission: false,
+        detail: None,
     };
     agent::ticket_event(&mut mem, &t, event).expect("ask_human");
     assert_eq!(mem.comments.len(), 1, "an ask_human question is kept");

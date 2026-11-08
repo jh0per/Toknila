@@ -28,7 +28,7 @@ fn signals(name: &str, stdin: &str) -> NewActivity {
         session_id: input.session_id.clone(),
         transcript_path: input.transcript_path.clone(),
         tool: (name == "pre_tool_use")
-            .then(|| hook::tool_summary(&input))
+            .then(|| hook::tool_text(&input))
             .flatten(),
         prompt: hook::permission_prompt(name, &input),
     }
@@ -91,7 +91,7 @@ pub(super) fn run(name: &str) -> Result<()> {
     if name == "permission_request" {
         let input: HookInput = serde_json::from_str(&stdin).unwrap_or_default();
         let ask = PermissionAsk {
-            tool: hook::tool_summary(&input),
+            tool: hook::tool_text(&input),
         };
         let wait = Duration::from_secs(hook::PERMISSION_WAIT_SECS + 10);
         match agent.client.permission(&agent.ticket, &ask, wait) {
