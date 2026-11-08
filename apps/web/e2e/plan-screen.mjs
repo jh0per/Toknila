@@ -149,7 +149,7 @@ try {
   must((await t("chain-status").getAttribute("class")).includes("tone-attn"), "the pill of a chain that needs a person has the amber tone");
   must((await css(t("chain-status"), "color")) === attn, "the chain pill is amber");
   must((await t("run-chain").getAttribute("class")).includes("primary"), "Run chain is the primary button");
-  await expectText(t("canvas-hint"), "Order is priority. Left to right, no dates.", "the hint is on the canvas");
+  await expectText(t("canvas-hint"), "Lines run from Start to the end. Drag a card to place it.", "the hint is on the canvas");
   for (const word of ["todo", "in progress", "needs you", "done"]) await expectText(t("canvas-legend"), word, "the legend has a word");
 
   // 5. Theme: System, Light, Dark; remembered for this viewer.
@@ -280,7 +280,15 @@ try {
   console.log("PASS Delete in the line's menu removed the dependency");
 
   // The empty canvas menu: New card with N.
-  await page.mouse.click(1330, 300, { button: "right" });
+  // (The Finish node and the cards fill part of the diagram: go down to a free spot.)
+  const freeY = await page.evaluate(() => {
+    for (let y = 300; y < 800; y += 8) {
+      const el = document.elementFromPoint(1330, y);
+      if (el?.closest(".canvas-wrap") && !el.closest(".node, .handle, .canvas-corner, .canvas-hint")) return y;
+    }
+    return 300;
+  });
+  await page.mouse.click(1330, freeY, { button: "right" });
   await t("menu-canvas-new-card").waitFor();
   const canvasMenu = await menuShape();
   must(canvasMenu === "New card,|New chain,Import a plan,|Plan with the assistant", `the canvas menu has three groups (${canvasMenu})`);

@@ -69,6 +69,23 @@ export interface paths {
         patch: operations["patch_chain"];
         trace?: never;
     };
+    "/chains/{chain}/arrange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clears the places a person put the chain's cards at, so the automatic layout draws them. */
+        post: operations["arrange_chain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chains/{chain}/edges": {
         parameters: {
             query?: never;
@@ -2117,6 +2134,7 @@ export interface components {
         PatchTicket: {
             acceptance?: string[] | null;
             needs_secrets?: boolean | null;
+            pos?: components["schemas"]["Pos"] | null;
             profile?: string | null;
             prompt?: string | null;
             review_mode?: components["schemas"]["ReviewMode"] | null;
@@ -2228,6 +2246,13 @@ export interface components {
             run?: components["schemas"]["RunId"] | null;
             /** @description Its process is alive. */
             running: boolean;
+        };
+        /** @description A place on a chain's canvas, in whole canvas pixels. */
+        Pos: {
+            /** Format: int32 */
+            x: number;
+            /** Format: int32 */
+            y: number;
         };
         /** @description Where the cost estimate's prices come from. */
         PriceInfo: {
@@ -2752,6 +2777,7 @@ export interface components {
             needs_secrets: boolean;
             /** @description Paused tickets stay in Backlog and are skipped by autostart. */
             paused: boolean;
+            pos?: components["schemas"]["Pos"] | null;
             pr?: components["schemas"]["PullRequest"] | null;
             /** @description Agent profile name; `None` means the project default. */
             profile?: string | null;
@@ -3135,6 +3161,36 @@ export interface operations {
                 "application/json": components["schemas"]["ChainSettings"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    arrange_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {

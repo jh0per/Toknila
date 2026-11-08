@@ -275,6 +275,24 @@ pub fn move_ticket<U: UnitOfWork + ?Sized>(
     })
 }
 
+/// Hands every card of the chain back to the automatic layout (clears the places a person put
+/// them at). Cards that have none are left alone.
+pub fn arrange<U: UnitOfWork + ?Sized>(uow: &mut U, chain: &str) -> AppResult<ChainId> {
+    change(uow, chain, |ctx| {
+        let placed: Vec<_> = ctx
+            .view
+            .tickets
+            .iter()
+            .filter(|t| t.pos.is_some())
+            .map(|t| t.id)
+            .collect();
+        for id in placed {
+            ctx.edit_ticket(id, |t| t.pos = None)?;
+        }
+        Ok(())
+    })
+}
+
 /// What a person may set on a chain after it is made (a project takes the review fields in
 /// [`crate::projects::PatchProject`]). A field left out is kept.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

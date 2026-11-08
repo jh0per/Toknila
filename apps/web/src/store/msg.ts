@@ -6,6 +6,7 @@ import type {
 } from "../api/types";
 import type { AutostartEffect, AutostartIntent, AutostartResult } from "./autostart";
 import type { EdgeEffect, EdgeIntent, EdgeResult } from "./edges";
+import type { PlacementEffect, PlacementIntent, PlacementResult } from "./placement";
 import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
 import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
 import type { QuickIntent } from "./quick";
@@ -32,6 +33,7 @@ export type Intent =
   | ImportIntent
   | RemovalIntent
   | EdgeIntent
+  | PlacementIntent
   | AutostartIntent
   | QuickIntent
   | ThemeIntent
@@ -81,6 +83,7 @@ export type Msg =
   | ImportResult
   | RemovalResult
   | EdgeResult
+  | PlacementResult
   | AutostartResult
   | UpdateResult
   | UsageResult;
@@ -103,6 +106,7 @@ export type Effect =
   | ImportEffect
   | RemovalEffect
   | EdgeEffect
+  | PlacementEffect
   | AutostartEffect
   | ThemeEffect
   | UpdateEffect

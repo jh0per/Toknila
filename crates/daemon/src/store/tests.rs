@@ -71,6 +71,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         done_out_of_order: None,
         pr: None,
         review: toknila_core::Review::default(),
+        pos: None,
     }
 }
 
@@ -632,4 +633,55 @@ async fn subtasks_and_comments_roundtrip() {
         .expect("read");
     assert_eq!(subs, vec![s]);
     assert_eq!(comments, vec![cm]);
+}
+
+#[tokio::test]
+async fn a_database_before_positions_has_none_and_a_position_is_stored() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("toknila.db");
+    let p = project();
+    let c = chain(p.id);
+    let old = ticket(c.id, 1);
+    {
+        let conn = Connection::open(&path).expect("raw open");
+        for m in &schema::MIGRATIONS[..13] {
+            conn.execute_batch(m).expect("schema");
+        }
+        conn.pragma_update(None, "user_version", 13)
+            .expect("version");
+        insert_phase_0_rows(&conn, &p, &c);
+        conn.execute(
+            "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
+             status_since, paused, needs_secrets, tokens_used) \
+             VALUES (?1, ?2, 'DEMO-1', ?3, ?4, '[]', 'backlog', 1, 0, 0, 0)",
+            params![old.id.to_string(), c.id.to_string(), old.title, old.prompt],
+        )
+        .expect("old ticket");
+    }
+    let store = Store::open(&path).expect("migrates");
+    let id = old.id;
+    let loaded = store
+        .read(move |repo| repo.ticket(id))
+        .await
+        .expect("read")
+        .expect("ticket");
+    assert_eq!(loaded.pos, None);
+
+    let mut moved = loaded.clone();
+    moved.pos = Some(toknila_core::Pos { x: -8, y: 240 });
+    let saved = moved.clone();
+    store
+        .write(Actor::Human, NOW, move |tx| tx.repo().upsert_ticket(&saved))
+        .await
+        .expect("save");
+    let back = store.read(move |repo| repo.ticket(id)).await.expect("read");
+    assert_eq!(back, Some(moved.clone()));
+
+    moved.pos = None;
+    store
+        .write(Actor::Human, NOW, move |tx| tx.repo().upsert_ticket(&moved))
+        .await
+        .expect("clear");
+    let back = store.read(move |repo| repo.ticket(id)).await.expect("read");
+    assert_eq!(back.map(|t| t.pos), Some(None));
 }

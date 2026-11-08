@@ -252,4 +252,9 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE projects ADD COLUMN command_policy TEXT NOT NULL DEFAULT 'ask';
     ALTER TABLE projects ADD COLUMN allowed_commands TEXT NOT NULL DEFAULT '[]';
     "#,
+    // 14: where a person put a card on its chain's canvas (both or neither).
+    r#"
+    ALTER TABLE tickets ADD COLUMN pos_x INTEGER;
+    ALTER TABLE tickets ADD COLUMN pos_y INTEGER;
+    "#,
 ];

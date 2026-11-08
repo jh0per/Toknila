@@ -188,6 +188,21 @@ pub async fn move_ticket(
     Ok(Json(detail))
 }
 
+#[utoipa::path(post, path = "/chains/{chain}/arrange", tag = "chains",
+    params(("chain" = String, Path, description = "Chain id or name")),
+    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody)))]
+/// Clears the places a person put the chain's cards at, so the automatic layout draws them.
+pub async fn arrange_chain(
+    State(state): State<AppState>,
+    Path(chain): Path<String>,
+) -> ApiResult<Json<ChainDetail>> {
+    let detail = chain_write(&state, Actor::Human, move |tx| {
+        Ok(chains::arrange(tx, &chain)?)
+    })
+    .await?;
+    Ok(Json(detail))
+}
+
 #[utoipa::path(delete, path = "/chains/{chain}/edges", tag = "chains",
     params(("chain" = String, Path, description = "Chain id or name"), EdgeInput),
     responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody)))]

@@ -44,6 +44,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         done_out_of_order: None,
         pr: None,
         review: crate::Review::default(),
+        pos: None,
     }
 }
 
@@ -352,4 +353,27 @@ fn pinned_ticket_json_shape() {
             r#""branch":null,"needs_secrets":true,"tokens_used":12345}"#
         )
     );
+}
+
+#[test]
+fn a_patch_tells_a_cleared_position_from_one_left_out() {
+    use crate::{Pos, TicketPatch};
+
+    let left_out: TicketPatch = serde_json::from_str(r#"{"title":"x"}"#).expect("parse");
+    let cleared: TicketPatch = serde_json::from_str(r#"{"pos":null}"#).expect("parse");
+    let set: TicketPatch = serde_json::from_str(r#"{"pos":{"x":8,"y":16}}"#).expect("parse");
+    assert_eq!(left_out.pos, None);
+    assert_eq!(cleared.pos, Some(None));
+    assert_eq!(set.pos, Some(Some(Pos { x: 8, y: 16 })));
+    assert!(cleared.only_moves() && set.only_moves() && !left_out.only_moves());
+    let both: TicketPatch = serde_json::from_str(r#"{"title":"x","pos":null}"#).expect("parse");
+    assert!(!both.only_moves());
+
+    let mut t = ticket(TicketStatus::Backlog, None);
+    set.apply(&mut t);
+    assert_eq!(t.pos, Some(Pos { x: 8, y: 16 }));
+    left_out.apply(&mut t);
+    assert_eq!(t.pos, Some(Pos { x: 8, y: 16 }), "left out keeps it");
+    cleared.apply(&mut t);
+    assert_eq!(t.pos, None);
 }

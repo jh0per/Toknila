@@ -55,6 +55,18 @@ pub struct Ticket {
     /// Whose verdict the card waits for in Review, and the rounds held so far.
     #[serde(default, skip_serializing_if = "Review::is_empty")]
     pub review: Review,
+    /// Where a person put the card on its chain's canvas (canvas pixels); `None` leaves the card
+    /// to the automatic layout. Only the window reads it: it is not in chain files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pos: Option<Pos>,
+}
+
+/// A place on a chain's canvas, in whole canvas pixels.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Pos {
+    pub x: i32,
+    pub y: i32,
 }
 
 /// The mark of a card that was done out of order: the earlier cards that were still open.
@@ -151,6 +163,7 @@ impl Ticket {
             done_out_of_order: None,
             pr: None,
             review: Review::default(),
+            pos: None,
         }
     }
 
@@ -193,9 +206,32 @@ pub struct TicketPatch {
     pub review_mode: Option<ReviewMode>,
     pub reviewer: Option<String>,
     pub needs_secrets: Option<bool>,
+    /// Where the card sits on the canvas: a place, `null` to hand it back to the automatic
+    /// layout, left out to keep it.
+    #[serde(
+        default,
+        deserialize_with = "some_or_null",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[cfg_attr(feature = "openapi", schema(value_type = Option<Pos>, nullable))]
+    pub pos: Option<Option<Pos>>,
+}
+
+/// Tells a field that is `null` from one that is left out: `Some(None)` against `None`.
+fn some_or_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<Pos>>, D::Error> {
+    Option::<Pos>::deserialize(d).map(Some)
 }
 
 impl TicketPatch {
+    /// Whether the patch only moves the card on the canvas (allowed on a finished card too).
+    pub fn only_moves(&self) -> bool {
+        self.pos.is_some()
+            && Self {
+                pos: None,
+                ..self.clone()
+            } == Self::default()
+    }
+
     /// Writes the given fields into `t`.
     pub fn apply(self, t: &mut Ticket) {
         if let Some(v) = self.title {
@@ -218,6 +254,9 @@ impl TicketPatch {
         }
         if let Some(v) = self.needs_secrets {
             t.needs_secrets = v;
+        }
+        if let Some(v) = self.pos {
+            t.pos = v;
         }
     }
 }

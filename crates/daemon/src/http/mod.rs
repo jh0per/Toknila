@@ -60,6 +60,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(get_chain, patch_chain, delete_chain))
         .routes(routes!(add_edge, remove_edge))
         .routes(routes!(move_ticket))
+        .routes(routes!(arrange_chain))
         .routes(routes!(archive_project))
         .routes(routes!(unarchive_project))
         .routes(routes!(delete_project))

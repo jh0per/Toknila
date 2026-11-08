@@ -4,6 +4,7 @@ import type {
   ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads,
 } from "../api/types";
 import { type EdgesState, initialEdges } from "./edges";
+import { type PlacementState, initialPlacement } from "./placement";
 import { type ImportState, initialImports } from "./imports";
 import { type PlanState, initialPlan } from "./plan";
 import { type QuickState, initialQuick } from "./quick";
@@ -57,6 +58,7 @@ export interface State {
   removal: RemovalState;
   /// Editing dependencies: the selected line and the daemon's last refusal.
   edges: EdgesState;
+  placement: PlacementState;
   /// The quick new-card field and the card menu on the diagram.
   quick: QuickState;
   /// The Usage page: window, metric and the daemon's answer.
@@ -97,6 +99,7 @@ export function initialState(route: Route): State {
     imports: initialImports,
     removal: initialRemoval,
     edges: initialEdges,
+    placement: initialPlacement,
     quick: initialQuick,
     usage: initialUsage,
     updates: initialUpdates,

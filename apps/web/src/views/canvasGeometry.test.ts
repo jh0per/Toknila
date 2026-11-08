@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { H, edgeGeometry, edgeId, inPoint, outPoint, y } from "./canvasGeometry";
+import { GAP_X, GAP_Y, GRID, H, PAD, W, canvasSize, edgeGeometry, edgeId, inPoint, outPoint, snapPos, x, y } from "./canvasGeometry";
 
-const node = (col: number, lane: number) => ({ col, lane });
+const node = (col: number, lane: number) => ({ x: x(col), y: y(lane) });
 
 describe("edgeGeometry", () => {
   it("keeps a single line at the middle of each card's edge", () => {
@@ -12,7 +12,7 @@ describe("edgeGeometry", () => {
   });
 
   it("spreads eight lines from one card over separate points, in the order of their targets", () => {
-    const at = new Map<string, { col: number; lane: number }>([["root", node(0, 4)]]);
+    const at = new Map<string, { x: number; y: number }>([["root", node(0, 4)]]);
     const edges = [];
     for (let i = 0; i < 8; i++) {
       at.set(`t${i}`, node(1, i));
@@ -33,7 +33,7 @@ describe("edgeGeometry", () => {
   });
 
   it("spreads the lines that enter one card at separate points of its left edge", () => {
-    const at = new Map<string, { col: number; lane: number }>([["sink", node(1, 0)]]);
+    const at = new Map<string, { x: number; y: number }>([["sink", node(1, 0)]]);
     const edges = [];
     for (let i = 0; i < 3; i++) {
       at.set(`s${i}`, node(0, i));
@@ -48,5 +48,29 @@ describe("edgeGeometry", () => {
     const at = new Map([["a", node(0, 0)], ["b", node(1, 0)], ["c", node(1, 1)]]);
     const edges = [{ from: "a", to: "b" }, { from: "a", to: "c" }];
     expect(edgeGeometry(edges, at)).toEqual(edgeGeometry(edges, at));
+  });
+});
+
+describe("pixels", () => {
+  it("puts the connectors on the middle of the right and left edges of a box", () => {
+    expect(outPoint({ x: 100, y: 40 })).toEqual({ x: 100 + W, y: 40 + H / 2 });
+    expect(inPoint({ x: 100, y: 40 })).toEqual({ x: 100, y: 40 + H / 2 });
+  });
+
+  it("lays the auto grid out on the snap grid, so a card that was not moved is already on it", () => {
+    for (const v of [x(0), x(3), y(0), y(5), x(1) - x(0), y(1) - y(0)]) expect(v % GRID).toBe(0);
+    expect(W + GAP_X).toBe(240);
+    expect(H + GAP_Y).toBe(112);
+  });
+
+  it("snaps a dropped card to the grid and keeps it inside the padding", () => {
+    expect(snapPos({ x: 251, y: 99 })).toEqual({ x: 248, y: 96 });
+    expect(snapPos({ x: 252, y: 100 })).toEqual({ x: 256, y: 104 });
+    expect(snapPos({ x: -90, y: 3 })).toEqual({ x: PAD, y: PAD });
+  });
+
+  it("grows the canvas to fit the farthest box", () => {
+    expect(canvasSize([])).toEqual({ width: 2 * PAD, height: 2 * PAD });
+    expect(canvasSize([{ x: PAD, y: PAD }, { x: 600, y: 300 }])).toEqual({ width: 600 + W + PAD, height: 300 + H + PAD });
   });
 });

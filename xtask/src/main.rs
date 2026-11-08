@@ -136,6 +136,7 @@ fn e2e_web() -> Result<(), String> {
     run("node", &["e2e/chain-delete.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/autostart.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/canvas.mjs", &exe("tok")], &web)?;
+    run("node", &["e2e/canvas-move.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/plan-screen.mjs", &exe("tok")], &web)?;
     run("node", &["e2e/chat-keys.mjs", &exe("tok")], &web)?;
     run(

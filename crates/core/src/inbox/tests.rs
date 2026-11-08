@@ -31,6 +31,7 @@ pub(super) fn ticket(n: u32, status: TicketStatus, since: i64) -> Ticket {
         review_mode: None,
         reviewer: None,
         review: crate::Review::default(),
+        pos: None,
         branch: None,
         needs_secrets: false,
         tokens_used: 0,

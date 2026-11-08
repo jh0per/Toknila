@@ -357,6 +357,99 @@ async fn tickets_create_autostart_list_get_patch() {
 }
 
 #[tokio::test]
+async fn a_card_keeps_the_place_it_was_put_at_until_the_chain_is_arranged() {
+    let api = Api::new();
+    api.demo().await;
+    api.post(
+        "/v1/chains/demo/tickets",
+        json!({ "title": "A", "paused": true }),
+    )
+    .await;
+    api.post(
+        "/v1/chains/demo/tickets",
+        json!({ "title": "B", "paused": true }),
+    )
+    .await;
+    assert!(
+        api.get("/v1/tickets/DEMO-1").await["ticket"]
+            .get("pos")
+            .is_none()
+    );
+
+    let (s, moved) = api
+        .call(
+            Method::PATCH,
+            "/v1/tickets/DEMO-1",
+            Some(json!({ "pos": { "x": 248, "y": 40 } })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{moved}");
+    assert_eq!(moved["ticket"]["pos"], json!({ "x": 248, "y": 40 }));
+    api.call(
+        Method::PATCH,
+        "/v1/tickets/DEMO-2",
+        Some(json!({ "pos": { "x": 8, "y": 8 } })),
+    )
+    .await;
+    // A patch without `pos` keeps it.
+    api.call(
+        Method::PATCH,
+        "/v1/tickets/DEMO-1",
+        Some(json!({ "title": "A2" })),
+    )
+    .await;
+    let chain = api.get("/v1/chains/demo").await;
+    let at = |i: usize| chain["tickets"][i]["pos"].clone();
+    assert_eq!(
+        (at(0), at(1)),
+        (json!({ "x": 248, "y": 40 }), json!({ "x": 8, "y": 8 }))
+    );
+
+    // `null` hands one card back to the layout.
+    let (_, cleared) = api
+        .call(
+            Method::PATCH,
+            "/v1/tickets/DEMO-2",
+            Some(json!({ "pos": null })),
+        )
+        .await;
+    assert!(cleared["ticket"].get("pos").is_none(), "{cleared}");
+    assert_eq!(
+        api.get("/v1/tickets/DEMO-1").await["ticket"]["pos"]["x"],
+        248
+    );
+
+    // The positions are not in the chain file.
+    let toml = api.get("/v1/chains/demo/export").await["toml"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    assert!(!toml.contains("248"), "{toml}");
+
+    api.call(
+        Method::PATCH,
+        "/v1/tickets/DEMO-2",
+        Some(json!({ "pos": { "x": 8, "y": 8 } })),
+    )
+    .await;
+    let (s, arranged) = api
+        .call(Method::POST, "/v1/chains/demo/arrange", None)
+        .await;
+    assert_eq!(s, StatusCode::OK, "{arranged}");
+    assert!(
+        arranged["tickets"]
+            .as_array()
+            .expect("tickets")
+            .iter()
+            .all(|t| t.get("pos").is_none())
+    );
+    let (s, _) = api
+        .call(Method::POST, "/v1/chains/nope/arrange", None)
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn edges_add_remove_and_cycles() {
     let api = Api::new();
     api.demo().await;
@@ -791,6 +884,7 @@ async fn openapi_describes_every_route() {
             "/agents",
             "/chains",
             "/chains/{chain}",
+            "/chains/{chain}/arrange",
             "/chains/{chain}/edges",
             "/chains/{chain}/export",
             "/chains/{chain}/releases",
