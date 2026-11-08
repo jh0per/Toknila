@@ -8,6 +8,7 @@ use toknila_core::{BlockedReason, MergeMode, ReviewTurn, ShipLook, TicketStatus}
 use super::Mem;
 use super::merges::{accept, blocked_reason, in_review, unblock};
 use super::runs::settle;
+use crate::GitError;
 use crate::external::ExternalEffect;
 use crate::ships::{self, GuardError};
 use crate::{ShipError, ships::finished_look};
@@ -156,7 +157,7 @@ fn a_pull_request_that_is_already_open_is_watched_without_looking_again() {
 #[test]
 fn a_yard_that_cannot_look_fails_the_merge_with_the_reason() {
     let mut mem = in_review();
-    *mem.yard.found.borrow_mut() = Err(ShipError::GitMissing);
+    *mem.yard.found.borrow_mut() = Err(ShipError::Git(GitError::Missing));
     accept(&mut mem);
     settle(&mut mem);
     let BlockedReason::MergeFailed { detail } = blocked_reason(&mem.ticket_by_title("A")) else {

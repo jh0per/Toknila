@@ -12,8 +12,9 @@ use toknila_app::{resolve, runs};
 use toknila_core::{Actor, AgentRole};
 
 use super::{ApiResult, scrollback_response};
-use crate::http::error::{ApiError, ErrorBody};
+use crate::http::error::ErrorBody;
 use crate::server::AppState;
+use toknila_app::AppError;
 
 #[utoipa::path(get, path = "/tickets/{ticket}/runner/scrollback", tag = "runner",
     params(("ticket" = String, Path, description = "Ticket id or key"), RunnerQuery),
@@ -32,9 +33,8 @@ pub async fn scrollback(
         .await??;
     let runners = state.runners.clone();
     let chunk = tokio::task::spawn_blocking(move || runners.read(t.id, role, None))
-        .await
-        .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))?
-        .ok_or_else(|| ApiError::not_found(format!("output of {}", t.key)))?;
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("output of {}", t.key)))?;
     Ok(scrollback_response(chunk))
 }
 

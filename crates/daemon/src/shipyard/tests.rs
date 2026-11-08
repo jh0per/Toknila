@@ -128,7 +128,10 @@ fn a_missing_git_is_a_typed_error() {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = repo(tmp.path());
     let yard = GitShipyard::with_program(tmp.path().join("ships"), "toknila-no-such-git");
-    assert_eq!(yard.prepare(&spec(&repo)), Err(ShipError::GitMissing));
+    assert_eq!(
+        yard.prepare(&spec(&repo)),
+        Err(ShipError::Git(toknila_app::GitError::Missing))
+    );
 }
 
 #[test]

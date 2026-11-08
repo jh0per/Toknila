@@ -1,7 +1,7 @@
 //! The shipyard over `git`: one worktree per ticket under `<home>/ships/<project>/<chain>/<slug>`.
 //!
 //! No shell: every command goes through [`crate::git::Git`], an argument list. A missing `git` is
-//! [`ShipError::GitMissing`], not a panic.
+//! [`ShipError::Git(GitError::Missing)`], not a panic.
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};

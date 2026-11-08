@@ -2333,7 +2333,7 @@ export interface components {
         };
         /** @description A release milestone between tickets on the chain graph. */
         Release: {
-            /** @description `release/<version>`; empty in phase 0, where there are no branches. */
+            /** @description The release's branch (`release/<version>`); `null` while no branch was made. */
             branch?: string | null;
             chain_id: components["schemas"]["ChainId"];
             channel: components["schemas"]["ReleaseChannel"];
@@ -2630,7 +2630,7 @@ export interface components {
         Ticket: {
             /** @description Acceptance criteria, one per entry. */
             acceptance: string[];
-            /** @description Ship branch `ship/<chain>/<slug>`; empty until phase 1 creates ships. */
+            /** @description Ship branch `ship/<chain>/<slug>`; `null` until the card's ship is made. */
             branch?: string | null;
             chain_id: components["schemas"]["ChainId"];
             done_out_of_order?: components["schemas"]["OutOfOrder"] | null;

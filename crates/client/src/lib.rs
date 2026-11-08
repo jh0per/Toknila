@@ -5,17 +5,21 @@ use std::time::Duration;
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use toknila_api_types::{
-    ActionInput, AgentEvent, ChainDetail, ChainFile, ChainItem, EdgeInput, ErrorBody, EventRecord,
-    NewActivity, NewChain, NewComment, NewMessage, NewRelease, NewSubtask, NewThread, NewTicket,
-    NewVersion, NewWildcard, PatchSubtask, PatchTicket, ProfileList, ProjectAgents, ReleaseEvent,
-    ThreadDetail, TicketDetail, TicketItem, TicketQuery, TicketThreads,
-};
+use toknila_api_types::ErrorBody;
 
+mod agents;
+mod chains;
+mod events;
+mod inbox;
 mod planner;
+mod plans;
 mod projects;
+mod questions;
+mod releases;
 mod runner;
-mod settings;
+mod system;
+mod threads;
+mod tickets;
 mod usage;
 
 pub use runner::Scrollback;
@@ -105,248 +109,6 @@ impl Client {
             Err(e) => Err(transport_error(e)),
         }
     }
-
-    /// `GET /agents`.
-    pub fn agents(&self) -> ClientResult<Vec<ProjectAgents>> {
-        self.call("GET", "/agents", NO_BODY)
-    }
-
-    // ---- profiles ----
-
-    /// `GET /profiles`.
-    pub fn profiles(&self) -> ClientResult<ProfileList> {
-        self.call("GET", "/profiles", NO_BODY)
-    }
-
-    // ---- chains ----
-
-    /// `POST /projects/{project}/chains`.
-    pub fn create_chain(&self, project: &str, c: &NewChain) -> ClientResult<ChainDetail> {
-        self.call(
-            "POST",
-            &format!("/projects/{}/chains", enc(project)),
-            Some(c),
-        )
-    }
-
-    /// `POST /projects/{project}/import`.
-    pub fn import_chain(&self, project: &str, toml: String) -> ClientResult<ChainDetail> {
-        let path = format!("/projects/{}/import", enc(project));
-        self.call("POST", &path, Some(&ChainFile { toml }))
-    }
-
-    /// `GET /chains/{chain}/export`.
-    pub fn export_chain(&self, chain: &str) -> ClientResult<String> {
-        let path = format!("/chains/{}/export", enc(chain));
-        Ok(self.call::<ChainFile>("GET", &path, NO_BODY)?.toml)
-    }
-
-    /// `GET /chains`.
-    pub fn chains(&self) -> ClientResult<Vec<ChainItem>> {
-        self.call("GET", "/chains", NO_BODY)
-    }
-
-    /// `GET /chains/{chain}`.
-    pub fn chain(&self, chain: &str) -> ClientResult<ChainDetail> {
-        self.call("GET", &format!("/chains/{}", enc(chain)), NO_BODY)
-    }
-
-    /// `POST /chains/{chain}/edges`.
-    pub fn add_edge(&self, chain: &str, e: &EdgeInput) -> ClientResult<ChainDetail> {
-        self.call("POST", &format!("/chains/{}/edges", enc(chain)), Some(e))
-    }
-
-    /// `DELETE /chains/{chain}/edges`.
-    pub fn remove_edge(&self, chain: &str, from: &str, to: &str) -> ClientResult<ChainDetail> {
-        let path = format!(
-            "/chains/{}/edges?from={}&to={}",
-            enc(chain),
-            enc(from),
-            enc(to)
-        );
-        self.call("DELETE", &path, NO_BODY)
-    }
-
-    // ---- releases ----
-
-    /// `POST /chains/{chain}/releases`.
-    pub fn create_release(&self, chain: &str, r: &NewRelease) -> ClientResult<ChainDetail> {
-        self.call("POST", &format!("/chains/{}/releases", enc(chain)), Some(r))
-    }
-
-    /// `POST /releases/{release}/actions/{action}`: start or complete.
-    pub fn release_action(&self, release: &str, action: &str) -> ClientResult<ChainDetail> {
-        let path = format!("/releases/{}/actions/{action}", enc(release));
-        self.call("POST", &path, Some(&serde_json::json!({})))
-    }
-
-    /// `POST /releases/{release}/events`: what a release agent reports.
-    pub fn release_event(&self, release: &str, e: &ReleaseEvent) -> ClientResult<ChainDetail> {
-        self.call(
-            "POST",
-            &format!("/releases/{}/events", enc(release)),
-            Some(e),
-        )
-    }
-
-    // ---- tickets ----
-
-    /// `POST /chains/{chain}/tickets`.
-    pub fn create_ticket(&self, chain: &str, t: &NewTicket) -> ClientResult<TicketDetail> {
-        self.call("POST", &format!("/chains/{}/tickets", enc(chain)), Some(t))
-    }
-
-    /// `POST /chains/{chain}/wildcards`: a person proposes a wildcard card. Approve or reject it
-    /// with [`Self::ticket_action`] (`approve`, `reject`).
-    pub fn propose_wildcard(&self, chain: &str, w: &NewWildcard) -> ClientResult<TicketDetail> {
-        let path = format!("/chains/{}/wildcards", enc(chain));
-        self.call("POST", &path, Some(w))
-    }
-
-    /// `GET /tickets`.
-    pub fn tickets(&self, q: &TicketQuery) -> ClientResult<Vec<TicketItem>> {
-        let mut path = format!("/tickets?needs_human={}", q.needs_human);
-        if let Some(c) = &q.chain {
-            path.push_str(&format!("&chain={}", enc(c)));
-        }
-        self.call("GET", &path, NO_BODY)
-    }
-
-    /// `GET /tickets/{ticket}`.
-    pub fn ticket(&self, ticket: &str) -> ClientResult<TicketDetail> {
-        self.call("GET", &format!("/tickets/{}", enc(ticket)), NO_BODY)
-    }
-
-    /// `PATCH /tickets/{ticket}`.
-    pub fn patch_ticket(&self, ticket: &str, p: &PatchTicket) -> ClientResult<TicketDetail> {
-        self.call("PATCH", &format!("/tickets/{}", enc(ticket)), Some(p))
-    }
-
-    /// `POST /tickets/{ticket}/actions/{action}`.
-    pub fn ticket_action(
-        &self,
-        ticket: &str,
-        action: &str,
-        text: Option<&str>,
-    ) -> ClientResult<TicketDetail> {
-        let path = format!("/tickets/{}/actions/{action}", enc(ticket));
-        let body = ActionInput {
-            text: text.map(str::to_owned),
-        };
-        self.call("POST", &path, Some(&body))
-    }
-
-    /// `POST /tickets/{ticket}/comments`.
-    pub fn add_comment(&self, ticket: &str, c: &NewComment) -> ClientResult<TicketDetail> {
-        self.call(
-            "POST",
-            &format!("/tickets/{}/comments", enc(ticket)),
-            Some(c),
-        )
-    }
-
-    // ---- threads on a card ----
-
-    /// `GET /tickets/{ticket}/threads`.
-    pub fn threads(&self, ticket: &str) -> ClientResult<TicketThreads> {
-        self.call("GET", &format!("/tickets/{}/threads", enc(ticket)), NO_BODY)
-    }
-
-    /// `POST /tickets/{ticket}/threads`.
-    pub fn open_thread(&self, ticket: &str, t: &NewThread) -> ClientResult<ThreadDetail> {
-        let path = format!("/tickets/{}/threads", enc(ticket));
-        self.call("POST", &path, Some(t))
-    }
-
-    /// `POST /tickets/{ticket}/threads/{thread}/messages`.
-    pub fn post_thread_message(
-        &self,
-        ticket: &str,
-        thread: &str,
-        m: &NewMessage,
-    ) -> ClientResult<ThreadDetail> {
-        self.call("POST", &thread_path(ticket, thread, "messages"), Some(m))
-    }
-
-    /// `POST /tickets/{ticket}/threads/{thread}/versions`.
-    pub fn post_thread_version(
-        &self,
-        ticket: &str,
-        thread: &str,
-        v: &NewVersion,
-    ) -> ClientResult<ThreadDetail> {
-        self.call("POST", &thread_path(ticket, thread, "versions"), Some(v))
-    }
-
-    /// `POST /tickets/{ticket}/threads/{thread}/approve`.
-    pub fn approve_thread(&self, ticket: &str, thread: &str) -> ClientResult<ThreadDetail> {
-        self.call("POST", &thread_path(ticket, thread, "approve"), NO_BODY)
-    }
-
-    /// `POST /tickets/{ticket}/threads/{thread}/changes`.
-    pub fn request_thread_changes(
-        &self,
-        ticket: &str,
-        thread: &str,
-        m: &NewMessage,
-    ) -> ClientResult<ThreadDetail> {
-        self.call("POST", &thread_path(ticket, thread, "changes"), Some(m))
-    }
-
-    /// `POST /tickets/{ticket}/subtasks`.
-    pub fn add_subtask(&self, ticket: &str, text: &str) -> ClientResult<TicketDetail> {
-        let body = NewSubtask {
-            text: text.to_owned(),
-        };
-        self.call(
-            "POST",
-            &format!("/tickets/{}/subtasks", enc(ticket)),
-            Some(&body),
-        )
-    }
-
-    /// `PATCH /tickets/{ticket}/subtasks/{position}`.
-    pub fn patch_subtask(
-        &self,
-        ticket: &str,
-        position: u32,
-        p: &PatchSubtask,
-    ) -> ClientResult<TicketDetail> {
-        let path = format!("/tickets/{}/subtasks/{position}", enc(ticket));
-        self.call("PATCH", &path, Some(p))
-    }
-
-    /// `POST /tickets/{ticket}/events`: what a ticket's agent reports. The answer is the ticket,
-    /// or the new card for `propose`.
-    pub fn agent_event(&self, ticket: &str, e: &AgentEvent) -> ClientResult<TicketDetail> {
-        self.call("POST", &format!("/tickets/{}/events", enc(ticket)), Some(e))
-    }
-
-    /// `POST /tickets/{ticket}/activity`: a sign of life from the ticket's agent.
-    pub fn activity(&self, ticket: &str, a: &NewActivity) -> ClientResult<()> {
-        self.call(
-            "POST",
-            &format!("/tickets/{}/activity", enc(ticket)),
-            Some(a),
-        )
-    }
-
-    // ---- journal and daemon ----
-
-    /// `GET /events`: journal entries after `since`, oldest first.
-    pub fn events(&self, since: i64, limit: usize) -> ClientResult<Vec<EventRecord>> {
-        self.call(
-            "GET",
-            &format!("/events?since={since}&limit={limit}"),
-            NO_BODY,
-        )
-    }
-
-    /// `POST /shutdown`: asks the daemon to stop.
-    pub fn shutdown(&self) -> ClientResult<()> {
-        self.call::<serde_json::Value>("POST", "/shutdown", NO_BODY)
-            .map(|_| ())
-    }
 }
 
 /// A failed `ureq` call as a [`ClientError`]: the daemon's error body, or the transport failure.
@@ -362,10 +124,6 @@ fn transport_error(e: ureq::Error) -> ClientError {
         }
         e => ClientError::Transport(e.to_string()),
     }
-}
-
-fn thread_path(ticket: &str, thread: &str, tail: &str) -> String {
-    format!("/tickets/{}/threads/{}/{tail}", enc(ticket), enc(thread))
 }
 
 /// Percent-encodes a path segment or query value.

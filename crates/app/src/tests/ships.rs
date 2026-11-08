@@ -10,6 +10,7 @@ use toknila_core::{BlockedReason, Ship, ShipLook, ShipSpec, StatusReason, Ticket
 
 use super::Mem;
 use super::runs::settle as settle_ships;
+use crate::GitError;
 use crate::external::ExternalEffect;
 use crate::recovery::recover;
 use crate::{AppResult, ShipError, Shipyard, agent, tickets};
@@ -194,7 +195,7 @@ fn a_returned_ticket_reuses_its_ship() {
 #[test]
 fn a_failed_ship_blocks_the_ticket_with_the_reason_and_unblock_retries() {
     let mut mem = with_repo();
-    *mem.yard.fail_prepare.borrow_mut() = Some(ShipError::GitMissing);
+    *mem.yard.fail_prepare.borrow_mut() = Some(ShipError::Git(GitError::Missing));
     recover(&mut mem).expect("settle");
     assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Running);
     settle_ships(&mut mem);
@@ -226,7 +227,7 @@ fn a_failed_ship_blocks_the_ticket_with_the_reason_and_unblock_retries() {
 #[test]
 fn an_outcome_for_a_ticket_that_moved_on_does_not_fail() {
     let mut mem = with_repo();
-    *mem.yard.fail_prepare.borrow_mut() = Some(ShipError::GitMissing);
+    *mem.yard.fail_prepare.borrow_mut() = Some(ShipError::Git(GitError::Missing));
     recover(&mut mem).expect("settle");
     let reason = "not needed".to_owned();
     act_on_a(&mut mem, TicketEvent::Cancel { reason }).expect("cancel");

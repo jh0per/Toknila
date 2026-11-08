@@ -9,8 +9,9 @@ use utoipa::IntoParams;
 
 use super::ApiResult;
 use crate::http::dto::{QuotaReport, UsageSettings, UsageView};
-use crate::http::error::{ApiError, ErrorBody};
+use crate::http::error::ErrorBody;
 use crate::server::{AppState, Principal};
+use toknila_app::AppError;
 
 /// Query of `GET /v1/usage`.
 #[derive(Debug, Deserialize, IntoParams)]
@@ -30,9 +31,9 @@ pub async fn get_usage(
 ) -> ApiResult<Json<UsageView>> {
     let days = q.days.unwrap_or(WINDOWS[0]);
     if !WINDOWS.contains(&days) {
-        return Err(ApiError::bad_request(format!(
-            "days must be one of {WINDOWS:?}, not {days}"
-        )));
+        return Err(
+            AppError::bad_request(format!("days must be one of {WINDOWS:?}, not {days}")).into(),
+        );
     }
     Ok(Json(state.usage.view(&state.store, days).await?))
 }

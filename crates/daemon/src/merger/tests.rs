@@ -262,7 +262,7 @@ fn missing_branches_and_a_missing_program_are_typed_errors() {
     );
     assert_eq!(
         GitMerger::with_program("toknila-no-such-git").merge(&spec(&f)),
-        Err(MergeError::GitMissing)
+        Err(MergeError::Git(GitError::Missing))
     );
 }
 

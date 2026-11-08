@@ -1,14 +1,8 @@
-//! Projects and their plans: create, change, archive and delete a project, move a card, import
-//! by path, and the plans of a repository.
-
-use toknila_api_types::{
-    ChainDeletion, ChainDetail, DeleteProject, ImportPath, ImportPathResult, MoveInput, NewProject,
-    PatchProject, PlanScan, ProjectDeletion, RepoCheckRequest,
-};
-use toknila_core::Project;
-use toknila_core::repo::RepoCheck;
+//! The project routes: create, read, change, archive and delete a project.
 
 use crate::{Client, ClientResult, NO_BODY, enc};
+use toknila_api_types::{DeleteProject, NewProject, PatchProject, ProjectDeletion};
+use toknila_core::Project;
 
 impl Client {
     /// `GET /projects`.
@@ -19,20 +13,6 @@ impl Client {
     /// `POST /projects`.
     pub fn create_project(&self, p: &NewProject) -> ClientResult<Project> {
         self.call("POST", "/projects", Some(p))
-    }
-
-    /// `POST /repos/check`: what a folder suggests for a project (key, name, base branch, check
-    /// command, merge mode) and what is wrong with it.
-    pub fn check_repo(
-        &self,
-        repo_path: &str,
-        work_branch: Option<&str>,
-    ) -> ClientResult<RepoCheck> {
-        let body = RepoCheckRequest {
-            repo_path: repo_path.to_owned(),
-            work_branch: work_branch.map(str::to_owned),
-        };
-        self.call("POST", "/repos/check", Some(&body))
     }
 
     /// `PATCH /projects/{project}`.
@@ -69,40 +49,5 @@ impl Client {
             &format!("/projects/{}/delete", enc(project)),
             Some(d),
         )
-    }
-
-    /// `DELETE /chains/{chain}`: the chain and its cards go; the answer says what became of the
-    /// ships and run files. `project` narrows the chain's name to one project.
-    pub fn delete_chain(&self, chain: &str, project: Option<&str>) -> ClientResult<ChainDeletion> {
-        let mut path = format!("/chains/{}", enc(chain));
-        if let Some(p) = project {
-            path = format!("{path}?project={}", enc(p));
-        }
-        self.call("DELETE", &path, NO_BODY)
-    }
-
-    /// `POST /chains/{chain}/tickets/{ticket}/move`.
-    pub fn move_ticket(
-        &self,
-        chain: &str,
-        ticket: &str,
-        m: &MoveInput,
-    ) -> ClientResult<ChainDetail> {
-        let path = format!("/chains/{}/tickets/{}/move", enc(chain), enc(ticket));
-        self.call("POST", &path, Some(m))
-    }
-
-    /// `POST /projects/{project}/import-path`: the daemon reads `path` (absolute) and imports it.
-    pub fn import_path(&self, project: &str, path: &str) -> ClientResult<ImportPathResult> {
-        let body = ImportPath {
-            path: path.to_owned(),
-        };
-        let route = format!("/projects/{}/import-path", enc(project));
-        self.call("POST", &route, Some(&body))
-    }
-
-    /// `GET /projects/{project}/plans`: the plans in the project's repository.
-    pub fn plans(&self, project: &str) -> ClientResult<PlanScan> {
-        self.call("GET", &format!("/projects/{}/plans", enc(project)), NO_BODY)
     }
 }

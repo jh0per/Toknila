@@ -1,7 +1,7 @@
 //! Looking at a ship's worktree for the uncommitted-ship guard: what `git status` lists and how
 //! many commits the branch has beyond where it started.
 
-use toknila_app::ShipError;
+use toknila_app::{GitError, ShipError};
 use toknila_core::ShipLook;
 use toknila_core::guard::ShipState;
 
@@ -35,17 +35,19 @@ impl GitShipyard {
             )
             .map_err(ShipError::from)?;
         if !out.status.success() {
-            return Err(ShipError::Git {
+            return Err(ShipError::Git(GitError::Failed {
                 command: "status".to_owned(),
                 detail: String::from_utf8_lossy(&out.stderr).trim().to_owned(),
-            });
+            }));
         }
         let changed = changed_paths(&out.stdout);
         let range = format!("{}..HEAD", look.start);
         let count = self.git(dir, ["rev-list", "--count", range.as_str()])?;
-        let ahead = count.parse().map_err(|_| ShipError::Git {
-            command: "rev-list --count".to_owned(),
-            detail: format!("unexpected answer {count:?}"),
+        let ahead = count.parse().map_err(|_| {
+            ShipError::Git(GitError::Failed {
+                command: "rev-list --count".to_owned(),
+                detail: format!("unexpected answer {count:?}"),
+            })
         })?;
         Ok(ShipState { changed, ahead })
     }

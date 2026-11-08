@@ -9,6 +9,7 @@ use toknila_core::{BlockedReason, MergeSpec, ReviewTurn, StatusReason, Ticket, T
 
 use super::Mem;
 use super::runs::settle;
+use crate::GitError;
 use crate::external::ExternalEffect;
 use crate::recovery::recover;
 use crate::{MergeError, MergeOutcome, Merger, agent, tickets};
@@ -184,7 +185,7 @@ fn a_dirty_base_checkout_and_a_failed_merge_block_with_their_own_reasons() {
         }
     );
 
-    answer(&mem, Err(MergeError::GitMissing));
+    answer(&mem, Err(MergeError::Git(GitError::Missing)));
     unblock(&mut mem);
     settle(&mut mem);
     assert_eq!(

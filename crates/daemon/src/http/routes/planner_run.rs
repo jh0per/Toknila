@@ -14,8 +14,9 @@ use toknila_app::resolve;
 use toknila_core::{Actor, AgentProfile, AgentRole, PlannerSpec, Project, planner as rules};
 
 use super::{ApiResult, scrollback_response};
-use crate::http::error::{ApiError, ErrorBody};
+use crate::http::error::ErrorBody;
 use crate::server::AppState;
+use toknila_app::AppError;
 
 const PROJECT: &str = "Project id or key";
 
@@ -71,7 +72,7 @@ pub async fn start_planner(
         .into_iter()
         .map(|l| l.profile)
         .find(|prof| prof.name == name)
-        .ok_or_else(|| ApiError::bad_request(format!("agent profile {name} does not exist")))?;
+        .ok_or_else(|| AppError::bad_request(format!("agent profile {name} does not exist")))?;
     let runners = state.runners.clone();
     // A live planner is kept as it is: its checkout is not moved under it.
     let yard = if state_of(&state, &p).running {
@@ -87,8 +88,7 @@ pub async fn start_planner(
                 .and_then(|yard| PlannerSpec::for_project(&p).map(|spec| yard.planner_site(&spec)));
             planner::start(&*runners, Actor::Human, &p, &profile, site)
         })
-        .await
-        .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))??
+        .await??
     };
     let mut answer = state_of(&state, &p);
     answer.run = Some(started.run.id);
@@ -106,9 +106,7 @@ pub async fn stop_planner(
     let p = project_of(&state, project).await?;
     // Ending the process tree waits for a grace period; not on an async worker.
     let (runners, target) = (state.runners.clone(), p.clone());
-    tokio::task::spawn_blocking(move || planner::stop(&*runners, Actor::Human, &target))
-        .await
-        .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))??;
+    tokio::task::spawn_blocking(move || planner::stop(&*runners, Actor::Human, &target)).await??;
     Ok(Json(state_of(&state, &p)))
 }
 
@@ -125,9 +123,8 @@ pub async fn planner_scrollback(
     let runners = state.runners.clone();
     let key = rules::run_key(p.id);
     let chunk = tokio::task::spawn_blocking(move || runners.read(key, AgentRole::Planner, None))
-        .await
-        .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))?
-        .ok_or_else(|| ApiError::not_found(format!("output of the planner of {}", p.key)))?;
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("output of the planner of {}", p.key)))?;
     Ok(scrollback_response(chunk))
 }
 

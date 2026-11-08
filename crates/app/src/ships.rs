@@ -14,14 +14,14 @@ use toknila_core::{
 use crate::external::ExternalEffect;
 
 use crate::chain::tell_ticket;
-use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork};
+use crate::{AppError, AppResult, ChainTx, GitError, Reader, UnitOfWork};
 
 /// Why a ship could not be made or removed. The text lands in the ticket's blocked reason.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ShipError {
-    /// The `git` executable is not installed or not on the path.
-    #[error("git is not installed or not on PATH")]
-    GitMissing,
+    /// A `git` command did not give a result.
+    #[error(transparent)]
+    Git(#[from] GitError),
     /// The project's repository path is not a git repository.
     #[error("{0} is not a git repository")]
     NotARepository(String),
@@ -35,9 +35,6 @@ pub enum ShipError {
     /// The ship's path is taken by something that is not this ship's worktree.
     #[error("{0} exists but is not the worktree of this ship")]
     PathTaken(String),
-    /// A git command failed.
-    #[error("git {command} failed: {detail}")]
-    Git { command: String, detail: String },
     /// The file system refused.
     #[error("{0}")]
     Io(String),
