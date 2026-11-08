@@ -1,7 +1,7 @@
 //! `tok watch`: print every journal entry live, resuming after a reconnect. With `--json` each
 //! entry is one line of JSON (the journal record as the API gives it,
 //! `at` being the event time in milliseconds since the Unix epoch, UTC). Plain lines start with the
-//! event's local time..
+//! event's local time.
 
 use std::io::Write;
 use std::time::Duration;

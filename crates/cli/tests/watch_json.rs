@@ -47,3 +47,44 @@ fn watch_json_prints_each_journal_entry_as_one_json_line() {
     assert!((now - at).abs() < 10 * 60 * 1000, "at={at} now={now}");
     snapshot("watch_json_first_entry", entry);
 }
+
+#[test]
+fn watch_plain_line_starts_with_the_local_time() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tok = Tok {
+        home: dir.path().join("home"),
+    };
+    tok.run(&["project", "new", "DEMO"]);
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_tok"))
+        .args(["watch", "--since", "0"])
+        .env("TOKNILA_HOME", &tok.home)
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn tok watch");
+    let out = child.stdout.take().expect("stdout");
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        for line in BufReader::new(out).lines().map_while(Result::ok) {
+            let _ = tx.send(line);
+        }
+    });
+    let first = rx.recv_timeout(Duration::from_secs(30));
+    let _ = child.kill();
+    let _ = child.wait();
+    let line = first.expect("a journal line");
+    let (time, rest) = line.split_once(' ').expect("time then text");
+    let digits: Vec<&str> = time.split(':').collect();
+    assert!(
+        digits.len() == 3
+            && digits
+                .iter()
+                .all(|d| d.len() == 2 && d.bytes().all(|b| b.is_ascii_digit())),
+        "line must start with HH:MM:SS: {line}"
+    );
+    // The clock time varies with the run and the zone; the rest is pinned.
+    snapshot(
+        "watch_plain_first_line",
+        serde_json::Value::String(format!("<HH:MM:SS> {rest}")),
+    );
+}
