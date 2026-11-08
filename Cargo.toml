@@ -37,6 +37,7 @@ http-body-util = "0.1"
 axum = { version = "0.8", features = ["ws"] }
 tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 dirs = "7"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 getrandom = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
