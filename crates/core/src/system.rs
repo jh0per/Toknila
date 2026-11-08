@@ -78,10 +78,12 @@ pub struct SystemChecks {
 }
 
 impl SystemChecks {
-    /// The checks with their overall verdict.
+    /// The checks with their overall verdict: ok unless a line is worse than a warning.
     pub fn new(checks: Vec<Check>) -> Self {
         Self {
-            ok: checks.iter().all(|c| c.status == CheckStatus::Ok),
+            ok: checks
+                .iter()
+                .all(|c| matches!(c.status, CheckStatus::Ok | CheckStatus::Warning)),
             checks,
         }
     }
@@ -333,6 +335,14 @@ mod tests {
         assert_eq!(data_home("/h", &ran(128, "")), None);
         assert_eq!(data_home("/h", &ran(0, "false\n")), None);
         assert_eq!(data_home("/h", &Probe::Missing), None);
+    }
+
+    #[test]
+    fn a_warning_keeps_the_overall_verdict_ok_but_a_failure_does_not() {
+        let good = claude(&ran(0, "2.1.0 (Claude Code)"));
+        let warn = data_home("/h", &ran(0, "true\n")).expect("warning");
+        assert!(SystemChecks::new(vec![good.clone(), warn.clone()]).ok);
+        assert!(!SystemChecks::new(vec![good, warn, git(&Probe::Missing)]).ok);
     }
 
     #[test]
