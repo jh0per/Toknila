@@ -21,10 +21,12 @@ function Arrow({ id }: { id: string }) {
 /// the selected line shows a handle at each end to drag onto another card (in a second layer
 /// above the cards' own handles); a line being dragged is drawn to the pointer. While a card is
 /// the focus, its own lines are drawn strong and the others fade (`data-focus`).
-export function EdgeLayer({ width, height, edges, geo, label, selected, focus, drag, onSelect, onMenu, onGrab }: {
+export function EdgeLayer({ width, height, edges, implicit, geo, label, selected, focus, drag, onSelect, onMenu, onGrab }: {
   width: number;
   height: number;
   edges: LaidEdge[];
+  /// The lines from Start and to the end node: drawn thin and dim, not stored, not selectable.
+  implicit: LaidEdge[];
   geo: Map<string, EdgeGeo>;
   /// A node's name for people: a card's key, a milestone's version.
   label: (nodeKey: string) => string;
@@ -44,6 +46,7 @@ export function EdgeLayer({ width, height, edges, geo, label, selected, focus, d
           <Arrow id="arrow" />
           <Arrow id="arrow-hl" />
           <Arrow id="arrow-sel" />
+          <Arrow id="arrow-imp" />
         </defs>
         {edges.map((e) => {
           const g = geo.get(edgeId(e));
@@ -71,6 +74,15 @@ export function EdgeLayer({ width, height, edges, geo, label, selected, focus, d
                   onMenu(e, { x: ev.clientX, y: ev.clientY });
                 }}
               />
+            </g>
+          );
+        })}
+        {implicit.map((e) => {
+          const g = geo.get(edgeId(e));
+          if (!g) return null;
+          return (
+            <g key={edgeId(e)} className="edge implicit" data-implicit={`${label(e.from)}>${label(e.to)}`}>
+              <path className="line" d={curve(g.from, g.to, g.turn)} markerEnd="url(#arrow-imp)" />
             </g>
           );
         })}

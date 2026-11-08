@@ -563,6 +563,12 @@ I/O.
   (`toknila_core::schedule::working_cards`, the same rule that counts slots). Afterwards the same
   cleanup removes the ships' checkouts and run files (`after_chain_delete`); the repository folder
   and `ship/*` branches stay. The answer is `ChainDeletion`.
+- **Card places.** A card may have a place on its chain's canvas (`Ticket.pos`, whole canvas
+  pixels, migration 14). `PATCH /v1/tickets/{t}` takes `pos` (an object, `null` to clear it, left
+  out to keep it; moving is allowed on a finished card too) and `POST /v1/chains/{chain}/arrange`
+  clears every place of a chain. Places are window state: they are not in chain files and not in
+  the planner's view. The Start and end nodes and the implicit lines to them are drawn by the
+  window (`apps/web/src/canvasScene.ts`) and are not stored.
 - **Dependencies from the diagram.** `POST`/`DELETE /v1/chains/{chain}/edges` are the only way
   the window edits a dependency (drag from a card's handle onto another card, click a line and
   press Delete or use the right-click menu, drag a selected line's end onto another card, or the

@@ -59,7 +59,16 @@ try {
   /// A point on empty canvas, to the right of the cards.
   const empty = async (dy = 0) => {
     const b = await inner();
-    return { x: b.x + 760, y: b.y + 300 + dy };
+    const at = { x: b.x + 760, y: b.y + 300 + dy };
+    // The Finish node and the cards take their share of the diagram: go down to a free spot.
+    const y = await page.evaluate(({ x, y }) => {
+      for (let yy = y; yy < y + 480; yy += 8) {
+        const el = document.elementFromPoint(x, yy);
+        if (el?.closest(".canvas-wrap") && !el.closest(".node, .handle, .quick-card, .canvas-corner, .canvas-hint")) return yy;
+      }
+      return y;
+    }, at);
+    return { x: at.x, y };
   };
   const centre = async (loc) => {
     const b = await loc.boundingBox();

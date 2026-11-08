@@ -69,8 +69,8 @@ try {
   await expectText(page.locator('[data-version="R1"]'), "planned", "milestone R1 is a node");
   await expectText(page.locator("[data-testid=running]"), "DEMO-1", "running agents list");
   const nodes = await page.locator(".canvas .node").count();
-  if (nodes !== 5) throw new Error(`canvas: expected 5 nodes, got ${nodes}`);
-  console.log("PASS canvas: 4 cards and 1 milestone");
+  if (nodes !== 7) throw new Error(`canvas: expected 7 nodes, got ${nodes}`);
+  console.log("PASS canvas: 4 cards, 1 milestone, Start and Finish");
   await shot("chain");
 
   // Agent slots: one of the two slots is taken; a chain without autostart whose three cards are

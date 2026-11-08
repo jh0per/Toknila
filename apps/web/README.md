@@ -4,7 +4,10 @@ The read-only page the daemon serves on `127.0.0.1` (Vite + TypeScript + React),
 IDE. Left sidebar: projects, the chains of the selected project, the inbox (tickets that need a
 human, with a count), running agents, a settings placeholder. Main area: the chain canvas (cards
 linked left to right in dependency order, release milestones as their own nodes; `src/layout.ts`
-is the pure position function) above a panel for the selected card with tabs Details, Events
+is the pure position function; `src/canvasScene.ts` adds the Start node on the left and the end
+node on the right, the chain's last release or a Finish node, with thin implicit lines to every
+card that has nothing before or after it; a card can be dragged and keeps its place, Arrange
+hands them all back to the layout) above a panel for the selected card with tabs Details, Events
 (that ticket's journal in words, live, the raw event folded), Chat (its comments, questions and
 answers as bubbles, with the answer box inline), Terminal, Threads and PR. Statuses are grouped
 for display in `src/store/groups.ts` (to do, in progress, blocked, done; cancelled apart). It

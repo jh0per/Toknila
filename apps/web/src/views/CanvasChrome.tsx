@@ -1,20 +1,31 @@
-/// What sits over the diagram without scrolling with it: how to read the order (bottom left), the
-/// Fit button and the colours of the cards (bottom right) and, while a card is being picked for
+/// What sits over the diagram without scrolling with it: how to read it (bottom left), the
+/// Arrange and Fit buttons and the colours of the cards (bottom right) and, while a card is being picked for
 /// "Add dependency", what to click (top).
-export function CanvasChrome({ fitted, cut, onFit, linking, onCancelLinking }: {
+export function CanvasChrome({ fitted, cut, onFit, arrangeable, onArrange, linking, onCancelLinking }: {
   fitted: boolean;
   /// At 100% some cards are outside the view.
   cut: boolean;
   onFit: () => void;
+  /// Some card has a place of its own, so "Arrange" has something to undo.
+  arrangeable: boolean;
+  onArrange: () => void;
   /// The key of the card that will wait for the one picked, while one is being picked.
   linking: string | undefined;
   onCancelLinking: () => void;
 }) {
   return (
     <>
-      <p className="canvas-hint" data-testid="canvas-hint">Order is priority. Left to right, no dates.</p>
+      <p className="canvas-hint" data-testid="canvas-hint">Lines run from Start to the end. Drag a card to place it.</p>
       <div className="canvas-corner">
         {cut && !fitted && <span className="canvas-cut" data-testid="cut-hint">Some cards are out of view.</span>}
+        {arrangeable && (
+          <button
+            type="button" className="btn" data-testid="arrange" title="Put every card back where the layout puts it"
+            onClick={onArrange}
+          >
+            Arrange
+          </button>
+        )}
         {(cut || fitted) && (
           <button
             type="button" className={`btn${cut && !fitted ? " primary" : ""}`} data-testid="fit" aria-pressed={fitted}

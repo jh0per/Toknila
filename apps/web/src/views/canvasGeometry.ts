@@ -14,27 +14,37 @@ export interface Pt {
   y: number;
 }
 
-interface Placed {
-  col: number;
-  lane: number;
-}
+/// The grid a dragged card snaps to, in canvas pixels.
+export const GRID = 8;
+
+const snapTo = (v: number): number => Math.max(PAD, Math.round(v / GRID) * GRID);
+
+/// A card's top-left corner as dropped: on the grid, never outside the canvas's padding.
+export const snapPos = (p: Pt): Pt => ({ x: snapTo(p.x), y: snapTo(p.y) });
+
+/// Where a node sits: the top-left corner of its box, in canvas pixels.
+export type Box = Pt;
 
 /// Where a line leaves a node (the middle of its right edge): the node's connector handle.
-export const outPoint = (n: Placed): Pt => ({ x: x(n.col) + W, y: y(n.lane) + H / 2 });
+export const outPoint = (n: Box): Pt => ({ x: n.x + W, y: n.y + H / 2 });
 
 /// Where a line enters a node (the middle of its left edge).
-export const inPoint = (n: Placed): Pt => ({ x: x(n.col), y: y(n.lane) + H / 2 });
+export const inPoint = (n: Box): Pt => ({ x: n.x, y: n.y + H / 2 });
 
 /// The curve from `a` to `b`, turning at `mid` (the middle by default).
 export function curve(a: Pt, b: Pt, mid = (a.x + b.x) / 2): string {
   return `M${a.x},${a.y} C${mid},${a.y} ${mid},${b.y} ${b.x},${b.y}`;
 }
 
-export function canvasSize(columns: number, lanes: number): { width: number; height: number } {
-  return {
-    width: PAD * 2 + columns * W + Math.max(0, columns - 1) * GAP_X,
-    height: PAD * 2 + lanes * H + Math.max(0, lanes - 1) * GAP_Y,
-  };
+/// The size of the canvas that holds every box, with the padding on every side.
+export function canvasSize(boxes: Iterable<Box>): { width: number; height: number } {
+  let width = PAD;
+  let height = PAD;
+  for (const b of boxes) {
+    width = Math.max(width, b.x + W);
+    height = Math.max(height, b.y + H);
+  }
+  return { width: width + PAD, height: height + PAD };
 }
 
 /// How one line runs: where it leaves, where it enters and where its curve turns.
@@ -64,9 +74,9 @@ const fan = (i: number, n: number, step: number, room: number): number =>
 /// at slightly different places. A card with one line on a side keeps it at the middle.
 export function edgeGeometry(
   edges: { from: string; to: string }[],
-  at: Map<string, Placed>,
+  at: Map<string, Box>,
 ): Map<string, EdgeGeo> {
-  const byY = (a: string, b: string) => (at.get(a)?.lane ?? 0) - (at.get(b)?.lane ?? 0) || (at.get(a)?.col ?? 0) - (at.get(b)?.col ?? 0);
+  const byY = (a: string, b: string) => (at.get(a)?.y ?? 0) - (at.get(b)?.y ?? 0) || (at.get(a)?.x ?? 0) - (at.get(b)?.x ?? 0);
   const out = new Map<string, string[]>();
   const into = new Map<string, string[]>();
   for (const e of edges) {

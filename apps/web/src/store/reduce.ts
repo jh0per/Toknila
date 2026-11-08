@@ -7,6 +7,7 @@ import { reduceAutostart } from "./autostart";
 import { detailsWanted, knownKey } from "./cardDetails";
 import { reduceTheme } from "./theme";
 import { reduceEdges } from "./edges";
+import { reducePlacement } from "./placement";
 import { reduceQuick } from "./quick";
 import { type Dialog, reducePlan, withChain } from "./plan";
 import { ONBOARDING_DRAFT, loadPlanner, reducePlanner } from "./planner";
@@ -194,6 +195,12 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "edgesChanged":
     case "edgeRefused":
       return reduceEdges(s, msg);
+    case "placeCard":
+    case "arrangeChain":
+    case "cardPlaced":
+    case "cardPlaceRefused":
+    case "chainArranged":
+      return reducePlacement(s, msg);
     case "setAutostart":
     case "autostartSet":
     case "autostartRefused":

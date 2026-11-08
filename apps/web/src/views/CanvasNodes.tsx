@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import type { Release, Ticket, TicketDetail, UsageFigures } from "../api/types";
 import { outOfOrderText } from "../format";
 import { nodeKey } from "../layout";
@@ -12,11 +12,13 @@ import { UsageChip } from "./UsageChip";
 /// subtasks are when it has any, and a proposed card carries its own Approve and Reject, the same
 /// actions the Inbox offers, when the daemon allows them. The agent's runner shows only when it is
 /// not the project's default; the usage figures show here and nowhere else on the page.
-export function TicketNode({ ticket: t, href, style, selected, over, linking, detail, usage, queued, defaultProfile, onHover, handlers }: {
+export function TicketNode({ ticket: t, href, style, selected, moving, over, linking, detail, usage, queued, defaultProfile, onHover, handlers }: {
   ticket: Ticket;
   href: string;
   style: CSSProperties;
   selected: boolean;
+  /// The card is being dragged to a new place.
+  moving: boolean;
   /// A line being dragged is over this card.
   over: boolean;
   /// The card can be picked as the one a card waits for ("Add dependency").
@@ -31,6 +33,8 @@ export function TicketNode({ ticket: t, href, style, selected, over, linking, de
   onHover: (on: boolean) => void;
   handlers: {
     activate: () => void;
+    /// The pointer went down on the card: it may start dragging it.
+    press: (e: PointerEvent) => void;
     focus: () => void;
     menu: (e: MouseEvent) => void;
     approve: () => void;
@@ -40,7 +44,7 @@ export function TicketNode({ ticket: t, href, style, selected, over, linking, de
   const progress = subtaskProgress(detail);
   const classes = [
     "node", "ticket", `g-${statusGroup(t.status)}`, statusClass(t.status),
-    selected ? "sel" : "", over ? "over" : "", linking ? "linkable" : "",
+    selected ? "sel" : "", moving ? "moving" : "", over ? "over" : "", linking ? "linkable" : "",
   ].filter(Boolean).join(" ");
   const proposal = t.status === "proposed" && (allows(detail, "approve") || allows(detail, "reject"));
   const extras = Boolean(progress || queued !== undefined || t.pr || t.done_out_of_order || usage);
@@ -53,6 +57,7 @@ export function TicketNode({ ticket: t, href, style, selected, over, linking, de
     <a
       className={classes} data-key={t.key} data-node={nodeKey({ kind: "ticket", id: t.id })} href={href} draggable={false} style={style}
       onClick={act(handlers.activate)}
+      onPointerDown={handlers.press}
       onPointerEnter={() => onHover(true)}
       onPointerLeave={() => onHover(false)}
       // A focused card's allowed actions are read, so S can start it.
@@ -108,13 +113,40 @@ export function TicketNode({ ticket: t, href, style, selected, over, linking, de
   );
 }
 
-/// A release milestone: a dashed node at the end of its cards.
-export function ReleaseNode({ release: r, nodeKey, style, over }: { release: Release; nodeKey: string; style: CSSProperties; over: boolean }) {
+/// A release milestone: a dashed node at the end of its cards. The chain's last release is the
+/// end of the diagram (`end`).
+export function ReleaseNode({ release: r, nodeKey, style, over, end = false }: {
+  release: Release;
+  nodeKey: string;
+  style: CSSProperties;
+  over: boolean;
+  end?: boolean;
+}) {
   return (
-    <div className={`node release${over ? " over" : ""}`} data-node={nodeKey} data-version={r.version} style={style}>
+    <div className={`node release${over ? " over" : ""}`} data-node={nodeKey} data-version={r.version} data-end={end || undefined} style={style}>
       <b className="key">◆ {r.version}</b>
       <span className="muted">{r.channel} · {r.start_mode}</span>
       <small className="muted" data-testid="release-state">{r.state}</small>
+    </div>
+  );
+}
+
+/// Where the diagram starts: a dashed node at its left edge, with the chain's goal under the name.
+export function StartNode({ goal, style }: { goal: string; style: CSSProperties }) {
+  return (
+    <div className="node bookend" data-testid="start-node" style={style}>
+      <b className="key">Start</b>
+      <span className="muted goal" title={goal}>{goal.trim() || "No goal yet"}</span>
+    </div>
+  );
+}
+
+/// Where the diagram ends when the chain has no release: a dashed node at its right edge.
+export function FinishNode({ style }: { style: CSSProperties }) {
+  return (
+    <div className="node bookend" data-testid="end-node" data-end style={style}>
+      <b className="key">Finish</b>
+      <span className="muted">Everything above is done</span>
     </div>
   );
 }

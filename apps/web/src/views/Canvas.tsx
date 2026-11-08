@@ -1,19 +1,21 @@
 import { type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import type { ChainDetail, TicketAction } from "../api/types";
-import { type LaidEdge, layoutChain, nodeKey } from "../layout";
+import type { ChainDetail, Pos, TicketAction } from "../api/types";
+import { FINISH, START, sceneOf } from "../canvasScene";
+import { type LaidEdge, nodeKey } from "../layout";
 import { type EdgeRef, idOf } from "../store/edges";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
 import { ContextMenu, type MenuEntry } from "./ContextMenu";
 import { EdgeLayer } from "./EdgeLayer";
 import { QuickCard } from "./QuickCard";
-import { H, type Pt, W, canvasSize, edgeGeometry, edgeId, outPoint, x, y } from "./canvasGeometry";
+import { H, type Pt, W, canvasSize, edgeGeometry, edgeId, outPoint, snapPos } from "./canvasGeometry";
 import { CancelConfirm } from "./CancelConfirm";
 import { CanvasChrome } from "./CanvasChrome";
-import { ReleaseNode, TicketNode } from "./CanvasNodes";
+import { FinishNode, ReleaseNode, StartNode, TicketNode } from "./CanvasNodes";
 import { ReasonAsk } from "./ReasonAsk";
 import { canvasEntries, cardEntries, edgeMenu } from "./canvasMenus";
 import { useCanvasKeys } from "./useCanvasKeys";
+import { useCardDrag } from "./useCardDrag";
 import { type Drag, useEdgeDrag } from "./useEdgeDrag";
 import { useFit } from "./useFit";
 
@@ -38,19 +40,32 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
   /// Shown over the diagram while the chain has no cards; the canvas under it keeps working.
   onEmpty?: ReactNode;
 }) {
-  const layout = layoutChain(chain);
   const chainId = chain.chain.id;
   const project = currentProject(state);
   const projectKey = project?.key ?? chain.chain.project_id;
-  const at = new Map(layout.nodes.map((n) => [nodeKey(n), n]));
-  const geo = edgeGeometry(layout.edges, at);
   const tickets = new Map(chain.tickets.map((t) => [t.id, t]));
   const releases = new Map(chain.releases.map((r) => [r.id, r]));
+  const place = (id: string, pos: Pos | null) => {
+    const t = tickets.get(id);
+    if (t) dispatch({ type: "placeCard", chain: chainId, ticket: id, key: t.key, pos });
+  };
+  // A card is drawn where it is being dragged, else where it was just put, else where it was saved.
+  const zoomRef = useRef(1);
+  const { moving, press, wasDrag } = useCardDrag(zoomRef, place);
+  const pending = state.placement.pending;
+  const posOf = (id: string): Pos | undefined =>
+    moving?.id === id ? moving.pos : id in pending ? pending[id] ?? undefined : tickets.get(id)?.pos ?? undefined;
+  const scene = sceneOf(chain, posOf);
+  const endKey = scene.nodes[scene.nodes.length - 1].key;
+  const at = new Map(scene.nodes.map((n) => [n.key, n.box]));
+  const geo = edgeGeometry(scene.lines, at);
   const label = (k: string) => {
+    if (k === START) return "Start";
+    if (k === FINISH) return "Finish";
     const id = idOf(k);
     return tickets.get(id)?.key ?? releases.get(id)?.version ?? id;
   };
-  const selected: LaidEdge | undefined = layout.edges.find((e) => {
+  const selected: LaidEdge | undefined = scene.edges.find((e) => {
     const s = state.edges.selected;
     return s?.chain === chainId && s.from === e.from && s.to === e.to;
   });
@@ -62,8 +77,9 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
   const [hover, setHover] = useState<string>();
   const inner = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
-  const { width, height } = canvasSize(layout.columns, layout.lanes);
+  const { width, height } = canvasSize(scene.nodes.map((n) => n.box));
   const fit = useFit(root, width, height);
+  zoomRef.current = fit.zoom;
   const local = (clientX: number, clientY: number): Pt => {
     const r = inner.current?.getBoundingClientRect();
     return { x: (clientX - (r?.left ?? 0)) / fit.zoom, y: (clientY - (r?.top ?? 0)) / fit.zoom };
@@ -74,8 +90,15 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
   const quickLabel = quick?.after
     ? `New card that waits for ${quick.after}`
     : quick?.before ? `New card that ${quick.before} waits for` : "New card";
+  const sel = state.route.name === "card" ? state.route.key : "";
+  const focusTicket = chain.tickets.find((t) => t.key === sel);
+  const focusNode = focusTicket ? nodeKey({ kind: "ticket", id: focusTicket.id }) : undefined;
+  const nudge = (dx: number, dy: number) => {
+    const b = focusNode && at.get(focusNode);
+    if (focusTicket && b) place(focusTicket.id, snapPos({ x: b.x + dx, y: b.y + dy }));
+  };
   useCanvasKeys(state, dispatch, () =>
-    newCardAt({ x: (root.current?.scrollLeft ?? 0) / fit.zoom + 24, y: (root.current?.scrollTop ?? 0) / fit.zoom + 48 }));
+    newCardAt({ x: (root.current?.scrollLeft ?? 0) / fit.zoom + 24, y: (root.current?.scrollTop ?? 0) / fit.zoom + 48 }), nudge);
 
   const drop = (d: Drag, target: string | undefined, at: Pt) => {
     if (!target) {
@@ -159,9 +182,6 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
     }
   };
 
-  const sel = state.route.name === "card" ? state.route.key : "";
-  const focusTicket = chain.tickets.find((t) => t.key === sel);
-  const focusNode = focusTicket ? nodeKey({ kind: "ticket", id: focusTicket.id }) : undefined;
   // A card's connector shows while the pointer is on the card, while it is the open card, and
   // while a line is dragged from it.
   const handleShown = (k: string) => hover === k || focusNode === k || (drag?.mode === "new" && drag.node === k);
@@ -200,24 +220,28 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
             className="canvas-inner" ref={inner} data-zoom={fit.zoom}
             style={{ width, height, transform: fit.zoom === 1 ? undefined : `scale(${fit.zoom})` }}
           >
-            {layout.nodes.map((n) => {
-              const style = { left: x(n.col), top: y(n.lane), width: W, height: H };
-              const over = drag?.over === nodeKey(n);
+            {scene.nodes.map((n) => {
+              const style = { left: n.box.x, top: n.box.y, width: W, height: H };
+              if (n.kind === "start") return <StartNode key={n.key} goal={chain.chain.goal} style={style} />;
+              if (n.kind === "finish") return <FinishNode key={n.key} style={style} />;
+              const over = drag?.over === n.key;
               const r = n.kind === "release" ? releases.get(n.id) : undefined;
-              if (r) return <ReleaseNode key={nodeKey(n)} release={r} nodeKey={nodeKey(n)} style={style} over={over} />;
+              if (r) return <ReleaseNode key={n.key} release={r} nodeKey={n.key} style={style} over={over} end={n.key === endKey} />;
               const t = tickets.get(n.id);
               if (!t) return null;
               const route = { name: "card" as const, project: projectKey, chain: chain.chain.name, key: t.key };
               return (
                 <TicketNode
-                  key={nodeKey(n)} ticket={t} href={hrefOf(route)} style={style} selected={sel === t.key} over={over}
-                  linking={Boolean(linking) && nodeKey(n) !== linking} detail={state.details[t.key]}
+                  key={n.key} ticket={t} href={hrefOf(route)} style={style} selected={sel === t.key} moving={moving?.id === t.id} over={over}
+                  linking={Boolean(linking) && n.key !== linking} detail={state.details[t.key]}
                   usage={chain.usage?.[t.key]} queued={queuePosition(state, t.id)} defaultProfile={project?.default_profile}
-                  onHover={(on) => setHover(on ? nodeKey(n) : undefined)}
+                  onHover={(on) => setHover(on ? n.key : undefined)}
                   handlers={{
                     activate: () => {
+                      if (wasDrag()) return;
                       if (!pick(t.id)) openCard(t.key);
                     },
+                    press: (e) => press(t.id, n.box, e),
                     focus: () => dispatch({ type: "peekCard", key: t.key }),
                     menu: (e) => {
                       e.preventDefault();
@@ -231,18 +255,18 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
                 />
               );
             })}
-            {layout.nodes.map((n) => (
+            {scene.nodes.filter((n) => n.kind === "ticket" || n.kind === "release").map((n) => (
               <span
-                key={`h-${nodeKey(n)}`} className={`handle${handleShown(nodeKey(n)) ? " show" : ""}`} data-node={nodeKey(n)}
-                data-testid={`handle-${label(nodeKey(n))}`} title="Drag onto another card to make it wait for this one"
-                style={{ left: outPoint(n).x - 6, top: outPoint(n).y - 6 }}
-                onPointerEnter={() => setHover(nodeKey(n))}
+                key={`h-${n.key}`} className={`handle${handleShown(n.key) ? " show" : ""}`} data-node={n.key}
+                data-testid={`handle-${label(n.key)}`} title="Drag onto another card to make it wait for this one"
+                style={{ left: outPoint(n.box).x - 6, top: outPoint(n.box).y - 6 }}
+                onPointerEnter={() => setHover(n.key)}
                 onPointerLeave={() => setHover(undefined)}
-                onPointerDown={(e) => start({ mode: "new", node: nodeKey(n), anchor: outPoint(n) }, e)}
+                onPointerDown={(e) => start({ mode: "new", node: n.key, anchor: outPoint(n.box) }, e)}
               />
             ))}
             <EdgeLayer
-              width={width} height={height} edges={layout.edges} geo={geo} label={label} selected={selected} focus={focusNode} drag={drag}
+              width={width} height={height} edges={scene.edges} implicit={scene.lines.filter((l) => l.implicit)} geo={geo} label={label} selected={selected} focus={focusNode} drag={drag}
               onSelect={select}
               onMenu={(edge, p) => {
                 select(edge);
@@ -260,7 +284,9 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
         </div>
       </div>
       {onEmpty && chain.tickets.length === 0 && <div className="canvas-empty" data-testid="chain-empty">{onEmpty}</div>}
-      <CanvasChrome fitted={fit.fitted} cut={fit.cut} onFit={fit.toggle} linking={linkingKey} onCancelLinking={() => setLinking(undefined)} />
+      <CanvasChrome
+        fitted={fit.fitted} cut={fit.cut} onFit={fit.toggle} arrangeable={scene.nodes.some((n) => n.placed)}
+        onArrange={() => dispatch({ type: "arrangeChain", chain: chainId })} linking={linkingKey} onCancelLinking={() => setLinking(undefined)} />
       {menu?.kind === "cancel" && (
         <div className="ctx-menu cancel-pop" style={{ left: popAt(menu), top: menu.y }}>
           <CancelConfirm

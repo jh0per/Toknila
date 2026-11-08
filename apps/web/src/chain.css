@@ -68,6 +68,16 @@ a.node:hover { border-color: var(--muted); }
 .node.g-awaiting_approval .st { background: transparent; padding-left: 0; }
 .node.release { border-top-color: var(--done); border-style: dashed; }
 .node.release .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The Start and end nodes of the diagram, dashed like a release; the lines that join cards to them
+   are drawn thinner and dimmer than a real dependency. */
+.node.bookend { border-style: dashed; border-top-color: var(--muted); cursor: default; }
+.node.bookend .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.canvas svg .edge.implicit .line { stroke-width: 1; opacity: 0.45; stroke-dasharray: 3 3; }
+.canvas svg .arrow-imp path { fill: var(--muted); opacity: 0.55; }
+/* A card is moved by its body; the one in the pointer's hand rides above the others. */
+a.node.ticket { cursor: grab; }
+a.node.moving { z-index: 6; cursor: grabbing; box-shadow: 0 6px 18px color-mix(in srgb, var(--fg) 22%, transparent); }
+.canvas:has(.node.moving) { user-select: none; }
 
 /* Over the diagram, not scrolling with it. */
 .canvas-hint, .canvas-legend, .canvas-cut { margin: 0; padding: 2px 10px; border-radius: var(--r-pill); font-size: 11px;

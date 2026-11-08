@@ -7,6 +7,7 @@ import type {
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { runAutostartEffect } from "./autostartEffects";
 import { runEdgeEffect } from "./edgeEffects";
+import { runPlacementEffect } from "./placementEffects";
 import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
 import { runPlannerEffect } from "./plannerEffects";
@@ -201,6 +202,10 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "moveEdge":
       case "removeEdge":
         runEdgeEffect(e, dispatch);
+        return;
+      case "placeCard":
+      case "arrangeChain":
+        runPlacementEffect(e, dispatch);
         return;
       case "setAutostart":
         runAutostartEffect(e, dispatch);
