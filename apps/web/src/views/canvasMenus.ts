@@ -74,7 +74,7 @@ export interface CanvasMenuHandlers {
   askPlanner: () => void;
 }
 
-/// The menu of empty canvas: New card | New chain, Import a plan | Ask the planner.
+/// The menu of empty canvas: New card | New chain, Import a plan | Plan with the assistant.
 export function canvasEntries(h: CanvasMenuHandlers): MenuEntry[] {
   return menuGroups(
     [{ label: "New card", testId: "menu-canvas-new-card", keys: "N", run: h.newCard }],
@@ -82,7 +82,7 @@ export function canvasEntries(h: CanvasMenuHandlers): MenuEntry[] {
       { label: "New chain", testId: "menu-canvas-new-chain", run: h.newChain },
       { label: "Import a plan", testId: "menu-canvas-import", run: h.importPlan },
     ],
-    [{ label: "Ask the planner", testId: "menu-canvas-planner", run: h.askPlanner }],
+    [{ label: "Plan with the assistant", testId: "menu-canvas-planner", run: h.askPlanner }],
   );
 }
 

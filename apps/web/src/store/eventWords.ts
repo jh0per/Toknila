@@ -17,6 +17,12 @@ const ANSWER: Record<string, string> = {
   one: "Chose 1", two: "Chose 2", up: "Pressed the up arrow", down: "Pressed the down arrow", escape: "Pressed Esc",
 };
 
+/// "an instruction", "a report", "a comment".
+const aKind = (kind: unknown): string => {
+  const k = str(kind) || "comment";
+  return `${/^[aeiou]/.test(k) ? "an" : "a"} ${k}`;
+};
+
 /// What a person's answer to a question was, in words.
 export const answerWords = (answer: unknown): string => ANSWER[str(answer)] ?? str(answer);
 
@@ -76,8 +82,8 @@ const TABLE: Record<string, Words> = {
   "ticket.question_answered": (p) => `Answered: ${answerWords(p.answer)}`,
   "release.created": (p) => `Milestone ${str(p.release?.version)} created`,
   "release.state_changed": (p) => `Milestone ${str(p.version)} moved from ${status(p.from)} to ${status(p.to)}`,
-  "comment.added": (p) => `Wrote a ${str(p.comment?.kind) || "comment"}: ${str(p.comment?.body?.gist)}`,
-  "comment.delivered": (p) => `The agent received a ${str(p.comment?.kind) || "comment"}: ${str(p.comment?.body?.gist)}`,
+  "comment.added": (p) => `Wrote ${aKind(p.comment?.kind)}: ${str(p.comment?.body?.gist)}`,
+  "comment.delivered": (p) => `The agent received ${aKind(p.comment?.kind)}: ${str(p.comment?.body?.gist)}`,
   "subtask.added": (p) => `Subtask added: ${str(p.subtask?.text)}`,
   "subtask.updated": (p) => `Subtask ${p.subtask?.done ? "done" : "reopened"}: ${str(p.subtask?.text)}`,
   "thread.opened": (p) => `Thread opened: ${str(p.thread?.title)}`,

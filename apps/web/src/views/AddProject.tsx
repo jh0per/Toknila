@@ -7,17 +7,23 @@ import type { State } from "../store/state";
 import { canBrowse } from "../store/shell";
 import { Field } from "./Field";
 
-const DETAIL_FIELDS = ["work_branch", "key", "name", "check_command", "merge_mode"];
+/// The id of the add-project form, for a button that sits outside it.
+export const ADD_PROJECT_FORM = "add-project-form";
+
+const DETAIL_FIELDS =["work_branch", "key", "name", "check_command", "merge_mode"];
 
 /// Add a project from a folder. In the desktop app Browse opens the system's folder picker; in a
 /// browser (and beside it) the path is typed or pasted. Toknila fills in what it finds in the
 /// folder, as real values, under Details; the daemon says what is wrong with the folder and, when
 /// the main branch is missing, which branches the repository has.
-export function AddProject({ state, dispatch, focus = false }: {
+export function AddProject({ state, dispatch, focus = false, submit = true }: {
   state: State;
   dispatch: (i: Intent) => void;
   /// Put the cursor in the folder field (in a dialog, not on the onboarding page).
   focus?: boolean;
+  /// Draw the form's own "Add project" button. The onboarding page puts it at the end of its last
+  /// step instead, tied to this form by `ADD_PROJECT_FORM`.
+  submit?: boolean;
 }) {
   const s = state.settings;
   const d = s.add.draft;
@@ -30,6 +36,7 @@ export function AddProject({ state, dispatch, focus = false }: {
   return (
     <form
       className="card-block form add-project"
+      id={ADD_PROJECT_FORM}
       data-testid="add-project"
       onSubmit={(e) => {
         e.preventDefault();
@@ -102,7 +109,7 @@ export function AddProject({ state, dispatch, focus = false }: {
         </p>
       </details>
       {formError(s) && <p className="error" role="alert">{formError(s)}</p>}
-      <button className="btn primary" type="submit" disabled={s.busy} data-testid="add-project-submit">Add project</button>
+      {submit && <button className="btn primary" type="submit" disabled={s.busy} data-testid="add-project-submit">Add project</button>}
     </form>
   );
 }

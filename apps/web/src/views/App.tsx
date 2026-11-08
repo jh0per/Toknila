@@ -9,14 +9,17 @@ import { Onboarding } from "./Onboarding";
 import { PlannerScreen } from "./PlannerScreen";
 import { Settings } from "./Settings";
 import { SettingsSidebar } from "./SettingsSidebar";
+import { Shortcuts } from "./Shortcuts";
 import { Sidebar } from "./Sidebar";
 import { UpdateBanner } from "./UpdateBanner";
 import { Usage } from "./Usage";
 import { useSettingsShortcut } from "./useSettingsShortcut";
+import { useShortcutsKey } from "./useShortcutsKey";
 
 export function App() {
   const [state, dispatch] = useStore();
   useSettingsShortcut(state, dispatch);
+  useShortcutsKey(state, dispatch);
   if (!token()) {
     return <main><p className="error">Open the address that <code>tok open</code> prints; it carries the access token.</p></main>;
   }
@@ -56,6 +59,7 @@ export function App() {
         <UpdateBanner state={state} dispatch={dispatch} />
       </main>
       <Dialogs state={state} dispatch={dispatch} inline={onboarding} />
+      <Shortcuts state={state} dispatch={dispatch} />
     </div>
   );
 }

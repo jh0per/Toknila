@@ -30,6 +30,8 @@ describe("eventWords", () => {
 
   it("words comments, subtasks and answers", () => {
     expect(eventWords(e("comment", "added", { comment: { kind: "report", body: { gist: "All done" } } }))).toBe("Wrote a report: All done");
+    expect(eventWords(e("comment", "added", { comment: { kind: "instruction", body: { gist: "Use blue" } } }))).toBe("Wrote an instruction: Use blue");
+    expect(eventWords(e("comment", "delivered", { comment: { kind: "decision", body: { gist: "Ship" } } }))).toBe("The agent received a decision: Ship");
     expect(eventWords(e("subtask", "updated", { subtask: { text: "Write tests", done: true } }))).toBe("Subtask done: Write tests");
     expect(eventWords(e("ticket", "question_answered", { answer: "deny", role: "worker" }))).toBe("Answered: Turned down");
     expect(eventWords(e("ticket", "runner_started", { run: { role: "reviewer" } }))).toBe("The reviewer started");

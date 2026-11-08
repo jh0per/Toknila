@@ -70,6 +70,25 @@ describe("chatItems", () => {
     expect(chatItems(detail([]), events, false).map((i) => i.text)).toContain("Open one?");
   });
 
+  it("shows a question once, though the daemon also writes it down as a report", () => {
+    const d = detail([
+      comment("c1", "report", "agent", "Login form drafted", at(9, 0)),
+      comment("c2", "report", "agent", "Archive or delete?", at(10, 0)),
+    ]);
+    const events = [event(1, at(10, 0) + 20, "status_changed", {
+      from: "running", to: "waiting", reason: { status: "waiting", kind: "question", text: "Archive or delete?" },
+    })];
+    expect(chatItems(d, events, false).map((i) => [i.kind, i.text])).toEqual([
+      ["report", "Login form drafted"],
+      ["question", "Archive or delete?"],
+    ]);
+    // Open: the answer box shows it, so no bubble repeats it.
+    expect(chatItems(d, events, true).map((i) => i.text)).toEqual(["Login form drafted"]);
+    // The same words long after are two different reports, and both stay.
+    const later = detail([comment("c2", "report", "agent", "Archive or delete?", at(10, 0) + 60_000)]);
+    expect(chatItems(later, events, false).map((i) => i.kind)).toEqual(["question", "report"]);
+  });
+
   it("an agent that went silent is a note", () => {
     const events = [event(1, at(9), "status_changed", { reason: { status: "waiting", kind: "silent" } })];
     expect(chatItems(undefined, events, false)).toMatchObject([{ kind: "note", text: "The agent stopped responding." }]);

@@ -74,13 +74,12 @@ try {
   await value("project-key", "TOKNILA", "the folder suggests the key");
   await value("project-name", "Toknila", "the folder suggests the name");
   await t("add-project-submit").click();
-  await expectPath("/projects/TOKNILA/settings", "the new project opens its settings");
-  await t("settings-back").click();
+  await expectPath("/projects/TOKNILA/planner", "the first project leads into the assistant");
 
-  // 2. No chains yet: the window says so and offers New chain and Import.
+  // 2. No chains yet: the window asks what to build, and offers New chain and Import below.
   await row("TOKNILA").locator("a").click();
   await expectPath("/projects/TOKNILA", "the project opens");
-  await expectText(t("no-chains"), "No chains yet", "a project without chains says so");
+  await expectText(t("no-chains"), "What do you want to build?", "a project without chains asks what to build");
   await t("empty-import").click();
   await t("import-dialog").locator("[data-testid=import-path]").waitFor({ timeout: 10_000 });
   console.log("PASS Import opens the import dialog");

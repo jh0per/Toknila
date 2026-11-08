@@ -29,6 +29,9 @@ export interface ChatItem {
 const SIDE: Record<Actor, ChatSide> = { human: "you", agent: "agent", system: "system" };
 const WHO: Record<ChatSide, string> = { you: "You", agent: "Agent", system: "Toknila" };
 
+/// How far apart a question and the report that repeats it may be written.
+const TWIN_MS = 5000;
+
 function commentItem(c: Comment): ChatItem {
   const side = SIDE[c.author];
   const b = c.body;
@@ -69,7 +72,12 @@ function eventItem(e: EventRecord): ChatItem | undefined {
 export function chatItems(detail: TicketDetail | undefined, events: EventRecord[], open: boolean): ChatItem[] {
   const comments = (detail?.comments ?? []).filter((c) => !isPermissionReport(c)).map(commentItem);
   const asked = events.map(eventItem).filter((i): i is ChatItem => i !== undefined);
-  const items = [...comments, ...asked].sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
+  // An agent's question is also written down as a report of the same words, a moment apart; the
+  // question stays, as the question.
+  const twin = (c: ChatItem) =>
+    c.kind === "report" && c.side === "agent" &&
+    asked.some((q) => q.kind === "question" && q.text === c.text && Math.abs(q.at - c.at) <= TWIN_MS);
+  const items = [...comments.filter((c) => !twin(c)), ...asked].sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
   if (open) {
     const last = items.map((i) => i.kind).lastIndexOf("question");
     if (last >= 0) items.splice(last, 1);

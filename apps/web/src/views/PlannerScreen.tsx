@@ -6,15 +6,15 @@ import { PanelDivider } from "./PanelDivider";
 import { PlannerPanel } from "./PlannerPanel";
 import { ThemeButton } from "./ThemeButton";
 
-/// The planner entry: the project's most recently active chain above, which follows what the
-/// planner edits as the journal arrives, and the planner's terminal below.
+/// The assistant's screen: the project's most recently active chain above ("Plan so far"), which
+/// follows what the assistant edits as the journal arrives, and the conversation below.
 export function PlannerScreen({ project, state, dispatch }: { project: Project; state: State; dispatch: (i: Intent) => void }) {
   const chain = currentChain(state);
   return (
     <>
       <header className="top">
         <div className="crumb">
-          <b>{project.key}</b><i>/</i><b data-testid="planner-title">Planner</b>
+          <b>{project.key}</b><i>/</i><b data-testid="planner-title">Plan with the assistant</b>
         </div>
         {chain && <span className="muted" data-testid="planner-chain">Plan so far: chain {chain.chain.name}</span>}
         {state.error && <span className="error">{state.error}</span>}
@@ -26,7 +26,7 @@ export function PlannerScreen({ project, state, dispatch }: { project: Project; 
       ) : (
         <div className="canvas planner-empty" data-testid="planner-empty">
           <h3>Plan so far</h3>
-          <p className="muted empty">No chains yet. Start the planner and ask it to plan this project; its chains show here as it makes them.</p>
+          <p className="muted empty">Nothing yet. Tell the assistant below what you want to build; the chains and cards it makes show here as it plans.</p>
         </div>
       )}
       <PanelDivider />
