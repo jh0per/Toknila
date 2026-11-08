@@ -61,8 +61,8 @@ try {
     failed = true;
   });
   await page.goto(url);
-  const { expectText } = checks(page);
-  await expectText(page.locator("[data-testid=link]"), "live", "stream connected");
+  const { expectText, expectLink } = checks(page);
+  await expectLink("live", "stream connected");
   await expectText(page.locator("[data-testid=inbox-count]"), "6", "badge counts proposal, question, blocked and 3 leftovers");
   await page.locator("[data-testid=inbox-link]").click();
   const inbox = page.locator("[data-testid=inbox]");

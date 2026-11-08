@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 import type { TicketStatus } from "../api/types";
-import { statusGroup, statusText } from "./groups";
+import { chainTone, statusClass, statusGroup, statusText } from "./groups";
+
+describe("chainTone and statusClass", () => {
+  it("reads a chain that needs a person as attention and a running one as progress", () => {
+    expect(chainTone("needs_human")).toBe("attn");
+    expect(chainTone("blocked")).toBe("attn");
+    expect(chainTone("running")).toBe("prog");
+    expect(chainTone("done")).toBe("done");
+    expect(chainTone("idle")).toBe("todo");
+    expect(chainTone("not_started")).toBe("todo");
+    expect(chainTone("empty")).toBe("todo");
+  });
+
+  it("gives every fine status its own class", () => {
+    const all = ["proposed", "backlog", "ready", "running", "waiting", "blocked", "review", "merged", "released", "cancelled"] as const;
+    expect(new Set(all.map(statusClass)).size).toBe(all.length);
+    expect(statusClass("waiting")).toBe("s-waiting");
+  });
+});
 
 describe("statusGroup", () => {
   it("maps every status to its display group", () => {

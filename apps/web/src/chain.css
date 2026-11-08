@@ -1,44 +1,88 @@
-/* The chain of linked cards: dotted canvas, cards with a status stripe, edges. */
+/* The chain of linked cards: dotted canvas, cards coloured by their status, edges, the legend. */
+.canvas-frame { position: relative; min-height: 0; min-width: 0; display: flex; overflow: hidden; }
+.canvas-frame > .canvas { flex: 1; min-width: 0; }
 .canvas { overflow: auto; position: relative; min-height: 0; background: radial-gradient(circle, var(--line) 1px, transparent 1px) 0 0 / 18px 18px, var(--bg); }
-.canvas-inner { position: relative; min-width: 100%; min-height: 100%; box-sizing: border-box; }
+.canvas-wrap { position: relative; min-width: 100%; min-height: 100%; box-sizing: border-box; }
+.canvas-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; box-sizing: border-box; }
 .canvas svg { position: absolute; inset: 0; fill: none; pointer-events: none; }
 .canvas svg.ends { z-index: 3; }
-.canvas svg .line { stroke: var(--muted); stroke-width: 1.5; }
+.canvas svg .line { stroke: var(--muted); stroke-width: 1.5; transition: opacity 0.12s, stroke 0.12s; }
 .canvas svg .hit { stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
 .canvas svg .edge:hover .line { stroke: var(--fg); }
+.canvas svg .edge.hl .line, .canvas svg .edge.hl:hover .line { stroke: var(--accent); stroke-width: 2.25; }
+.canvas svg .edge.dim .line { opacity: 0.2; }
+.canvas svg .edge.dim:hover .line { opacity: 0.7; }
 .canvas svg .edge.sel .line { stroke: var(--accent); stroke-width: 2.5; }
+.canvas svg .arrow path { fill: var(--muted); }
+.canvas svg .arrow-hl path, .canvas svg .arrow-sel path { fill: var(--accent); }
 .canvas svg .end { fill: var(--surface); stroke: var(--accent); stroke-width: 2; pointer-events: all; cursor: grab; }
 .canvas svg .ghost { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
 .canvas.dragging, .canvas.dragging .node { cursor: grabbing; }
 .canvas.dragging svg .hit, .canvas.dragging svg .end { pointer-events: none; }
 .canvas.dragging svg .edge.sel .line { opacity: 0.35; }
+/* The connector of a card shows on hover and on the open card; it stays in the way of nothing else. */
 .handle { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--surface);
-  border: 2px solid var(--muted); cursor: crosshair; opacity: 0.6; transition: opacity 0.1s; touch-action: none; z-index: 2; }
-.canvas.dragging .handle, .handle:hover { opacity: 1; }
+  border: 2px solid var(--muted); cursor: crosshair; opacity: 0; transition: opacity 0.1s; touch-action: none; z-index: 2; }
+.handle.show, .canvas.dragging .handle, .handle:hover { opacity: 1; }
 .handle:hover { border-color: var(--accent); background: var(--accent); }
 .node.over { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.canvas.linking .node.linkable { cursor: crosshair; }
+.canvas.linking .node.linkable:hover { outline: 2px dashed var(--accent); outline-offset: 2px; }
 .edge-error { position: sticky; top: 0; left: 0; z-index: 5; display: flex; gap: var(--s2); align-items: center; justify-content: space-between;
   padding: var(--s1) var(--s3); background: var(--surface); color: var(--danger); border-bottom: 1px solid var(--danger); font-size: var(--fs-s); }
+
+/* What a status looks like: a class per fine status (s-*) and per tone (tone-*), one set of colours.
+   A person is needed for waiting, review, blocked and proposed, so those read amber. */
+.tone-todo, .s-backlog, .s-ready { --sc: var(--todo); --sc-soft: var(--todo-soft); }
+.tone-prog, .s-running { --sc: var(--prog); --sc-soft: var(--prog-soft); }
+.tone-attn, .s-waiting, .s-review, .s-blocked, .s-proposed { --sc: var(--block); --sc-soft: var(--block-soft); }
+.tone-done, .s-merged, .s-released { --sc: var(--done); --sc-soft: var(--done-soft); }
+.tone-cancel, .s-cancelled { --sc: var(--cancel); --sc-soft: var(--todo-soft); }
+
+:where(.node) { --sc: var(--todo); --sc-soft: var(--todo-soft); }
 .node { position: absolute; display: flex; flex-direction: column; gap: 3px; padding: var(--s2) 10px; overflow: hidden;
-  background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--todo); border-radius: var(--r-m); }
+  background: var(--surface); border: 1px solid color-mix(in srgb, var(--sc) 40%, var(--line)); border-top: 4px solid var(--sc); border-radius: var(--r-m); }
 a.node:hover { border-color: var(--muted); }
 .node.sel { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 .node .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0; }
 .node .title { font-weight: 600; font-size: var(--fs-m); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node .key { font-size: var(--fs-xs); color: var(--muted); }
-.node .st { font-size: 11px; color: var(--muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .st { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; box-sizing: border-box; font-size: 11px; font-weight: 600; color: var(--sc); background: var(--sc-soft);
+  border-radius: var(--r-pill); padding: 1px 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .st .dot { background: var(--sc); }
 .node .mark { font-size: var(--fs-xs); color: var(--block); border: 1px solid var(--block); border-radius: 3px; padding: 0 4px; white-space: nowrap; width: fit-content; }
 .node .mark.pr { cursor: pointer; }
 .node .mark.pr.passed { color: var(--done); border-color: var(--done); }
 .node .mark.pr.failed { color: var(--danger); border-color: var(--danger); }
 .node .mark.pr.pending { color: var(--muted); border-color: var(--muted); }
 .runner { font-family: var(--mono); font-size: 10px; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; color: var(--muted); white-space: nowrap; flex: none; }
-.g-todo { border-top-color: var(--todo); } .g-in_progress { border-top-color: var(--prog); }
-.g-blocked { border-top-color: var(--block); } .g-done { border-top-color: var(--done); }
-.g-cancelled { border-top-color: var(--cancel); opacity: 0.6; }
-.g-awaiting_approval { border: 1.5px dashed var(--block); background: var(--block-soft); }
+.node .foot { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: auto; }
+.node .foot .usage-chip { align-self: center; margin-left: auto; flex: none; }
+.node .sub { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 40px; }
+.node .sub .sub-bar { flex: 1; height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+.node .sub .sub-bar i { display: block; height: 100%; background: var(--prog); }
+.node .sub b { font-family: var(--mono); font-size: var(--fs-xs); font-weight: 600; color: var(--muted); }
+.node .acts .btn { padding: 1px 10px; font-size: var(--fs-s); }
+.node.g-cancelled, .node.s-cancelled { opacity: 0.6; }
+.node.g-awaiting_approval { border: 1.5px dashed var(--block); background: var(--block-soft); }
+.node.g-awaiting_approval .st { background: transparent; padding-left: 0; }
 .node.release { border-top-color: var(--done); border-style: dashed; }
 .node.release .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Over the diagram, not scrolling with it. */
+.canvas-hint, .canvas-legend, .canvas-cut { margin: 0; padding: 2px 10px; border-radius: var(--r-pill); font-size: 11px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent); }
+.canvas-hint { position: absolute; left: 12px; bottom: 8px; color: var(--muted); pointer-events: none; }
+.canvas-cut { color: var(--muted); }
+.canvas-corner { position: absolute; right: 16px; bottom: 8px; display: flex; gap: var(--s2); align-items: center; pointer-events: none; z-index: 4; }
+.canvas-corner .btn { pointer-events: auto; padding: 1px 10px; font-size: var(--fs-s); }
+.canvas-legend { display: flex; gap: 12px; }
+.canvas-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--sc); font-weight: 600; }
+.canvas-legend span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sc); }
+.canvas-linking { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 6; margin: 0; display: flex; gap: var(--s2); align-items: center;
+  padding: var(--s1) var(--s3); background: var(--surface); border: 1px solid var(--accent); border-radius: var(--r-m); box-shadow: 0 4px 14px rgb(0 0 0 / 0.2); font-size: var(--fs-s); }
+.planner-empty { padding: var(--s4); }
+.planner-empty h3 { margin: 0 0 var(--s1); font-size: var(--fs-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .quick-card { position: absolute; z-index: 6; display: flex; flex-direction: column; gap: var(--s1); width: 250px; padding: var(--s2);
   background: var(--surface); border: 1px solid var(--accent); border-radius: var(--r-m); box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); }
 .quick-card label { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-s); color: var(--muted); }

@@ -13,10 +13,18 @@ mod updater;
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_window_state::StateFlags;
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        // Size, position and maximized state come back on the next start. Fullscreen and
+        // visibility are not stored, so the window never reopens fullscreen or hidden.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
+                .build(),
+        )
         .menu(menu::build)
         .on_menu_event(|app, event| menu::on_event(app, event.id()))
         .plugin(tauri_plugin_updater::Builder::new().build())

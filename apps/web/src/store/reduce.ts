@@ -4,6 +4,8 @@ import type { EventRecord } from "../api/types";
 import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
 import { reduceAutostart } from "./autostart";
+import { detailsWanted, knownKey } from "./cardDetails";
+import { reduceTheme } from "./theme";
 import { reduceEdges } from "./edges";
 import { reduceQuick } from "./quick";
 import { type Dialog, reducePlan, withChain } from "./plan";
@@ -46,14 +48,16 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       };
       // First run: no project yet, so the window offers the checks and a form to add one.
       const first = !msg.projects.some((p) => !p.archived);
-      return [next, [...enter(next.route, next), ...(first ? setupLoads : [])]];
+      return [next, [...enter(next.route, next), ...detailsWanted(next, msg.chains, true), ...(first ? setupLoads : [])]];
     }
     case "projectsLoaded":
       return [{ ...s, projects: msg.projects }, []];
     case "agentsLoaded":
       return [{ ...s, agents: msg.agents }, []];
-    case "chainLoaded":
-      return [{ ...withChain(s, msg.chain), error: "" }, []];
+    case "chainLoaded": {
+      const next = { ...withChain(s, msg.chain), error: "" };
+      return [next, detailsWanted(next, [msg.chain])];
+    }
     case "inboxLoaded":
       return [{ ...s, inbox: msg.items }, []];
     case "detailLoaded": {
@@ -205,6 +209,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "cardMoved":
     case "planRejected":
       return reducePlan(s, msg);
+    case "setTheme":
+      return reduceTheme(s, msg);
     case "checkForUpdates":
     case "restartToUpdate":
     case "restartAnyway":
@@ -280,6 +286,9 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   const ticket = ticketOfEvent(e);
   const open = s.route.name === "card" ? s.details[s.route.key]?.ticket : undefined;
   if (open && ticket === open.id) fx.push({ type: "loadDetail", key: open.key });
+  // A card the diagram shows more of (subtasks, proposal buttons) keeps its detail fresh too.
+  const known = knownKey(s, ticket);
+  if (known && known !== open?.key) fx.push({ type: "loadDetail", key: known });
   return [next, fx];
 }
 
