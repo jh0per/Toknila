@@ -20,7 +20,7 @@ export function useChainMenu(dispatch: (i: Intent) => void): {
     <ContextMenu
       x={at.x} y={at.y} onClose={close}
       entries={[{
-        label: at.chain.chain.autostart ? "Turn autostart off" : "Turn autostart on",
+        label: at.chain.chain.autostart ? "Stop starting cards automatically" : "Start cards automatically",
         testId: "menu-autostart",
         hint: AUTOSTART_HINT,
         run: () => dispatch({ type: "setAutostart", chain: at.chain.chain.id, autostart: !at.chain.chain.autostart }),

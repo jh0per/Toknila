@@ -76,7 +76,7 @@ describe("Run chain", () => {
     const [, fx] = reduce(start(), { type: "setAutostart", chain: "c1", autostart: true });
     expect(fx).toEqual([{ type: "setAutostart", chain: "c1", autostart: true }]);
     expect(RUN_CHAIN_HINT).toMatch(/starts the ready cards up to the free agent slots/);
-    expect(RUN_CHAIN_HINT).toMatch(/Stop chain turns autostart off; cards already running keep running/);
+    expect(RUN_CHAIN_HINT).toMatch(/Stop chain stops starting cards automatically; cards already running keep running/);
   });
 });
 

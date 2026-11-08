@@ -6,6 +6,9 @@ import type { State } from "../store/state";
 import { Field } from "./Field";
 
 const MODES: ReviewMode[] = ["human", "agent", "both"];
+const REVIEW_WORDS: Record<ReviewMode, string> = {
+  human: "I review every finished card", agent: "A reviewer agent reviews it", both: "A reviewer agent first, then me",
+};
 
 /// A new, empty chain in a project: its name, an optional goal, whether ready cards start by
 /// themselves, and who reviews. The daemon judges the input; its refusal shows here.
@@ -39,12 +42,12 @@ export function NewChain({ project, state, dispatch }: { project: string; state:
       </Field>
       <label className="check">
         <input type="checkbox" data-testid="chain-autostart" checked={autostart} onChange={(e) => setAutostart(e.target.checked)} />
-        Start ready cards by themselves
+        Start cards automatically
       </label>
       <Field label="Who reviews finished cards" name="chain-review-mode" error={undefined}>
         <select data-testid="chain-review-mode" value={mode} onChange={(e) => setMode(e.target.value as ReviewMode | "")}>
-          <option value="">(the project's setting)</option>
-          {MODES.map((m) => <option key={m}>{m}</option>)}
+          <option value="">The project's setting</option>
+          {MODES.map((m) => <option key={m} value={m}>{REVIEW_WORDS[m]}</option>)}
         </select>
       </Field>
       {refused && <p className="error" role="alert" data-testid="chain-error">{refused}</p>}

@@ -16,7 +16,7 @@ pub enum ChainCmd {
         name: String,
         #[arg(long)]
         goal: Option<String>,
-        /// Do not start Ready tickets automatically.
+        /// Do not start cards automatically (a person starts each one).
         #[arg(long)]
         no_autostart: bool,
         #[arg(long)]
@@ -38,15 +38,15 @@ pub enum ChainCmd {
         #[arg(long, conflicts_with = "file")]
         spec: Option<std::path::PathBuf>,
     },
-    /// Change a chain's settings after it is made. `--autostart on` lets the chain start its
-    /// ready cards by itself, and starts the ready ones now (as far as slots allow); `off` stops
+    /// Change a chain's settings after it is made. `--autostart on` starts cards automatically:
+    /// the ready ones now (as far as slots allow) and later ones as they become ready; `off` stops
     /// that and opens the chain's graph to the planner.
     Set {
         chain: String,
         /// The project, when two projects have a chain of this name.
         #[arg(long)]
         project: Option<String>,
-        /// Whether the chain starts its ready cards by itself.
+        /// Whether the chain starts its cards automatically.
         #[arg(long, value_parser = ["on", "off"])]
         autostart: String,
     },
@@ -54,8 +54,8 @@ pub enum ChainCmd {
     Show { chain: String },
     /// List chains with their status.
     Ls,
-    /// Delete a chain with its cards, threads and ships' checkouts (the repository folder and
-    /// the `ship/*` branches stay). Refused while an agent works on one of its cards.
+    /// Delete a chain with its cards, threads and workspaces (the project folder and the branches
+    /// made for the cards stay). Refused while an agent works on one of its cards.
     Rm {
         chain: String,
         /// The project, when two projects have a chain of this name.

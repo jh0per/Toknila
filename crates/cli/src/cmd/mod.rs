@@ -85,14 +85,14 @@ pub enum Command {
     Resume { ticket: String },
     /// Block a ticket, with a reason.
     Block { ticket: String, reason: String },
-    /// Unblock a ticket; it returns to where it was. A card whose base branch is behind its
+    /// Unblock a ticket; it returns to where it was. A card whose main branch is behind its
     /// upstream can instead start after a fast-forward (`--fast-forward`) or as it is (`--anyway`).
     Unblock {
         ticket: String,
-        /// Fast-forward the base branch to its upstream, then start.
+        /// Fast-forward the main branch to its upstream, then start.
         #[arg(long, conflicts_with = "anyway")]
         fast_forward: bool,
-        /// Start from the base branch as it is.
+        /// Start from the main branch as it is.
         #[arg(long)]
         anyway: bool,
     },

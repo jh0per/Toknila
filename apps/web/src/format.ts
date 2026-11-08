@@ -46,15 +46,15 @@ export function reasonText(r: StatusReason | null | undefined): string {
         case "dependency_reopened": return `dependency reopened: ${b.dependency}`;
         case "merge_conflict": return `merge conflict: ${b.detail}`;
         case "base_checkout_dirty": return `${b.path} has local changes; commit or stash them, then unblock`;
-        case "ship_uncommitted": return `the ship has changes that are not committed (${b.files.slice(0, 8).join(", ")}${b.files.length > 8 ? ` and ${b.files.length - 8} more` : ""}); commit them on the ship, then unblock`;
-        case "ship_empty": return "the ship's branch has no commit of its own, so there is nothing to merge; commit the work on the ship, then unblock";
+        case "ship_uncommitted": return `the workspace has changes that are not committed (${b.files.slice(0, 8).join(", ")}${b.files.length > 8 ? ` and ${b.files.length - 8} more` : ""}); commit them in the workspace, then unblock`;
+        case "ship_empty": return "the workspace has no commit of its own, so there is nothing to merge; commit the work in the workspace, then unblock";
         case "merge_failed": return `merge failed: ${b.detail}`;
         case "ci_failed": return `checks failed: ${b.checks.join(", ")}`;
         case "pr_closed": return "the pull request was closed without merging";
         case "runner_lost": return "runner lost";
-        case "ship_failed": return `ship failed: ${b.detail}`;
-        case "base_behind": return `base branch ${b.base} is ${b.behind} ${b.behind === 1 ? "commit" : "commits"} behind ${b.upstream}${b.can_fast_forward ? "; fast-forward it and start, " : "; "}start anyway, or unblock to look again`;
-        case "no_working_dir": return "no working directory: the project has no repository; give it one or use the sim profile";
+        case "ship_failed": return `workspace failed: ${b.detail}`;
+        case "base_behind": return `main branch ${b.base} is ${b.behind} ${b.behind === 1 ? "commit" : "commits"} behind ${b.upstream}${b.can_fast_forward ? "; fast-forward it and start, " : "; "}start anyway, or unblock to look again`;
+        case "no_working_dir": return "no working directory: the project has no repository; give it a folder or use the simulated agent";
       }
     }
   }

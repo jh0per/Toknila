@@ -15,6 +15,6 @@ export function awaitingText(review: ReviewView): string {
   const turn = review.awaiting;
   if (!turn) return "";
   if (turn.by === "person") return "waiting for you";
-  if (turn.by === "merging") return "merging into the base branch";
+  if (turn.by === "merging") return "merging into the main branch";
   return turn.decides ? "waiting for the reviewer agent" : "waiting for the reviewer agent, then you";
 }

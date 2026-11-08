@@ -22,19 +22,19 @@ describe("reasonText", () => {
       "the pull request was closed without merging",
     );
   });
-  it("names a base branch that is behind its upstream and the decisions", () => {
+  it("names a main branch that is behind its upstream and the decisions", () => {
     const behind = (can_fast_forward: boolean) =>
       reasonText(blocked({ kind: "base_behind", base: "main", upstream: "origin/main", behind: 133, can_fast_forward }));
     expect(behind(true)).toBe(
-      "base branch main is 133 commits behind origin/main; fast-forward it and start, start anyway, or unblock to look again",
+      "main branch main is 133 commits behind origin/main; fast-forward it and start, start anyway, or unblock to look again",
     );
     expect(behind(false)).toBe(
-      "base branch main is 133 commits behind origin/main; start anyway, or unblock to look again",
+      "main branch main is 133 commits behind origin/main; start anyway, or unblock to look again",
     );
   });
   it("says a card without a working directory has no repository to run in", () => {
     expect(reasonText(blocked({ kind: "no_working_dir" }))).toBe(
-      "no working directory: the project has no repository; give it one or use the sim profile",
+      "no working directory: the project has no repository; give it a folder or use the simulated agent",
     );
   });
 });

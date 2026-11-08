@@ -1,4 +1,4 @@
-// Changing a chain's autostart from the window (the sidebar menu and the chain header). The daemon
+// Changing whether a chain starts its cards automatically from the window (the sidebar menu and the chain header). The daemon
 // decides and answers with the chain; turning it on may start ready cards, which is the owner's
 // act. A refusal is shown as the daemon said it.
 
@@ -19,11 +19,11 @@ export type AutostartEffect = AutostartIntent;
 
 /// The hint on the toggle: what turning it on does.
 export const AUTOSTART_HINT =
-  "On: ready cards start by themselves, and turning it on starts the ready ones now. The planner cannot change the cards' order or dependencies in a chain that starts by itself.";
+  "On: ready cards start by themselves, and turning it on starts the ready ones now. The planner cannot change the cards' order or dependencies in a chain that starts cards automatically.";
 
 /// The hint on the chain header's Run chain / Stop chain button: what each does.
 export const RUN_CHAIN_HINT =
-  "Run chain turns autostart on and starts the ready cards up to the free agent slots. Stop chain turns autostart off; cards already running keep running.";
+  "Run chain starts cards automatically and starts the ready cards up to the free agent slots. Stop chain stops starting cards automatically; cards already running keep running.";
 
 /// The reducer of the autostart toggle.
 export function reduceAutostart(s: State, msg: AutostartIntent | AutostartResult): [State, Effect[]] {
