@@ -102,7 +102,7 @@ pub fn router(state: AppState) -> Router {
         .route("/inbox", get(crate::web::index))
         .route("/settings", get(crate::web::index))
         .route("/usage", get(crate::web::index))
-        .route("/settings/profiles", get(crate::web::index))
+        .route("/settings/{section}", get(crate::web::index))
         .route("/projects/{project}/settings", get(crate::web::index))
         .route(
             "/projects/{project}/settings/{section}",

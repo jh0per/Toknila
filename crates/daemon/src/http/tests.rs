@@ -1149,13 +1149,21 @@ async fn page_routes_serve_the_page_and_nothing_else_does() {
     for page in [
         "/settings",
         "/settings/profiles",
+        "/settings/updates",
+        "/settings/about",
+        "/settings/checks",
         "/projects/DEMO/settings",
         "/projects/DEMO/settings/agents",
+        "/projects/DEMO/settings/advanced",
     ] {
         assert_eq!(status(page).await, html, "{page}");
     }
     assert_eq!(
         status("/projects/DEMO/settings/agents/extra").await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        status("/settings/checks/extra").await.0,
         StatusCode::NOT_FOUND
     );
     assert_eq!(status("/projects/DEMO/chains/demo").await, html);
