@@ -4,7 +4,8 @@
 //! the process's end so the application can move the ticket (`supervise`).
 //!
 //! A ticket has one runner per role: its worker, and while the card is in review a reviewer next
-//! to it, on the same ship. The worker's output is what the ticket's routes mean; the reviewer's
+//! to it, on the same ship. A project's planner is one more runner, keyed by the project's id
+//! read as a card id (`toknila_core::planner::run_key`), in the project's repository. The worker's output is what the ticket's routes mean; the reviewer's
 //! is read, written to and answered through the `reviewer` role selector.
 //!
 //! No database here and nothing runs inside a transaction: the store calls [`Runners`] after a
@@ -42,7 +43,7 @@ pub use prompts::Prompts;
 pub use silence::{tick as silence_tick, watch as watch_silence};
 pub use supervise::supervise;
 pub use tokens::{Activity, AgentTokens, Grant, SpawnFacts};
-pub use ws::stream;
+pub use ws::{planner_stream, stream};
 
 /// What a client sees of a ticket's output: the scrollback of its newest run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -165,6 +166,12 @@ impl Runners {
             .filter(|((_, r), a)| *r == role && !a.is_over())
             .map(|((t, _), _)| *t)
             .collect()
+    }
+
+    /// The run of `role` that is alive for `ticket` now, if any.
+    pub fn live_run(&self, ticket: TicketId, role: AgentRole) -> Option<Run> {
+        let active = self.active().get(&(ticket, role)).cloned();
+        active.filter(|a| !a.is_over()).map(|a| a.run().clone())
     }
 
     /// Kills every live process, for a daemon that is shutting down.
@@ -368,7 +375,16 @@ impl Runner for Runners {
     }
 
     fn resize(&self, ticket: TicketId, size: Size) -> Result<(), RunnerError> {
-        let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
+        self.resize_role(ticket, AgentRole::Worker, size)
+    }
+
+    fn resize_role(
+        &self,
+        ticket: TicketId,
+        role: AgentRole,
+        size: Size,
+    ) -> Result<(), RunnerError> {
+        let active = self.active().get(&(ticket, role)).cloned();
         match active.filter(|a| !a.is_over()) {
             Some(a) => a.resize(size),
             None => Err(RunnerError::NotRunning),

@@ -178,6 +178,57 @@
       }
     },
     {
+      "file": null,
+      "profile": {
+        "command": [
+          "claude",
+          "--permission-mode",
+          "dontAsk",
+          "{kickoff}"
+        ],
+        "env": {},
+        "hooks": {
+          "enabled": false,
+          "settings_flag": "--settings"
+        },
+        "instructions_file": "CLAUDE.md",
+        "instructions_flag": "--append-system-prompt-file",
+        "mcp": {
+          "config_flag": "--mcp-config",
+          "enabled": true
+        },
+        "name": "claude-code-planner",
+        "nudge": {
+          "idle_secs": 120,
+          "max_nudges": 3,
+          "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done.",
+          "window_secs": 900
+        },
+        "output": {
+          "max_log_bytes": 20971520,
+          "scrollback_lines": 10000,
+          "strip_ansi": true
+        },
+        "permissions": {
+          "allow": [
+            "Read",
+            "Grep",
+            "Glob",
+            "Bash(git status *)",
+            "Bash(git diff *)",
+            "Bash(git log *)",
+            "Bash(git show *)",
+            "Bash(git ls-files *)",
+            "Bash(git merge-base *)",
+            "Bash(git rev-parse *)",
+            "mcp__toknila"
+          ]
+        },
+        "role": "planner",
+        "startup_secs": 0
+      }
+    },
+    {
       "file": "my-agent.toml",
       "profile": {
         "command": [

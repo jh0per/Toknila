@@ -15,6 +15,7 @@ pub mod machine;
 pub mod model;
 pub mod nudge;
 pub mod plan;
+pub mod planner;
 pub mod plans;
 pub mod pr;
 pub mod profile;

@@ -2,7 +2,7 @@
 //! profiles plus the files of the profiles folder. Pure: the daemon reads the files.
 //!
 //! ```toml
-//! role = "worker"                       # worker (default) | reviewer | release
+//! role = "worker"                       # worker (default) | reviewer | release | planner
 //! command = ["my-agent", "{kickoff}"]   # argv list, never a shell string; {kickoff} is the first prompt
 //! instructions_file = "AGENTS.md"       # optional, relative to the working directory
 //! instructions_flag = "--append-system-prompt-file"  # takes the path of the generated per-run instructions

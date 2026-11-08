@@ -12,7 +12,7 @@ pub(super) struct AgentEnv {
     pub client: Client,
     /// Key of the ticket the run belongs to.
     pub ticket: String,
-    /// What the run is: the ticket's worker, or the reviewer next to it.
+    /// What the run is: the ticket's worker, the reviewer next to it, or a project's planner.
     pub role: AgentRole,
 }
 
@@ -27,14 +27,21 @@ impl AgentEnv {
                     format!("{name} is not set: this command runs inside a Toknila agent")
                 })
         };
+        // Without a role the run is a worker's: the runners before review set none.
+        let role = match std::env::var(agent_env::ROLE).as_deref() {
+            Ok("reviewer") => AgentRole::Reviewer,
+            Ok("planner") => AgentRole::Planner,
+            _ => AgentRole::Worker,
+        };
         Ok(AgentEnv {
             client: Client::new(var(agent_env::URL)?, var(agent_env::TOKEN)?),
-            ticket: var(agent_env::TICKET)?,
-            // Without a role the run is a worker's: the runners before review set none.
-            role: match std::env::var(agent_env::ROLE).as_deref() {
-                Ok("reviewer") => AgentRole::Reviewer,
-                _ => AgentRole::Worker,
+            // A planner works on a project, not a ticket: its token names the project.
+            ticket: if role == AgentRole::Planner {
+                String::new()
+            } else {
+                var(agent_env::TICKET)?
             },
+            role,
         })
     }
 }

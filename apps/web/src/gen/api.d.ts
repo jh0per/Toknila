@@ -181,6 +181,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/cards/{card}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edits a card of the planner's project that has not started. */
+        patch: operations["planner_edit_card"];
+        trace?: never;
+    };
+    "/planner/cards/{card}/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Opens a thread on a card of the planner's project. */
+        post: operations["planner_open_thread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/cards/{card}/threads/{thread}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Posts a message in a thread of a card of the planner's project. */
+        post: operations["planner_thread_message"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/cards/{card}/threads/{thread}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Posts the next artifact version of a thread; an approved thread reopens. */
+        post: operations["planner_thread_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/chains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A new chain in the planner's project. It never starts its cards by itself. */
+        post: operations["planner_new_chain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/chains/{chain}/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A new card in a chain of the planner's project. */
+        post: operations["planner_add_card"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/chains/{chain}/cards/{card}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Puts a card directly before or after another; the dependencies around it are rewired. */
+        post: operations["planner_move_card"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/chains/{chain}/edges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Makes `to` wait for `from`. */
+        post: operations["planner_add_dependency"];
+        /** Removes the wait of `to` for `from`. */
+        delete: operations["planner_remove_dependency"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The whole plan of the planner's project: chains, cards in order, dependencies, threads. */
+        get: operations["planner_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles": {
         parameters: {
             query?: never;
@@ -345,6 +499,109 @@ export interface paths {
         get: operations["get_inbox"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/planner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the project's planner is running. */
+        get: operations["get_planner"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/planner/input": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["planner_input"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/planner/scrollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["planner_scrollback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/planner/size": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The size of the panel that shows the planner's terminal. */
+        post: operations["planner_size"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/planner/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts the project's planner in its repository (Claude Code, read-only, with the planner
+         *     tools), or keeps the live one.
+         */
+        post: operations["start_planner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/planner/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stops the project's planner; one that is not running is fine. */
+        post: operations["stop_planner"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1013,7 +1270,7 @@ export interface components {
          * @description What an agent profile is for.
          * @enum {string}
          */
-        AgentRole: "worker" | "reviewer" | "release";
+        AgentRole: "worker" | "reviewer" | "release" | "planner";
         /**
          * @description One way a person answers a question.
          * @enum {string}
@@ -1084,6 +1341,16 @@ export interface components {
         } | {
             /** @enum {string} */
             kind: "no_working_dir";
+        };
+        /** @description What the planner may change on a card that has not started. */
+        CardEdit: {
+            acceptance?: string[] | null;
+            /** @description Checklist items to append. */
+            add_subtasks?: string[];
+            /** @description Checklist items to rename. */
+            edit_subtasks?: components["schemas"]["SubtaskEdit"][];
+            prompt?: string | null;
+            title?: string | null;
         };
         /**
          * @description A flow of tickets with dependencies and release milestones between them. Its status,
@@ -1516,6 +1783,16 @@ export interface components {
             /** @description The text of a `text` answer; the optional comment of a `deny`. */
             text?: string | null;
         };
+        /** @description What the planner gives for a new card. */
+        NewCard: {
+            acceptance?: string[];
+            /** @description Cards (keys) or release versions of the chain it waits for. Empty: the end of the chain. */
+            after?: string[];
+            prompt?: string;
+            /** @description Checklist items. */
+            subtasks?: string[];
+            title: string;
+        };
         /** @description `POST /v1/projects/{project}/chains`. */
         NewChain: {
             /** @description Defaults to true. */
@@ -1538,6 +1815,11 @@ export interface components {
         /** @description Body of `.../messages` and `.../changes`. */
         NewMessage: {
             text: string;
+        };
+        /** @description What the planner may give for a new chain; a chain it makes never starts cards by itself. */
+        NewPlanChain: {
+            goal?: string | null;
+            name: string;
         };
         /** @description `POST /v1/projects`: a new project; unset fields take the project defaults. */
         NewProject: {
@@ -1766,6 +2048,21 @@ export interface components {
          * @enum {string}
          */
         Place: "before" | "after";
+        /** @description A card with its place in the plan. */
+        PlanCard: {
+            /** @description What it waits for: card keys and `release <version>` labels. */
+            after: string[];
+            subtasks: components["schemas"]["Subtask"][];
+            threads: components["schemas"]["PlanThread"][];
+            /** @description The card with its status, prompt, acceptance, review rounds and pull request. */
+            ticket: components["schemas"]["Ticket"];
+        };
+        /** @description A chain with its cards in dependency order (the order is the priority). */
+        PlanChain: {
+            cards: components["schemas"]["PlanCard"][];
+            chain: components["schemas"]["Chain"];
+            summary: components["schemas"]["ChainSummary"];
+        };
         /**
          * @description What kind of plan an entry is.
          * @enum {string}
@@ -1778,6 +2075,29 @@ export interface components {
             plans: components["schemas"]["FoundPlan"][];
             /** @description The repository has a `.specify/` folder. */
             specify_dir: boolean;
+        };
+        /** @description A thread of a card with what was said in it. */
+        PlanThread: {
+            messages: components["schemas"]["ThreadMessage"][];
+            thread: components["schemas"]["Thread"];
+            /**
+             * Format: int32
+             * @description How many artifact versions it has; their bodies are read in the window.
+             */
+            versions: number;
+        };
+        /** @description `GET /v1/planner/plan`: the project and all of its chains. */
+        PlanView: {
+            chains: components["schemas"]["PlanChain"][];
+            project: components["schemas"]["Project"];
+        };
+        /** @description `GET /v1/projects/{project}/planner`: the project's planner. */
+        PlannerState: {
+            /** @description The profile it runs with (or, when it is not running, would start with). */
+            profile: string;
+            run?: components["schemas"]["RunId"] | null;
+            /** @description Its process is alive. */
+            running: boolean;
         };
         /** @description Where the cost estimate's prices come from. */
         PriceInfo: {
@@ -2077,6 +2397,8 @@ export interface components {
             /** @description Every verdict so far, oldest first. */
             rounds: components["schemas"]["ReviewRound"][];
         };
+        /** @description Identifies a [`crate::Run`] of a runner process. */
+        RunId: string;
         /** @description The worktree and branch a ticket works in, once the shipyard has made them. */
         Ship: {
             /** @description `ship/<chain>/<slug>`. */
@@ -2091,6 +2413,11 @@ export interface components {
          * @enum {string}
          */
         StartMode: "auto" | "manual";
+        /** @description `POST /v1/projects/{project}/planner/start`. */
+        StartPlanner: {
+            /** @description A planner profile from `GET /v1/profiles`; unset: `claude-code-planner`. */
+            profile?: string | null;
+        };
         /** @description The reason attached to the current status, if that status carries one. */
         StatusReason: (components["schemas"]["WaitingReason"] & {
             /** @enum {string} */
@@ -2134,6 +2461,15 @@ export interface components {
             position: number;
             text: string;
             ticket_id: components["schemas"]["TicketId"];
+        };
+        /** @description A rename of a checklist item. */
+        SubtaskEdit: {
+            /**
+             * Format: int32
+             * @description 1-based position.
+             */
+            position: number;
+            text: string;
         };
         /** @description Identifies a [`crate::Subtask`]. */
         SubtaskId: string;
@@ -2929,6 +3265,440 @@ export interface operations {
             };
         };
     };
+    planner_edit_card: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card id, key or title */
+                card: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardEdit"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_open_thread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card id, key or title */
+                card: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewThread"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_thread_message: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card id, key or title */
+                card: string;
+                /** @description Thread number on the card (1, 2, ...) or thread id */
+                thread: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewMessage"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_thread_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card id, key or title */
+                card: string;
+                /** @description Thread number on the card (1, 2, ...) or thread id */
+                thread: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewVersion"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_new_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewPlanChain"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_add_card: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewCard"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_move_card: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+                /** @description Card id, key or title */
+                card: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_add_dependency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EdgeInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_remove_dependency: {
+        parameters: {
+            query: {
+                /** @description Ticket key or release version. */
+                from: string;
+                /** @description Ticket key or release version. */
+                to: string;
+                kind?: components["schemas"]["EdgeKind"];
+            };
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_profiles: {
         parameters: {
             query?: never;
@@ -3328,6 +4098,238 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxItem"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_planner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannerState"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_input: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        /** @description Bytes typed into the planner's terminal, as they are */
+        requestBody: {
+            content: {
+                "application/octet-stream": number[];
+            };
+        };
+        responses: {
+            /** @description Written */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_scrollback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Raw terminal output of the planner's newest run, last lines only (ANSI kept). Headers x-toknila-run, x-toknila-offset (of the first byte) and x-toknila-end (after the last; continue the stream from here). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": number[];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_size: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminalSize"];
+            };
+        };
+        responses: {
+            /** @description Resized; sizes outside 20x5..500x200 are brought into that range */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    start_planner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartPlanner"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannerState"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    stop_planner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannerState"];
                 };
             };
             404: {

@@ -7,7 +7,8 @@ the code does not match it yet, the refactoring plan below says which step fixes
 
 Decision records: [ADR 0001](adr/0001-layered-architecture-and-mvi.md),
 [ADR 0002](adr/0002-wildcard-cards.md) (wildcard cards),
-[ADR 0003](adr/0003-card-threads.md) (threads on a card).
+[ADR 0003](adr/0003-card-threads.md) (threads on a card),
+[ADR 0005](adr/0005-planner.md) (the planner, a project's main agent).
 
 ## Layers
 
@@ -55,7 +56,7 @@ progress, where a chain stopped) are never stored, here or in a client.
 ## Agent profiles
 
 A profile says how to launch one agent: `command` (an argv list, never a shell string), `env`,
-`role` (`worker`, `reviewer` or `release`), `instructions_file`, `instructions_flag`, `mcp` and `hooks` wiring,
+`role` (`worker`, `reviewer`, `release` or `planner`), `instructions_file`, `instructions_flag`, `mcp` and `hooks` wiring,
 `permissions` (allow rules), `output` rules, `nudge` thresholds and `startup_secs` (default 20; see "Answering an agent"). The working directory is not in it: the ship supplies it at launch.
 A new agent is a new file, not new code.
 
@@ -639,6 +640,48 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
 Tests use `fake-agent` (`crates/daemon/src/bin/fake-agent.rs`: prints lines, echoes a line of
 input, prints its terminal size, sleeps, exits with a code) as the profile command, so the same tests run on a Unix pty and
 on ConPTY without a shell.
+
+## The planner
+
+A project's main agent ([ADR 0005](adr/0005-planner.md)): a Claude Code session that plans and
+starts nothing. Planner, card agents and owner divide the work: the planner plans; card agents do
+the cards; the owner starts cards and accepts work.
+
+- **Role and profile.** `AgentRole::Planner`; built-in profile `claude-code-planner`
+  (`--permission-mode dontAsk`, allow `Read`, `Grep`, `Glob`, read-only `git`, `mcp__toknila`; no
+  hooks, so no nudges and no hand-in). Documented mechanisms only: `--permission-mode dontAsk`
+  and `permissions.allow` ([permissions](https://code.claude.com/docs/en/permissions),
+  [permission modes](https://code.claude.com/docs/en/permission-modes)), `--settings`
+  ([settings](https://code.claude.com/docs/en/settings)), `--mcp-config`
+  ([MCP](https://code.claude.com/docs/en/mcp)) and `--append-system-prompt-file`
+  ([CLI reference](https://code.claude.com/docs/en/cli-reference)). A profile file with
+  `role = "planner"` is another planner (the tests use the fake agent).
+- **Run.** A person starts it (`POST /v1/projects/{project}/planner/start`, `tok planner start`,
+  the window): `toknila_app::planner::start` builds the `RunRequest` (the project's `repo_path`
+  as the directory; the project's key, branch, merge mode and check command as the brief) and the
+  `Runner` port starts it. It is keyed by the project's id read as a card id
+  (`toknila_core::planner::run_key`) and labelled `<KEY>-0`; its files are in
+  `runs/<project id>/planner/` (`mcp.json` without a ticket variable, `settings.json` with the
+  allow rules, `instructions.md` from `toknila_core::instructions::generate_planner`), its log and
+  scrollback like any run's. The journal does not record its start or end. One per project; a
+  start keeps the live one.
+- **Terminal.** `GET /v1/projects/{project}/planner` (running or not), `/planner/scrollback`, the
+  WebSocket `/planner/stream` (the same frames as a card's terminal), `POST /planner/input`,
+  `/planner/size`, `/planner/start` and `/planner/stop`. All run as a person.
+  `tok planner start|stop|logs <PROJECT>` is the CLI.
+- **Tools and routes.** `tok mcp` with `TOKNILA_ROLE=planner` offers `show_plan`, `new_chain`,
+  `add_card`, `edit_card`, `add_dependency`, `remove_dependency`, `move_card`, `open_thread`,
+  `thread_message` and `thread_version` (`cmd/mcp_planner`), each a call to `/v1/planner/...`
+  (`PLANNER_ROUTES`; `http/routes/planner.rs`) with the run's token. A planner token reaches
+  those ten routes and no other (`403`); nothing in them starts, accepts or merges.
+- **Scope.** The project is the token's, never in a path. `toknila_app::planner` resolves every
+  reference inside it and refuses (`403`) another project's chain, card or thread. Core's
+  `planner` module holds the rules: only a card that has not started is edited; a chain that
+  autostarts is closed to graph changes (they could start a card); a chain the planner creates
+  never autostarts; a planner needs a repository.
+- **Writes** run as `Actor::Agent` through the use cases of `chains`, `tickets`, `notes` and
+  `threads`, so core's rules (cycles, dependency checks, `can_edit`, `can_move`, thread states)
+  apply, events are journaled, and the window's diagram updates from the stream as for any edit.
 
 ## Data safety
 

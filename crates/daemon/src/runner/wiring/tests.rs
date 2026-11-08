@@ -7,6 +7,8 @@ use toknila_core::{AgentProfile, AgentRole, RunId};
 
 use super::*;
 
+mod planner;
+
 const TOKEN: &str = "secret-run-token-0123456789abcdef";
 
 struct Rig {
@@ -29,6 +31,7 @@ impl Rig {
                 prompt: "Wire the instructions.".to_owned(),
                 acceptance: vec!["It is wired".to_owned()],
                 check_command: None,
+                project: None,
             },
         }
     }

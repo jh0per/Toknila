@@ -133,6 +133,7 @@ fn the_catalog_lists_built_ins_then_files_by_name_and_skips_other_files() {
             ("claude-code", None),
             ("sim-reviewer", None),
             ("claude-code-reviewer", None),
+            ("claude-code-planner", None),
             ("alpha", Some("alpha.toml")),
             ("zeta", Some("zeta.toml")),
         ]
@@ -151,7 +152,7 @@ fn the_catalog_reports_bad_files_and_still_lists_the_good_ones() {
         },
         file("good.toml", "command = [\"g\"]"),
     ]);
-    assert_eq!(c.profiles.len(), 5, "four built-ins and good");
+    assert_eq!(c.profiles.len(), 6, "five built-ins and good");
     assert_eq!(
         c.profiles[1].profile.command,
         ["claude", "--permission-mode", "acceptEdits", "{kickoff}"],
@@ -172,6 +173,41 @@ fn the_catalog_reports_bad_files_and_still_lists_the_good_ones() {
     );
     assert!(c.problems[1].message.contains("built-in"));
     assert!(c.problems[2].message.contains("permission denied"));
+}
+
+#[test]
+fn the_built_in_planner_reads_and_plans_and_nothing_else() {
+    let p = AgentProfile::claude_code_planner();
+    assert_eq!(p.role, AgentRole::Planner);
+    assert_eq!(
+        p.command,
+        ["claude", "--permission-mode", "dontAsk", "{kickoff}"]
+    );
+    assert!(p.mcp.enabled, "the planner tools are the MCP server");
+    assert!(!p.hooks.enabled, "no card hooks for a planner");
+    assert_eq!(p.hooks.settings_flag.as_deref(), Some("--settings"));
+    let allow = p.permissions.rules(None);
+    for want in ["Read", "Grep", "Glob", "Bash(git diff *)", "mcp__toknila"] {
+        assert!(allow.iter().any(|r| r == want), "{want} is allowed");
+    }
+    for never in [
+        "Edit",
+        "Write",
+        "Bash(git add",
+        "Bash(git commit",
+        "Bash(git branch",
+    ] {
+        assert!(
+            !allow.iter().any(|r| r.starts_with(never)),
+            "{never} is not allowed"
+        );
+    }
+}
+
+#[test]
+fn a_profile_file_can_have_the_planner_role() {
+    let p = parse("my-planner", "role = \"planner\"\ncommand = [\"a\"]").expect("valid");
+    assert_eq!(p.role, AgentRole::Planner);
 }
 
 #[test]

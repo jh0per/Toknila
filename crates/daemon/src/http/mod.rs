@@ -34,8 +34,9 @@ impl Modify for BearerAuth {
 /// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
-        agents::*, chains::*, events::*, inbox::*, plans::*, profiles::*, projects::*,
-        questions::*, releases::*, runner::*, system::*, threads::*, tickets::*, usage::*,
+        agents::*, chains::*, events::*, inbox::*, planner::*, planner_run::*, plans::*,
+        profiles::*, projects::*, questions::*, releases::*, runner::*, system::*, threads::*,
+        tickets::*, usage::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -77,6 +78,21 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(post_thread_version))
         .routes(routes!(approve_thread))
         .routes(routes!(request_thread_changes))
+        .routes(routes!(get_planner))
+        .routes(routes!(start_planner))
+        .routes(routes!(stop_planner))
+        .routes(routes!(planner_scrollback))
+        .routes(routes!(planner_input))
+        .routes(routes!(planner_size))
+        .routes(routes!(planner_plan))
+        .routes(routes!(planner_new_chain))
+        .routes(routes!(planner_add_card))
+        .routes(routes!(planner_edit_card))
+        .routes(routes!(planner_add_dependency, planner_remove_dependency))
+        .routes(routes!(planner_move_card))
+        .routes(routes!(planner_open_thread))
+        .routes(routes!(planner_thread_message))
+        .routes(routes!(planner_thread_version))
         .routes(routes!(scrollback))
         .routes(routes!(runner_input))
         .routes(routes!(runner_answer))

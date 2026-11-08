@@ -55,6 +55,7 @@ fn role_dir(role: AgentRole) -> &'static str {
         AgentRole::Worker => "worker",
         AgentRole::Reviewer => "reviewer",
         AgentRole::Release => "release",
+        AgentRole::Planner => "planner",
     }
 }
 
@@ -64,16 +65,23 @@ fn reference(name: &str) -> String {
 }
 
 /// The MCP config: one stdio server, `toknila mcp`, whose environment is taken from the agent's.
-fn mcp_config(bin: &Path) -> Value {
-    let env: serde_json::Map<String, Value> = [
-        agent_env::URL,
-        agent_env::TOKEN,
-        agent_env::TICKET,
-        agent_env::ROLE,
-    ]
-    .into_iter()
-    .map(|name| (name.to_owned(), Value::String(reference(name))))
-    .collect();
+fn mcp_config(bin: &Path, role: AgentRole) -> Value {
+    // A planner works on a project, not a card: it has no ticket for the variable to name, and a
+    // reference to a variable that is not set would stop the agent's config from loading.
+    let names: &[&str] = match role {
+        AgentRole::Planner => &[agent_env::URL, agent_env::TOKEN, agent_env::ROLE],
+        _ => &[
+            agent_env::URL,
+            agent_env::TOKEN,
+            agent_env::TICKET,
+            agent_env::ROLE,
+        ],
+    };
+    let env: serde_json::Map<String, Value> = names
+        .iter()
+        .copied()
+        .map(|name| (name.to_owned(), Value::String(reference(name))))
+        .collect();
     json!({ "mcpServers": { SERVER: {
         "type": "stdio",
         "command": bin.display().to_string(),
@@ -159,7 +167,11 @@ pub(super) fn prepare_with(
     cx: &Context<'_>,
     inherited: impl IntoIterator<Item = String>,
 ) -> Result<Wiring, RunnerError> {
-    let key = cx.key.to_string();
+    // A planner run is labelled by its project's key; there is no card.
+    let key = match cx.role {
+        AgentRole::Planner => cx.key.project().to_string(),
+        _ => cx.key.to_string(),
+    };
     let brief = brief_of_key(cx, &key);
     let mut wiring = Wiring {
         command: profile.argv(&instructions::kickoff(cx.role, &brief)),
@@ -171,14 +183,21 @@ pub(super) fn prepare_with(
     if let Some(url) = cx.url {
         wiring.env.push((agent_env::URL.to_owned(), url.to_owned()));
     }
+    wiring
+        .env
+        .push((agent_env::TOKEN.to_owned(), cx.token.to_owned()));
+    if cx.role != AgentRole::Planner {
+        wiring
+            .env
+            .push((agent_env::TICKET.to_owned(), cx.key.to_string()));
+    }
     wiring.env.extend([
-        (agent_env::TOKEN.to_owned(), cx.token.to_owned()),
-        (agent_env::TICKET.to_owned(), cx.key.to_string()),
         (agent_env::RUN.to_owned(), cx.run.to_string()),
         (
             agent_env::ROLE.to_owned(),
             match cx.role {
                 AgentRole::Reviewer => "reviewer",
+                AgentRole::Planner => "planner",
                 _ => "worker",
             }
             .to_owned(),
@@ -195,7 +214,7 @@ pub(super) fn prepare_with(
             profile.mcp.enabled,
             profile.mcp.config_flag.as_deref(),
             "mcp.json",
-            mcp_config(cx.bin),
+            mcp_config(cx.bin, cx.role),
         ),
         (
             true,
@@ -217,6 +236,12 @@ pub(super) fn prepare_with(
     }
     if let Some(flag) = profile.instructions_flag.as_deref() {
         let text = match cx.role {
+            AgentRole::Planner => {
+                let facts = cx.brief.project.as_ref().ok_or_else(|| {
+                    RunnerError::Spawn("a planner run needs the project's facts".to_owned())
+                })?;
+                instructions::generate_planner(facts)
+            }
             AgentRole::Reviewer => instructions::generate_review(&brief),
             _ => instructions::generate(&brief),
         };

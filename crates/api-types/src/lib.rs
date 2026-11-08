@@ -3,6 +3,7 @@
 //! in `toknila-app` and are re-exported here; this crate adds the read models, errors and journal
 //! entries.
 
+mod planner;
 mod plans;
 pub mod questions;
 mod removal;
@@ -22,11 +23,15 @@ use toknila_core::{
     Ship, Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketId, Timestamp,
 };
 
+pub use planner::{PlannerState, StartPlanner};
 pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedChain};
 pub use questions::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
 pub use removal::{ChainDeletion, DeleteProject, ProjectDeletion};
 pub use system::{CliLink, RepoCheckRequest};
 pub use toknila_app::chains::NewChain;
+pub use toknila_app::planner::{
+    CardEdit, NewCard, NewPlanChain, PlanCard, PlanChain, PlanThread, PlanView, SubtaskEdit,
+};
 pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;
 pub use toknila_app::reviews::{ReviewSettings, ReviewView};

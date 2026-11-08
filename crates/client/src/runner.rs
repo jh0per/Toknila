@@ -38,9 +38,14 @@ impl Client {
             enc(ticket),
             role_query(role, '?')
         );
+        self.scrollback_at(&url)
+    }
+
+    /// Reads a scrollback answer (raw bytes and the three headers) from `url`.
+    pub(crate) fn scrollback_at(&self, url: &str) -> ClientResult<Scrollback> {
         let resp = self
             .agent
-            .get(&url)
+            .get(url)
             .set("Authorization", &format!("Bearer {}", self.token))
             .call()
             .map_err(transport_error)?;

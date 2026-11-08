@@ -5,6 +5,8 @@ pub mod agents;
 pub mod chains;
 pub mod events;
 pub mod inbox;
+pub mod planner;
+pub mod planner_run;
 pub mod plans;
 pub mod profiles;
 pub mod projects;

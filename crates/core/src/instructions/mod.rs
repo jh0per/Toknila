@@ -10,12 +10,21 @@
 //! - [`typed`] and [`for_hook`]: the text of that delivery.
 //! - [`terminal`]: the bounds of a terminal size.
 
+mod planner;
 mod protocol;
 pub mod terminal;
 #[cfg(test)]
 mod tests;
 
+pub use planner::{ProjectFacts, generate_planner};
+
 use crate::{Comment, CommentKind, template};
+
+/// The part of the planner's instructions that is the same for every project; the MCP server
+/// sends it as its `instructions`.
+pub fn planner_protocol() -> &'static str {
+    planner::PLANNER_PROTOCOL
+}
 
 /// What the generated file says about one run.
 #[derive(Debug, Clone, Copy)]
@@ -37,6 +46,12 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         .map(|c| format!(" Run `{c}` before you hand in."))
         .unwrap_or_default();
     match role {
+        crate::AgentRole::Planner => format!(
+            "You are the planner of project {key}. Read your Toknila instructions, call \
+             `show_plan`, then tell the owner in a line or two how the plan stands and wait for \
+             what they want planned. Do not start any card.",
+            key = brief.key
+        ),
         crate::AgentRole::Reviewer => format!(
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
              branch, run the checks, then call `review_verdict` once. You do not change the code.",

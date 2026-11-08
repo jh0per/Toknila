@@ -3,7 +3,9 @@
 //! Two kinds of token exist. The person's token (`daemon.json`) may call every route. An agent
 //! token (one per run, [`crate::runner::AgentTokens`]) may call only the routes in
 //! [`AGENT_ROUTES`], for its own ticket; everything else, including every route added later, is
-//! refused with `403` until it is listed there on purpose.
+//! refused with `403` until it is listed there on purpose. A planner's token (its role says so)
+//! reaches [`PLANNER_ROUTES`] and nothing else, so it cannot start, pause, resume, cancel,
+//! accept, return, reopen or merge anything: those routes are not on the list.
 
 use axum::Json;
 use axum::extract::{MatchedPath, Request, State};
@@ -12,7 +14,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use toknila_app::{AppError, AppResult, agent};
 use toknila_core::agent::AgentEvent;
-use toknila_core::{AgentRole, Ticket};
+use toknila_core::{AgentRole, ProjectId, Ticket, planner};
 
 use super::{AppState, now};
 use crate::http::error::ErrorBody;
@@ -27,6 +29,22 @@ pub const AGENT_ROUTES: [&str; 5] = [
     "/v1/tickets/{ticket}/permission",
     "/v1/tickets/{ticket}/instructions/claim",
     "/v1/usage/quota",
+];
+
+/// The only routes a planner's token may call, as `(method, path)`. Each acts on the planner's own
+/// project, which the token names, so no path carries a project. Every route here runs a use case
+/// of `toknila_app::planner`, which checks the scope again.
+pub const PLANNER_ROUTES: [(&str, &str); 10] = [
+    ("GET", "/v1/planner/plan"),
+    ("POST", "/v1/planner/chains"),
+    ("POST", "/v1/planner/chains/{chain}/cards"),
+    ("PATCH", "/v1/planner/cards/{card}"),
+    ("POST", "/v1/planner/chains/{chain}/edges"),
+    ("DELETE", "/v1/planner/chains/{chain}/edges"),
+    ("POST", "/v1/planner/chains/{chain}/cards/{card}/move"),
+    ("POST", "/v1/planner/cards/{card}/threads"),
+    ("POST", "/v1/planner/cards/{card}/threads/{thread}/messages"),
+    ("POST", "/v1/planner/cards/{card}/threads/{thread}/versions"),
 ];
 
 /// Who is calling, as the token says. Handlers of agent routes check [`Principal::owns`] and, for
@@ -48,6 +66,19 @@ impl Principal {
         }
     }
 
+    /// The project a planner's token works on. Only a planner has one: a person uses the project
+    /// routes, and a card's agent has its ticket.
+    pub fn planner_project(&self) -> AppResult<ProjectId> {
+        match self {
+            Principal::Agent(grant) if grant.role == AgentRole::Planner => {
+                Ok(planner::project_of(grant.ticket))
+            }
+            _ => Err(AppError::forbidden(
+                "these routes are for a project's planner",
+            )),
+        }
+    }
+
     /// What an agent may report depends on its role: a worker reports its work, a reviewer
     /// only gives its verdict on it. A person may send any event (a simulated agent is one).
     pub fn may_send(&self, event: &AgentEvent) -> AppResult<()> {
@@ -58,6 +89,9 @@ impl Principal {
             (AgentRole::Reviewer, true) | (AgentRole::Worker, false) => Ok(()),
             (AgentRole::Reviewer, false) => Err(AppError::forbidden(
                 "a reviewer agent may only send its review_verdict",
+            )),
+            (AgentRole::Planner, false) => Err(AppError::forbidden(
+                "a planner may not send card events; it plans through its own tools",
             )),
             (_, true) => Err(AppError::forbidden(
                 "only the reviewer agent may send a review_verdict",
@@ -107,17 +141,25 @@ pub(super) async fn require_token(
     let principal = if constant_time_eq(token.as_bytes(), state.token.as_bytes()) {
         Principal::Person
     } else if let Some(grant) = state.runners.tokens().lookup(&token) {
-        let allowed = req.method() == Method::POST
-            && req
-                .extensions()
-                .get::<MatchedPath>()
-                .is_some_and(|m| AGENT_ROUTES.contains(&m.as_str()));
+        let matched = req
+            .extensions()
+            .get::<MatchedPath>()
+            .map(MatchedPath::as_str);
+        let allowed = match grant.role {
+            AgentRole::Planner => matched.is_some_and(|path| {
+                PLANNER_ROUTES
+                    .iter()
+                    .any(|(method, route)| *method == req.method().as_str() && *route == path)
+            }),
+            _ => req.method() == Method::POST && matched.is_some_and(|p| AGENT_ROUTES.contains(&p)),
+        };
         if !allowed {
-            return refuse(
-                StatusCode::FORBIDDEN,
-                "an agent token may only send agent events for its own ticket",
-                "forbidden",
-            );
+            let what = if grant.role == AgentRole::Planner {
+                "a planner token may only plan: read the plan, edit chains and cards, write in threads"
+            } else {
+                "an agent token may only send agent events for its own ticket"
+            };
+            return refuse(StatusCode::FORBIDDEN, what, "forbidden");
         }
         // Any call of a run's token is a sign of life; the startup rule counts it for either role.
         state

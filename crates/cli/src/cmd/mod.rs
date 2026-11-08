@@ -7,7 +7,9 @@ mod chain_rm;
 mod hook;
 mod logs;
 mod mcp;
+mod mcp_planner;
 mod mcp_tools;
+mod planner;
 mod profile;
 mod project;
 mod release;
@@ -27,6 +29,7 @@ use toknila_client::Client;
 use toknila_daemon::paths::Paths;
 
 pub use chain::{ChainCmd, DepCmd};
+pub use planner::PlannerCmd;
 pub use profile::ProfileCmd;
 pub use project::ProjectCmd;
 pub use release::ReleaseCmd;
@@ -46,6 +49,9 @@ pub enum Command {
     /// Projects: one product, one repository.
     #[command(subcommand)]
     Project(ProjectCmd),
+    /// A project's planner: its main agent, which plans chains and cards and starts nothing.
+    #[command(subcommand)]
+    Planner(PlannerCmd),
     /// Agent profiles: how each agent is launched.
     #[command(subcommand)]
     Profile(ProfileCmd),
@@ -235,6 +241,7 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
         }
         Command::Project(p) => project::run(&c, p, json_out),
         Command::Profile(p) => profile::run(&c, p, json_out),
+        Command::Planner(p) => planner::run(&c, p, json_out),
         Command::Chain(ch) => chain::run(&c, ch, json_out),
         Command::Dep(d) => chain::dep(&c, d, json_out),
         Command::Ticket(t) => ticket::run(&c, t, json_out),
