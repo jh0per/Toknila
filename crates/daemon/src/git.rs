@@ -8,7 +8,7 @@ use std::io::Read;
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
-use toknila_app::{MergeError, ShipError};
+pub(crate) use toknila_app::GitError;
 
 #[cfg(test)]
 pub(crate) mod testing;
@@ -38,37 +38,6 @@ fn kill_tree(child: &mut std::process::Child) {
         }
     }
     let _ = child.kill();
-}
-
-/// Why a git command did not give a result.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum GitError {
-    /// The program is not installed or not on the path.
-    Missing,
-    /// The process could not be run.
-    Io(String),
-    /// The command ran and exited with a failure.
-    Failed { command: String, detail: String },
-}
-
-impl From<GitError> for ShipError {
-    fn from(e: GitError) -> Self {
-        match e {
-            GitError::Missing => ShipError::GitMissing,
-            GitError::Io(text) => ShipError::Io(text),
-            GitError::Failed { command, detail } => ShipError::Git { command, detail },
-        }
-    }
-}
-
-impl From<GitError> for MergeError {
-    fn from(e: GitError) -> Self {
-        match e {
-            GitError::Missing => MergeError::GitMissing,
-            GitError::Io(text) => MergeError::Io(text),
-            GitError::Failed { command, detail } => MergeError::Git { command, detail },
-        }
-    }
 }
 
 /// How long a best-effort `git fetch` may take before it is given up: a network that hangs must

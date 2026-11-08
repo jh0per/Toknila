@@ -128,10 +128,10 @@ impl GitMerger {
                 }
                 Ok(Err(files))
             }
-            _ => Err(MergeError::Git {
+            _ => Err(MergeError::Git(GitError::Failed {
                 command: args.join(" "),
                 detail: String::from_utf8_lossy(&out.stderr).trim().to_owned(),
-            }),
+            })),
         }
     }
 

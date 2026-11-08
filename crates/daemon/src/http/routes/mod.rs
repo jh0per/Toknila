@@ -30,6 +30,7 @@ use super::dto::{ChainDetail, ThreadDetail, TicketDetail};
 use super::error::ApiError;
 use crate::server::{AppState, now};
 use crate::store::{Repo, RowFilter, WriteTx};
+use toknila_app::AppError;
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -61,7 +62,7 @@ fn load_chain_detail(
 ) -> ApiResult<ChainDetail> {
     let view = repo
         .chain_view(chain)?
-        .ok_or_else(|| ApiError::not_found(format!("chain {chain}")))?;
+        .ok_or_else(|| AppError::not_found(format!("chain {chain}")))?;
     let rows = repo.usage_rows(RowFilter {
         chain: Some(chain),
         ..RowFilter::default()
@@ -79,7 +80,7 @@ fn load_ticket_detail(
 ) -> ApiResult<TicketDetail> {
     let t = repo
         .ticket(ticket)?
-        .ok_or_else(|| ApiError::not_found(format!("ticket {ticket}")))?;
+        .ok_or_else(|| AppError::not_found(format!("ticket {ticket}")))?;
     let chain = repo.chain(t.chain_id)?.map(|c| c.name).unwrap_or_default();
     let review = toknila_app::reviews::view(repo, &t)?;
     let rows = repo.usage_rows(RowFilter {

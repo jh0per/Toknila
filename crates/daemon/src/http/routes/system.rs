@@ -29,17 +29,14 @@ pub async fn system_checks(State(state): State<AppState>) -> ApiResult<Json<Syst
     .await?;
     let checks =
         tokio::task::spawn_blocking(move || tools::system_checks_for(t.as_ref(), &commands))
-            .await
-            .map_err(|e| toknila_app::AppError::internal(e.to_string()))?;
+            .await?;
     Ok(Json(checks))
 }
 
 /// The folder check on a blocking thread (it runs `git`).
 pub async fn check_repo(state: &AppState, path: String, base: String) -> ApiResult<RepoCheck> {
     let t = state.tools.clone();
-    tokio::task::spawn_blocking(move || tools::check_repo(t.as_ref(), &path, &base))
-        .await
-        .map_err(|e| toknila_app::AppError::internal(e.to_string()).into())
+    Ok(tokio::task::spawn_blocking(move || tools::check_repo(t.as_ref(), &path, &base)).await?)
 }
 
 /// The base branch a repository suggests, on a blocking thread (it asks the repository).
@@ -48,9 +45,7 @@ pub async fn default_base(
     path: String,
 ) -> ApiResult<Result<String, NoDefaultBase>> {
     let t = state.tools.clone();
-    tokio::task::spawn_blocking(move || tools::default_base(t.as_ref(), &path))
-        .await
-        .map_err(|e| toknila_app::AppError::internal(e.to_string()).into())
+    Ok(tokio::task::spawn_blocking(move || tools::default_base(t.as_ref(), &path)).await?)
 }
 
 /// The first problem of a check, as a refusal.

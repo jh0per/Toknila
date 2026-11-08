@@ -17,9 +17,7 @@ use crate::server::AppState;
 
 /// Runs blocking filesystem work off the async workers.
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> ApiResult<T> {
-    tokio::task::spawn_blocking(f)
-        .await
-        .map_err(|e| ApiError(AppError::internal(format!("reading the disk stopped: {e}"))))
+    Ok(tokio::task::spawn_blocking(f).await?)
 }
 
 #[utoipa::path(post, path = "/projects/{project}/import-path", tag = "chains", request_body = ImportPath,
@@ -73,7 +71,7 @@ pub async fn import_path(
 /// Imports one chain file or spec folder as its own command. A refusal of the import names the
 /// path; a file that could not be read already does.
 async fn import(state: &AppState, project: &str, c: Candidate) -> ApiResult<ImportedChain> {
-    let prepared = c.chain.map_err(ApiError::bad_request)?;
+    let prepared = c.chain.map_err(AppError::bad_request)?;
     let (at, prices) = stamp(state);
     let (project, source, toml) = (project.to_owned(), c.path.clone(), prepared.toml);
     let path = c.path.clone();

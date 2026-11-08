@@ -260,7 +260,7 @@ fn without_a_ship_there_is_no_directory_and_the_ticket_is_blocked_with_the_reaso
 #[test]
 fn a_failed_ship_starts_no_runner() {
     let mut mem = with_agents();
-    *mem.yard.fail_prepare.borrow_mut() = Some(crate::ShipError::GitMissing);
+    *mem.yard.fail_prepare.borrow_mut() = Some(crate::ShipError::Git(crate::GitError::Missing));
     recover(&mut mem).expect("settle");
     settle(&mut mem);
     assert!(mem.runner.started.borrow().is_empty());

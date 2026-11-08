@@ -33,7 +33,7 @@ pub mod tickets;
 pub mod wildcards;
 
 pub use chain::{ChainTx, with_chain};
-pub use error::{AppError, AppResult, ErrorKind};
+pub use error::{AppError, AppResult, ErrorKind, GitError};
 pub use merges::{MergeError, MergeOutcome, Merger};
 pub use ports::{Reader, UnitOfWork};
 pub use runner::{Runner, RunnerError};

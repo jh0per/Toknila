@@ -44,6 +44,20 @@ pub struct AppError {
     pub message: String,
 }
 
+/// Why a `git` command did not give a result. Ships and merges both report it.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum GitError {
+    /// The program is not installed or not on the path.
+    #[error("git is not installed or not on PATH")]
+    Missing,
+    /// The process could not be run.
+    #[error("{0}")]
+    Io(String),
+    /// The command ran and exited with a failure.
+    #[error("git {command} failed: {detail}")]
+    Failed { command: String, detail: String },
+}
+
 /// Result of a use case.
 pub type AppResult<T> = Result<T, AppError>;
 

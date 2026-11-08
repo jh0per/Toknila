@@ -14,7 +14,7 @@ use toknila_core::{
 use crate::chain::tell_ticket;
 use crate::external::{ExternalEffect, Host};
 use crate::ships::{self, GuardError};
-use crate::{AppResult, UnitOfWork};
+use crate::{AppResult, GitError, UnitOfWork};
 
 /// How a merge ended when nothing went wrong on the host.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,9 +49,9 @@ pub enum MergeOutcome {
 /// Why a merge could not run or finish. The text lands in the ticket's blocked reason.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum MergeError {
-    /// The `git` executable is not installed or not on the path.
-    #[error("git is not installed or not on PATH")]
-    GitMissing,
+    /// A `git` command did not give a result.
+    #[error(transparent)]
+    Git(#[from] GitError),
     /// Merging without a working tree needs a newer `git`.
     #[error("git {found} is too old to merge without a working tree; {needs} or newer is needed")]
     GitTooOld { found: String, needs: String },
@@ -64,9 +64,6 @@ pub enum MergeError {
     /// The base branch moved every time the merge tried to update it.
     #[error("base branch {0} kept moving while merging; unblock to try again")]
     BaseMoved(String),
-    /// A git command failed.
-    #[error("git {command} failed: {detail}")]
-    Git { command: String, detail: String },
     /// Pull-request mode needs the GitHub CLI.
     #[error(
         "gh (the GitHub CLI) is not installed or not on PATH; install it from https://cli.github.com, then unblock"

@@ -17,18 +17,6 @@ use crate::store::StoreError;
 pub struct ApiError(pub AppError);
 
 impl ApiError {
-    pub fn not_found(what: impl std::fmt::Display) -> Self {
-        Self(AppError::not_found(what))
-    }
-
-    pub fn bad_request(msg: impl Into<String>) -> Self {
-        Self(AppError::bad_request(msg))
-    }
-
-    pub fn conflict(msg: impl Into<String>) -> Self {
-        Self(AppError::conflict(msg))
-    }
-
     /// The HTTP status for this error's kind.
     pub fn status(&self) -> StatusCode {
         match self.0.kind {
@@ -62,6 +50,13 @@ impl IntoResponse for ApiError {
 impl From<AppError> for ApiError {
     fn from(e: AppError) -> Self {
         Self(e)
+    }
+}
+
+/// A blocking task that panicked or was cancelled.
+impl From<tokio::task::JoinError> for ApiError {
+    fn from(e: tokio::task::JoinError) -> Self {
+        Self(AppError::internal(e.to_string()))
     }
 }
 
