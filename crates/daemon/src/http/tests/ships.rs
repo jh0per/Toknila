@@ -159,6 +159,16 @@ impl toknila_app::Shipyard for ThreadSpy {
         self.note();
         self.inner.remove(repo, ship)
     }
+
+    fn retire(
+        &self,
+        repo: &str,
+        ship: &toknila_core::Ship,
+        start: &str,
+    ) -> Result<toknila_app::BranchFate, toknila_app::ShipError> {
+        self.note();
+        self.inner.retire(repo, ship, start)
+    }
 }
 
 #[tokio::test]

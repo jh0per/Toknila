@@ -13,6 +13,7 @@ pub mod projects;
 pub mod questions;
 pub mod releases;
 pub mod runner;
+pub mod strays;
 pub mod system;
 pub mod threads;
 pub mod tickets;

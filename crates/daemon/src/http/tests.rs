@@ -29,6 +29,7 @@ mod settings;
 mod ship_guard;
 mod ships;
 mod smart_defaults;
+mod strays;
 mod threads;
 mod usage;
 
@@ -821,6 +822,8 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/planner/start",
             "/projects/{project}/planner/stop",
             "/projects/{project}/plans",
+            "/projects/{project}/strays",
+            "/projects/{project}/strays/clean",
             "/projects/{project}/unarchive",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",

@@ -25,6 +25,7 @@ pub mod removal;
 pub mod repo;
 pub mod schedule;
 pub mod spec;
+pub mod strays;
 pub mod suggest;
 pub mod system;
 pub mod template;

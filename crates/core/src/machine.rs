@@ -27,7 +27,7 @@
 //! | Backlog, Ready, Running, Waiting, Blocked | Backlog (paused) | `Pause` |
 //! | Running, Waiting | same | `ShipReady` (the ticket learns its branch) |
 //! | Backlog (paused) | Backlog | `Resume` |
-//! | any but Proposed, Merged, Released, Cancelled | Cancelled | `Cancel` (the ship stays) |
+//! | any but Proposed, Merged, Released, Cancelled | Cancelled | `Cancel` (removes the worktree; the branch goes too unless it has commits of its own) |
 //! | Proposed | Backlog | `Approve` (a person only; the proposed edges follow) |
 //! | Proposed | Cancelled | `Reject` (a person only, with a reason) |
 //!
@@ -266,6 +266,7 @@ pub fn apply(
             if matches!(s, S::Running | S::Waiting | S::Blocked | S::Review) {
                 effects.push(Effect::StopRunner);
             }
+            effects.push(Effect::RetireShip);
             effects.push(Effect::DependencySatisfied);
             next.paused = false;
             next.review.turn = None;

@@ -2180,6 +2180,104 @@
         }
       }
     },
+    "/projects/{project}/strays": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Lists the ships' worktrees and `ship/*` branches in the project's repository that no live\ncard owns: what cancelled or deleted cards left behind. Nothing is changed.",
+        "operationId": "list_strays",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Strays"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/strays/clean": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Removes what `GET .../strays` lists, looked at again now: stray worktrees first (their\ncheckouts are discarded), then stray branches, whatever commits they hold. A step that fails\nis named in `warnings` and that leftover stays.",
+        "operationId": "clean_strays",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StraysCleaned"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}/unarchive": {
       "post": {
         "tags": [
@@ -7749,6 +7847,85 @@
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          }
+        }
+      },
+      "Stray": {
+        "type": "object",
+        "description": "One worktree or branch the host found under Toknila's ships.",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "properties": {
+          "ahead": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "For a branch, its commits that the project's base branch does not have; deleting it\nloses them. `None` when the host could not count.",
+            "minimum": 0
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a worktree, the branch checked out in it."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/StrayKind"
+          },
+          "name": {
+            "type": "string",
+            "description": "The worktree's path, or the branch's name."
+          }
+        }
+      },
+      "StrayKind": {
+        "type": "string",
+        "description": "What kind of leftover.",
+        "enum": [
+          "worktree",
+          "branch"
+        ]
+      },
+      "Strays": {
+        "type": "object",
+        "description": "Answer of `GET /v1/projects/{project}/strays`: the worktrees and `ship/*` branches in the\nproject's repository that no live card owns, left by cancelled or deleted cards.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Stray"
+            },
+            "description": "Worktrees first, then branches."
+          }
+        }
+      },
+      "StraysCleaned": {
+        "type": "object",
+        "description": "Answer of `POST /v1/projects/{project}/strays/clean`: what was removed, and the steps that\nfailed (those leftovers stay listed).",
+        "required": [
+          "removed",
+          "warnings"
+        ],
+        "properties": {
+          "removed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Stray"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

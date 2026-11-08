@@ -14,7 +14,7 @@ use crate::merges::{self, MergeError, MergeOutcome, Merger};
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError};
 use crate::{
     AppResult, ShipError, Shipyard, UnitOfWork, instructions as deliver_instructions, reviews,
-    runs, ships,
+    runs, ships, ships::BranchFate,
 };
 
 /// Something to do on the host once the command that asked for it has committed.
@@ -30,6 +30,12 @@ pub enum ExternalEffect {
     },
     /// Remove the ship's worktree from the repository at `repo`; the branch stays.
     RemoveShip { repo: String, ship: Ship },
+    /// Remove a cancelled ship's worktree; delete its branch unless it has commits beyond `start`.
+    RetireShip {
+        repo: String,
+        ship: Ship,
+        start: String,
+    },
     /// Run the profile's command for the ticket in its ship, once the ship is ready.
     StartRunner {
         ticket: TicketId,
@@ -80,6 +86,11 @@ pub enum ExternalOutcome {
     ShipRemoveFailed {
         ship: Ship,
         error: ShipError,
+    },
+    /// A cancelled ship's worktree is gone; the branch was deleted or kept.
+    ShipRetired {
+        ship: Ship,
+        fate: BranchFate,
     },
     /// A new runner process started.
     RunnerStarted {
@@ -144,6 +155,12 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
             ExternalEffect::RemoveShip { repo, ship } => {
                 outcomes.push(match host.yard.remove(&repo, &ship) {
                     Ok(()) => ExternalOutcome::ShipRemoved { ship },
+                    Err(error) => ExternalOutcome::ShipRemoveFailed { ship, error },
+                });
+            }
+            ExternalEffect::RetireShip { repo, ship, start } => {
+                outcomes.push(match host.yard.retire(&repo, &ship, &start) {
+                    Ok(fate) => ExternalOutcome::ShipRetired { ship, fate },
                     Err(error) => ExternalOutcome::ShipRemoveFailed { ship, error },
                 });
             }
@@ -268,6 +285,7 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
                 merges::finished(uow, ticket, result)?;
             }
             ExternalOutcome::ShipRemoved { ship } => ships::removed(uow, ship)?,
+            ExternalOutcome::ShipRetired { ship, fate } => ships::retired(uow, ship, fate)?,
             ExternalOutcome::ShipRemoveFailed { ship, error } => {
                 ships::remove_failed(uow, ship, &error)?;
             }

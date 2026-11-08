@@ -6,12 +6,14 @@
 use toknila_core::events::DomainEvent;
 use toknila_core::guard::{self, ShipProblem, ShipState};
 use toknila_core::machine::TicketEvent;
+use toknila_core::strays::Stray;
 use toknila_core::{
-    BaseBehind, BlockedReason, Chain, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec,
-    StalePolicy, Ticket, TicketId,
+    Actor, BaseBehind, BlockedReason, Chain, CommentBody, CommentKind, PlannerSite, PlannerSpec,
+    Ship, ShipLook, ShipSpec, StalePolicy, Ticket, TicketId,
 };
 
 use crate::external::ExternalEffect;
+use crate::notes::add_comment;
 
 use crate::chain::tell_ticket;
 use crate::{AppError, AppResult, ChainTx, GitError, Reader, UnitOfWork};
@@ -40,6 +42,15 @@ pub enum ShipError {
     Io(String),
 }
 
+/// What became of a cancelled ship's branch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BranchFate {
+    /// It had no commits of its own and was deleted (or was already gone).
+    Deleted,
+    /// It has this many commits beyond its start and stays.
+    Kept { ahead: u32 },
+}
+
 /// What the application needs from the host to give a ticket a ship. The daemon implements it
 /// over `git`.
 pub trait Shipyard: std::fmt::Debug {
@@ -49,6 +60,21 @@ pub trait Shipyard: std::fmt::Debug {
     /// Removes the ship's worktree from the repository at `repo` and keeps its branch. A worktree
     /// that is already gone is fine.
     fn remove(&self, repo: &str, ship: &Ship) -> Result<(), ShipError>;
+    /// Removes the ship's worktree like [`Self::remove`], then deletes its branch when it has no
+    /// commits beyond `start`; a branch with commits stays. Says which.
+    fn retire(&self, repo: &str, ship: &Ship, start: &str) -> Result<BranchFate, ShipError>;
+    /// Every worktree under the yard's folder and every `ship/*` branch of the repository at
+    /// `repo`, with the commits each branch has beyond `base`. A yard without any says none.
+    fn found(&self, repo: &str, base: &str) -> Result<Vec<Stray>, ShipError> {
+        let _ = (repo, base);
+        Ok(Vec::new())
+    }
+    /// Removes one stray worktree (its checkout is discarded) or deletes one stray branch,
+    /// whatever commits it has. Already gone is fine.
+    fn discard(&self, repo: &str, stray: &Stray) -> Result<(), ShipError> {
+        let _ = (repo, stray);
+        Ok(())
+    }
     /// Looks at the worktree at `look.path`: the changes in it that are not committed, and the
     /// commits its branch has beyond `look.start`. A yard that cannot look says the ship holds
     /// one clean commit, so nothing is refused for lack of an answer.
@@ -177,6 +203,55 @@ pub(crate) fn queue_remove<U: UnitOfWork + ?Sized>(
         ship,
     });
     Ok(())
+}
+
+/// `RetireShip`: queue taking a cancelled ticket's worktree away (and its branch, if empty) for
+/// after the commit; a ticket without a ship is left alone.
+pub(crate) fn queue_retire<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ctx: &ChainTx,
+    ticket: TicketId,
+) -> AppResult<()> {
+    let (Some(ship), Some(spec)) = (uow.ship(ticket)?, spec_for(uow, ctx, ticket)?) else {
+        return Ok(());
+    };
+    uow.defer(ExternalEffect::RetireShip {
+        start: spec.start_point(),
+        repo: spec.repo,
+        ship,
+    });
+    Ok(())
+}
+
+/// The cancelled ship is gone: forget its path, journal it, and when its branch had work on it
+/// say so on the card.
+pub(crate) fn retired<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ship: Ship,
+    fate: BranchFate,
+) -> AppResult<()> {
+    let (ticket, branch) = (ship.ticket_id, ship.branch.clone());
+    removed(uow, ship)?;
+    let BranchFate::Kept { ahead } = fate else {
+        return Ok(());
+    };
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(());
+    };
+    let Some(view) = uow.chain_view(t.chain_id)? else {
+        return Ok(());
+    };
+    let body = CommentBody {
+        gist: format!("Branch {branch} kept: it has {ahead} commit(s) of work"),
+        what: Some(format!(
+            "The worktree was removed with the cancel; the branch {branch} was kept because it holds {ahead} commit(s) not in the base."
+        )),
+        how_to_verify: Some(format!(
+            "git log {branch}; delete it with Clean up in Settings when the work is not needed."
+        )),
+        ..CommentBody::default()
+    };
+    add_comment(uow, &view, ticket, Actor::System, CommentKind::Report, body).map(|_| ())
 }
 
 /// The shipyard made the ship: remember it, journal it, tell the ticket its branch.
