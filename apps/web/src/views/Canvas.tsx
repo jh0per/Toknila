@@ -1,4 +1,4 @@
-import { type MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { ChainDetail, TicketAction } from "../api/types";
 import { type LaidEdge, layoutChain, nodeKey } from "../layout";
 import { type EdgeRef, idOf } from "../store/edges";
@@ -31,10 +31,12 @@ type Menu =
 /// double-click, N and the right-click menus make cards without the dialog. The daemon decides;
 /// its refusal shows on top. The open card's lines are drawn strong and the others fade; Fit zooms
 /// the whole diagram into view.
-export function Canvas({ chain, state, dispatch }: {
+export function Canvas({ chain, state, dispatch, onEmpty }: {
   chain: ChainDetail;
   state: State;
   dispatch: (i: Intent) => void;
+  /// Shown over the diagram while the chain has no cards; the canvas under it keeps working.
+  onEmpty?: ReactNode;
 }) {
   const layout = layoutChain(chain);
   const chainId = chain.chain.id;
@@ -257,6 +259,7 @@ export function Canvas({ chain, state, dispatch }: {
           </div>
         </div>
       </div>
+      {onEmpty && chain.tickets.length === 0 && <div className="canvas-empty" data-testid="chain-empty">{onEmpty}</div>}
       <CanvasChrome fitted={fit.fitted} cut={fit.cut} onFit={fit.toggle} linking={linkingKey} onCancelLinking={() => setLinking(undefined)} />
       {menu?.kind === "cancel" && (
         <div className="ctx-menu cancel-pop" style={{ left: popAt(menu), top: menu.y }}>

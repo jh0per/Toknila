@@ -4,6 +4,7 @@ import { outOfOrderText } from "../format";
 import { nodeKey } from "../layout";
 import { allows, subtaskProgress } from "../store/cardDetails";
 import { statusClass, statusGroup, statusText } from "../store/groups";
+import { showAgentName } from "../store/profiles";
 import { PrChip } from "./PrChip";
 import { UsageChip } from "./UsageChip";
 
@@ -60,7 +61,7 @@ export function TicketNode({ ticket: t, href, style, selected, over, linking, de
     >
       <span className="row">
         <span className="title">{t.title}</span>
-        {t.profile && t.profile !== defaultProfile && <span className="runner">{t.profile}</span>}
+        {t.profile && showAgentName(t.profile, defaultProfile, import.meta.env.DEV) && <span className="runner">{t.profile}</span>}
       </span>
       <span className="row">
         <span className="st" data-testid="status">

@@ -79,10 +79,18 @@ describe("adding a project", () => {
   });
 
   it("an added project joins the list, the page moves to its settings and the agents reload", () => {
-    const [s, fx] = reduce(ready([]), { type: "projectAdded", project: project() });
-    expect(s.projects.map((p) => p.key)).toEqual(["DEMO"]);
+    const [s, fx] = reduce(ready([project({ id: "p0", key: "OLD" })]), { type: "projectAdded", project: project() });
+    expect(s.projects.map((p) => p.key)).toEqual(["OLD", "DEMO"]);
     expect(s.route).toEqual({ name: "settings", project: "DEMO" });
     expect(fx).toContainEqual({ type: "pushUrl", path: "/projects/DEMO/settings" });
+    expect(fx).toContainEqual({ type: "loadAgents" });
+  });
+
+  it("the first project leads into the assistant instead", () => {
+    const [s, fx] = reduce(ready([]), { type: "projectAdded", project: project() });
+    expect(s.projects.map((p) => p.key)).toEqual(["DEMO"]);
+    expect(s.route).toEqual({ name: "planner", project: "DEMO" });
+    expect(fx).toContainEqual({ type: "pushUrl", path: "/projects/DEMO/planner" });
     expect(fx).toContainEqual({ type: "loadAgents" });
   });
 });

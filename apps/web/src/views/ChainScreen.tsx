@@ -3,6 +3,7 @@ import { chainTone } from "../store/groups";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, runningAgents, slotsOf } from "../store/state";
 import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
+import { AskBox } from "./AskBox";
 import { Canvas } from "./Canvas";
 import { PanelDivider } from "./PanelDivider";
 import { Panel } from "./Panel";
@@ -15,11 +16,12 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
   const running = runningAgents(state).length;
   const slots = slotsOf(state);
   const on = chain.chain.autostart;
+  const project = currentProject(state);
   return (
     <>
       <header className="top">
         <div className="crumb">
-          <b>{currentProject(state)?.key ?? ""}</b><i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
+          <b>{project?.key ?? ""}</b><i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
         </div>
         <span className={`pill tone-${chainTone(chain.summary.status)}`} data-testid="chain-status" data-status={chain.summary.status}>
           {chain.summary.status.replace(/_/g, " ")}
@@ -36,7 +38,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
             type="checkbox" data-testid="chain-autostart-toggle" checked={on}
             onChange={(e) => dispatch({ type: "setAutostart", chain: chain.chain.id, autostart: e.target.checked })}
           />{" "}
-          Autostart
+          Start cards automatically
         </label>
         <ThemeButton theme={state.theme} dispatch={dispatch} />
         <button
@@ -52,7 +54,32 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
           {on ? "Stop chain" : "Run chain"}
         </button>
       </header>
-      <Canvas chain={chain} state={state} dispatch={dispatch} />
+      <Canvas
+        chain={chain} state={state} dispatch={dispatch}
+        onEmpty={project && (
+          <div className="empty-state">
+            <h2>What should {chain.chain.name} do?</h2>
+            <p className="muted">
+              This chain has no cards yet. Tell the assistant what it is for and it drafts the cards, or add the first card yourself.
+            </p>
+            <AskBox
+              project={project.key} state={state} dispatch={dispatch} testId="chain-ask" label="What should this chain do?"
+              placeholder={`For example: the cards for ${chain.chain.name}`} button="Plan it with the assistant"
+            />
+            <p className="secondary-links">
+              Or{" "}
+              <button
+                type="button" className="inline-link" data-testid="chain-empty-new-card"
+                onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newCard", chain: chain.chain.id } })}
+              >
+                add a card
+              </button>{" "}
+              by hand.
+            </p>
+          </div>
+        )}
+      />
+
       <PanelDivider />
       <Panel state={state} dispatch={dispatch} />
     </>

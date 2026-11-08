@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { reduce } from "./reduce";
 import { initialState } from "./state";
-import { type UpdateView, banner, lastCheckText } from "./updates";
+import { type UpdateView, banner, lastCheckText, updateReady } from "./updates";
 
 const view = (over: Partial<UpdateView> = {}): UpdateView => ({
   current_version: "0.2.0",
@@ -63,6 +63,17 @@ describe("updates", () => {
     expect(fx).toEqual([{ type: "checkForUpdates" }]);
     const [failed] = reduce(s, { type: "updateFailed", message: "offline" });
     expect(failed.updates.error).toBe("offline");
+  });
+
+  it("the dot on Settings stays while an update waits, even after Later", () => {
+    expect(updateReady(start().updates)).toBe(false);
+    const [none] = reduce(start(), { type: "updateViewLoaded", view: view({ banner: null }) });
+    expect(updateReady(none.updates)).toBe(false);
+    const [ready] = reduce(start(), { type: "updateViewLoaded", view: view() });
+    expect(updateReady(ready.updates)).toBe(true);
+    const [later] = reduce(ready, { type: "updateLater" });
+    expect(banner(later.updates)).toBeUndefined();
+    expect(updateReady(later.updates)).toBe(true);
   });
 
   it("words the last check", () => {

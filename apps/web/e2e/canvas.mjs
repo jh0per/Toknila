@@ -125,7 +125,7 @@ try {
   await page.mouse.click(q.x, q.y, { button: "right" });
   await page.locator("[data-testid=context-menu]").waitFor();
   const canvasMenu = await menuLabels();
-  if (canvasMenu.join("|") !== "New card|New chain|Import a plan|Ask the planner") throw new Error(`canvas menu: ${canvasMenu}`);
+  if (canvasMenu.join("|") !== "New card|New chain|Import a plan|Plan with the assistant") throw new Error(`canvas menu: ${canvasMenu}`);
   console.log(`PASS the canvas menu: ${canvasMenu.join(", ")}`);
   await shot("canvas-menu");
   await page.locator("[data-testid=menu-canvas-new-card]").click();
@@ -145,7 +145,7 @@ try {
   await page.locator("[data-testid=import-dialog]").waitFor({ state: "detached" });
   await page.mouse.click(q.x, q.y, { button: "right" });
   await page.locator("[data-testid=menu-canvas-planner]").click();
-  await expectPath("/projects/CAN/planner", "Ask the planner opens the project's planner");
+  await expectPath("/projects/CAN/planner", "Plan with the assistant opens the project's planner");
 
   // 4. Right-click on a card: the actions that apply to its state.
   await open("CAN", "work");

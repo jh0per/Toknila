@@ -65,6 +65,8 @@ export interface State {
   updates: UpdatesState;
   /// The viewer's colour theme; remembered in this browser only.
   theme: Theme;
+  /// The "?" list of keyboard shortcuts is open.
+  shortcutsOpen: boolean;
 }
 
 export const FIRST_RETRY_MS = 500;
@@ -99,6 +101,7 @@ export function initialState(route: Route): State {
     usage: initialUsage,
     updates: initialUpdates,
     theme: "system",
+    shortcutsOpen: false,
   };
 }
 

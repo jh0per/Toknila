@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { TicketDetail } from "../api/types";
-import { finishReport } from "./permissionReports";
+import { finishReport } from "../store/permissionReports";
 
 /// A card in review: what the agent reported when it handed in, then the card's actions (Accept
 /// or Return) right under it, so the person reads before deciding. The daemon's API gives the

@@ -112,7 +112,7 @@ try {
 
   // Events tab: the card's journal, then a new line arrives from the stream.
   await page.getByRole("tab", { name: "Events" }).click();
-  await expectText(page.locator("[data-testid=events]"), "ticket.", "Events tab lists the journal");
+  await expectText(page.locator("[data-testid=events]"), "Moved from", "Events tab lists the journal in words");
   const before = await page.locator("[data-testid=events] li").count();
   tok("comment", "DEMO-1", "live note");
   await page.waitForFunction(

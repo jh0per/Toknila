@@ -76,7 +76,7 @@ describe("the canvas menu", () => {
   it("has its entries in three groups, New card first with its key", () => {
     const h = { newCard: vi.fn(), newChain: vi.fn(), importPlan: vi.fn(), askPlanner: vi.fn() };
     const e = canvasEntries(h);
-    expect(e.map((x) => `${x.sep ? "|" : ""}${x.label}`)).toEqual(["New card", "|New chain", "Import a plan", "|Ask the planner"]);
+    expect(e.map((x) => `${x.sep ? "|" : ""}${x.label}`)).toEqual(["New card", "|New chain", "Import a plan", "|Plan with the assistant"]);
     expect(e[0].keys).toBe("N");
     e[3].run();
     expect(h.askPlanner).toHaveBeenCalled();

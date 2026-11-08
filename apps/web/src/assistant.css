@@ -1,0 +1,65 @@
+/* Talking to the assistant (the planner), a card's Chat, the Events lines, the keyboard list. */
+
+/* The box that talks to the assistant: a text area and a button. */
+.prompt-field { font: inherit; font-size: var(--fs-m); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-m);
+  padding: var(--s2) var(--s3); width: 100%; resize: vertical; min-height: 44px; }
+.prompt-field:focus { border-color: var(--accent); outline: none; }
+.prompt-field:disabled { opacity: 0.6; }
+.ask { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; width: 100%; }
+.ask.compact { flex-direction: row; align-items: flex-end; margin-top: var(--s2); flex: none; }
+.ask.compact .prompt-field { flex: 1; resize: none; }
+button.inline-link { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.secondary-links { margin: 0; color: var(--muted); font-size: var(--fs-s); }
+.empty-state .ask { max-width: 520px; }
+.empty-state .ask .prompt-field { min-height: 76px; }
+
+/* The assistant's panel: a centred box until it has run; then its terminal with the box under it. */
+.tabpanel[data-tab=planner] { display: flex; flex-direction: column; overflow: hidden; }
+.assist-idle { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3); text-align: center; }
+.assist-idle h3 { margin: 0; font-size: var(--fs-l); font-weight: 600; }
+.assist-idle .ask { max-width: 560px; align-items: stretch; }
+.assist-idle .ask .btn { align-self: center; }
+.assist-note { margin: 0; max-width: 56ch; }
+
+/* An empty chain asks what it should do, over its own (still working) canvas. */
+.canvas-empty { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; pointer-events: none; z-index: 1; padding: var(--s4); overflow: auto; }
+.canvas-empty .empty-state { pointer-events: auto; margin-top: 4vh; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); padding: var(--s4); box-shadow: 0 2px 10px rgb(0 0 0 / 0.1); }
+
+/* The describe step of the first run. */
+.describe .prompt-field { min-height: 76px; }
+
+/* A card's Chat: one bubble per thing said; the person's on the right. */
+.chat { display: flex; flex-direction: column; gap: var(--s3); max-width: 760px; }
+.bubbles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.bubble { max-width: 85%; padding: var(--s2) var(--s3); border-radius: var(--r-m); background: var(--surface2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; align-self: flex-start; }
+.bubble.you { align-self: flex-end; background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.bubble.system { align-self: center; background: none; border-style: dashed; }
+.bubble.k-question, .bubble.open-question { border-color: var(--block); background: var(--block-soft); }
+.bubble.open-question { max-width: 100%; align-self: stretch; }
+.bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble .gist { font-weight: 500; }
+.bubble-head { display: flex; gap: var(--s2); align-items: baseline; font-size: var(--fs-s); }
+.bubble-head .kind { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.bubble-head time { margin-left: auto; }
+.chat-box { display: flex; gap: var(--s2); align-items: flex-end; }
+.chat-box .prompt-field { flex: 1; min-height: 52px; }
+
+/* The Events tab: one line in words, the raw event behind a disclosure. */
+.events li { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); align-items: baseline; }
+.events .when { font-size: var(--fs-s); min-width: 12em; }
+.events .words { flex: 1; min-width: 14em; }
+.events .raw { flex-basis: 100%; font-size: var(--fs-s); }
+.events .raw summary { cursor: pointer; color: var(--muted); }
+.events .raw pre { margin: var(--s1) 0 0; padding: var(--s2); background: var(--surface2); border-radius: var(--r-s); overflow-x: auto; }
+
+/* A dot on Settings while an update waits for a restart. */
+.update-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--block); flex: none; }
+.shortcuts-link { border: 0; background: none; width: 100%; text-align: left; color: var(--muted); }
+.shortcuts-link:hover { color: var(--fg); }
+
+/* The keyboard list. */
+.shortcut-list { margin: 0; display: flex; flex-direction: column; gap: var(--s2); width: 100%; }
+.shortcut { display: grid; grid-template-columns: 9em 1fr; gap: var(--s3); align-items: baseline; }
+.shortcut dt { white-space: nowrap; }
+.shortcut dd { margin: 0; }
+.shortcuts p { margin: 0; }

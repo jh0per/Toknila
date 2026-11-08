@@ -9,7 +9,8 @@ import { reduceTheme } from "./theme";
 import { reduceEdges } from "./edges";
 import { reduceQuick } from "./quick";
 import { type Dialog, reducePlan, withChain } from "./plan";
-import { loadPlanner, reducePlanner } from "./planner";
+import { ONBOARDING_DRAFT, loadPlanner, reducePlanner } from "./planner";
+import { reduceShortcuts } from "./shortcuts";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
@@ -17,7 +18,7 @@ import { nextSettingsFrom } from "./settingsNav";
 import { reduceUpdates } from "./updates";
 import { loadUsage, reduceUsage } from "./usage";
 import {
-  FIRST_RETRY_MS, MAX_RETRY_MS, type State, cardRoute, chainOfEvent, currentProject, ticketOfEvent,
+  FIRST_RETRY_MS, MAX_RETRY_MS, type State, activeProjects, cardRoute, chainOfEvent, currentProject, ticketOfEvent,
 } from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
@@ -93,9 +94,16 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [calm({ ...s, route: msg.route, settingsFrom: nextSettingsFrom(s.route, msg.route, s.settingsFrom) }), enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
+      const key = msg.project.key;
       // The new project's repository may hold plans; they are offered once the scan answers.
-      const scan: Effect = { type: "loadPlans", project: msg.project.key, reason: "added" };
-      return then(withDialog(added, undefined), [...fx, scan], { name: "settings", project: msg.project.key });
+      const scan: Effect = { type: "loadPlans", project: key, reason: "added" };
+      // The first project leads into the assistant; what was typed under "Describe your project"
+      // is sent to it. A project added later goes on to its settings.
+      if (activeProjects(s).length > 0) return then(withDialog(added, undefined), [...fx, scan], { name: "settings", project: key });
+      const { [ONBOARDING_DRAFT]: described = "", ...rest } = added.planner.drafts;
+      const kept = { ...added, planner: { ...added.planner, drafts: { ...rest, [key]: described } } };
+      const [asked, ask] = reducePlanner(kept, { type: "askPlanner", project: key });
+      return then(withDialog(asked, undefined), [...fx, ...(ask.length ? ask : [scan])], { name: "planner", project: key });
     }
     case "chainImported":
     case "recheck":
@@ -222,13 +230,24 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "updateWarned":
     case "updateFailed":
       return reduceUpdates(s, msg);
+    case "askPlanner": {
+      const [next, fx] = reducePlanner(s, msg);
+      // The conversation is on the assistant's screen: a message sent from elsewhere goes there.
+      const there = s.route.name === "planner" && s.route.project === msg.project;
+      return fx.length && !there ? then(next, fx, { name: "planner", project: msg.project }) : [next, fx];
+    }
     case "startPlanner":
     case "stopPlanner":
     case "refreshPlanner":
     case "pickPlannerProfile":
+    case "editPlannerDraft":
+    case "plannerAsked":
     case "plannerLoaded":
     case "plannerFailed":
       return reducePlanner(s, msg);
+    case "toggleShortcuts":
+    case "closeShortcuts":
+      return [reduceShortcuts(s, msg), []];
     case "setUsageDays":
     case "setUsageMetric":
     case "setMachineScan":

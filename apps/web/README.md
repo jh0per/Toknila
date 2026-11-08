@@ -5,7 +5,8 @@ IDE. Left sidebar: projects, the chains of the selected project, the inbox (tick
 human, with a count), running agents, a settings placeholder. Main area: the chain canvas (cards
 linked left to right in dependency order, release milestones as their own nodes; `src/layout.ts`
 is the pure position function) above a panel for the selected card with tabs Details, Events
-(that ticket's journal, live) and placeholders Chat, Terminal, Threads, PR. Statuses are grouped
+(that ticket's journal in words, live, the raw event folded), Chat (its comments, questions and
+answers as bubbles, with the answer box inline), Terminal, Threads and PR. Statuses are grouped
 for display in `src/store/groups.ts` (to do, in progress, blocked, done; cancelled apart). It
 updates live over the WebSocket stream (`/v1/stream`) and reconnects by itself, also across a
 daemon restart, which keeps its address. Styling is neutral on purpose (CSS variables, light and

@@ -1,6 +1,7 @@
 import { KIND_TITLE, itemKey, itemRoute } from "../store/inbox";
 import type { Intent } from "../store/msg";
 import { type State, cardRoute, chainsOf, currentChain, currentProject, runningAgents } from "../store/state";
+import { updateReady } from "../store/updates";
 import { useChainMenu } from "./ChainMenu";
 import { NavLink } from "./Link";
 import { SidebarProjects } from "./SidebarProjects";
@@ -55,7 +56,7 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
                 className={`item${state.route.name === "planner" ? " sel" : ""}`}
                 testId="planner-link"
               >
-                <span className="t key">Planner</span>
+                <span className="t">Plan with the assistant</span>
                 <span className="n" title="The project's main agent: it plans, you start the cards">✦</span>
               </NavLink>
             </li>
@@ -123,7 +124,14 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
         </NavLink>
         <NavLink route={{ name: "settings", project: project?.key }} dispatch={dispatch} className={`item${state.route.name === "settings" ? " sel" : ""}`} testId="settings-link">
           <span className="t">Settings</span>
+          {updateReady(state.updates) && (
+            <span className="update-dot" data-testid="settings-dot" role="img" aria-label="An update is ready" title="An update is ready" />
+          )}
         </NavLink>
+        <button type="button" className="item shortcuts-link" data-testid="shortcuts-link" onClick={() => dispatch({ type: "toggleShortcuts" })}>
+          <span className="t">Keyboard shortcuts</span>
+          <kbd>?</kbd>
+        </button>
       </div>
     </nav>
   );

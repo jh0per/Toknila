@@ -283,7 +283,7 @@ try {
   await page.mouse.click(1330, 300, { button: "right" });
   await t("menu-canvas-new-card").waitFor();
   const canvasMenu = await menuShape();
-  must(canvasMenu === "New card,|New chain,Import a plan,|Ask the planner", `the canvas menu has three groups (${canvasMenu})`);
+  must(canvasMenu === "New card,|New chain,Import a plan,|Plan with the assistant", `the canvas menu has three groups (${canvasMenu})`);
   must((await t("menu-canvas-new-card").locator("kbd").textContent()) === "N", "New card shows N");
   await page.keyboard.press("Escape");
 
@@ -342,10 +342,10 @@ try {
   must(banner.y + banner.height <= divider.y, `the update note (bottom ${Math.round(banner.y + banner.height)}) is above the divider (${Math.round(divider.y)})`);
   await shot("plan-screen-update");
 
-  // 11. The planner's empty state offers Start in the middle, with no empty terminal.
+  // 11. The assistant's idle panel asks what to build in the middle, with no empty terminal.
   await open("/projects/PLN/planner");
-  await t("planner-start-centre").waitFor();
-  must(!(await t("term-host").isVisible()), "the planner's empty terminal is not drawn");
+  await t("planner-idle").waitFor();
+  must((await t("term-host").count()) === 0, "the planner's empty terminal is not drawn");
   await expectText(t("planner-chain"), "Plan so far", "the diagram is labelled");
   await shot("plan-screen-planner");
 

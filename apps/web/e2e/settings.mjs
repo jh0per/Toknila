@@ -117,7 +117,9 @@ try {
   await expectText(t("branches"), "main", "the repository's branches are offered");
   await page.locator("[data-branch=main]").click();
   await t("add-project-submit").click();
-  await expectPath("/projects/DEMO/settings", "the new project opens its settings");
+  await expectPath("/projects/DEMO/planner", "the first project leads into the assistant");
+  await t("settings-link").click();
+  await expectPath("/projects/DEMO/settings", "the settings open");
 
   // Settings: the sidebar is a back arrow and a flat list; the project picker names the project.
   await t("settings-sidebar").waitFor();

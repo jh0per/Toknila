@@ -696,13 +696,20 @@ the cards; the owner starts cards and accepts work.
   WebSocket `/planner/stream` (the same frames as a card's terminal), `POST /planner/input`,
   `/planner/size`, `/planner/start` and `/planner/stop`. All run as a person.
   `tok planner start|stop|logs <PROJECT>` is the CLI.
-- **Window.** A "Planner" entry at the top of the current project's section in the sidebar
-  (route `/projects/{project}/planner`, `store/planner.ts`: whether it runs, the profile Start
-  uses, the last refusal). Selecting it shows the project's most recently active chain above
-  (the diagram follows what the planner edits, from the journal) and the planner's terminal below
-  (`views/PlannerPanel.tsx`: Start/Stop, a profile pick when a project has more than one planner
-  profile, xterm over the scrollback and the stream; typing goes to the planner). The terminal
-  connection is `terminal/connect.ts` with the project's routes (`openPlannerTerminal`).
+- **Window.** The planner is the window's entry point, worded "the assistant" (see the
+  glossary): "Plan with the assistant" is the first item of the current project's section in the
+  sidebar (route `/projects/{project}/planner`, `store/planner.ts`: whether it runs, the profile
+  Start uses, the last refusal, and what the person has typed to it per place). Selecting it
+  shows the project's most recently active chain above ("Plan so far": the diagram follows what
+  the planner edits, from the journal) and the conversation below (`views/PlannerPanel.tsx`).
+  Until it has run the panel is a centred prompt box and no terminal; sending the text
+  (`askPlanner`: `POST .../planner/start`, wait until the screen has stopped changing, then
+  `POST .../planner/input` with the text and, in a write of its own, Enter —
+  `store/plannerEffects.ts`) starts it. Once it runs, xterm over the scrollback and the stream
+  is the record (typing in it goes to the planner) and the same prompt box sits under it. An
+  empty project, an empty chain and the last step of the first-run page send their text the same
+  way. The terminal connection is `terminal/connect.ts` with the project's routes
+  (`openPlannerTerminal`). There is no chat transcript of the planner: the terminal is the record.
 - **Tools and routes.** `tok mcp` with `TOKNILA_ROLE=planner` offers `show_plan`, `new_chain`,
   `add_card`, `edit_card`, `add_dependency`, `remove_dependency`, `move_card`, `open_thread`,
   `thread_message` and `thread_version` (`cmd/mcp_planner`), each a call to `/v1/planner/...`

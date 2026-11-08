@@ -81,7 +81,7 @@ try {
     await t("repo-path").fill(dir);
     await page.waitForFunction((k) => document.querySelector("[data-testid=project-key]")?.value === k, key, { timeout: 10_000 });
     await t("add-project-submit").click();
-    await expectPath(`/projects/${key}/settings`, `${key} is added`);
+    await expectPath(`/projects/${key}/planner`, `${key} is added and leads into the assistant`);
   };
 
   // 1. Adding the project offers the plans its repository holds; two of three are imported.
@@ -152,6 +152,7 @@ try {
   // 5. Remove from Toknila only: the folder stays.
   await t("onboarding").waitFor({ timeout: 10_000 });
   await addProject(keeper, "KEEPER");
+  await t("settings-link").click();
   await t("settings-nav-advanced").click();
   await t("danger-zone").locator("summary").click();
   await t("delete-project-button").click();
