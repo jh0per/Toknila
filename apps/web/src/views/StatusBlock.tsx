@@ -20,6 +20,11 @@ export function StatusBlock({ state, card, detail, dispatch }: {
     <section className={`status-block tone-${line.tone}`} data-testid="status-block" data-status={card.status}>
       <p className="status-sentence" data-testid="status-sentence">{line.text}</p>
       {line.next && !asked && <p className="muted status-next" data-testid="status-next">{line.next}</p>}
+      {line.tab && !asked && (
+        <button type="button" className="btn primary" data-testid="status-tab-link" onClick={() => dispatch({ type: "selectTab", tab: line.tab!.tab })}>
+          {line.tab.label}
+        </button>
+      )}
       {asked && <Answer item={asked} dispatch={dispatch} />}
       {card.status === "waiting" && !asked && <p className="muted">Write to the agent under Comments below.</p>}
     </section>

@@ -32,6 +32,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "acceptance": list_of_text("Testable acceptance items: a command to run, a behaviour to observe"),
                 "after": list_of_text("Cards (keys) the new card waits for; empty: the end of the chain"),
                 "subtasks": list_of_text("Checklist items"),
+                "design_first": { "type": "boolean", "description": "True for a card that changes what the person sees (screens, flows): its agent then shows a design for approval before any code" },
             }),
             &["chain", "title"],
         ),
@@ -43,6 +44,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "title": text("New title"),
                 "prompt": text("New prompt"),
                 "acceptance": list_of_text("The new acceptance list; it replaces the old one"),
+                "design_first": { "type": "boolean", "description": "Whether the agent shows a design for approval before any code" },
                 "add_subtasks": list_of_text("Checklist items to append"),
                 "edit_subtasks": { "type": "array", "description": "Checklist items to rename",
                     "items": { "type": "object", "properties": {

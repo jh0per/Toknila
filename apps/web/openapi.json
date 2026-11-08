@@ -2733,7 +2733,7 @@
           {
             "name": "action",
             "in": "path",
-            "description": "start, pause, resume, block, unblock, accept, return, reopen, cancel, approve or reject",
+            "description": "start, pause, resume, block, unblock, accept, return, reopen, cancel, approve, reject or ask_design",
             "required": true,
             "schema": {
               "type": "string"
@@ -4678,6 +4678,13 @@
             },
             "description": "Checklist items to append."
           },
+          "design_first": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the agent shows a design for approval before any code."
+          },
           "edit_subtasks": {
             "type": "array",
             "items": {
@@ -5855,6 +5862,10 @@
             },
             "description": "Cards (keys) or release versions of the chain it waits for. Empty: the end of the chain."
           },
+          "design_first": {
+            "type": "boolean",
+            "description": "The card changes what the person sees: the agent shows a design for approval before any\ncode."
+          },
           "prompt": {
             "type": "string"
           },
@@ -6179,6 +6190,10 @@
               "type": "string"
             },
             "description": "Cards or milestones of the same chain that wait for the new card: it becomes a\ndependency of each. Refused, with nothing created, when one of them has started."
+          },
+          "design_first": {
+            "type": "boolean",
+            "description": "Show the person a design to approve before any code."
           },
           "needs_secrets": {
             "type": "boolean"
@@ -6568,6 +6583,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "design_first": {
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "needs_secrets": {
             "type": [
@@ -8390,6 +8411,10 @@
           "chain_id": {
             "$ref": "#/components/schemas/ChainId"
           },
+          "design_first": {
+            "type": "boolean",
+            "description": "The person wants to see and approve a design (a thread version) before any code: the agent\nis told to open a design thread first, and `finished` is refused until one is approved."
+          },
           "done_out_of_order": {
             "oneOf": [
               {
@@ -8529,7 +8554,8 @@
           "cancel",
           "approve",
           "reject",
-          "run_reviewer"
+          "run_reviewer",
+          "ask_design"
         ]
       },
       "TicketDetail": {
@@ -8571,6 +8597,10 @@
             "items": {
               "$ref": "#/components/schemas/Comment"
             }
+          },
+          "design_waiting": {
+            "type": "boolean",
+            "description": "A thread of the card has a version that waits for the person's verdict (approve, or ask\nfor changes)."
           },
           "in_status_ms": {
             "type": "integer",

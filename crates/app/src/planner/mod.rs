@@ -114,6 +114,10 @@ pub struct NewCard {
     /// Checklist items.
     #[serde(default)]
     pub subtasks: Vec<String>,
+    /// The card changes what the person sees: the agent shows a design for approval before any
+    /// code.
+    #[serde(default)]
+    pub design_first: bool,
 }
 
 /// Adds a card to a chain of the planner's project.
@@ -132,6 +136,7 @@ pub fn add_card<U: UnitOfWork + ?Sized>(
         acceptance: input.acceptance,
         after: input.after,
         subtasks: input.subtasks,
+        design_first: input.design_first,
         at_end,
         ..NewTicket::default()
     };
@@ -154,6 +159,8 @@ pub struct CardEdit {
     pub title: Option<String>,
     pub prompt: Option<String>,
     pub acceptance: Option<Vec<String>>,
+    /// Whether the agent shows a design for approval before any code.
+    pub design_first: Option<bool>,
     /// Checklist items to append.
     #[serde(default)]
     pub add_subtasks: Vec<String>,
@@ -175,6 +182,7 @@ pub fn edit_card<U: UnitOfWork + ?Sized>(
         title: edit.title,
         prompt: edit.prompt,
         acceptance: edit.acceptance,
+        design_first: edit.design_first,
         ..TicketPatch::default()
     };
     if patch != TicketPatch::default() {

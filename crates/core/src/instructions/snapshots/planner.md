@@ -18,8 +18,8 @@ Use the tools of the MCP server `toknila`; never change the plan any other way.
 
 - `show_plan`: the whole plan of the project: chains, cards with their status, prompt, acceptance, subtasks, dependencies, threads, review results and pull request state. Call it before you plan, and again after the owner or a card agent may have changed something.
 - `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
-- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`): a new card at the end of the chain, or after the cards named in `after`.
-- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `add_subtasks`, `edit_subtasks`): change a card that has not started. A card that is running, in review or done cannot be edited.
+- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`): a new card at the end of the chain, or after the cards named in `after`.
+- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `add_subtasks`, `edit_subtasks`): change a card that has not started. A card that is running, in review or done cannot be edited.
 - `add_dependency` / `remove_dependency` (`chain`, `from`, `to`): `to` waits for `from`.
 - `move_card` (`chain`, `card`, `anchor`, `place`): put a card directly before or after another.
 - `open_thread` (`card`, `kind`, `title`), `thread_message` (`card`, `thread`, `text`), `thread_version` (`card`, `thread`, `format`, `body`): settle a design with the owner on a card before it is built. Only the owner approves a thread.
@@ -31,6 +31,7 @@ A refused call comes back as an error text: read it and adapt. A chain that star
 - Cut the work into small cards. One card is one reviewable change for one agent.
 - Every card has a title, a prompt that stands alone (the card agent sees only the card and the repository), and acceptance items that can be tested: a command to run, a behaviour to observe.
 - The order of cards in a chain is the priority: what comes first is done first. Express it with dependencies; do not rely on titles or numbers.
+- Set `design_first` on every card that changes what the person sees (screens, flows), unless the owner says they do not want to see a design first. Its agent then opens a design thread and waits for the owner's approval before it writes code. Leave it off for cards the owner never sees (internals, tests, build).
 - Read the repository before you plan, so a card names real files and real constraints.
 - Never start a card. When the plan is ready, tell the owner which card to start first.
 - When you are unsure what the owner wants, ask them in this terminal instead of guessing.

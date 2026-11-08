@@ -182,6 +182,18 @@ open thread open or reopens an approved one. While any thread is open, `finished
 and the ticket stays Running. The ticket's `phase` in `TicketDetail` is `design` while any thread
 is open and `implement` otherwise; it is computed, never stored.
 
+A card can ask for a design first (`design_first`, default off; `design_first = true` in a chain
+file; `POST|PATCH` take it; `tok ticket new --design-first`). Its run instructions and kickoff
+tell the agent to open a design thread with a first version and to write code only after a
+person approved one, and `finished` is refused (`409`, "cannot hand in DEMO-1: it was asked to
+show a design first, ...") until a thread is approved with a version pinned. The action
+`ask_design` (`tok design <card>`) is allowed on a card that is not in Review or done and has not
+asked yet: it sets `design_first`, and on a Running or Waiting card it also records the
+instruction "Before you go further, open a design thread for this card and wait for approval",
+delivered like any other. `TicketDetail.design_waiting` is true while a thread has a version
+that waits for the person's verdict; the window words it as "Waiting for you to approve the
+design".
+
 Each thread in the answers carries `changes_requested` (bool): true while the thread is open and
 a person's request for changes has no newer artifact version yet. Core computes it
 (`thread::changes_requested`), the daemon only fills the field, and the web shows it as the

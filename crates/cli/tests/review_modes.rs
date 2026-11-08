@@ -143,7 +143,7 @@ fn the_actions_a_card_allows_come_from_the_daemon() {
     let ready = tok.run(&["show", "DEMO-1"]);
     assert_eq!(
         ready["allowed_actions"],
-        serde_json::json!(["start", "pause", "cancel"])
+        serde_json::json!(["start", "pause", "ask_design", "cancel"])
     );
     let h = hand_in(&tok, "DEMO-1");
     assert_eq!(

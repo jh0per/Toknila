@@ -8,7 +8,7 @@ use super::codec::{Repo, enum_from, enum_str, from_json, json, opt_enum, opt_enu
 
 const TICKET_COLS: &str = "id, chain_id, key, title, prompt, acceptance_json, status, status_reason_json, \
      status_since, paused, profile, review_mode, branch, needs_secrets, tokens_used, wildcard_json, \
-     done_out_of_order_json, queued, review_json, reviewer, pr_json, pos_x, pos_y";
+     done_out_of_order_json, queued, review_json, reviewer, pr_json, pos_x, pos_y, design_first";
 impl Repo<'_> {
     /// All tickets, optionally of one chain, in key order.
     pub fn tickets(&self, chain: Option<ChainId>) -> Result<Vec<Ticket>, StoreError> {
@@ -25,7 +25,7 @@ impl Repo<'_> {
     pub fn upsert_ticket(&self, t: &Ticket) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23) \
+                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24) \
                  ON CONFLICT(id) DO UPDATE SET title = excluded.title, prompt = excluded.prompt, \
                  acceptance_json = excluded.acceptance_json, status = excluded.status, \
                  status_reason_json = excluded.status_reason_json, status_since = excluded.status_since, \
@@ -34,7 +34,7 @@ impl Repo<'_> {
                  wildcard_json = excluded.wildcard_json, \
                  done_out_of_order_json = excluded.done_out_of_order_json, queued = excluded.queued, \
                  review_json = excluded.review_json, reviewer = excluded.reviewer, pr_json = excluded.pr_json, \
-                 pos_x = excluded.pos_x, pos_y = excluded.pos_y"
+                 pos_x = excluded.pos_x, pos_y = excluded.pos_y, design_first = excluded.design_first"
             ),
             params![
                 t.id.to_string(),
@@ -60,6 +60,7 @@ impl Repo<'_> {
                 t.pr.as_ref().map(json).transpose()?,
                 t.pos.map(|p| p.x),
                 t.pos.map(|p| p.y),
+                t.design_first,
             ],
         )?;
         Ok(())
@@ -94,6 +95,7 @@ impl Repo<'_> {
             Option<String>,
             Option<i32>,
             Option<i32>,
+            bool,
         );
         let mut st = self
             .conn
@@ -123,6 +125,7 @@ impl Repo<'_> {
                 r.get(20)?,
                 r.get(21)?,
                 r.get(22)?,
+                r.get(23)?,
             ))
         })?;
         rows.map(|r| {
@@ -155,6 +158,7 @@ impl Repo<'_> {
                 reviewer: r.19,
                 pr: r.20.as_deref().map(from_json).transpose()?,
                 pos: r.21.zip(r.22).map(|(x, y)| Pos { x, y }),
+                design_first: r.23,
             })
         })
         .collect()

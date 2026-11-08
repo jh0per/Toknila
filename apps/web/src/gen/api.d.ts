@@ -1430,6 +1430,8 @@ export interface components {
             acceptance?: string[] | null;
             /** @description Checklist items to append. */
             add_subtasks?: string[];
+            /** @description Whether the agent shows a design for approval before any code. */
+            design_first?: boolean | null;
             /** @description Checklist items to rename. */
             edit_subtasks?: components["schemas"]["SubtaskEdit"][];
             prompt?: string | null;
@@ -1902,6 +1904,11 @@ export interface components {
             acceptance?: string[];
             /** @description Cards (keys) or release versions of the chain it waits for. Empty: the end of the chain. */
             after?: string[];
+            /**
+             * @description The card changes what the person sees: the agent shows a design for approval before any
+             *     code.
+             */
+            design_first?: boolean;
             prompt?: string;
             /** @description Checklist items. */
             subtasks?: string[];
@@ -1991,6 +1998,8 @@ export interface components {
              *     dependency of each. Refused, with nothing created, when one of them has started.
              */
             before?: string[];
+            /** @description Show the person a design to approve before any code. */
+            design_first?: boolean;
             needs_secrets?: boolean;
             paused?: boolean;
             profile?: string | null;
@@ -2133,6 +2142,7 @@ export interface components {
          */
         PatchTicket: {
             acceptance?: string[] | null;
+            design_first?: boolean | null;
             needs_secrets?: boolean | null;
             pos?: components["schemas"]["Pos"] | null;
             profile?: string | null;
@@ -2770,6 +2780,11 @@ export interface components {
             /** @description Ship branch `ship/<chain>/<slug>`; `null` until the card's ship is made. */
             branch?: string | null;
             chain_id: components["schemas"]["ChainId"];
+            /**
+             * @description The person wants to see and approve a design (a thread version) before any code: the agent
+             *     is told to open a design thread first, and `finished` is refused until one is approved.
+             */
+            design_first?: boolean;
             done_out_of_order?: components["schemas"]["OutOfOrder"] | null;
             id: components["schemas"]["TicketId"];
             key: components["schemas"]["TicketKey"];
@@ -2808,7 +2823,7 @@ export interface components {
          * @description What a person can do with a ticket.
          * @enum {string}
          */
-        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "fast_forward_start" | "start_anyway" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject" | "run_reviewer";
+        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "fast_forward_start" | "start_anyway" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject" | "run_reviewer" | "ask_design";
         /** @description A ticket with everything attached to it. */
         TicketDetail: {
             /** @description What a person can do with the ticket now, computed by the state machine. */
@@ -2819,6 +2834,11 @@ export interface components {
             can_move: boolean;
             chain: string;
             comments: components["schemas"]["Comment"][];
+            /**
+             * @description A thread of the card has a version that waits for the person's verdict (approve, or ask
+             *     for changes).
+             */
+            design_waiting?: boolean;
             /**
              * Format: int64
              * @description Milliseconds in the current status.
@@ -5001,7 +5021,7 @@ export interface operations {
             path: {
                 /** @description Ticket id or key */
                 ticket: string;
-                /** @description start, pause, resume, block, unblock, accept, return, reopen, cancel, approve or reject */
+                /** @description start, pause, resume, block, unblock, accept, return, reopen, cancel, approve, reject or ask_design */
                 action: string;
             };
             cookie?: never;

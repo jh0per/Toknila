@@ -95,6 +95,9 @@ fn ticket_section(view: &ChainView, t: &Ticket, subtasks: Option<&Vec<String>>, 
     if t.needs_secrets {
         out.raw("needs_secrets = true");
     }
+    if t.design_first {
+        out.raw("design_first = true");
+    }
     if t.paused {
         out.raw("paused = true");
     }

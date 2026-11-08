@@ -60,6 +60,8 @@ pub struct RunBrief {
     /// Instructions the card's earlier runs were given (`toknila_core::instructions::earlier`),
     /// for a run that replaces one.
     pub earlier: Vec<String>,
+    /// The card must show a design for approval before any code.
+    pub design_first: bool,
     /// The project's Claude model (`--model`), for a profile that runs Claude Code.
     pub model: Option<String>,
     /// The project's setting for when a card's agent wants to run a command (a worker only).

@@ -1,12 +1,14 @@
 {
   "allowed_actions": [
     "pause",
+    "ask_design",
     "cancel"
   ],
   "can_edit": true,
   "can_move": true,
   "chain": "demo",
   "comments": [],
+  "design_waiting": false,
   "in_status_ms": 0,
   "phase": "implement",
   "queue_position": null,

@@ -36,6 +36,9 @@ pub struct NewTicket {
     pub reviewer: Option<String>,
     #[serde(default)]
     pub needs_secrets: bool,
+    /// Show the person a design to approve before any code.
+    #[serde(default)]
+    pub design_first: bool,
     #[serde(default)]
     pub paused: bool,
     /// Put the card after the chain's last cards (what nothing waits for yet) when `after` is
@@ -78,6 +81,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         review_mode: input.review_mode,
         reviewer: input.reviewer.filter(|r| !r.trim().is_empty()),
         needs_secrets: input.needs_secrets,
+        design_first: input.design_first,
     };
     let t = Ticket::new_backlog(TicketId::new(), c.id, key, draft, uow.now());
     let id = t.id;
