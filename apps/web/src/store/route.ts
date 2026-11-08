@@ -48,6 +48,12 @@ export type Tab = "details" | "events" | "chat" | "terminal" | "threads" | "pr";
 
 export const TABS: Tab[] = ["details", "events", "chat", "terminal", "threads", "pr"];
 
+/// The tabs a card shows: the pull request only for a project that opens pull requests (or a card
+/// that already has one), since with local merges there is none.
+export function visibleTabs(opensPullRequests: boolean, hasPullRequest: boolean): Tab[] {
+  return TABS.filter((t) => t !== "pr" || opensPullRequests || hasPullRequest);
+}
+
 /// The route of a path; anything unknown is the home page.
 export function parseRoute(pathname: string): Route {
   const p = pathname.split("/").filter(Boolean).map(decodeURIComponent);

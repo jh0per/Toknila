@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Route, isProjectSection, parseRoute, routePath, settingsSection } from "./route";
+import { type Route, TABS, isProjectSection, parseRoute, routePath, settingsSection, visibleTabs } from "./route";
 
 describe("the settings routes", () => {
   const cases: [string, Route][] = [
@@ -43,5 +43,13 @@ describe("the settings routes", () => {
     expect(settingsSection({ section: "profiles" })).toBe("profiles");
     expect(isProjectSection("advanced")).toBe(true);
     expect(isProjectSection("checks")).toBe(false);
+  });
+});
+
+describe("the card's tabs", () => {
+  it("hides Pull request for a project that merges locally, unless the card has one", () => {
+    expect(visibleTabs(false, false)).not.toContain("pr");
+    expect(visibleTabs(false, true)).toContain("pr");
+    expect(visibleTabs(true, false)).toEqual(TABS);
   });
 });

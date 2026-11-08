@@ -11,6 +11,7 @@ import "./usage.css";
 import "./plan.css";
 import "./updates.css";
 import "./inbox.css";
+import "./details.css";
 
 const root = document.getElementById("root");
 if (root) {

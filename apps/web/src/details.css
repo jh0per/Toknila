@@ -1,0 +1,17 @@
+/* A card's Details: the status sentence first, the report in review, the folded technical details. */
+.status-block { display: flex; flex-direction: column; gap: var(--s1); margin: 0 0 var(--s3); padding: var(--s2) var(--s3); border-left: 3px solid var(--todo); background: var(--surface2); border-radius: 0 var(--r-m) var(--r-m) 0; }
+.status-block.tone-needs { border-left-color: var(--block); background: var(--block-soft); }
+.status-block.tone-going { border-left-color: var(--prog); background: var(--prog-soft); }
+.status-block.tone-done { border-left-color: var(--done); background: var(--done-soft); }
+.status-sentence { margin: 0; font-weight: 600; font-size: var(--fs-l); max-width: none; }
+.status-next { margin: 0; }
+.status-block .answer { margin-top: var(--s2); }
+.review-block { display: flex; flex-direction: column; gap: var(--s2); margin: 0 0 var(--s3); padding: var(--s3); border: 1px solid var(--line); border-radius: var(--r-m); }
+.review-block h4 { margin: 0; }
+.report { display: flex; flex-direction: column; gap: var(--s1); }
+.report p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-gist { font-weight: 600; }
+.review-block .actions { padding-top: var(--s1); }
+.technical { margin-top: var(--s3); }
+.technical dl { margin: 0; }
+.details .facts code { overflow-wrap: anywhere; }
