@@ -1,7 +1,7 @@
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
 
-const TOOL: Record<string, string> = { git: "Git", claude: "Claude Code", gh: "GitHub CLI" };
+const TOOL: Record<string, string> = { git: "Git", claude: "Claude Code", gh: "GitHub CLI", data_home: "Data home" };
 
 /// The system checks: git, claude and gh, each with what was found and, when it is not fine, how to fix it.
 export function Checks({ state, dispatch, title = true }: { state: State; dispatch: (i: Intent) => void; title?: boolean }) {

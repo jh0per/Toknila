@@ -202,10 +202,16 @@ pub fn system_checks(tools: &dyn Tools) -> SystemChecks {
     SystemChecks::new(vec![git, claude, gh])
 }
 
-/// [`system_checks`] plus one line for the projects' check commands: whether the first word of
-/// each resolves on the agents' `PATH`. The first command that does not is the one reported.
-pub fn system_checks_for(tools: &dyn Tools, commands: &[String]) -> SystemChecks {
+/// [`system_checks`] plus a warning when the data `home` sits inside a git work tree, and one line
+/// for the projects' check commands: whether the first word of each resolves on the agents'
+/// `PATH`. The first command that does not is the one reported.
+pub fn system_checks_for(tools: &dyn Tools, commands: &[String], home: &Path) -> SystemChecks {
     let mut checks = system_checks(tools).checks;
+    let home_text = home.to_string_lossy();
+    checks.extend(system::data_home(
+        &home_text,
+        &git(tools, &home_text, &["rev-parse", "--show-toplevel"]),
+    ));
     let dirs = crate::agent_path::agent_dirs();
     let verdicts: Vec<_> = commands
         .iter()

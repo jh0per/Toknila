@@ -15,7 +15,8 @@ fn me() -> String {
 #[test]
 fn a_check_command_whose_program_is_not_on_the_agents_path_is_reported() {
     let commands = vec!["no-such-program-p208 --all".to_owned()];
-    let checks = system_checks_for(&SystemTools, &commands).checks;
+    let outside = tempfile::tempdir().expect("tmp");
+    let checks = system_checks_for(&SystemTools, &commands, outside.path()).checks;
     let line = checks
         .iter()
         .find(|c| c.tool == system::Tool::CheckCommand)
@@ -23,11 +24,34 @@ fn a_check_command_whose_program_is_not_on_the_agents_path_is_reported() {
     assert_eq!(line.status, system::CheckStatus::Missing);
     assert!(line.detail.contains("`no-such-program-p208`"), "{line:?}");
     assert!(
-        system_checks_for(&SystemTools, &[])
+        system_checks_for(&SystemTools, &[], outside.path())
             .checks
             .iter()
             .all(|c| c.tool != system::Tool::CheckCommand)
     );
+}
+
+#[test]
+fn a_data_home_inside_a_repository_warns_and_one_outside_does_not() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let repo = tmp.path().join("repo");
+    init_repo(&repo, "main");
+    let inside = repo.join(".toknila");
+    std::fs::create_dir_all(&inside).expect("mkdir");
+    let warn = |home: &Path| {
+        system_checks_for(&SystemTools, &[], home)
+            .checks
+            .into_iter()
+            .find(|c| c.tool == system::Tool::DataHome)
+    };
+    let line = warn(&inside).expect("a data home warning");
+    assert_eq!(line.status, system::CheckStatus::Warning);
+    assert!(
+        line.detail.contains("inside the git repository"),
+        "{line:?}"
+    );
+    let plain = tempfile::tempdir().expect("tmp");
+    assert_eq!(warn(plain.path()), None);
 }
 
 #[test]

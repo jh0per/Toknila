@@ -33,6 +33,8 @@ pub enum Tool {
     Gh,
     /// The first word of a project check command.
     CheckCommand,
+    /// The folder Toknila keeps its files in.
+    DataHome,
 }
 
 /// The verdict on one tool.
@@ -49,6 +51,8 @@ pub enum CheckStatus {
     NotLoggedIn,
     /// It ran but did not behave (timeout, odd output).
     Failed,
+    /// Works, but the setup will cause trouble (the data home sits inside a repository).
+    Warning,
 }
 
 /// One line of the system check.
@@ -196,6 +200,31 @@ pub fn git(probe: &Probe) -> Check {
     }
 }
 
+/// The warning for a data home inside a git work tree, judged from `git rev-parse
+/// --show-toplevel` run in `home`; `None` when `home` is not inside one (git failing or missing
+/// counts as not inside).
+pub fn data_home(home: &str, toplevel: &Probe) -> Option<Check> {
+    let Probe::Ran {
+        code: Some(0),
+        stdout,
+        ..
+    } = toplevel
+    else {
+        return None;
+    };
+    let root = stdout.trim();
+    if root.is_empty() {
+        return None;
+    }
+    Some(check(
+        Tool::DataHome,
+        CheckStatus::Warning,
+        None,
+        format!("the data home {home} is inside the git repository {root}"),
+        "Claude Code asks about external CLAUDE.md imports on every run when the data home sits inside a repository. Point TOKNILA_HOME at a folder outside any repository, or leave it unset.",
+    ))
+}
+
 const CLAUDE_HINT: &str = "Install Claude Code (see https://docs.claude.com/claude-code) so `claude` is on the PATH, or use the sim profile.";
 
 /// The verdict on `claude --version`.
@@ -294,6 +323,17 @@ mod tests {
         assert_eq!(c.status, CheckStatus::Missing);
         assert!(c.hint.contains("claude"), "{}", c.hint);
         assert_eq!(gh(&Probe::Missing, None).status, CheckStatus::Missing);
+    }
+
+    #[test]
+    fn a_data_home_inside_a_work_tree_warns_and_one_outside_does_not() {
+        let c = data_home("/work/repo/.toknila", &ran(0, "/work/repo\n")).expect("warning");
+        assert_eq!((c.tool, c.status), (Tool::DataHome, CheckStatus::Warning));
+        assert!(c.detail.contains("/work/repo/.toknila"), "{}", c.detail);
+        assert!(c.hint.contains("TOKNILA_HOME"), "{}", c.hint);
+        assert_eq!(data_home("/h", &ran(128, "")), None);
+        assert_eq!(data_home("/h", &ran(0, "\n")), None);
+        assert_eq!(data_home("/h", &Probe::Missing), None);
     }
 
     #[test]
