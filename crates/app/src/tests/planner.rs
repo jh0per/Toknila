@@ -179,11 +179,13 @@ fn only_a_card_that_has_not_started_is_edited_and_its_checklist_with_it() {
         title: Some("A2".to_owned()),
         prompt: Some("new prompt".to_owned()),
         acceptance: Some(vec!["a".to_owned(), "b".to_owned()]),
+        design_first: Some(true),
         add_subtasks: vec!["first".to_owned()],
         edit_subtasks: vec![],
     };
     let id = edit_card(&mut mem, p, "DEMO-1", edit).expect("edit");
     let t = mem.ticket_by_id(id);
+    assert!(t.design_first);
     assert_eq!(t.title, "A2");
     assert_eq!(t.prompt, "new prompt");
     assert_eq!(t.acceptance, ["a", "b"]);

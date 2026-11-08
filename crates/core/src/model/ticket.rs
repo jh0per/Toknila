@@ -39,6 +39,10 @@ pub struct Ticket {
     pub branch: Option<String>,
     /// Copy depot secrets onto the ship at start.
     pub needs_secrets: bool,
+    /// The person wants to see and approve a design (a thread version) before any code: the agent
+    /// is told to open a design thread first, and `finished` is refused until one is approved.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub design_first: bool,
     pub tokens_used: u64,
     /// Set on a wildcard card (work nobody planned): where it came from and whether a person
     /// approved it. It stays after the decision. Absent on planned tickets.
@@ -130,6 +134,11 @@ pub struct TicketDraft {
     pub review_mode: Option<ReviewMode>,
     pub reviewer: Option<String>,
     pub needs_secrets: bool,
+    pub design_first: bool,
+}
+
+fn is_false(v: &bool) -> bool {
+    !*v
 }
 
 impl Ticket {
@@ -158,6 +167,7 @@ impl Ticket {
             reviewer: draft.reviewer,
             branch: None,
             needs_secrets: draft.needs_secrets,
+            design_first: draft.design_first,
             tokens_used: 0,
             wildcard: None,
             done_out_of_order: None,
@@ -206,6 +216,7 @@ pub struct TicketPatch {
     pub review_mode: Option<ReviewMode>,
     pub reviewer: Option<String>,
     pub needs_secrets: Option<bool>,
+    pub design_first: Option<bool>,
     /// Where the card sits on the canvas: a place, `null` to hand it back to the automatic
     /// layout, left out to keep it.
     #[serde(
@@ -254,6 +265,9 @@ impl TicketPatch {
         }
         if let Some(v) = self.needs_secrets {
             t.needs_secrets = v;
+        }
+        if let Some(v) = self.design_first {
+            t.design_first = v;
         }
         if let Some(v) = self.pos {
             t.pos = v;

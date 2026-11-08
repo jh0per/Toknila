@@ -104,6 +104,9 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
                 return Err(AppError::bad_request("finished needs a summary"));
             }
             let open_threads = threads::open_threads(uow, t)?;
+            if open_threads.is_empty() {
+                threads::require_design(uow, t)?;
+            }
             let mode = reviews::mode_of(uow, t)?;
             with_chain(uow, t.chain_id, |ctx| {
                 let event = TicketEvent::Finished {

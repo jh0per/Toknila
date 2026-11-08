@@ -186,6 +186,7 @@ fn build(raw: RawFile, edges: Vec<PlanEdge>) -> Plan {
         profile: t.profile,
         review_mode: t.review_mode,
         needs_secrets: t.needs_secrets,
+        design_first: t.design_first,
         paused: t.paused,
         done: t.done,
         done_subtasks: t.done_subtasks,

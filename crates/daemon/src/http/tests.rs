@@ -15,6 +15,7 @@ use crate::store::Store;
 mod agent_tokens;
 mod chain_settings;
 mod commands;
+mod design;
 mod inbox;
 mod merges;
 mod parallel;

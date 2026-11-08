@@ -26,6 +26,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         acceptance,
         check_command: None,
         earlier: &[],
+        design_first: false,
     }
 }
 
@@ -89,6 +90,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         acceptance: &[],
         check_command: None,
         earlier: &[],
+        design_first: false,
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -169,6 +171,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         acceptance: &[],
         check_command: check,
         earlier: &[],
+        design_first: false,
     }
 }
 
@@ -263,4 +266,25 @@ fn the_instructions_of_a_replacement_run_carry_the_earlier_ones_and_the_kickoff_
     assert!(!kickoff(crate::AgentRole::Worker, &pinned_brief(&acceptance)).contains("earlier"));
     assert!(!generate(&pinned_brief(&acceptance)).contains("given earlier"));
     assert!(!generate_review(&brief).contains("given earlier"));
+}
+
+#[test]
+fn a_design_first_card_is_told_to_open_a_design_thread_before_any_code() {
+    let acceptance = vec!["A design is approved before the code".to_owned()];
+    let brief = RunBrief {
+        design_first: true,
+        ..pinned_brief(&acceptance)
+    };
+    assert_pinned(&generate(&brief), "run_design_first.md");
+    let text = generate(&brief);
+    assert!(text.contains("## Design first"));
+    assert!(text.contains("`open_thread` with kind `design`"));
+    assert!(text.contains("Write code only after the person approved a version"));
+    let kick = kickoff(crate::AgentRole::Worker, &brief);
+    assert!(kick.contains("open a design thread"), "{kick}");
+    // A card that did not ask for it is told nothing about it.
+    let plain = pinned_brief(&acceptance);
+    assert!(!generate(&plain).contains("Design first"));
+    assert!(!kickoff(crate::AgentRole::Worker, &plain).contains("design thread"));
+    assert!(!generate_review(&brief).contains("Design first"));
 }

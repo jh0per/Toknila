@@ -34,6 +34,7 @@ pub(super) fn ticket(n: u32, status: TicketStatus, since: i64) -> Ticket {
         pos: None,
         branch: None,
         needs_secrets: false,
+        design_first: false,
         tokens_used: 0,
         wildcard: None,
         done_out_of_order: None,

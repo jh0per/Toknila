@@ -1,7 +1,8 @@
 {
   "allowed_actions": [
     "pause",
-    "cancel"
+    "cancel",
+    "ask_design"
   ],
   "can_edit": true,
   "can_move": true,

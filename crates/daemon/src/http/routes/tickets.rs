@@ -126,7 +126,7 @@ pub async fn patch_ticket(
 #[utoipa::path(post, path = "/tickets/{ticket}/actions/{action}", tag = "tickets", request_body = ActionInput,
     params(
         ("ticket" = String, Path, description = "Ticket id or key"),
-        ("action" = String, Path, description = "start, pause, resume, block, unblock, accept, return, reopen, cancel, approve or reject"),
+        ("action" = String, Path, description = "start, pause, resume, block, unblock, accept, return, reopen, cancel, approve, reject or ask_design"),
     ),
     responses((status = 200, body = TicketDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
 pub async fn ticket_action(

@@ -37,6 +37,8 @@ pub enum TicketAction {
     Reject,
     /// Run the reviewer again, after it gave no verdict.
     RunReviewer,
+    /// Ask for a design to approve before any code (`tok design`).
+    AskDesign,
 }
 
 /// The name is not an action.
@@ -57,7 +59,7 @@ impl FromStr for TicketAction {
 
 impl TicketAction {
     /// Every action, in the order a client shows them.
-    pub const ALL: [TicketAction; 14] = [
+    pub const ALL: [TicketAction; 15] = [
         Self::Start,
         Self::Pause,
         Self::Resume,
@@ -72,6 +74,7 @@ impl TicketAction {
         Self::Approve,
         Self::Reject,
         Self::RunReviewer,
+        Self::AskDesign,
     ];
 
     /// The name used in routes and commands.
@@ -91,6 +94,7 @@ impl TicketAction {
             Self::Approve => "approve",
             Self::Reject => "reject",
             Self::RunReviewer => "run_reviewer",
+            Self::AskDesign => "ask_design",
         }
     }
 
@@ -127,6 +131,7 @@ impl TicketAction {
                 by,
             },
             Self::RunReviewer => TicketEvent::RunReviewer,
+            Self::AskDesign => TicketEvent::AskDesign,
         })
     }
 
@@ -179,11 +184,11 @@ mod tests {
     fn what_is_allowed_follows_the_status() {
         assert_eq!(
             names(&ticket(TicketStatus::Ready)),
-            ["start", "pause", "cancel"]
+            ["start", "pause", "cancel", "ask_design"]
         );
         assert_eq!(
             names(&ticket(TicketStatus::Running)),
-            ["pause", "block", "cancel"]
+            ["pause", "block", "cancel", "ask_design"]
         );
         assert_eq!(names(&ticket(TicketStatus::Merged)), ["reopen"]);
         assert!(names(&ticket(TicketStatus::Released)).is_empty());
