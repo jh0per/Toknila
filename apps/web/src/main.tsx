@@ -10,6 +10,7 @@ import "./settings.css";
 import "./usage.css";
 import "./plan.css";
 import "./updates.css";
+import "./inbox.css";
 
 const root = document.getElementById("root");
 if (root) {

@@ -14,7 +14,9 @@ type Menu = { x: number; y: number; project: Project | undefined };
 export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const [menu, setMenu] = useState<Menu>();
   const close = useCallback(() => setMenu(undefined), []);
-  const project = currentProject(state);
+  // The inbox and the usage page are about every project, so none is highlighted there.
+  const global = state.route.name === "inbox" || state.route.name === "usage";
+  const project = global ? undefined : currentProject(state);
   const archived = archivedProjects(state);
   const show = state.plan.showArchived;
   const openMenu = (p: Project | undefined) => (e: MouseEvent) => {
