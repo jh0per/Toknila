@@ -58,7 +58,7 @@ export function AddProject({ state, dispatch, focus = false }: {
           Details
           {found && (
             <span className="muted found" data-testid="add-found">
-              {" "}· {found.key} · {found.work_branch} · {found.merge_mode === "github" ? "pull requests" : "merges locally"}
+              {found.key} · {found.work_branch} · {found.merge_mode === "github" ? "pull requests" : "merges locally"}
             </span>
           )}
         </summary>

@@ -8,7 +8,7 @@
 .inbox .row-head { display: flex; gap: var(--s2); align-items: baseline; justify-content: space-between; }
 .inbox .row-head .t { font-weight: 600; font-size: var(--fs-l); min-width: 0; overflow-wrap: anywhere; }
 .inbox .row-head .key { font-size: var(--fs-xs); color: var(--muted); }
-.inbox .kind { margin-bottom: var(--s1); }
+.inbox .row-kind { margin-bottom: var(--s1); }
 .inbox .row-body { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; }
 .inbox blockquote, .answer blockquote { margin: 0; padding-left: var(--s2); border-left: 3px solid var(--line); }
 .inbox .btns, .answer .btns { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }

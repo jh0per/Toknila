@@ -9,7 +9,6 @@ export function UpdatesSettings({ state, dispatch }: { state: State; dispatch: (
   const failure = view && (error ?? view.error);
   return (
     <section className="card-block" data-testid="updates">
-      <h2>Updates</h2>
       {!view ? (
         <p className="muted" data-testid="updates-browser">
           Updates come with the Toknila desktop app. In a browser, install the newer version yourself.

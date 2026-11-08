@@ -40,25 +40,7 @@ export function ProjectSettings({ state, dispatch, project, section }: Props) {
           Add a project…
         </button>
       </div>
-      {project && (
-        <>
-          <nav className="tabs-row" aria-label="Project settings" data-testid="settings-nav">
-            {PROJECT_SECTIONS.map((s) => (
-              <NavLink
-                key={s} route={{ name: "settings", project: project.key, section: s }} dispatch={dispatch}
-                className={`tab${section === s ? " sel" : ""}`} testId={`settings-nav-${s}`}
-              >
-                {SECTION_LABEL[s]}
-              </NavLink>
-            ))}
-          </nav>
-          {section === "plans" ? (
-            <PlansSection project={project} state={state} dispatch={dispatch} />
-          ) : (
-            <Form key={formKey(project, state)} project={project} state={state} dispatch={dispatch} section={section} />
-          )}
-        </>
-      )}
+      {project && <Body key={formKey(project, state)} project={project} state={state} dispatch={dispatch} section={section} />}
     </>
   );
 }
@@ -68,28 +50,55 @@ function formKey(p: Project, state: State): string {
   return [p.id, JSON.stringify(formOf(p)), state.settings.profiles.length].join("|");
 }
 
-function Form({ project, state, dispatch, section }: Omit<Props, "project"> & { project: Project }) {
+/// The tabs and the section shown, over one form that keeps what was typed while the person looks
+/// at another tab.
+function Body({ project, state, dispatch, section }: Omit<Props, "project"> & { project: Project }) {
   const [form, setForm] = useState<ProjectForm>(() => formOf(project));
   const set = <K extends keyof ProjectForm>(field: K, value: ProjectForm[K]) => setForm((f) => ({ ...f, [field]: value }));
   const props = { project, state, form, set };
-  return (
-    <form
-      className="project-form" noValidate data-testid="project-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (isDirty(form, project)) dispatch({ type: "saveProject", project: project.key, patch: patchOf(form) });
-      }}
-    >
+  const dirty = isDirty(form, project);
+  const save = () => dispatch({ type: "saveProject", project: project.key, patch: patchOf(form) });
+  const sections = (
+    <>
       {section === "general" && <GeneralSection {...props} />}
       {section === "agents" && <AgentsSection {...props} />}
       {section === "review" && <ReviewSection {...props} />}
       {section === "advanced" && <AdvancedSection {...props} dispatch={dispatch} />}
+    </>
+  );
+  return (
+    <>
+      <nav className="tabs-row" aria-label="Project settings" data-testid="settings-nav">
+        {PROJECT_SECTIONS.map((s) => (
+          <NavLink
+            key={s} route={{ name: "settings", project: project.key, section: s }} dispatch={dispatch}
+            className={`tab${section === s ? " sel" : ""}`} testId={`settings-nav-${s}`}
+          >
+            {SECTION_LABEL[s]}
+          </NavLink>
+        ))}
+      </nav>
+      {section === "plans" ? (
+        <PlansSection project={project} state={state} dispatch={dispatch} />
+      ) : (
+        <form
+          className="project-form" noValidate data-testid="project-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (dirty) save();
+          }}
+        >
+          {sections}
+        </form>
+      )}
       <SaveBar
-        project={project.key} section={section} state={state.settings} dispatch={dispatch}
-        dirty={isDirty(form, project)}
-        onSave={() => dispatch({ type: "saveProject", project: project.key, patch: patchOf(form) })}
-        onDiscard={() => setForm(formOf(project))}
+        project={project.key} section={section} state={state.settings} dispatch={dispatch} dirty={dirty}
+        onSave={save}
+        onDiscard={() => {
+          setForm(formOf(project));
+          dispatch({ type: "dismissSettingsNotes" });
+        }}
       />
-    </form>
+    </>
   );
 }

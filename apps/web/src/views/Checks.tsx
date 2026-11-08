@@ -4,11 +4,11 @@ import type { State } from "../store/state";
 const TOOL: Record<string, string> = { git: "Git", claude: "Claude Code", gh: "GitHub CLI" };
 
 /// The system checks: git, claude and gh, each with what was found and, when it is not fine, how to fix it.
-export function Checks({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
+export function Checks({ state, dispatch, title = true }: { state: State; dispatch: (i: Intent) => void; title?: boolean }) {
   const checks = state.settings.checks;
   return (
     <section className="card-block" data-testid="checks">
-      <h2>System checks</h2>
+      {title && <h2>System checks</h2>}
       {!checks && <p className="muted">Checking…</p>}
       <ul className="checks">
         {checks?.checks.map((c) => (

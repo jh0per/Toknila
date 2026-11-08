@@ -15,7 +15,6 @@ export function ProfilesSettings({ state, dispatch }: { state: State; dispatch: 
   return (
     <div className="page-section">
       <section className="card-block" data-testid="profiles">
-        <h2>Agents</h2>
         <p className="muted">
           An agent says how a coding agent is started and what it may do. To add one, put a <code>.toml</code> file in the
           agent files folder; it applies at once.

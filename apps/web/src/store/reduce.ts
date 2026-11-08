@@ -105,6 +105,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "editDraft":
     case "submitProject":
     case "browseFolder":
+    case "dismissSettingsNotes":
     case "repoChecked":
     case "saveProject":
     case "importChain":

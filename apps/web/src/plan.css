@@ -49,4 +49,4 @@
 .formats ul { margin: var(--s1) 0 0; padding-left: var(--s4); display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-s); }
 .formats code { overflow-wrap: anywhere; }
 .add-project .fold .field { margin-bottom: var(--s2); }
-.fold .found { font-weight: 400; }
+.fold .found { font-weight: 400; margin-left: var(--s2); }

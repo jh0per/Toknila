@@ -24,7 +24,7 @@ export function ActionBar(
         {specs.map((a) => (
           <button
             key={a.action}
-            className={a.danger ? "danger" : a.action === specs[0].action ? "primary" : ""}
+            className={`btn${a.danger ? " danger" : a.action === specs[0].action ? " primary" : ""}`}
             onClick={() => {
               if (a.action === "cancel") setCancelling(!cancelling);
               else if (a.needsText) setReturning(!returning);

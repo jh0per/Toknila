@@ -6,7 +6,6 @@ export function About({ state, dispatch }: { state: State; dispatch: (i: Intent)
   const { cli, cliError } = state.settings;
   return (
     <section className="card-block" data-testid="about">
-      <h2>About</h2>
       <p data-testid="version">Toknila {cli?.version ?? "…"}</p>
       <h3 className="sub">The <code>tok</code> command</h3>
       <p className="muted">A command for the terminal that does what this window does: list cards, start them, answer them.</p>

@@ -27,7 +27,7 @@ export function Settings({ state, dispatch }: { state: State; dispatch: (i: Inte
         {section === "about" && <About state={state} dispatch={dispatch} />}
         {section === "checks" && (
           <>
-            <Checks state={state} dispatch={dispatch} />
+            <Checks state={state} dispatch={dispatch} title={false} />
             <TrustNote />
           </>
         )}

@@ -35,7 +35,7 @@ export function InboxRow({ state, item, dispatch }: { state: State; item: InboxI
         <span className="t">{item.title}</span>
         {route ? <NavLink route={route} dispatch={dispatch} className="key">{item.ticket}</NavLink> : <span className="key">{item.ticket}</span>}
       </div>
-      <div className="kind muted" data-testid="inbox-kind">{KIND_LINE[item.kind]}</div>
+      <div className="row-kind muted" data-testid="inbox-kind">{KIND_LINE[item.kind]}</div>
       <Body item={item} route={route} open={open} dispatch={dispatch} />
     </li>
   );

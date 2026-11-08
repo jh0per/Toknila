@@ -15,9 +15,10 @@ export function SaveBar({ project, dirty, state, section, onSave, onDiscard, dis
   onDiscard: () => void;
   dispatch: (i: Intent) => void;
 }) {
-  const refusal = state.error?.field ? state.error : undefined;
-  const general = formError(state);
-  if (!dirty && !state.saved && !refusal && !general) return null;
+  // A refusal belongs to the values that were sent; a form that is back to the saved values has none.
+  const refusal = dirty && state.error?.field ? state.error : undefined;
+  const general = dirty ? formError(state) : undefined;
+  if (!dirty && !state.saved) return null;
   const where = refusal ? sectionOfField(refusal.field ?? "") : undefined;
   return (
     <div className="savebar" role="region" aria-label="Save changes" data-testid="savebar" data-dirty={dirty}>
