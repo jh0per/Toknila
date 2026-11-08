@@ -251,7 +251,7 @@ pub(crate) fn retired<U: UnitOfWork + ?Sized>(
         )),
         ..CommentBody::default()
     };
-    add_comment(uow, &view, ticket, Actor::Human, CommentKind::Report, body).map(|_| ())
+    add_comment(uow, &view, ticket, Actor::System, CommentKind::Report, body).map(|_| ())
 }
 
 /// The shipyard made the ship: remember it, journal it, tell the ticket its branch.

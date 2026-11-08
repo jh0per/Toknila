@@ -281,6 +281,7 @@ fn cancel_keeps_a_branch_with_work_and_names_it_on_the_card() {
         .filter(|c| c.ticket_id == a.id)
         .collect();
     assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].author, toknila_core::Actor::System);
     assert!(
         notes[0].body.gist.contains("ship/demo/demo-1-a") && notes[0].body.gist.contains("3"),
         "{:?}",

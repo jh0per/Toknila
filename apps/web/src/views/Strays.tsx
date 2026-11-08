@@ -38,7 +38,7 @@ export function Strays({ project }: { project: string }) {
   };
   return (
     <section data-testid="strays">
-      <h3 className="sub">Leftover ships</h3>
+      <h3 className="sub">Leftover workspaces</h3>
       <p className="muted">
         Workspaces and branches that no card owns any more, left by cancelled or deleted cards. Clean up deletes them,
         and the commits on a branch with it.
