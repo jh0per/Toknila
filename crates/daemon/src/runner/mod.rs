@@ -78,8 +78,6 @@ pub struct Runners {
     permission_wait_ms: AtomicU64,
     /// The daemon's address, known once it listens; agents get it in their environment.
     url: OnceLock<String>,
-    /// The `toknila` binary agents run for `mcp` and `hook`; this process unless set.
-    bin: OnceLock<PathBuf>,
 }
 
 impl Runners {
@@ -101,7 +99,6 @@ impl Runners {
             prompts: Prompts::default(),
             permission_wait_ms: AtomicU64::new(toknila_core::hook::PERMISSION_WAIT_SECS * 1000),
             url: OnceLock::new(),
-            bin: OnceLock::new(),
         };
         (Arc::new(runners), rx)
     }
@@ -132,17 +129,9 @@ impl Runners {
         let _ = self.url.set(url);
     }
 
-    /// Sets the `toknila` binary agents run for `mcp` and `hook`. Set once.
-    pub fn set_agent_bin(&self, bin: PathBuf) {
-        let _ = self.bin.set(bin);
-    }
-
+    /// The `toknila` binary agents run for `mcp` and `hook`: this process.
     fn agent_bin(&self) -> PathBuf {
-        self.bin
-            .get()
-            .cloned()
-            .or_else(|| std::env::current_exe().ok())
-            .unwrap_or_else(|| PathBuf::from("toknila"))
+        std::env::current_exe().unwrap_or_else(|_| PathBuf::from("toknila"))
     }
 
     /// Pings whenever a ticket's runner wrote or ended.

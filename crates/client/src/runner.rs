@@ -25,12 +25,8 @@ pub struct Scrollback {
 }
 
 impl Client {
-    /// `GET /tickets/{ticket}/runner/scrollback`: the worker's output.
-    pub fn runner_scrollback(&self, ticket: &str) -> ClientResult<Scrollback> {
-        self.runner_scrollback_of(ticket, AgentRole::Worker)
-    }
-
-    /// The scrollback of the ticket's runner of `role`; the reviewer's is read-only.
+    /// `GET /tickets/{ticket}/runner/scrollback`: the output of the ticket's runner of `role`;
+    /// the reviewer's is read-only.
     pub fn runner_scrollback_of(&self, ticket: &str, role: AgentRole) -> ClientResult<Scrollback> {
         let url = format!(
             "{}/v1/tickets/{}/runner/scrollback{}",
