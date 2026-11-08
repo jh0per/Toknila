@@ -258,9 +258,12 @@ fn running_to_review_on_finished_records_report() {
     assert_eq!(tr.ticket.status, TicketStatus::Review);
     assert_eq!(
         tr.effects,
-        vec![Effect::RecordReport {
-            summary: "зроблено X".to_owned()
-        }]
+        vec![
+            Effect::RecordReport {
+                summary: "зроблено X".to_owned()
+            },
+            Effect::StopWorker
+        ]
     );
 }
 

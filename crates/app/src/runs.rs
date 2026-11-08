@@ -62,6 +62,11 @@ pub(crate) fn queue_stop<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: TicketId) 
     uow.defer(ExternalEffect::StopRunner { ticket });
 }
 
+/// `StopWorker`: queue stopping the ticket's worker runner; a reviewer keeps running.
+pub(crate) fn queue_stop_worker<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: TicketId) {
+    uow.defer(ExternalEffect::StopWorker { ticket });
+}
+
 /// The host started a runner: journal it. A runner that was kept is not news.
 pub(crate) fn started<U: UnitOfWork + ?Sized>(uow: &mut U, run: Run) -> AppResult<()> {
     uow.emit(&DomainEvent::RunnerStarted { run })

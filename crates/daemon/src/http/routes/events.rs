@@ -3,7 +3,7 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
-use toknila_app::{agent, instructions, questions, resolve, reviews, ships};
+use toknila_app::{AppError, agent, instructions, questions, resolve, reviews, ships};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::{Actor, AgentRole, TicketStatus, hook, nudge};
 
@@ -56,18 +56,23 @@ pub async fn agent_event(
                 .map_err(|e| ships::refuse_finished(e, &look))?;
         }
     }
-    let (detail, _) = state
+    let ((detail, asked), _) = state
         .store
-        .write(Actor::Agent, at, move |tx| -> ApiResult<TicketDetail> {
+        .write(Actor::Agent, at, move |tx| -> ApiResult<_> {
             let t = resolve::ticket(&*tx, &ticket)?;
             // An agent token acts on its own ticket only, and says what its role may.
             principal.owns(&t)?;
             principal.may_send(&event)?;
+            let asked = agent::turns_into_question(&*tx, &t, &event)?;
             // The ticket itself, or the card it proposed.
             let answer = agent::ticket_event(tx, &t, event)?;
-            load_ticket_detail(&tx.repo(), answer, at, &prices)
+            Ok((load_ticket_detail(&tx.repo(), answer, at, &prices)?, asked))
         })
         .await?;
+    if asked {
+        // The question is in the inbox; the agent reads this as the answer to its note.
+        return Err(AppError::conflict(AgentEvent::NOTE_ASKED).into());
+    }
     Ok(Json(detail))
 }
 

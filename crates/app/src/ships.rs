@@ -164,6 +164,25 @@ pub fn refuse_finished(error: GuardError, look: &ShipLook) -> AppError {
     }
 }
 
+/// The error Accept answers with when the workspace differs from the hand-in commit: it names
+/// the files, and the card stays in Review.
+pub fn refuse_accept(error: GuardError, look: &ShipLook) -> AppError {
+    match error {
+        GuardError::Problem(ShipProblem::Uncommitted { files }) => AppError::conflict(format!(
+            "Cannot accept: the workspace has changes beyond the hand-in commit ({}). Return the \
+             card so the agent commits or discards them, or deal with them on the ship.",
+            guard::list_files(&files)
+        )),
+        GuardError::Problem(ShipProblem::Empty) => AppError::conflict(format!(
+            "Cannot accept: the branch has no commit of its own on top of {}.",
+            look.start
+        )),
+        GuardError::Ship(e) => AppError::conflict(format!(
+            "Cannot accept: Toknila could not look at the workspace ({e}). Try again."
+        )),
+    }
+}
+
 /// The ship a spec stands for once the shipyard gave it a path.
 pub(crate) fn ship_of(ticket: TicketId, spec: &ShipSpec, path: String) -> Ship {
     Ship {

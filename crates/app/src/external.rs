@@ -46,6 +46,8 @@ pub enum ExternalEffect {
     },
     /// Stop every runner of the ticket (worker and reviewer).
     StopRunner { ticket: TicketId },
+    /// Stop the worker's runner only; the reviewer's keeps running.
+    StopWorker { ticket: TicketId },
     /// Run the reviewer profile's command in the ticket's ship, next to the worker's runner.
     /// `dir` is the ship's path; `None` when the ticket has no ship.
     StartReviewer {
@@ -196,6 +198,9 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 }
             }
             ExternalEffect::StopRunner { ticket } => host.runner.stop(ticket),
+            ExternalEffect::StopWorker { ticket } => {
+                host.runner.stop_role(ticket, AgentRole::Worker);
+            }
             ExternalEffect::StartReviewer {
                 ticket,
                 key,

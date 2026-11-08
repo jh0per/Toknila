@@ -121,38 +121,36 @@ async fn finished_is_refused_when_the_branch_has_no_commit_of_its_own() {
 }
 
 #[tokio::test]
-async fn accept_blocks_a_ship_that_became_dirty_and_pushes_and_merges_nothing() {
+async fn accept_is_refused_naming_the_files_while_the_workspace_differs_from_the_hand_in() {
     let e = env().await;
     commit_file(&e.ship, "login.txt", "login\n", "add login");
     assert!(e.finish().await.0.is_success());
     let base = git(&e.repo, &["rev-parse", "develop"]);
     std::fs::write(e.ship.join("late.txt"), "late work\n").expect("untracked");
+    std::fs::write(e.ship.join("login.txt"), "edited after the hand-in\n").expect("tracked");
 
-    let d = e.accept().await;
-    assert_eq!(d["ticket"]["status"], "blocked", "{d}");
-    assert_eq!(reason(&d)["kind"], "ship_uncommitted");
-    assert_eq!(reason(&d)["files"], json!(["late.txt"]));
-    assert_eq!(git(&e.repo, &["rev-parse", "develop"]), base, "not merged");
-    assert!(e.ship.exists(), "the ship stays");
-
-    // The inbox says it in words.
-    let items = e.api.get("/v1/projects/DEMO/inbox").await;
-    let item = &items.as_array().expect("list")[0];
-    assert_eq!(item["kind"], "blocked");
-    assert!(
-        item["text"]
-            .as_str()
-            .is_some_and(|t| t.starts_with("ship_uncommitted: ") && t.contains("late.txt")),
-        "{item}"
-    );
-
-    // Commit it on the ship, unblock: the merge goes through.
-    git(&e.ship, &["add", "late.txt"]);
-    git(&e.ship, &["commit", "--quiet", "-m", "late"]);
-    e.api
-        .post("/v1/tickets/DEMO-1/actions/unblock", json!({}))
+    let (status, body) = e
+        .api
+        .call(
+            Method::POST,
+            "/v1/tickets/DEMO-1/actions/accept",
+            Some(json!({})),
+        )
         .await;
-    assert_eq!(e.api.status("DEMO-1").await, "merged");
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    let text = body["error"].as_str().expect("an error text");
+    assert!(
+        text.contains("hand-in commit") && text.contains("late.txt") && text.contains("login.txt"),
+        "{text}"
+    );
+    assert_eq!(e.api.status("DEMO-1").await, "review", "the card stays put");
+    assert_eq!(git(&e.repo, &["rev-parse", "develop"]), base, "not merged");
+
+    // Commit it on the ship: the accept goes through.
+    git(&e.ship, &["add", "-A"]);
+    git(&e.ship, &["commit", "--quiet", "-m", "late"]);
+    let d = e.accept().await;
+    assert_eq!(d["ticket"]["status"], "merged", "{d}");
     assert!(e.repo.join("late.txt").is_file());
 }
 

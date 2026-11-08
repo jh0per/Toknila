@@ -181,3 +181,43 @@ async fn closing_leftovers_marks_the_subtasks_done() {
     assert_eq!(d["comments"][0]["kind"], "decision");
     assert_eq!(inbox(&api).await, []);
 }
+
+#[tokio::test]
+async fn a_note_that_asks_a_question_reaches_the_inbox_and_a_progress_note_does_not() {
+    let api = Api::new();
+    api.demo().await;
+    api.post(
+        "/v1/chains/demo/tickets",
+        json!({ "title": "asks", "profile": "sim" }),
+    )
+    .await;
+
+    let note = |text: &str| json!({ "event": "note", "body": { "gist": text } });
+    api.post(
+        "/v1/tickets/DEMO-1/events",
+        note("half way through the parser"),
+    )
+    .await;
+    assert_eq!(api.status("DEMO-1").await, "running");
+    assert_eq!(inbox(&api).await, []);
+
+    // The question is kept, and the agent is told to use ask_human.
+    let (status, body) = api
+        .call(
+            Method::POST,
+            "/v1/tickets/DEMO-1/events",
+            Some(note("Which framework should I use?")),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert!(
+        body["error"]
+            .as_str()
+            .is_some_and(|t| t.contains("ask_human")),
+        "{body}"
+    );
+    assert_eq!(api.status("DEMO-1").await, "waiting");
+    let items = api.get("/v1/projects/DEMO/inbox").await;
+    assert_eq!(items[0]["kind"], "question", "{items}");
+    assert_eq!(items[0]["text"], "Which framework should I use?");
+}

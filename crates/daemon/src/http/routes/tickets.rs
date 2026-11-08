@@ -5,9 +5,12 @@ use std::collections::HashMap;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use toknila_app::ships::GuardError;
 use toknila_app::tickets::{self, TicketAction};
-use toknila_app::{notes, resolve, schedule, wildcards};
-use toknila_core::{Actor, ChainId};
+use toknila_app::{notes, resolve, schedule, ships, wildcards};
+use toknila_core::guard::ShipProblem;
+use toknila_core::machine::TicketEvent;
+use toknila_core::{Actor, ChainId, ReviewTurn, TicketStatus};
 
 use super::{ApiResult, load_ticket_detail, read, stamp, ticket_write};
 use crate::http::dto::{
@@ -137,6 +140,34 @@ pub async fn ticket_action(
     let text = body.and_then(|Json(b)| b.text);
     let by = Actor::Human;
     let event = action.parse::<TicketAction>()?.event(text, by)?;
+    // Accept looks at the ship first, off the store thread: git never runs inside a transaction.
+    if matches!(event, TicketEvent::Accept { .. }) {
+        let looked = ticket.clone();
+        let target = state
+            .store
+            .read(move |repo| {
+                Ok(resolve::ticket(repo, &looked).and_then(|t| {
+                    let waiting = t.status == TicketStatus::Review
+                        && t.review.turn != Some(ReviewTurn::Merging);
+                    let look = if waiting {
+                        ships::finished_look(repo, &t)?
+                    } else {
+                        None
+                    };
+                    Ok(look)
+                }))
+            })
+            .await??;
+        if let Some(look) = target {
+            // Only changes beyond the hand-in commit are refused here; an empty branch or a
+            // ship git cannot look at is the merge's to block with its own reason.
+            if let Err(e @ GuardError::Problem(ShipProblem::Uncommitted { .. })) =
+                state.store.guard_ship(look.clone()).await
+            {
+                return Err(ships::refuse_accept(e, &look).into());
+            }
+        }
+    }
     ticket_write(&state, ticket, by, move |tx, t| {
         Ok(tickets::act(tx, &t, event)?)
     })

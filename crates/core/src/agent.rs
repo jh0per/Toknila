@@ -80,6 +80,30 @@ impl AgentEvent {
         matches!(self, Self::ReviewVerdict { .. })
     }
 
+    /// The text of a note that asks a question: it ends with a question mark, or asks "which",
+    /// "may I" or "should I". Such a note is a question in disguise; `None` for a plain report.
+    pub fn note_question(body: &CommentBody) -> Option<String> {
+        let mut text = body.gist.trim().to_owned();
+        if let Some(what) = body.what.as_deref().filter(|w| !w.trim().is_empty()) {
+            text.push('\n');
+            text.push_str(what.trim());
+        }
+        let lower = text.to_lowercase();
+        let words: Vec<&str> = lower
+            .split(|c: char| !c.is_alphanumeric() && c != '\'')
+            .filter(|w| !w.is_empty())
+            .collect();
+        let asks = text.ends_with('?')
+            || words.contains(&"which")
+            || words
+                .windows(2)
+                .any(|w| w == ["may", "i"] || w == ["should", "i"]);
+        (asks && !text.is_empty()).then_some(text)
+    }
+
+    /// What a card's agent is told when its note was turned into a question.
+    pub const NOTE_ASKED: &'static str = "Your note asked a question, so Toknila put it in the inbox as a question and the card now waits. A note is a report and is never answered: to ask a person something, use ask_human.";
+
     /// The question as a Waiting reason, for `AskHuman`.
     pub fn waiting_reason(text: &str, permission: bool, detail: Option<String>) -> WaitingReason {
         if permission {
@@ -107,6 +131,45 @@ pub enum ReleaseEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn note(gist: &str, what: Option<&str>) -> CommentBody {
+        CommentBody {
+            gist: gist.into(),
+            what: what.map(Into::into),
+            ..CommentBody::default()
+        }
+    }
+
+    #[test]
+    fn a_note_that_asks_is_a_question_and_a_progress_note_is_not() {
+        for asks in [
+            "Is the parser meant to accept tabs?",
+            "Which framework should we use",
+            "May I delete the old module",
+            "I wonder, should I split this card",
+        ] {
+            assert_eq!(
+                AgentEvent::note_question(&note(asks, None)).as_deref(),
+                Some(asks)
+            );
+        }
+        let long = note("Parser question", Some("Tabs or spaces?"));
+        assert_eq!(
+            AgentEvent::note_question(&long).as_deref(),
+            Some("Parser question\nTabs or spaces?")
+        );
+        for plain in [
+            "Parser done, 12 tests pass",
+            "Why this works: the cache is keyed by id.",
+            "I may inspect the code next",
+        ] {
+            assert_eq!(
+                AgentEvent::note_question(&note(plain, None)),
+                None,
+                "{plain}"
+            );
+        }
+    }
 
     #[test]
     fn wire_shape_is_pinned() {

@@ -266,6 +266,10 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
                 runs::queue_stop(uow, ticket);
                 continue;
             }
+            Effect::StopWorker => {
+                runs::queue_stop_worker(uow, ticket);
+                continue;
+            }
             Effect::StartReviewer => {
                 reviews::queue_start(uow, ctx, ticket)?;
                 continue;

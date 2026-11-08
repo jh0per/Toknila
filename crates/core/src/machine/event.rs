@@ -152,6 +152,8 @@ pub enum Effect {
     RetireShip,
     /// Stop the ticket's runners, worker and reviewer, if any.
     StopRunner,
+    /// Stop the worker's runner only (the hand-in ended its run); a reviewer keeps running.
+    StopWorker,
     /// Run the reviewer agent next to the worker (its own runner, on the same ship).
     StartReviewer,
     /// Stop the reviewer's runner, if any; the worker keeps running.
