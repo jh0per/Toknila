@@ -13,6 +13,7 @@ import type { PlannerEffect, PlannerIntent, PlannerResult } from "./planner";
 import type { RemovalEffect, RemovalIntent, RemovalResult } from "./removal";
 import type { Route, Tab } from "./route";
 import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
+import type { ThemeEffect, ThemeIntent } from "./theme";
 import type { UpdateEffect, UpdateIntent, UpdateResult } from "./updates";
 import type { UsageEffect, UsageIntent, UsageResult } from "./usage";
 
@@ -34,6 +35,7 @@ export type Intent =
   | EdgeIntent
   | AutostartIntent
   | QuickIntent
+  | ThemeIntent
   | UpdateIntent
   | UsageIntent;
 
@@ -102,6 +104,7 @@ export type Effect =
   | RemovalEffect
   | EdgeEffect
   | AutostartEffect
+  | ThemeEffect
   | UpdateEffect
   | UsageEffect
   | { type: "connect"; since: number; delayMs: number }

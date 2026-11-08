@@ -11,6 +11,7 @@ import { type PlannerSlice, initialPlanner } from "./planner";
 import { type RemovalState, initialRemoval } from "./removal";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
+import type { Theme } from "./theme";
 import { type UpdatesState, initialUpdates } from "./updates";
 import { type UsageState, initialUsage } from "./usage";
 
@@ -60,6 +61,8 @@ export interface State {
   usage: UsageState;
   /// Updates of the desktop app (empty in a browser).
   updates: UpdatesState;
+  /// The viewer's colour theme; remembered in this browser only.
+  theme: Theme;
 }
 
 export const FIRST_RETRY_MS = 500;
@@ -92,6 +95,7 @@ export function initialState(route: Route): State {
     quick: initialQuick,
     usage: initialUsage,
     updates: initialUpdates,
+    theme: "system",
   };
 }
 
