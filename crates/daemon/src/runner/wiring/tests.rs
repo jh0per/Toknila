@@ -34,6 +34,7 @@ impl Rig {
                 earlier: Vec::new(),
                 model: None,
                 project: None,
+                ..RunBrief::default()
             },
         }
     }
@@ -481,5 +482,73 @@ fn a_binary_path_with_spaces_works_in_hooks_status_line_and_mcp_config() {
     assert_eq!(
         m["mcpServers"]["toknila"]["command"].as_str(),
         Some(rig.bin.to_str().expect("utf8"))
+    );
+}
+
+/// The permission mode in the command and the allow rules in the settings file of a worker run
+/// under `policy`.
+fn mode_and_allow(
+    policy: toknila_core::CommandPolicy,
+    remembered: &[&str],
+) -> (String, Vec<String>) {
+    let mut rig = Rig::new();
+    rig.brief.command_policy = policy;
+    rig.brief.allowed_commands = remembered.iter().map(|r| (*r).to_owned()).collect();
+    rig.brief.check_command = Some("make check".to_owned());
+    let w = rig.prepare(&AgentProfile::claude_code());
+    let at = w.command.iter().position(|a| a == "--permission-mode");
+    let mode = w.command[at.expect("flag") + 1].clone();
+    let (_, text) = rig.file("settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    let rules = |key: &str| -> Vec<String> {
+        v["permissions"][key]
+            .as_array()
+            .expect("rules")
+            .iter()
+            .map(|r| r.as_str().expect("rule").to_owned())
+            .collect()
+    };
+    assert_eq!(rules("deny"), DENIED_TOOLS, "denied in every mode");
+    (mode, rules("allow"))
+}
+
+#[test]
+fn the_commands_setting_of_the_project_picks_the_mode_and_the_allow_rules() {
+    use toknila_core::CommandPolicy::*;
+    let (mode, allow) = mode_and_allow(Ask, &["Bash(cargo test *)"]);
+    assert_eq!(mode, "acceptEdits");
+    assert!(
+        allow.contains(&"Bash(cargo test *)".to_owned()),
+        "{allow:?}"
+    );
+    assert!(allow.contains(&"Bash(make check *)".to_owned()));
+    assert!(!allow.contains(&"Bash".to_owned()));
+
+    let (mode, allow) = mode_and_allow(Auto, &[]);
+    assert_eq!(mode, "auto");
+    assert!(!allow.contains(&"Bash".to_owned()));
+
+    let (mode, allow) = mode_and_allow(Trust, &[]);
+    assert_eq!(mode, "acceptEdits");
+    for rule in ["Bash", "WebFetch", "WebSearch"] {
+        assert!(allow.contains(&rule.to_owned()), "{rule}: {allow:?}");
+    }
+}
+
+#[test]
+fn a_reviewer_keeps_dont_ask_whatever_the_projects_setting() {
+    let mut rig = Rig::new();
+    rig.brief.command_policy = toknila_core::CommandPolicy::Trust;
+    rig.brief.allowed_commands = vec!["Bash(rm *)".to_owned()];
+    let w = rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    assert!(
+        w.command
+            .windows(2)
+            .any(|p| p == ["--permission-mode", "dontAsk"])
+    );
+    let (_, text) = rig.file_of("reviewer", "settings.json");
+    assert!(
+        !text.contains("\"Bash\"") && !text.contains("Bash(rm *)"),
+        "{text}"
     );
 }

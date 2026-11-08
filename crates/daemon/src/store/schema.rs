@@ -246,4 +246,10 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE projects ADD COLUMN reviewer_model TEXT;
     ALTER TABLE projects ADD COLUMN planner_model TEXT;
     "#,
+    // 13: when a card agent wants to run a command (existing projects keep asking) and the rules
+    // a person remembered with "Allow always" (a JSON list).
+    r#"
+    ALTER TABLE projects ADD COLUMN command_policy TEXT NOT NULL DEFAULT 'ask';
+    ALTER TABLE projects ADD COLUMN allowed_commands TEXT NOT NULL DEFAULT '[]';
+    "#,
 ];

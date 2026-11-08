@@ -8,7 +8,7 @@ use super::codec::{Repo, enum_from, enum_str, parse};
 
 const PROJECT_COLS: &str = "id, key, name, repo_path, work_branch, release_branch, default_profile, \
      default_review_mode, max_parallel, default_reviewer, merge_mode, pr_title, merge_method, check_command, archived, \
-     worker_model, reviewer_model, planner_model";
+     worker_model, reviewer_model, planner_model, command_policy, allowed_commands";
 
 type RawProject = (
     String,
@@ -29,6 +29,8 @@ type RawProject = (
     Option<String>,
     Option<String>,
     Option<String>,
+    String,
+    String,
 );
 
 fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
@@ -51,6 +53,8 @@ fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
         r.get(15)?,
         r.get(16)?,
         r.get(17)?,
+        r.get(18)?,
+        r.get(19)?,
     ))
 }
 
@@ -74,6 +78,8 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         worker_model,
         reviewer_model,
         planner_model,
+        command_policy,
+        allowed_commands,
     ) = c;
     Ok(Project {
         id: parse(&id, "project id")?,
@@ -96,6 +102,9 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         worker_model,
         reviewer_model,
         planner_model,
+        command_policy: enum_from(&command_policy)?,
+        allowed_commands: serde_json::from_str(&allowed_commands)
+            .map_err(|e| StoreError::Corrupt(format!("bad allowed_commands: {e}")))?,
         archived,
     })
 }
@@ -104,7 +113,7 @@ impl Repo<'_> {
     pub fn insert_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)"
+                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)"
             ),
             params![
                 p.id.to_string(),
@@ -125,6 +134,8 @@ impl Repo<'_> {
                 p.worker_model,
                 p.reviewer_model,
                 p.planner_model,
+                enum_str(&p.command_policy)?,
+                serde_json::to_string(&p.allowed_commands)?,
             ],
         )?;
         Ok(())
@@ -136,7 +147,7 @@ impl Repo<'_> {
             "UPDATE projects SET name = ?2, repo_path = ?3, work_branch = ?4, release_branch = ?5, \
              default_profile = ?6, default_review_mode = ?7, max_parallel = ?8, default_reviewer = ?9, \
              merge_mode = ?10, pr_title = ?11, merge_method = ?12, check_command = ?13, archived = ?14, \
-             worker_model = ?15, reviewer_model = ?16, planner_model = ?17 \
+             worker_model = ?15, reviewer_model = ?16, planner_model = ?17, command_policy = ?18, allowed_commands = ?19 \
              WHERE id = ?1",
             params![
                 p.id.to_string(),
@@ -156,6 +167,8 @@ impl Repo<'_> {
                 p.worker_model,
                 p.reviewer_model,
                 p.planner_model,
+                enum_str(&p.command_policy)?,
+                serde_json::to_string(&p.allowed_commands)?,
             ],
         )?;
         Ok(())

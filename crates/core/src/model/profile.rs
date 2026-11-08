@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::CommandPolicy;
+
 /// What an agent profile is for.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -223,6 +225,31 @@ impl AgentProfile {
                     && !self.env.keys().any(|k| same(k, n))
             })
             .collect()
+    }
+
+    /// The profile as a card's worker runs it under a project's setting: the project's
+    /// [`CommandPolicy`] picks the permission mode of the command (auto mode replaces
+    /// `acceptEdits`) and adds its allow rules, and the rules a person remembered are allowed too.
+    /// Only a worker that runs Claude Code is changed; a reviewer or planner stays as it is (its
+    /// `dontAsk` is what keeps it read-only).
+    pub fn under_policy(&self, policy: CommandPolicy, remembered: &[String]) -> Self {
+        let mut out = self.clone();
+        if self.role != AgentRole::Worker || !self.runs_claude_code() {
+            return out;
+        }
+        let mut args = out.command.iter_mut().peekable();
+        while let Some(arg) = args.next() {
+            if arg == "--permission-mode"
+                && let Some(mode) = args.peek_mut()
+            {
+                **mode = policy.permission_mode(mode).to_owned();
+            }
+        }
+        out.permissions
+            .allow
+            .extend(policy.allow_rules().iter().map(|r| (*r).to_owned()));
+        out.permissions.allow.extend(remembered.iter().cloned());
+        out
     }
 
     /// A profile that runs `command`, with defaults everywhere else.

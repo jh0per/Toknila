@@ -1517,6 +1517,11 @@ export interface components {
             version: string;
         };
         /**
+         * @description When the agent of a card wants to run a command.
+         * @enum {string}
+         */
+        CommandPolicy: "ask" | "auto" | "trust";
+        /**
          * @description A permanent record in a ticket: an instruction from a person, an agent's report, or a decision.
          *     Everything said to an agent is stored here first and delivered after.
          */
@@ -1823,6 +1828,12 @@ export interface components {
         };
         /** @description Body of `POST /v1/tickets/{ticket}/runner/answer`: a person's answer to what an agent asks. */
         NewAnswer: {
+            /**
+             * @description With `allow` on a worker's Bash prompt: also remember a rule for the command in the
+             *     project ("Allow always"), so later runs and prompts of running agents it covers are allowed
+             *     without asking. Ignored for any other answer or tool.
+             */
+            always?: boolean;
             answer: components["schemas"]["AnswerKind"];
             role?: components["schemas"]["AgentRole"] | null;
             /** @description The text of a `text` answer; the optional comment of a `deny`. */
@@ -1870,6 +1881,7 @@ export interface components {
         NewProject: {
             /** @description The command that checks the work; an empty text names none. */
             check_command?: string | null;
+            command_policy?: components["schemas"]["CommandPolicy"] | null;
             default_profile?: string | null;
             default_review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile; unset means `<worker profile>-reviewer`. */
@@ -2016,10 +2028,16 @@ export interface components {
         /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
         PatchProject: {
             /**
+             * @description The commands remembered with "Allow always" (`Bash(cargo test *)`); the list replaces the
+             *     remembered ones, so a rule is removed by sending the list without it.
+             */
+            allowed_commands?: string[] | null;
+            /**
              * @description The command that checks the work (`cargo xtask verify`); agents are told to run it and may
              *     without asking. An empty text clears it.
              */
             check_command?: string | null;
+            command_policy?: components["schemas"]["CommandPolicy"] | null;
             /** @description Profile of cards that name none; a name from `GET /v1/profiles`. */
             default_profile?: string | null;
             /**
@@ -2199,6 +2217,11 @@ export interface components {
         };
         /** @description One product: one monorepo, its chains, depot and settings. */
         Project: {
+            /**
+             * @description Rules a person remembered with "Allow always" (`Bash(cargo test *)`): they go into every
+             *     later run's allow list, and a prompt one covers is answered without asking.
+             */
+            allowed_commands?: string[];
             /** @description Hidden from the sidebar; its data is kept and it can be brought back. */
             archived?: boolean;
             /**
@@ -2206,6 +2229,8 @@ export interface components {
              *     told to use it, and may run it without asking. `None`: the project names none.
              */
             check_command?: string | null;
+            /** @description When a card's agent wants to run a command. */
+            command_policy?: components["schemas"]["CommandPolicy"];
             default_profile: string;
             default_review_mode: components["schemas"]["ReviewMode"];
             /**

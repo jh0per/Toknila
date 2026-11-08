@@ -349,6 +349,8 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
         worker_model: None,
         reviewer_model: None,
         planner_model: None,
+        command_policy: Default::default(),
+        allowed_commands: Vec::new(),
         archived: false,
     };
     let chain = crate::Chain {

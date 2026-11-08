@@ -124,6 +124,9 @@ pub async fn ticket_activity(
         });
         let text = hook::permission_text(Some(message), summary.as_deref());
         let (fresh, _) = prompts.begin(t.id, role, text.clone(), detail.clone(), at, false);
+        if let Some(full) = fresh.then(|| prompts.last_tool(t.id, role)).flatten() {
+            prompts.note_dialog_tool(t.id, role, full);
+        }
         (fresh, (text, detail))
     });
     // Only the worker's signs of life count for the nudge and bring a waiting card back: a

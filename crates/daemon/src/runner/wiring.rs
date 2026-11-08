@@ -182,6 +182,8 @@ pub(super) fn prepare_with(
     cx: &Context<'_>,
     inherited: impl IntoIterator<Item = String>,
 ) -> Result<Wiring, RunnerError> {
+    // The project's setting for commands changes a worker's permission mode and allow rules.
+    let profile = &profile.under_policy(cx.brief.command_policy, &cx.brief.allowed_commands);
     // A planner run is labelled by its project's key; there is no card.
     let key = match cx.role {
         AgentRole::Planner => cx.key.project().to_string(),

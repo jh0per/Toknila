@@ -65,6 +65,8 @@ fn project_roundtrips() {
         worker_model: None,
         reviewer_model: None,
         planner_model: None,
+        command_policy: Default::default(),
+        allowed_commands: Vec::new(),
         archived: false,
     });
 }

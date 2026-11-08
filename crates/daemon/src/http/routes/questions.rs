@@ -8,9 +8,9 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
 use toknila_api_types::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
-use toknila_app::{AppError, agent, questions, resolve, runs};
+use toknila_app::{AppError, agent, projects, questions, resolve, runs};
 use toknila_core::agent::AgentEvent;
-use toknila_core::question::{self, Decision, Delivery, QuestionKind};
+use toknila_core::question::{self, AnswerKind, Decision, Delivery, QuestionKind};
 use toknila_core::{
     Actor, AgentRole, StatusReason, Ticket, TicketStatus, Timestamp, WaitingReason, hook,
 };
@@ -75,6 +75,15 @@ pub async fn runner_answer(
     if !kind.accepts(body.answer) {
         return Err(AppError::from(question::AnswerError::NotOffered(body.answer)).into());
     }
+    // "Allow always": the Bash call the dialog is about, taken before the answer clears it.
+    let remember = (body.always && body.answer == AnswerKind::Allow && role == AgentRole::Worker)
+        .then(|| {
+            let prompts = runners.prompts();
+            prompts
+                .dialog_tool(t.id, role)
+                .or_else(|| prompts.last_tool(t.id, role))
+        })
+        .flatten();
     let hook_waiting = runners.prompts().hook_waiting(t.id, role);
     match question::deliver(body.answer, body.text.as_deref(), hook_waiting)
         .map_err(AppError::from)?
@@ -97,6 +106,9 @@ pub async fn runner_answer(
     state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<()> {
+            if let Some(tool) = &remember {
+                projects::remember_command(tx, &t, tool)?;
+            }
             Ok(questions::answered(tx, &t, role, answer)?)
         })
         .await?;
@@ -134,15 +146,33 @@ pub async fn agent_permission(
     }
     let at = now();
     let prompts = state.runners.prompts();
-    let (summary, detail) =
-        ask.tool
-            .or_else(|| prompts.last_tool(t.id, role))
-            .map_or((None, None), |full| {
-                let (summary, detail) = hook::summary_and_detail(&full);
-                (Some(summary), detail)
-            });
+    let tool = ask.tool.or_else(|| prompts.last_tool(t.id, role));
+    // A command the person allowed always (the project remembers a rule for it) is not asked
+    // again, not even by an agent that started before the rule was made.
+    if role == AgentRole::Worker
+        && let Some(tool) = tool.clone()
+    {
+        let ticket = t.clone();
+        let covered = state
+            .store
+            .read(move |repo| Ok(projects::of_ticket(repo, &ticket).map(|p| p.allows_tool(&tool))))
+            .await??;
+        if covered {
+            return Ok(Json(PermissionReply {
+                decision: PermissionDecision::Allow,
+                message: None,
+            }));
+        }
+    }
+    let (summary, detail) = tool.clone().map_or((None, None), |full| {
+        let (summary, detail) = hook::summary_and_detail(&full);
+        (Some(summary), detail)
+    });
     let text = hook::permission_text(None, summary.as_deref());
     let (_, rx) = prompts.begin(t.id, role, text.clone(), detail.clone(), at, true);
+    if let Some(tool) = tool {
+        prompts.note_dialog_tool(t.id, role, tool);
+    }
     raise(&state, t.clone(), role, (text, detail), at).await?;
     let reply = match rx {
         Some(rx) => match tokio::time::timeout(state.runners.permission_wait(), rx).await {
