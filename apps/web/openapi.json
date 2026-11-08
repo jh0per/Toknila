@@ -2425,6 +2425,26 @@
         }
       }
     },
+    "/system/places": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Where the data home, the ships and the profiles folder are on this machine.",
+        "operationId": "system_places",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Places"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets": {
       "get": {
         "tags": [
@@ -5777,6 +5797,13 @@
           "key"
         ],
         "properties": {
+          "check_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command that checks the work; an empty text names none."
+          },
           "default_profile": {
             "type": [
               "string",
@@ -5812,6 +5839,17 @@
             "format": "int32",
             "description": "Most agents working at once; default 2.",
             "minimum": 0
+          },
+          "merge_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MergeMode",
+                "description": "Where accepted work lands; default `local`."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "type": [
@@ -6176,6 +6214,13 @@
         "type": "object",
         "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
         "properties": {
+          "agent_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Claude model of the project's card agents, reviewers and planner (`sonnet`, `opus`, a\nfull model name). An empty text clears it: the person's own Claude Code default."
+          },
           "check_command": {
             "type": [
               "string",
@@ -6399,6 +6444,29 @@
           "before",
           "after"
         ]
+      },
+      "Places": {
+        "type": "object",
+        "description": "`GET /v1/system/places`: where Toknila keeps what it makes on this machine.",
+        "required": [
+          "home",
+          "ships",
+          "profiles"
+        ],
+        "properties": {
+          "home": {
+            "type": "string",
+            "description": "The data home: the database, run logs and the agents' generated files."
+          },
+          "profiles": {
+            "type": "string",
+            "description": "Where profile files go."
+          },
+          "ships": {
+            "type": "string",
+            "description": "Where new ships (a card's git worktree) are made."
+          }
+        }
       },
       "PlanCard": {
         "type": "object",
@@ -6675,6 +6743,13 @@
           "merge"
         ],
         "properties": {
+          "agent_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Claude model of the project's card agents, reviewers and planner (`--model`: an alias\nsuch as `sonnet`, or a full model name). `None`: the person's own Claude Code default."
+          },
           "archived": {
             "type": "boolean",
             "description": "Hidden from the sidebar; its data is kept and it can be brought back."
@@ -7137,12 +7212,30 @@
             ],
             "description": "The base branch the repository suggests (where HEAD is, else the remote's default);\n`null` when it suggests none."
           },
+          "suggested_check_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The check command the repository suggests (`cargo xtask verify`, `npm test`, ...); `null`\nwhen it suggests none."
+          },
           "suggested_key": {
             "type": [
               "string",
               "null"
             ],
             "description": "The project key the folder suggests; `null` when its name leaves no valid key."
+          },
+          "suggested_merge_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MergeMode",
+                "description": "Where accepted work should land: `github` for a GitHub remote with a working `gh` login,\nelse `local`; `null` when the folder is not a usable repository."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "suggested_name": {
             "type": [

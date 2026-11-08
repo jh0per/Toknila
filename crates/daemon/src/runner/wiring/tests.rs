@@ -31,6 +31,7 @@ impl Rig {
                 prompt: "Wire the instructions.".to_owned(),
                 acceptance: vec!["It is wired".to_owned()],
                 check_command: None,
+                model: None,
                 project: None,
             },
         }
@@ -321,6 +322,36 @@ fn without_a_check_command_no_rule_names_one() {
     );
     let (_, instructions) = rig.file_of("reviewer", "instructions.md");
     assert!(!instructions.contains("## Checks"));
+}
+
+/// The value after `--model` in the flags and the command of a wiring, if any.
+fn model_of(w: &Wiring) -> Option<String> {
+    let all: Vec<&String> = w.command.iter().chain(&w.args).collect();
+    all.iter()
+        .position(|a| a.as_str() == "--model")
+        .map(|i| all[i + 1].clone())
+}
+
+#[test]
+fn the_project_model_is_passed_as_model_to_every_claude_code_role_and_nowhere_else() {
+    let mut rig = Rig::new();
+    rig.brief.model = Some("opus".to_owned());
+    let worker = rig.prepare_as(&AgentProfile::claude_code(), AgentRole::Worker);
+    assert_eq!(model_of(&worker).as_deref(), Some("opus"), "{worker:?}");
+    assert!(
+        worker.args.windows(2).any(|p| p == ["--model", "opus"]),
+        "one flag, one value: {:?}",
+        worker.args
+    );
+    let reviewer = rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    assert_eq!(model_of(&reviewer).as_deref(), Some("opus"));
+    // A profile of another program, and the simulated one, get no flag they do not know.
+    let other = AgentProfile::new("other", AgentRole::Worker, vec!["my-agent".to_owned()]);
+    assert_eq!(model_of(&rig.prepare(&other)), None);
+    assert_eq!(model_of(&rig.prepare(&AgentProfile::sim())), None);
+    // Control: without a project model nothing is added.
+    rig.brief.model = None;
+    assert_eq!(model_of(&rig.prepare(&AgentProfile::claude_code())), None);
 }
 
 #[test]

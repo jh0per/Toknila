@@ -3,9 +3,10 @@
 
 use toknila_api_types::{
     ChainDeletion, ChainDetail, DeleteProject, ImportPath, ImportPathResult, MoveInput, NewProject,
-    PatchProject, PlanScan, ProjectDeletion,
+    PatchProject, PlanScan, ProjectDeletion, RepoCheckRequest,
 };
 use toknila_core::Project;
+use toknila_core::repo::RepoCheck;
 
 use crate::{Client, ClientResult, NO_BODY, enc};
 
@@ -18,6 +19,20 @@ impl Client {
     /// `POST /projects`.
     pub fn create_project(&self, p: &NewProject) -> ClientResult<Project> {
         self.call("POST", "/projects", Some(p))
+    }
+
+    /// `POST /repos/check`: what a folder suggests for a project (key, name, base branch, check
+    /// command, merge mode) and what is wrong with it.
+    pub fn check_repo(
+        &self,
+        repo_path: &str,
+        work_branch: Option<&str>,
+    ) -> ClientResult<RepoCheck> {
+        let body = RepoCheckRequest {
+            repo_path: repo_path.to_owned(),
+            work_branch: work_branch.map(str::to_owned),
+        };
+        self.call("POST", "/repos/check", Some(&body))
     }
 
     /// `PATCH /projects/{project}`.

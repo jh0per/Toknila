@@ -62,6 +62,7 @@ fn project_roundtrips() {
         max_parallel: 2,
         merge: Default::default(),
         check_command: None,
+        agent_model: None,
         archived: false,
     });
 }

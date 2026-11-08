@@ -107,6 +107,7 @@ impl Rig {
             tools: Arc::new(toknila_daemon::tools::SystemTools),
             usage: Arc::new(toknila_daemon::usage::Usage::disabled()),
             home: tmp.path().to_owned(),
+            ships: tmp.path().join("ships"),
             trash: Arc::new(toknila_daemon::trash::NoTrash),
         });
         let rig = Rig {

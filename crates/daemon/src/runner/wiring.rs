@@ -243,6 +243,9 @@ pub(super) fn prepare_with(
         wiring.args.push(flag.to_owned());
         wiring.args.push(path.display().to_string());
     }
+    wiring
+        .args
+        .extend(profile.model_args(cx.brief.model.as_deref()));
     if let Some(flag) = profile.instructions_flag.as_deref() {
         let text = match cx.role {
             AgentRole::Planner => {

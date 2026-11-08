@@ -181,6 +181,34 @@ impl AgentProfile {
             .collect()
     }
 
+    /// Whether the command starts Claude Code (a program named `claude`, with or without a path
+    /// or `.exe`): only such a profile understands its `--model` flag.
+    pub fn runs_claude_code(&self) -> bool {
+        let Some(program) = self.command.first() else {
+            return false;
+        };
+        let name = program.rsplit(['/', '\\']).next().unwrap_or(program);
+        let name = name.strip_suffix(".exe").unwrap_or(name);
+        name.eq_ignore_ascii_case("claude")
+    }
+
+    /// The arguments that run the command on `model` (`--model <model>`, from the CLI reference
+    /// of Claude Code): none without a model, for a profile that does not run Claude Code, or
+    /// when the profile's own command already names one, which then stays the profile's choice.
+    pub fn model_args(&self, model: Option<&str>) -> Vec<String> {
+        let Some(model) = model.map(str::trim).filter(|m| !m.is_empty()) else {
+            return Vec::new();
+        };
+        let named = self
+            .command
+            .iter()
+            .any(|a| a == "--model" || a.starts_with("--model="));
+        if !self.runs_claude_code() || named {
+            return Vec::new();
+        }
+        vec!["--model".to_owned(), model.to_owned()]
+    }
+
     /// The inherited environment variables of the agent's own kind that must not reach it:
     /// `CLAUDECODE` and `CLAUDE_CODE_*` describe the session that started Toknila (a child-session
     /// marker, the entrypoint), not this run. A variable the profile's `env` sets is its choice and

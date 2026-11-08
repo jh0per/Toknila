@@ -11,6 +11,18 @@ pub struct RepoCheckRequest {
     pub work_branch: Option<String>,
 }
 
+/// `GET /v1/system/places`: where Toknila keeps what it makes on this machine.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Places {
+    /// The data home: the database, run logs and the agents' generated files.
+    pub home: String,
+    /// Where new ships (a card's git worktree) are made.
+    pub ships: String,
+    /// Where profile files go.
+    pub profiles: String,
+}
+
 /// `GET /v1/system/cli` and `POST /v1/system/cli/install`: the version of Toknila, the `tok`
 /// command that ships next to the daemon and whether it is linked into `~/.local/bin`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

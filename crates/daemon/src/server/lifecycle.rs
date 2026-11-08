@@ -84,6 +84,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         tools: Arc::new(crate::tools::SystemTools),
         usage,
         home: paths.home.clone(),
+        ships: paths.ships(),
         trash: crate::trash::trasher_for(std::env::var_os(crate::trash::TRASH_DIR_ENV)),
     };
 

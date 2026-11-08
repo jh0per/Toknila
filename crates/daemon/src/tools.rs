@@ -7,6 +7,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+use toknila_core::defaults::RepoTraits;
 use toknila_core::repo::{self, GitState, PathKind, RepoCheck, RepoFacts};
 use toknila_core::system::{self, Probe, SystemChecks};
 
@@ -104,6 +105,7 @@ fn facts(tools: &dyn Tools, path: &str) -> RepoFacts {
         return RepoFacts {
             path: kind,
             git: GitState::NotARepo,
+            traits: RepoTraits::default(),
         };
     }
     let inside = git(tools, path, &["rev-parse", "--is-inside-work-tree"]);
@@ -143,7 +145,15 @@ fn facts(tools: &dyn Tools, path: &str) -> RepoFacts {
         }
         _ => GitState::NotARepo,
     };
-    RepoFacts { path: kind, git }
+    let traits = match git {
+        GitState::Repo { .. } => traits::gather(tools, path),
+        _ => RepoTraits::default(),
+    };
+    RepoFacts {
+        path: kind,
+        git,
+        traits,
+    }
 }
 
 /// The base branch of a project in `path` when none was named: see `repo::default_base`.
@@ -165,6 +175,7 @@ pub fn check_repo(tools: &dyn Tools, path: &str, base: &str) -> RepoCheck {
         RepoFacts {
             path: PathKind::Missing,
             git: GitState::NotARepo,
+            traits: RepoTraits::default(),
         }
     } else {
         facts(tools, path)
@@ -189,6 +200,8 @@ pub fn system_checks(tools: &dyn Tools) -> SystemChecks {
     });
     SystemChecks::new(vec![git, claude, gh])
 }
+
+mod traits;
 
 #[cfg(test)]
 mod tests;

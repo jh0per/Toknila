@@ -2,7 +2,7 @@
 // every refusal comes from the daemon and is handed to the reducer as it is.
 
 import { Refusal, get, patch, post } from "../api/http";
-import type { ChainDetail, CliLink, ProfileList, Project, RepoCheck, SystemChecks } from "../api/types";
+import type { ChainDetail, CliLink, Places, ProfileList, Project, RepoCheck, SystemChecks } from "../api/types";
 import type { Msg } from "./msg";
 import type { SettingsEffect } from "./settings";
 
@@ -15,7 +15,7 @@ const reject = (dispatch: Dispatch, e: unknown, fallback?: string) => {
 };
 
 async function addProject(e: Extract<SettingsEffect, { type: "addProject" }>, dispatch: Dispatch) {
-  const { key, name, repo_path, work_branch } = e.draft;
+  const { key, name, repo_path, work_branch, check_command, merge_mode } = e.draft;
   const check = await post<RepoCheck>("/repos/check", { repo_path, work_branch });
   if (check.problems.length) {
     dispatch({ type: "addRejected", problems: check.problems, branches: check.branches });
@@ -23,6 +23,7 @@ async function addProject(e: Extract<SettingsEffect, { type: "addProject" }>, di
   }
   const project = await post<Project>("/projects", {
     key, name: name || undefined, repo_path, work_branch: work_branch || undefined,
+    check_command: check_command || undefined, merge_mode,
   });
   dispatch({ type: "projectAdded", project });
 }
@@ -53,8 +54,13 @@ export function runSettingsEffect(e: SettingsEffect, dispatch: Dispatch): void {
       return;
     case "loadProfiles":
       get<ProfileList>("/profiles")
-        .then((l) => dispatch({ type: "profilesLoaded", profiles: l.profiles }))
+        .then((l) => dispatch({ type: "profilesLoaded", profiles: l.profiles, folder: l.folder }))
         .catch((err) => reject(dispatch, err));
+      return;
+    case "loadPlaces":
+      get<Places>("/system/places")
+        .then((places) => dispatch({ type: "placesLoaded", places }))
+        .catch(() => undefined);
       return;
     case "addProject":
       // A refusal of the create itself (key in use, malformed key) is about the key.

@@ -160,6 +160,7 @@ mod tests {
             max_parallel: 2,
             merge: crate::MergeSettings::default(),
             check_command: None,
+            agent_model: None,
             archived: false,
         };
         assert!(matches!(ensure_can_run(&p), Err(Refusal::NoRepository(_))));

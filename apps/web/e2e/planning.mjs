@@ -165,6 +165,8 @@ try {
   await row("TOKNILA").click({ button: "right" });
   await t("menu-project-settings").click();
   await expectPath("/projects/TOKNILA/settings", "the menu opens the project's settings");
+  await t("settings-nav-danger").click();
+  await expectPath("/projects/TOKNILA/settings/danger", "the danger zone has its own address");
   await t("archive-project-button").click();
   await gone(row("TOKNILA"), "a project archived in Settings leaves the sidebar");
   await expectText(t("show-archived"), "Show archived (2)", "the sidebar offers the archived projects");

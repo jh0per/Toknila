@@ -29,6 +29,14 @@ pub enum ProjectCmd {
         /// Agent profile tickets run with unless they name one (default: sim).
         #[arg(long)]
         profile: Option<String>,
+        /// The command that checks the work (default: detected from the repository, e.g.
+        /// `cargo xtask verify`, `npm test`; an empty text names none).
+        #[arg(long)]
+        check_command: Option<String>,
+        /// Where accepted work lands: `local` or `github` (default: `github` when the repository
+        /// has a GitHub remote and `gh auth status` succeeds, else `local`).
+        #[arg(long)]
+        merge: Option<String>,
     },
     /// Change a project's settings.
     Set {
@@ -50,6 +58,11 @@ pub enum ProjectCmd {
         /// and may without asking. An empty text clears it.
         #[arg(long)]
         check_command: Option<String>,
+        /// The Claude model of the project's card agents, reviewers and planner (`sonnet`, `opus`,
+        /// `haiku`, or a full model name); passed as `--model` to profiles that run Claude Code.
+        /// An empty text goes back to your Claude Code default.
+        #[arg(long)]
+        model: Option<String>,
     },
     /// List projects.
     Ls,
@@ -74,16 +87,52 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             repo,
             base,
             profile,
+            check_command,
+            merge,
         } => {
+            let mut merge_mode = merge
+                .as_deref()
+                .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge mode {m}")))
+                .transpose()?;
+            let mut check_command = check_command;
+            // What the repository suggests fills in what was not given; the check failing is
+            // not an error here, the creation below says what is wrong with the folder.
+            let mut detected = Vec::new();
+            if let Some(path) = repo.as_deref()
+                && (check_command.is_none() || merge_mode.is_none())
+                && let Ok(found) = c.check_repo(path, base.as_deref())
+            {
+                if check_command.is_none()
+                    && let Some(cmd) = found.suggested_check_command
+                {
+                    detected.push(format!("check command: {cmd} (detected)"));
+                    check_command = Some(cmd);
+                }
+                if merge_mode.is_none() {
+                    merge_mode = found.suggested_merge_mode;
+                    if merge_mode == Some(toknila_core::MergeMode::Github) {
+                        detected.push(
+                            "merge: github (detected: GitHub remote, gh logged in)".to_owned(),
+                        );
+                    }
+                }
+            }
             let p = c.create_project(&NewProject {
                 key: key.to_uppercase(),
                 name: Some(name.unwrap_or(key)),
                 repo_path: repo,
                 work_branch: base,
                 default_profile: profile,
+                check_command,
+                merge_mode,
                 ..NewProject::default()
             })?;
-            emit(json_out, &p, |p| println!("project {} created", p.key));
+            emit(json_out, &p, |p| {
+                println!("project {} created", p.key);
+                for line in &detected {
+                    println!("{line}");
+                }
+            });
         }
         ProjectCmd::Set {
             key,
@@ -92,6 +141,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             pr_title,
             merge_method,
             check_command,
+            model,
         } => {
             let patch = PatchProject {
                 max_parallel: parallel,
@@ -105,6 +155,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge method {m}")))
                     .transpose()?,
                 check_command,
+                agent_model: model,
                 ..PatchProject::default()
             };
             let p = c.patch_project(&key, &patch)?;
@@ -119,6 +170,9 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 );
                 if let Some(c) = &p.check_command {
                     println!("check command: {c}");
+                }
+                if let Some(m) = &p.agent_model {
+                    println!("agent model: {m}");
                 }
             });
         }

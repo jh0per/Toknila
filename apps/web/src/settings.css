@@ -19,3 +19,21 @@
 .row { display: flex; align-items: center; gap: var(--s3); }
 .saved { color: var(--done); font-size: var(--fs-s); }
 .card-block .hint { margin: 0; color: var(--block); font-size: var(--fs-s); }
+
+/* The settings screen: a section list on the left, the section on the right. */
+.settings-screen { display: flex; gap: var(--s4); align-items: flex-start; width: 100%; }
+.settings-nav { flex: 0 0 180px; display: flex; flex-direction: column; gap: var(--s2); position: sticky; top: 0; }
+.settings-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.settings-nav h3 { margin: var(--s3) 0 0; padding: 0 var(--s2); font-size: var(--fs-s); font-weight: 600; color: var(--muted); }
+.settings-nav .item { display: block; padding: 5px var(--s2); border-radius: var(--r-s); color: var(--fg); text-decoration: none; }
+.settings-nav .item.sel { background: var(--surface); font-weight: 600; }
+.settings-body { max-width: 640px; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--s3); }
+.settings-body h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.danger-title { margin: 0; font-size: var(--fs-l); font-weight: 600; color: var(--danger); }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 2px var(--s3); margin: 0; width: 100%; font-size: var(--fs-s); }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--s1); }
+.profiles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); width: 100%; }
+.profiles li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); }
+.profiles .cmd { flex-basis: 100%; color: var(--muted); font-size: var(--fs-s); overflow-wrap: anywhere; }

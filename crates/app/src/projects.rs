@@ -24,6 +24,10 @@ pub struct NewProject {
     pub default_reviewer: Option<String>,
     /// Most agents working at once; default 2.
     pub max_parallel: Option<u32>,
+    /// The command that checks the work; an empty text names none.
+    pub check_command: Option<String>,
+    /// Where accepted work lands; default `local`.
+    pub merge_mode: Option<MergeMode>,
 }
 
 /// `PATCH /v1/projects/{project}`: the settings to change; unset fields stay.
@@ -49,6 +53,9 @@ pub struct PatchProject {
     /// The command that checks the work (`cargo xtask verify`); agents are told to run it and may
     /// without asking. An empty text clears it.
     pub check_command: Option<String>,
+    /// The Claude model of the project's card agents, reviewers and planner (`sonnet`, `opus`, a
+    /// full model name). An empty text clears it: the person's own Claude Code default.
+    pub agent_model: Option<String>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -57,6 +64,16 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
         .key
         .parse()
         .map_err(|e: toknila_core::KeyError| AppError::bad_request(e.to_string()))?;
+    if draft.merge_mode == Some(MergeMode::Github)
+        && draft
+            .repo_path
+            .as_deref()
+            .is_none_or(|r| r.trim().is_empty())
+    {
+        return Err(AppError::bad_request(
+            "pull-request mode needs the project's repository (a project without one has no ships to push)",
+        ));
+    }
     let p = Project {
         id: ProjectId::new(),
         name: draft.name.unwrap_or_else(|| draft.key.clone()),
@@ -77,8 +94,15 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             .max_parallel
             .map_or(Ok(schedule::DEFAULT_LIMIT), schedule::check_limit)
             .map_err(|e| AppError::bad_request(e.to_string()))?,
-        merge: Default::default(),
-        check_command: None,
+        merge: toknila_core::MergeSettings {
+            mode: draft.merge_mode.unwrap_or_default(),
+            ..Default::default()
+        },
+        check_command: match draft.check_command {
+            Some(c) => Project::clean_check_command(&c).map_err(AppError::bad_request)?,
+            None => None,
+        },
+        agent_model: None,
         archived: false,
     };
     uow.insert_project(&p)?;
@@ -116,6 +140,9 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     }
     if let Some(c) = patch.check_command {
         p.check_command = Project::clean_check_command(&c).map_err(AppError::bad_request)?;
+    }
+    if let Some(m) = patch.agent_model {
+        p.agent_model = Project::clean_agent_model(&m).map_err(AppError::bad_request)?;
     }
     if let Some(m) = patch.merge_mode {
         if m == MergeMode::Github && p.repo_path.as_deref().is_none_or(|r| r.trim().is_empty()) {

@@ -1,4 +1,5 @@
 import type { ChangeEvent, ReactNode } from "react";
+import type { MergeMode } from "../api/types";
 import type { DraftField } from "../store/addForm";
 import type { Intent } from "../store/msg";
 import { fieldError, formError } from "../store/settings";
@@ -68,6 +69,25 @@ export function AddProject({ state, dispatch, focus = false }: {
       <Field label="Name" name="name" error={fieldError(s, "name")}>
         <input data-testid="project-name" value={d.name} placeholder="the folder's name" onChange={edit("name")} />
       </Field>
+      <Field label="Check command (agents run it before they hand in)" name="check_command" error={fieldError(s, "check_command")}>
+        <input
+          data-testid="new-check-command" value={d.check_command} spellCheck={false}
+          placeholder="none found in the repository" onChange={edit("check_command")}
+        />
+      </Field>
+      <Field label="Accepted work lands" name="merge_mode" error={fieldError(s, "merge_mode")}>
+        <select
+          data-testid="new-merge-mode" value={d.merge_mode}
+          onChange={(e) => dispatch({ type: "editDraft", field: "merge_mode", value: e.target.value as MergeMode })}
+        >
+          <option value="local">local (merge into the base branch)</option>
+          <option value="github">github (open a pull request)</option>
+        </select>
+      </Field>
+      <p className="muted" data-testid="add-defaults-note">
+        Prefilled from the repository: its test command, and a pull request when it has a GitHub remote and <code>gh</code> is
+        logged in. Change them here or later in the project's settings.
+      </p>
       {formError(s) && <p className="error" role="alert">{formError(s)}</p>}
       <button className="btn primary" type="submit" disabled={s.busy} data-testid="add-project-submit">Add project</button>
     </form>

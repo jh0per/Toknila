@@ -758,6 +758,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where the data home, the ships and the profiles folder are on this machine. */
+        get: operations["system_places"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets": {
         parameters: {
             query?: never;
@@ -1840,6 +1857,8 @@ export interface components {
         };
         /** @description `POST /v1/projects`: a new project; unset fields take the project defaults. */
         NewProject: {
+            /** @description The command that checks the work; an empty text names none. */
+            check_command?: string | null;
             default_profile?: string | null;
             default_review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile; unset means `<worker profile>-reviewer`. */
@@ -1851,6 +1870,7 @@ export interface components {
              * @description Most agents working at once; default 2.
              */
             max_parallel?: number | null;
+            merge_mode?: components["schemas"]["MergeMode"] | null;
             name?: string | null;
             release_branch?: string | null;
             repo_path?: string | null;
@@ -1980,6 +2000,11 @@ export interface components {
         /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
         PatchProject: {
             /**
+             * @description The Claude model of the project's card agents, reviewers and planner (`sonnet`, `opus`, a
+             *     full model name). An empty text clears it: the person's own Claude Code default.
+             */
+            agent_model?: string | null;
+            /**
              * @description The command that checks the work (`cargo xtask verify`); agents are told to run it and may
              *     without asking. An empty text clears it.
              */
@@ -2065,6 +2090,15 @@ export interface components {
          * @enum {string}
          */
         Place: "before" | "after";
+        /** @description `GET /v1/system/places`: where Toknila keeps what it makes on this machine. */
+        Places: {
+            /** @description The data home: the database, run logs and the agents' generated files. */
+            home: string;
+            /** @description Where profile files go. */
+            profiles: string;
+            /** @description Where new ships (a card's git worktree) are made. */
+            ships: string;
+        };
         /** @description A card with its place in the plan. */
         PlanCard: {
             /** @description What it waits for: card keys and `release <version>` labels. */
@@ -2145,6 +2179,11 @@ export interface components {
         };
         /** @description One product: one monorepo, its chains, depot and settings. */
         Project: {
+            /**
+             * @description The Claude model of the project's card agents, reviewers and planner (`--model`: an alias
+             *     such as `sonnet`, or a full model name). `None`: the person's own Claude Code default.
+             */
+            agent_model?: string | null;
             /** @description Hidden from the sidebar; its data is kept and it can be brought back. */
             archived?: boolean;
             /**
@@ -2327,8 +2366,14 @@ export interface components {
              *     `null` when it suggests none.
              */
             suggested_branch?: string | null;
+            /**
+             * @description The check command the repository suggests (`cargo xtask verify`, `npm test`, ...); `null`
+             *     when it suggests none.
+             */
+            suggested_check_command?: string | null;
             /** @description The project key the folder suggests; `null` when its name leaves no valid key. */
             suggested_key?: string | null;
+            suggested_merge_mode?: components["schemas"]["MergeMode"] | null;
             /** @description The project name the folder suggests: its base name. */
             suggested_name?: string | null;
         };
@@ -4576,6 +4621,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CliLink"];
+                };
+            };
+        };
+    };
+    system_places: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Places"];
                 };
             };
         };

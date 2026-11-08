@@ -27,7 +27,7 @@ pub use planner::{PlannerState, StartPlanner};
 pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedChain};
 pub use questions::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
 pub use removal::{ChainDeletion, DeleteProject, ProjectDeletion};
-pub use system::{CliLink, RepoCheckRequest};
+pub use system::{CliLink, Places, RepoCheckRequest};
 pub use toknila_app::chains::{ChainSettings, NewChain};
 pub use toknila_app::planner::{
     CardEdit, NewCard, NewPlanChain, PlanCard, PlanChain, PlanThread, PlanView, SubtaskEdit,
