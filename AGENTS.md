@@ -43,13 +43,27 @@ before moving code between crates. Summary of what holds today:
 ## Commands
 
 ```sh
-cargo xtask verify   # the one gate: fmt --check, clippy -D warnings, tests, guards
+cargo xtask verify   # the one Rust gate: fmt --check, clippy -D warnings, tests, guards
+cargo xtask web      # the web gate: lint, unit tests, build (apps/web)
+cargo xtask e2e-web  # the browser gate: the daemon with the web build, Playwright scripts
 cargo xtask guards   # architecture guards only
 cargo fmt --all      # fix formatting
 ```
 
 CI runs `cargo xtask verify` on Ubuntu, Windows and macOS. Do not copy its steps into CI or
 scripts; add new checks to `xtask` so local and CI cannot drift.
+
+Running the gates on a developer Mac:
+
+- `cargo xtask e2e-web` uses the browser that is already installed: set
+  `PW_CHROMIUM="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`. Never run
+  `playwright install`; nothing is downloaded for a gate.
+- When `apps/web/node_modules` is missing, run `npm ci --no-audit --no-fund` in `apps/web` first.
+  Do not link or copy `node_modules` from another checkout.
+- macOS has no `timeout` command; do not wrap commands in it.
+- Run one gate at a time: other agents build and test on the same machine. Stop only processes
+  you started, by pid; never `pkill -f` or `killall` (that has killed other agents).
+- A test that starts a `tok daemon` stops it before it ends, and leaves no process behind.
 
 ## Working on a ticket
 
@@ -59,7 +73,16 @@ scripts; add new checks to `xtask` so local and CI cannot drift.
 3. Keep the change to the ticket. Note follow-ups instead of doing them.
 4. Cross-platform from the first line: paths via `std::path`/`dirs`, no shell-only assumptions,
    no hard-coded `/tmp`, line endings normalised by `.gitattributes`.
-5. One ticket, one branch, one PR, title `P0-XX: <title>`, body from the PR template.
+5. One ticket, one branch. Commit on it; a pull request only when the project merges by pull
+   request. The hand-in (the `finished` summary, or the PR body) follows the comment template
+   below. Never hand in with uncommitted changes, and do not keep editing after handing in.
+6. Change files with the Edit and Write tools, not shell edits (python, sed, perl, heredocs):
+   tool edits are approved without asking, shell edits are refused.
+7. A new dependency is declared once in the workspace `Cargo.toml` under
+   `[workspace.dependencies]` and used with `workspace = true`; `cargo add` into a crate is not
+   enough. Ask before adding one.
+8. When you need a decision (which option, may I install something), ask the person through the
+   question tool you were given (`ask_human` under Toknila); a note or a report is never answered.
 
 ## Rust conventions
 
@@ -103,9 +126,12 @@ Omit empty fields.
 
 ## Checklist before saying done
 
-- [ ] `cargo xtask verify` passes locally on the committed tree.
+- [ ] `cargo xtask verify` passes locally on the committed tree; `cargo xtask web` and
+      `cargo xtask e2e-web` too when `apps/web` changed.
 - [ ] Every acceptance criterion of the ticket has a test or a stated manual check.
 - [ ] New gates were seen failing once.
 - [ ] No business rule outside `crates/core`; core has no I/O dependency.
 - [ ] Nothing platform-specific without a Windows path.
-- [ ] PR body lists checks as PASS / FAIL / NOT_RUN / BLOCKED.
+- [ ] The hand-in lists checks as PASS / FAIL / NOT_RUN / BLOCKED with one line of evidence each,
+      and names what is not covered.
+- [ ] Nothing of yours is still running (test daemons, servers), nothing is left uncommitted.

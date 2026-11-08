@@ -115,7 +115,8 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         ),
         _ => format!(
             "Start ticket {key} now. Read your Toknila instructions, work the card, commit your \
-             work on this branch, then call `finished`.{checks}",
+             work on this branch, then call `finished` and stop. Ask with `ask_human` when you \
+             need a decision.{checks}",
             key = brief.key
         ),
     }
