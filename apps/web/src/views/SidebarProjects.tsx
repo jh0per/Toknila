@@ -5,7 +5,8 @@ import { planError } from "../store/plan";
 import { type State, activeProjects, archivedProjects, currentProject } from "../store/state";
 import { ContextMenu } from "./ContextMenu";
 import { NavLink } from "./Link";
-import { projectMenu } from "./projectMenu";
+import { menuGroups } from "./menuGroups";
+import { byGroup, projectMenu } from "./projectMenu";
 
 type Menu = { x: number; y: number; project: Project | undefined };
 
@@ -69,9 +70,9 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
       {menu && (
         <ContextMenu
           x={menu.x} y={menu.y} onClose={close}
-          entries={projectMenu(menu.project).map((m) => ({
+          entries={menuGroups(...byGroup(projectMenu(menu.project)).map((g) => g.map((m) => ({
             label: m.label, testId: m.testId, danger: m.danger, run: () => dispatch(m.intent),
-          }))}
+          }))))}
         />
       )}
     </section>

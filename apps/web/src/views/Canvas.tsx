@@ -1,34 +1,36 @@
-import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { ChainDetail, TicketAction } from "../api/types";
 import { type LaidEdge, layoutChain, nodeKey } from "../layout";
-import { outOfOrderText } from "../format";
-import { statusGroup, statusText } from "../store/groups";
 import { type EdgeRef, idOf } from "../store/edges";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
 import { ContextMenu, type MenuEntry } from "./ContextMenu";
 import { EdgeLayer } from "./EdgeLayer";
-import { PrChip } from "./PrChip";
 import { QuickCard } from "./QuickCard";
-import { UsageChip } from "./UsageChip";
-import { H, type Pt, W, canvasSize, inPoint, outPoint, x, y } from "./canvasGeometry";
+import { H, type Pt, W, canvasSize, edgeGeometry, edgeId, outPoint, x, y } from "./canvasGeometry";
 import { CancelConfirm } from "./CancelConfirm";
-import { canvasEntries, cardEntries } from "./canvasMenus";
+import { CanvasChrome } from "./CanvasChrome";
+import { ReleaseNode, TicketNode } from "./CanvasNodes";
+import { ReasonAsk } from "./ReasonAsk";
+import { canvasEntries, cardEntries, edgeMenu } from "./canvasMenus";
 import { useCanvasKeys } from "./useCanvasKeys";
 import { type Drag, useEdgeDrag } from "./useEdgeDrag";
+import { useFit } from "./useFit";
 
 type Menu =
   | { kind: "edge"; x: number; y: number; edge: LaidEdge }
   | { kind: "canvas"; x: number; y: number; at: Pt }
   | { kind: "card"; x: number; y: number; key: string; at: Pt }
-  | { kind: "cancel"; x: number; y: number; key: string };
+  | { kind: "cancel"; x: number; y: number; key: string }
+  | { kind: "ask"; x: number; y: number; key: string; action: "reject" | "return" };
 
 /// The chain canvas: cards left to right in dependency order, releases as their own nodes. The
 /// dependencies can be edited with the mouse: drag from a card's handle onto another card to add
 /// one, click a line to select it, drag a selected line's end onto another card to move it,
 /// Delete or the right-click menu to remove it. A connector released on empty canvas, a
 /// double-click, N and the right-click menus make cards without the dialog. The daemon decides;
-/// its refusal shows on top.
+/// its refusal shows on top. The open card's lines are drawn strong and the others fade; Fit zooms
+/// the whole diagram into view.
 export function Canvas({ chain, state, dispatch }: {
   chain: ChainDetail;
   state: State;
@@ -36,8 +38,10 @@ export function Canvas({ chain, state, dispatch }: {
 }) {
   const layout = layoutChain(chain);
   const chainId = chain.chain.id;
-  const projectKey = currentProject(state)?.key ?? chain.chain.project_id;
+  const project = currentProject(state);
+  const projectKey = project?.key ?? chain.chain.project_id;
   const at = new Map(layout.nodes.map((n) => [nodeKey(n), n]));
+  const geo = edgeGeometry(layout.edges, at);
   const tickets = new Map(chain.tickets.map((t) => [t.id, t]));
   const releases = new Map(chain.releases.map((r) => [r.id, r]));
   const label = (k: string) => {
@@ -51,24 +55,30 @@ export function Canvas({ chain, state, dispatch }: {
   const select = (e: LaidEdge | undefined) =>
     dispatch({ type: "selectEdge", edge: e && { chain: chainId, from: e.from, to: e.to } satisfies EdgeRef });
   const [menu, setMenu] = useState<Menu>();
+  // "Add dependency": the node key of the card that waits, until the card it waits for is clicked.
+  const [linking, setLinking] = useState<string>();
+  const [hover, setHover] = useState<string>();
   const inner = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  const { width, height } = canvasSize(layout.columns, layout.lanes);
+  const fit = useFit(root, width, height);
   const local = (clientX: number, clientY: number): Pt => {
     const r = inner.current?.getBoundingClientRect();
-    return { x: clientX - (r?.left ?? 0), y: clientY - (r?.top ?? 0) };
+    return { x: (clientX - (r?.left ?? 0)) / fit.zoom, y: (clientY - (r?.top ?? 0)) / fit.zoom };
   };
-  const keyOf = (k: string) => label(k);
   const newCardAt = (at: Pt, rel: { after?: string; before?: string } = {}) =>
     dispatch({ type: "openQuickCard", chain: chainId, x: at.x, y: at.y, ...rel });
   const quick = state.quick.card?.chain === chainId ? state.quick.card : undefined;
-  const quickLabel = quick?.after ? `New card after ${quick.after}` : quick?.before ? `New card before ${quick.before}` : "New card";
+  const quickLabel = quick?.after
+    ? `New card that waits for ${quick.after}`
+    : quick?.before ? `New card that ${quick.before} waits for` : "New card";
   useCanvasKeys(state, dispatch, () =>
-    newCardAt({ x: (root.current?.scrollLeft ?? 0) + 24, y: (root.current?.scrollTop ?? 0) + 48 }));
+    newCardAt({ x: (root.current?.scrollLeft ?? 0) / fit.zoom + 24, y: (root.current?.scrollTop ?? 0) / fit.zoom + 48 }));
 
   const drop = (d: Drag, target: string | undefined, at: Pt) => {
     if (!target) {
       // Released on empty canvas: a new card after the card the line came from.
-      if (d.mode === "new") newCardAt(at, { after: keyOf(d.node) });
+      if (d.mode === "new") newCardAt(at, { after: label(d.node) });
       return;
     }
     if (d.mode === "new") {
@@ -79,18 +89,20 @@ export function Canvas({ chain, state, dispatch }: {
     const kind = chain.edges.find((e) => nodeKey(e.from) === d.edge.from && nodeKey(e.to) === d.edge.to)?.kind ?? "normal";
     dispatch({ type: "moveEdge", chain: chainId, from: d.edge.from, to: d.edge.to, kind, end: d.end, target });
   };
-  const { drag, start } = useEdgeDrag(inner, drop);
+  const { drag, start } = useEdgeDrag(inner, drop, fit.zoom);
 
-  // Delete or Backspace removes the selected line, Escape lets go of it; typing in a field is left alone.
+  // Delete or Backspace removes the selected line, Escape lets go of it (or of "Add dependency");
+  // typing in a field or in a menu is left alone.
   useEffect(() => {
-    if (!selected) return;
+    if (!selected && !linking) return;
     const key = (ev: KeyboardEvent) => {
       const t = ev.target as HTMLElement | null;
-      if (t?.closest("input, textarea, select, [contenteditable=true], [role=dialog]")) return;
-      if (ev.key === "Delete" || ev.key === "Backspace") {
+      if (t?.closest("input, textarea, select, [contenteditable=true], [role=dialog], .ctx-menu")) return;
+      if (selected && (ev.key === "Delete" || ev.key === "Backspace")) {
         ev.preventDefault();
         dispatch({ type: "removeEdge", chain: chainId, from: selected.from, to: selected.to });
       } else if (ev.key === "Escape") {
+        setLinking(undefined);
         select(undefined);
       }
     };
@@ -98,164 +110,179 @@ export function Canvas({ chain, state, dispatch }: {
     return () => window.removeEventListener("keydown", key);
   });
 
-  const act = (key: string, action: TicketAction) => dispatch({ type: "ticketAction", key, action });
-  const entriesOf = (m: Menu): MenuEntry[] => {
+  const act = (key: string, action: TicketAction, text?: string) => dispatch({ type: "ticketAction", key, action, text });
+  const openCard = (key: string) => dispatch({ type: "selectCard", project: projectKey, chain: chain.chain.name, key });
+  const entriesOf = (m: Menu): { entries: MenuEntry[]; title?: string } => {
     switch (m.kind) {
       case "edge":
-        return [{
-          label: "Remove dependency", testId: "menu-remove-edge", danger: true,
-          run: () => dispatch({ type: "removeEdge", chain: chainId, from: m.edge.from, to: m.edge.to }),
-        }];
+        return edgeMenu(label(m.edge.from), label(m.edge.to), () =>
+          dispatch({ type: "removeEdge", chain: chainId, from: m.edge.from, to: m.edge.to }));
       case "canvas":
-        return canvasEntries({
-          newCard: () => newCardAt(m.at),
-          newChain: () => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: projectKey } }),
-          importPlan: () => dispatch({ type: "openDialog", dialog: { kind: "import", project: projectKey } }),
-          askPlanner: () => dispatch({ type: "navigate", route: { name: "planner", project: projectKey } }),
-        });
+        return {
+          entries: canvasEntries({
+            newCard: () => newCardAt(m.at),
+            newChain: () => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: projectKey } }),
+            importPlan: () => dispatch({ type: "openDialog", dialog: { kind: "import", project: projectKey } }),
+            askPlanner: () => dispatch({ type: "navigate", route: { name: "planner", project: projectKey } }),
+          }),
+        };
       case "card": {
         // Entries that depend on the card's state wait for the daemon's fresh word on it.
         const fresh = state.quick.peek?.key === m.key && state.quick.peek.fresh;
-        return cardEntries(fresh ? state.details[m.key] : undefined, {
-          open: () => dispatch({ type: "selectCard", project: projectKey, chain: chain.chain.name, key: m.key }),
-          act: (a) => act(m.key, a),
-          addAfter: () => newCardAt(m.at, { after: m.key }),
-          addBefore: () => newCardAt(m.at, { before: m.key }),
-          askCancel: () => setMenu({ kind: "cancel", x: m.x, y: m.y, key: m.key }),
-        });
+        const ticket = chain.tickets.find((t) => t.key === m.key);
+        return {
+          title: m.key,
+          entries: cardEntries(fresh ? state.details[m.key] : undefined, {
+            open: () => openCard(m.key),
+            openTerminal: () => {
+              openCard(m.key);
+              dispatch({ type: "selectTab", tab: "terminal" });
+            },
+            edit: () => {
+              openCard(m.key);
+              dispatch({ type: "editCard", key: m.key });
+            },
+            act: (a) => act(m.key, a),
+            ask: (action) => setMenu({ kind: "ask", x: m.x, y: m.y, key: m.key, action }),
+            addAfter: () => newCardAt(m.at, { after: m.key }),
+            addBefore: () => newCardAt(m.at, { before: m.key }),
+            addDependency: () => ticket && setLinking(nodeKey({ kind: "ticket", id: ticket.id })),
+            askCancel: () => setMenu({ kind: "cancel", x: m.x, y: m.y, key: m.key }),
+          }),
+        };
       }
       case "cancel":
-        return [];
+      case "ask":
+        return { entries: [] };
     }
   };
 
-  const { width, height } = canvasSize(layout.columns, layout.lanes);
   const sel = state.route.name === "card" ? state.route.key : "";
+  const focusTicket = chain.tickets.find((t) => t.key === sel);
+  const focusNode = focusTicket ? nodeKey({ kind: "ticket", id: focusTicket.id }) : undefined;
+  // A card's connector shows while the pointer is on the card, while it is the open card, and
+  // while a line is dragged from it.
+  const handleShown = (k: string) => hover === k || focusNode === k || (drag?.mode === "new" && drag.node === k);
+  const closeMenu = useCallback(() => setMenu(undefined), []);
+  const popAt = (m: { x: number }) => Math.max(4, Math.min(m.x, window.innerWidth - 300));
+  const linkingKey = linking ? label(linking) : undefined;
+  const pick = (id: string) => {
+    if (!linking) return false;
+    const target = nodeKey({ kind: "ticket", id });
+    if (target !== linking) dispatch({ type: "addEdge", chain: chainId, from: target, to: linking });
+    setLinking(undefined);
+    return true;
+  };
   return (
-    <div ref={root} className={`canvas${drag ? " dragging" : ""}`} data-testid="canvas" data-chain={chain.chain.name}>
-      {state.edges.error && (
-        <div className="edge-error" role="alert" data-testid="edge-error">
-          <span>{state.edges.error}</span>
-          <button type="button" className="link-btn" onClick={() => dispatch({ type: "dismissEdgeError" })}>Dismiss</button>
-        </div>
-      )}
-      <div
-        className="canvas-inner" ref={inner} style={{ width, height }} onClick={() => select(undefined)}
-        onDoubleClick={(e) => {
-          if (e.target instanceof Element && e.target.closest(".node, .handle, .quick-card, .edge, .end")) return;
-          newCardAt(local(e.clientX, e.clientY));
-        }}
-        onContextMenu={(e: ReactMouseEvent) => {
-          if (e.target instanceof Element && e.target.closest(".node, .quick-card")) return;
-          e.preventDefault();
-          setMenu({ kind: "canvas", x: e.clientX, y: e.clientY, at: local(e.clientX, e.clientY) });
-        }}
-      >
-        {layout.nodes.map((n) => {
-          const style = { left: x(n.col), top: y(n.lane), width: W, height: H };
-          const over = drag?.over === nodeKey(n) ? " over" : "";
-          if (n.kind === "release") {
-            const r = releases.get(n.id);
-            if (!r) return null;
-            return (
-              <div key={nodeKey(n)} className={`node release${over}`} data-node={nodeKey(n)} data-version={r.version} style={style}>
-                <b className="key">◆ {r.version}</b>
-                <span className="muted">{r.channel} · {r.start_mode}</span>
-                <small className="muted" data-testid="release-state">{r.state}</small>
-              </div>
-            );
-          }
-          const t = tickets.get(n.id);
-          if (!t) return null;
-          const route = { name: "card" as const, project: projectKey, chain: chain.chain.name, key: t.key };
-          return (
-            <a
-              key={nodeKey(n)}
-              className={`node ticket g-${statusGroup(t.status)}${sel === t.key ? " sel" : ""}${over}`}
-              data-key={t.key}
-              data-node={nodeKey(n)}
-              href={hrefOf(route)}
-              draggable={false}
-              style={style}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dispatch({ type: "selectCard", project: route.project, chain: route.chain, key: t.key });
-              }}
-              // A focused card's allowed actions are read, so S can start it.
-              onFocus={() => dispatch({ type: "peekCard", key: t.key })}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dispatch({ type: "peekCard", key: t.key });
-                setMenu({ kind: "card", x: e.clientX, y: e.clientY, key: t.key, at: local(e.clientX, e.clientY) });
-              }}
-            >
-              <span className="row">
-                <span className="title">{t.title}</span>
-                {t.profile && <span className="runner">{t.profile}</span>}
-              </span>
-              <span className="row">
-                <span className="st" data-testid="status">
-                  {t.status === "running" && <span className="dot pulse" data-testid="live" />}
-                  {statusText(t.status)}
-                </span>
-                <UsageChip figures={chain.usage?.[t.key]} />
-                <span className="key">{t.key}</span>
-              </span>
-              {queuePosition(state, t.id) !== undefined && (
-                <span className="mark queued" data-testid="queued" title="Waiting for a free agent slot">
-                  queued #{queuePosition(state, t.id)}
-                </span>
-              )}
-              {t.pr && <PrChip pr={t.pr} />}
-              {t.done_out_of_order && (
-                <span className="mark" title={outOfOrderText(t.done_out_of_order)}>out of order</span>
-              )}
-            </a>
-          );
-        })}
-        {layout.nodes.map((n) => (
-          <span
-            key={`h-${nodeKey(n)}`} className="handle" data-node={nodeKey(n)} data-testid={`handle-${label(nodeKey(n))}`}
-            title="Drag onto another card to make it wait for this one"
-            style={{ left: outPoint(n).x - 6, top: outPoint(n).y - 6 }}
-            onPointerDown={(e) => start({ mode: "new", node: nodeKey(n), anchor: outPoint(n) }, e)}
-          />
-        ))}
-        <EdgeLayer
-          width={width} height={height} edges={layout.edges} at={at} label={label} selected={selected} drag={drag}
-          onSelect={select}
-          onMenu={(edge, p) => {
-            select(edge);
-            setMenu({ kind: "edge", ...p, edge });
+    <div className="canvas-frame">
+      <div ref={root} className={`canvas${drag ? " dragging" : ""}${linking ? " linking" : ""}`} data-testid="canvas" data-chain={chain.chain.name}>
+        {state.edges.error && (
+          <div className="edge-error" role="alert" data-testid="edge-error">
+            <span>{state.edges.error}</span>
+            <button type="button" className="link-btn" onClick={() => dispatch({ type: "dismissEdgeError" })}>Dismiss</button>
+          </div>
+        )}
+        <div
+          className="canvas-wrap" style={{ width: width * fit.zoom, height: height * fit.zoom }} onClick={() => select(undefined)}
+          onDoubleClick={(e) => {
+            if (e.target instanceof Element && e.target.closest(".node, .handle, .quick-card, .edge, .end")) return;
+            newCardAt(local(e.clientX, e.clientY));
           }}
-          onGrab={(e, end, ev) =>
-            start(
-              {
-                mode: "move",
-                edge: { from: e.from, to: e.to },
-                end,
+          onContextMenu={(e: ReactMouseEvent) => {
+            if (e.target instanceof Element && e.target.closest(".node, .quick-card")) return;
+            e.preventDefault();
+            setMenu({ kind: "canvas", x: e.clientX, y: e.clientY, at: local(e.clientX, e.clientY) });
+          }}
+        >
+          <div
+            className="canvas-inner" ref={inner} data-zoom={fit.zoom}
+            style={{ width, height, transform: fit.zoom === 1 ? undefined : `scale(${fit.zoom})` }}
+          >
+            {layout.nodes.map((n) => {
+              const style = { left: x(n.col), top: y(n.lane), width: W, height: H };
+              const over = drag?.over === nodeKey(n);
+              const r = n.kind === "release" ? releases.get(n.id) : undefined;
+              if (r) return <ReleaseNode key={nodeKey(n)} release={r} nodeKey={nodeKey(n)} style={style} over={over} />;
+              const t = tickets.get(n.id);
+              if (!t) return null;
+              const route = { name: "card" as const, project: projectKey, chain: chain.chain.name, key: t.key };
+              return (
+                <TicketNode
+                  key={nodeKey(n)} ticket={t} href={hrefOf(route)} style={style} selected={sel === t.key} over={over}
+                  linking={Boolean(linking) && nodeKey(n) !== linking} detail={state.details[t.key]}
+                  usage={chain.usage?.[t.key]} queued={queuePosition(state, t.id)} defaultProfile={project?.default_profile}
+                  onHover={(on) => setHover(on ? nodeKey(n) : undefined)}
+                  handlers={{
+                    activate: () => {
+                      if (!pick(t.id)) openCard(t.key);
+                    },
+                    focus: () => dispatch({ type: "peekCard", key: t.key }),
+                    menu: (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      dispatch({ type: "peekCard", key: t.key });
+                      setMenu({ kind: "card", x: e.clientX, y: e.clientY, key: t.key, at: local(e.clientX, e.clientY) });
+                    },
+                    approve: () => act(t.key, "approve"),
+                    reject: (p) => setMenu({ kind: "ask", x: p.x, y: p.y, key: t.key, action: "reject" }),
+                  }}
+                />
+              );
+            })}
+            {layout.nodes.map((n) => (
+              <span
+                key={`h-${nodeKey(n)}`} className={`handle${handleShown(nodeKey(n)) ? " show" : ""}`} data-node={nodeKey(n)}
+                data-testid={`handle-${label(nodeKey(n))}`} title="Drag onto another card to make it wait for this one"
+                style={{ left: outPoint(n).x - 6, top: outPoint(n).y - 6 }}
+                onPointerEnter={() => setHover(nodeKey(n))}
+                onPointerLeave={() => setHover(undefined)}
+                onPointerDown={(e) => start({ mode: "new", node: nodeKey(n), anchor: outPoint(n) }, e)}
+              />
+            ))}
+            <EdgeLayer
+              width={width} height={height} edges={layout.edges} geo={geo} label={label} selected={selected} focus={focusNode} drag={drag}
+              onSelect={select}
+              onMenu={(edge, p) => {
+                select(edge);
+                setMenu({ kind: "edge", ...p, edge });
+              }}
+              onGrab={(e, end, ev) => {
+                const g = geo.get(edgeId(e));
+                if (!g) return;
                 // The end that stays: the other one.
-                anchor: end === "from" ? inPoint(at.get(e.to) ?? { col: 0, lane: 0 }) : outPoint(at.get(e.from) ?? { col: 0, lane: 0 }),
-              },
-              ev,
-            )}
-        />
-        {quick && <QuickCard key={`${quick.x},${quick.y}`} quick={quick} label={quickLabel} state={state} dispatch={dispatch} />}
+                start({ mode: "move", edge: { from: e.from, to: e.to }, end, anchor: end === "from" ? g.to : g.from }, ev);
+              }}
+            />
+            {quick && <QuickCard key={`${quick.x},${quick.y}`} quick={quick} label={quickLabel} state={state} dispatch={dispatch} />}
+          </div>
+        </div>
       </div>
+      <CanvasChrome fitted={fit.fitted} cut={fit.cut} onFit={fit.toggle} linking={linkingKey} onCancelLinking={() => setLinking(undefined)} />
       {menu?.kind === "cancel" && (
-        <div className="ctx-menu cancel-pop" style={{ left: Math.max(4, Math.min(menu.x, window.innerWidth - 300)), top: menu.y }}>
+        <div className="ctx-menu cancel-pop" style={{ left: popAt(menu), top: menu.y }}>
           <CancelConfirm
             cardKey={menu.key} onKeep={() => setMenu(undefined)}
             onSend={(text) => {
               setMenu(undefined);
-              dispatch({ type: "ticketAction", key: menu.key, action: "cancel", text });
+              act(menu.key, "cancel", text);
             }}
           />
         </div>
       )}
-      {menu && menu.kind !== "cancel" && <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(undefined)} entries={entriesOf(menu)} />}
+      {menu?.kind === "ask" && (
+        <div className="ctx-menu cancel-pop" style={{ left: popAt(menu), top: menu.y }}>
+          <ReasonAsk
+            cardKey={menu.key} action={menu.action} onKeep={() => setMenu(undefined)}
+            onSend={(text) => {
+              setMenu(undefined);
+              act(menu.key, menu.action, text);
+            }}
+          />
+        </div>
+      )}
+      {menu && menu.kind !== "cancel" && menu.kind !== "ask" && (
+        <ContextMenu x={menu.x} y={menu.y} onClose={closeMenu} {...entriesOf(menu)} />
+      )}
     </div>
   );
 }

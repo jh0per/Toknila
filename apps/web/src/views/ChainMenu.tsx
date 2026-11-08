@@ -3,6 +3,7 @@ import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
 import { AUTOSTART_HINT } from "../store/autostart";
 import { ContextMenu } from "./ContextMenu";
+import { menuGroups } from "./menuGroups";
 
 /// The right-click menu of a chain in the sidebar. `open(chain)` returns the handler for a row;
 /// render `menu` once next to the list.
@@ -19,17 +20,18 @@ export function useChainMenu(dispatch: (i: Intent) => void): {
   const menu = at && (
     <ContextMenu
       x={at.x} y={at.y} onClose={close}
-      entries={[{
-        label: at.chain.chain.autostart ? "Turn autostart off" : "Turn autostart on",
+      title={at.chain.chain.name}
+      entries={menuGroups([{
+        label: at.chain.chain.autostart ? "Stop starting cards automatically" : "Start cards automatically",
         testId: "menu-autostart",
         hint: AUTOSTART_HINT,
         run: () => dispatch({ type: "setAutostart", chain: at.chain.chain.id, autostart: !at.chain.chain.autostart }),
-      }, {
+      }], [{
         label: "Delete chain…",
         testId: "menu-delete-chain",
         danger: true,
         run: () => dispatch({ type: "openDialog", dialog: { kind: "deleteChain", chain: at.chain.chain.id } }),
-      }]}
+      }])}
     />
   );
   return { open, menu };

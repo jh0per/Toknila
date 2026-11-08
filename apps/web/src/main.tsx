@@ -10,6 +10,7 @@ import "./threads.css";
 import "./settings.css";
 import "./usage.css";
 import "./plan.css";
+import "./menu.css";
 import "./updates.css";
 
 // The viewer's theme goes on before the first paint, so a forced dark or light does not flash.
