@@ -7,8 +7,10 @@
 //!
 //! Ships (worktrees) do not live in the data home: its path has a space on macOS, which makes
 //! agents backslash-escape paths. They go to `~/.toknila-ships` (never `~/.toknila`, which is the
-//! legacy data home), or to `TOKNILA_SHIPS_DIR`. With an explicit `TOKNILA_HOME` they stay under
-//! that home, so a test or a second instance never writes into the person's real ships.
+//! legacy data home), or to `TOKNILA_SHIPS_DIR`. With an explicit `TOKNILA_HOME` that is not the
+//! platform default they stay under that home, so a test or a second instance never writes into
+//! the person's real ships. The default home passed explicitly (the CLI and the desktop shell
+//! hand it to the daemon they start) counts as the default.
 
 use std::path::{Path, PathBuf};
 
@@ -34,6 +36,26 @@ pub struct Paths {
 pub(crate) fn ships_root(over: Option<PathBuf>, user_home: Option<&Path>, home: &Path) -> PathBuf {
     over.or_else(|| user_home.map(|h| h.join(SHIPS_DIR_NAME)))
         .unwrap_or_else(|| home.join("ships"))
+}
+
+/// The ships root for an explicit `TOKNILA_HOME`: the default layout when `home` is the platform
+/// default home, else under `home`. The override wins in both cases.
+pub(crate) fn explicit_ships(
+    over: Option<PathBuf>,
+    home: &Path,
+    default_home: Option<&Path>,
+    user_home: Option<&Path>,
+) -> PathBuf {
+    if default_home == Some(home) {
+        ships_root(over, user_home, home)
+    } else {
+        over.unwrap_or_else(|| home.join("ships"))
+    }
+}
+
+/// The platform default home of this machine, if it can be told.
+pub fn platform_home() -> Option<PathBuf> {
+    layout(std::env::consts::OS, dirs::home_dir(), dirs::data_dir()).map(|l| l.home)
 }
 
 fn env_path(name: &str) -> Option<PathBuf> {
@@ -100,7 +122,12 @@ impl Paths {
     /// Resolves the home directory from the environment and the platform.
     pub fn resolve() -> Result<Paths, String> {
         if let Some(home) = env_path(HOME_ENV) {
-            let ships = env_path(SHIPS_ENV).unwrap_or_else(|| home.join("ships"));
+            let ships = explicit_ships(
+                env_path(SHIPS_ENV),
+                &home,
+                platform_home().as_deref(),
+                dirs::home_dir().as_deref(),
+            );
             return Ok(Paths { home, ships });
         }
         let layout = layout(std::env::consts::OS, dirs::home_dir(), dirs::data_dir())
