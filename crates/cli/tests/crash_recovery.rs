@@ -1,4 +1,4 @@
-//! P0-13: the daemon is killed hard (`kill -9` / `TerminateProcess`) at 20 pseudo-random points
+//! The daemon is killed hard (`kill -9` / `TerminateProcess`) at 20 pseudo-random points
 //! of the gate scenario. After each restart `tok ls --json` must equal the state after the last
 //! command that committed, never a mix, and the finished run must equal a run without kills.
 

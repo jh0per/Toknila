@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::TicketKey;
 
-/// Ticket status. Transitions between them are owned by the state machine (P0-04).
+/// Ticket status. Transitions between them are owned by the state machine.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

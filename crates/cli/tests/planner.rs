@@ -1,4 +1,4 @@
-//! P2-03: a project's planner through the real `tok` binary and daemon, with the workspace's
+//! A project's planner through the real `tok` binary and daemon, with the workspace's
 //! `fake-agent` as the planner profile's command (no real agent is launched). The planner runs in
 //! the project's repository, plans with its run token (chains, cards, threads), and is refused
 //! everything that starts, accepts or stops: those routes are not on its list. `tok mcp` in the

@@ -1,4 +1,4 @@
-//! P1-14: review modes through the real `tok` binary and daemon, with simulated reviewers: a
+//! Review modes through the real `tok` binary and daemon, with simulated reviewers: a
 //! person alone (human), the reviewer agent alone (agent), and the agent first and then a person
 //! who sees its remarks (both). The mode resolves ticket, then chain, then project.
 

@@ -1,4 +1,4 @@
-// Browser test of the quick actions on the diagram against a real daemon (P2-06).
+// Browser test of the quick actions on the diagram against a real daemon.
 // Usage: node e2e/canvas.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // A connector released on empty canvas opens a new-card field (the card follows the one the line

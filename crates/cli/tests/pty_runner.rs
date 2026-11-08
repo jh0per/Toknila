@@ -1,4 +1,4 @@
-//! P1-07: the PTY runner through the real `tok` binary and daemon, with the workspace's
+//! The PTY runner through the real `tok` binary and daemon, with the workspace's
 //! `fake-agent` as the profile's command (no shell, no OS tools): a runner starts in its ship and
 //! streams over the WebSocket, takes input, stops on cancel, a crash blocks the ticket, and a
 //! daemon killed hard marks the tickets it was running `runner_lost` on restart.

@@ -1,4 +1,4 @@
-//! P1-03: threads on a card through the real `tok` binary and daemon. The simulated agent of a
+//! Threads on a card through the real `tok` binary and daemon. The simulated agent of a
 //! running ticket opens a design thread and posts a mermaid version; its hand-in is refused while
 //! the thread is open; the owner requests changes, the agent posts version 2, the owner approves
 //! and the hand-in moves the ticket to Review. The `--json` output is pinned by snapshots in

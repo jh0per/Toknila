@@ -1,4 +1,4 @@
-// Browser test of editing dependencies on the diagram against a real daemon (P2-02).
+// Browser test of editing dependencies on the diagram against a real daemon.
 // Usage: node e2e/edges.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // With the mouse: drag from a card's handle onto another card adds a dependency; a click on a

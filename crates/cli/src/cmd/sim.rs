@@ -1,4 +1,4 @@
-//! `tok sim`: act as the simulated agent of a ticket or a release (phase 0).
+//! `tok sim`: act as the simulated agent of a ticket or a release.
 
 use anyhow::{Context, Result};
 use clap::Subcommand;

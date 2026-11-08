@@ -1,4 +1,4 @@
-//! P1-04: a spec folder through the real `tok` binary and daemon: import, tick a subtask as the
+//! A spec folder through the real `tok` binary and daemon: import, tick a subtask as the
 //! simulated agent, export into a copy, check the file. `TOKNILA_UPDATE_SNAPSHOTS=1` rewrites
 //! the snapshot after an intended change.
 

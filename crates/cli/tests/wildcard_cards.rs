@@ -1,4 +1,4 @@
-//! P1-01: wildcard cards through the real `tok` binary and daemon. The simulated agent of a
+//! Wildcard cards through the real `tok` binary and daemon. The simulated agent of a
 //! running ticket finds work nobody planned; the card waits for the owner, does not count in
 //! progress, and once approved starts when its dependencies allow. A card that would go before
 //! work already running cannot be approved and is rejected instead. The `--json` output is

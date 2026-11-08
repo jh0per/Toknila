@@ -1,4 +1,4 @@
-//! P0-14, gate 0: the whole phase-0 scenario through the real `tok` binary and daemon, with
+//! Gate 0: the whole phase-0 scenario through the real `tok` binary and daemon, with
 //! simulated agents. The `--json` output people and scripts read is pinned by snapshots in
 //! `tests/snapshots/`; `TOKNILA_UPDATE_SNAPSHOTS=1` rewrites them after an intended change.
 

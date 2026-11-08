@@ -1,4 +1,4 @@
-//! P1-10: `tok mcp` through the real binary over stdio against a real daemon. An agent's events
+//! `tok mcp` through the real binary over stdio against a real daemon. An agent's events
 //! come in as MCP tool calls and move the ticket exactly as the same events from `tok sim` do.
 //!
 //! The run token here is the daemon's own token: the daemon only issues agent tokens to runs it

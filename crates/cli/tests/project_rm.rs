@@ -1,4 +1,4 @@
-//! P1-29: `tok project rm` through the real `tok` binary and daemon: deleting the records keeps
+//! `tok project rm` through the real `tok` binary and daemon: deleting the records keeps
 //! the repository folder, and moving the folder to the Trash is refused unless the person types
 //! the key at a terminal (or passes `--yes`, which no test does: the real Trash is not touched).
 

@@ -1,4 +1,4 @@
-// Browser test of the inbox against a real daemon (P1-17).
+// Browser test of the inbox against a real daemon.
 // Usage: node e2e/inbox.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // A wildcard proposal is approved, a blocked card is unblocked and an agent question is answered,
@@ -115,7 +115,7 @@ try {
   await page.waitForFunction(() => window.location.pathname.endsWith("/cards/INB-1"), null, { timeout: 10_000 });
   console.log("PASS an item opens its card");
   // Accept of a ship whose work is not committed: the card is blocked with ship_uncommitted and
-  // the inbox says so in words (P1-25). The ship is a real worktree of a temporary repository.
+  // the inbox says so in words. The ship is a real worktree of a temporary repository.
   const git = (cwd, ...args) =>
     execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], {
       cwd,

@@ -1,4 +1,4 @@
-//! P1-05: `tok profile ls` through the real binary and daemon: the built-in profiles, the files
+//! `tok profile ls` through the real binary and daemon: the built-in profiles, the files
 //! of the profiles folder, and an invalid file named with its line and column.
 
 mod common;
