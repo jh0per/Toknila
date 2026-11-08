@@ -184,19 +184,34 @@ try {
   console.log(`PASS a running card's menu: ${runningMenu.join(", ")}`);
   // Cancel asks first: Keep it changes nothing, the confirmation cancels.
   await page.locator("[data-testid=menu-card-cancel]").click();
-  await page.locator("[data-testid=menu-cancel-confirm]").waitFor();
-  await page.locator("[data-testid=menu-cancel-keep]").click();
+  await page.locator("[data-testid=cancel-confirm]").waitFor();
+  if ((await page.locator("[data-testid=cancel-reason]").inputValue()) !== "Cancelled in the window") throw new Error("the reason is not prefilled");
+  console.log("PASS the confirmation has the reason prefilled");
+  await page.locator("[data-testid=cancel-keep]").click();
   await page.waitForTimeout(300);
   await expectText(status("CAN-1"), "running", "Keep it left the card running");
   await card("CAN-1").click({ button: "right" });
   await page.locator("[data-testid=menu-card-cancel]").click();
   await shot("cancel-asks");
-  await page.locator("[data-testid=menu-cancel-confirm]").click();
+  await page.locator("[data-testid=cancel-send]").click();
   await expectText(status("CAN-1"), "cancelled", "the confirmed Cancel cancelled the card");
   // Open
   await card("CAN-3").click({ button: "right" });
   await page.locator("[data-testid=menu-card-open]").click();
   await expectPath("/projects/CAN/chains/work/cards/CAN-3", "Open opens the card");
+
+  // The card bar's Cancel opens the same confirmation, with the reason editable.
+  await page.locator("[data-testid=actions] button.danger").click();
+  await page.locator("[data-testid=cancel-confirm]").waitFor();
+  const reason = page.locator("[data-testid=cancel-reason]");
+  if ((await reason.inputValue()) !== "Cancelled in the window") throw new Error("the bar's reason is not prefilled");
+  await reason.fill("changed my mind");
+  await page.locator("[data-testid=cancel-send]").click();
+  await expectText(status("CAN-3"), "cancelled", "Cancel in the card bar cancelled the card");
+  if (await page.locator("[data-testid=cancel-confirm]").count()) throw new Error("the confirmation stayed open");
+  const said = JSON.stringify(JSON.parse(tok("ticket", "--json", "show", "CAN-3")));
+  if (!said.includes("changed my mind")) throw new Error(`the edited reason did not reach the daemon: ${said.slice(0, 300)}`);
+  console.log("PASS the edited reason reached the daemon");
 
   // 5. Run chain / Stop chain.
   await open("RUN", "go");

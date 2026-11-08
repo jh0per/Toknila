@@ -8,6 +8,9 @@ import type { Effect } from "./msg";
 import { reducePlan } from "./plan";
 import type { State } from "./state";
 
+/// The reason a cancellation starts with in the confirmation; the daemon asks for one.
+export const CANCEL_REASON = "Cancelled in the window";
+
 /// The new-card field: where it sits on the canvas (canvas pixels) and what the card follows.
 export interface QuickCard {
   chain: string;

@@ -12,7 +12,8 @@ import { PrChip } from "./PrChip";
 import { QuickCard } from "./QuickCard";
 import { UsageChip } from "./UsageChip";
 import { H, type Pt, W, canvasSize, inPoint, outPoint, x, y } from "./canvasGeometry";
-import { cancelEntries, canvasEntries, cardEntries } from "./canvasMenus";
+import { CancelConfirm } from "./CancelConfirm";
+import { canvasEntries, cardEntries } from "./canvasMenus";
 import { useCanvasKeys } from "./useCanvasKeys";
 import { type Drag, useEdgeDrag } from "./useEdgeDrag";
 
@@ -124,8 +125,7 @@ export function Canvas({ chain, state, dispatch }: {
         });
       }
       case "cancel":
-        // The daemon wants a reason for a cancellation; the confirmation is the person's decision.
-        return cancelEntries(m.key, () => dispatch({ type: "ticketAction", key: m.key, action: "cancel", text: "Cancelled from the diagram" }));
+        return [];
     }
   };
 
@@ -241,7 +241,18 @@ export function Canvas({ chain, state, dispatch }: {
         />
         {quick && <QuickCard key={`${quick.x},${quick.y}`} quick={quick} label={quickLabel} state={state} dispatch={dispatch} />}
       </div>
-      {menu && <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(undefined)} entries={entriesOf(menu)} />}
+      {menu?.kind === "cancel" && (
+        <div className="ctx-menu cancel-pop" style={{ left: Math.max(4, Math.min(menu.x, window.innerWidth - 300)), top: menu.y }}>
+          <CancelConfirm
+            cardKey={menu.key} onKeep={() => setMenu(undefined)}
+            onSend={(text) => {
+              setMenu(undefined);
+              dispatch({ type: "ticketAction", key: menu.key, action: "cancel", text });
+            }}
+          />
+        </div>
+      )}
+      {menu && menu.kind !== "cancel" && <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(undefined)} entries={entriesOf(menu)} />}
     </div>
   );
 }

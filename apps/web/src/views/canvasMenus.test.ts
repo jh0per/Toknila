@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TicketAction, TicketDetail } from "../api/types";
-import { cancelEntries, canvasEntries, cardEntries } from "./canvasMenus";
+import { canvasEntries, cardEntries } from "./canvasMenus";
 
 const detail = (allowed: TicketAction[], can_move: boolean): TicketDetail =>
   ({ allowed_actions: allowed, can_move }) as unknown as TicketDetail;
@@ -28,16 +28,6 @@ describe("the card menu", () => {
     e.find((x) => x.testId === "menu-card-cancel")?.run();
     expect(h.askCancel).toHaveBeenCalled();
     expect(h.act).toHaveBeenCalledTimes(1);
-  });
-
-  it("asks before cancelling, and keeping the card runs nothing", () => {
-    const run = vi.fn();
-    const e = cancelEntries("DEMO-1", run);
-    expect(e.map((x) => x.label)).toEqual(["Cancel DEMO-1", "Keep it"]);
-    e[1].run();
-    expect(run).not.toHaveBeenCalled();
-    e[0].run();
-    expect(run).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TicketDetail } from "../api/types";
 import { RUN_CHAIN_HINT } from "./autostart";
+import { CANCEL_REASON } from "./quick";
 import { reduce } from "./reduce";
 import { initialState } from "./state";
 
@@ -76,5 +77,13 @@ describe("Run chain", () => {
     expect(fx).toEqual([{ type: "setAutostart", chain: "c1", autostart: true }]);
     expect(RUN_CHAIN_HINT).toMatch(/starts the ready cards up to the free agent slots/);
     expect(RUN_CHAIN_HINT).toMatch(/Stop chain turns autostart off; cards already running keep running/);
+  });
+});
+
+describe("cancelling a card", () => {
+  it("sends the reason the person confirmed, and starts from the prefilled one", () => {
+    expect(CANCEL_REASON).toBe("Cancelled in the window");
+    const [, fx] = reduce(start(), { type: "ticketAction", key: "DEMO-1", action: "cancel", text: "not needed any more" });
+    expect(fx).toEqual([{ type: "ticketAction", key: "DEMO-1", action: "cancel", text: "not needed any more" }]);
   });
 });

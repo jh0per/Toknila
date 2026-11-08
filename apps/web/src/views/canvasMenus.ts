@@ -33,14 +33,6 @@ export function cardEntries(detail: TicketDetail | undefined, h: CardMenuHandler
   return entries;
 }
 
-/// The question before a card is cancelled.
-export function cancelEntries(key: string, run: () => void): MenuEntry[] {
-  return [
-    { label: `Cancel ${key}`, testId: "menu-cancel-confirm", danger: true, run, hint: "The card is dropped" },
-    { label: "Keep it", testId: "menu-cancel-keep", run: () => undefined },
-  ];
-}
-
 export interface CanvasMenuHandlers {
   newCard: () => void;
   newChain: () => void;
