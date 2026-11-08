@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type TermStatus, type TerminalConnection, type TerminalSink } from "../terminal/connect";
 import { fitTerminal } from "../terminal/fit";
+import { currentRenderer } from "../terminal/renderer";
 import { type SizeReporter, sizeReporter } from "../terminal/size";
 import { exitText } from "../terminal/wire";
 
@@ -54,9 +55,26 @@ export function LiveTerminal({ streamKey, connect, noneText, placeholder, offer,
       const term = new Terminal({
         fontFamily: css.getPropertyValue("--mono").trim() || "monospace",
         fontSize: 12,
+        // A calm terminal: no blinking cursor, no animated scrolling, a bounded scrollback.
+        cursorBlink: false,
+        smoothScrollDuration: 0,
+        scrollback: 5000,
         theme: { background: css.getPropertyValue("--term-bg").trim(), foreground: css.getPropertyValue("--term-fg").trim() },
       });
       term.open(el);
+      // The canvas renderer draws a TUI's full-frame redraws without flicker; if WebGL is missing
+      // or its context is lost, the DOM renderer (the default) carries on.
+      if (currentRenderer() === "webgl") {
+        try {
+          const { WebglAddon } = await import("@xterm/addon-webgl");
+          if (cancelled) return term.dispose();
+          const gl = new WebglAddon();
+          gl.onContextLoss(() => gl.dispose());
+          term.loadAddon(gl);
+        } catch {
+          /* no WebGL: the DOM renderer stays */
+        }
+      }
       // The grid follows the host's box: on every resize of the panel or the window, and once the
       // font is loaded (the cell size is known only then).
       const fit = () => fitTerminal(el, term);
