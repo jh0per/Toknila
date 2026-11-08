@@ -338,6 +338,27 @@ fn a_crash_exit_blocks_the_ticket_with_the_code() {
 }
 
 #[test]
+fn an_exit_143_blocks_the_ticket_as_terminated_and_unblock_starts_it_again() {
+    let mut mem = with_agents();
+    recover(&mut mem).expect("settle");
+    settle(&mut mem);
+    end(&mut mem, Some(143), false);
+    let reason = blocked_reason(&a(&mem));
+    assert_eq!(
+        reason,
+        BlockedReason::Terminated {
+            detail: "exit 143, SIGTERM".to_owned()
+        }
+    );
+    assert!(reason.to_string().contains("unblock starts it again"));
+    mem.runner.live.borrow_mut().clear();
+    act(&mut mem, TicketEvent::Unblock);
+    settle(&mut mem);
+    assert_eq!(a(&mem).status, TicketStatus::Running);
+    assert_eq!(mem.runner.started.borrow().len(), 2);
+}
+
+#[test]
 fn a_clean_exit_without_finished_blocks_the_ticket_and_unblock_starts_it_again() {
     let mut mem = with_agents();
     recover(&mut mem).expect("settle");

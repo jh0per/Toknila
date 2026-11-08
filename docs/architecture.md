@@ -314,7 +314,9 @@ worker; the reviewer's output is read, never written, with `?role=reviewer`.
 - **Exit.** The process's end comes back as `runs::ended` in one unit of work: it journals
   `ticket.runner_exited` (`{run, exit: {code, signal}}`) and, if the ticket's agent was still
   working (Running or Waiting) and the host did not stop it, feeds the machine
-  `Block(crashed)`: non-zero code and signals say so (`exit 101`, `killed by signal ...`), and a
+  `Block(crashed)`: non-zero code and signals say so (`exit 101`, `killed by signal ...`); an end
+  that came from outside (SIGTERM, SIGKILL, hang-up, interrupt, exit 143 and 137, Windows' terminated
+  status) is `Block(terminated)` instead, worded "terminated from outside, unblock starts it again"; a
   zero exit without a `finished` event is a crash too (`exited without a finished event`), since
   the work cannot be taken as done; `tok unblock` starts the runner again. After the hand-in
   (Review) an exit changes nothing.

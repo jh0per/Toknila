@@ -31,6 +31,7 @@ pub(super) fn block(
     if matches!(
         reason,
         BlockedReason::Crashed { .. }
+            | BlockedReason::Terminated { .. }
             | BlockedReason::RunnerLost
             | BlockedReason::ShipFailed { .. }
             | BlockedReason::BaseBehind { .. }

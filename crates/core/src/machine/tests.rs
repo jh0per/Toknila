@@ -774,6 +774,9 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(BlockedReason::Crashed {
             detail: "c".to_owned()
         }),
+        Just(BlockedReason::Terminated {
+            detail: "t".to_owned()
+        }),
         Just(BlockedReason::RunnerLost),
         Just(BlockedReason::ShipFailed {
             detail: "s".to_owned()

@@ -43,6 +43,7 @@ export function reasonText(r: StatusReason | null | undefined): string {
       switch (b.kind) {
         case "manual": return `blocked: ${b.text}`;
         case "crashed": return `crashed: ${b.detail}`;
+        case "terminated": return `the agent was terminated from outside (${b.detail}); unblock starts it again`;
         case "dependency_reopened": return `dependency reopened: ${b.dependency}`;
         case "merge_conflict": return `merge conflict: ${b.detail}`;
         case "base_checkout_dirty": return `${b.path} has local changes; commit or stash them, then unblock`;

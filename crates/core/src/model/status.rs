@@ -93,6 +93,9 @@ pub enum BlockedReason {
     Manual { text: String },
     /// The runner process crashed.
     Crashed { detail: String },
+    /// The agent's process was ended from outside (terminated or killed by another tool or the
+    /// user); `detail` says how. Unblocking starts it again.
+    Terminated { detail: String },
     /// A dependency was reopened after it had merged.
     DependencyReopened { dependency: TicketKey },
     /// Merging into the base branch conflicted; `detail` names the files.
@@ -186,6 +189,10 @@ impl fmt::Display for BlockedReason {
         match self {
             Self::Manual { text } => write!(f, "manual: {text}"),
             Self::Crashed { detail } => write!(f, "crashed: {detail}"),
+            Self::Terminated { detail } => write!(
+                f,
+                "terminated: the agent was terminated from outside ({detail}); unblock starts it again"
+            ),
             Self::DependencyReopened { dependency } => {
                 write!(f, "dependency {dependency} reopened")
             }
@@ -301,6 +308,12 @@ mod tests {
                     detail: "exit 1".into(),
                 }),
                 "crashed: exit 1",
+            ),
+            (
+                blocked(BlockedReason::Terminated {
+                    detail: "exit 143, SIGTERM".into(),
+                }),
+                "terminated: the agent was terminated from outside (exit 143, SIGTERM); unblock starts it again",
             ),
             (
                 blocked(BlockedReason::DependencyReopened { dependency: dep }),
