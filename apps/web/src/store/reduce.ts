@@ -82,10 +82,6 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [{ ...s, tab: msg.tab }, []];
     case "navigate":
       return go(s, msg.route);
-    case "selectProject":
-      return go(s, { name: "project", project: msg.project });
-    case "selectChain":
-      return go(s, { name: "projectChain", project: msg.project, chain: msg.chain });
     case "selectCard":
       return go(s, { name: "card", project: msg.project, chain: msg.chain, key: msg.key });
     case "urlChanged":
