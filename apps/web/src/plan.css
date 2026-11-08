@@ -42,3 +42,11 @@
 .trash-zone code { overflow-wrap: anywhere; }
 .modal [data-testid=delete-error] p { margin: 0; }
 .warnings { margin: 0; padding-left: var(--s4); color: var(--block); font-size: var(--fs-s); }
+.path-row { display: flex; gap: var(--s2); width: 100%; }
+.path-row input { flex: 1; min-width: 0; }
+.formats { width: 100%; }
+.formats p { margin: 0; }
+.formats ul { margin: var(--s1) 0 0; padding-left: var(--s4); display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-s); }
+.formats code { overflow-wrap: anywhere; }
+.add-project .fold .field { margin-bottom: var(--s2); }
+.fold .found { font-weight: 400; }

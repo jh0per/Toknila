@@ -1,5 +1,11 @@
-/// The commands the page may call through Tauri IPC (see `capabilities/updates.json`).
-const COMMANDS: &[&str] = &["update_status", "check_for_updates", "restart_to_update"];
+/// The commands the page may call through Tauri IPC (see `capabilities/updates.json` and
+/// `capabilities/folders.json`).
+const COMMANDS: &[&str] = &[
+    "update_status",
+    "check_for_updates",
+    "restart_to_update",
+    "pick_folder",
+];
 
 fn main() {
     let app = tauri_build::AppManifest::new().commands(COMMANDS);

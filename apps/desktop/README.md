@@ -7,6 +7,10 @@ the daemon or attaches to the running one exactly like the CLI, and opens a wind
 address with its token. Closing the window leaves the daemon and its agents running. If the daemon
 cannot start, the window shows the reason from `static/index.html`.
 
+The Add project form's Browse button asks the shell for a folder through Tauri IPC: the one command `pick_folder`
+(`src/folder.rs`, `capabilities/folders.json`) opens the system's folder picker, and only for the daemon's loopback
+page. The dialog plugin's own commands are not allowed to the page.
+
 The app menu is the platform's default with File > Add Project... (Cmd+Shift+N, Ctrl+Shift+N) on
 top (`src/menu.rs`). The window has no Tauri IPC, so the item sets the page's address hash to
 `#/add-project`, which the page's store turns into the add-a-project form.

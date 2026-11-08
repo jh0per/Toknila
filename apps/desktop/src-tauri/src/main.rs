@@ -5,6 +5,7 @@
 // No console window next to the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod folder;
 mod menu;
 mod path;
 mod takeover;
@@ -17,13 +18,15 @@ use tauri_plugin_shell::ShellExt;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .menu(menu::build)
         .on_menu_event(|app, event| menu::on_event(app, event.id()))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             updater::update_status,
             updater::check_for_updates,
-            updater::restart_to_update
+            updater::restart_to_update,
+            folder::pick_folder
         ])
         .setup(|app| {
             app.manage(updater::Updates::new(env!("CARGO_PKG_VERSION")));

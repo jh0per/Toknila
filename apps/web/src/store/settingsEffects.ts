@@ -4,6 +4,7 @@
 import { Refusal, get, patch, post } from "../api/http";
 import type { ChainDetail, CliLink, Places, ProfileList, Project, RepoCheck, SystemChecks } from "../api/types";
 import type { Msg } from "./msg";
+import { pickFolder } from "./shell";
 import type { SettingsEffect } from "./settings";
 
 type Dispatch = (msg: Msg) => void;
@@ -35,6 +36,11 @@ export function runSettingsEffect(e: SettingsEffect, dispatch: Dispatch): void {
       // Only for the suggestion; a failure here shows when the form is sent.
       post<RepoCheck>("/repos/check", { repo_path: e.repo_path, work_branch: e.work_branch })
         .then((check) => dispatch({ type: "repoChecked", repo_path: e.repo_path, check }))
+        .catch(() => undefined);
+      return;
+    case "pickFolder":
+      pickFolder()
+        .then((path) => path && dispatch({ type: "editDraft", field: "repo_path", value: path }))
         .catch(() => undefined);
       return;
     case "loadChecks":

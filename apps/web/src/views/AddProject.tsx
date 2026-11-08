@@ -1,23 +1,18 @@
-import type { ChangeEvent, ReactNode } from "react";
+import { type ChangeEvent, useState } from "react";
 import type { MergeMode } from "../api/types";
 import type { DraftField } from "../store/addForm";
 import type { Intent } from "../store/msg";
 import { fieldError, formError } from "../store/settings";
 import type { State } from "../store/state";
+import { canBrowse } from "../store/shell";
+import { Field } from "./Field";
 
-export function Field({ label, name, error, children }: { label: string; name: string; error: string | undefined; children: ReactNode }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
-      {error && <span className="field-error" role="alert" data-testid={`error-${name}`}>{error}</span>}
-    </label>
-  );
-}
+const DETAIL_FIELDS = ["work_branch", "key", "name", "check_command", "merge_mode"];
 
-/// Add a project from a folder. A text field takes the path (paste-friendly); the daemon says what
-/// is wrong with it and, when the base branch is missing, which branches the repository has. Key
-/// and name follow what the folder suggests until the person types into them (the store decides).
+/// Add a project from a folder. In the desktop app Browse opens the system's folder picker; in a
+/// browser (and beside it) the path is typed or pasted. Toknila fills in what it finds in the
+/// folder, as real values, under Details; the daemon says what is wrong with the folder and, when
+/// the main branch is missing, which branches the repository has.
 export function AddProject({ state, dispatch, focus = false }: {
   state: State;
   dispatch: (i: Intent) => void;
@@ -26,11 +21,15 @@ export function AddProject({ state, dispatch, focus = false }: {
 }) {
   const s = state.settings;
   const d = s.add.draft;
+  const [opened, setOpened] = useState(false);
+  // A refusal about a field inside Details opens it, so the person sees it.
+  const refused = DETAIL_FIELDS.some((f) => fieldError(s, f));
   const edit = (field: DraftField) => (e: ChangeEvent<HTMLInputElement>) =>
     dispatch({ type: "editDraft", field, value: e.target.value });
+  const found = s.add.suggested;
   return (
     <form
-      className="card-block form"
+      className="card-block form add-project"
       data-testid="add-project"
       onSubmit={(e) => {
         e.preventDefault();
@@ -38,56 +37,70 @@ export function AddProject({ state, dispatch, focus = false }: {
       }}
     >
       <h2>Add a project</h2>
-      <Field label="Folder of the repository" name="repo_path" error={fieldError(s, "repo_path")}>
-        <input
-          data-testid="repo-path" value={d.repo_path} placeholder="/Users/you/Work/my-repo" spellCheck={false}
-          autoFocus={focus} onChange={edit("repo_path")}
-        />
-      </Field>
-      <Field label="Base branch" name="work_branch" error={fieldError(s, "work_branch")}>
-        <input
-          data-testid="work-branch" value={d.work_branch} placeholder="the branch the repository is on" spellCheck={false}
-          onChange={edit("work_branch")}
-        />
-      </Field>
-      {s.branches.length > 0 && fieldError(s, "work_branch") && (
-        <p className="branches" data-testid="branches">
-          Branches in this repository:{" "}
-          {s.branches.map((b) => (
-            <button
-              type="button" className="btn" key={b} data-branch={b}
-              onClick={() => dispatch({ type: "editDraft", field: "work_branch", value: b })}
-            >
-              {b}
+      <Field
+        label="Folder of your project" name="repo_path" error={fieldError(s, "repo_path")}
+        hint={canBrowse() ? "Pick it with Browse, or paste its path." : "Paste the path of the folder that holds your project (a git repository)."}
+      >
+        <span className="path-row">
+          <input data-testid="repo-path" value={d.repo_path} spellCheck={false} autoFocus={focus} onChange={edit("repo_path")} />
+          {canBrowse() && (
+            <button type="button" className="btn" data-testid="browse-folder" onClick={() => dispatch({ type: "browseFolder" })}>
+              Browse…
             </button>
-          ))}
+          )}
+        </span>
+      </Field>
+      <details
+        className="fold" data-testid="add-details" open={opened || refused}
+        onToggle={(e) => setOpened((e.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary>
+          Details
+          {found && (
+            <span className="muted found" data-testid="add-found">
+              {" "}· {found.key} · {found.work_branch} · {found.merge_mode === "github" ? "pull requests" : "merges locally"}
+            </span>
+          )}
+        </summary>
+        <Field label="Main branch" name="work_branch" error={fieldError(s, "work_branch")} hint="Agents start from it, and approved work lands on it.">
+          <input data-testid="work-branch" value={d.work_branch} spellCheck={false} onChange={edit("work_branch")} />
+        </Field>
+        {s.branches.length > 0 && fieldError(s, "work_branch") && (
+          <p className="branches" data-testid="branches">
+            Branches in this folder:{" "}
+            {s.branches.map((b) => (
+              <button
+                type="button" className="btn" key={b} data-branch={b}
+                onClick={() => dispatch({ type: "editDraft", field: "work_branch", value: b })}
+              >
+                {b}
+              </button>
+            ))}
+          </p>
+        )}
+        <Field label="Card prefix" name="key" error={fieldError(s, "key")} hint="Cards are named with it, like DEMO-1.">
+          <input data-testid="project-key" value={d.key} spellCheck={false} onChange={edit("key")} />
+        </Field>
+        <Field label="Name" name="name" error={fieldError(s, "name")}>
+          <input data-testid="project-name" value={d.name} onChange={edit("name")} />
+        </Field>
+        <Field label="Test command (optional)" name="check_command" error={fieldError(s, "check_command")} hint="Agents run it before they hand in.">
+          <input data-testid="new-check-command" value={d.check_command} spellCheck={false} onChange={edit("check_command")} />
+        </Field>
+        <Field label="When a card is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
+          <select
+            data-testid="new-merge-mode" value={d.merge_mode}
+            onChange={(e) => dispatch({ type: "editDraft", field: "merge_mode", value: e.target.value as MergeMode })}
+          >
+            <option value="local">Merge it into the main branch</option>
+            <option value="github">Open a pull request on GitHub</option>
+          </select>
+        </Field>
+        <p className="muted" data-testid="add-defaults-note">
+          Filled in from the folder: its test command, and pull requests when it has a GitHub remote and <code>gh</code> is
+          logged in. Change them here or later in the project's settings.
         </p>
-      )}
-      <Field label="Key (prefix of ticket keys)" name="key" error={fieldError(s, "key")}>
-        <input data-testid="project-key" value={d.key} placeholder="from the folder's name" spellCheck={false} onChange={edit("key")} />
-      </Field>
-      <Field label="Name" name="name" error={fieldError(s, "name")}>
-        <input data-testid="project-name" value={d.name} placeholder="the folder's name" onChange={edit("name")} />
-      </Field>
-      <Field label="Check command (agents run it before they hand in)" name="check_command" error={fieldError(s, "check_command")}>
-        <input
-          data-testid="new-check-command" value={d.check_command} spellCheck={false}
-          placeholder="none found in the repository" onChange={edit("check_command")}
-        />
-      </Field>
-      <Field label="Accepted work lands" name="merge_mode" error={fieldError(s, "merge_mode")}>
-        <select
-          data-testid="new-merge-mode" value={d.merge_mode}
-          onChange={(e) => dispatch({ type: "editDraft", field: "merge_mode", value: e.target.value as MergeMode })}
-        >
-          <option value="local">local (merge into the base branch)</option>
-          <option value="github">github (open a pull request)</option>
-        </select>
-      </Field>
-      <p className="muted" data-testid="add-defaults-note">
-        Prefilled from the repository: its test command, and a pull request when it has a GitHub remote and <code>gh</code> is
-        logged in. Change them here or later in the project's settings.
-      </p>
+      </details>
       {formError(s) && <p className="error" role="alert">{formError(s)}</p>}
       <button className="btn primary" type="submit" disabled={s.busy} data-testid="add-project-submit">Add project</button>
     </form>

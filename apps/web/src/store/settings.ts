@@ -58,6 +58,7 @@ export type SettingsIntent =
   | { type: "installCli" }
   | { type: "editDraft"; field: DraftField; value: string }
   | { type: "submitProject" }
+  | { type: "browseFolder" }
   | { type: "saveProject"; project: string; patch: PatchProject }
   | { type: "importChain"; project: string; toml: string };
 
@@ -84,6 +85,7 @@ export type SettingsEffect =
   | { type: "loadPlaces" }
   | { type: "loadCli" }
   | { type: "installCli" }
+  | { type: "pickFolder" }
   | { type: "checkRepo"; repo_path: string; work_branch: string }
   | { type: "addProject"; draft: ProjectDraft }
   | Extract<SettingsIntent, { type: "saveProject" | "importChain" }>;
@@ -141,6 +143,8 @@ export function reduceSettings(s: State, msg: SettingsMsg): [State, Effect[]] {
     case "saveProject":
     case "importChain":
       return [{ ...s, settings: start(s) }, [msg]];
+    case "browseFolder":
+      return [s, [{ type: "pickFolder" }]];
     case "installCli":
       return [set({ cliError: undefined }), [msg]];
     case "cliLoaded":

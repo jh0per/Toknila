@@ -12,10 +12,20 @@ export function ImportDialog({ project, state, dispatch }: { project: string; st
   const [path, setPath] = useState("");
   const [toml, setToml] = useState("");
   const i = state.imports;
+  const repo = state.projects.find((p) => p.key === project)?.repo_path;
+  const home = repo ? `${repo.replace(/\/$/, "")}/` : "";
   const refused = (source: ImportSource) => (i.error?.source === source ? i.error.message : undefined);
   return (
     <div className="card-block form" data-testid="import-plans">
       <h2>Import into {project}</h2>
+      <section className="formats" data-testid="import-formats">
+        <p className="muted">Toknila reads three kinds of plans:</p>
+        <ul>
+          <li><b>A chain file</b> (TOML), one card per <code>[[ticket]]</code>: <code>{home}plans/login.toml</code></li>
+          <li><b>A spec folder</b> with a <code>tasks.md</code> in it: <code>{home}specs/001-login</code></li>
+          <li><b>A folder of spec folders</b>, one chain for each: <code>{home}specs</code></li>
+        </ul>
+      </section>
       <form
         className="import-form"
         onSubmit={(e) => {
@@ -23,11 +33,8 @@ export function ImportDialog({ project, state, dispatch }: { project: string; st
           if (path.trim()) dispatch({ type: "importPath", project, path: path.trim() });
         }}
       >
-        <Field label="Path of a TOML file or spec folder" name="import-path" error={refused("path")}>
-          <input
-            data-testid="import-path" value={path} spellCheck={false} autoFocus
-            placeholder="/Users/you/Work/my-repo/specs/001-feature" onChange={(e) => setPath(e.target.value)}
-          />
+        <Field label="Path of a chain file or folder" name="import-path" error={refused("path")} hint="The full path, as it is on this computer.">
+          <input data-testid="import-path" value={path} spellCheck={false} autoFocus onChange={(e) => setPath(e.target.value)} />
         </Field>
         <button className="btn primary" type="submit" disabled={i.busy || !path.trim()} data-testid="import-path-submit">
           Import from path
@@ -40,7 +47,7 @@ export function ImportDialog({ project, state, dispatch }: { project: string; st
           if (toml.trim()) dispatch({ type: "importText", project, toml });
         }}
       >
-        <Field label="Or paste a chain file (TOML)" name="import-text" error={refused("paste")}>
+        <Field label="Or paste a chain file" name="import-text" error={refused("paste")} hint={<>Starts with <code>[chain]</code> and a <code>name = "login"</code> line.</>}>
           <textarea data-testid="import-text" rows={4} spellCheck={false} value={toml} onChange={(e) => setToml(e.target.value)} />
         </Field>
         <button className="btn" type="submit" disabled={i.busy || !toml.trim()} data-testid="import-text-submit">
@@ -48,7 +55,7 @@ export function ImportDialog({ project, state, dispatch }: { project: string; st
         </button>
       </form>
       {i.result && <ImportSummary result={i.result} />}
-      <h3 className="sub">Plans in this repository</h3>
+      <h3 className="sub">Plans found in this project</h3>
       <FoundPlans project={project} state={state} dispatch={dispatch} />
     </div>
   );
