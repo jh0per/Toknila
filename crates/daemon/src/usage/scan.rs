@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use toknila_core::usage::{Chunk, TranscriptFormat};
 
 /// At most this many bytes are read from one file in one pass; the rest follows next time.
-const PASS: u64 = 32 * 1024 * 1024;
+pub const PASS: u64 = 4 * 1024 * 1024;
 
 /// Folders are searched this deep below a root (project folder, session folder, sub-agents,
 /// workflows).
@@ -21,6 +21,8 @@ pub struct FileRead {
     /// Where this read started (0 when the file shrank and is read again from the top).
     pub from: u64,
     pub chunk: Chunk,
+    /// Whether the file has more past what this pass took.
+    pub more: bool,
 }
 
 impl FileRead {
@@ -66,9 +68,8 @@ pub fn read_new(format: &dyn TranscriptFormat, path: &Path, offset: u64) -> Opti
     }
     file.seek(SeekFrom::Start(from)).ok()?;
     let mut bytes = Vec::new();
-    file.take(PASS.min(len - from))
-        .read_to_end(&mut bytes)
-        .ok()?;
+    let take = PASS.min(len - from);
+    file.take(take).read_to_end(&mut bytes).ok()?;
     let chunk = format.parse(&bytes);
     // Only an unfinished line is new: wait for its end. (A file that shrank is still reported,
     // so its offset goes back to the start.)
@@ -79,5 +80,39 @@ pub fn read_new(format: &dyn TranscriptFormat, path: &Path, offset: u64) -> Opti
         path: path.to_owned(),
         from,
         chunk,
+        more: from + take < len,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use toknila_core::usage::ClaudeCode;
+
+    fn line(i: usize) -> String {
+        format!(
+            "{{\"type\":\"assistant\",\"uuid\":\"u{i}\",\"requestId\":\"r{i}\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"/w\",\"message\":{{\"id\":\"m{i}\",\"model\":\"claude-opus-4-8\",\"usage\":{{\"input_tokens\":1,\"output_tokens\":1}}}}}}\n"
+        )
+    }
+
+    #[test]
+    fn a_big_file_is_read_in_bounded_passes_and_none_is_lost() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("s.jsonl");
+        let count = (PASS as usize * 2 / line(0).len()) + 10;
+        std::fs::write(&path, (0..count).map(line).collect::<String>()).expect("write");
+        let (mut offset, mut records, mut passes) = (0, 0, 0);
+        while let Some(read) = read_new(&ClaudeCode, &path, offset) {
+            assert!(
+                read.chunk.consumed as u64 <= PASS,
+                "a pass stays within the bound"
+            );
+            records += read.chunk.records.len();
+            offset = read.next_offset();
+            passes += 1;
+            assert_eq!(read.more, read_new(&ClaudeCode, &path, offset).is_some());
+        }
+        assert!(passes >= 3, "{passes} passes");
+        assert_eq!(records, count);
+    }
 }

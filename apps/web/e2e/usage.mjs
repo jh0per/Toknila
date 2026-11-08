@@ -122,6 +122,23 @@ try {
   await expectText(page.locator("a.node[data-key=DEMO-1] [data-testid=usage-chip]"), "3.1M tok · ~$8.50", "the card's chip on the canvas");
   await expectText(t("details-usage"), "~$8.50", "the card's chip in its details");
 
+  // Strictly: the chip's whole text and tooltip, and no chip on any card that used nothing.
+  const chip = page.locator("a.node[data-key=DEMO-1] [data-testid=usage-chip]");
+  const exact = async (got, want, what) => {
+    if (got !== want) throw new Error(`${what}: expected "${want}", got "${got}"`);
+    console.log(`PASS ${what}: ${want}`);
+  };
+  await exact((await chip.textContent())?.trim(), "3.1M tok · ~$8.50", "the canvas chip reads exactly tokens and cost");
+  await exact(
+    await chip.getAttribute("title"),
+    "3.1M tok · ~$8.50. Estimate at API list prices; on a subscription the real cost differs.",
+    "the chip's tooltip says it is an estimate",
+  );
+  const chips = await page.locator("a.node [data-testid=usage-chip]").count();
+  await exact(String(chips), "1", "only the card that used tokens has a chip on the canvas");
+  const other = await page.locator("a.node:not([data-key=DEMO-1]) [data-testid=usage-chip]").count();
+  await exact(String(other), "0", "a card without usage has no chip");
+
   // Only Toknila's runs: the other session disappears.
   await page.goto(at("/usage"));
   // The box follows the daemon's answer, so it changes after the save, not at the click.
