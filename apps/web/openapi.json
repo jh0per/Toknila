@@ -168,7 +168,7 @@
         "tags": [
           "chains"
         ],
-        "summary": "Sets how the chain's tickets are reviewed: the mode and the reviewer agent profile. A ticket\nthat sets its own keeps it; a field left out is kept.",
+        "summary": "Sets the chain's review mode, reviewer agent profile and autostart. A ticket that sets its\nown review keeps it; a field left out is kept. Turning autostart on starts the chain's ready\ncards that have a free slot: it is the owner's act, and the journal records it\n(`chain.updated`).",
         "operationId": "patch_chain",
         "parameters": [
           {
@@ -179,13 +179,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "description": "Project id or key, when two projects have a chain of this name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReviewSettings"
+                "$ref": "#/components/schemas/ChainSettings"
               }
             }
           },
@@ -4694,6 +4703,36 @@
           }
         }
       },
+      "ChainSettings": {
+        "type": "object",
+        "description": "What a person may set on a chain after it is made (a project takes the review fields in\n[`crate::projects::PatchProject`]). A field left out is kept.",
+        "properties": {
+          "autostart": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the chain starts its ready cards by itself. Turning it on starts the ready cards\nthat have a free slot, so it is a person's act; the planner cannot change a chain's graph\nwhile it is on."
+          },
+          "review_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
+          }
+        }
+      },
       "ChainStatus": {
         "type": "string",
         "description": "Computed chain status (never stored). Proposed wildcard cards are not part of the plan: they\ndo not count in `total` or `done`, but a pending decision makes the chain need a human.",
@@ -7278,29 +7317,6 @@
           },
           "verdict": {
             "$ref": "#/components/schemas/Verdict"
-          }
-        }
-      },
-      "ReviewSettings": {
-        "type": "object",
-        "description": "What a person may set about review on a chain (a project takes the same two fields in\n[`crate::projects::PatchProject`]). A field left out is kept.",
-        "properties": {
-          "review_mode": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/ReviewMode"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "reviewer": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
           }
         }
       },

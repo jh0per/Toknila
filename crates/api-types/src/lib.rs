@@ -28,13 +28,13 @@ pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedCha
 pub use questions::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
 pub use removal::{ChainDeletion, DeleteProject, ProjectDeletion};
 pub use system::{CliLink, RepoCheckRequest};
-pub use toknila_app::chains::NewChain;
+pub use toknila_app::chains::{ChainSettings, NewChain};
 pub use toknila_app::planner::{
     CardEdit, NewCard, NewPlanChain, PlanCard, PlanChain, PlanThread, PlanView, SubtaskEdit,
 };
 pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;
-pub use toknila_app::reviews::{ReviewSettings, ReviewView};
+pub use toknila_app::reviews::ReviewView;
 pub use toknila_app::threads::{NewMessage, NewThread, NewVersion};
 pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;

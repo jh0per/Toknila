@@ -13,6 +13,7 @@ use crate::server::{AppState, router};
 use crate::store::Store;
 
 mod agent_tokens;
+mod chain_settings;
 mod inbox;
 mod merges;
 mod parallel;

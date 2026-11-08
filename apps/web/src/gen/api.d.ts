@@ -61,8 +61,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Sets how the chain's tickets are reviewed: the mode and the reviewer agent profile. A ticket
-         *     that sets its own keeps it; a field left out is kept.
+         * Sets the chain's review mode, reviewer agent profile and autostart. A ticket that sets its
+         *     own review keeps it; a field left out is kept. Turning autostart on starts the chain's ready
+         *     cards that have a free slot: it is the owner's act, and the journal records it
+         *     (`chain.updated`).
          */
         patch: operations["patch_chain"];
         trace?: never;
@@ -1418,6 +1420,21 @@ export interface components {
             summary: components["schemas"]["ChainSummary"];
         };
         /**
+         * @description What a person may set on a chain after it is made (a project takes the review fields in
+         *     [`crate::projects::PatchProject`]). A field left out is kept.
+         */
+        ChainSettings: {
+            /**
+             * @description Whether the chain starts its ready cards by itself. Turning it on starts the ready cards
+             *     that have a free slot, so it is a person's act; the planner cannot change a chain's graph
+             *     while it is on.
+             */
+            autostart?: boolean | null;
+            review_mode?: components["schemas"]["ReviewMode"] | null;
+            /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
+            reviewer?: string | null;
+        };
+        /**
          * @description Computed chain status (never stored). Proposed wildcard cards are not part of the plan: they
          *     do not count in `total` or `done`, but a pending decision makes the chain need a human.
          * @enum {string}
@@ -2371,15 +2388,6 @@ export interface components {
             reviewer: components["schemas"]["Actor"];
             verdict: components["schemas"]["Verdict"];
         };
-        /**
-         * @description What a person may set about review on a chain (a project takes the same two fields in
-         *     [`crate::projects::PatchProject`]). A field left out is kept.
-         */
-        ReviewSettings: {
-            review_mode?: components["schemas"]["ReviewMode"] | null;
-            /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
-            reviewer?: string | null;
-        };
         /** @description Whose verdict a card in Review waits for. */
         ReviewTurn: {
             /** @enum {string} */
@@ -2936,7 +2944,10 @@ export interface operations {
     };
     patch_chain: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Project id or key, when two projects have a chain of this name */
+                project?: string;
+            };
             header?: never;
             path: {
                 /** @description Chain id or name */
@@ -2946,7 +2957,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReviewSettings"];
+                "application/json": components["schemas"]["ChainSettings"];
             };
         };
         responses: {

@@ -5,6 +5,8 @@ export interface MenuEntry {
   testId: string;
   run: () => void;
   danger?: boolean;
+  /// Shown as the entry's tooltip.
+  hint?: string;
 }
 
 /// A small menu at the pointer. Escape, a click outside it, scrolling or leaving the window
@@ -46,6 +48,7 @@ export function ContextMenu({ x, y, entries, onClose }: {
           type="button"
           role="menuitem"
           data-testid={m.testId}
+          title={m.hint}
           className={m.danger ? "danger" : ""}
           onClick={() => {
             onClose();

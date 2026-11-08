@@ -2,6 +2,7 @@ import type { Project } from "../api/types";
 import type { Intent } from "../store/msg";
 import { type State, currentChain } from "../store/state";
 import { Canvas } from "./Canvas";
+import { PanelDivider } from "./PanelDivider";
 import { PlannerPanel } from "./PlannerPanel";
 
 /// The planner entry: the project's most recently active chain above, which follows what the
@@ -24,6 +25,7 @@ export function PlannerScreen({ project, state, dispatch }: { project: Project; 
           <p className="muted empty">No chains yet. Start the planner and ask it to plan this project; its chains show here as it makes them.</p>
         </div>
       )}
+      <PanelDivider />
       <PlannerPanel project={project} state={state} dispatch={dispatch} />
     </>
   );

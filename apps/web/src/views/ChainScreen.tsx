@@ -1,7 +1,9 @@
 import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, runningAgents, slotsOf } from "../store/state";
+import { AUTOSTART_HINT } from "../store/autostart";
 import { Canvas } from "./Canvas";
+import { PanelDivider } from "./PanelDivider";
 import { Panel } from "./Panel";
 
 /// A chain: its top bar (where it stands, a new card, the agent slots), the canvas and the panel.
@@ -22,6 +24,13 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
         >
           New card
         </button>
+        <label className="autostart" title={AUTOSTART_HINT}>
+          <input
+            type="checkbox" data-testid="chain-autostart-toggle" checked={chain.chain.autostart}
+            onChange={(e) => dispatch({ type: "setAutostart", chain: chain.chain.id, autostart: e.target.checked })}
+          />{" "}
+          Autostart
+        </label>
         {state.error && <span className="error">{state.error}</span>}
         <span className="grow" />
         <span className="pill" data-testid="slots" title="Agents working now / agents allowed at once">
@@ -30,6 +39,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
         </span>
       </header>
       <Canvas chain={chain} state={state} dispatch={dispatch} />
+      <PanelDivider />
       <Panel state={state} dispatch={dispatch} />
     </>
   );

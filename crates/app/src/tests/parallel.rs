@@ -5,6 +5,7 @@ use toknila_core::machine::TicketEvent;
 use toknila_core::{Actor, Ticket, TicketDraft, TicketId, TicketStatus};
 
 use super::Mem;
+use crate::chains::{self, ChainSettings};
 use crate::projects::{self, PatchProject};
 use crate::tickets::TicketAction;
 use crate::{ErrorKind, schedule, tickets, with_chain};
@@ -183,4 +184,48 @@ fn starting_a_card_twice_while_it_waits_is_a_conflict() {
         .expect("event");
     let err = tickets::act(&mut mem, &t, event).expect_err("already queued");
     assert_eq!(err.kind, ErrorKind::Conflict);
+}
+
+#[test]
+fn turning_autostart_on_starts_the_ready_cards_and_is_journaled_and_off_starts_none() {
+    let mut mem = world(2);
+    assert_eq!(status(&mem, 1), TicketStatus::Ready, "control: waits");
+    mem.events.clear();
+    let on = ChainSettings {
+        autostart: Some(true),
+        ..ChainSettings::default()
+    };
+    chains::set_settings(&mut mem, "demo", None, on).expect("on");
+    assert!(mem.view.chain.autostart);
+    assert_eq!(status(&mem, 1), TicketStatus::Running);
+    assert_eq!(status(&mem, 2), TicketStatus::Running);
+    assert!(
+        mem.kinds().contains(&"chain.updated".to_owned()),
+        "{:?}",
+        mem.kinds()
+    );
+
+    let off = ChainSettings {
+        autostart: Some(false),
+        ..ChainSettings::default()
+    };
+    chains::set_settings(&mut mem, "demo", None, off).expect("off");
+    assert!(!mem.view.chain.autostart);
+    // A field left out is kept.
+    chains::set_settings(&mut mem, "demo", None, ChainSettings::default()).expect("noop");
+    assert!(!mem.view.chain.autostart);
+}
+
+#[test]
+fn turning_autostart_on_respects_the_slot_limit() {
+    let mut mem = world(3);
+    let on = ChainSettings {
+        autostart: Some(true),
+        ..ChainSettings::default()
+    };
+    chains::set_settings(&mut mem, "demo", None, on).expect("on");
+    let running = (1..=3)
+        .filter(|n| status(&mem, *n) == TicketStatus::Running)
+        .count();
+    assert_eq!(running, 2, "two slots; the third waits in the queue");
 }

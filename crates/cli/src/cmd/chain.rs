@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Subcommand};
-use toknila_api_types::{EdgeInput, NewChain};
+use toknila_api_types::{ChainSettings, EdgeInput, NewChain};
 use toknila_client::Client;
 use toknila_core::EdgeKind;
 
@@ -37,6 +37,18 @@ pub enum ChainCmd {
         /// The spec folder whose tasks.md to patch.
         #[arg(long, conflicts_with = "file")]
         spec: Option<std::path::PathBuf>,
+    },
+    /// Change a chain's settings after it is made. `--autostart on` lets the chain start its
+    /// ready cards by itself, and starts the ready ones now (as far as slots allow); `off` stops
+    /// that and opens the chain's graph to the planner.
+    Set {
+        chain: String,
+        /// The project, when two projects have a chain of this name.
+        #[arg(long)]
+        project: Option<String>,
+        /// Whether the chain starts its ready cards by itself.
+        #[arg(long, value_parser = ["on", "off"])]
+        autostart: String,
     },
     /// Show a chain as a graph in dependency order with its status.
     Show { chain: String },
@@ -127,6 +139,18 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
             project,
             yes,
         } => return super::chain_rm::run(c, &chain, project.as_deref(), yes, json_out),
+        ChainCmd::Set {
+            chain,
+            project,
+            autostart,
+        } => {
+            let settings = ChainSettings {
+                autostart: Some(autostart == "on"),
+                ..ChainSettings::default()
+            };
+            let detail = c.patch_chain(&chain, project.as_deref(), &settings)?;
+            emit(json_out, &detail, output::chain);
+        }
         ChainCmd::Show { chain } => emit(json_out, &c.chain(&chain)?, output::chain),
         ChainCmd::Ls => {
             emit(json_out, &c.chains()?, |items| {

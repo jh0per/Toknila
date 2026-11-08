@@ -72,9 +72,11 @@ and `tok mcp` in the planner role does the same through tools), and a Playwright
 - No migration and no journal entries for the planner's start and end; its plan edits are ordinary
   journal events, so the diagram updates live. The window learns that the planner ended from the
   terminal stream.
-- A chain made in the window autostarts by default, and there is no way to turn that off after
-  creation, so the planner can only restructure chains made with autostart off (`tok chain new
-  --no-autostart`, or the planner's own). Open question for the owner: a switch for it.
+- A chain made in the window autostarts by default, so the planner can only restructure chains
+  with autostart off. The owner changes it after creation (`tok chain set <chain> --autostart
+  on|off`, `PATCH /chains/{chain}`, the toggle in the chain's header and context menu); turning it
+  on starts the ready cards, which is the owner's act, and the journal records it as
+  `chain.updated`.
 - A chain's name cannot be changed and its review settings stay with the owner, so "edit a chain"
   means creating one.
 - The planner has no profile setting per project: `start` takes a profile name and defaults to

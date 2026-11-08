@@ -5,6 +5,7 @@ import type {
   ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
+import { runAutostartEffect } from "./autostartEffects";
 import { runEdgeEffect } from "./edgeEffects";
 import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
@@ -197,6 +198,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "moveEdge":
       case "removeEdge":
         runEdgeEffect(e, dispatch);
+        return;
+      case "setAutostart":
+        runAutostartEffect(e, dispatch);
         return;
       case "watchUpdates":
         stopWatch = runUpdateEffect(e, dispatch);
