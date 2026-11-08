@@ -118,9 +118,11 @@ fn now_rfc3339() -> String {
     rfc3339(secs)
 }
 
-/// The merged pull request titles in the output of
-/// `git log --first-parent --format=%s%x1f%b%x1e`: the first body line of a GitHub merge commit,
-/// or the subject of a commit made directly or by squashing.
+/// The merged titles in the output of `git log --first-parent --format=%s%x1f%b%x1e`: the first
+/// body line of a GitHub merge commit, the title after the colon of a local merge made as
+/// `Merge <branch>: <title>` (the daemon merges accepted cards that way), or the subject of a
+/// commit made directly or by squashing. Other merge commits (`Merge branch 'main' into x`) are
+/// left out.
 pub fn notes_from_log(log: &str) -> Vec<String> {
     log.split('\x1e')
         .filter_map(|record| {
@@ -128,7 +130,11 @@ pub fn notes_from_log(log: &str) -> Vec<String> {
             let subject = subject.trim();
             if subject.starts_with("Merge pull request") {
                 body.lines().map(str::trim).find(|l| !l.is_empty())
-            } else if subject.is_empty() || subject.starts_with("Merge ") {
+            } else if let Some(rest) = subject.strip_prefix("Merge ") {
+                rest.split_once(": ")
+                    .map(|(_, title)| title.trim())
+                    .filter(|t| !t.is_empty())
+            } else if subject.is_empty() {
                 None
             } else {
                 Some(subject)
@@ -331,6 +337,8 @@ mod tests {
         let log = "Merge pull request #42 from jh0per/p1-28\x1fP1-28: reviewer without a verdict\n\x1e\
                    Merge pull request #41 from jh0per/p1-27\x1f\nP1-27: threads\n\x1e\
                    Merge branch 'main' into x\x1f\x1e\
+                   Merge ship/phase-2/toknila-17-tok-watch: TOKNILA-17 tok watch prints when things happened\x1f\x1e\
+                   Merge p2-08-agent-env: tool folders on the agents' PATH\x1f\nCo-Authored-By: x\x1e\
                    Fix a typo (#40)\x1f\x1e\
                    P1-20: direct\x1f\x1e";
         assert_eq!(
@@ -338,6 +346,8 @@ mod tests {
             vec![
                 "P1-28: reviewer without a verdict",
                 "P1-27: threads",
+                "TOKNILA-17 tok watch prints when things happened",
+                "tool folders on the agents' PATH",
                 "Fix a typo (#40)",
                 "P1-20: direct"
             ]
