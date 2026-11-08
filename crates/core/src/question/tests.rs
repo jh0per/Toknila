@@ -202,3 +202,17 @@ fn the_screen_hash_ignores_escape_codes_and_sees_text() {
     assert_eq!(screen_hash(b"\x1b[1mhi\x1b[0m\n"), screen_hash(b"hi\n"));
     assert_ne!(screen_hash(b"hi\n"), screen_hash(b"ho\n"));
 }
+
+#[test]
+fn a_worker_that_handed_in_is_refused_without_asking_and_only_then() {
+    use crate::TicketStatus as S;
+    let Some(Decision::Deny { message }) = auto_decision(AgentRole::Worker, S::Review) else {
+        panic!("a handed-in worker is refused");
+    };
+    assert_eq!(message, HANDED_IN_DENIAL);
+    assert!(message.contains("handed in") && message.contains("unless the card is returned"));
+    for status in S::ALL.into_iter().filter(|s| *s != S::Review) {
+        assert_eq!(auto_decision(AgentRole::Worker, status), None, "{status:?}");
+    }
+    assert_eq!(auto_decision(AgentRole::Reviewer, S::Review), None);
+}

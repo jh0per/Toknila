@@ -806,7 +806,12 @@ no verdict carries the text "The reviewer gave no verdict", the reviewer's last 
 A `question` item says whose it is (`role`: the card's worker or its reviewer), what is asked
 (`text`; for a permission it ends with the tool and a summary of the call, the command or the
 file, at most 300 characters, never the contents of a prompt or a file) and which answers it takes
-(`answers`, from `toknila_core::question::QuestionKind::answers`):
+(`answers`, from `toknila_core::question::QuestionKind::answers`). When the summary lost something
+(it was cut, or the command had several lines) the item also carries `detail`: the whole text of
+the call, lines kept, at most 4000 characters (`hook::summary_and_detail`); the window shows it
+behind "Show the full command" and `tok show` prints it under "the full request". A worker whose
+card is in Review has handed in: its permission requests are refused at once with a reason
+(`question::auto_decision`), nobody is asked, and the card is asked about again only after a Return.
 
 | Question | Answers | Source |
 |---|---|---|

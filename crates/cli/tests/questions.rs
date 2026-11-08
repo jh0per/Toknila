@@ -189,3 +189,63 @@ fn a_long_permission_request_shows_its_full_command_in_the_inbox_and_in_tok_show
     assert!(shown.contains("  EOF"), "{shown}");
     tok.run(&["cancel", "DEMO-1", "done"]);
 }
+
+#[test]
+fn an_agent_that_asks_after_its_hand_in_is_refused_with_a_reason_and_asks_again_once_returned() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tok = Tok::in_dir(dir.path());
+    // It waits for a line, then asks to run something, twice: the first ask comes after the
+    // hand-in, the second after the card was returned.
+    tok.profile(
+        "verifier",
+        &[
+            "print",
+            "ready",
+            "echo",
+            "post",
+            "/tickets/{ticket}/permission",
+            r#"{"tool":"Bash: cargo xtask verify"}"#,
+            "echo",
+            "post",
+            "/tickets/{ticket}/permission",
+            r#"{"tool":"Bash: cargo xtask verify"}"#,
+            "sleep",
+            "30000",
+        ],
+        "",
+    );
+    setup(&tok, dir.path(), "verifier");
+    let client = tok.client();
+    wait_until("the agent to be ready", || {
+        tok.logs("DEMO-1").contains("ready")
+    });
+    let ship = std::path::PathBuf::from(
+        tok.run(&["show", "DEMO-1"])["ship"]["path"]
+            .as_str()
+            .expect("ship"),
+    );
+    std::fs::write(ship.join("a.txt"), "a\n").expect("write");
+    common::git(&ship, &["add", "a.txt"]);
+    common::git(&ship, &["commit", "--quiet", "-m", "a"]);
+    tok.run(&["sim", "DEMO-1", "finish", "done"]);
+    assert_eq!(tok.status("DEMO-1"), "review");
+
+    client.runner_input("DEMO-1", b"go\r").expect("input");
+    wait_until("the refusal", || {
+        tok.logs("DEMO-1").contains(r#""decision":"deny""#)
+    });
+    let log = tok.logs("DEMO-1");
+    assert!(
+        log.contains("handed in") && log.contains("unless the card is returned"),
+        "{log}"
+    );
+    assert_eq!(tok.status("DEMO-1"), "review", "nobody was asked");
+    assert!(questions(&client).is_empty());
+
+    // Returned, the card is the worker's again and its next request waits for a person.
+    tok.run(&["return", "DEMO-1", "one more thing"]);
+    client.runner_input("DEMO-1", b"go\r").expect("input");
+    wait_until("the question", || !questions(&client).is_empty());
+    assert_eq!(tok.status("DEMO-1"), "waiting");
+    tok.run(&["cancel", "DEMO-1", "done"]);
+}

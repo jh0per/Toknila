@@ -125,6 +125,13 @@ pub async fn agent_permission(
         Principal::Agent(grant) => grant.role,
         Principal::Person => AgentRole::Worker,
     };
+    // A worker that handed in and still wants to run something is refused without asking anyone.
+    if let Some(Decision::Deny { message }) = question::auto_decision(role, t.status) {
+        return Ok(Json(PermissionReply {
+            decision: PermissionDecision::Deny,
+            message: Some(message),
+        }));
+    }
     let at = now();
     let prompts = state.runners.prompts();
     let (summary, detail) =
