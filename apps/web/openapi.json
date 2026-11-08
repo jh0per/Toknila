@@ -8322,7 +8322,7 @@
       },
       "TicketStatus": {
         "type": "string",
-        "description": "Ticket status. Transitions between them are owned by the state machine (P0-04).",
+        "description": "Ticket status. Transitions between them are owned by the state machine.",
         "enum": [
           "proposed",
           "backlog",
@@ -8406,7 +8406,8 @@
         "enum": [
           "git",
           "claude",
-          "gh"
+          "gh",
+          "check_command"
         ]
       },
       "UsageFigures": {

@@ -6,9 +6,10 @@ import type { Effect, Intent, Msg } from "./msg";
 import { reduce } from "./reduce";
 import { parseRoute } from "./route";
 import { type State, initialState } from "./state";
+import { readTheme } from "./themeEffects";
 
 export function useStore(): [State, (intent: Intent) => void] {
-  const [state, setState] = useState(() => initialState(parseRoute(window.location.pathname)));
+  const [state, setState] = useState(() => ({ ...initialState(parseRoute(window.location.pathname)), theme: readTheme() }));
   const current = useRef(state);
   const runner = useRef<{ run: (e: Effect) => void; stop: () => void } | null>(null);
 

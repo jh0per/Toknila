@@ -4,21 +4,16 @@
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::http::StatusCode;
+use axum::response::Response;
 use toknila_api_types::TerminalSize;
-use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN, RunnerQuery};
+use toknila_api_types::runner::RunnerQuery;
 use toknila_app::{resolve, runs};
 use toknila_core::{Actor, AgentRole};
 
-use super::ApiResult;
+use super::{ApiResult, scrollback_response};
 use crate::http::error::{ApiError, ErrorBody};
 use crate::server::AppState;
-
-fn header(name: &'static str, value: impl ToString) -> (HeaderName, HeaderValue) {
-    let value = HeaderValue::from_str(&value.to_string()).unwrap_or(HeaderValue::from_static(""));
-    (HeaderName::from_static(name), value)
-}
 
 #[utoipa::path(get, path = "/tickets/{ticket}/runner/scrollback", tag = "runner",
     params(("ticket" = String, Path, description = "Ticket id or key"), RunnerQuery),
@@ -40,12 +35,7 @@ pub async fn scrollback(
         .await
         .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))?
         .ok_or_else(|| ApiError::not_found(format!("output of {}", t.key)))?;
-    let headers = HeaderMap::from_iter([
-        header(HEADER_RUN, chunk.run),
-        header(HEADER_OFFSET, chunk.offset),
-        header(HEADER_END, chunk.end),
-    ]);
-    Ok((headers, chunk.bytes).into_response())
+    Ok(scrollback_response(chunk))
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/runner/input", tag = "runner",

@@ -46,6 +46,26 @@ pub struct AppState {
     pub trash: Arc<dyn crate::trash::Trasher>,
 }
 
+#[cfg(test)]
+impl AppState {
+    /// A state for tests over `store`: no runners, no transcripts, the real tools, a trash that
+    /// moves nothing. Its folders (`ships`) sit under `home`.
+    pub(crate) fn for_test(store: Store, token: &str, home: &std::path::Path) -> Self {
+        Self {
+            store,
+            token: token.into(),
+            shutdown: Arc::new(Notify::new()),
+            profiles: PathBuf::new(),
+            runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
+            tools: Arc::new(crate::tools::SystemTools),
+            usage: Arc::new(crate::usage::Usage::disabled()),
+            home: home.to_owned(),
+            ships: home.join("ships"),
+            trash: Arc::new(crate::trash::NoTrash),
+        }
+    }
+}
+
 /// Current wall-clock time.
 pub fn now() -> Timestamp {
     let ms = SystemTime::now()

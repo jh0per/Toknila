@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,6 +12,7 @@ use serde_json::{Value, json};
 use toknila_core::system::Probe;
 
 use super::Api;
+use crate::git::testing::{git, init_repo};
 use crate::tools::Tools;
 
 /// Answers by `program args...`; a program it does not know is missing.
@@ -103,27 +103,10 @@ async fn system_checks_are_ok_when_every_tool_is() {
     assert_eq!(api.get("/v1/system/checks").await["ok"], true);
 }
 
-fn git(dir: &Path, args: &[&str]) {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@example.com"])
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .output()
-        .expect("git runs");
-    assert!(out.status.success(), "git {args:?}: {out:?}");
-}
-
 /// A repository whose only branch is `develop`, with one commit.
 fn repo(dir: &Path) -> PathBuf {
     let repo = dir.join("repo");
-    std::fs::create_dir_all(&repo).expect("mkdir");
-    git(&repo, &["init", "--quiet"]);
-    git(&repo, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
-    std::fs::write(repo.join("a.txt"), "a").expect("write");
-    git(&repo, &["add", "a.txt"]);
-    git(&repo, &["commit", "--quiet", "-m", "init"]);
+    init_repo(&repo, "develop");
     repo
 }
 
@@ -139,7 +122,7 @@ async fn a_new_project_with_a_bad_folder_is_refused_with_a_typed_error_per_field
     let good = repo(tmp.path());
     let plain = tmp.path().join("plain");
     std::fs::create_dir_all(&plain).expect("mkdir");
-    let file = good.join("a.txt");
+    let file = good.join("README.md");
     let api = Api::new();
     let path = |p: &Path| p.to_string_lossy().into_owned();
 

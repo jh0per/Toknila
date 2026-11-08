@@ -5,7 +5,7 @@
   --accent: #0b7a8a; --accent-soft: #d9eef1;
   --todo: #7b8794; --prog: #0b7a8a; --block: #b86e00; --done: #2a8a4a; --cancel: #66727f;
   --todo-soft: #e6eaee; --prog-soft: #d9eef1; --block-soft: #fbe9cc; --done-soft: #dbf0e1;
-  --danger: #c0392b; --term-bg: #12181e; --term-fg: #b9c7d3; --term-dim: #6f8191;
+  --danger: #c0392b; --term-bg: #12181e; --term-fg: #b9c7d3;
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
   --fs-xs: 10.5px; --fs-s: 12px; --fs-m: 13px; --fs-l: 15px;
   --r-s: 4px; --r-m: 6px; --r-pill: 999px;

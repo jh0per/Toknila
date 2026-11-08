@@ -11,6 +11,7 @@ import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
 import { runPlannerEffect } from "./plannerEffects";
 import { runSettingsEffect } from "./settingsEffects";
+import { saveTheme } from "./themeEffects";
 import { runUpdateEffect } from "./updatesEffects";
 import { runUsageEffect } from "./usageEffects";
 
@@ -203,6 +204,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "setAutostart":
         runAutostartEffect(e, dispatch);
+        return;
+      case "saveTheme":
+        saveTheme(e.theme);
         return;
       case "watchUpdates":
         stopWatch = runUpdateEffect(e, dispatch);

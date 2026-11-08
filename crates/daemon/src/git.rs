@@ -13,6 +13,33 @@ use toknila_app::{MergeError, ShipError};
 #[cfg(test)]
 pub(crate) mod testing;
 
+/// Kills the child and what it started: the whole process group on Unix (it leads its own), the
+/// process tree through `taskkill /T` on Windows. The child alone is the fallback.
+fn kill_tree(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        use nix::sys::signal::{Signal, killpg};
+        if let Ok(raw) = i32::try_from(child.id())
+            && killpg(nix::unistd::Pid::from_raw(raw), Signal::SIGKILL).is_ok()
+        {
+            return;
+        }
+    }
+    #[cfg(windows)]
+    {
+        let tree = Command::new("taskkill")
+            .args(["/T", "/F", "/PID", &child.id().to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        if tree.is_ok_and(|s| s.success()) {
+            return;
+        }
+    }
+    let _ = child.kill();
+}
+
 /// Why a git command did not give a result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum GitError {
@@ -92,19 +119,21 @@ impl Git {
             .map(|a| a.as_ref().to_string_lossy().into_owned())
             .collect::<Vec<_>>()
             .join(" ");
-        let mut child = Command::new(&self.program)
-            .arg("-C")
+        let mut cmd = Command::new(&self.program);
+        cmd.arg("-C")
             .arg(repo)
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| match e.kind() {
-                ErrorKind::NotFound => GitError::Missing,
-                _ => GitError::Io(format!("cannot run {}: {e}", self.program)),
-            })?;
+            .stderr(Stdio::piped());
+        // Its own process group, so a timeout can end git and its helpers (`git-remote-https`).
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
+        let mut child = cmd.spawn().map_err(|e| match e.kind() {
+            ErrorKind::NotFound => GitError::Missing,
+            _ => GitError::Io(format!("cannot run {}: {e}", self.program)),
+        })?;
         // Read both pipes on threads so a chatty command cannot fill them and stall. Not joined
         // after a kill: a helper process of git may still hold the pipe open.
         fn drain(pipe: Option<impl Read + Send + 'static>) -> std::sync::mpsc::Receiver<Vec<u8>> {
@@ -125,7 +154,7 @@ impl Git {
             match child.try_wait() {
                 Ok(Some(status)) => break status,
                 Ok(None) if started.elapsed() >= limit => {
-                    let _ = child.kill();
+                    kill_tree(&mut child);
                     let _ = child.wait();
                     return Err(GitError::Failed {
                         command,

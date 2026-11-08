@@ -50,3 +50,38 @@ fn a_command_within_the_limit_gives_its_output_and_its_failure() {
     };
     assert!(detail.starts_with("fatal:"), "{detail}");
 }
+
+/// A stand-in for the program that starts a sleeping helper, as `git-remote-https` is, and waits.
+#[cfg(unix)]
+#[test]
+fn a_timeout_ends_the_helper_processes_too() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().expect("tmp");
+    let pid_file = tmp.path().join("helper.pid");
+    let script = tmp.path().join("fake-git");
+    std::fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\nsleep 60 &\necho $! > '{}'\nwait\n",
+            pid_file.display()
+        ),
+    )
+    .expect("script");
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let g = Git::new(&script.to_string_lossy());
+    let err = g
+        .run_within("/", &["fetch"], Duration::from_secs(1))
+        .expect_err("times out");
+    assert!(matches!(err, GitError::Failed { .. }), "{err:?}");
+    let pid: i32 = std::fs::read_to_string(&pid_file)
+        .expect("helper pid")
+        .trim()
+        .parse()
+        .expect("number");
+    let alive = || nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok();
+    let until = Instant::now() + Duration::from_secs(5);
+    while alive() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(!alive(), "the helper outlived the timeout");
+}

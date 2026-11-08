@@ -121,12 +121,12 @@ pub(super) const MIGRATIONS: &[&str] = &[
     );
     CREATE INDEX events_entity ON events(entity, entity_id, seq);
     "#,
-    // 2: wildcard cards (P1-01). The mark of a card nobody planned: where it came from, who
+    // 2: wildcard cards. The mark of a card nobody planned: where it came from, who
     // proposed it, its pending dependencies and whether a person approved it (JSON).
     r#"
     ALTER TABLE tickets ADD COLUMN wildcard_json TEXT;
     "#,
-    // 3: threads on a card (P1-03). Messages and versions are insert-only; a version number is
+    // 3: threads on a card. Messages and versions are insert-only; a version number is
     // unique per thread, a thread number per ticket.
     r#"
     CREATE TABLE threads (
@@ -162,7 +162,7 @@ pub(super) const MIGRATIONS: &[&str] = &[
         UNIQUE (thread_id, number)
     );
     "#,
-    // 4: cards imported as done behind open cards (P1-04): the earlier cards that were open
+    // 4: cards imported as done behind open cards: the earlier cards that were open
     // (JSON), kept for good so a view can say "done out of order".
     r#"
     ALTER TABLE tickets ADD COLUMN done_out_of_order_json TEXT;
@@ -173,7 +173,7 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE projects ADD COLUMN max_parallel INTEGER NOT NULL DEFAULT 2;
     ALTER TABLE tickets ADD COLUMN queued INTEGER NOT NULL DEFAULT 0;
     "#,
-    // 6: review (P1-14). A ticket's review state (whose turn, the rounds so far; JSON) and the
+    // 6: review. A ticket's review state (whose turn, the rounds so far; JSON) and the
     // reviewer agent profile that may be set on a ticket, a chain and a project.
     r#"
     ALTER TABLE tickets ADD COLUMN review_json TEXT;
@@ -181,7 +181,7 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE chains ADD COLUMN reviewer TEXT;
     ALTER TABLE projects ADD COLUMN default_reviewer TEXT;
     "#,
-    // 7: pull-request mode (P1-21). A project's merge mode, pull request title template and merge
+    // 7: pull-request mode. A project's merge mode, pull request title template and merge
     // method, and the pull request of a card (JSON: number, url, checks).
     r#"
     ALTER TABLE projects ADD COLUMN merge_mode TEXT NOT NULL DEFAULT 'local';
@@ -189,7 +189,7 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE projects ADD COLUMN merge_method TEXT NOT NULL DEFAULT 'merge';
     ALTER TABLE tickets ADD COLUMN pr_json TEXT;
     "#,
-    // 8: token usage (P1-22). Which Claude Code session a run is (from hook input), the
+    // 8: token usage. Which Claude Code session a run is (from hook input), the
     // transcript files read so far (byte offset), one row per model call (the key is the
     // message id and request id, so a call is one row however often it was written), and
     // machine-wide settings (a key and a JSON value).

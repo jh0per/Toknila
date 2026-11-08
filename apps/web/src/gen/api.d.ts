@@ -2722,7 +2722,7 @@ export interface components {
         /** @example DEMO-3 */
         TicketKey: string;
         /**
-         * @description Ticket status. Transitions between them are owned by the state machine (P0-04).
+         * @description Ticket status. Transitions between them are owned by the state machine.
          * @enum {string}
          */
         TicketStatus: "proposed" | "backlog" | "ready" | "running" | "waiting" | "blocked" | "review" | "merged" | "released" | "cancelled";
@@ -2762,7 +2762,7 @@ export interface components {
          * @description Which tool a check is about.
          * @enum {string}
          */
-        Tool: "git" | "claude" | "gh";
+        Tool: "git" | "claude" | "gh" | "check_command";
         /** @description The numbers of one group of calls. */
         UsageFigures: {
             /**

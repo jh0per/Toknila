@@ -11,6 +11,7 @@ import { type PlannerSlice, initialPlanner } from "./planner";
 import { type RemovalState, initialRemoval } from "./removal";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
+import type { Theme } from "./theme";
 import { type UpdatesState, initialUpdates } from "./updates";
 import { type UsageState, initialUsage } from "./usage";
 
@@ -62,6 +63,8 @@ export interface State {
   usage: UsageState;
   /// Updates of the desktop app (empty in a browser).
   updates: UpdatesState;
+  /// The viewer's colour theme; remembered in this browser only.
+  theme: Theme;
 }
 
 export const FIRST_RETRY_MS = 500;
@@ -95,6 +98,7 @@ export function initialState(route: Route): State {
     quick: initialQuick,
     usage: initialUsage,
     updates: initialUpdates,
+    theme: "system",
   };
 }
 
@@ -108,7 +112,7 @@ export const activeProjects = (s: State): Project[] => s.projects.filter((p) => 
 /// Archived projects, listed only when the person asks to see them.
 export const archivedProjects = (s: State): Project[] => s.projects.filter((p) => p.archived);
 
-/// The project in focus: the one in the route, the chain's for phase 0 paths, else the first one
+/// The project in focus: the one in the route, the chain's for the `/chains` paths, else the first one
 /// that is not archived.
 export function currentProject(s: State): Project | undefined {
   const r = s.route;

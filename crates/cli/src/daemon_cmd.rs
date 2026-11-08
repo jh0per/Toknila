@@ -115,9 +115,12 @@ pub fn start(paths: &Paths) -> Result<DaemonInfo> {
     std::fs::create_dir_all(&paths.home)?;
     let exe = std::env::current_exe().context("cannot find own executable")?;
     let mut cmd = Command::new(exe);
-    cmd.args(["daemon", "run"])
-        .env(toknila_daemon::paths::HOME_ENV, &paths.home)
-        .stdin(Stdio::null())
+    cmd.args(["daemon", "run"]);
+    // The platform default home is not passed: the daemon resolves it itself, with its ships.
+    if toknila_daemon::paths::platform_home().as_deref() != Some(paths.home.as_path()) {
+        cmd.env(toknila_daemon::paths::HOME_ENV, &paths.home);
+    }
+    cmd.stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     detach(&mut cmd);

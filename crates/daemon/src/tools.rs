@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use toknila_core::defaults::RepoTraits;
 use toknila_core::repo::{self, GitState, PathKind, RepoCheck, RepoFacts};
 use toknila_core::system::{self, Probe, SystemChecks};
+use toknila_core::toolpath;
 
 /// Time a tool gets before it is stopped.
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -199,6 +200,29 @@ pub fn system_checks(tools: &dyn Tools) -> SystemChecks {
         (join(git), join(claude), join(gh))
     });
     SystemChecks::new(vec![git, claude, gh])
+}
+
+/// [`system_checks`] plus one line for the projects' check commands: whether the first word of
+/// each resolves on the agents' `PATH`. The first command that does not is the one reported.
+pub fn system_checks_for(tools: &dyn Tools, commands: &[String]) -> SystemChecks {
+    let mut checks = system_checks(tools).checks;
+    let dirs = crate::agent_path::agent_dirs();
+    let verdicts: Vec<_> = commands
+        .iter()
+        .filter_map(|c| {
+            let program = toolpath::program_of(c)?;
+            Some(toolpath::check_command(
+                c,
+                crate::agent_path::find_in(program, &dirs).as_deref(),
+            ))
+        })
+        .collect();
+    let shown = verdicts
+        .iter()
+        .find(|c| c.status != system::CheckStatus::Ok)
+        .or(verdicts.first());
+    checks.extend(shown.cloned());
+    SystemChecks::new(checks)
 }
 
 mod traits;

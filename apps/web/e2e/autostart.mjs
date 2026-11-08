@@ -1,4 +1,4 @@
-// Browser test of the chain's autostart toggle against a real daemon (P2-05).
+// Browser test of the chain's autostart toggle against a real daemon.
 // Usage: node e2e/autostart.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // A chain without autostart holds a ready card. The right-click menu of the chain in the sidebar

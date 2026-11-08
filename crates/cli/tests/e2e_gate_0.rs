@@ -1,4 +1,4 @@
-//! P0-14, gate 0: the whole phase-0 scenario through the real `tok` binary and daemon, with
+//! Gate 0: the whole phase-0 scenario through the real `tok` binary and daemon, with
 //! simulated agents. The `--json` output people and scripts read is pinned by snapshots in
 //! `tests/snapshots/`; `TOKNILA_UPDATE_SNAPSHOTS=1` rewrites them after an intended change.
 
@@ -11,9 +11,7 @@ const DEMO: &str = include_str!("../../../examples/demo.toml");
 #[test]
 fn gate_0() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, DEMO).expect("write demo");
     let file = file.to_str().expect("utf-8 path");

@@ -304,8 +304,24 @@ pub fn ticket(d: &TicketDetail) {
     }
 }
 
-/// One `tok watch` line for a journal entry.
-pub fn event(e: &EventRecord) -> String {
+/// The clock time (`HH:MM:SS`) of a journal entry in the given UTC offset; `--:--:--` if the
+/// timestamp is out of range.
+pub fn clock(e: &EventRecord, offset: chrono::FixedOffset) -> String {
+    chrono::DateTime::from_timestamp_millis(e.at.0)
+        .map(|t| t.with_timezone(&offset).format("%H:%M:%S").to_string())
+        .unwrap_or_else(|| "--:--:--".to_owned())
+}
+
+/// The UTC offset in force on this machine at the time of the entry.
+pub fn local_offset(e: &EventRecord) -> chrono::FixedOffset {
+    use chrono::{Local, Offset, TimeZone};
+    chrono::DateTime::from_timestamp_millis(e.at.0)
+        .map(|t| Local.from_utc_datetime(&t.naive_utc()).offset().fix())
+        .unwrap_or_else(|| chrono::FixedOffset::east_opt(0).expect("zero offset is valid"))
+}
+
+/// One `tok watch` line for a journal entry, starting with its time in `offset`.
+pub fn event(e: &EventRecord, offset: chrono::FixedOffset) -> String {
     let p = &e.payload;
     let s = |v: &Value| v.as_str().unwrap_or("").to_owned();
     let payload_reason = serde_json::from_value::<StatusReason>(p["reason"].clone()).ok();
@@ -332,7 +348,7 @@ pub fn event(e: &EventRecord) -> String {
         ),
         (entity, kind) => format!("{entity} {kind}"),
     };
-    format!("#{} {} {what}", e.seq, w(&e.actor))
+    format!("{} #{} {} {what}", clock(e, offset), e.seq, w(&e.actor))
 }
 
 #[cfg(test)]
@@ -387,6 +403,18 @@ mod tests {
             kind: "status_changed".to_owned(),
             payload: json!({"key": "DEMO-1", "from": "ready", "to": "running", "reason": null}),
         };
-        assert_eq!(event(&e), "#4 system DEMO-1 ready -> running");
+        let utc = chrono::FixedOffset::east_opt(0).expect("valid");
+        assert_eq!(event(&e, utc), "00:00:00 #4 system DEMO-1 ready -> running");
+        // 2024-01-02T03:04:05Z shown at UTC+02:00 is 05:04:05.
+        let e = EventRecord {
+            at: Timestamp(1_704_164_645_000),
+            ..e
+        };
+        let plus2 = chrono::FixedOffset::east_opt(2 * 3600).expect("valid");
+        assert_eq!(
+            event(&e, plus2),
+            "05:04:05 #4 system DEMO-1 ready -> running"
+        );
+        assert_eq!(event(&e, utc), "03:04:05 #4 system DEMO-1 ready -> running");
     }
 }

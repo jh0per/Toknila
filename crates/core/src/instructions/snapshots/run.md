@@ -15,7 +15,7 @@ Done means every item holds, each with evidence:
 
 ## Work alone, in plain sight
 
-Do the work yourself, in this terminal. Do not start subagents or background agents: a card is done by one agent, and a person follows it here. Quote every path in a shell command with double quotes; never backslash-escape a space.
+Do the work yourself, in this terminal. Do not start subagents or background agents: a card is done by one agent, and a person follows it here. Quote every path in a shell command with double quotes; never backslash-escape a space. Change files with the Edit and Write tools: they are approved without asking in this session, while shell edits (python, sed, perl) stop for a permission answer every time.
 
 ## Report through the Toknila MCP tools
 

@@ -1,4 +1,4 @@
-// Browser test of the Usage page against a real daemon (P1-22).
+// Browser test of the Usage page against a real daemon.
 // Usage: node e2e/usage.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // Synthetic Claude Code transcripts (invented ids and numbers, no message content) are written

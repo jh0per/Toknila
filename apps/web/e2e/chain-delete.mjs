@@ -1,4 +1,4 @@
-// Browser test of deleting a chain from the sidebar against a real daemon (P2-02).
+// Browser test of deleting a chain from the sidebar against a real daemon.
 // Usage: node e2e/chain-delete.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // A chain imported by mistake (all its cards cancelled) is deleted through the chain's context

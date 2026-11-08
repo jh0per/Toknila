@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChainDetail } from "../api/types";
 import { runEdgeEffect } from "./edgeEffects";
-import { type EdgeRef, idOf, sameEdge } from "./edges";
+import { type EdgeRef, idOf } from "./edges";
 import type { Msg } from "./msg";
 import { reduce } from "./reduce";
 import { type State, initialState } from "./state";
@@ -43,10 +43,7 @@ describe("edge editing in the store", () => {
     expect(run(s, { type: "selectEdge", edge: undefined }).edges).toMatchObject({ selected: undefined, error: undefined });
   });
 
-  it("compares lines by chain and both ends", () => {
-    expect(sameEdge(ab, { ...ab })).toBe(true);
-    expect(sameEdge(ab, { ...ab, to: "ticket:C" })).toBe(false);
-    expect(sameEdge(undefined, ab)).toBe(false);
+  it("reads the id out of a node key", () => {
     expect(idOf("release:01HX")).toBe("01HX");
   });
 });

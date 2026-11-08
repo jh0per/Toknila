@@ -1,4 +1,4 @@
-//! P1-05: `tok profile ls` through the real binary and daemon: the built-in profiles, the files
+//! `tok profile ls` through the real binary and daemon: the built-in profiles, the files
 //! of the profiles folder, and an invalid file named with its line and column.
 
 mod common;
@@ -11,9 +11,7 @@ use serde_json::json;
 #[test]
 fn profile_ls_lists_built_ins_and_files_and_names_the_invalid_one() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     let folder = tok.home.join("profiles");
     std::fs::create_dir_all(&folder).expect("mkdir");
     std::fs::write(

@@ -145,7 +145,7 @@ pub enum Command {
     /// Release milestones.
     #[command(subcommand)]
     Release(ReleaseCmd),
-    /// Act as the simulated agent of a ticket or release (phase 0).
+    /// Act as the simulated agent of a ticket or release.
     Sim {
         /// Ticket key/title, or release version.
         target: String,

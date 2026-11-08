@@ -8,18 +8,13 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use super::Api;
-use crate::git::testing::{commit_file, git};
+use crate::git::testing::{commit_file, git, init_repo};
 use crate::shipyard::GitShipyard;
 
 /// A repository with a `develop` branch and one commit.
 pub(super) fn repo(dir: &Path) -> std::path::PathBuf {
     let repo = dir.join("repo");
-    std::fs::create_dir_all(&repo).expect("mkdir");
-    git(&repo, &["init", "--quiet"]);
-    git(&repo, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
-    std::fs::write(repo.join("README.md"), "hi\n").expect("write");
-    git(&repo, &["add", "README.md"]);
-    git(&repo, &["commit", "--quiet", "-m", "init"]);
+    init_repo(&repo, "develop");
     repo
 }
 

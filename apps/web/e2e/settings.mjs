@@ -1,4 +1,4 @@
-// Browser test of onboarding and settings against a real daemon (P1-19, rebuilt in D2).
+// Browser test of onboarding and settings against a real daemon (rebuilt in D2).
 // Usage: node e2e/settings.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // An empty home opens onboarding: the git, claude and gh checks, then a form that adds a project

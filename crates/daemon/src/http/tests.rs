@@ -560,7 +560,7 @@ async fn releases_create_start_complete() {
         .await;
     api.post("/v1/tickets/DEMO-1/actions/resume", json!({}))
         .await;
-    // Drive A to Merged through the state machine: Running -> Review is an agent event (P0-10),
+    // Drive A to Merged through the state machine: Running -> Review is an agent event,
     // so here cancel counts as done for the graph.
     api.post(
         "/v1/tickets/DEMO-1/actions/cancel",

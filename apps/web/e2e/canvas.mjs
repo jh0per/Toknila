@@ -1,4 +1,4 @@
-// Browser test of the quick actions on the diagram against a real daemon (P2-06).
+// Browser test of the quick actions on the diagram against a real daemon.
 // Usage: node e2e/canvas.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // A connector released on empty canvas opens a new-card field (the card follows the one the line
@@ -50,7 +50,7 @@ try {
   const quick = page.locator("[data-testid=quick-card]");
   const title = page.locator("[data-testid=quick-card-title]");
   const edge = (e) => page.locator(`[data-testid=edge-hit][data-edge="${e}"]`);
-  const menuLabels = async () => (await page.locator("[data-testid=context-menu] button").allTextContents()).map((t) => t.trim());
+  const menuLabels = async () => (await page.locator("[data-testid=context-menu] .ctx-label").allTextContents()).map((t) => t.trim());
   const inner = async () => {
     const b = await page.locator(".canvas-inner").boundingBox();
     if (!b) throw new Error("no canvas");
@@ -89,7 +89,7 @@ try {
   // 1. A connector released on empty canvas: a field for a card after the one it came from.
   await dragTo(handle("CAN-1"), await empty());
   await quick.waitFor();
-  await expectText(page.locator("[data-testid=quick-card-label]"), "New card after CAN-1", "the drop opens the field");
+  await expectText(page.locator("[data-testid=quick-card-label]"), "New card that waits for CAN-1", "the drop opens the field");
   await shot("drop-menu");
   await page.keyboard.press("Escape");
   await quick.waitFor({ state: "detached" });
@@ -153,11 +153,11 @@ try {
   await card("CAN-2").click({ button: "right" });
   await page.locator("[data-testid=menu-card-start]").waitFor();
   const readyMenu = await menuLabels();
-  if (readyMenu.join("|") !== "Open|Start|Pause|Add card after|Add card before|Cancel") throw new Error(`ready card menu: ${readyMenu}`);
+  if (readyMenu.join("|") !== "Open|Edit|Open terminal|Start|Pause|Add card before|Add card after|Add dependency…|Cancel") throw new Error(`ready card menu: ${readyMenu}`);
   console.log(`PASS a ready card's menu: ${readyMenu.join(", ")}`);
   await shot("card-menu");
   await page.locator("[data-testid=menu-card-add-before]").click();
-  await expectText(page.locator("[data-testid=quick-card-label]"), "New card before CAN-2", "Add card before opens the field");
+  await expectText(page.locator("[data-testid=quick-card-label]"), "New card that CAN-2 waits for", "Add card before opens the field");
   await title.fill("Prelude");
   await page.keyboard.press("Enter");
   await edge("CAN-5>CAN-2").waitFor({ state: "attached" });
@@ -167,7 +167,7 @@ try {
   const waitingMenu = await menuLabels();
   console.log(`PASS a card that waits: ${waitingMenu.join(", ")}`);
   await page.locator("[data-testid=menu-card-add-after]").click();
-  await expectText(page.locator("[data-testid=quick-card-label]"), "New card after CAN-2", "Add card after opens the field");
+  await expectText(page.locator("[data-testid=quick-card-label]"), "New card that waits for CAN-2", "Add card after opens the field");
   await title.fill("Epilogue");
   await page.keyboard.press("Enter");
   await edge("CAN-2>CAN-6").waitFor({ state: "attached" });

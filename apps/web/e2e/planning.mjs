@@ -1,4 +1,4 @@
-// Browser test of planning from the window against a real daemon (P1-29).
+// Browser test of planning from the window against a real daemon.
 // Usage: node e2e/planning.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // An empty home adds a project from a repository folder named Toknila: the key and the name come

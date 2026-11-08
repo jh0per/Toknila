@@ -4,7 +4,7 @@ import { type State, cardRoute, chainsOf, currentChain, currentProject, runningA
 import { useChainMenu } from "./ChainMenu";
 import { NavLink } from "./Link";
 import { SidebarProjects } from "./SidebarProjects";
-import { UsageChip } from "./UsageChip";
+import { SlotStepper } from "./SlotStepper";
 
 export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const project = currentProject(state);
@@ -13,10 +13,15 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
   const running = runningAgents(state);
   const chainMenu = useChainMenu(dispatch);
   return (
-    <nav className="sidebar" aria-label="Sidebar">
+    <nav className="sidebar" aria-label="Sidebar" data-link={state.link}>
       <div className="brand">
         <h1><NavLink route={{ name: "chains" }} dispatch={dispatch}>Toknila</NavLink></h1>
-        <span className={`link l-${state.link}`} data-testid="link">{state.link}</span>
+        {/* Nothing to say while the connection works; only losing it is news. */}
+        {state.link === "offline" && (
+          <span className="link l-offline" role="status" data-testid="link" title="The window lost the daemon and is reconnecting">
+            Offline
+          </span>
+        )}
       </div>
 
       <SidebarProjects state={state} dispatch={dispatch} />
@@ -97,6 +102,7 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
 
       <section className="sec" data-testid="running">
         <h2>Agents</h2>
+        {project && <SlotStepper project={project} state={state} dispatch={dispatch} />}
         {running.length === 0 && <p className="muted side-note">None running.</p>}
         <ul>
           {running.map(({ ticket, chain: c }) => (
@@ -105,7 +111,6 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
                 <span className="dot pulse" />
                 <span className="key">{ticket.key}</span>
                 <span className="t">{ticket.title}</span>
-                <UsageChip figures={c.usage?.[ticket.key]} testId="agent-usage" />
               </NavLink>
             </li>
           ))}

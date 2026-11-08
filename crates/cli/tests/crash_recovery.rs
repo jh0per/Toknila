@@ -1,4 +1,4 @@
-//! P0-13: the daemon is killed hard (`kill -9` / `TerminateProcess`) at 20 pseudo-random points
+//! The daemon is killed hard (`kill -9` / `TerminateProcess`) at 20 pseudo-random points
 //! of the gate scenario. After each restart `tok ls --json` must equal the state after the last
 //! command that committed, never a mix, and the finished run must equal a run without kills.
 
@@ -7,6 +7,8 @@ use std::process::{Child, Command, Output, Stdio};
 use std::time::Duration;
 
 use serde_json::Value;
+
+mod common;
 
 const DEMO: &str = include_str!("../../../examples/demo.toml");
 
@@ -112,16 +114,6 @@ fn daemon_pid(home: &Path) -> Option<u32> {
     v["pid"].as_u64().and_then(|p| u32::try_from(p).ok())
 }
 
-fn kill_hard(pid: u32) {
-    let pid = pid.to_string();
-    #[cfg(unix)]
-    let out = Command::new("kill").args(["-9", &pid]).output();
-    #[cfg(windows)]
-    let out = Command::new("taskkill").args(["/F", "/PID", &pid]).output();
-    // The daemon may already be gone (killed earlier); only a missing tool is a test error.
-    out.expect("run kill");
-}
-
 /// Small deterministic generator, so a failure replays with the same kill points.
 struct Lcg(u64);
 
@@ -208,7 +200,7 @@ fn kill_9_at_20_points_loses_nothing_and_mixes_nothing() {
         if kill_now {
             std::thread::sleep(Duration::from_micros(rng.next(12_000)));
             if let Some(pid) = daemon_pid(&home) {
-                kill_hard(pid);
+                common::kill_hard(pid);
             }
             kills += 1;
             let _ = child.wait_with_output();

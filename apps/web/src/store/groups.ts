@@ -1,20 +1,8 @@
 // How statuses are grouped for display. The finer status stays visible as small text.
 
-import type { TicketStatus } from "../api/types";
+import type { ChainStatus, TicketStatus } from "../api/types";
 
 export type StatusGroup = "awaiting_approval" | "todo" | "in_progress" | "blocked" | "done" | "cancelled";
-
-/// Display order of the groups; a proposed card waits for the owner first, cancelled is shown apart, last.
-export const GROUP_ORDER: StatusGroup[] = ["awaiting_approval", "todo", "in_progress", "blocked", "done", "cancelled"];
-
-export const GROUP_LABEL: Record<StatusGroup, string> = {
-  awaiting_approval: "awaiting approval",
-  todo: "To do",
-  in_progress: "In progress",
-  blocked: "Blocked",
-  done: "Done",
-  cancelled: "Cancelled",
-};
 
 /// The group a status is shown in.
 export function statusGroup(status: TicketStatus): StatusGroup {
@@ -38,13 +26,6 @@ export function statusGroup(status: TicketStatus): StatusGroup {
   }
 }
 
-/// Items split by group, every group present, order inside a group kept.
-export function groupBy<T>(items: T[], status: (item: T) => TicketStatus): Record<StatusGroup, T[]> {
-  const out: Record<StatusGroup, T[]> = { awaiting_approval: [], todo: [], in_progress: [], blocked: [], done: [], cancelled: [] };
-  for (const i of items) out[statusGroup(status(i))].push(i);
-  return out;
-}
-
 const GROUP_WORD: Record<StatusGroup, string> = {
   awaiting_approval: "awaiting approval",
   todo: "todo",
@@ -59,4 +40,30 @@ const GROUP_WORD: Record<StatusGroup, string> = {
 export function statusText(status: TicketStatus): string {
   const group = GROUP_WORD[statusGroup(status)];
   return group === status ? group : `${group} · ${status}`;
+}
+
+/// How a thing reads at a glance: nothing needed (`todo`), work going on (`prog`), a person
+/// needed (`attn`), finished (`done`), set aside (`cancel`). The stylesheet colours the classes
+/// `tone-*` and, per fine status, `s-<status>` (see `statusClass`).
+export type Tone = "todo" | "prog" | "attn" | "done" | "cancel";
+
+/// The class of a card for its fine status. Waiting, review, blocked and proposed share a colour
+/// (a person is needed) but each has its own class.
+export const statusClass = (status: TicketStatus): string => `s-${status}`;
+
+/// The tone of a chain's computed status, for its pill in the top bar.
+export function chainTone(status: ChainStatus): Tone {
+  switch (status) {
+    case "running":
+      return "prog";
+    case "blocked":
+    case "needs_human":
+      return "attn";
+    case "done":
+      return "done";
+    case "empty":
+    case "not_started":
+    case "idle":
+      return "todo";
+  }
 }

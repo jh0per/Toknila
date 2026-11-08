@@ -20,13 +20,16 @@ const statusText = (s: TermStatus, none: string): string => {
 /// draws for what the person sees, and sends the keystrokes. `connect` opens the connection
 /// (a card's runner, a project's planner); a new `streamKey` reconnects. The component takes the
 /// whole height its parent gives it.
-export function LiveTerminal({ streamKey, connect, noneText, placeholder, lead, onEnded }: {
+export function LiveTerminal({ streamKey, connect, noneText, placeholder, offer, lead, onEnded }: {
   streamKey: string;
   connect: (sink: TerminalSink) => TerminalConnection;
   /// The status line while no run has written anything yet.
   noneText: string;
   /// Shown while there is no run.
   placeholder: string;
+  /// What to do about it, shown with the placeholder. With it, the empty terminal is not drawn:
+  /// the placeholder and this are centred until something has run.
+  offer?: ReactNode;
   /// Controls before the status line (the card's worker/reviewer switch).
   lead?: ReactNode;
   /// The run ended (the stream said so).
@@ -101,13 +104,18 @@ export function LiveTerminal({ streamKey, connect, noneText, placeholder, lead, 
   }, [streamKey]);
 
   return (
-    <div className="terminal" data-testid="terminal">
+    <div className={`terminal${offer && status.kind === "none" ? " offer" : ""}`} data-testid="terminal">
       <div className="term-status" data-testid="term-status">
         {lead}
         <span className="muted">{statusText(status, noneText)}</span>
         {refused && <span className="error"> · {refused}</span>}
       </div>
-      {status.kind === "none" && <p className="muted" data-testid="placeholder">{placeholder}</p>}
+      {status.kind === "none" && (
+        <div className="term-empty">
+          <p className="muted" data-testid="placeholder">{placeholder}</p>
+          {offer}
+        </div>
+      )}
       <div className="term-host" ref={host} data-testid="term-host" />
     </div>
   );

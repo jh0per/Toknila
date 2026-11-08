@@ -8,7 +8,7 @@ use toknila_core::Project;
 use toknila_core::repo::{NoDefaultBase, RepoCheck, RepoProblem};
 use toknila_core::system::SystemChecks;
 
-use super::ApiResult;
+use super::{ApiResult, read};
 use crate::http::dto::RepoCheckRequest;
 use crate::server::AppState;
 use crate::tools;
@@ -18,9 +18,19 @@ use crate::tools;
 /// Is `git` new enough, is `claude` installed, is `gh` logged in; each with a fix hint.
 pub async fn system_checks(State(state): State<AppState>) -> ApiResult<Json<SystemChecks>> {
     let t = state.tools.clone();
-    let checks = tokio::task::spawn_blocking(move || tools::system_checks(t.as_ref()))
-        .await
-        .map_err(|e| toknila_app::AppError::internal(e.to_string()))?;
+    let commands = read(&state, |repo| {
+        Ok(repo
+            .projects()?
+            .into_iter()
+            .filter(|p| !p.archived)
+            .filter_map(|p| p.check_command)
+            .collect::<Vec<_>>())
+    })
+    .await?;
+    let checks =
+        tokio::task::spawn_blocking(move || tools::system_checks_for(t.as_ref(), &commands))
+            .await
+            .map_err(|e| toknila_app::AppError::internal(e.to_string()))?;
     Ok(Json(checks))
 }
 

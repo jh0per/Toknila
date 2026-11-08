@@ -1,4 +1,4 @@
-// Browser test of the inbox against a real daemon (P1-17).
+// Browser test of the inbox against a real daemon.
 // Usage: node e2e/inbox.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // A wildcard proposal is approved, a blocked card is unblocked and an agent question is answered,
@@ -66,8 +66,8 @@ try {
     failed = true;
   });
   await page.goto(url);
-  const { expectText } = checks(page);
-  await expectText(page.locator("[data-testid=link]"), "live", "stream connected");
+  const { expectText, expectLink } = checks(page);
+  await expectLink("live", "stream connected");
   await expectText(page.locator("[data-testid=inbox-count]"), "6", "badge counts proposal, question, blocked and 3 leftovers");
   await page.locator("[data-testid=inbox-link]").click();
   const inbox = page.locator("[data-testid=inbox]");
@@ -155,7 +155,7 @@ try {
   if ((await t("actions").count()) !== 1) throw new Error("the action bar should be there once");
   console.log("PASS the action bar is there once");
   // Accept of a ship whose work is not committed: the card is blocked with ship_uncommitted and
-  // the inbox says so in words (P1-25). The ship is a real worktree of a temporary repository.
+  // the inbox says so in words. The ship is a real worktree of a temporary repository.
   const git = (cwd, ...args) =>
     execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], {
       cwd,

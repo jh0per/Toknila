@@ -104,7 +104,14 @@ fn bad_env_names_and_a_zero_idle_time_are_reported() {
     let e = err("command = [\"a\"]\n[env]\n\"A=B\" = \"x\"\n");
     assert_eq!(e.line, 3, "{e}");
     let e = err("command = [\"a\"]\n[nudge]\nidle_secs = 0\n");
-    assert_eq!(e.line, 3, "{e}");
+    assert_eq!((e.line, e.column), (3, 13), "{e}");
+    assert!(e.message.contains("at least 1"), "{e}");
+}
+
+#[test]
+fn a_zero_idle_time_is_found_at_its_value_not_at_an_earlier_mention_of_the_name() {
+    let e = err("command = [\"a\"] # idle_secs\n[nudge]\nmessage = \"idle_secs\"\nidle_secs = 0\n");
+    assert_eq!((e.line, e.column), (4, 13), "{e}");
 }
 
 #[test]

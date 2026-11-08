@@ -37,8 +37,6 @@
 .events { list-style: none; margin: 0; padding: 0; }
 .events li { padding: var(--s1) 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .events code { display: block; font-size: var(--fs-s); color: var(--muted); }
-.term { margin: 0; background: var(--term-bg); color: var(--term-fg); font: 12px/1.55 var(--mono); padding: 10px 12px; border-radius: var(--r-s); min-height: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
-.term .dim { color: var(--term-dim); }
 .details-meta { margin: var(--s2) 0 var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
 .tag-note { margin: 0; width: fit-content; }
 .details > p.muted { margin-bottom: var(--s3); }
@@ -57,6 +55,10 @@
 .tabpanel[data-tab=terminal] { display: flex; flex-direction: column; overflow: hidden; }
 .terminal { display: flex; flex-direction: column; gap: var(--s1); flex: 1; min-height: 0; }
 .term-status { font-size: var(--fs-s); flex: none; }
+/* A terminal that offers a way to start shows no empty screen: the placeholder and the offer are centred. */
+.terminal.offer .term-status, .terminal.offer .term-host { display: none; }
+.terminal.offer .term-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3); text-align: center; }
+.term-empty p { margin: 0; max-width: 48ch; }
 .term-host { flex: 1; min-height: 0; background: var(--term-bg); padding: 6px 8px; border-radius: var(--r-s); overflow: hidden; }
 .depends { margin: var(--s2) 0 var(--s3); display: flex; flex-direction: column; gap: var(--s1); }
 .depends h4 { margin: 0; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }

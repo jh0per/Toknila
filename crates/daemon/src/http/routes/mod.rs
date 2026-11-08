@@ -19,6 +19,9 @@ pub mod tickets;
 pub mod usage;
 
 use axum::Json;
+use axum::http::{HeaderMap, HeaderName, HeaderValue};
+use axum::response::{IntoResponse, Response};
+use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
 use toknila_app::schedule;
 use toknila_core::usage::{PriceTable, figures, figures_per_card};
 use toknila_core::{Actor, ChainId, Thread, Ticket, TicketId, Timestamp};
@@ -29,6 +32,21 @@ use crate::server::{AppState, now};
 use crate::store::{Repo, RowFilter, WriteTx};
 
 type ApiResult<T> = Result<T, ApiError>;
+
+fn header(name: &'static str, value: impl ToString) -> (HeaderName, HeaderValue) {
+    let value = HeaderValue::from_str(&value.to_string()).unwrap_or(HeaderValue::from_static(""));
+    (HeaderName::from_static(name), value)
+}
+
+/// A terminal's scrollback as raw bytes, with the run and the offsets it covers in headers.
+fn scrollback_response(chunk: crate::runner::Chunk) -> Response {
+    let headers = HeaderMap::from_iter([
+        header(HEADER_RUN, chunk.run),
+        header(HEADER_OFFSET, chunk.offset),
+        header(HEADER_END, chunk.end),
+    ]);
+    (headers, chunk.bytes).into_response()
+}
 
 /// The time of a command, and the prices its answer is costed with.
 fn stamp(state: &AppState) -> (Timestamp, PriceTable) {

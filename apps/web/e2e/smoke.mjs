@@ -1,4 +1,4 @@
-// Browser smoke test of the IDE-layout page against a real daemon (P0-14, P1-02).
+// Browser smoke test of the IDE-layout page against a real daemon.
 // Usage: node e2e/smoke.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // It starts a daemon in a private TOKNILA_HOME, imports examples/demo.toml, opens the page and
@@ -51,14 +51,14 @@ try {
     await page.emulateMedia({ colorScheme: "light" });
     console.log(`PASS screenshot ${name}`);
   };
-  const { expectText, expectPath } = checks(page);
+  const { expectText, expectPath, expectLink } = checks(page);
   const openChain = async () => {
     await page.locator("[data-testid=chains]").getByRole("link", { name: "demo" }).click();
     await expectPath("/projects/DEMO/chains/demo", "chain route");
   };
 
   // Sidebar: the project, then its chain; the canvas draws the chain.
-  await expectText(page.locator("[data-testid=link]"), "live", "stream connected");
+  await expectLink("live", "stream connected");
   await expectText(page.locator("[data-testid=projects]"), "DEMO", "project listed");
   await openChain();
   await expectText(status("DEMO-1"), "running", "DEMO-1 autostarted");
@@ -178,7 +178,7 @@ try {
   await page.goto(at("/projects/DEMO/chains/demo/cards/DEMO-2"));
   await expectText(page.locator("[data-testid=details]"), "DEMO-2", "card deep link loads");
   await page.goto(at("/inbox"));
-  await expectText(page.locator("[data-testid=link]"), "live", "inbox deep link loads");
+  await expectLink("live", "inbox deep link loads");
   await page.locator('[data-testid=inbox] li[data-key="DEMO-1"]').waitFor({ timeout: 10_000 });
   const inbox = await page.locator("[data-testid=inbox] li").count();
   if (inbox !== 1) throw new Error(`inbox: expected 1 ticket, got ${inbox}`);
@@ -187,10 +187,11 @@ try {
   await expectPath("/", "title link");
 
   tok("daemon", "stop");
-  await expectText(page.locator("[data-testid=link]"), "offline", "daemon stop seen");
+  await expectLink("offline", "daemon stop seen");
+  await expectText(page.locator("[data-testid=link]"), "Offline", "the sidebar says Offline");
   tok("daemon", "start");
   tok("comment", "DEMO-2", "left");
-  await expectText(page.locator("[data-testid=link]"), "live", "reconnected after restart");
+  await expectLink("live", "reconnected after restart");
   await openChain();
   await expectText(status("DEMO-1"), "waiting", "state is still there after the restart");
   if (failed) throw new Error("the page threw errors");

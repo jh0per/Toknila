@@ -1,4 +1,4 @@
-// Browser test of plans in the window and of deleting a project, against a real daemon (P1-29).
+// Browser test of plans in the window and of deleting a project, against a real daemon.
 // Usage: node e2e/plans.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // A repository holds two spec folders and a chain file. Adding it as a project offers the three
