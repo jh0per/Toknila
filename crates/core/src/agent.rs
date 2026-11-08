@@ -93,8 +93,13 @@ impl AgentEvent {
             .split(|c: char| !c.is_alphanumeric() && c != '\'')
             .filter(|w| !w.is_empty())
             .collect();
+        // "which" asks only where a sentence starts with it, not as a relative clause.
+        let which_starts = lower.split(['.', '!', '?', '\n']).any(|sentence| {
+            let sentence = sentence.trim_start_matches(|c: char| !c.is_alphanumeric());
+            sentence.split(|c: char| !c.is_alphanumeric()).next() == Some("which")
+        });
         let asks = text.ends_with('?')
-            || words.contains(&"which")
+            || which_starts
             || words
                 .windows(2)
                 .any(|w| w == ["may", "i"] || w == ["should", "i"]);
@@ -147,6 +152,7 @@ mod tests {
             "Which framework should we use",
             "May I delete the old module",
             "I wonder, should I split this card",
+            "Parser done. Which framework next",
         ] {
             assert_eq!(
                 AgentEvent::note_question(&note(asks, None)).as_deref(),
@@ -162,6 +168,8 @@ mod tests {
             "Parser done, 12 tests pass",
             "Why this works: the cache is keyed by id.",
             "I may inspect the code next",
+            "The parser, which handles tabs, is done",
+            "Tests pass. The module, which is small, is committed",
         ] {
             assert_eq!(
                 AgentEvent::note_question(&note(plain, None)),

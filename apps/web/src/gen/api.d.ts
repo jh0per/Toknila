@@ -2030,7 +2030,7 @@ export interface components {
             max_nudges: number;
             /**
              * @description Text sent to the agent.
-             * @default Report your state through the Toknila tools: call note with progress, ask_human if you are stuck, or finished if you are done.
+             * @default Report your state through the Toknila tools: call note with progress, ask_human if you are stuck or have a question (only ask_human gets an answer), or finished if you are done.
              */
             message: string;
             /**
