@@ -121,6 +121,66 @@ async fn allow_always_remembers_a_rule_and_a_covered_prompt_is_answered_without_
 }
 
 #[tokio::test]
+async fn allow_always_also_answers_what_another_card_of_the_project_already_asks() {
+    let api = Api::new();
+    api.demo_with(&["A", "B"]).await;
+    let mut tokens = Vec::new();
+    for key in ["DEMO-1", "DEMO-2"] {
+        let (token, _) = api.agent_token(key).await;
+        api.call_with(
+            &token,
+            Method::POST,
+            &format!("/v1/tickets/{key}/events"),
+            Some(json!({ "event": "started" })),
+        )
+        .await;
+        tokens.push(token);
+    }
+    let ask = |key: &'static str, token: &str, tool: &'static str| {
+        let api = &api;
+        let token = token.to_owned();
+        async move {
+            api.call_with(
+                &token,
+                Method::POST,
+                &format!("/v1/tickets/{key}/permission"),
+                Some(json!({ "tool": tool })),
+            )
+            .await
+        }
+    };
+    let first = ask("DEMO-1", &tokens[0], "Bash: make check");
+    let second = ask("DEMO-2", &tokens[1], "Bash: make check -j4");
+    let person = async {
+        for _ in 0..300 {
+            let inbox = api.get("/v1/projects/DEMO/inbox").await;
+            if inbox.as_array().is_some_and(|i| i.len() == 2) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let (s, v) = api
+            .call(
+                Method::POST,
+                "/v1/tickets/DEMO-1/runner/answer",
+                Some(json!({ "answer": "allow", "always": true })),
+            )
+            .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    };
+    let ((s1, r1), (s2, r2), ()) = tokio::join!(first, second, person);
+    assert_eq!((s1, s2), (StatusCode::OK, StatusCode::OK));
+    assert_eq!(r1, json!({ "decision": "allow" }));
+    assert_eq!(
+        r2,
+        json!({ "decision": "allow" }),
+        "the other card was not left asking"
+    );
+    assert_eq!(api.get("/v1/projects/DEMO/inbox").await, json!([]));
+    assert_eq!(api.status("DEMO-2").await, "running");
+}
+
+#[tokio::test]
 async fn allow_always_without_a_bash_call_allows_and_remembers_nothing() {
     let (api, token) = setup().await;
     let hook = permission(&api, &token, "WebFetch: https://example.com");

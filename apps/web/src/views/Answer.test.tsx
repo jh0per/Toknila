@@ -16,6 +16,14 @@ describe("Answer", () => {
     expect(html).not.toContain("<details open");
     expect(html).toContain("print(1)\nEOF</pre>");
   });
+  it("offers Allow always next to Allow for a worker's command, and for nothing else", () => {
+    const html = (extra: Partial<InboxItem>) => renderToStaticMarkup(<Answer item={item(extra)} dispatch={() => {}} />);
+    const bash = html({});
+    expect(bash).toMatch(/data-testid="answer-allow"[^>]*>Allow<\/button><button[^>]*data-testid="answer-allow-always"[^>]*>Allow always</);
+    expect(html({ text: "Claude Code asks for permission: Write: src/lib.rs" })).not.toContain("answer-allow-always");
+    expect(html({ role: "reviewer" })).not.toContain("answer-allow-always");
+    expect(html({ answers: ["enter"] })).not.toContain("answer-allow-always");
+  });
   it("has no disclosure when the text already says everything", () => {
     const html = renderToStaticMarkup(<Answer item={item({})} dispatch={() => {}} />);
     expect(html).not.toContain("question-detail");

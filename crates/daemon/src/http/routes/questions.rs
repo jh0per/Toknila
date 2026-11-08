@@ -8,11 +8,11 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
 use toknila_api_types::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
-use toknila_app::{AppError, agent, projects, questions, resolve, runs};
+use toknila_app::{AppError, Reader, agent, projects, questions, resolve, runs};
 use toknila_core::agent::AgentEvent;
 use toknila_core::question::{self, AnswerKind, Decision, Delivery, QuestionKind};
 use toknila_core::{
-    Actor, AgentRole, StatusReason, Ticket, TicketStatus, Timestamp, WaitingReason, hook,
+    Actor, AgentRole, StatusReason, Ticket, TicketId, TicketStatus, Timestamp, WaitingReason, hook,
 };
 
 use super::ApiResult;
@@ -103,15 +103,36 @@ pub async fn runner_answer(
         }
     }
     let answer = body.answer;
-    state
+    let others = runners.prompts().worker_hook_dialogs();
+    let (covered, _) = state
         .store
-        .write(Actor::Human, at, move |tx| -> ApiResult<()> {
-            if let Some(tool) = &remember {
-                projects::remember_command(tx, &t, tool)?;
+        .write(Actor::Human, at, move |tx| -> ApiResult<Vec<TicketId>> {
+            let mut covered = Vec::new();
+            if let Some(tool) = &remember
+                && projects::remember_command(tx, &t, tool)?.is_some()
+            {
+                // The new rule also answers what other cards of the project already ask.
+                let project = projects::of_ticket(tx, &t)?;
+                for (id, other_tool) in &others {
+                    let Some(other) = tx.ticket(*id)? else {
+                        continue;
+                    };
+                    let same = projects::of_ticket(tx, &other)?.id == project.id;
+                    if *id != t.id && same && project.allows_tool(other_tool) {
+                        questions::answered(tx, &other, AgentRole::Worker, AnswerKind::Allow)?;
+                        covered.push(*id);
+                    }
+                }
             }
-            Ok(questions::answered(tx, &t, role, answer)?)
+            questions::answered(tx, &t, role, answer)?;
+            Ok(covered)
         })
         .await?;
+    for id in covered {
+        runners
+            .prompts()
+            .resolve(id, AgentRole::Worker, Decision::Allow);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

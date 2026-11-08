@@ -53,6 +53,7 @@ export type PatchProject = Schemas["PatchProject"];
 export type ReviewMode = Schemas["ReviewMode"];
 export type MergeMode = Schemas["MergeMode"];
 export type MergeMethod = Schemas["MergeMethod"];
+export type CommandPolicy = Schemas["CommandPolicy"];
 export type PullRequest = Schemas["PullRequest"];
 export type UsageView = Schemas["UsageView"];
 export type UsageSummary = Schemas["UsageSummary"];

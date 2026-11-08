@@ -6,6 +6,7 @@
   "kind": "created",
   "payload": {
     "project": {
+      "command_policy": "auto",
       "default_profile": "sim",
       "default_review_mode": "human",
       "id": "<id>",

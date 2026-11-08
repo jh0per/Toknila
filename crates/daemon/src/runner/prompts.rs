@@ -103,6 +103,19 @@ impl Prompts {
         self.inner().pending.get(&(ticket, role))?.tool.clone()
     }
 
+    /// The worker dialogs a permission hook holds open, with the tool call each is about.
+    pub fn worker_hook_dialogs(&self) -> Vec<(TicketId, String)> {
+        let inner = self.inner();
+        inner
+            .pending
+            .iter()
+            .filter(|((_, role), p)| {
+                *role == AgentRole::Worker && p.waiter.as_ref().is_some_and(|w| !w.is_closed())
+            })
+            .filter_map(|((ticket, _), p)| Some((*ticket, p.tool.clone()?)))
+            .collect()
+    }
+
     /// Whether a permission hook of the run waits for a decision.
     pub fn hook_waiting(&self, ticket: TicketId, role: AgentRole) -> bool {
         self.inner()

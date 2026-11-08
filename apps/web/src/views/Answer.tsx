@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AnswerKind, InboxItem } from "../api/types";
+import { canAllowAlways } from "../store/commands";
 import type { Intent } from "../store/msg";
 
 const ANSWER_LABEL: Record<AnswerKind, string> = {
@@ -14,8 +15,8 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
   const [comment, setComment] = useState("");
   const role = item.role ?? "worker";
   const answers = item.answers ?? [];
-  const send = (answer: AnswerKind, body?: string) =>
-    dispatch({ type: "answer", key: item.ticket, role, answer, text: body?.trim() || undefined });
+  const send = (answer: AnswerKind, body?: string, always?: boolean) =>
+    dispatch({ type: "answer", key: item.ticket, role, answer, text: body?.trim() || undefined, always });
   const keys = answers.filter((a) => a !== "text" && a !== "allow" && a !== "deny");
   const reply = answers.includes("text") ? "screen" : role === "worker" ? "comment" : undefined;
   return (
@@ -34,6 +35,14 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
       {answers.includes("allow") && (
         <div className="btns">
           <button className="btn primary" data-testid="answer-allow" onClick={() => send("allow")}>Allow</button>
+          {canAllowAlways(item) && (
+            <button
+              className="btn" data-testid="answer-allow-always" title="Allow this command now and next time, in this project"
+              onClick={() => send("allow", undefined, true)}
+            >
+              Allow always
+            </button>
+          )}
           <input aria-label={`Why ${item.ticket} is denied`} placeholder="Comment for a denial (optional)" value={comment} onChange={(e) => setComment(e.target.value)} />
           <button className="btn danger" data-testid="answer-deny" onClick={() => send("deny", comment)}>Deny</button>
         </div>
