@@ -96,14 +96,14 @@ describe("the chain shown without a pick", () => {
 describe("selection", () => {
   it("selects a project; the first project is the default", () => {
     expect(currentProject(loaded())?.key).toBe("DEMO");
-    const [s, fx] = reduce(loaded(), { type: "selectProject", project: "OTHER" });
+    const [s, fx] = reduce(loaded(), { type: "navigate", route: { name: "project", project: "OTHER" } });
     expect(fx).toEqual([{ type: "pushUrl", path: "/projects/OTHER" }]);
     expect(currentProject(s)?.id).toBe("p2");
     expect(currentChain(s)).toBeUndefined();
   });
 
   it("selects a chain", () => {
-    const [s, fx] = reduce(loaded(), { type: "selectChain", project: "DEMO", chain: "other" });
+    const [s, fx] = reduce(loaded(), { type: "navigate", route: { name: "projectChain", project: "DEMO", chain: "other" } });
     expect(fx).toEqual([{ type: "pushUrl", path: "/projects/DEMO/chains/other" }]);
     expect(currentChain(s)?.chain.id).toBe("c2");
     expect(currentCard(s)).toBeUndefined();
@@ -186,9 +186,9 @@ describe("agent slots", () => {
   it("show the slots of the project in focus and the place of each waiting card", () => {
     const [s] = reduce(loaded(), { type: "agentsLoaded", agents });
     expect(slotsOf(s)).toEqual({ used: 2, limit: 2 });
-    const [inDemo] = reduce(s, { type: "selectProject", project: "DEMO" });
+    const [inDemo] = reduce(s, { type: "navigate", route: { name: "project", project: "DEMO" } });
     expect(slotsOf(inDemo)).toEqual({ used: 2, limit: 2 });
-    const [inOther] = reduce(s, { type: "selectProject", project: "OTHER" });
+    const [inOther] = reduce(s, { type: "navigate", route: { name: "project", project: "OTHER" } });
     expect(slotsOf(inOther)).toEqual({ used: 0, limit: 4 });
     expect([queuePosition(s, "t2"), queuePosition(s, "t3"), queuePosition(s, "t1")]).toEqual([1, 2, undefined]);
   });

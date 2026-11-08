@@ -1,4 +1,4 @@
-//! P1-03: threads on a card through the real `tok` binary and daemon. The simulated agent of a
+//! Threads on a card through the real `tok` binary and daemon. The simulated agent of a
 //! running ticket opens a design thread and posts a mermaid version; its hand-in is refused while
 //! the thread is open; the owner requests changes, the agent posts version 2, the owner approves
 //! and the hand-in moves the ticket to Review. The `--json` output is pinned by snapshots in
@@ -25,9 +25,7 @@ const V2: &str = "flowchart TD\n  A[List] --> B[Item]\n  A --> E[Empty state]\n"
 #[test]
 fn the_hand_in_waits_for_the_owner_to_approve_the_design() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     let chain = dir.path().join("demo.toml");
     std::fs::write(&chain, CHAIN).expect("write chain");
     let v1 = dir.path().join("v1.mmd");
@@ -173,9 +171,7 @@ fn the_hand_in_waits_for_the_owner_to_approve_the_design() {
 #[test]
 fn a_person_opens_a_thread_and_approves_it_in_words() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     let chain = dir.path().join("demo.toml");
     std::fs::write(&chain, CHAIN).expect("write chain");
     tok.run(&["project", "new", "DEMO", "--name", "Demo"]);

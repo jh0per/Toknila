@@ -12,9 +12,7 @@ use common::{Tok, snapshot};
 #[test]
 fn watch_json_prints_each_journal_entry_as_one_json_line() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO"]);
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_tok"))

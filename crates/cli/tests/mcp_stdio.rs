@@ -1,4 +1,4 @@
-//! P1-10: `tok mcp` through the real binary over stdio against a real daemon. An agent's events
+//! `tok mcp` through the real binary over stdio against a real daemon. An agent's events
 //! come in as MCP tool calls and move the ticket exactly as the same events from `tok sim` do.
 //!
 //! The run token here is the daemon's own token: the daemon only issues agent tokens to runs it
@@ -7,68 +7,18 @@
 
 mod common;
 
-use std::io::Write;
 use std::process::{Command, Stdio};
 
-use common::Tok;
+use common::{Tok, call, mcp_session};
 use serde_json::{Value, json};
+use toknila_daemon::info::DaemonInfo;
 
 const DEMO: &str = include_str!("../../../examples/demo.toml");
 
-struct Daemon {
-    url: String,
-    token: String,
-}
-
-fn daemon(tok: &Tok) -> Daemon {
-    let text = std::fs::read_to_string(tok.home.join("daemon.json")).expect("daemon.json");
-    let info: Value = serde_json::from_str(&text).expect("json");
-    Daemon {
-        url: format!("http://127.0.0.1:{}", info["port"]),
-        token: info["token"].as_str().expect("token").to_owned(),
-    }
-}
-
-/// One MCP session: the `lines` are sent, stdin is closed, and every answer is returned.
-fn session(d: &Daemon, token: &str, ticket: &str, lines: &[Value]) -> Vec<Value> {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_tok"))
-        .arg("mcp")
-        .env("TOKNILA_URL", &d.url)
-        .env("TOKNILA_RUN_TOKEN", token)
-        .env("TOKNILA_TICKET", ticket)
-        // Nothing of the data home is needed: the daemon is found through the environment.
-        .env("TOKNILA_HOME", "/nonexistent-toknila-home")
-        // The test may itself run inside an agent's session (a reviewer runs the check command):
-        // the role and run of that session must not leak into the server under test.
-        .env_remove("TOKNILA_ROLE")
-        .env_remove("TOKNILA_RUN")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn tok mcp");
-    {
-        let mut stdin = child.stdin.take().expect("stdin");
-        for line in lines {
-            writeln!(stdin, "{line}").expect("write");
-        }
-    }
-    let out = child.wait_with_output().expect("wait");
-    assert!(
-        out.status.success(),
-        "tok mcp failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8(out.stdout)
-        .expect("utf-8")
-        .lines()
-        .map(|l| serde_json::from_str(l).unwrap_or_else(|e| panic!("stdout line {l:?}: {e}")))
-        .collect()
-}
-
-fn call(id: u32, name: &str, arguments: Value) -> Value {
-    json!({ "jsonrpc": "2.0", "id": id, "method": "tools/call",
-        "params": { "name": name, "arguments": arguments } })
+/// One MCP session as the agent of `ticket`: the `lines` are sent, stdin is closed, and every
+/// answer is returned.
+fn session(d: &DaemonInfo, token: &str, ticket: &str, lines: &[Value]) -> Vec<Value> {
+    mcp_session(&d.base_url(), token, &[("TOKNILA_TICKET", ticket)], lines)
 }
 
 fn handshake() -> Vec<Value> {
@@ -84,9 +34,7 @@ fn handshake() -> Vec<Value> {
 #[test]
 fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, DEMO).expect("write demo");
     let file = file.to_str().expect("utf-8 path");
@@ -99,7 +47,7 @@ fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
         tok.run(&["subtask", "add", t, "write the test"]);
         assert_eq!(tok.status(t), "running");
     }
-    let d = daemon(&tok);
+    let d = tok.info();
 
     // The protocol: handshake and the tool list.
     let answers = session(&d, &d.token, "DEMO-3", &handshake());
@@ -218,14 +166,12 @@ fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
 #[test]
 fn a_refused_event_and_a_bad_token_come_back_as_tool_errors_and_change_nothing() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
     tok.run(&["chain", "new", "demo", "--goal", "g"]);
     tok.run(&["ticket", "new", "demo", "A"]);
     assert_eq!(tok.status("DEMO-1"), "running");
-    let d = daemon(&tok);
+    let d = tok.info();
 
     // An open thread refuses the hand-in: the daemon's message reaches the agent.
     let answers = session(

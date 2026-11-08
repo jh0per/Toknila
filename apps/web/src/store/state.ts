@@ -105,7 +105,7 @@ export const activeProjects = (s: State): Project[] => s.projects.filter((p) => 
 /// Archived projects, listed only when the person asks to see them.
 export const archivedProjects = (s: State): Project[] => s.projects.filter((p) => p.archived);
 
-/// The project in focus: the one in the route, the chain's for phase 0 paths, else the first one
+/// The project in focus: the one in the route, the chain's for the `/chains` paths, else the first one
 /// that is not archived.
 export function currentProject(s: State): Project | undefined {
   const r = s.route;

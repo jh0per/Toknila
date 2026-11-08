@@ -1,4 +1,4 @@
-// Browser test of the planner entry against a real daemon (P2-03). No real agent is launched:
+// Browser test of the planner entry against a real daemon. No real agent is launched:
 // the planner profile runs `fake-agent`, which plays what the planner's tools do with its run
 // token (it creates a chain and two cards over the planner routes).
 // Usage: node e2e/planner.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)

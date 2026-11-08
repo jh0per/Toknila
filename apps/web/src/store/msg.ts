@@ -19,8 +19,6 @@ import type { UsageEffect, UsageIntent, UsageResult } from "./usage";
 /// What the person did.
 export type Intent =
   | { type: "navigate"; route: Route }
-  | { type: "selectProject"; project: string }
-  | { type: "selectChain"; project: string; chain: string }
   | { type: "selectCard"; project: string; chain: string; key: string }
   | { type: "selectTab"; tab: Tab }
   | { type: "pickVersion"; thread: string; number: number }

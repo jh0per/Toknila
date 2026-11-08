@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use toknila_core::MergeSpec;
 
 use super::*;
-use crate::git::testing::{commit_file, git};
+use crate::git::testing::{commit_file, git, init_repo};
 
 struct Fixture {
     _tmp: tempfile::TempDir,
@@ -21,10 +21,7 @@ struct Fixture {
 fn setup() -> Fixture {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = tmp.path().join("the repo");
-    std::fs::create_dir_all(&repo).expect("mkdir");
-    git(&repo, &["init", "--quiet"]);
-    git(&repo, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
-    commit_file(&repo, "README.md", "hi\n", "init");
+    init_repo(&repo, "develop");
     let ship = tmp.path().join("ship");
     git(
         &repo,

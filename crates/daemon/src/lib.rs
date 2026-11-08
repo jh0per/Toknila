@@ -23,18 +23,3 @@ pub mod tools;
 pub mod trash;
 pub mod usage;
 pub mod web;
-
-/// Name the daemon reports about itself.
-pub fn component_name() -> String {
-    format!("toknila-daemon {}", toknila_core::VERSION)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn component_name_carries_core_version() {
-        assert!(component_name().ends_with(toknila_core::VERSION));
-    }
-}

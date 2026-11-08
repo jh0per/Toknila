@@ -1,6 +1,6 @@
 //! The agent event contract: what a running agent reports about its ticket.
 //!
-//! Phase 0's `sim` profile receives these from the CLI (`tok sim ...`); phase 1 sends the same
+//! The `sim` profile receives these from the CLI (`tok sim ...`); real agents send the same
 //! events from MCP tools and agent hooks. See `docs/events.md`.
 
 use serde::{Deserialize, Serialize};

@@ -1,5 +1,4 @@
 use std::net::Ipv4Addr;
-use std::path::PathBuf;
 
 use super::*;
 use crate::info::{DaemonInfo, new_token};
@@ -13,20 +12,9 @@ async fn spawn_test_server() -> (
 ) {
     let dir = tempfile::tempdir().expect("tempdir");
     let store = Store::open(&dir.path().join("t.db")).expect("store");
-    let shutdown = Arc::new(Notify::new());
     let token = "secret-token".to_owned();
-    let state = AppState {
-        store,
-        token: token.clone().into(),
-        shutdown: shutdown.clone(),
-        profiles: PathBuf::new(),
-        runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
-        tools: std::sync::Arc::new(crate::tools::SystemTools),
-        usage: Arc::new(crate::usage::Usage::disabled()),
-        home: dir.path().to_owned(),
-        ships: dir.path().join("ships"),
-        trash: Arc::new(crate::trash::NoTrash),
-    };
+    let state = AppState::for_test(store, &token, dir.path());
+    let shutdown = state.shutdown.clone();
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await
         .expect("bind");

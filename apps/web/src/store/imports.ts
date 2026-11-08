@@ -104,9 +104,6 @@ export function firstImported(f: PlanList): string | undefined {
   return undefined;
 }
 
-/// Whether a plan of the last "Import selected" was refused.
-export const anyFailed = (f: PlanList): boolean => Object.values(f.outcomes).some((o) => o.state === "failed");
-
 /// Whether an import of the list is still on its way.
 export const importing = (f: PlanList): boolean => Object.values(f.outcomes).some((o) => o.state === "running");
 

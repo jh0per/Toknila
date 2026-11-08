@@ -1,4 +1,4 @@
-// Browser smoke test of the IDE-layout page against a real daemon (P0-14, P1-02).
+// Browser smoke test of the IDE-layout page against a real daemon.
 // Usage: node e2e/smoke.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // It starts a daemon in a private TOKNILA_HOME, imports examples/demo.toml, opens the page and

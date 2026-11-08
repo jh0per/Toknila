@@ -28,9 +28,6 @@ export const initialEdges: EdgesState = { selected: undefined, busy: false, erro
 /// The id inside a `nodeKey`.
 export const idOf = (key: string): string => key.slice(key.indexOf(":") + 1);
 
-export const sameEdge = (a: EdgeRef | undefined, b: EdgeRef): boolean =>
-  !!a && a.chain === b.chain && a.from === b.from && a.to === b.to;
-
 /// What the person did. Nodes are `nodeKey`s.
 export type EdgeIntent =
   | { type: "selectEdge"; edge: EdgeRef | undefined }

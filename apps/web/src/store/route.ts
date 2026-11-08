@@ -1,5 +1,5 @@
 // Navigation is state that lives in the URL, so a deep link opens the right screen.
-// `chains` (`/`) and `chain` (`/chains/:chain`) are the phase 0 paths; they still render, inside
+// `chains` (`/`) and `chain` (`/chains/:chain`) are the paths without a project; they render inside
 // the same layout, with the project taken from the chain.
 
 export type Route =

@@ -1,9 +1,6 @@
 use std::net::Ipv4Addr;
-use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::Notify;
 use toknila_core::{Actor, Timestamp};
 
 use crate::server::{AppState, router};
@@ -56,18 +53,7 @@ fn read_seqs(ws: &mut Ws, want: usize) -> Vec<i64> {
 async fn reconnect_gets_exactly_the_missed_events() {
     let dir = tempfile::tempdir().expect("tempdir");
     let store = Store::open(&dir.path().join("t.db")).expect("store");
-    let state = AppState {
-        store: store.clone(),
-        token: "tkn".into(),
-        shutdown: Arc::new(Notify::new()),
-        profiles: PathBuf::new(),
-        runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
-        tools: std::sync::Arc::new(crate::tools::SystemTools),
-        usage: Arc::new(crate::usage::Usage::disabled()),
-        home: dir.path().to_owned(),
-        ships: dir.path().join("ships"),
-        trash: Arc::new(crate::trash::NoTrash),
-    };
+    let state = AppState::for_test(store.clone(), "tkn", dir.path());
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await
         .expect("bind");

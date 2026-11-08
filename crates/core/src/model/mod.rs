@@ -36,7 +36,7 @@ pub use review::{
 pub use run::{ProcessExit, Run};
 pub use ship::{MergeSpec, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec, slugify};
 pub use stale::{BaseBehind, BaseCourse, StalePolicy, describe as describe_base_behind};
-pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};
+pub use status::{BlockedReason, StatusReason, TicketStatus, WaitingReason};
 pub use thread::{
     ArtifactFormat, MessageKind, Phase, Thread, ThreadKind, ThreadMessage, ThreadState,
     ThreadVersion,

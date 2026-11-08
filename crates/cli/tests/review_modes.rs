@@ -1,4 +1,4 @@
-//! P1-14: review modes through the real `tok` binary and daemon, with simulated reviewers: a
+//! Review modes through the real `tok` binary and daemon, with simulated reviewers: a
 //! person alone (human), the reviewer agent alone (agent), and the agent first and then a person
 //! who sees its remarks (both). The mode resolves ticket, then chain, then project.
 
@@ -31,9 +31,7 @@ profile = "sim"
 
 fn setup() -> (tempfile::TempDir, Tok) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let tok = Tok {
-        home: dir.path().join("home"),
-    };
+    let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, CHAIN).expect("write chain");
     tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
