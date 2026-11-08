@@ -20,6 +20,7 @@ read. A change that adds a screen or a help line checks it against this table.
 | model | model alias | Under a project's Advanced; "leave empty to use your Claude Code default". |
 | assistant | planner | The project's main agent: "Plan with the assistant" is the first entry of a project in the sidebar. `tok planner` and the `/v1/planner` routes keep their name. |
 | Chat, Events (tabs of a card) | comments, questions and answers; the journal | Chat shows what the person and the card's agent said to each other; Events prints one sentence per journal entry with the raw event folded under "Raw event". |
+| design first ("Show me a design before the code", "Ask for a design") | `design_first` on a card, the `ask_design` action, `tok design`, `tok ticket new --design-first` | The agent opens a design thread (a diagram or a mockup) first and writes code only after the person approved a version; `finished` is refused until then. A card that has not started gets the flag; a running card also gets an instruction. |
 | card | ticket | Already the word in the window. |
 | chain | chain | Same word both sides. |
 | Back to work | (settings screen) | The settings replace the sidebar; Ctrl+, (Cmd+, on a Mac) opens them. |

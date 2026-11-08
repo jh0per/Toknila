@@ -70,11 +70,11 @@ impl TicketAction {
         Self::Accept,
         Self::Return,
         Self::Reopen,
+        Self::AskDesign,
         Self::Cancel,
         Self::Approve,
         Self::Reject,
         Self::RunReviewer,
-        Self::AskDesign,
     ];
 
     /// The name used in routes and commands.
@@ -184,11 +184,11 @@ mod tests {
     fn what_is_allowed_follows_the_status() {
         assert_eq!(
             names(&ticket(TicketStatus::Ready)),
-            ["start", "pause", "cancel", "ask_design"]
+            ["start", "pause", "ask_design", "cancel"]
         );
         assert_eq!(
             names(&ticket(TicketStatus::Running)),
-            ["pause", "block", "cancel", "ask_design"]
+            ["pause", "block", "ask_design", "cancel"]
         );
         assert_eq!(names(&ticket(TicketStatus::Merged)), ["reopen"]);
         assert!(names(&ticket(TicketStatus::Released)).is_empty());

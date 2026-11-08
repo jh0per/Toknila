@@ -926,8 +926,8 @@ fn a_base_behind_blocks_the_start_and_offers_the_two_decisions() {
             "unblock",
             "fast_forward_start",
             "start_anyway",
-            "cancel",
-            "ask_design"
+            "ask_design",
+            "cancel"
         ]
     );
 

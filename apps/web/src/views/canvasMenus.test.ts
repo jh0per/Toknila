@@ -39,6 +39,16 @@ describe("the card menu", () => {
     expect(red).toEqual([e.length - 1]);
   });
 
+  it("offers Ask for a design among the actions, before Cancel, and runs ask_design", () => {
+    const h = handlers();
+    const d = detail(["start", "pause", "ask_design", "cancel"], true);
+    expect(shape(d)).toContain("|Start");
+    expect(shape(d).filter((l) => l.includes("design"))).toEqual(["Ask for a design"]);
+    cardEntries(d, h).find((x) => x.testId === "menu-card-ask_design")?.run();
+    expect(h.act).toHaveBeenCalledWith("ask_design");
+    expect(shape(detail(["accept", "return"], false)).join()).not.toContain("design");
+  });
+
   it("shows the shortcuts the diagram has: Enter opens, S starts", () => {
     const e = cardEntries(detail(["start"], false), handlers());
     expect(e.find((x) => x.testId === "menu-card-open")?.keys).toBe("Enter");

@@ -40,6 +40,7 @@
       "ticket_id": "<id>"
     }
   ],
+  "design_waiting": false,
   "in_status_ms": 0,
   "phase": "implement",
   "queue_position": null,

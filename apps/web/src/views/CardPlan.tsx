@@ -3,6 +3,7 @@ import type { ChainDetail, Place, Ticket, TicketDetail } from "../api/types";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import { type State, ticketsInOrder } from "../store/state";
+import { DesignFirst } from "./DesignFirst";
 
 type Props = { state: State; card: Ticket; detail: TicketDetail | undefined; chain: ChainDetail | undefined; dispatch: (i: Intent) => void };
 
@@ -35,13 +36,14 @@ export function CardPlan({ state, card, detail, chain, dispatch }: Props) {
 function CardEditor({ state, card, dispatch }: { state: State; card: Ticket; dispatch: (i: Intent) => void }) {
   const [title, setTitle] = useState(card.title);
   const [prompt, setPrompt] = useState(card.prompt);
+  const [designFirst, setDesignFirst] = useState(card.design_first ?? false);
   const refused = planError(state.plan, "edit") ?? planError(state.plan, "edit", "title");
   return (
     <form
       className="plan-form" data-testid="card-editor"
       onSubmit={(e) => {
         e.preventDefault();
-        dispatch({ type: "saveCard", key: card.key, patch: { title: title.trim(), prompt } });
+        dispatch({ type: "saveCard", key: card.key, patch: { title: title.trim(), prompt, design_first: designFirst } });
       }}
     >
       <label className="field">
@@ -52,6 +54,7 @@ function CardEditor({ state, card, dispatch }: { state: State; card: Ticket; dis
         <span>Description (Markdown)</span>
         <textarea data-testid="edit-prompt" rows={6} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
       </label>
+      <DesignFirst checked={designFirst} onChange={setDesignFirst} />
       {refused && <p className="error" role="alert" data-testid="edit-error">{refused}</p>}
       <div className="row">
         <button className="btn primary" type="submit" disabled={state.plan.busy} data-testid="save-card">Save</button>

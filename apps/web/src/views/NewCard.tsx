@@ -4,6 +4,7 @@ import { acceptanceFrom, cardTitle, titleFromTask } from "../store/cardForm";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import { type State, ticketsInOrder } from "../store/state";
+import { DesignFirst } from "./DesignFirst";
 import { Field } from "./Field";
 
 /// A new card in a chain. It starts with what the agent should do (several lines; it is the
@@ -16,6 +17,7 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
   // What the person typed into Title; undefined while it still follows the task.
   const [typed, setTyped] = useState<string | undefined>(undefined);
   const [after, setAfter] = useState("");
+  const [designFirst, setDesignFirst] = useState(false);
   const p = state.plan;
   const refused = planError(p, "card");
   const title = typed ?? titleFromTask(task);
@@ -30,7 +32,7 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
         dispatch({
           type: "createCard",
           chain: chain.chain.id,
-          input: { title: cardTitle(typed, task), prompt: task.trim(), acceptance: acceptanceFrom(acceptance), ...place },
+          input: { title: cardTitle(typed, task), prompt: task.trim(), acceptance: acceptanceFrom(acceptance), ...(designFirst ? { design_first: true } : {}), ...place },
         });
       }}
     >
@@ -50,6 +52,7 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
           {ticketsInOrder(chain).map((t) => <option key={t.id} value={t.key}>{t.key} · {t.title}</option>)}
         </select>
       </Field>
+      <DesignFirst checked={designFirst} onChange={setDesignFirst} />
       {refused && <p className="error" role="alert" data-testid="card-error">{refused}</p>}
       <button className="btn primary" type="submit" disabled={p.busy} data-testid="create-card">Add card</button>
     </form>

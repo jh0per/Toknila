@@ -14,6 +14,8 @@ export interface StatusLine {
   text: string;
   /// The next step, when there is one; the buttons for it are the card's actions.
   next?: string;
+  /// A link to a tab of the card that the next step is about (the design waits in Threads).
+  tab?: { tab: "threads"; label: string };
 }
 
 /// What the card's chain and the queue say about when it starts.
@@ -46,9 +48,17 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
         ? { tone: "going", text: "Ready: starts when a slot is free" }
         : { tone: "needs", text: "Ready: start it when you want", next: "This chain does not start cards automatically; press Start." };
     case "running":
-      return { tone: "going", text: "An agent is working on it", next: "Watch it in Terminal; it will ask here if it needs you." };
+      return designLine(detail) ?? {
+        tone: "going",
+        text: "An agent is working on it",
+        next: "Watch it in Terminal; it will ask here if it needs you.",
+      };
     case "waiting":
-      return { tone: "needs", text: "Waiting for your answer", next: waitingText(card) };
+      return (card.status_reason?.status === "waiting" && card.status_reason.kind === "silent" ? designLine(detail) : undefined) ?? {
+        tone: "needs",
+        text: "Waiting for your answer",
+        next: waitingText(card),
+      };
     case "blocked":
       return { tone: "needs", text: `Blocked: ${blockedText(card)}`, next: can("unblock") ? "Fix what it says, then Unblock." : undefined };
     case "review": {
@@ -68,6 +78,23 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
       return { tone: "quiet", text: why ? `Cancelled: ${why}` : "Cancelled", next: can("reopen") ? "Reopen it to bring it back." : undefined };
     }
   }
+}
+
+/// The sentence of a card whose agent has a design on the table: waiting for the person's verdict
+/// on a version, or working on the design after changes were asked for.
+function designLine(detail: TicketDetail | undefined): StatusLine | undefined {
+  if (detail?.design_waiting) {
+    return {
+      tone: "needs",
+      text: "Waiting for you to approve the design",
+      next: "Look at the design in Threads, then approve it or ask for changes. No code is written before you approve.",
+      tab: { tab: "threads", label: "Open the design" },
+    };
+  }
+  if (detail?.phase === "design") {
+    return { tone: "going", text: "An agent is working on the design", next: "It will show it in Threads when it is ready for you to judge." };
+  }
+  return undefined;
 }
 
 /// What a waiting card asks, in a sentence.

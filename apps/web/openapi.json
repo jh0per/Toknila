@@ -8598,6 +8598,10 @@
               "$ref": "#/components/schemas/Comment"
             }
           },
+          "design_waiting": {
+            "type": "boolean",
+            "description": "A thread of the card has a version that waits for the person's verdict (approve, or ask\nfor changes)."
+          },
           "in_status_ms": {
             "type": "integer",
             "format": "int64",

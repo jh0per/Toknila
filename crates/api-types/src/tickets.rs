@@ -18,6 +18,10 @@ pub struct TicketDetail {
     pub in_status_ms: u64,
     /// Computed from the ticket's threads: design while any is open, implement otherwise.
     pub phase: Phase,
+    /// A thread of the card has a version that waits for the person's verdict (approve, or ask
+    /// for changes).
+    #[serde(default)]
+    pub design_waiting: bool,
     /// The ticket's worktree and branch while it has them; `null` before it started, after it
     /// merged, or when its project has no repository.
     pub ship: Option<Ship>,

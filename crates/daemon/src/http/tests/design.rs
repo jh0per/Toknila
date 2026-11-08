@@ -135,8 +135,14 @@ async fn ask_design_on_a_running_card_sends_an_instruction_and_review_refuses_it
         json!({ "event": "thread_version", "thread": "1", "format": "mermaid", "body": "graph TD; A-->B" }),
     )
     .await;
+    let waiting = api.get("/v1/tickets/DEMO-1").await;
+    assert_eq!(
+        waiting["design_waiting"], true,
+        "a version waits for the person"
+    );
     api.post("/v1/tickets/DEMO-1/threads/1/approve", json!({}))
         .await;
+    assert_eq!(api.get("/v1/tickets/DEMO-1").await["design_waiting"], false);
     api.post(
         "/v1/tickets/DEMO-1/events",
         json!({ "event": "finished", "summary": "done" }),
