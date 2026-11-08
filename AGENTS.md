@@ -105,6 +105,10 @@ A check you have never seen fail is a claim, not a check.
   a thing you know is there.
 - Print the bytes that cross a boundary (HTTP bodies, event JSON), not the struct you meant to send.
 - Run the gate on exactly what you commit; stage the paths you changed, read `git diff --cached`.
+- A snapshot moves only when you meant it to: update one test at a time
+  (`TOKNILA_UPDATE_SNAPSHOTS=1 cargo test -p <crate> <test>`), read the snapshot diff and keep it
+  only if it is the change you intended. Never run the whole workspace with the variable set:
+  that rewrites every pinned output and hides regressions.
 
 ## Reporting
 
