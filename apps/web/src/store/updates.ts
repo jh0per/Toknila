@@ -58,6 +58,10 @@ export function banner(u: UpdatesState): { title: string; notes: string } | unde
   return b && b.title !== u.dismissed ? b : undefined;
 }
 
+/// Whether an update waits for a restart, dismissed banner or not: the dot on Settings stays until
+/// the app has restarted into it.
+export const updateReady = (u: UpdatesState): boolean => Boolean(u.view?.banner);
+
 type S = { updates: UpdatesState };
 
 /// The reducer of this slice.

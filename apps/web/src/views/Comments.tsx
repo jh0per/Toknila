@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Comment, CommentKind, Ticket, TicketDetail } from "../api/types";
 import type { Intent } from "../store/msg";
-import { isPermissionReport } from "./permissionReports";
+import { isPermissionReport } from "../store/permissionReports";
 
 const KINDS: CommentKind[] = ["instruction", "report", "decision"];
 
