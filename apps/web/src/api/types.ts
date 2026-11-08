@@ -66,4 +66,5 @@ export type ImportPathResult = Schemas["ImportPathResult"];
 export type ImportedChain = Schemas["ImportedChain"];
 export type FolderNote = Schemas["FolderNote"];
 export type ProjectDeletion = Schemas["ProjectDeletion"];
+export type PlannerState = Schemas["PlannerState"];
 export type ChainDeletion = Schemas["ChainDeletion"];

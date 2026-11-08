@@ -42,12 +42,25 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
           )}
         </h2>
         <ul>
+          {project && (
+            <li key="planner" data-testid="planner-entry">
+              <NavLink
+                route={{ name: "planner", project: project.key }}
+                dispatch={dispatch}
+                className={`item${state.route.name === "planner" ? " sel" : ""}`}
+                testId="planner-link"
+              >
+                <span className="t key">Planner</span>
+                <span className="n" title="The project's main agent: it plans, you start the cards">✦</span>
+              </NavLink>
+            </li>
+          )}
           {chainsOf(state, project).map((c) => (
             <li key={c.chain.id} data-chain-item={c.chain.name} onContextMenu={chainMenu.open(c)}>
               <NavLink
                 route={{ name: "projectChain", project: project?.key ?? "", chain: c.chain.name }}
                 dispatch={dispatch}
-                className={`item${c.chain.id === chain?.chain.id ? " sel" : ""}`}
+                className={`item${c.chain.id === chain?.chain.id && state.route.name !== "planner" ? " sel" : ""}`}
               >
                 <span className="t key">{c.chain.name}</span>
                 <span className="n">{c.summary.done}/{c.summary.total}</span>

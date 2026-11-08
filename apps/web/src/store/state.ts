@@ -6,6 +6,7 @@ import type {
 import { type EdgesState, initialEdges } from "./edges";
 import { type ImportState, initialImports } from "./imports";
 import { type PlanState, initialPlan } from "./plan";
+import { type PlannerSlice, initialPlanner } from "./planner";
 import { type RemovalState, initialRemoval } from "./removal";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
@@ -44,6 +45,8 @@ export interface State {
   settings: SettingsState;
   /// Planning from the window: the open dialog, a card being edited or moved, archived projects.
   plan: PlanState;
+  /// Each project's planner: whether its process is alive.
+  planner: PlannerSlice;
   /// Imports from the window and the plans found in a repository.
   imports: ImportState;
   /// Deleting a project or a chain: the dialog's answer.
@@ -79,6 +82,7 @@ export function initialState(route: Route): State {
     tab: "details",
     settings: initialSettings,
     plan: initialPlan,
+    planner: initialPlanner,
     imports: initialImports,
     removal: initialRemoval,
     edges: initialEdges,
@@ -145,7 +149,11 @@ export function defaultChain(s: State, project: Project | undefined): ChainDetai
 /// The chain in focus: the one the route names, or the project's default when it names none.
 export function currentChain(s: State): ChainDetail | undefined {
   const r = s.route;
-  if (r.name === "project" || r.name === "chains") return defaultChain(s, currentProject(s));
+  // The planner's screen shows the project's most recently active chain above its terminal, so
+  // the diagram follows what the planner edits.
+  if (r.name === "project" || r.name === "chains" || r.name === "planner") {
+    return defaultChain(s, currentProject(s));
+  }
   if (r.name !== "chain" && r.name !== "projectChain" && r.name !== "card") return undefined;
   const mine = r.name === "chain" ? allChains(s) : chainsOf(s, currentProject(s));
   return mine.find((c) => c.chain.name === r.chain);

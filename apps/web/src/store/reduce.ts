@@ -5,6 +5,7 @@ import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
 import { reduceEdges } from "./edges";
 import { type Dialog, reducePlan, withChain } from "./plan";
+import { loadPlanner, reducePlanner } from "./planner";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
@@ -200,6 +201,13 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "updateWarned":
     case "updateFailed":
       return reduceUpdates(s, msg);
+    case "startPlanner":
+    case "stopPlanner":
+    case "refreshPlanner":
+    case "pickPlannerProfile":
+    case "plannerLoaded":
+    case "plannerFailed":
+      return reducePlanner(s, msg);
     case "setUsageDays":
     case "setUsageMetric":
     case "setMachineScan":
@@ -228,6 +236,7 @@ function then(s: State, fx: Effect[], route: Route): [State, Effect[]] {
 function enter(route: Route, s: State): Effect[] {
   if (route.name === "settings") return [...setupLoads, { type: "loadCli" }];
   if (route.name === "usage") return [loadUsage(s)];
+  if (route.name === "planner") return [loadPlanner(route.project), { type: "loadProfiles" }];
   return route.name === "card"
     ? [{ type: "loadDetail", key: route.key }, { type: "loadThreads", key: route.key }]
     : [];

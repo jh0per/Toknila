@@ -2,7 +2,7 @@
 // scrollback ended, reconnecting by itself. Output goes out through callbacks; typing comes in
 // through `send`. No DOM here, so the view can be any terminal emulator.
 
-import { getBytes, post, postBytes, runnerStreamUrl } from "../api/http";
+import { getBytes, plannerStreamUrl, post, postBytes, runnerStreamUrl } from "../api/http";
 import type { Size } from "./size";
 import { type Exit, type Frame, type TermCursor, applyFrame, parseFrame } from "./wire";
 
@@ -33,10 +33,38 @@ export interface TerminalConnection {
   close(): void;
 }
 
+/// Where a terminal's routes are: the path the scrollback, input and size hang off, a query
+/// that picks the role, the address of its stream, and whether the panel's size is its to set.
+interface Target {
+  base: string;
+  roleQuery: string;
+  streamUrl(cursor: { run: string; from: number } | null): string;
+  sized: boolean;
+}
+
 export function openTerminal(key: string, sink: TerminalSink, role: "worker" | "reviewer" = "worker"): TerminalConnection {
-  const base = `/tickets/${encodeURIComponent(key)}/runner`;
-  // The worker is the default; the reviewer's terminal is addressed with `?role=reviewer`.
-  const roleQuery = role === "reviewer" ? "?role=reviewer" : "";
+  return open({
+    base: `/tickets/${encodeURIComponent(key)}/runner`,
+    // The worker is the default; the reviewer's terminal is addressed with `?role=reviewer`.
+    roleQuery: role === "reviewer" ? "?role=reviewer" : "",
+    streamUrl: (cursor) => runnerStreamUrl(key, cursor, role),
+    // The panel's size belongs to the worker's terminal.
+    sized: role === "worker",
+  }, sink);
+}
+
+/// A project's planner terminal: the same frames, on the project's routes.
+export function openPlannerTerminal(project: string, sink: TerminalSink): TerminalConnection {
+  return open({
+    base: `/projects/${encodeURIComponent(project)}/planner`,
+    roleQuery: "",
+    streamUrl: (cursor) => plannerStreamUrl(project, cursor),
+    sized: true,
+  }, sink);
+}
+
+function open(target: Target, sink: TerminalSink): TerminalConnection {
+  const { base, roleQuery } = target;
   let cursor: TermCursor = { run: null, end: 0 };
   let ws: WebSocket | null = null;
   let closed = false;
@@ -55,7 +83,7 @@ export function openTerminal(key: string, sink: TerminalSink, role: "worker" | "
   const connect = () => {
     if (closed) return;
     const from = cursor.run === null ? null : { run: cursor.run, from: cursor.end };
-    ws = new WebSocket(runnerStreamUrl(key, from, role));
+    ws = new WebSocket(target.streamUrl(from));
     ws.binaryType = "arraybuffer";
     ws.onopen = () => {
       retryMs = FIRST_RETRY_MS;
@@ -109,8 +137,7 @@ export function openTerminal(key: string, sink: TerminalSink, role: "worker" | "
         .catch((e: unknown) => sink.refused(e instanceof Error ? e.message : String(e)));
     },
     resize(size) {
-      // The panel's size belongs to the worker's terminal.
-      if (role === "worker") void post(`${base}/size`, size).catch(() => undefined);
+      if (target.sized) void post(`${base}/size`, size).catch(() => undefined);
     },
     close() {
       closed = true;

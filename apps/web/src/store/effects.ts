@@ -8,6 +8,7 @@ import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { runEdgeEffect } from "./edgeEffects";
 import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
+import { runPlannerEffect } from "./plannerEffects";
 import { runSettingsEffect } from "./settingsEffects";
 import { runUpdateEffect } from "./updatesEffects";
 import { runUsageEffect } from "./usageEffects";
@@ -180,6 +181,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "archiveProject":
       case "clearHash":
         runPlanEffect(e, dispatch);
+        return;
+      case "plannerCall":
+        runPlannerEffect(e, dispatch);
         return;
       case "importText":
       case "importPath":
