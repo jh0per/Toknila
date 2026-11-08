@@ -142,3 +142,11 @@ mod tests {
         );
     }
 }
+
+/// Body of `POST /v1/tickets/{ticket}/runner/size`: the size of the panel showing the terminal.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct TerminalSize {
+    pub cols: u32,
+    pub rows: u32,
+}

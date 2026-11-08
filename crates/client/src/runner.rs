@@ -4,13 +4,11 @@
 
 use std::io::Read;
 
+use toknila_api_types::TerminalSize;
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
-use toknila_api_types::{
-    InstructionClaim, NewAnswer, PermissionAsk, PermissionReply, TerminalSize,
-};
 use toknila_core::{AgentRole, RunId};
 
-use crate::{Client, ClientError, ClientResult, NO_BODY, enc, transport_error};
+use crate::{Client, ClientError, ClientResult, enc, transport_error};
 
 /// The tail of a ticket's newest run, as the daemon keeps it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,52 +124,6 @@ fn role_query(role: AgentRole, sep: char) -> String {
 }
 
 impl Client {
-    /// `POST /tickets/{ticket}/instructions/claim`: the instructions a person left for the
-    /// ticket's agent, handed over once.
-    pub fn claim_instructions(&self, ticket: &str) -> ClientResult<InstructionClaim> {
-        self.call(
-            "POST",
-            &format!("/tickets/{}/instructions/claim", enc(ticket)),
-            NO_BODY,
-        )
-    }
-
-    /// `GET /projects/{project}/inbox`: what waits on a person, newest first.
-    pub fn inbox(&self, project: &str) -> ClientResult<Vec<toknila_core::inbox::InboxItem>> {
-        self.call("GET", &format!("/projects/{}/inbox", enc(project)), NO_BODY)
-    }
-
-    /// `POST /tickets/{ticket}/runner/answer`: a person's answer to what the agent asks.
-    pub fn answer(&self, ticket: &str, a: &NewAnswer) -> ClientResult<()> {
-        self.call(
-            "POST",
-            &format!("/tickets/{}/runner/answer", enc(ticket)),
-            Some(a),
-        )
-    }
-
-    /// `POST /tickets/{ticket}/permission`: the agent's permission hook asks and waits (up to
-    /// `wait`) for the person's decision.
-    pub fn permission(
-        &self,
-        ticket: &str,
-        ask: &PermissionAsk,
-        wait: std::time::Duration,
-    ) -> ClientResult<PermissionReply> {
-        let url = format!("{}/v1/tickets/{}/permission", self.base, enc(ticket));
-        let json = serde_json::to_value(ask).map_err(|e| ClientError::Decode(e.to_string()))?;
-        let text = self
-            .agent
-            .post(&url)
-            .timeout(wait)
-            .set("Authorization", &format!("Bearer {}", self.token))
-            .send_json(json)
-            .map_err(transport_error)?
-            .into_string()
-            .map_err(|e| ClientError::Decode(e.to_string()))?;
-        serde_json::from_str(&text).map_err(|e| ClientError::Decode(e.to_string()))
-    }
-
     /// `POST /tickets/{ticket}/runner/size`: the size of the panel showing the terminal.
     pub fn runner_size(&self, ticket: &str, size: &TerminalSize) -> ClientResult<()> {
         self.call(
