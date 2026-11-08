@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "handover",
+  "description": "The bundled start page (local content only, never the daemon's page) may read how many agents run on an older daemon and answer whether to replace it now or later.",
+  "windows": ["main"],
+  "local": true,
+  "permissions": ["allow-takeover-state", "allow-takeover-choose"]
+}

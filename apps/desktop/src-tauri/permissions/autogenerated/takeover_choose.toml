@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-takeover-choose"
+description = "Enables the takeover_choose command without any pre-configured scope."
+commands.allow = ["takeover_choose"]
+
+[[permission]]
+identifier = "deny-takeover-choose"
+description = "Denies the takeover_choose command without any pre-configured scope."
+commands.deny = ["takeover_choose"]

@@ -6,9 +6,52 @@
   body { font: 15px/1.5 -apple-system, system-ui, sans-serif; margin: 3rem; color: #222; background: #fff; }
   @media (prefers-color-scheme: dark) { body { color: #ddd; background: #1c1c1e; } }
   code { font-size: 13px; }
+  [hidden] { display: none; }
+  #ask { max-width: 32rem; padding: 1.25rem 1.5rem; border: 1px solid #8884; border-radius: 10px; }
+  #ask p { white-space: pre-line; margin-top: 0; }
+  button { font: inherit; padding: 0.4rem 0.9rem; margin-right: 0.5rem; border-radius: 6px; border: 1px solid #8886; background: transparent; color: inherit; cursor: pointer; }
+  button.primary { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
 </style>
 <h1>Toknila</h1>
-<p>The daemon could not be started:</p>
-<pre id="status">starting…</pre>
-<p>Logs are in the Toknila data folder (<code>toknila daemon status</code> shows where).</p>
+<div id="ask" role="dialog" aria-labelledby="ask-title" hidden>
+  <h2 id="ask-title">An older daemon has agents running</h2>
+  <p id="ask-text"></p>
+  <button id="now" class="primary" type="button"></button>
+  <button id="later" type="button">Later</button>
+  <p id="ask-error" role="alert" hidden></p>
+</div>
+<div id="failed" hidden>
+  <p>The daemon could not be started:</p>
+  <pre id="status">starting…</pre>
+  <p>Logs are in the Toknila data folder (<code>toknila daemon status</code> shows where).</p>
+</div>
+<script>
+  // The shell has read the older daemon and tells how many agents run on it; the answer goes back
+  // to the shell, which then shows a daemon's page in this window.
+  const invoke = window.__TAURI__ && window.__TAURI__.core.invoke;
+  const $ = (id) => document.getElementById(id);
+  async function choose(answer) {
+    $('now').disabled = $('later').disabled = true;
+    try {
+      await invoke('takeover_choose', { choice: answer });
+    } catch (e) {
+      $('ask-error').textContent = String(e);
+      $('ask-error').hidden = false;
+      $('now').disabled = $('later').disabled = false;
+    }
+  }
+  if (invoke) {
+    invoke('takeover_state').then((q) => {
+      if (!q) { $('failed').hidden = false; return; }
+      $('ask-text').textContent = q.message;
+      $('now').textContent = q.replace_label;
+      $('ask').hidden = false;
+      $('now').onclick = () => choose('now');
+      $('later').onclick = () => choose('later');
+    }).catch(() => { $('failed').hidden = false; });
+  } else {
+    $('failed').hidden = false;
+  }
+</script>
 </html>

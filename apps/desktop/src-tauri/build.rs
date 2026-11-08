@@ -5,6 +5,8 @@ const COMMANDS: &[&str] = &[
     "check_for_updates",
     "restart_to_update",
     "pick_folder",
+    "takeover_state",
+    "takeover_choose",
 ];
 
 fn main() {

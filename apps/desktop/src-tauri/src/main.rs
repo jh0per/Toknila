@@ -6,6 +6,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod folder;
+mod handover;
 mod menu;
 mod path;
 mod takeover;
@@ -34,10 +35,13 @@ fn main() {
             updater::update_status,
             updater::check_for_updates,
             updater::restart_to_update,
-            folder::pick_folder
+            folder::pick_folder,
+            handover::takeover_state,
+            handover::takeover_choose
         ])
         .setup(|app| {
             app.manage(updater::Updates::new(env!("CARGO_PKG_VERSION")));
+            app.manage(handover::Pending::default());
             updater::spawn_loop(app.handle().clone());
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -53,22 +57,34 @@ fn main() {
 
 /// Starts or attaches to the daemon and opens the main window on its page.
 async fn open(app: &AppHandle) -> Result<(), String> {
-    make_way_for_our_daemon(app).await?;
+    if make_way_for_our_daemon(app).await? {
+        // Agents run on the older daemon: the start page asks; its answer opens the daemon's page.
+        WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+            .title("Toknila")
+            .inner_size(1200.0, 800.0)
+            .build()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
     toknila(app, &["daemon", "start"]).await?;
-    let open = toknila(app, &["open", "--json"]).await?;
-    let url = serde_json::from_str::<serde_json::Value>(&open)
-        .ok()
-        .and_then(|v| v["url"].as_str().map(str::to_owned))
-        .ok_or_else(|| format!("unexpected answer from `toknila open`: {open}"))?;
-    let url = url
-        .parse()
-        .map_err(|e| format!("bad page address {url}: {e}"))?;
+    let url = page_url(app).await?;
     WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
         .title("Toknila")
         .inner_size(1200.0, 800.0)
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// The address of the daemon's page, from `toknila open`.
+async fn page_url(app: &AppHandle) -> Result<tauri::Url, String> {
+    let open = toknila(app, &["open", "--json"]).await?;
+    let url = serde_json::from_str::<serde_json::Value>(&open)
+        .ok()
+        .and_then(|v| v["url"].as_str().map(str::to_owned))
+        .ok_or_else(|| format!("unexpected answer from `toknila open`: {open}"))?;
+    url.parse()
+        .map_err(|e| format!("bad page address {url}: {e}"))
 }
 
 /// The path of the bundled daemon, resolved the way the daemon reports its own.
@@ -81,30 +97,24 @@ fn own_daemon_exe() -> Option<String> {
 /// A daemon of another version or from another binary (a replaced app) is stopped, so the app
 /// runs its own; the same version from the same binary is left to `daemon start` to attach to.
 /// If the old one does not stop, the window says so instead of attaching to it.
-async fn make_way_for_our_daemon(app: &AppHandle) -> Result<(), String> {
+/// With agents running on it, nothing is stopped: the question goes to the start page
+/// (`handover.rs`) and this returns `true`.
+async fn make_way_for_our_daemon(app: &AppHandle) -> Result<bool, String> {
     let status = toknila(app, &["daemon", "status", "--json"]).await?;
     let found = takeover::parse_status(&status);
     let own_exe = own_daemon_exe().unwrap_or_default();
-    if takeover::decide(found.as_ref(), env!("CARGO_PKG_VERSION"), &own_exe)
-        != takeover::Decision::Replace
-    {
-        return Ok(());
-    }
+    let decision = takeover::decide(found.as_ref(), env!("CARGO_PKG_VERSION"), &own_exe);
     let Some(found) = found else {
-        return Ok(());
+        return Ok(false);
     };
-    // `daemon stop` asks the daemon to shut down and waits for it to exit (10 s).
-    toknila(app, &["daemon", "stop"])
-        .await
-        .map_err(|e| takeover::stuck_message(&found, &e))?;
-    let after = toknila(app, &["daemon", "status", "--json"]).await?;
-    if takeover::parse_status(&after).is_some() {
-        return Err(takeover::stuck_message(
-            &found,
-            "it still answers after the stop request",
-        ));
+    match decision {
+        takeover::Decision::Start | takeover::Decision::Attach => Ok(false),
+        takeover::Decision::Replace => handover::stop_old(app, &found).await.map(|()| false),
+        takeover::Decision::Ask(n) => {
+            app.state::<handover::Pending>().set(found, n);
+            Ok(true)
+        }
     }
-    Ok(())
 }
 
 /// Runs the bundled `toknila` binary and returns its standard output. A daemon it starts gets the
@@ -136,7 +146,9 @@ fn show_error(app: &AppHandle, message: &str) {
     if let Ok(w) = window {
         let text = serde_json::to_string(message).unwrap_or_default();
         let _ = w.eval(format!(
-            "document.getElementById('status').textContent = {text};"
+            "document.getElementById('ask').hidden = true; \
+             document.getElementById('failed').hidden = false; \
+             document.getElementById('status').textContent = {text};"
         ));
     }
 }

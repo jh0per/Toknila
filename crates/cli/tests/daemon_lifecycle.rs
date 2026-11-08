@@ -62,6 +62,8 @@ fn start_status_auth_stop() {
     // Starting again is a no-op that reports the same daemon.
     assert_eq!(tok(h, &["daemon", "start"])["pid"], started["pid"]);
     assert_eq!(tok(h, &["daemon", "status"])["port"], port);
+    // The desktop app reads this to decide whether replacing the daemon needs asking.
+    assert_eq!(tok(h, &["daemon", "status"])["agents"], 0);
 
     let base = format!("http://127.0.0.1:{port}");
     assert_eq!(
