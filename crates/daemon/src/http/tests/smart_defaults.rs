@@ -3,7 +3,6 @@
 //! `gh` is answered by the test, so the machine's own login does not matter.
 
 use std::path::Path;
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -12,6 +11,7 @@ use serde_json::{Value, json};
 use toknila_core::system::Probe;
 
 use super::Api;
+use crate::git::testing::git;
 use crate::tools::{SystemTools, Tools};
 
 /// Real tools, except that `gh auth status` answers `code`.
@@ -29,18 +29,6 @@ impl Tools for GhAnswers {
         }
         SystemTools.run(program, args, timeout)
     }
-}
-
-fn git(dir: &Path, args: &[&str]) {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@example.com"])
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .output()
-        .expect("git runs");
-    assert!(out.status.success(), "git {args:?}: {out:?}");
 }
 
 /// A repository on `main` with these files (relative path, text) and, if given, an `origin`.

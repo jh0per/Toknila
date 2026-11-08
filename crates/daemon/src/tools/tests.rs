@@ -2,9 +2,8 @@
 //! facts against a real temporary repository. The hanging program is this test binary itself,
 //! running the `#[ignore]`d test below, so no helper binary or shell is needed.
 
-use std::process::Command;
-
 use super::*;
+use crate::git::testing::{git, init_repo};
 
 fn me() -> String {
     std::env::current_exe()
@@ -56,28 +55,11 @@ fn a_program_that_hangs_is_stopped_at_the_timeout() {
     );
 }
 
-fn git(dir: &std::path::Path, args: &[&str]) {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@example.com"])
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .output()
-        .expect("git runs");
-    assert!(out.status.success(), "git {args:?}: {out:?}");
-}
-
 #[test]
 fn repo_facts_follow_the_disk_and_the_branches() {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = tmp.path().join("repo");
-    std::fs::create_dir_all(&repo).expect("mkdir");
-    git(&repo, &["init", "--quiet"]);
-    git(&repo, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
-    std::fs::write(repo.join("a.txt"), "a").expect("write");
-    git(&repo, &["add", "a.txt"]);
-    git(&repo, &["commit", "--quiet", "-m", "init"]);
+    init_repo(&repo, "develop");
     git(&repo, &["branch", "release/1"]);
     let path = repo.to_string_lossy().into_owned();
 
@@ -96,6 +78,6 @@ fn repo_facts_follow_the_disk_and_the_branches() {
         format!("{:?}", c.problems[0].code)
     };
     assert_eq!(code(&plain), "NotAGitRepo");
-    assert_eq!(code(&repo.join("a.txt")), "NotADirectory");
+    assert_eq!(code(&repo.join("README.md")), "NotADirectory");
     assert_eq!(code(&tmp.path().join("nope")), "PathMissing");
 }

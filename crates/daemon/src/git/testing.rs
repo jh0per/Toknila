@@ -21,6 +21,18 @@ pub(crate) fn git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
+/// Makes `repo` (and its parents) a repository whose only branch is `branch`, with one commit that
+/// adds `README.md`.
+pub(crate) fn init_repo(repo: &Path, branch: &str) {
+    std::fs::create_dir_all(repo).expect("mkdir");
+    git(repo, &["init", "--quiet"]);
+    git(
+        repo,
+        &["symbolic-ref", "HEAD", &format!("refs/heads/{branch}")],
+    );
+    commit_file(repo, "README.md", "hi\n", "init");
+}
+
 /// Writes `name` in `dir` and commits it with `message`.
 pub(crate) fn commit_file(dir: &Path, name: &str, content: &str, message: &str) {
     std::fs::write(dir.join(name), content).expect("write");

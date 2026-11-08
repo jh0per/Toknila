@@ -5,17 +5,12 @@ use std::path::Path;
 use toknila_core::{StalePolicy, TicketId};
 
 use super::*;
-use crate::git::testing::git;
+use crate::git::testing::{git, init_repo};
 
 /// A repository whose only branch is `develop`, with one commit.
 pub(super) fn repo(dir: &Path) -> String {
     let repo = dir.join("the repo");
-    std::fs::create_dir_all(&repo).expect("mkdir");
-    git(&repo, &["init", "--quiet"]);
-    git(&repo, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
-    std::fs::write(repo.join("README.md"), "hi\n").expect("write");
-    git(&repo, &["add", "README.md"]);
-    git(&repo, &["commit", "--quiet", "-m", "init"]);
+    init_repo(&repo, "develop");
     repo.to_string_lossy().into_owned()
 }
 

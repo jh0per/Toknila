@@ -1,10 +1,6 @@
-use std::path::PathBuf;
-use std::sync::Arc;
-
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::{Value, json};
-use tokio::sync::Notify;
 use tower::ServiceExt;
 
 use super::*;
@@ -29,18 +25,7 @@ async fn post(app: &axum::Router, uri: &str, body: Value) {
 async fn seeded() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().expect("tempdir");
     let store = Store::open(&dir.path().join("t.db")).expect("store");
-    let app = router(AppState {
-        store: store.clone(),
-        token: "t".into(),
-        shutdown: Arc::new(Notify::new()),
-        profiles: PathBuf::new(),
-        runners: crate::runner::Runners::new(PathBuf::new(), PathBuf::new()).0,
-        tools: std::sync::Arc::new(crate::tools::SystemTools),
-        usage: Arc::new(crate::usage::Usage::disabled()),
-        home: dir.path().to_owned(),
-        ships: dir.path().join("ships"),
-        trash: Arc::new(crate::trash::NoTrash),
-    });
+    let app = router(AppState::for_test(store.clone(), "t", dir.path()));
     post(&app, "/v1/projects", json!({ "key": "DEMO" })).await;
     let toml = include_str!("../../../../examples/demo.toml");
     post(&app, "/v1/projects/DEMO/import", json!({ "toml": toml })).await;
