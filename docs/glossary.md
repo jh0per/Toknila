@@ -16,6 +16,8 @@ read. A change that adds a screen or a help line checks it against this table.
 | agent | profile | In Settings, "Agents" lists profiles; "default agent" is the project's default profile. |
 | simulated agent | `sim` profile | Named in the window only in a development build, or where a project uses it. |
 | model | model alias | Under a project's Advanced; "leave empty to use your Claude Code default". |
+| assistant | planner | The project's main agent: "Plan with the assistant" is the first entry of a project in the sidebar. `tok planner` and the `/v1/planner` routes keep their name. |
+| Chat, Events (tabs of a card) | comments, questions and answers; the journal | Chat shows what the person and the card's agent said to each other; Events prints one sentence per journal entry with the raw event folded under "Raw event". |
 | card | ticket | Already the word in the window. |
 | chain | chain | Same word both sides. |
 | Back to work | (settings screen) | The settings replace the sidebar; Ctrl+, (Cmd+, on a Mac) opens them. |
