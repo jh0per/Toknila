@@ -7118,7 +7118,7 @@
               "string",
               "null"
             ],
-            "description": "`release/<version>`; empty in phase 0, where there are no branches."
+            "description": "The release's branch (`release/<version>`); `null` while no branch was made."
           },
           "chain_id": {
             "$ref": "#/components/schemas/ChainId"
@@ -8049,7 +8049,7 @@
               "string",
               "null"
             ],
-            "description": "Ship branch `ship/<chain>/<slug>`; empty until phase 1 creates ships."
+            "description": "Ship branch `ship/<chain>/<slug>`; `null` until the card's ship is made."
           },
           "chain_id": {
             "$ref": "#/components/schemas/ChainId"

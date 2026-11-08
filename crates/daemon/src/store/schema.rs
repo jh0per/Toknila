@@ -93,7 +93,7 @@ pub(super) const MIGRATIONS: &[&str] = &[
         config_json TEXT NOT NULL
     );
     INSERT INTO agent_profiles (name, role, config_json) VALUES ('sim', 'worker', '{"kind":"sim"}');
-    -- Phase 1 fills these.
+    -- The worktree and branch of a card, and the process working in it.
     CREATE TABLE ships (
         id TEXT PRIMARY KEY,
         ticket_id TEXT NOT NULL REFERENCES tickets(id),

@@ -48,7 +48,7 @@ pub struct Release {
     pub channel: ReleaseChannel,
     pub start_mode: StartMode,
     pub state: ReleaseState,
-    /// `release/<version>`; empty in phase 0, where there are no branches.
+    /// The release's branch (`release/<version>`); `null` while no branch was made.
     pub branch: Option<String>,
     pub cut_at: Option<Timestamp>,
     pub released_at: Option<Timestamp>,

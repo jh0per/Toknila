@@ -35,7 +35,7 @@ pub struct Ticket {
     /// `<worker profile>-reviewer`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reviewer: Option<String>,
-    /// Ship branch `ship/<chain>/<slug>`; empty until phase 1 creates ships.
+    /// Ship branch `ship/<chain>/<slug>`; `null` until the card's ship is made.
     pub branch: Option<String>,
     /// Copy depot secrets onto the ship at start.
     pub needs_secrets: bool,
