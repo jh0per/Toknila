@@ -39,7 +39,7 @@ code, pre, .key { font-family: var(--mono); }
 .side-foot { margin-top: auto; border-top: 1px solid var(--line); padding: var(--s2); }
 /* The top bar, the diagram, the divider, the bottom panel. The panel's height is `--panel-h`: 45% of
    the window until the person drags the divider (PanelDivider sets it in pixels). */
-.ide > main { display: grid; grid-template-rows: auto minmax(160px, 1fr) 8px var(--panel-h, 45%); min-width: 0; min-height: 0; }
+.ide > main { display: grid; grid-template-rows: auto minmax(160px, 1fr) 8px var(--panel-h, max(45%, 240px)); min-width: 0; min-height: 0; }
 .ide > main.plain { display: block; padding: var(--s4); overflow: auto; }
 .top { display: flex; align-items: center; gap: 10px; padding: var(--s2) var(--s3); background: var(--surface); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .autostart { display: inline-flex; gap: 4px; align-items: center; font-size: var(--fs-s); color: var(--muted); cursor: pointer; }
