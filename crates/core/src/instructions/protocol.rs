@@ -10,7 +10,10 @@ with Read and Grep: those are approved without asking in this session, while she
 (python, sed, perl, heredocs) stop for a permission answer every time; do not probe for an \
 interpreter to edit with. Stay inside this workspace: never read, copy or link files from other \
 checkouts of the repository or from other people's folders; install what the work needs here, the \
-way the repository's docs say.
+way the repository's docs say. The person's private files are off limits even to look at: their \
+Claude Code transcripts and settings (`~/.claude`), shell history, mail, keychains, browser data. \
+When a measurement needs data like that, make synthetic data of the same shape in a temporary \
+folder of your own.
 
 ## Report through the Toknila MCP tools
 
