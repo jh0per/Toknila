@@ -31,17 +31,6 @@ pub enum TicketStatus {
     Cancelled,
 }
 
-/// Board column a status belongs to, as in Jira.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StatusCategory {
-    ToDo,
-    InProgress,
-    InReview,
-    Done,
-}
-
 impl TicketStatus {
     /// Every status, in lifecycle order.
     pub const ALL: [TicketStatus; 10] = [
@@ -56,16 +45,6 @@ impl TicketStatus {
         Self::Released,
         Self::Cancelled,
     ];
-
-    /// The board column for this status.
-    pub fn category(self) -> StatusCategory {
-        match self {
-            Self::Proposed | Self::Backlog | Self::Ready => StatusCategory::ToDo,
-            Self::Running | Self::Waiting | Self::Blocked => StatusCategory::InProgress,
-            Self::Review => StatusCategory::InReview,
-            Self::Merged | Self::Released | Self::Cancelled => StatusCategory::Done,
-        }
-    }
 
     /// Done for its dependents: in the work branch (Merged, Released) or dropped (Cancelled).
     pub fn is_done(self) -> bool {
@@ -274,16 +253,6 @@ impl fmt::Display for StatusReason {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn every_status_has_the_category_from_the_plan() {
-        use StatusCategory::*;
-        let expected = [
-            ToDo, ToDo, ToDo, InProgress, InProgress, InProgress, InReview, Done, Done, Done,
-        ];
-        let actual: Vec<_> = TicketStatus::ALL.iter().map(|s| s.category()).collect();
-        assert_eq!(actual, expected);
-    }
 
     #[test]
     fn done_means_merged_released_or_cancelled() {
