@@ -6,24 +6,18 @@
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
-use axum::response::{IntoResponse, Response};
-use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
+use axum::http::StatusCode;
+use axum::response::Response;
 use toknila_api_types::{PlannerState, StartPlanner, TerminalSize};
 use toknila_app::planner;
 use toknila_app::resolve;
 use toknila_core::{Actor, AgentProfile, AgentRole, PlannerSpec, Project, planner as rules};
 
-use super::ApiResult;
+use super::{ApiResult, scrollback_response};
 use crate::http::error::{ApiError, ErrorBody};
 use crate::server::AppState;
 
 const PROJECT: &str = "Project id or key";
-
-fn header(name: &'static str, value: impl ToString) -> (HeaderName, HeaderValue) {
-    let value = HeaderValue::from_str(&value.to_string()).unwrap_or(HeaderValue::from_static(""));
-    (HeaderName::from_static(name), value)
-}
 
 async fn project_of(state: &AppState, reference: String) -> ApiResult<Project> {
     Ok(state
@@ -134,12 +128,7 @@ pub async fn planner_scrollback(
         .await
         .map_err(|e| ApiError(toknila_app::AppError::internal(e.to_string())))?
         .ok_or_else(|| ApiError::not_found(format!("output of the planner of {}", p.key)))?;
-    let headers = HeaderMap::from_iter([
-        header(HEADER_RUN, chunk.run),
-        header(HEADER_OFFSET, chunk.offset),
-        header(HEADER_END, chunk.end),
-    ]);
-    Ok((headers, chunk.bytes).into_response())
+    Ok(scrollback_response(chunk))
 }
 
 #[utoipa::path(post, path = "/projects/{project}/planner/input", tag = "planner",
