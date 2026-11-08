@@ -7,12 +7,12 @@ import { type State, initialState } from "./state";
 const A = "/work/Toknila";
 const B = "/work/other-repo";
 
-const check = (key: string | null, name: string | null): RepoCheck =>
-  ({ problems: [], branches: ["develop"], suggested_key: key, suggested_name: name });
+const check = (key: string | null, name: string | null, branch: string | null = "develop"): RepoCheck =>
+  ({ problems: [], branches: ["develop"], suggested_key: key, suggested_name: name, suggested_branch: branch });
 
 const path = (value: string): Msg => ({ type: "editDraft", field: "repo_path", value });
-const checked = (repo_path: string, key: string | null, name: string | null): Msg =>
-  ({ type: "repoChecked", repo_path, check: check(key, name) });
+const checked = (repo_path: string, key: string | null, name: string | null, branch: string | null = "develop"): Msg =>
+  ({ type: "repoChecked", repo_path, check: check(key, name, branch) });
 
 function blank(): State {
   const projects = [{ id: "p1", key: "DEMO", name: "Demo" }] as Project[];
@@ -24,7 +24,7 @@ const run = (s: State, ...msgs: Msg[]): State => msgs.reduce((at, m) => reduce(a
 describe("the add-a-project form", () => {
   it("asks the daemon about a new folder, once per folder and never for an empty one", () => {
     const [s, fx] = reduce(blank(), path(A));
-    expect(fx).toEqual([{ type: "checkRepo", repo_path: A, work_branch: "develop" }]);
+    expect(fx).toEqual([{ type: "checkRepo", repo_path: A, work_branch: "" }]);
     expect(reduce(s, path(`${A} `))[1]).toEqual([]);
     expect(reduce(s, path("  "))[1]).toEqual([]);
   });
@@ -32,6 +32,17 @@ describe("the add-a-project form", () => {
   it("fills the key and the name from the folder's suggestion", () => {
     const s = run(blank(), path(A), checked(A, "TOKNILA", "Toknila"));
     expect(s.settings.add.draft).toMatchObject({ key: "TOKNILA", name: "Toknila", repo_path: A });
+  });
+
+  it("prefills the base branch with the repository's own and keeps one the person typed", () => {
+    const s = run(blank(), path(A), checked(A, "TOKNILA", "Toknila", "main"));
+    expect(s.settings.add.draft.work_branch).toBe("main");
+    const followed = run(s, path(B), checked(B, "OTHERREPO", "other-repo", "trunk"));
+    expect(followed.settings.add.draft.work_branch).toBe("trunk");
+    const mine = run(followed, { type: "editDraft", field: "work_branch", value: "release" }, path(A), checked(A, "TOKNILA", "Toknila", "main"));
+    expect(mine.settings.add.draft.work_branch).toBe("release");
+    // A repository that suggests none leaves the field empty for the daemon to judge.
+    expect(run(blank(), path(A), checked(A, "TOKNILA", "Toknila", null)).settings.add.draft.work_branch).toBe("");
   });
 
   it("follows a new folder until the person types into the field", () => {
@@ -63,7 +74,7 @@ describe("the add-a-project form", () => {
 
   it("sent before the suggestion came, waits for the folder check and then goes out with it", () => {
     const [waiting, fx] = reduce(run(blank(), path(` ${A} `)), { type: "submitProject" });
-    expect(fx).toEqual([{ type: "checkRepo", repo_path: A, work_branch: "develop" }]);
+    expect(fx).toEqual([{ type: "checkRepo", repo_path: A, work_branch: "" }]);
     expect(waiting.settings.busy).toBe(true);
     const [sent, out] = reduce(waiting, checked(A, "TOKNILA", "Toknila"));
     expect(out).toEqual([{ type: "addProject", draft: { key: "TOKNILA", name: "Toknila", repo_path: A, work_branch: "develop" } }]);

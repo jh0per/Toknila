@@ -234,10 +234,17 @@ fn a_planner_plans_with_its_token_and_is_refused_everything_that_starts_or_accep
     assert_eq!(tok.run(&["planner", "start", "DEMO"])["running"], true);
 
     // The owner stops it; a second stop is fine.
-    tok.run(&["planner", "stop", "DEMO"]);
+    assert_eq!(
+        tok.text(&["planner", "stop", "DEMO"]),
+        "planner of DEMO stopped\n"
+    );
     wait_for(&tok, "the planner to stop", || {
         !client(&tok).planner("DEMO").expect("state").running
     });
+    assert_eq!(
+        tok.text(&["planner", "stop", "DEMO"]),
+        "planner of DEMO was not running\n"
+    );
     assert_eq!(tok.run(&["planner", "stop", "DEMO"])["running"], false);
     assert!(planner_logs(&tok).contains("post="), "history stays");
 }

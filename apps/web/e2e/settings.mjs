@@ -25,7 +25,7 @@ const tok = (...args) =>
 const git = (dir, ...args) =>
   execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
 
-// A repository whose only branch is `main`: the form's default base branch, develop, is missing.
+// A repository whose only branch is `main`: the form prefills it, and typing develop misses it.
 const repo = join(home, "repo");
 mkdirSync(repo);
 git(repo, "init", "--quiet");
@@ -69,6 +69,9 @@ try {
   await expectText(t("error-repo_path"), "not a git repository", "plain folder is refused at the path field");
   // A repository without the base branch: the error is at the branch field and the branches are offered.
   await t("repo-path").fill(repo);
+  await page.waitForFunction(() => document.querySelector("[data-testid=work-branch]")?.value === "main", null, { timeout: 10_000 });
+  console.log("PASS the base branch is prefilled with the branch the repository is on");
+  await t("work-branch").fill("develop");
   await t("add-project-submit").click();
   await expectText(t("error-work_branch"), "develop", "missing base branch is refused at the branch field");
   await expectText(t("branches"), "main", "the repository's branches are offered");

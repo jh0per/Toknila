@@ -81,6 +81,18 @@ fn git(tools: &dyn Tools, repo: &str, args: &[&str]) -> Probe {
     tools.run("git", &all, TIMEOUT)
 }
 
+/// The one line a successful command printed.
+fn ok_line(probe: Probe) -> Option<String> {
+    match probe {
+        Probe::Ran {
+            code: Some(0),
+            stdout,
+            ..
+        } => Some(stdout.trim().to_owned()).filter(|l| !l.is_empty()),
+        _ => None,
+    }
+}
+
 /// Stats `path` and asks git about it.
 fn facts(tools: &dyn Tools, path: &str) -> RepoFacts {
     let kind = match Path::new(path).metadata() {
@@ -111,11 +123,38 @@ fn facts(tools: &dyn Tools, path: &str) -> RepoFacts {
                 Probe::Ran { stdout, .. } => stdout.lines().map(str::to_owned).collect(),
                 _ => Vec::new(),
             };
-            GitState::Repo { branches }
+            let head = git(tools, path, &["symbolic-ref", "--quiet", "--short", "HEAD"]);
+            let remote = git(
+                tools,
+                path,
+                &[
+                    "symbolic-ref",
+                    "--quiet",
+                    "--short",
+                    "refs/remotes/origin/HEAD",
+                ],
+            );
+            GitState::Repo {
+                branches,
+                head: ok_line(head),
+                remote_default: ok_line(remote)
+                    .map(|b| b.strip_prefix("origin/").map_or(b.clone(), str::to_owned)),
+            }
         }
         _ => GitState::NotARepo,
     };
     RepoFacts { path: kind, git }
+}
+
+/// The base branch of a project in `path` when none was named: see `repo::default_base`.
+pub fn default_base(tools: &dyn Tools, path: &str) -> Result<String, repo::NoDefaultBase> {
+    let path = path.trim();
+    if path.is_empty() || !Path::new(path).is_absolute() {
+        return Err(repo::NoDefaultBase {
+            branches: Vec::new(),
+        });
+    }
+    repo::default_base(&facts(tools, path).git)
 }
 
 /// May `path` be a project's repository with `base` as its base branch?

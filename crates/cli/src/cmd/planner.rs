@@ -42,6 +42,15 @@ fn say(project: &str, s: &PlannerState) {
     }
 }
 
+/// What stopping did: the planner was running and is stopped now, or there was none.
+fn stopped(project: &str, was_running: bool) -> String {
+    if was_running {
+        format!("planner of {project} stopped")
+    } else {
+        format!("planner of {project} was not running")
+    }
+}
+
 pub(super) fn run(c: &Client, cmd: PlannerCmd, json_out: bool) -> Result<()> {
     match cmd {
         PlannerCmd::Start { project, profile } => {
@@ -49,8 +58,11 @@ pub(super) fn run(c: &Client, cmd: PlannerCmd, json_out: bool) -> Result<()> {
             emit(json_out, &s, |s| say(&project, s));
         }
         PlannerCmd::Stop { project } => {
+            let was_running = c.planner(&project)?.running;
             let s = c.stop_planner(&project)?;
-            emit(json_out, &s, |s| say(&project, s));
+            emit(json_out, &s, |_| {
+                println!("{}", stopped(&project, was_running))
+            });
         }
         PlannerCmd::Logs { project, follow } => {
             let scrollback = c.planner_scrollback(&project)?;

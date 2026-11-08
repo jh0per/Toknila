@@ -5,7 +5,7 @@ use axum::Json;
 use axum::extract::State;
 use toknila_api_types::CliLink;
 use toknila_core::Project;
-use toknila_core::repo::{RepoCheck, RepoProblem};
+use toknila_core::repo::{NoDefaultBase, RepoCheck, RepoProblem};
 use toknila_core::system::SystemChecks;
 
 use super::ApiResult;
@@ -32,6 +32,17 @@ pub async fn check_repo(state: &AppState, path: String, base: String) -> ApiResu
         .map_err(|e| toknila_app::AppError::internal(e.to_string()).into())
 }
 
+/// The base branch a repository suggests, on a blocking thread (it asks the repository).
+pub async fn default_base(
+    state: &AppState,
+    path: String,
+) -> ApiResult<Result<String, NoDefaultBase>> {
+    let t = state.tools.clone();
+    tokio::task::spawn_blocking(move || tools::default_base(t.as_ref(), &path))
+        .await
+        .map_err(|e| toknila_app::AppError::internal(e.to_string()).into())
+}
+
 /// The first problem of a check, as a refusal.
 pub fn first_problem(check: RepoCheck) -> Result<(), RepoProblem> {
     check.problems.into_iter().next().map_or(Ok(()), Err)
@@ -45,9 +56,13 @@ pub async fn repos_check(
     State(state): State<AppState>,
     Json(input): Json<RepoCheckRequest>,
 ) -> ApiResult<Json<RepoCheck>> {
-    let base = input
-        .work_branch
-        .unwrap_or_else(|| Project::DEFAULT_WORK_BRANCH.to_owned());
+    // No base named: the repository's own default, so the form can show it as the value.
+    let base = match input.work_branch.filter(|b| !b.trim().is_empty()) {
+        Some(b) => b,
+        None => default_base(&state, input.repo_path.clone())
+            .await?
+            .unwrap_or_else(|_| Project::DEFAULT_WORK_BRANCH.to_owned()),
+    };
     Ok(Json(check_repo(&state, input.repo_path, base).await?))
 }
 

@@ -2305,6 +2305,11 @@ export interface components {
              */
             branches: string[];
             problems: components["schemas"]["RepoProblem"][];
+            /**
+             * @description The base branch the repository suggests (where HEAD is, else the remote's default);
+             *     `null` when it suggests none.
+             */
+            suggested_branch?: string | null;
             /** @description The project key the folder suggests; `null` when its name leaves no valid key. */
             suggested_key?: string | null;
             /** @description The project name the folder suggests: its base name. */

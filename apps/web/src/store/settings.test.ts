@@ -16,7 +16,7 @@ function ready(projects: Project[]): State {
 
 /// The form with every field typed in by the person.
 function typed(s: State): State {
-  const fields = ["repo_path", "key", "name"] as const;
+  const fields = ["repo_path", "key", "name", "work_branch"] as const;
   return fields.reduce((at, field) => reduce(at, { type: "editDraft", field, value: draft[field] })[0], s);
 }
 
@@ -74,7 +74,7 @@ describe("adding a project", () => {
       type: "openDialog", dialog: { kind: "addProject" },
     });
     const [s] = reduce(open, { type: "projectAdded", project: project() });
-    expect(s.settings.add.draft).toEqual({ key: "", name: "", repo_path: "", work_branch: "develop" });
+    expect(s.settings.add.draft).toEqual({ key: "", name: "", repo_path: "", work_branch: "" });
     expect(s.plan.dialog).toBeUndefined();
   });
 

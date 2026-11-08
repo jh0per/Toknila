@@ -375,3 +375,69 @@ async fn the_check_command_is_saved_cleared_refused_at_its_field_and_survives_a_
         "an empty text clears it: {p}"
     );
 }
+
+#[tokio::test]
+async fn a_project_without_a_base_takes_the_branch_the_repository_is_on() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let main = repo(tmp.path());
+    git(&main, &["branch", "-m", "develop", "main"]);
+    git(&main, &["branch", "develop"]);
+    let path = main.to_string_lossy().into_owned();
+    let api = Api::new();
+
+    // The folder check suggests it, and judges the base against it.
+    let check = api
+        .post("/v1/repos/check", json!({ "repo_path": path }))
+        .await;
+    assert_eq!(check["suggested_branch"], "main");
+    assert_eq!(check["problems"], json!([]));
+
+    let made = api
+        .post("/v1/projects", json!({ "key": "DEMO", "repo_path": path }))
+        .await;
+    assert_eq!(made["work_branch"], "main");
+    // A base that was named stays as it was named.
+    let named = api
+        .post(
+            "/v1/projects",
+            json!({ "key": "NAMED", "repo_path": path, "work_branch": "develop" }),
+        )
+        .await;
+    assert_eq!(named["work_branch"], "develop");
+}
+
+#[tokio::test]
+async fn a_detached_head_falls_back_to_the_remote_default_and_then_names_the_choices() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let origin = repo(tmp.path());
+    let clone = tmp.path().join("clone");
+    git(
+        tmp.path(),
+        &["clone", "--quiet", &origin.to_string_lossy(), "clone"],
+    );
+    git(&clone, &["branch", "other"]);
+    git(&clone, &["checkout", "--quiet", "--detach"]);
+    let path = clone.to_string_lossy().into_owned();
+    let api = Api::new();
+    let made = api
+        .post("/v1/projects", json!({ "key": "DEMO", "repo_path": path }))
+        .await;
+    assert_eq!(made["work_branch"], "develop", "origin's default");
+
+    // No remote either: an error naming the branches to choose from.
+    git(&clone, &["remote", "remove", "origin"]);
+    let e = refused(&api, json!({ "key": "TWO", "repo_path": path })).await;
+    assert_eq!(
+        (e["code"].as_str(), e["field"].as_str()),
+        (Some("branch_missing"), Some("work_branch"))
+    );
+    assert_eq!(
+        e["error"],
+        "cannot tell the base branch: HEAD is not on a branch and the remote names no default; \
+         pass one of the repository's branches (develop, other)"
+    );
+    assert_eq!(
+        api.get("/v1/projects").await.as_array().map(Vec::len),
+        Some(1)
+    );
+}

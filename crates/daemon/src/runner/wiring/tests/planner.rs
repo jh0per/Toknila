@@ -19,6 +19,7 @@ fn planner_rig() -> Rig {
         merge_mode: MergeMode::Github,
         merge_method: MergeMethod::Squash,
         check_command: Some("cargo xtask verify".to_owned()),
+        base_behind: None,
     });
     rig
 }
@@ -84,9 +85,19 @@ fn the_planner_settings_allow_reading_and_its_tools_and_name_no_hooks() {
         "a planner is not a card's agent: {text}"
     );
     assert!(v.get("statusLine").is_none());
-    // A planner is a normal role: it gets what every role gets (auto memory off, no subagents).
+    // A planner is a normal role: it gets what every role gets (auto memory off, no subagents, no tool that leaves the ship).
     assert_eq!(v["autoMemoryEnabled"], false);
-    assert_eq!(v["permissions"]["deny"], serde_json::json!(["Agent"]));
+    assert_eq!(
+        v["permissions"]["deny"],
+        serde_json::json!([
+            "Agent",
+            "Workflow",
+            "EnterWorktree",
+            "CronCreate",
+            "CronDelete",
+            "RemoteTrigger"
+        ])
+    );
     let allow: Vec<&str> = v["permissions"]["allow"]
         .as_array()
         .expect("allow")

@@ -337,6 +337,16 @@ fn the_settings_hold_hooks_and_rules_side_by_side() {
     );
 }
 
+/// The deny rules of every role, written out: a change here is a decision, not a refactor.
+const DENIED: [&str; 6] = [
+    "Agent",
+    "Workflow",
+    "EnterWorktree",
+    "CronCreate",
+    "CronDelete",
+    "RemoteTrigger",
+];
+
 #[test]
 fn a_profile_without_rules_and_hooks_still_gets_the_isolation_settings() {
     let rig = Rig::new();
@@ -349,13 +359,13 @@ fn a_profile_without_rules_and_hooks_still_gets_the_isolation_settings() {
     let v: Value = serde_json::from_str(&text).expect("json");
     assert_eq!(
         v,
-        json!({ "autoMemoryEnabled": false, "permissions": { "deny": ["Agent"] } }),
+        json!({ "autoMemoryEnabled": false, "permissions": { "deny": DENIED }}),
         "{text}"
     );
 }
 
 #[test]
-fn every_role_runs_without_auto_memory_and_without_the_subagent_tool() {
+fn every_role_runs_without_auto_memory_and_without_the_denied_tools() {
     let rig = Rig::new();
     for (role, dir, profile) in [
         (AgentRole::Worker, "worker", AgentProfile::claude_code()),
@@ -369,7 +379,7 @@ fn every_role_runs_without_auto_memory_and_without_the_subagent_tool() {
         let (_, text) = rig.file_of(dir, "settings.json");
         let v: Value = serde_json::from_str(&text).expect("json");
         assert_eq!(v["autoMemoryEnabled"], false, "{dir}: {text}");
-        assert_eq!(v["permissions"]["deny"], json!(["Agent"]), "{dir}: {text}");
+        assert_eq!(v["permissions"]["deny"], json!(DENIED), "{dir}: {text}");
         assert!(
             w.env
                 .contains(&("CLAUDE_CODE_DISABLE_AUTO_MEMORY".to_owned(), "1".to_owned())),
