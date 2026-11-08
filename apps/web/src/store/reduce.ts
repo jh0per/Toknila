@@ -5,6 +5,7 @@ import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
 import { reduceAutostart } from "./autostart";
 import { reduceEdges } from "./edges";
+import { reduceQuick } from "./quick";
 import { type Dialog, reducePlan, withChain } from "./plan";
 import { loadPlanner, reducePlanner } from "./planner";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
@@ -55,8 +56,11 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [{ ...withChain(s, msg.chain), error: "" }, []];
     case "inboxLoaded":
       return [{ ...s, inbox: msg.items }, []];
-    case "detailLoaded":
-      return [{ ...s, details: { ...s.details, [msg.detail.ticket.key]: msg.detail } }, []];
+    case "detailLoaded": {
+      const key = msg.detail.ticket.key;
+      const peek = s.quick.peek?.key === key ? { key, fresh: true } : s.quick.peek;
+      return [{ ...s, details: { ...s.details, [key]: msg.detail }, quick: { ...s.quick, peek } }, []];
+    }
     case "threadsLoaded":
       return [{ ...s, threads: { ...s.threads, [msg.threads.ticket]: msg.threads } }, []];
     case "pickVersion":
@@ -114,7 +118,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return then(next, fx, { name: "projectChain", project: msg.project, chain: msg.chain.chain.name });
     }
     case "cardCreated": {
-      const [next, fx] = reducePlan(s, msg);
+      const [planned, fx] = reducePlan(s, msg);
+      const next = { ...planned, quick: { ...planned.quick, card: undefined } };
       const chain = next.chains[msg.detail.ticket.chain_id];
       return chain ? then(next, fx, cardRoute(next, chain, msg.detail.ticket)) : [next, fx];
     }
@@ -182,6 +187,11 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "autostartSet":
     case "autostartRefused":
       return reduceAutostart(s, msg);
+    case "openQuickCard":
+    case "closeQuickCard":
+    case "submitQuickCard":
+    case "peekCard":
+      return reduceQuick(s, msg);
     case "projectDeleted": {
       const [next, fx] = reduceRemoval(s, msg);
       return then(next, fx, { name: "chains" });

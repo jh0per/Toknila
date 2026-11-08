@@ -57,6 +57,32 @@ async fn cards_added_at_the_end_form_a_line_and_one_without_it_stands_alone() {
 }
 
 #[tokio::test]
+async fn a_card_made_before_another_becomes_its_dependency_or_nothing_is_made() {
+    let api = Api::new();
+    manual(&api, 2).await;
+    let made = api
+        .post(
+            "/v1/chains/plan/tickets",
+            json!({ "title": "first", "before": ["DEMO-1"] }),
+        )
+        .await;
+    assert_eq!(made["ticket"]["key"], "DEMO-3");
+    assert_eq!(order(&api, "plan").await, ["DEMO-3", "DEMO-1", "DEMO-2"]);
+    api.post("/v1/tickets/DEMO-3/actions/start", json!({}))
+        .await;
+    let (s, e) = api
+        .call(
+            Method::POST,
+            "/v1/chains/plan/tickets",
+            Some(json!({ "title": "too late", "before": ["DEMO-3"] })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{e}");
+    let detail = api.get("/v1/chains/plan").await;
+    assert_eq!(detail["tickets"].as_array().map(Vec::len), Some(3));
+}
+
+#[tokio::test]
 async fn a_card_moves_and_the_order_follows() {
     let api = Api::new();
     manual(&api, 3).await;

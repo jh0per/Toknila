@@ -10,11 +10,12 @@ type Start = Omit<Extract<Drag, { mode: "new" }>, "at" | "over"> | Omit<Extract<
 
 /// The pointer gesture of the diagram. `start` is called on pointer down on a handle; while the
 /// pointer is down `drag` says where the line ends and which card is under it (`over`); on release
-/// over a card `drop` gets the gesture and that card's node key. Escape cancels. The gesture is
+/// over a card `drop` gets the gesture and that card's node key, on release over empty canvas it
+/// gets no target and the point (canvas pixels). Escape cancels. The gesture is
 /// the only state kept here: the rules are the daemon's.
 export function useEdgeDrag(
   inner: RefObject<HTMLElement>,
-  drop: (d: Drag, target: string) => void,
+  drop: (d: Drag, target: string | undefined, at: Pt) => void,
 ): { drag: Drag | undefined; start: (s: Start, e: ReactPointerEvent) => void } {
   const [drag, setDrag] = useState<Drag>();
   const latest = useRef(drop);
@@ -45,7 +46,8 @@ export function useEdgeDrag(
       const target = nodeAt(e);
       const d = current.current;
       setDrag(undefined);
-      if (d && target) latest.current(d, target);
+      const onCanvas = !!document.elementFromPoint(e.clientX, e.clientY)?.closest(".canvas-inner");
+      if (d && (target || onCanvas)) latest.current(d, target, local(e.clientX, e.clientY));
     };
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") setDrag(undefined);

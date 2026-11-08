@@ -23,6 +23,10 @@ pub struct NewTicket {
     /// Dependencies: ticket keys or release versions of the same chain.
     #[serde(default)]
     pub after: Vec<String>,
+    /// Cards or milestones of the same chain that wait for the new card: it becomes a
+    /// dependency of each. Refused, with nothing created, when one of them has started.
+    #[serde(default)]
+    pub before: Vec<String>,
     /// Checklist items.
     #[serde(default)]
     pub subtasks: Vec<String>,
@@ -70,7 +74,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
     };
     let t = Ticket::new_backlog(TicketId::new(), c.id, key, draft, uow.now());
     let id = t.id;
-    let (after, at_end) = (input.after, input.at_end);
+    let (after, before, at_end) = (input.after, input.before, input.at_end);
     with_chain(uow, c.id, move |ctx| -> AppResult<()> {
         let mut deps = after
             .iter()
@@ -84,7 +88,22 @@ pub fn create<U: UnitOfWork + ?Sized>(
                 .map(NodeRef::Ticket)
                 .collect();
         }
+        let waiting = before
+            .iter()
+            .map(|b| resolve::node(&ctx.view, b))
+            .collect::<AppResult<Vec<_>>>()?;
+        for to in &waiting {
+            ctx.view.check_dependency_change(*to)?;
+        }
         ctx.add_ticket(t);
+        for to in waiting {
+            ctx.add_edge(Edge {
+                chain_id: ctx.view.chain.id,
+                from: NodeRef::Ticket(id),
+                to,
+                kind: EdgeKind::Normal,
+            })?;
+        }
         for from in deps {
             ctx.add_edge(Edge {
                 chain_id: ctx.view.chain.id,

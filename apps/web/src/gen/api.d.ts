@@ -1905,6 +1905,11 @@ export interface components {
              *     empty. Without it a card with no `after` has no dependencies and may start at once.
              */
             at_end?: boolean;
+            /**
+             * @description Cards or milestones of the same chain that wait for the new card: it becomes a
+             *     dependency of each. Refused, with nothing created, when one of them has started.
+             */
+            before?: string[];
             needs_secrets?: boolean;
             paused?: boolean;
             profile?: string | null;
