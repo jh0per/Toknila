@@ -6,6 +6,7 @@ use toknila_core::agent::Proposal;
 use toknila_core::graph::ChainView;
 use toknila_core::{NodeRef, Ticket, TicketDraft, TicketId, TicketKey, Wildcard};
 
+use crate::tickets::next_key;
 use crate::{AppError, AppResult, UnitOfWork, resolve, with_chain};
 
 /// `POST /v1/chains/{chain}/wildcards`: a person proposes a card.
@@ -31,12 +32,7 @@ pub fn propose<U: UnitOfWork + ?Sized>(
         return Err(AppError::bad_request("card title is empty"));
     }
     let c = resolve::chain(uow, chain)?;
-    let project = uow
-        .project(c.project_id)?
-        .ok_or_else(|| AppError::not_found("project"))?;
-    let number = uow.take_ticket_number(project.id)?;
-    let key = TicketKey::new(project.key.clone(), number)
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+    let key = next_key(uow, c.project_id)?;
     let draft = TicketDraft {
         title: title.to_owned(),
         prompt: card.prompt,

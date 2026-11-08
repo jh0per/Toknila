@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 pub use toknila_core::machine::TicketAction;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    Actor, CommentBody, CommentKind, Edge, EdgeKind, NodeRef, ReviewMode, Ticket, TicketDraft,
-    TicketId, TicketKey, TicketPatch,
+    Actor, CommentBody, CommentKind, Edge, EdgeKind, NodeRef, ProjectId, ReviewMode, Ticket,
+    TicketDraft, TicketId, TicketKey, TicketPatch,
 };
 
 use crate::notes::{add_comment, add_subtask, body_from_text};
@@ -44,6 +44,18 @@ pub struct NewTicket {
     pub at_end: bool,
 }
 
+/// The key of the next card of a project (`DEMO-7`); takes its number.
+pub(crate) fn next_key<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    project: ProjectId,
+) -> AppResult<TicketKey> {
+    let project = uow
+        .project(project)?
+        .ok_or_else(|| AppError::not_found("project"))?;
+    let number = uow.take_ticket_number(project.id)?;
+    TicketKey::new(project.key, number).map_err(|e| AppError::bad_request(e.to_string()))
+}
+
 /// Adds a ticket to a chain. The ticket and its edges land together, then the chain settles
 /// (autostart); the checklist follows.
 pub fn create<U: UnitOfWork + ?Sized>(
@@ -56,12 +68,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         return Err(AppError::bad_request("ticket title is empty"));
     }
     let c = resolve::chain(uow, chain)?;
-    let project = uow
-        .project(c.project_id)?
-        .ok_or_else(|| AppError::not_found("project"))?;
-    let number = uow.take_ticket_number(project.id)?;
-    let key = TicketKey::new(project.key.clone(), number)
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+    let key = next_key(uow, c.project_id)?;
     let draft = TicketDraft {
         title: title.to_owned(),
         prompt: input.prompt,
