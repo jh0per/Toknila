@@ -1,4 +1,4 @@
-//! Chains: create, import and export chain files, edit dependencies.
+//! Chains: create, import and export chain files, edit settings and dependencies.
 
 use std::collections::HashMap;
 
@@ -273,4 +273,45 @@ pub fn move_ticket<U: UnitOfWork + ?Sized>(
         }
         Ok(())
     })
+}
+
+/// What a person may set on a chain after it is made (a project takes the review fields in
+/// [`crate::projects::PatchProject`]). A field left out is kept.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ChainSettings {
+    pub review_mode: Option<ReviewMode>,
+    /// Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`.
+    pub reviewer: Option<String>,
+    /// Whether the chain starts its ready cards by itself. Turning it on starts the ready cards
+    /// that have a free slot, so it is a person's act; the planner cannot change a chain's graph
+    /// while it is on.
+    pub autostart: Option<bool>,
+}
+
+/// Sets a chain's review mode, reviewer and autostart, journals it (`ChainUpdated`) and lets the
+/// schedule run, since turning autostart on may start cards. `project` narrows the name lookup.
+/// Returns the chain's id.
+pub fn set_settings<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: &str,
+    project: Option<&str>,
+    settings: ChainSettings,
+) -> AppResult<ChainId> {
+    let c = resolve::chain_in(uow, project, chain)?;
+    with_chain(uow, c.id, |ctx| -> AppResult<()> {
+        ctx.edit_chain(|c| {
+            if let Some(m) = settings.review_mode {
+                c.review_mode = Some(m);
+            }
+            if let Some(r) = settings.reviewer {
+                c.reviewer = Some(r.trim().to_owned()).filter(|r| !r.is_empty());
+            }
+            if let Some(a) = settings.autostart {
+                c.autostart = a;
+            }
+        });
+        Ok(())
+    })?;
+    Ok(c.id)
 }

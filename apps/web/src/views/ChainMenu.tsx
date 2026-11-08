@@ -1,6 +1,7 @@
 import { type MouseEvent, type ReactNode, useCallback, useState } from "react";
 import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
+import { AUTOSTART_HINT } from "../store/autostart";
 import { ContextMenu } from "./ContextMenu";
 
 /// The right-click menu of a chain in the sidebar. `open(chain)` returns the handler for a row;
@@ -19,6 +20,11 @@ export function useChainMenu(dispatch: (i: Intent) => void): {
     <ContextMenu
       x={at.x} y={at.y} onClose={close}
       entries={[{
+        label: at.chain.chain.autostart ? "Turn autostart off" : "Turn autostart on",
+        testId: "menu-autostart",
+        hint: AUTOSTART_HINT,
+        run: () => dispatch({ type: "setAutostart", chain: at.chain.chain.id, autostart: !at.chain.chain.autostart }),
+      }, {
         label: "Delete chain…",
         testId: "menu-delete-chain",
         danger: true,

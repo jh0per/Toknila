@@ -6,13 +6,12 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_app::removal::{self, Removed};
-use toknila_app::{chains, resolve, reviews};
+use toknila_app::{chains, resolve};
 use toknila_core::Actor;
 
 use super::{ApiResult, chain_write, load_chain_detail, read, stamp};
 use crate::http::dto::{
-    ChainDeletion, ChainDetail, ChainFile, ChainItem, EdgeInput, MoveInput, NewChain,
-    ReviewSettings,
+    ChainDeletion, ChainDetail, ChainFile, ChainItem, ChainSettings, EdgeInput, MoveInput, NewChain,
 };
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -103,18 +102,28 @@ pub async fn get_chain(
     ))
 }
 
-#[utoipa::path(patch, path = "/chains/{chain}", tag = "chains", request_body = ReviewSettings,
-    params(("chain" = String, Path, description = "Chain id or name")),
+#[utoipa::path(patch, path = "/chains/{chain}", tag = "chains", request_body = ChainSettings,
+    params(("chain" = String, Path, description = "Chain id or name"),
+        ("project" = Option<String>, Query, description = "Project id or key, when two projects have a chain of this name")),
     responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody)))]
-/// Sets how the chain's tickets are reviewed: the mode and the reviewer agent profile. A ticket
-/// that sets its own keeps it; a field left out is kept.
+/// Sets the chain's review mode, reviewer agent profile and autostart. A ticket that sets its
+/// own review keeps it; a field left out is kept. Turning autostart on starts the chain's ready
+/// cards that have a free slot: it is the owner's act, and the journal records it
+/// (`chain.updated`).
 pub async fn patch_chain(
     State(state): State<AppState>,
     Path(chain): Path<String>,
-    Json(settings): Json<ReviewSettings>,
+    Query(q): Query<HashMap<String, String>>,
+    Json(settings): Json<ChainSettings>,
 ) -> ApiResult<Json<ChainDetail>> {
+    let project = q.get("project").cloned();
     let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(reviews::set_chain(tx, &chain, settings)?)
+        Ok(chains::set_settings(
+            tx,
+            &chain,
+            project.as_deref(),
+            settings,
+        )?)
     })
     .await?;
     Ok(Json(detail))

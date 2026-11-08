@@ -10,6 +10,7 @@ use toknila_core::{
 
 use super::Mem;
 use super::runs::{FakeRunner, a, act, finish, run_of, settle, with_agents};
+use crate::chains::{self, ChainSettings};
 use crate::external::ExternalEffect;
 use crate::projects::{self, PatchProject};
 use crate::recovery::recover;
@@ -175,11 +176,12 @@ fn the_mode_and_the_reviewer_resolve_ticket_then_chain_then_project() {
 #[test]
 fn settings_on_a_chain_and_a_project_are_kept_and_journaled() {
     let mut mem = Mem::demo();
-    let settings = reviews::ReviewSettings {
+    let settings = ChainSettings {
         review_mode: Some(ReviewMode::Both),
         reviewer: Some(" qa ".to_owned()),
+        autostart: None,
     };
-    reviews::set_chain(&mut mem, "demo", settings.clone()).expect("chain");
+    chains::set_settings(&mut mem, "demo", None, settings).expect("chain");
     assert_eq!(mem.view.chain.review_mode, Some(ReviewMode::Both));
     assert_eq!(mem.view.chain.reviewer.as_deref(), Some("qa"));
     let patch = PatchProject {

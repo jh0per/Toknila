@@ -18,7 +18,7 @@ use toknila_core::{
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
 use crate::runner::{RunBrief, RunnerError};
-use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork, resolve, with_chain};
+use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork};
 
 /// How a ticket is reviewed now, and what has been decided so far.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -167,39 +167,4 @@ pub fn mark_lost<U: UnitOfWork + ?Sized>(
         }
     }
     Ok(moved)
-}
-
-/// What a person may set about review on a chain (a project takes the same two fields in
-/// [`crate::projects::PatchProject`]). A field left out is kept.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ReviewSettings {
-    pub review_mode: Option<ReviewMode>,
-    /// Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`.
-    pub reviewer: Option<String>,
-}
-
-fn clean(reviewer: String) -> Option<String> {
-    Some(reviewer.trim().to_owned()).filter(|r| !r.is_empty())
-}
-
-/// Sets how a chain's tickets are reviewed. Returns the chain's id.
-pub fn set_chain<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    chain: &str,
-    settings: ReviewSettings,
-) -> AppResult<toknila_core::ChainId> {
-    let c = resolve::chain(uow, chain)?;
-    with_chain(uow, c.id, |ctx| -> AppResult<()> {
-        ctx.edit_chain(|c| {
-            if let Some(m) = settings.review_mode {
-                c.review_mode = Some(m);
-            }
-            if let Some(r) = settings.reviewer {
-                c.reviewer = clean(r);
-            }
-        });
-        Ok(())
-    })?;
-    Ok(c.id)
 }

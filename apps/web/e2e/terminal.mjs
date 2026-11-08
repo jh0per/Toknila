@@ -108,9 +108,8 @@ try {
         hostRight: edge("[data-testid=term-host]").right,
       };
     });
-  for (const height of [720, 520, 900]) {
-    await page.setViewportSize({ width: 1280, height });
-    // The page settles on the new grid (the panel resized, the grid fitted, the daemon told).
+  // The page settles on a new grid (the panel resized, the grid fitted, the daemon told).
+  const settle = async () => {
     let g;
     const settled = () =>
       g.lastBottom <= g.panelBottom + 0.5 &&
@@ -121,6 +120,100 @@ try {
       g = await grid();
       if (settled()) break;
     }
+    return g;
+  };
+  const panelHeight = () => page.locator("[data-testid=panel]").evaluate((el) => el.getBoundingClientRect().height);
+  const diagramHeight = () => page.locator("[data-testid=panel-divider]").evaluate((el) => el.previousElementSibling.getBoundingClientRect().height);
+
+  // The panel starts tall enough for an agent's terminal: about 45% of the window, and at 720px
+  // more than the 12 rows it used to show (the divider gives more).
+  {
+    const g = await settle();
+    const h = await panelHeight();
+    if (h < 720 * 0.4 || h > 720 * 0.5) throw new Error(`the panel starts ${h}px tall in a 720px window, not about 45%`);
+    if (g.rows <= 12) throw new Error(`the terminal shows only ${g.rows} rows at 720px`);
+    console.log(`PASS the panel starts ${Math.round(h)}px of 720 and the terminal shows ${g.rows} rows`);
+  }
+
+  // Dragging the divider up gives the panel (and the terminal) more room; the grid is refitted,
+  // the daemon told, and the last row stays inside the panel.
+  const divider = page.locator("[data-testid=panel-divider]");
+  const drag = async (dy) => {
+    const box = await divider.boundingBox();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + dy / 2, { steps: 5 });
+    await page.mouse.move(x, y + dy, { steps: 5 });
+    await page.mouse.up();
+  };
+  {
+    const before = await settle();
+    const hBefore = await panelHeight();
+    await drag(-120);
+    const after = await settle();
+    const hAfter = await panelHeight();
+    if (!(hAfter > hBefore + 100)) throw new Error(`dragging up moved the panel from ${hBefore} to ${hAfter}`);
+    if (!(after.rows > before.rows)) throw new Error(`the terminal did not gain rows: ${before.rows} -> ${after.rows}`);
+    if (after.lastBottom > after.panelBottom + 0.5) throw new Error(`after the drag the last row is cut: ${JSON.stringify(after)}`);
+    const told = sizes[sizes.length - 1];
+    if (told.rows !== after.rows) throw new Error(`after the drag the page shows ${after.rows} rows but told the daemon ${JSON.stringify(told)}`);
+    console.log(`PASS dragging the divider up: panel ${Math.round(hBefore)} -> ${Math.round(hAfter)}px, rows ${before.rows} -> ${after.rows}, the last row inside the panel`);
+  }
+
+  // Both parts keep a minimum, however far the divider is dragged.
+  await drag(-2000);
+  if ((await diagramHeight()) < 150) throw new Error(`the diagram shrank to ${await diagramHeight()}px`);
+  await drag(2000);
+  if ((await panelHeight()) < 150) throw new Error(`the panel shrank to ${await panelHeight()}px`);
+  console.log("PASS the diagram and the panel keep their minimum height");
+  await drag(-3000);
+  await drag(220);
+  const kept = await panelHeight();
+
+  // The height is remembered for this viewer: a reload brings it back.
+  await page.reload();
+  await tab("Terminal");
+  await expectText(term, "agent ready", "after a reload the terminal is back");
+  const restored = await panelHeight();
+  if (Math.abs(restored - kept) > 1.5) throw new Error(`the panel was ${kept}px, after a reload ${restored}px`);
+  console.log(`PASS the panel height is remembered across a reload (${Math.round(restored)}px)`);
+
+  // Without storage (blocked site data) the page works and the divider still drags.
+  {
+    const blocked = await browser.newPage();
+    await blocked.addInitScript(() => {
+      Object.defineProperty(window, "localStorage", { get() { throw new Error("blocked"); } });
+    });
+    const failures = [];
+    blocked.on("pageerror", (e) => failures.push(e.message));
+    await blocked.goto(url.replace("/?", "/projects/WEB/chains/work/cards/WEB-1?"));
+    await blocked.getByRole("tab", { name: "Terminal" }).click();
+    const d = blocked.locator("[data-testid=panel-divider]");
+    const box = await d.boundingBox();
+    const h0 = await blocked.locator("[data-testid=panel]").evaluate((el) => el.getBoundingClientRect().height);
+    await blocked.mouse.move(box.x + 5, box.y + 4);
+    await blocked.mouse.down();
+    await blocked.mouse.move(box.x + 5, box.y - 80, { steps: 5 });
+    await blocked.mouse.up();
+    const h1 = await blocked.locator("[data-testid=panel]").evaluate((el) => el.getBoundingClientRect().height);
+    await blocked.close();
+    if (failures.length) throw new Error(`with storage blocked the page threw: ${failures.join("; ")}`);
+    if (!(h1 > h0 + 50)) throw new Error(`with storage blocked the divider did not drag: ${h0} -> ${h1}`);
+    console.log("PASS the page and the divider work with storage blocked");
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(() => {
+    try { localStorage.removeItem("toknila.panelHeight"); } catch { /* none */ }
+  });
+  await page.reload();
+  await tab("Terminal");
+  await expectText(term, "agent ready", "back to the default height");
+
+  for (const height of [720, 520, 900]) {
+    await page.setViewportSize({ width: 1280, height });
+    const g = await settle();
     if (g.lastBottom > g.panelBottom + 0.5 || g.lastBottom > g.hostBottom + 0.5 || g.screenRight > g.hostRight + 0.5) {
       throw new Error(`at window height ${height} the grid is cut: ${JSON.stringify(g)}`);
     }

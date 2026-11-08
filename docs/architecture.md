@@ -508,6 +508,11 @@ I/O.
   is read twice. The journal entries about the project and everything in it go too (by entity
   id: project, chains, cards, milestones, comments, subtasks, threads); then one `ChainDeleted`
   per chain and one `ProjectDeleted` are journaled. Sequence numbers are never reused.
+- **Chain autostart.** `PATCH /v1/chains/{chain}` (`?project=KEY` narrows the name) takes
+  `autostart` next to the review settings; `toknila_app::chains::set_settings` journals the change
+  as `chain.updated` and lets the schedule run, so turning it on starts the ready cards (the
+  owner's act; the planner cannot call it). `tok chain set <chain> [--project KEY] --autostart
+  on|off`; the window has the toggle in the chain header and its sidebar context menu.
 - **Chain deletion.** `DELETE /v1/chains/{chain}` (`?project=KEY` narrows a name two projects
   share; `tok chain rm <chain> [--project KEY] [--yes]`, the window's chain context menu in the
   sidebar with a dialog that names the chain and its cards). Same semantics for the one chain:

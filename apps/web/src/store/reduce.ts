@@ -3,6 +3,7 @@
 import type { EventRecord } from "../api/types";
 import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
+import { reduceAutostart } from "./autostart";
 import { reduceEdges } from "./edges";
 import { type Dialog, reducePlan, withChain } from "./plan";
 import { loadPlanner, reducePlanner } from "./planner";
@@ -176,6 +177,10 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "edgesChanged":
     case "edgeRefused":
       return reduceEdges(s, msg);
+    case "setAutostart":
+    case "autostartSet":
+    case "autostartRefused":
+      return reduceAutostart(s, msg);
     case "projectDeleted": {
       const [next, fx] = reduceRemoval(s, msg);
       return then(next, fx, { name: "chains" });
