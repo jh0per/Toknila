@@ -57,6 +57,20 @@ fn the_review_file_is_pinned() {
 }
 
 #[test]
+fn the_check_command_is_to_be_run_as_given_and_files_changed_with_the_edit_tools() {
+    let brief = RunBrief {
+        check_command: Some("cargo xtask verify"),
+        ..pinned_brief(&[])
+    };
+    for text in [generate(&brief), generate_review(&brief)] {
+        assert!(text.contains("with no `cd` or `export` in front"), "{text}");
+        assert!(text.contains("the ship is already your working directory"));
+    }
+    assert!(generate(&brief).contains("Change files with the Edit and Write tools"));
+    assert!(!generate_review(&brief).contains("Edit and Write tools"));
+}
+
+#[test]
 fn both_roles_are_told_to_work_alone_and_to_quote_paths() {
     for text in [protocol(), review_protocol()] {
         assert!(text.contains("Do not start subagents or background agents"));

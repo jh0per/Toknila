@@ -29,6 +29,7 @@ pub mod suggest;
 pub mod system;
 pub mod template;
 pub mod thread;
+pub mod toolpath;
 pub mod usage;
 pub mod wire;
 

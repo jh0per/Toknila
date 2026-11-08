@@ -167,7 +167,12 @@ fn brief_of_key<'a>(cx: &'a Context<'_>, key: &'a str) -> instructions::RunBrief
 /// Generates the files `profile` asks for and returns the flags and environment of the process.
 pub(super) fn prepare(profile: &AgentProfile, cx: &Context<'_>) -> Result<Wiring, RunnerError> {
     let inherited = std::env::vars_os().filter_map(|(k, _)| k.into_string().ok());
-    prepare_with(profile, cx, inherited)
+    let mut wiring = prepare_with(profile, cx, inherited)?;
+    // The tool folders the login shell left out (`~/.cargo/bin`), so a command runs as given.
+    if let Some(path) = crate::agent_path::agent_path_value() {
+        wiring.env.push(("PATH".to_owned(), path));
+    }
+    Ok(wiring)
 }
 
 /// [`prepare`] for a daemon whose environment has the variables called `inherited`.
