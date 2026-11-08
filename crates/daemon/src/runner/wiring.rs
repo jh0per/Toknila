@@ -161,6 +161,7 @@ fn brief_of_key<'a>(cx: &'a Context<'_>, key: &'a str) -> instructions::RunBrief
         prompt: &cx.brief.prompt,
         acceptance: &cx.brief.acceptance,
         check_command: cx.brief.check_command.as_deref(),
+        earlier: &cx.brief.earlier,
     }
 }
 

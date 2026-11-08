@@ -121,10 +121,22 @@ mod tests {
 
     #[test]
     fn an_agent_ended_from_outside_is_terminated_not_crashed() {
-        assert_eq!(terminated(Some(143), None).as_deref(), Some("exit 143, SIGTERM"));
-        assert_eq!(terminated(Some(137), None).as_deref(), Some("exit 137, SIGKILL"));
-        assert_eq!(terminated(None, Some("Terminated")).as_deref(), Some("signal Terminated"));
-        assert_eq!(terminated(None, Some("Killed")).as_deref(), Some("signal Killed"));
+        assert_eq!(
+            terminated(Some(143), None).as_deref(),
+            Some("exit 143, SIGTERM")
+        );
+        assert_eq!(
+            terminated(Some(137), None).as_deref(),
+            Some("exit 137, SIGKILL")
+        );
+        assert_eq!(
+            terminated(None, Some("Terminated")).as_deref(),
+            Some("signal Terminated")
+        );
+        assert_eq!(
+            terminated(None, Some("Killed")).as_deref(),
+            Some("signal Killed")
+        );
         assert!(terminated(Some(-1_073_741_510), None).is_some());
     }
 

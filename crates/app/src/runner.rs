@@ -57,6 +57,9 @@ pub struct RunBrief {
     pub acceptance: Vec<String>,
     /// The project's check command, named in the agent's instructions.
     pub check_command: Option<String>,
+    /// Instructions the card's earlier runs were given (`toknila_core::instructions::earlier`),
+    /// for a run that replaces one.
+    pub earlier: Vec<String>,
     /// The project's Claude model (`--model`), for a profile that runs Claude Code.
     pub model: Option<String>,
     /// What a planner is told about its project; `None` for a card's agent.

@@ -208,6 +208,7 @@ mod tests {
             prompt: "",
             acceptance: &[],
             check_command: None,
+            earlier: &[],
         };
         let text = crate::instructions::kickoff(AgentRole::Planner, &brief);
         assert!(text.contains("planner of project DEMO"));
