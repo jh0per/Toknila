@@ -1,149 +1,112 @@
-import { useState } from "react";
 import type { MergeMethod, MergeMode, Project, ReviewMode } from "../api/types";
-import type { Intent } from "../store/msg";
-import { MODEL_ALIASES } from "../store/models";
+import { type ProjectForm } from "../store/projectForm";
+import { listProfile } from "../store/profiles";
 import { fieldError } from "../store/settings";
 import type { State } from "../store/state";
-import { Field } from "./AddProject";
-import { SectionForm, profileOptions } from "./SectionForm";
+import { Field } from "./Field";
 
-type Props = { project: Project; state: State; dispatch: (i: Intent) => void };
+export type FormProps = {
+  project: Project;
+  state: State;
+  form: ProjectForm;
+  set: <K extends keyof ProjectForm>(field: K, value: ProjectForm[K]) => void;
+};
 
-const MODES: ReviewMode[] = ["human", "agent", "both"];
-const MERGE_MODES: MergeMode[] = ["local", "github"];
+/// The role names of the profile catalog for a select, keeping a saved name the catalog no longer
+/// lists selectable, so saving never changes it silently.
+export function profileOptions(state: State, role: string, current: string): string[] {
+  const all = state.settings.profiles
+    .filter((l) => l.profile.role === role && listProfile(l.profile.name, current, import.meta.env.DEV))
+    .map((l) => l.profile.name);
+  return current && !all.includes(current) ? [current, ...all] : all;
+}
+
+const REVIEW_MODES: { value: ReviewMode; label: string }[] = [
+  { value: "human", label: "I review every finished card" },
+  { value: "agent", label: "A reviewer agent reviews it" },
+  { value: "both", label: "A reviewer agent first, then me" },
+];
+const MERGE_MODES: { value: MergeMode; label: string }[] = [
+  { value: "local", label: "Merge it into the main branch" },
+  { value: "github", label: "Open a pull request on GitHub" },
+];
 const METHODS: MergeMethod[] = ["merge", "squash", "rebase"];
 
-/// General: the project's name and repository (set when it was added) and its branches.
-export function GeneralSection({ project, state, dispatch }: Props) {
-  const s = state.settings;
-  const [branch, setBranch] = useState(project.work_branch);
+/// General: which project this is (set when it was added) and its main branch.
+export function GeneralSection({ project, state, form, set }: FormProps) {
   return (
-    <SectionForm
-      project={project} title="General" testId="project-general" state={state} dispatch={dispatch}
-      patch={() => ({ work_branch: branch.trim() })}
-    >
+    <div className="page-section" data-testid="project-general">
       <dl className="facts">
         <dt>Name</dt>
         <dd data-testid="project-name-shown">{project.name}</dd>
-        <dt>Key</dt>
+        <dt>Card prefix</dt>
         <dd>{project.key}</dd>
-        <dt>Repository</dt>
+        <dt>Folder</dt>
         <dd data-testid="project-repo-shown"><code>{project.repo_path ?? "none"}</code></dd>
-        <dt>Release branch</dt>
-        <dd>{project.release_branch}</dd>
       </dl>
-      <Field label="Base branch (ships start from it, accepted work lands on it)" name="work_branch" error={fieldError(s, "work_branch")}>
-        <input data-testid="project-branch" value={branch} spellCheck={false} onChange={(e) => setBranch(e.target.value)} />
+      <Field
+        label="Main branch" name="work_branch" error={fieldError(state.settings, "work_branch")}
+        hint="Agents start from it, and approved work lands on it."
+      >
+        <input data-testid="project-branch" value={form.work_branch} spellCheck={false} onChange={(e) => set("work_branch", e.target.value)} />
       </Field>
-    </SectionForm>
+    </div>
   );
 }
 
-/// One model field: free text with the documented aliases offered.
-function ModelField({ label, name, testId, value, onChange, state }: {
-  label: string; name: string; testId: string; value: string; onChange: (v: string) => void; state: State;
-}) {
-  return (
-    <Field label={label} name={name} error={fieldError(state.settings, name)}>
-      <input
-        data-testid={testId} value={value} spellCheck={false} list="model-aliases"
-        placeholder="empty: your Claude Code default" onChange={(e) => onChange(e.target.value)}
-      />
-    </Field>
-  );
-}
-
-/// Agents: which profile runs cards, how many at once, the check command, the Claude model and
-/// the planner's profile.
-export function AgentsSection({ project, state, dispatch }: Props) {
+/// Agents: which agent runs new cards, how many at once, and the test command.
+export function AgentsSection({ state, form, set }: FormProps) {
   const s = state.settings;
-  const [profile, setProfile] = useState(project.default_profile);
-  const [limit, setLimit] = useState(String(project.max_parallel));
-  const [check, setCheck] = useState(project.check_command ?? "");
-  const [worker, setWorker] = useState(project.worker_model ?? "");
-  const [reviewer, setReviewer] = useState(project.reviewer_model ?? "");
-  const [planner, setPlanner] = useState(project.planner_model ?? "");
-  const planners = state.settings.profiles.filter((l) => l.profile.role === "planner").map((l) => l.profile.name);
   return (
-    <SectionForm
-      project={project} title="Agents" testId="project-agents" state={state} dispatch={dispatch}
-      patch={() => ({
-        default_profile: profile, max_parallel: Number(limit), check_command: check.trim(),
-        worker_model: worker.trim(), reviewer_model: reviewer.trim(), planner_model: planner.trim(),
-      })}
-    >
-      <Field label="Default profile" name="default_profile" error={fieldError(s, "default_profile")}>
-        <select data-testid="default-profile" value={profile} onChange={(e) => setProfile(e.target.value)}>
-          {profileOptions(state, "worker", profile).map((n) => <option key={n}>{n}</option>)}
+    <div className="page-section" data-testid="project-agents">
+      <Field label="Default agent" name="default_profile" error={fieldError(s, "default_profile")} hint="Runs every card that does not name another one.">
+        <select data-testid="default-profile" value={form.default_profile} onChange={(e) => set("default_profile", e.target.value)}>
+          {profileOptions(state, "worker", form.default_profile).map((n) => <option key={n}>{n}</option>)}
         </select>
       </Field>
-      <Field label="Agents working at once" name="max_parallel" error={fieldError(s, "max_parallel")}>
-        <input data-testid="max-parallel" type="number" min={1} max={64} value={limit} onChange={(e) => setLimit(e.target.value)} />
+      <Field label="Agents working at once" name="max_parallel" error={fieldError(s, "max_parallel")} hint="More cards than this wait in line for a free slot.">
+        <input data-testid="max-parallel" type="number" min={1} max={64} value={form.max_parallel} onChange={(e) => set("max_parallel", e.target.value)} />
       </Field>
-      <Field label="Check command (agents run it before they hand in)" name="check_command" error={fieldError(s, "check_command")}>
-        <input data-testid="check-command" value={check} spellCheck={false} placeholder="cargo xtask verify" onChange={(e) => setCheck(e.target.value)} />
+      <Field label="Test command (optional)" name="check_command" error={fieldError(s, "check_command")} hint="Agents run it before they hand in.">
+        <input data-testid="check-command" value={form.check_command} spellCheck={false} onChange={(e) => set("check_command", e.target.value)} />
       </Field>
-      <ModelField label="Claude model of card agents" name="worker_model" testId="worker-model" value={worker} onChange={setWorker} state={state} />
-      <ModelField label="Claude model of reviewers" name="reviewer_model" testId="reviewer-model" value={reviewer} onChange={setReviewer} state={state} />
-      <ModelField label="Claude model of the planner" name="planner_model" testId="planner-model" value={planner} onChange={setPlanner} state={state} />
-      <datalist id="model-aliases">{MODEL_ALIASES.map((m) => <option key={m} value={m} />)}</datalist>
-      <p className="muted" data-testid="model-aliases">
-        Empty uses your Claude Code default. Passed to Claude Code as <code>--model</code>, only for profiles that run it.
-        Aliases: {MODEL_ALIASES.join(", ")}; a full model name works too.
-      </p>
-      <Field label="Planner profile (used when you start the planner)" name="planner_profile" error={undefined}>
-        <select
-          data-testid="settings-planner-profile" value={state.planner.profile}
-          onChange={(e) => dispatch({ type: "pickPlannerProfile", profile: e.target.value })}
-        >
-          {(planners.includes(state.planner.profile) ? planners : [state.planner.profile, ...planners]).map((n) => <option key={n}>{n}</option>)}
-        </select>
-      </Field>
-    </SectionForm>
+    </div>
   );
 }
 
-/// Review and merge: who reviews finished cards, and where accepted work lands.
-export function ReviewSection({ project, state, dispatch }: Props) {
+/// Review and merge: who reviews finished cards, and what happens to an approved card.
+export function ReviewSection({ state, form, set }: FormProps) {
   const s = state.settings;
-  const [mode, setMode] = useState<ReviewMode>(project.default_review_mode);
-  const [reviewer, setReviewer] = useState(project.default_reviewer ?? "");
-  const [mergeMode, setMergeMode] = useState<MergeMode>(project.merge.mode);
-  const [prTitle, setPrTitle] = useState(project.merge.pr_title);
-  const [method, setMethod] = useState<MergeMethod>(project.merge.method);
   return (
-    <SectionForm
-      project={project} title="Review and merge" testId="project-review" state={state} dispatch={dispatch}
-      patch={() => ({ review_mode: mode, reviewer, merge_mode: mergeMode, pr_title: prTitle, merge_method: method })}
-    >
-      <Field label="Who reviews finished cards" name="review_mode" error={undefined}>
-        <select data-testid="review-mode" value={mode} onChange={(e) => setMode(e.target.value as ReviewMode)}>
-          {MODES.map((m) => <option key={m}>{m}</option>)}
+    <div className="page-section" data-testid="project-review">
+      <Field label="Who reviews finished cards" name="review_mode" error={fieldError(s, "review_mode")}>
+        <select data-testid="review-mode" value={form.review_mode} onChange={(e) => set("review_mode", e.target.value as ReviewMode)}>
+          {REVIEW_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
       </Field>
-      <Field label="Reviewer profile" name="reviewer" error={fieldError(s, "reviewer")}>
-        <select data-testid="reviewer" value={reviewer} onChange={(e) => setReviewer(e.target.value)}>
-          <option value="">(the worker profile's own reviewer)</option>
-          {profileOptions(state, "reviewer", reviewer).map((n) => <option key={n}>{n}</option>)}
+      <Field label="Reviewer agent" name="reviewer" error={fieldError(s, "reviewer")}>
+        <select data-testid="reviewer" value={form.reviewer} onChange={(e) => set("reviewer", e.target.value)}>
+          <option value="">The default for the card's agent</option>
+          {profileOptions(state, "reviewer", form.reviewer).map((n) => <option key={n}>{n}</option>)}
         </select>
       </Field>
-      <Field label="Accepted work lands" name="merge_mode" error={fieldError(s, "merge_mode")}>
-        <select data-testid="merge-mode" value={mergeMode} onChange={(e) => setMergeMode(e.target.value as MergeMode)}>
-          {MERGE_MODES.map((m) => <option key={m} value={m}>{m === "local" ? "local (merge into the base branch)" : "github (open a pull request)"}</option>)}
+      <Field label="When a card is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
+        <select data-testid="merge-mode" value={form.merge_mode} onChange={(e) => set("merge_mode", e.target.value as MergeMode)}>
+          {MERGE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
       </Field>
-      {mergeMode === "github" && (
+      {form.merge_mode === "github" && (
         <>
-          <Field label="Pull request title ({key} and {title})" name="pr_title" error={fieldError(s, "pr_title")}>
-            <input data-testid="pr-title" value={prTitle} spellCheck={false} onChange={(e) => setPrTitle(e.target.value)} />
+          <Field label="Pull request title" name="pr_title" error={fieldError(s, "pr_title")} hint="{key} and {title} are the card's.">
+            <input data-testid="pr-title" value={form.pr_title} spellCheck={false} onChange={(e) => set("pr_title", e.target.value)} />
           </Field>
-          <Field label="Merge method" name="merge_method" error={fieldError(s, "merge_method")}>
-            <select data-testid="merge-method" value={method} onChange={(e) => setMethod(e.target.value as MergeMethod)}>
+          <Field label="How to merge it" name="merge_method" error={fieldError(s, "merge_method")}>
+            <select data-testid="merge-method" value={form.merge_method} onChange={(e) => set("merge_method", e.target.value as MergeMethod)}>
               {METHODS.map((m) => <option key={m}>{m}</option>)}
             </select>
           </Field>
         </>
       )}
-    </SectionForm>
+    </div>
   );
 }

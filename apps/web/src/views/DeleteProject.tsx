@@ -3,7 +3,7 @@ import type { ProjectDeletion } from "../api/types";
 import type { Intent } from "../store/msg";
 import { folderText, keyConfirmed } from "../store/removal";
 import type { State } from "../store/state";
-import { Field } from "./AddProject";
+import { Field } from "./Field";
 
 /// Deleting a project: only its records, or its records and its repository folder (to the Trash,
 /// once the person typed the key). Afterwards: what became of everything.

@@ -11,6 +11,7 @@ import { loadPlanner, reducePlanner } from "./planner";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
+import { nextSettingsFrom } from "./settingsNav";
 import { reduceUpdates } from "./updates";
 import { loadUsage, reduceUsage } from "./usage";
 import {
@@ -89,7 +90,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "selectCard":
       return go(s, { name: "card", project: msg.project, chain: msg.chain, key: msg.key });
     case "urlChanged":
-      return [calm({ ...s, route: msg.route }), enter(msg.route, s)];
+      return [calm({ ...s, route: msg.route, settingsFrom: nextSettingsFrom(s.route, msg.route, s.settingsFrom) }), enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
       // The new project's repository may hold plans; they are offered once the scan answers.
@@ -237,7 +238,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
 /// move form stays with the screen it was opened on.
 function go(s: State, route: Route): [State, Effect[]] {
   const plan = { ...s.plan, editing: undefined, moving: undefined };
-  return [{ ...calm({ ...s, route, plan }) }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+  const settingsFrom = nextSettingsFrom(s.route, route, s.settingsFrom);
+  return [{ ...calm({ ...s, route, plan, settingsFrom }) }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
 }
 
 /// A settings section starts without the last section's "Saved" or refusal.

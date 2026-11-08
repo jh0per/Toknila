@@ -3,7 +3,7 @@ import type { ReviewMode } from "../api/types";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import type { State } from "../store/state";
-import { Field } from "./AddProject";
+import { Field } from "./Field";
 
 const MODES: ReviewMode[] = ["human", "agent", "both"];
 

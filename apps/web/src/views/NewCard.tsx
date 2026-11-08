@@ -3,7 +3,7 @@ import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import { type State, ticketsInOrder } from "../store/state";
-import { Field } from "./AddProject";
+import { Field } from "./Field";
 
 /// A new card in a chain: a title and a description in Markdown (the agent's prompt). It goes at
 /// the end of the chain unless the person picks the card it follows.

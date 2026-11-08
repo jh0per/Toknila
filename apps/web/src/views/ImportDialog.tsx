@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ImportSource } from "../store/imports";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
-import { Field } from "./AddProject";
+import { Field } from "./Field";
 import { FoundPlans } from "./FoundPlans";
 import { ImportSummary } from "./ImportSummary";
 
