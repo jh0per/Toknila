@@ -44,7 +44,10 @@ export function AddProject({ state, dispatch, focus = false }: {
         />
       </Field>
       <Field label="Base branch" name="work_branch" error={fieldError(s, "work_branch")}>
-        <input data-testid="work-branch" value={d.work_branch} spellCheck={false} onChange={edit("work_branch")} />
+        <input
+          data-testid="work-branch" value={d.work_branch} placeholder="the branch the repository is on" spellCheck={false}
+          onChange={edit("work_branch")}
+        />
       </Field>
       {s.branches.length > 0 && fieldError(s, "work_branch") && (
         <p className="branches" data-testid="branches">

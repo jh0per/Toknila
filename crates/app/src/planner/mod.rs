@@ -13,8 +13,8 @@ use toknila_core::instructions::ProjectFacts;
 use toknila_core::machine::person_only;
 use toknila_core::planner::{self, Refusal};
 use toknila_core::{
-    Actor, AgentProfile, AgentRole, Chain, ChainId, EdgeKind, Project, ProjectId, Thread,
-    ThreadKind, Ticket, TicketId, TicketKey, TicketPatch,
+    Actor, AgentProfile, AgentRole, BaseBehind, Chain, ChainId, EdgeKind, PlannerSite, Project,
+    ProjectId, Thread, ThreadKind, Ticket, TicketId, TicketKey, TicketPatch,
 };
 
 pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, plan};
@@ -255,7 +255,7 @@ pub fn thread<R: Reader + ?Sized>(
 }
 
 /// What a project's planner run is told about the project.
-fn facts(p: &Project) -> ProjectFacts {
+fn facts(p: &Project, behind: Option<BaseBehind>) -> ProjectFacts {
     ProjectFacts {
         key: p.key.to_string(),
         name: p.name.clone(),
@@ -263,12 +263,23 @@ fn facts(p: &Project) -> ProjectFacts {
         merge_mode: p.merge.mode,
         merge_method: p.merge.method,
         check_command: p.check_command.clone(),
+        base_behind: behind,
     }
 }
 
 /// The request that starts `project`'s planner with the profile named `profile`, in the
 /// project's repository. The caller has checked that the profile's role is planner.
 pub fn request(project: &Project, profile: &AgentProfile) -> AppResult<RunRequest> {
+    request_at(project, profile, None)
+}
+
+/// [`request`] for a planner that runs in `site`, which the host prepared; `None`: the project's
+/// repository as it is.
+pub fn request_at(
+    project: &Project,
+    profile: &AgentProfile,
+    site: Option<PlannerSite>,
+) -> AppResult<RunRequest> {
     planner::ensure_can_run(project)?;
     if profile.role != AgentRole::Planner {
         return Err(AppError::bad_request(format!(
@@ -276,7 +287,10 @@ pub fn request(project: &Project, profile: &AgentProfile) -> AppResult<RunReques
             profile.name
         )));
     }
-    let dir = project.repo_path.clone().unwrap_or_default();
+    let (dir, behind) = match site {
+        Some(s) => (s.dir, s.behind),
+        None => (project.repo_path.clone().unwrap_or_default(), None),
+    };
     Ok(RunRequest {
         ticket: planner::run_key(project.id),
         key: TicketKey::planner(project.key.clone()),
@@ -286,7 +300,7 @@ pub fn request(project: &Project, profile: &AgentProfile) -> AppResult<RunReques
         brief: RunBrief {
             title: project.name.clone(),
             check_command: project.check_command.clone(),
-            project: Some(facts(project)),
+            project: Some(facts(project, behind)),
             ..RunBrief::default()
         },
     })
@@ -307,10 +321,11 @@ pub fn start(
     actor: Actor,
     project: &Project,
     profile: &AgentProfile,
+    site: Option<PlannerSite>,
 ) -> AppResult<Started> {
     person_only(actor, "start the planner")?;
     runner
-        .start(&request(project, profile)?)
+        .start(&request_at(project, profile, site)?)
         .map_err(runner_error)
 }
 

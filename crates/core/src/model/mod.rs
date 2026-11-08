@@ -34,7 +34,7 @@ pub use review::{
     resolve_reviewer, reviewer_profile,
 };
 pub use run::{ProcessExit, Run};
-pub use ship::{MergeSpec, Ship, ShipLook, ShipSpec, slugify};
+pub use ship::{MergeSpec, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec, slugify};
 pub use stale::{BaseBehind, BaseCourse, StalePolicy, describe as describe_base_behind};
 pub use status::{BlockedReason, StatusCategory, StatusReason, TicketStatus, WaitingReason};
 pub use thread::{

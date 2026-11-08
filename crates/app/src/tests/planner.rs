@@ -266,12 +266,24 @@ fn starting_the_planner_is_a_persons_action_in_the_repository_with_a_planner_pro
     let planner_profile = AgentProfile::claude_code_planner();
     let key = rules::run_key(mem.project.id);
 
-    let e = planner::start(&mem.runner, Actor::Agent, &mem.project, &planner_profile)
-        .expect_err("not an agent's: person-only is a conflict, like every person-only command");
+    let e = planner::start(
+        &mem.runner,
+        Actor::Agent,
+        &mem.project,
+        &planner_profile,
+        None,
+    )
+    .expect_err("not an agent's: person-only is a conflict, like every person-only command");
     assert_eq!(e.kind, ErrorKind::Conflict);
 
-    let started =
-        planner::start(&mem.runner, Actor::Human, &mem.project, &planner_profile).expect("start");
+    let started = planner::start(
+        &mem.runner,
+        Actor::Human,
+        &mem.project,
+        &planner_profile,
+        None,
+    )
+    .expect("start");
     assert!(!started.reused);
     let req = mem.runner.started.borrow()[0].clone();
     assert_eq!((req.ticket, req.role), (key, AgentRole::Planner));
@@ -284,9 +296,15 @@ fn starting_the_planner_is_a_persons_action_in_the_repository_with_a_planner_pro
     );
     assert!(planner::is_live(&mem.runner, &mem.project));
     assert!(
-        planner::start(&mem.runner, Actor::Human, &mem.project, &planner_profile)
-            .expect("again")
-            .reused
+        planner::start(
+            &mem.runner,
+            Actor::Human,
+            &mem.project,
+            &planner_profile,
+            None
+        )
+        .expect("again")
+        .reused
     );
 
     planner::send_input(&mem.runner, Actor::Human, &mem.project, b"hi\r")
@@ -302,10 +320,17 @@ fn starting_the_planner_is_a_persons_action_in_the_repository_with_a_planner_pro
 
     // A worker profile is not a planner; a project without a repository has nothing to read.
     let worker = AgentProfile::claude_code();
-    let e = planner::start(&mem.runner, Actor::Human, &mem.project, &worker).expect_err("worker");
+    let e =
+        planner::start(&mem.runner, Actor::Human, &mem.project, &worker, None).expect_err("worker");
     assert_eq!(e.kind, ErrorKind::BadRequest);
     mem.project.repo_path = None;
-    let e = planner::start(&mem.runner, Actor::Human, &mem.project, &planner_profile)
-        .expect_err("no repository");
+    let e = planner::start(
+        &mem.runner,
+        Actor::Human,
+        &mem.project,
+        &planner_profile,
+        None,
+    )
+    .expect_err("no repository");
     assert_eq!(e.kind, ErrorKind::Conflict);
 }

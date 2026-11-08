@@ -41,6 +41,22 @@ impl Tok {
         })
     }
 
+    /// Runs `tok <args>` without `--json`, expects it to succeed and returns what it printed.
+    pub fn text(&self, args: &[&str]) -> String {
+        let out = Command::new(env!("CARGO_BIN_EXE_tok"))
+            .args(args)
+            .env("TOKNILA_HOME", &self.home)
+            .output()
+            .expect("run tok");
+        assert!(
+            out.status.success(),
+            "tok {args:?}: {}\n{}",
+            out.status,
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n")
+    }
+
     /// Runs `tok <args>`, expects it to fail and returns its stderr.
     pub fn fails(&self, args: &[&str]) -> String {
         let out = Command::new(env!("CARGO_BIN_EXE_tok"))

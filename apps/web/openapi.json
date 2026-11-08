@@ -7091,6 +7091,13 @@
               "$ref": "#/components/schemas/RepoProblem"
             }
           },
+          "suggested_branch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The base branch the repository suggests (where HEAD is, else the remote's default);\n`null` when it suggests none."
+          },
           "suggested_key": {
             "type": [
               "string",

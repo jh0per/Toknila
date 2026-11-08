@@ -1,6 +1,6 @@
 //! The planner's instructions: what the project is, and how to plan through the MCP tools.
 
-use crate::{MergeMethod, MergeMode};
+use crate::{BaseBehind, MergeMethod, MergeMode};
 
 /// What the planner's instructions say about its project.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,6 +12,8 @@ pub struct ProjectFacts {
     pub merge_mode: MergeMode,
     pub merge_method: MergeMethod,
     pub check_command: Option<String>,
+    /// Local mode: the base branch is behind its upstream.
+    pub base_behind: Option<BaseBehind>,
 }
 
 pub(super) const PLANNER_PROTOCOL: &str = "\
@@ -85,12 +87,22 @@ pub fn generate_planner(facts: &ProjectFacts) -> String {
                  tested."
             .to_owned(),
     };
+    let stale = facts.base_behind.as_ref().map_or_else(String::new, |b| {
+        format!(
+            "\n\nThe local `{}` is {} commit{} behind `{}`: the code you read may be out of \
+             date.",
+            b.base,
+            b.behind,
+            if b.behind == 1 { "" } else { "s" },
+            b.upstream
+        )
+    });
     format!(
         "# Toknila: planner of {key}, {name}\n\n\
          You are the planner of project {key} for Toknila. The repository's own `CLAUDE.md` and \
          `AGENTS.md` still apply and win where they differ; this file only adds how to work with \
          Toknila.\n\n\
-         ## The project\n\n{merge}\n\n{checks}\n\n{protocol}",
+         ## The project\n\n{merge}\n\n{checks}{stale}\n\n{protocol}",
         key = facts.key,
         name = facts.name,
         protocol = PLANNER_PROTOCOL,
@@ -110,6 +122,7 @@ mod tests {
             merge_mode: MergeMode::Local,
             merge_method: MergeMethod::Merge,
             check_command: Some("cargo xtask verify".to_owned()),
+            base_behind: None,
         }
     }
 
@@ -141,6 +154,30 @@ mod tests {
         assert!(github.contains("pull request against `develop`"));
         assert!(github.contains("--squash"));
         assert!(github.contains("names no check command"));
+    }
+
+    #[test]
+    fn a_base_behind_its_upstream_is_said_in_one_line() {
+        let behind = |n| {
+            generate_planner(&ProjectFacts {
+                base_behind: Some(BaseBehind {
+                    base: "develop".to_owned(),
+                    upstream: "origin/develop".to_owned(),
+                    behind: n,
+                    can_fast_forward: true,
+                }),
+                ..facts()
+            })
+        };
+        let line = "The local `develop` is 133 commits behind `origin/develop`: the code you \
+                    read may be out of date.";
+        assert!(
+            behind(133).contains(&format!("{line}\n\n## Your role")),
+            "{}",
+            behind(133)
+        );
+        assert!(behind(1).contains("is 1 commit behind"));
+        assert!(!generate_planner(&facts()).contains("behind"));
     }
 
     #[test]

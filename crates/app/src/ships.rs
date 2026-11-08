@@ -7,7 +7,8 @@ use toknila_core::events::DomainEvent;
 use toknila_core::guard::{self, ShipProblem, ShipState};
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    BaseBehind, BlockedReason, Chain, Ship, ShipLook, ShipSpec, StalePolicy, Ticket, TicketId,
+    BaseBehind, BlockedReason, Chain, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec,
+    StalePolicy, Ticket, TicketId,
 };
 
 use crate::external::ExternalEffect;
@@ -60,6 +61,22 @@ pub trait Shipyard: std::fmt::Debug {
             changed: Vec::new(),
             ahead: 1,
         })
+    }
+    /// Gets the place the project's planner reads the code from, fresh as far as the network
+    /// allows (a fetch that fails is fine): in pull-request mode a checkout of the fetched
+    /// `origin/<base>` of its own, in local mode the working copy, with what is known about its
+    /// base being behind. A yard that cannot do better gives the repository as it is.
+    fn planner_site(&self, spec: &PlannerSpec) -> PlannerSite {
+        PlannerSite {
+            dir: spec.repo.clone(),
+            behind: None,
+        }
+    }
+    /// Removes the planner's checkout of `project` (the path-safe name) from the repository at
+    /// `repo`; none is fine.
+    fn remove_planner_site(&self, repo: &str, project: &str) -> Result<(), ShipError> {
+        let _ = (repo, project);
+        Ok(())
     }
 }
 

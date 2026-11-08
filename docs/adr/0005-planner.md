@@ -84,3 +84,11 @@ and `tok mcp` in the planner role does the same through tools), and a Playwright
 - P2-01 changes the run wiring for every role (auto memory off, the subagent tool denied, ships on
   a path without whitespace, a stale-base check). The planner is a normal role and gets what
   applies to it.
+
+**Where the planner reads the code (P2-04):** the planner's folder is not always the working copy.
+On every start the daemon makes a best-effort `git fetch` (20 s at most). In pull-request mode,
+where merges happen on GitHub and the working copy goes stale, the planner runs in a detached
+checkout of the fetched `origin/<base>` at `<ships root>/<project>/_planner`, moved to the fresh
+base on every start (a planner that is still live is left alone) and removed with the project. In
+local mode it runs in the working copy, and when the base is behind its upstream its instructions
+say so in one line. If the checkout cannot be made, it falls back to the working copy.

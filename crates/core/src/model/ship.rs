@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{Chain, MergeMode, Project, StalePolicy, Ticket, TicketId, TicketKey};
+use super::{BaseBehind, Chain, MergeMode, Project, StalePolicy, Ticket, TicketId, TicketKey};
 use crate::pr::PrSpec;
 
 /// The worktree and branch a ticket works in, once the shipyard has made them.
@@ -33,6 +33,45 @@ pub struct ShipSpec {
     pub project: String,
     pub chain: String,
     pub slug: String,
+}
+
+/// Where a project's planner reads the code: decided here, executed by the shipyard.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannerSpec {
+    /// The project's repository on the host.
+    pub repo: String,
+    /// The project's work branch.
+    pub base: String,
+    /// Pull-request mode: the base moves on the remote, so the planner reads the fetched
+    /// `origin/<base>` in a checkout of its own, not the working copy.
+    pub remote: bool,
+    /// Path-safe project name, the folder under the ships root.
+    pub project: String,
+}
+
+impl PlannerSpec {
+    /// The planner of `project`; `None` when it has no repository.
+    pub fn for_project(project: &Project) -> Option<Self> {
+        let repo = project
+            .repo_path
+            .as_deref()
+            .filter(|r| !r.trim().is_empty())?;
+        Some(Self {
+            repo: repo.to_owned(),
+            base: project.work_branch.clone(),
+            remote: project.merge.mode == MergeMode::Github,
+            project: slugify(&project.key.to_string()),
+        })
+    }
+}
+
+/// Where the planner runs and what the host found about the code it reads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannerSite {
+    /// The folder the planner starts in.
+    pub dir: String,
+    /// Local mode: the base branch is behind its upstream, so the code may be out of date.
+    pub behind: Option<BaseBehind>,
 }
 
 /// What a merge needs: the ship's branch goes into the base branch of the repository with a

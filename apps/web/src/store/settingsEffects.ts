@@ -22,7 +22,7 @@ async function addProject(e: Extract<SettingsEffect, { type: "addProject" }>, di
     return;
   }
   const project = await post<Project>("/projects", {
-    key, name: name || undefined, repo_path, work_branch,
+    key, name: name || undefined, repo_path, work_branch: work_branch || undefined,
   });
   dispatch({ type: "projectAdded", project });
 }
