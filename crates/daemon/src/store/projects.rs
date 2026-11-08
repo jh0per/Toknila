@@ -7,7 +7,8 @@ use super::StoreError;
 use super::codec::{Repo, enum_from, enum_str, parse};
 
 const PROJECT_COLS: &str = "id, key, name, repo_path, work_branch, release_branch, default_profile, \
-     default_review_mode, max_parallel, default_reviewer, merge_mode, pr_title, merge_method, check_command, archived, agent_model";
+     default_review_mode, max_parallel, default_reviewer, merge_mode, pr_title, merge_method, check_command, archived, \
+     worker_model, reviewer_model, planner_model";
 
 type RawProject = (
     String,
@@ -25,6 +26,8 @@ type RawProject = (
     String,
     Option<String>,
     bool,
+    Option<String>,
+    Option<String>,
     Option<String>,
 );
 
@@ -46,6 +49,8 @@ fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
         r.get(13)?,
         r.get(14)?,
         r.get(15)?,
+        r.get(16)?,
+        r.get(17)?,
     ))
 }
 
@@ -66,7 +71,9 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         merge_method,
         check_command,
         archived,
-        agent_model,
+        worker_model,
+        reviewer_model,
+        planner_model,
     ) = c;
     Ok(Project {
         id: parse(&id, "project id")?,
@@ -86,7 +93,9 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
             method: enum_from(&merge_method)?,
         },
         check_command,
-        agent_model,
+        worker_model,
+        reviewer_model,
+        planner_model,
         archived,
     })
 }
@@ -95,7 +104,7 @@ impl Repo<'_> {
     pub fn insert_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)"
+                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)"
             ),
             params![
                 p.id.to_string(),
@@ -113,7 +122,9 @@ impl Repo<'_> {
                 enum_str(&p.merge.method)?,
                 p.check_command,
                 p.archived,
-                p.agent_model,
+                p.worker_model,
+                p.reviewer_model,
+                p.planner_model,
             ],
         )?;
         Ok(())
@@ -124,7 +135,8 @@ impl Repo<'_> {
         self.conn.execute(
             "UPDATE projects SET name = ?2, repo_path = ?3, work_branch = ?4, release_branch = ?5, \
              default_profile = ?6, default_review_mode = ?7, max_parallel = ?8, default_reviewer = ?9, \
-             merge_mode = ?10, pr_title = ?11, merge_method = ?12, check_command = ?13, archived = ?14, agent_model = ?15 \
+             merge_mode = ?10, pr_title = ?11, merge_method = ?12, check_command = ?13, archived = ?14, \
+             worker_model = ?15, reviewer_model = ?16, planner_model = ?17 \
              WHERE id = ?1",
             params![
                 p.id.to_string(),
@@ -141,7 +153,9 @@ impl Repo<'_> {
                 enum_str(&p.merge.method)?,
                 p.check_command,
                 p.archived,
-                p.agent_model,
+                p.worker_model,
+                p.reviewer_model,
+                p.planner_model,
             ],
         )?;
         Ok(())

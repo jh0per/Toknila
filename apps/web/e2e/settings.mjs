@@ -8,7 +8,7 @@
 // bar shows the new limit, and all of them are still there after the daemon restarts. Settings are
 // sections with an address each (App, Profiles, and the project's General, Agents, Review and
 // merge, Plans, Danger zone). The form prefills the check command the repository's files suggest,
-// and the agent model is saved with the project.
+// and the Claude model of each role (card agents, reviewers, planner) is saved with the project.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -108,14 +108,18 @@ try {
   if ((await t("check-command").inputValue()) !== "cargo xtask verify") throw new Error("the prefilled check command was not saved with the project");
   console.log("PASS the project was added with the prefilled check command");
   if ((await t("max-parallel").inputValue()) !== "2") throw new Error("the default limit should be 2");
-  if ((await t("agent-model").inputValue()) !== "") throw new Error("the model should be empty (Claude Code's own default)");
+  for (const id of ["worker-model", "reviewer-model", "planner-model"]) {
+    if ((await t(id).inputValue()) !== "") throw new Error(`${id} should be empty (Claude Code's own default)`);
+  }
+  const aliases = await page.locator("#model-aliases option").evaluateAll((os) => os.map((o) => o.value));
+  if (!["sonnet", "opus", "haiku"].every((a) => aliases.includes(a))) throw new Error(`the aliases offered: ${aliases}`);
+  console.log("PASS the documented model aliases are offered");
   await t("max-parallel").fill("3");
-  await page.locator("[data-alias=sonnet]").click();
-  if ((await t("agent-model").inputValue()) !== "sonnet") throw new Error("an alias button should fill the model");
-  await t("agent-model").fill("not a model");
+  await t("worker-model").fill("sonnet");
+  await t("planner-model").fill("not a model");
   await t("save-settings").click();
-  await expectText(t("error-agent_model"), "one word", "a model with spaces is refused at its field");
-  await t("agent-model").fill("opus");
+  await expectText(t("error-planner_model"), "one word", "a model with spaces is refused at its field");
+  await t("planner-model").fill("opus");
   await t("check-command").fill("cargo test");
   await t("save-settings").click();
   await expectText(t("saved"), "Saved", "agent settings saved");
@@ -152,9 +156,9 @@ try {
   await page.goto(at("/projects/DEMO/settings/agents"));
   await t("max-parallel").waitFor({ timeout: 20_000 });
   const limit = await t("max-parallel").inputValue();
-  const model = await t("agent-model").inputValue();
-  if (limit !== "3" || model !== "opus") throw new Error(`after the restart: limit ${limit}, model ${model}`);
-  console.log("PASS limit 3 and the model opus survive a daemon restart");
+  const models = [await t("worker-model").inputValue(), await t("reviewer-model").inputValue(), await t("planner-model").inputValue()];
+  if (limit !== "3" || models.join("|") !== "sonnet||opus") throw new Error(`after the restart: limit ${limit}, models ${models}`);
+  console.log("PASS limit 3, worker model sonnet, no reviewer model and planner model opus survive a daemon restart");
   const check = await t("check-command").inputValue();
   if (check !== "cargo xtask verify") throw new Error(`after the restart: check command ${check}`);
   console.log("PASS the check command survives a daemon restart");

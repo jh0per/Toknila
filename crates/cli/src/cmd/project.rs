@@ -58,11 +58,17 @@ pub enum ProjectCmd {
         /// and may without asking. An empty text clears it.
         #[arg(long)]
         check_command: Option<String>,
-        /// The Claude model of the project's card agents, reviewers and planner (`sonnet`, `opus`,
-        /// `haiku`, or a full model name); passed as `--model` to profiles that run Claude Code.
-        /// An empty text goes back to your Claude Code default.
+        /// The Claude model of card agents (`sonnet`, `opus`, `haiku`, or a full model name);
+        /// passed as `--model` to profiles that run Claude Code. An empty text goes back to your
+        /// Claude Code default.
         #[arg(long)]
-        model: Option<String>,
+        worker_model: Option<String>,
+        /// The Claude model of reviewers; like `--worker-model`.
+        #[arg(long)]
+        reviewer_model: Option<String>,
+        /// The Claude model of the planner; like `--worker-model`.
+        #[arg(long)]
+        planner_model: Option<String>,
     },
     /// List projects.
     Ls,
@@ -141,7 +147,9 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             pr_title,
             merge_method,
             check_command,
-            model,
+            worker_model,
+            reviewer_model,
+            planner_model,
         } => {
             let patch = PatchProject {
                 max_parallel: parallel,
@@ -155,7 +163,9 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge method {m}")))
                     .transpose()?,
                 check_command,
-                agent_model: model,
+                worker_model,
+                reviewer_model,
+                planner_model,
                 ..PatchProject::default()
             };
             let p = c.patch_project(&key, &patch)?;
@@ -171,8 +181,14 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 if let Some(c) = &p.check_command {
                     println!("check command: {c}");
                 }
-                if let Some(m) = &p.agent_model {
-                    println!("agent model: {m}");
+                for (what, model) in [
+                    ("worker", &p.worker_model),
+                    ("reviewer", &p.reviewer_model),
+                    ("planner", &p.planner_model),
+                ] {
+                    if let Some(m) = model {
+                        println!("{what} model: {m}");
+                    }
                 }
             });
         }

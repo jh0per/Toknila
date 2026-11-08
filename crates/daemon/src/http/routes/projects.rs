@@ -178,8 +178,14 @@ pub async fn patch_project(
             e,
         ));
     }
-    if let Some(Err(e)) = patch.agent_model.as_deref().map(Project::clean_agent_model) {
-        return Err(FormError::field("agent_model", "agent_model_invalid", e));
+    for (field, text) in [
+        ("worker_model", &patch.worker_model),
+        ("reviewer_model", &patch.reviewer_model),
+        ("planner_model", &patch.planner_model),
+    ] {
+        if let Some(Err(e)) = text.as_deref().map(Project::clean_model) {
+            return Err(FormError::field(field, "model_invalid", e));
+        }
     }
     if let Some(profile) = &patch.default_profile {
         let catalog = crate::profiles::load(&state.profiles);

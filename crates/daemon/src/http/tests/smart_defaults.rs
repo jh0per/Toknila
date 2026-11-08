@@ -236,46 +236,65 @@ async fn the_places_name_the_data_home_the_ships_and_the_profiles_folder() {
 }
 
 #[tokio::test]
-async fn the_agent_model_is_saved_cleared_refused_at_its_field_and_survives_a_restart() {
+async fn the_models_per_role_are_saved_cleared_refused_at_their_field_and_survive_a_restart() {
     let api = Api::new();
     api.post("/v1/projects", json!({ "key": "DEMO" })).await;
-    assert!(
-        api.get("/v1/projects/DEMO")
-            .await
-            .get("agent_model")
-            .is_none()
-    );
+    let before = api.get("/v1/projects/DEMO").await;
+    for f in ["worker_model", "reviewer_model", "planner_model"] {
+        assert!(before.get(f).is_none(), "{f}: {before}");
+    }
     let patch = |body: Value| api.call(Method::PATCH, "/v1/projects/DEMO", Some(body));
 
-    let (s, p) = patch(json!({ "agent_model": " opus " })).await;
+    let (s, p) = patch(json!({ "worker_model": " sonnet ", "planner_model": "opus" })).await;
+    assert_eq!(s, StatusCode::OK);
     assert_eq!(
-        (s, p["agent_model"].as_str()),
-        (StatusCode::OK, Some("opus"))
+        (
+            p["worker_model"].as_str(),
+            p["reviewer_model"].as_str(),
+            p["planner_model"].as_str()
+        ),
+        (Some("sonnet"), None, Some("opus")),
+        "each role keeps its own: {p}"
     );
-    let (s, e) = patch(json!({ "agent_model": "claude opus" })).await;
+    for field in ["worker_model", "reviewer_model", "planner_model"] {
+        let (s, e) = patch(json!({ field: "claude opus" })).await;
+        assert_eq!(
+            (s, e["field"].as_str()),
+            (StatusCode::BAD_REQUEST, Some(field)),
+            "{e}"
+        );
+    }
+    let still = api.get("/v1/projects/DEMO").await;
     assert_eq!(
-        (s, e["field"].as_str()),
-        (StatusCode::BAD_REQUEST, Some("agent_model")),
-        "{e}"
-    );
-    assert_eq!(
-        api.get("/v1/projects/DEMO").await["agent_model"],
-        "opus",
+        (
+            still["worker_model"].as_str(),
+            still["planner_model"].as_str()
+        ),
+        (Some("sonnet"), Some("opus")),
         "a refused patch changes nothing"
     );
 
     let api = api.restart();
-    assert_eq!(api.get("/v1/projects/DEMO").await["agent_model"], "opus");
+    let again = api.get("/v1/projects/DEMO").await;
+    assert_eq!(
+        (
+            again["worker_model"].as_str(),
+            again["planner_model"].as_str()
+        ),
+        (Some("sonnet"), Some("opus"))
+    );
     let (s, p) = api
         .call(
             Method::PATCH,
             "/v1/projects/DEMO",
-            Some(json!({ "agent_model": "" })),
+            Some(json!({ "worker_model": "", "reviewer_model": "haiku" })),
         )
         .await;
     assert_eq!(s, StatusCode::OK);
     assert!(
-        p.get("agent_model").is_none(),
+        p.get("worker_model").is_none(),
         "an empty text clears it: {p}"
     );
+    assert_eq!(p["reviewer_model"], "haiku");
+    assert_eq!(p["planner_model"], "opus", "the others stay");
 }

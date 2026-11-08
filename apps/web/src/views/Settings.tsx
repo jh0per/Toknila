@@ -16,7 +16,7 @@ export function Settings({ state, dispatch }: { state: State; dispatch: (i: Inte
   // The form restarts from the daemon's values whenever they change (after a save, after a restart).
   const stamp = project && [
     project.id, project.default_profile, project.max_parallel, project.default_review_mode, project.default_reviewer,
-    project.work_branch, project.check_command, project.agent_model, project.merge.mode, project.merge.pr_title,
+    project.work_branch, project.check_command, project.worker_model, project.reviewer_model, project.planner_model, project.merge.mode, project.merge.pr_title,
     project.merge.method, state.settings.profiles.length,
   ].join("|");
   const form = { key: stamp, state, dispatch };

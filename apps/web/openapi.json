@@ -6214,13 +6214,6 @@
         "type": "object",
         "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
         "properties": {
-          "agent_model": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The Claude model of the project's card agents, reviewers and planner (`sonnet`, `opus`, a\nfull model name). An empty text clears it: the person's own Claude Code default."
-          },
           "check_command": {
             "type": [
               "string",
@@ -6266,6 +6259,13 @@
               }
             ]
           },
+          "planner_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Claude model of the project's planner; an empty text clears it."
+          },
           "pr_title": {
             "type": [
               "string",
@@ -6291,12 +6291,26 @@
             ],
             "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
           },
+          "reviewer_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Claude model of the project's reviewers; an empty text clears it."
+          },
           "work_branch": {
             "type": [
               "string",
               "null"
             ],
             "description": "The base branch ships start from and merges go into."
+          },
+          "worker_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Claude model of the project's card agents (`sonnet`, `opus`, a full model name). An\nempty text clears it: the person's own Claude Code default."
           }
         }
       },
@@ -6743,13 +6757,6 @@
           "merge"
         ],
         "properties": {
-          "agent_model": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The Claude model of the project's card agents, reviewers and planner (`--model`: an alias\nsuch as `sonnet`, or a full model name). `None`: the person's own Claude Code default."
-          },
           "archived": {
             "type": "boolean",
             "description": "Hidden from the sidebar; its data is kept and it can be brought back."
@@ -6793,6 +6800,13 @@
           "name": {
             "type": "string"
           },
+          "planner_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Claude model of the project's planner; `None`: the person's default."
+          },
           "release_branch": {
             "type": "string",
             "description": "Branch that only receives tagged releases (`main`)."
@@ -6804,9 +6818,23 @@
             ],
             "description": "Path to the repository on the host; empty until a repo is attached."
           },
+          "reviewer_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Claude model of the project's reviewer agents; `None`: the person's default."
+          },
           "work_branch": {
             "type": "string",
             "description": "Branch ships start from and merge into (`develop`)."
+          },
+          "worker_model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Claude model of the project's card agents (`--model`: an alias such as `sonnet`, or a\nfull model name). `None`: the person's own Claude Code default."
           }
         }
       },

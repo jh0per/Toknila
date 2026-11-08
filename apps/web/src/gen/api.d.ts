@@ -2000,11 +2000,6 @@ export interface components {
         /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
         PatchProject: {
             /**
-             * @description The Claude model of the project's card agents, reviewers and planner (`sonnet`, `opus`, a
-             *     full model name). An empty text clears it: the person's own Claude Code default.
-             */
-            agent_model?: string | null;
-            /**
              * @description The command that checks the work (`cargo xtask verify`); agents are told to run it and may
              *     without asking. An empty text clears it.
              */
@@ -2018,13 +2013,22 @@ export interface components {
             max_parallel?: number | null;
             merge_method?: components["schemas"]["MergeMethod"] | null;
             merge_mode?: components["schemas"]["MergeMode"] | null;
+            /** @description The Claude model of the project's planner; an empty text clears it. */
+            planner_model?: string | null;
             /** @description Title of the pull requests; `{key}` and `{title}` are the card's. */
             pr_title?: string | null;
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
             reviewer?: string | null;
+            /** @description The Claude model of the project's reviewers; an empty text clears it. */
+            reviewer_model?: string | null;
             /** @description The base branch ships start from and merges go into. */
             work_branch?: string | null;
+            /**
+             * @description The Claude model of the project's card agents (`sonnet`, `opus`, a full model name). An
+             *     empty text clears it: the person's own Claude Code default.
+             */
+            worker_model?: string | null;
         };
         /** @description `PATCH /v1/tickets/{ticket}/subtasks/{position}`. */
         PatchSubtask: {
@@ -2179,11 +2183,6 @@ export interface components {
         };
         /** @description One product: one monorepo, its chains, depot and settings. */
         Project: {
-            /**
-             * @description The Claude model of the project's card agents, reviewers and planner (`--model`: an alias
-             *     such as `sonnet`, or a full model name). `None`: the person's own Claude Code default.
-             */
-            agent_model?: string | null;
             /** @description Hidden from the sidebar; its data is kept and it can be brought back. */
             archived?: boolean;
             /**
@@ -2209,12 +2208,21 @@ export interface components {
             /** @description Where accepted work lands: the local base branch or a GitHub pull request. */
             merge: components["schemas"]["MergeSettings"];
             name: string;
+            /** @description The Claude model of the project's planner; `None`: the person's default. */
+            planner_model?: string | null;
             /** @description Branch that only receives tagged releases (`main`). */
             release_branch: string;
             /** @description Path to the repository on the host; empty until a repo is attached. */
             repo_path?: string | null;
+            /** @description The Claude model of the project's reviewer agents; `None`: the person's default. */
+            reviewer_model?: string | null;
             /** @description Branch ships start from and merge into (`develop`). */
             work_branch: string;
+            /**
+             * @description The Claude model of the project's card agents (`--model`: an alias such as `sonnet`, or a
+             *     full model name). `None`: the person's own Claude Code default.
+             */
+            worker_model?: string | null;
         };
         /** @description `GET /v1/agents`: one project's agent slots and the cards waiting for one. */
         ProjectAgents: {

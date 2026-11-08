@@ -346,7 +346,9 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
         max_parallel: 2,
         merge: Default::default(),
         check_command: None,
-        agent_model: None,
+        worker_model: None,
+        reviewer_model: None,
+        planner_model: None,
         archived: false,
     };
     let chain = crate::Chain {

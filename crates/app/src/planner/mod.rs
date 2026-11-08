@@ -300,7 +300,7 @@ pub fn request_at(
         brief: RunBrief {
             title: project.name.clone(),
             check_command: project.check_command.clone(),
-            model: project.agent_model.clone(),
+            model: project.planner_model.clone(),
             project: Some(facts(project, behind)),
             ..RunBrief::default()
         },

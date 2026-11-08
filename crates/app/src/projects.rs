@@ -53,9 +53,13 @@ pub struct PatchProject {
     /// The command that checks the work (`cargo xtask verify`); agents are told to run it and may
     /// without asking. An empty text clears it.
     pub check_command: Option<String>,
-    /// The Claude model of the project's card agents, reviewers and planner (`sonnet`, `opus`, a
-    /// full model name). An empty text clears it: the person's own Claude Code default.
-    pub agent_model: Option<String>,
+    /// The Claude model of the project's card agents (`sonnet`, `opus`, a full model name). An
+    /// empty text clears it: the person's own Claude Code default.
+    pub worker_model: Option<String>,
+    /// The Claude model of the project's reviewers; an empty text clears it.
+    pub reviewer_model: Option<String>,
+    /// The Claude model of the project's planner; an empty text clears it.
+    pub planner_model: Option<String>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -102,7 +106,9 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             Some(c) => Project::clean_check_command(&c).map_err(AppError::bad_request)?,
             None => None,
         },
-        agent_model: None,
+        worker_model: None,
+        reviewer_model: None,
+        planner_model: None,
         archived: false,
     };
     uow.insert_project(&p)?;
@@ -141,8 +147,14 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     if let Some(c) = patch.check_command {
         p.check_command = Project::clean_check_command(&c).map_err(AppError::bad_request)?;
     }
-    if let Some(m) = patch.agent_model {
-        p.agent_model = Project::clean_agent_model(&m).map_err(AppError::bad_request)?;
+    for (field, text) in [
+        (&mut p.worker_model, patch.worker_model),
+        (&mut p.reviewer_model, patch.reviewer_model),
+        (&mut p.planner_model, patch.planner_model),
+    ] {
+        if let Some(m) = text {
+            *field = Project::clean_model(&m).map_err(AppError::bad_request)?;
+        }
     }
     if let Some(m) = patch.merge_mode {
         if m == MergeMode::Github && p.repo_path.as_deref().is_none_or(|r| r.trim().is_empty()) {

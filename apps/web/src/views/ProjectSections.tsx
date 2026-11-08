@@ -39,6 +39,20 @@ export function GeneralSection({ project, state, dispatch }: Props) {
   );
 }
 
+/// One model field: free text with the documented aliases offered.
+function ModelField({ label, name, testId, value, onChange, state }: {
+  label: string; name: string; testId: string; value: string; onChange: (v: string) => void; state: State;
+}) {
+  return (
+    <Field label={label} name={name} error={fieldError(state.settings, name)}>
+      <input
+        data-testid={testId} value={value} spellCheck={false} list="model-aliases"
+        placeholder="empty: your Claude Code default" onChange={(e) => onChange(e.target.value)}
+      />
+    </Field>
+  );
+}
+
 /// Agents: which profile runs cards, how many at once, the check command, the Claude model and
 /// the planner's profile.
 export function AgentsSection({ project, state, dispatch }: Props) {
@@ -46,12 +60,17 @@ export function AgentsSection({ project, state, dispatch }: Props) {
   const [profile, setProfile] = useState(project.default_profile);
   const [limit, setLimit] = useState(String(project.max_parallel));
   const [check, setCheck] = useState(project.check_command ?? "");
-  const [model, setModel] = useState(project.agent_model ?? "");
+  const [worker, setWorker] = useState(project.worker_model ?? "");
+  const [reviewer, setReviewer] = useState(project.reviewer_model ?? "");
+  const [planner, setPlanner] = useState(project.planner_model ?? "");
   const planners = state.settings.profiles.filter((l) => l.profile.role === "planner").map((l) => l.profile.name);
   return (
     <SectionForm
       project={project} title="Agents" testId="project-agents" state={state} dispatch={dispatch}
-      patch={() => ({ default_profile: profile, max_parallel: Number(limit), check_command: check.trim(), agent_model: model.trim() })}
+      patch={() => ({
+        default_profile: profile, max_parallel: Number(limit), check_command: check.trim(),
+        worker_model: worker.trim(), reviewer_model: reviewer.trim(), planner_model: planner.trim(),
+      })}
     >
       <Field label="Default profile" name="default_profile" error={fieldError(s, "default_profile")}>
         <select data-testid="default-profile" value={profile} onChange={(e) => setProfile(e.target.value)}>
@@ -64,21 +83,13 @@ export function AgentsSection({ project, state, dispatch }: Props) {
       <Field label="Check command (agents run it before they hand in)" name="check_command" error={fieldError(s, "check_command")}>
         <input data-testid="check-command" value={check} spellCheck={false} placeholder="cargo xtask verify" onChange={(e) => setCheck(e.target.value)} />
       </Field>
-      <Field label="Claude model of card agents, reviewers and the planner" name="agent_model" error={fieldError(s, "agent_model")}>
-        <input
-          data-testid="agent-model" value={model} spellCheck={false} list="model-aliases"
-          placeholder="empty: your Claude Code default" onChange={(e) => setModel(e.target.value)}
-        />
-      </Field>
+      <ModelField label="Claude model of card agents" name="worker_model" testId="worker-model" value={worker} onChange={setWorker} state={state} />
+      <ModelField label="Claude model of reviewers" name="reviewer_model" testId="reviewer-model" value={reviewer} onChange={setReviewer} state={state} />
+      <ModelField label="Claude model of the planner" name="planner_model" testId="planner-model" value={planner} onChange={setPlanner} state={state} />
       <datalist id="model-aliases">{MODEL_ALIASES.map((m) => <option key={m} value={m} />)}</datalist>
-      <div className="chips" data-testid="model-aliases">
-        {MODEL_ALIASES.map((m) => (
-          <button type="button" className="btn" key={m} data-alias={m} onClick={() => setModel(m)}>{m}</button>
-        ))}
-      </div>
-      <p className="muted">
-        Passed to Claude Code as <code>--model</code>, only for profiles that run it. Aliases follow Claude Code's
-        model configuration; a full model name works too.
+      <p className="muted" data-testid="model-aliases">
+        Empty uses your Claude Code default. Passed to Claude Code as <code>--model</code>, only for profiles that run it.
+        Aliases: {MODEL_ALIASES.join(", ")}; a full model name works too.
       </p>
       <Field label="Planner profile (used when you start the planner)" name="planner_profile" error={undefined}>
         <select

@@ -448,11 +448,12 @@ The web shows what the daemon says and keeps no rule of its own.
   the optional `check_command` (`cargo xtask verify`: named in both roles' instructions and
   kickoff, and allowed without asking in both allow-lists; `tok project set KEY --check-command`,
   an empty text clears it; one line without parentheses, since it goes into a permission rule);
-  and the optional `agent_model` (the Claude model of card agents, reviewers and the planner:
-  an alias such as `sonnet` or a full name, passed as `--model <model>` by
-  `AgentProfile::model_args` only to a profile whose program is `claude`, and not when the
-  profile's own command already names `--model`; empty clears it and leaves the choice to the
-  person's Claude Code; `tok project set KEY --model`);
+  and the optional `worker_model`, `reviewer_model` and `planner_model` (the Claude model of card
+  agents, reviewers and the planner: an alias such as `sonnet` or a full name; `Project::model_for`
+  picks by the run's role, and `AgentProfile::model_args` passes `--model <model>` only to a
+  profile whose program is `claude`, and not when the profile's own command already names
+  `--model`; empty clears one and leaves the choice to the person's Claude Code;
+  `tok project set KEY --worker-model/--reviewer-model/--planner-model`);
   all of them live in the project row, so they survive a daemon restart. The page shows the title and the
   method only while the mode is `github`. `github` is refused (400) for a project without a
   repository, and a blank title template too.
