@@ -51,6 +51,14 @@ export function PlannerPanel({ project, state, dispatch }: { project: Project; s
           connect={(sink) => openPlannerTerminal(project.key, sink)}
           noneText="not started yet"
           placeholder="The planner has not run yet. Start it to plan this project with it."
+          offer={planner !== undefined && !running && (
+            <button
+              type="button" className="btn primary" data-testid="planner-start-centre"
+              onClick={() => dispatch({ type: "startPlanner", project: project.key })}
+            >
+              Start the planner
+            </button>
+          )}
           onEnded={() => dispatch({ type: "refreshPlanner", project: project.key })}
         />
       </div>

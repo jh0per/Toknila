@@ -28,8 +28,7 @@ export function App() {
   return (
     <div className="ide">
       <Sidebar state={state} dispatch={dispatch} />
-      <UpdateBanner state={state} dispatch={dispatch} />
-      <main className={showChain ? "" : "plain"}>
+      <main className={showChain ? "has-panel" : "plain"}>
         {state.error && !showChain && <p className="error">{state.error}</p>}
         {!state.loaded ? <p className="muted">Loading…</p> : r === "settings" ? (
           <Settings state={state} dispatch={dispatch} />
@@ -50,6 +49,8 @@ export function App() {
             Pick a chain in the sidebar.
           </p>
         )}
+        {/* Last in main, after the top bar the divider measures from, so it reads the panel's height. */}
+        <UpdateBanner state={state} dispatch={dispatch} />
       </main>
       <Dialogs state={state} dispatch={dispatch} inline={onboarding} />
     </div>
