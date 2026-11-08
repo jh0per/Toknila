@@ -21,6 +21,10 @@ export type AutostartEffect = AutostartIntent;
 export const AUTOSTART_HINT =
   "On: ready cards start by themselves, and turning it on starts the ready ones now. The planner cannot change the cards' order or dependencies in a chain that starts by itself.";
 
+/// The hint on the chain header's Run chain / Stop chain button: what each does.
+export const RUN_CHAIN_HINT =
+  "Run chain turns autostart on and starts the ready cards up to the free agent slots. Stop chain turns autostart off; cards already running keep running.";
+
 /// The reducer of the autostart toggle.
 export function reduceAutostart(s: State, msg: AutostartIntent | AutostartResult): [State, Effect[]] {
   switch (msg.type) {

@@ -1,22 +1,33 @@
-import { useEffect, useRef, useState } from "react";
-import type { ChainDetail } from "../api/types";
+import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
+import type { ChainDetail, TicketAction } from "../api/types";
 import { type LaidEdge, layoutChain, nodeKey } from "../layout";
 import { outOfOrderText } from "../format";
 import { statusGroup, statusText } from "../store/groups";
 import { type EdgeRef, idOf } from "../store/edges";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
-import { ContextMenu } from "./ContextMenu";
+import { ContextMenu, type MenuEntry } from "./ContextMenu";
 import { EdgeLayer } from "./EdgeLayer";
 import { PrChip } from "./PrChip";
+import { QuickCard } from "./QuickCard";
 import { UsageChip } from "./UsageChip";
-import { H, W, canvasSize, inPoint, outPoint, x, y } from "./canvasGeometry";
+import { H, type Pt, W, canvasSize, inPoint, outPoint, x, y } from "./canvasGeometry";
+import { cancelEntries, canvasEntries, cardEntries } from "./canvasMenus";
+import { useCanvasKeys } from "./useCanvasKeys";
 import { type Drag, useEdgeDrag } from "./useEdgeDrag";
+
+type Menu =
+  | { kind: "edge"; x: number; y: number; edge: LaidEdge }
+  | { kind: "canvas"; x: number; y: number; at: Pt }
+  | { kind: "card"; x: number; y: number; key: string; at: Pt }
+  | { kind: "cancel"; x: number; y: number; key: string };
 
 /// The chain canvas: cards left to right in dependency order, releases as their own nodes. The
 /// dependencies can be edited with the mouse: drag from a card's handle onto another card to add
 /// one, click a line to select it, drag a selected line's end onto another card to move it,
-/// Delete or the right-click menu to remove it. The daemon decides; its refusal shows on top.
+/// Delete or the right-click menu to remove it. A connector released on empty canvas, a
+/// double-click, N and the right-click menus make cards without the dialog. The daemon decides;
+/// its refusal shows on top.
 export function Canvas({ chain, state, dispatch }: {
   chain: ChainDetail;
   state: State;
@@ -38,10 +49,27 @@ export function Canvas({ chain, state, dispatch }: {
   });
   const select = (e: LaidEdge | undefined) =>
     dispatch({ type: "selectEdge", edge: e && { chain: chainId, from: e.from, to: e.to } satisfies EdgeRef });
-  const [menu, setMenu] = useState<{ x: number; y: number; edge: LaidEdge }>();
+  const [menu, setMenu] = useState<Menu>();
   const inner = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const local = (clientX: number, clientY: number): Pt => {
+    const r = inner.current?.getBoundingClientRect();
+    return { x: clientX - (r?.left ?? 0), y: clientY - (r?.top ?? 0) };
+  };
+  const keyOf = (k: string) => label(k);
+  const newCardAt = (at: Pt, rel: { after?: string; before?: string } = {}) =>
+    dispatch({ type: "openQuickCard", chain: chainId, x: at.x, y: at.y, ...rel });
+  const quick = state.quick.card?.chain === chainId ? state.quick.card : undefined;
+  const quickLabel = quick?.after ? `New card after ${quick.after}` : quick?.before ? `New card before ${quick.before}` : "New card";
+  useCanvasKeys(state, dispatch, () =>
+    newCardAt({ x: (root.current?.scrollLeft ?? 0) + 24, y: (root.current?.scrollTop ?? 0) + 48 }));
 
-  const drop = (d: Drag, target: string) => {
+  const drop = (d: Drag, target: string | undefined, at: Pt) => {
+    if (!target) {
+      // Released on empty canvas: a new card after the card the line came from.
+      if (d.mode === "new") newCardAt(at, { after: keyOf(d.node) });
+      return;
+    }
     if (d.mode === "new") {
       if (target !== d.node) dispatch({ type: "addEdge", chain: chainId, from: d.node, to: target });
       return;
@@ -69,17 +97,60 @@ export function Canvas({ chain, state, dispatch }: {
     return () => window.removeEventListener("keydown", key);
   });
 
+  const act = (key: string, action: TicketAction) => dispatch({ type: "ticketAction", key, action });
+  const entriesOf = (m: Menu): MenuEntry[] => {
+    switch (m.kind) {
+      case "edge":
+        return [{
+          label: "Remove dependency", testId: "menu-remove-edge", danger: true,
+          run: () => dispatch({ type: "removeEdge", chain: chainId, from: m.edge.from, to: m.edge.to }),
+        }];
+      case "canvas":
+        return canvasEntries({
+          newCard: () => newCardAt(m.at),
+          newChain: () => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: projectKey } }),
+          importPlan: () => dispatch({ type: "openDialog", dialog: { kind: "import", project: projectKey } }),
+          askPlanner: () => dispatch({ type: "navigate", route: { name: "planner", project: projectKey } }),
+        });
+      case "card": {
+        // Entries that depend on the card's state wait for the daemon's fresh word on it.
+        const fresh = state.quick.peek?.key === m.key && state.quick.peek.fresh;
+        return cardEntries(fresh ? state.details[m.key] : undefined, {
+          open: () => dispatch({ type: "selectCard", project: projectKey, chain: chain.chain.name, key: m.key }),
+          act: (a) => act(m.key, a),
+          addAfter: () => newCardAt(m.at, { after: m.key }),
+          addBefore: () => newCardAt(m.at, { before: m.key }),
+          askCancel: () => setMenu({ kind: "cancel", x: m.x, y: m.y, key: m.key }),
+        });
+      }
+      case "cancel":
+        // The daemon wants a reason for a cancellation; the confirmation is the person's decision.
+        return cancelEntries(m.key, () => dispatch({ type: "ticketAction", key: m.key, action: "cancel", text: "Cancelled from the diagram" }));
+    }
+  };
+
   const { width, height } = canvasSize(layout.columns, layout.lanes);
   const sel = state.route.name === "card" ? state.route.key : "";
   return (
-    <div className={`canvas${drag ? " dragging" : ""}`} data-testid="canvas" data-chain={chain.chain.name}>
+    <div ref={root} className={`canvas${drag ? " dragging" : ""}`} data-testid="canvas" data-chain={chain.chain.name}>
       {state.edges.error && (
         <div className="edge-error" role="alert" data-testid="edge-error">
           <span>{state.edges.error}</span>
           <button type="button" className="link-btn" onClick={() => dispatch({ type: "dismissEdgeError" })}>Dismiss</button>
         </div>
       )}
-      <div className="canvas-inner" ref={inner} style={{ width, height }} onClick={() => select(undefined)}>
+      <div
+        className="canvas-inner" ref={inner} style={{ width, height }} onClick={() => select(undefined)}
+        onDoubleClick={(e) => {
+          if (e.target instanceof Element && e.target.closest(".node, .handle, .quick-card, .edge, .end")) return;
+          newCardAt(local(e.clientX, e.clientY));
+        }}
+        onContextMenu={(e: ReactMouseEvent) => {
+          if (e.target instanceof Element && e.target.closest(".node, .quick-card")) return;
+          e.preventDefault();
+          setMenu({ kind: "canvas", x: e.clientX, y: e.clientY, at: local(e.clientX, e.clientY) });
+        }}
+      >
         {layout.nodes.map((n) => {
           const style = { left: x(n.col), top: y(n.lane), width: W, height: H };
           const over = drag?.over === nodeKey(n) ? " over" : "";
@@ -110,6 +181,14 @@ export function Canvas({ chain, state, dispatch }: {
                 e.preventDefault();
                 e.stopPropagation();
                 dispatch({ type: "selectCard", project: route.project, chain: route.chain, key: t.key });
+              }}
+              // A focused card's allowed actions are read, so S can start it.
+              onFocus={() => dispatch({ type: "peekCard", key: t.key })}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dispatch({ type: "peekCard", key: t.key });
+                setMenu({ kind: "card", x: e.clientX, y: e.clientY, key: t.key, at: local(e.clientX, e.clientY) });
               }}
             >
               <span className="row">
@@ -146,7 +225,7 @@ export function Canvas({ chain, state, dispatch }: {
           onSelect={select}
           onMenu={(edge, p) => {
             select(edge);
-            setMenu({ ...p, edge });
+            setMenu({ kind: "edge", ...p, edge });
           }}
           onGrab={(e, end, ev) =>
             start(
@@ -160,18 +239,9 @@ export function Canvas({ chain, state, dispatch }: {
               ev,
             )}
         />
+        {quick && <QuickCard key={`${quick.x},${quick.y}`} quick={quick} label={quickLabel} state={state} dispatch={dispatch} />}
       </div>
-      {menu && (
-        <ContextMenu
-          x={menu.x} y={menu.y} onClose={() => setMenu(undefined)}
-          entries={[{
-            label: "Remove dependency",
-            testId: "menu-remove-edge",
-            danger: true,
-            run: () => dispatch({ type: "removeEdge", chain: chainId, from: menu.edge.from, to: menu.edge.to }),
-          }]}
-        />
-      )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(undefined)} entries={entriesOf(menu)} />}
     </div>
   );
 }
