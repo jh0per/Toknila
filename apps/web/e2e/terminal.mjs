@@ -255,7 +255,11 @@ try {
   await expectText(status, "running", "Return sends the card back to the agent");
   await expectText(page.locator("[data-testid=rounds]"), "Round 1: you asked for changes — handle the error case", "the return is a review round");
 
-  // Hand in again and accept: merged, and the run's end shows in the terminal.
+  // Hand in again and accept: merged, and the run's end shows in the terminal. A hand-in after a
+  // Return carries a new commit: the same commit is refused.
+  writeFileSync(join(ship, "work2.txt"), "work\n");
+  git(ship, "add", "work2.txt");
+  git(ship, "commit", "--quiet", "-m", "work again");
   tok("sim", "WEB-1", "finish", "second try");
   await expectText(status, "review", "the agent finished again");
   await page.getByRole("button", { name: "Accept", exact: true }).click();
