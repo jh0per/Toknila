@@ -288,13 +288,19 @@ fn a_card_whose_check_the_restart_lost_goes_to_a_person() {
 }
 
 #[test]
-fn a_project_without_a_check_command_hands_in_as_before() {
+fn a_project_without_a_check_command_still_syncs_and_the_turn_passes_on() {
     let mut mem = running(ReviewMode::Human, 3);
     mem.project.check_command = None;
     finish(&mut mem, "done".to_owned());
-    let t = a(&mem);
-    assert_eq!(t.review.turn, Some(ReviewTurn::Person));
-    assert!(t.review.rounds.is_empty());
+    assert_eq!(
+        a(&mem).review.turn,
+        Some(ReviewTurn::Check),
+        "the sync runs"
+    );
+    settle(&mut mem);
+    assert_eq!(mem.merger.synced.borrow().len(), 1, "the ship is synced");
+    assert!(mem.checker.asked.borrow().is_empty(), "no command ran");
+    assert_eq!(a(&mem).review.turn, Some(ReviewTurn::Person));
 }
 
 #[test]

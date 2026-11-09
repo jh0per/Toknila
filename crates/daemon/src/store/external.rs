@@ -91,11 +91,14 @@ impl Store {
 
     async fn log_checks_starting(&self, queued: &[ExternalEffect]) {
         for e in queued {
-            if let ExternalEffect::RunCheck { ticket, spec } = e {
+            if let ExternalEffect::RunCheck { ticket, spec, sync } = e {
                 let key = self.key_of(*ticket).await;
                 match spec {
                     Some(s) => {
                         tracing::info!(ticket = %key, command = %s.command, dir = %s.dir, "check starting");
+                    }
+                    None if sync.is_some() => {
+                        tracing::info!(ticket = %key, "check only brings the ship up to its base");
                     }
                     None => tracing::info!(ticket = %key, "check has nothing to run"),
                 }

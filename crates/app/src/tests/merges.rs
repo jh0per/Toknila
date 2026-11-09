@@ -62,6 +62,10 @@ pub(super) fn in_review() -> Mem {
     let a = mem.ticket_by_title("A");
     let summary = "done".to_owned();
     agent::ticket_event(&mut mem, &a, AgentEvent::Finished { summary }).expect("finished");
+    // The hand-in brings the ship up to its base first (no check command: only the sync runs);
+    // what the tests below count starts after it.
+    settle(&mut mem);
+    mem.merger.synced.borrow_mut().clear();
     mem
 }
 
