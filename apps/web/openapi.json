@@ -6716,6 +6716,17 @@
               "null"
             ]
           },
+          "size": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Size",
+                "description": "The card's own size: a size, `null` to let it fit its text again, left out to keep it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "title": {
             "type": [
               "string",
@@ -7999,6 +8010,24 @@
           }
         }
       },
+      "Size": {
+        "type": "object",
+        "description": "The width and height of a card on a chain's canvas, in whole canvas pixels.",
+        "required": [
+          "w",
+          "h"
+        ],
+        "properties": {
+          "h": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "w": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "StartMode": {
         "type": "string",
         "description": "Whether the milestone cuts itself or waits for a person.",
@@ -8650,6 +8679,17 @@
               "null"
             ],
             "description": "Reviewer agent profile; `None` means the chain's, then the project's, then\n`<worker profile>-reviewer`."
+          },
+          "size": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Size",
+                "description": "The size a person gave the card on the canvas (canvas pixels); `None` lets the card fit its\ntext. Only the window reads it: it is not in chain files."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/TicketStatus"

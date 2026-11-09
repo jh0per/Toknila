@@ -1,4 +1,6 @@
-// Where things sit on the chain canvas, in pixels of the canvas (not of the window).
+// Where things sit on the chain canvas, in pixels of the canvas (not of the window). Cards have
+// their own sizes (`cardSize.ts`); `W` and `H` are the size of the nodes that do not (Start,
+// Finish, releases) and of a card whose content is not known yet.
 
 export const W = 196;
 export const H = 92;
@@ -6,8 +8,22 @@ export const GAP_X = 44;
 export const GAP_Y = 20;
 export const PAD = 16;
 
-export const x = (col: number): number => PAD + col * (W + GAP_X);
-export const y = (lane: number): number => PAD + lane * (H + GAP_Y);
+/// Where each column or lane starts, given the size of each (the widest or tallest node in it).
+const starts = (sizes: number[], gap: number): number[] => {
+  const out: number[] = [];
+  let at = PAD;
+  for (const s of sizes) {
+    out.push(at);
+    at += s + gap;
+  }
+  return out;
+};
+
+/// The left edge of every column, from the width of each.
+export const columnXs = (widths: number[]): number[] => starts(widths, GAP_X);
+
+/// The top edge of every lane, from the height of each.
+export const laneYs = (heights: number[]): number[] => starts(heights, GAP_Y);
 
 export interface Pt {
   x: number;
@@ -22,14 +38,17 @@ const snapTo = (v: number): number => Math.max(PAD, Math.round(v / GRID) * GRID)
 /// A card's top-left corner as dropped: on the grid, never outside the canvas's padding.
 export const snapPos = (p: Pt): Pt => ({ x: snapTo(p.x), y: snapTo(p.y) });
 
-/// Where a node sits: the top-left corner of its box, in canvas pixels.
-export type Box = Pt;
+/// Where a node sits and how big it is: its top-left corner and its size, in canvas pixels.
+export interface Box extends Pt {
+  w: number;
+  h: number;
+}
 
 /// Where a line leaves a node (the middle of its right edge): the node's connector handle.
-export const outPoint = (n: Box): Pt => ({ x: n.x + W, y: n.y + H / 2 });
+export const outPoint = (n: Box): Pt => ({ x: n.x + n.w, y: n.y + n.h / 2 });
 
 /// Where a line enters a node (the middle of its left edge).
-export const inPoint = (n: Box): Pt => ({ x: n.x, y: n.y + H / 2 });
+export const inPoint = (n: Box): Pt => ({ x: n.x, y: n.y + n.h / 2 });
 
 /// The curve from `a` to `b`, turning at `mid` (the middle by default).
 export function curve(a: Pt, b: Pt, mid = (a.x + b.x) / 2): string {
@@ -41,8 +60,8 @@ export function canvasSize(boxes: Iterable<Box>): { width: number; height: numbe
   let width = PAD;
   let height = PAD;
   for (const b of boxes) {
-    width = Math.max(width, b.x + W);
-    height = Math.max(height, b.y + H);
+    width = Math.max(width, b.x + b.w);
+    height = Math.max(height, b.y + b.h);
   }
   return { width: width + PAD, height: height + PAD };
 }
@@ -85,17 +104,18 @@ export function edgeGeometry(
   }
   for (const list of [...out.values(), ...into.values()]) list.sort(byY);
   const geo = new Map<string, EdgeGeo>();
-  const room = H - 2 * MARGIN_Y;
   for (const e of edges) {
     const a = at.get(e.from);
     const b = at.get(e.to);
     if (!a || !b) continue;
+    // The lines of a card stay inside its own height.
+    const room = (n: Box) => Math.max(0, n.h - 2 * MARGIN_Y);
     const outs = out.get(e.from) ?? [];
     const ins = into.get(e.to) ?? [];
     const o = outPoint(a);
     const i = inPoint(b);
-    const from = { x: o.x, y: o.y + fan(outs.indexOf(e.to), outs.length, SPREAD_Y, room) };
-    const to = { x: i.x, y: i.y + fan(ins.indexOf(e.from), ins.length, SPREAD_Y, room) };
+    const from = { x: o.x, y: o.y + fan(outs.indexOf(e.to), outs.length, SPREAD_Y, room(a)) };
+    const to = { x: i.x, y: i.y + fan(ins.indexOf(e.from), ins.length, SPREAD_Y, room(b)) };
     const middle = (from.x + to.x) / 2 + fan(outs.indexOf(e.to), outs.length, SPREAD_X, Math.max(0, to.x - from.x - 2 * TURN_MARGIN));
     geo.set(edgeId(e), { from, to, turn: Math.max(from.x + TURN_MARGIN, Math.min(to.x - TURN_MARGIN, middle)) });
   }

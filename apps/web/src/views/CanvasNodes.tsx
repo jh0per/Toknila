@@ -3,8 +3,9 @@ import type { Release, Ticket, TicketDetail, UsageFigures } from "../api/types";
 import { outOfOrderText } from "../format";
 import { nodeKey } from "../layout";
 import { allows, subtaskProgress } from "../store/cardDetails";
-import { statusClass, statusGroup, statusText } from "../store/groups";
+import { statusClass, statusGroup } from "../store/groups";
 import { showAgentName } from "../store/profiles";
+import type { CardLayout } from "./cardSize";
 import { PrChip } from "./PrChip";
 import { UsageChip } from "./UsageChip";
 
@@ -12,8 +13,10 @@ import { UsageChip } from "./UsageChip";
 /// subtasks are when it has any, and a proposed card carries its own Approve and Reject, the same
 /// actions the Inbox offers, when the daemon allows them. The agent's runner shows only when it is
 /// not the project's default; the usage figures show here and nowhere else on the page.
-export function TicketNode({ ticket: t, href, style, selected, moving, over, linking, detail, usage, queued, defaultProfile, onHover, handlers }: {
+export function TicketNode({ ticket: t, layout, href, style, selected, moving, over, linking, detail, usage, queued, defaultProfile, onHover, handlers }: {
   ticket: Ticket;
+  /// The title as wrapped for the card's width (`cardSize.ts`).
+  layout: CardLayout;
   href: string;
   style: CSSProperties;
   selected: boolean;
@@ -35,6 +38,10 @@ export function TicketNode({ ticket: t, href, style, selected, moving, over, lin
     activate: () => void;
     /// The pointer went down on the card: it may start dragging it.
     press: (e: PointerEvent) => void;
+    /// The pointer went down on the resize grip.
+    grip: (e: PointerEvent) => void;
+    /// Back to the size the content makes.
+    fit: () => void;
     focus: () => void;
     menu: (e: MouseEvent) => void;
     approve: () => void;
@@ -64,15 +71,15 @@ export function TicketNode({ ticket: t, href, style, selected, moving, over, lin
       onFocus={handlers.focus}
       onContextMenu={handlers.menu}
     >
-      <span className="row">
-        <span className="title">{t.title}</span>
-        {t.profile && showAgentName(t.profile, defaultProfile, import.meta.env.DEV) && <span className="runner">{t.profile}</span>}
+      <span className="title" title={t.title} data-testid="title">
+        {layout.lines.map((line, i) => <span className="tl" key={i}>{line}</span>)}
       </span>
       <span className="row">
         <span className="st" data-testid="status">
-          {t.status === "running" && <span className="dot pulse" data-testid="live" />}
-          {t.status === "proposed" ? "awaiting approval" : statusText(t.status)}
+          <span className={`dot${t.status === "running" ? " pulse" : ""}`} data-testid={t.status === "running" ? "live" : undefined} />
+          {t.status === "proposed" ? "awaiting approval" : t.status}
         </span>
+        {t.profile && showAgentName(t.profile, defaultProfile, import.meta.env.DEV) && <span className="runner">{t.profile}</span>}
         <span className="key">{t.key}</span>
       </span>
       {proposal ? (
@@ -109,6 +116,12 @@ export function TicketNode({ ticket: t, href, style, selected, moving, over, lin
           <UsageChip figures={usage} />
         </span>
       )}
+      <span
+        className="grip" data-testid="grip" title="Drag to resize, double-click to fit the text"
+        onPointerDown={handlers.grip}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onDoubleClick={act(handlers.fit)}
+      />
     </a>
   );
 }

@@ -75,6 +75,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         pr: None,
         review: toknila_core::Review::default(),
         pos: None,
+        size: None,
     }
 }
 
@@ -669,6 +670,7 @@ async fn a_database_before_positions_has_none_and_a_position_is_stored() {
         .expect("read")
         .expect("ticket");
     assert_eq!(loaded.pos, None);
+    assert_eq!(loaded.size, None);
 
     let mut moved = loaded.clone();
     moved.pos = Some(toknila_core::Pos { x: -8, y: 240 });
@@ -680,11 +682,21 @@ async fn a_database_before_positions_has_none_and_a_position_is_stored() {
     let back = store.read(move |repo| repo.ticket(id)).await.expect("read");
     assert_eq!(back, Some(moved.clone()));
 
+    moved.size = Some(toknila_core::Size { w: 280, h: 140 });
+    let saved = moved.clone();
+    store
+        .write(Actor::Human, NOW, move |tx| tx.repo().upsert_ticket(&saved))
+        .await
+        .expect("save size");
+    let back = store.read(move |repo| repo.ticket(id)).await.expect("read");
+    assert_eq!(back, Some(moved.clone()));
+
     moved.pos = None;
+    moved.size = None;
     store
         .write(Actor::Human, NOW, move |tx| tx.repo().upsert_ticket(&moved))
         .await
         .expect("clear");
     let back = store.read(move |repo| repo.ticket(id)).await.expect("read");
-    assert_eq!(back.map(|t| t.pos), Some(None));
+    assert_eq!(back.map(|t| (t.pos, t.size)), Some((None, None)));
 }

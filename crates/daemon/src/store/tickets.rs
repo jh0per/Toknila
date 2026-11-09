@@ -1,14 +1,14 @@
 //! Row <-> domain mapping for tickets.
 
 use rusqlite::params;
-use toknila_core::{ChainId, Pos, Ticket, TicketId, TicketKey, Timestamp};
+use toknila_core::{ChainId, Pos, Size, Ticket, TicketId, TicketKey, Timestamp};
 
 use super::StoreError;
 use super::codec::{Repo, enum_from, enum_str, from_json, json, opt_enum, opt_enum_from, parse};
 
 const TICKET_COLS: &str = "id, chain_id, key, title, prompt, acceptance_json, status, status_reason_json, \
      status_since, paused, profile, review_mode, branch, needs_secrets, tokens_used, wildcard_json, \
-     done_out_of_order_json, queued, review_json, reviewer, pr_json, pos_x, pos_y, design_first";
+     done_out_of_order_json, queued, review_json, reviewer, pr_json, pos_x, pos_y, design_first, size_w, size_h";
 impl Repo<'_> {
     /// All tickets, optionally of one chain, in key order.
     pub fn tickets(&self, chain: Option<ChainId>) -> Result<Vec<Ticket>, StoreError> {
@@ -25,7 +25,7 @@ impl Repo<'_> {
     pub fn upsert_ticket(&self, t: &Ticket) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24) \
+                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26) \
                  ON CONFLICT(id) DO UPDATE SET title = excluded.title, prompt = excluded.prompt, \
                  acceptance_json = excluded.acceptance_json, status = excluded.status, \
                  status_reason_json = excluded.status_reason_json, status_since = excluded.status_since, \
@@ -34,7 +34,8 @@ impl Repo<'_> {
                  wildcard_json = excluded.wildcard_json, \
                  done_out_of_order_json = excluded.done_out_of_order_json, queued = excluded.queued, \
                  review_json = excluded.review_json, reviewer = excluded.reviewer, pr_json = excluded.pr_json, \
-                 pos_x = excluded.pos_x, pos_y = excluded.pos_y, design_first = excluded.design_first"
+                 pos_x = excluded.pos_x, pos_y = excluded.pos_y, design_first = excluded.design_first, \
+                 size_w = excluded.size_w, size_h = excluded.size_h"
             ),
             params![
                 t.id.to_string(),
@@ -61,6 +62,8 @@ impl Repo<'_> {
                 t.pos.map(|p| p.x),
                 t.pos.map(|p| p.y),
                 t.design_first,
+                t.size.map(|s| s.w),
+                t.size.map(|s| s.h),
             ],
         )?;
         Ok(())
@@ -96,6 +99,8 @@ impl Repo<'_> {
             Option<i32>,
             Option<i32>,
             bool,
+            Option<i32>,
+            Option<i32>,
         );
         let mut st = self
             .conn
@@ -126,6 +131,8 @@ impl Repo<'_> {
                 r.get(21)?,
                 r.get(22)?,
                 r.get(23)?,
+                r.get(24)?,
+                r.get(25)?,
             ))
         })?;
         rows.map(|r| {
@@ -159,6 +166,7 @@ impl Repo<'_> {
                 pr: r.20.as_deref().map(from_json).transpose()?,
                 pos: r.21.zip(r.22).map(|(x, y)| Pos { x, y }),
                 design_first: r.23,
+                size: r.24.zip(r.25).map(|(w, h)| Size { w, h }),
             })
         })
         .collect()

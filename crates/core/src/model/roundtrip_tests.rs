@@ -46,6 +46,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         pr: None,
         review: crate::Review::default(),
         pos: None,
+        size: None,
     }
 }
 
@@ -375,8 +376,21 @@ fn a_patch_tells_a_cleared_position_from_one_left_out() {
     let mut t = ticket(TicketStatus::Backlog, None);
     set.apply(&mut t);
     assert_eq!(t.pos, Some(Pos { x: 8, y: 16 }));
-    left_out.apply(&mut t);
+    left_out.clone().apply(&mut t);
     assert_eq!(t.pos, Some(Pos { x: 8, y: 16 }), "left out keeps it");
     cleared.apply(&mut t);
     assert_eq!(t.pos, None);
+
+    use crate::Size;
+    let sized: TicketPatch = serde_json::from_str(r#"{"size":{"w":280,"h":120}}"#).expect("parse");
+    let unsized_: TicketPatch = serde_json::from_str(r#"{"size":null}"#).expect("parse");
+    assert_eq!(left_out.size, None);
+    assert_eq!(unsized_.size, Some(None));
+    assert!(sized.only_moves() && unsized_.only_moves());
+    sized.apply(&mut t);
+    assert_eq!(t.size, Some(Size { w: 280, h: 120 }));
+    left_out.clone().apply(&mut t);
+    assert_eq!(t.size, Some(Size { w: 280, h: 120 }), "left out keeps it");
+    unsized_.apply(&mut t);
+    assert_eq!(t.size, None);
 }

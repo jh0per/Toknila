@@ -44,11 +44,15 @@
   background: var(--surface); border: 1px solid color-mix(in srgb, var(--sc) 40%, var(--line)); border-top: 4px solid var(--sc); border-radius: var(--r-m); }
 a.node:hover { border-color: var(--muted); }
 .node.sel { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
-.node .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0; }
-.node .title { font-weight: 600; font-size: var(--fs-m); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.node .key { font-size: var(--fs-xs); color: var(--muted); }
-.node .st { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; box-sizing: border-box; font-size: 11px; font-weight: 600; color: var(--sc); background: var(--sc-soft);
-  border-radius: var(--r-pill); padding: 1px 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0; min-height: 16px; }
+/* The title is wrapped in script (cardSize.ts), one `.tl` per line, so what is measured is what is drawn. */
+.node .title { display: block; font-weight: 600; font-size: var(--fs-m); }
+.node .tl { display: block; line-height: 16px; height: 16px; white-space: nowrap; overflow: hidden; }
+.node .key { font-size: var(--fs-xs); color: var(--muted); margin-left: auto; white-space: nowrap; }
+.node .row .runner { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The status pill is never clipped: the card is as wide as the pill and the key need. */
+.node .st { display: inline-flex; align-items: center; gap: 5px; flex: none; box-sizing: border-box; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--sc); background: var(--sc-soft);
+  border-radius: var(--r-pill); padding: 1px 8px; white-space: nowrap; }
 .node .st .dot { background: var(--sc); }
 .node .mark { font-size: var(--fs-xs); color: var(--block); border: 1px solid var(--block); border-radius: 3px; padding: 0 4px; white-space: nowrap; width: fit-content; }
 .node .mark.pr { cursor: pointer; }
@@ -78,6 +82,11 @@ a.node:hover { border-color: var(--muted); }
 a.node.ticket { cursor: grab; }
 a.node.moving { z-index: 6; cursor: grabbing; box-shadow: 0 6px 18px color-mix(in srgb, var(--fg) 22%, transparent); }
 .canvas:has(.node.moving) { user-select: none; }
+/* The grip at a card's bottom-right corner resizes it; it shows on hover and on the open card. */
+.grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; opacity: 0; touch-action: none; z-index: 3;
+  background: linear-gradient(135deg, transparent 0 50%, var(--muted) 50% 58%, transparent 58% 70%, var(--muted) 70% 78%, transparent 78%); }
+.node:hover .grip, .node.sel .grip, .grip:hover { opacity: 0.8; }
+.canvas.dragging .grip { pointer-events: none; }
 
 /* Over the diagram, not scrolling with it. */
 .canvas-hint, .canvas-legend, .canvas-cut { margin: 0; padding: 2px 10px; border-radius: var(--r-pill); font-size: 11px;

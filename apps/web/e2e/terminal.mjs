@@ -59,7 +59,7 @@ try {
   const tab = (name) => page.getByRole("tab", { name }).click();
 
   await page.goto(url.replace("/?", "/projects/WEB/chains/work/cards/WEB-1?"));
-  await expectText(status, "todo · ready", "the card is ready, nothing started it");
+  await expectText(status, "ready", "the card is ready, nothing started it");
 
   // Start from the action bar: the runner starts and its output shows live in the terminal.
   await page.getByRole("button", { name: "Start", exact: true }).click();

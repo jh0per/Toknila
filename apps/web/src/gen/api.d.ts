@@ -2193,6 +2193,7 @@ export interface components {
             prompt?: string | null;
             review_mode?: components["schemas"]["ReviewMode"] | null;
             reviewer?: string | null;
+            size?: components["schemas"]["Size"] | null;
             title?: string | null;
         };
         /**
@@ -2663,6 +2664,13 @@ export interface components {
             path: string;
             ticket_id: components["schemas"]["TicketId"];
         };
+        /** @description The width and height of a card on a chain's canvas, in whole canvas pixels. */
+        Size: {
+            /** Format: int32 */
+            h: number;
+            /** Format: int32 */
+            w: number;
+        };
         /**
          * @description Whether the milestone cuts itself or waits for a person.
          * @enum {string}
@@ -2883,6 +2891,7 @@ export interface components {
              *     `<worker profile>-reviewer`.
              */
             reviewer?: string | null;
+            size?: components["schemas"]["Size"] | null;
             status: components["schemas"]["TicketStatus"];
             status_reason?: components["schemas"]["StatusReason"] | null;
             status_since: components["schemas"]["Timestamp"];

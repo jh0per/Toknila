@@ -275,4 +275,9 @@ pub(super) const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE projects ADD COLUMN no_checks_timeout_secs INTEGER NOT NULL DEFAULT 600;
     "#,
+    // 19: the size a person gave a card on its chain's canvas (both or neither).
+    r#"
+    ALTER TABLE tickets ADD COLUMN size_w INTEGER;
+    ALTER TABLE tickets ADD COLUMN size_h INTEGER;
+    "#,
 ];

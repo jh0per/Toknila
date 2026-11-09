@@ -1,5 +1,5 @@
 import { type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import type { ChainDetail, Pos, TicketAction } from "../api/types";
+import type { ChainDetail, Pos, Size, Ticket, TicketAction } from "../api/types";
 import { FINISH, START, sceneOf } from "../canvasScene";
 import { type LaidEdge, nodeKey } from "../layout";
 import { type EdgeRef, idOf } from "../store/edges";
@@ -8,7 +8,11 @@ import { type State, currentProject, hrefOf, queuePosition } from "../store/stat
 import { ContextMenu, type MenuEntry } from "./ContextMenu";
 import { EdgeLayer } from "./EdgeLayer";
 import { QuickCard } from "./QuickCard";
-import { H, type Pt, W, canvasSize, edgeGeometry, edgeId, outPoint, snapPos } from "./canvasGeometry";
+import { type Pt, canvasSize, edgeGeometry, edgeId, outPoint, snapPos } from "./canvasGeometry";
+import { cardLayouts, contentOf } from "./cardBoxes";
+import { minHeight } from "./cardSize";
+import { measureText } from "./measureText";
+import { useCardResize } from "./useCardResize";
 import { CancelConfirm } from "./CancelConfirm";
 import { CanvasChrome } from "./CanvasChrome";
 import { FinishNode, ReleaseNode, StartNode, TicketNode } from "./CanvasNodes";
@@ -52,10 +56,25 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
   // A card is drawn where it is being dragged, else where it was just put, else where it was saved.
   const zoomRef = useRef(1);
   const { moving, press, wasDrag } = useCardDrag(zoomRef, place);
+  const resize = (id: string, size: Size | null) => {
+    const t = tickets.get(id);
+    if (t) dispatch({ type: "sizeCard", chain: chainId, ticket: id, key: t.key, size });
+  };
+  const { resizing, begin, wasResize } = useCardResize(zoomRef, resize);
   const pending = state.placement.pending;
   const posOf = (id: string): Pos | undefined =>
     moving?.id === id ? moving.pos : id in pending ? pending[id] ?? undefined : tickets.get(id)?.pos ?? undefined;
-  const scene = sceneOf(chain, posOf);
+  // A card has the size it is being resized to, else the one it was just given, else its own, else
+  // the one its content makes.
+  const sizes = state.placement.sizes;
+  const sizeOf = (t: Ticket): Size | null | undefined =>
+    resizing?.id === t.id ? resizing.size : t.id in sizes ? sizes[t.id] : t.size;
+  const layouts = cardLayouts(chain, state, sizeOf, measureText);
+  const scene = sceneOf(chain, posOf, (id) => {
+    const l = layouts.get(id);
+    const t = tickets.get(id);
+    return l && t ? { w: l.w, h: l.h, own: Boolean(sizeOf(t)) } : undefined;
+  });
   const endKey = scene.nodes[scene.nodes.length - 1].key;
   const at = new Map(scene.nodes.map((n) => [n.key, n.box]));
   const geo = edgeGeometry(scene.lines, at);
@@ -221,27 +240,31 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
             style={{ width, height, transform: fit.zoom === 1 ? undefined : `scale(${fit.zoom})` }}
           >
             {scene.nodes.map((n) => {
-              const style = { left: n.box.x, top: n.box.y, width: W, height: H };
+              const style = { left: n.box.x, top: n.box.y, width: n.box.w, height: n.box.h };
               if (n.kind === "start") return <StartNode key={n.key} goal={chain.chain.goal} style={style} />;
               if (n.kind === "finish") return <FinishNode key={n.key} style={style} />;
               const over = drag?.over === n.key;
               const r = n.kind === "release" ? releases.get(n.id) : undefined;
               if (r) return <ReleaseNode key={n.key} release={r} nodeKey={n.key} style={style} over={over} end={n.key === endKey} />;
               const t = tickets.get(n.id);
-              if (!t) return null;
+              const layout = layouts.get(n.id);
+              if (!t || !layout) return null;
               const route = { name: "card" as const, project: projectKey, chain: chain.chain.name, key: t.key };
               return (
                 <TicketNode
-                  key={n.key} ticket={t} href={hrefOf(route)} style={style} selected={sel === t.key} moving={moving?.id === t.id} over={over}
+                  key={n.key} ticket={t} layout={layout} href={hrefOf(route)} style={style} selected={sel === t.key} moving={moving?.id === t.id} over={over}
                   linking={Boolean(linking) && n.key !== linking} detail={state.details[t.key]}
                   usage={chain.usage?.[t.key]} queued={queuePosition(state, t.id)} defaultProfile={project?.default_profile}
                   onHover={(on) => setHover(on ? n.key : undefined)}
                   handlers={{
                     activate: () => {
-                      if (wasDrag()) return;
+                      if (wasDrag() || wasResize()) return;
                       if (!pick(t.id)) openCard(t.key);
                     },
                     press: (e) => press(t.id, n.box, e),
+                    grip: (e) =>
+                      begin(t.id, { w: n.box.w, h: n.box.h }, (w) => minHeight(contentOf(t, state.details[t.key], chain.usage?.[t.key], queuePosition(state, t.id)), w, measureText), e),
+                    fit: () => resize(t.id, null),
                     focus: () => dispatch({ type: "peekCard", key: t.key }),
                     menu: (e) => {
                       e.preventDefault();
@@ -286,7 +309,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
       {onEmpty && chain.tickets.length === 0 && <div className="canvas-empty" data-testid="chain-empty">{onEmpty}</div>}
       <CanvasChrome
         zoom={fit.zoom} fitted={fit.fitted} cut={fit.cut} onFit={fit.fit} onZoomIn={fit.zoomIn} onZoomOut={fit.zoomOut}
-        arrangeable={scene.nodes.some((n) => n.placed)}
+        arrangeable={scene.nodes.some((n) => n.placed || n.sized)}
         onArrange={() => dispatch({ type: "arrangeChain", chain: chainId })} linking={linkingKey} onCancelLinking={() => setLinking(undefined)} />
       {menu?.kind === "cancel" && (
         <div className="ctx-menu cancel-pop" style={{ left: popAt(menu), top: menu.y }}>

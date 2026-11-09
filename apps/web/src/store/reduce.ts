@@ -197,7 +197,9 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return reduceEdges(s, msg);
     case "placeCard":
     case "arrangeChain":
+    case "sizeCard":
     case "cardPlaced":
+    case "cardSized":
     case "cardPlaceRefused":
     case "chainArranged":
       return reducePlacement(s, msg);

@@ -131,7 +131,7 @@ try {
     if (Date.now() > until) throw new Error("Approve on the card did not approve it");
   }
   must(statusOf("PLN-7") !== "proposed", "Approve on the card approved it in the daemon");
-  await expectText(st("PLN-7"), "todo", "the approved card reads todo");
+  await expectText(st("PLN-7"), "ready", "the approved card reads ready");
   must((await node("PLN-7").locator("[data-testid=card-approve]").count()) === 0, "the approved card has no proposal buttons");
   const second = page.locator("a.node.s-proposed");
   await second.locator("[data-testid=card-reject]").click();
