@@ -89,14 +89,7 @@ fn the_planner_settings_allow_reading_and_its_tools_and_name_no_hooks() {
     assert_eq!(v["autoMemoryEnabled"], false);
     assert_eq!(
         v["permissions"]["deny"],
-        serde_json::json!([
-            "Agent",
-            "Workflow",
-            "EnterWorktree",
-            "CronCreate",
-            "CronDelete",
-            "RemoteTrigger"
-        ])
+        serde_json::json!(super::denied_with_private())
     );
     let allow: Vec<&str> = v["permissions"]["allow"]
         .as_array()

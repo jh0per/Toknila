@@ -168,6 +168,17 @@ is the committed state, so the ship shows up in the next read and on the stream.
   `Agent` tool (no subagents: a card is done by one agent, visible in its terminal), and the
   environment variable `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, set after the inherited variables are
   scrubbed. A ship is a worktree of the person's repository, whose auto memory is theirs.
+- **Private files.** An agent may read what the person can, so every run's `settings.json` (worker,
+  reviewer, release, planner) also denies `Read` (Claude Code applies a `Read` path rule to `Grep` and
+  `Glob` too; a `Grep(path)` rule is refused with a warning) and `Bash` on the person's private
+  paths: `toknila_core::private::PRIVATE_HOME_PATHS`, the one list, below the home folder:
+  `.claude` and `.claude.json` (every conversation of the owner), `.ssh`, `.gnupg`,
+  `Library/Keychains`, and the shell history files (`.bash_history`, `.zsh_history`,
+  `.zsh_sessions`, `.sh_history`, `.history`, fish's `fish_history`); and the Toknila data home
+  except the run's own folder (`runs/<ticket>`): its other entries, and the other tickets' run
+  folders, are denied one by one when the run starts. `Bash` rules match a command that names the
+  path absolutely, as `~/` or as `$HOME/`; they are a guard against a mistake, not a sandbox (a
+  command can still build a path). The agent's scratchpad and the workspace are not listed.
 - In pull-request mode a ship starts from `origin/<base>` after `git fetch origin` (see
   [Pull-request mode](#pull-request-mode)).
 - Merged removes the worktree after the commit (forced; the work is merged) and keeps the

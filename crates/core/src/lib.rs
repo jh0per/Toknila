@@ -19,6 +19,7 @@ pub mod plan;
 pub mod planner;
 pub mod plans;
 pub mod pr;
+pub mod private;
 pub mod profile;
 pub mod question;
 pub mod removal;
