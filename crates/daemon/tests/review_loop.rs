@@ -56,6 +56,10 @@ struct Rig {
 
 impl Rig {
     async fn new(rounds: u32) -> Rig {
+        Rig::with_check(rounds, Some(CHECK)).await
+    }
+
+    async fn with_check(rounds: u32, check: Option<&str>) -> Rig {
         let tmp = tempfile::tempdir().expect("tmp");
         let repo = tmp.path().join("repo");
         std::fs::create_dir_all(&repo).expect("mkdir");
@@ -90,8 +94,11 @@ impl Rig {
         let project = rig
             .post(
                 "/v1/projects",
-                json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(),
-                        "check_command": CHECK }),
+                match check {
+                    Some(c) => json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(),
+                        "check_command": c }),
+                    None => json!({ "key": "DEMO", "repo_path": repo.to_string_lossy() }),
+                },
             )
             .await;
         // A new project reviews with both, three rounds of the loop.
@@ -351,6 +358,35 @@ async fn a_hand_in_on_a_ship_behind_the_base_gets_the_base_merged_in_before_anyo
     let parents = String::from_utf8_lossy(&out.stdout);
     assert_eq!(
         parents.split_whitespace().count(),
+        2,
+        "a merge commit, no rebase"
+    );
+}
+
+#[tokio::test]
+async fn a_project_without_a_check_command_still_syncs_a_ship_behind_the_base() {
+    let rig = Rig::with_check(3, None).await;
+    commit_file(&rig.repo, "from-base.txt", "base\n");
+    rig.finish("ok.txt").await;
+    let card = rig
+        .settled("the reviewer's turn", |c| {
+            c["review"]["awaiting"] == json!({ "by": "agent", "decides": false })
+        })
+        .await;
+    assert_eq!(
+        rounds(&card),
+        [("system".into(), "approve".into())],
+        "nothing to run counts as passed"
+    );
+    assert!(rig.ship.join("from-base.txt").is_file(), "base merged in");
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(&rig.ship)
+        .args(["log", "-1", "--format=%p"])
+        .output()
+        .expect("git");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).split_whitespace().count(),
         2,
         "a merge commit, no rebase"
     );

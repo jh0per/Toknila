@@ -62,10 +62,10 @@ pub trait Checker: std::fmt::Debug {
 }
 
 /// Whether a hand-in of `t` is checked by the daemon, and the project's round limit. A card is
-/// checked when its project names a check command and the card has a ship to run it in.
+/// checked (brought up to its base, and the command run when there is one) whenever it has a ship.
 pub fn plan_of<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<(bool, u32)> {
     let project = projects::of_ticket(r, t)?;
-    let check = project.check_command.is_some() && r.ship(t.id)?.is_some();
+    let check = r.ship(t.id)?.is_some();
     Ok((check, project.max_review_rounds))
 }
 
@@ -159,6 +159,14 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
         return Ok(());
     };
     let event = match result {
+        // No command: only the sync ran, and it went through.
+        Err(CheckError::NothingToRun) if command.is_none() => TicketEvent::CheckDone {
+            passed: true,
+            output: "The ship was brought up to its base; the project has no check command."
+                .to_owned(),
+            mode: reviews::mode_of(uow, &t)?,
+            max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
+        },
         Ok(r) => TicketEvent::CheckDone {
             passed: r.success,
             output: report(command.unwrap_or_default(), &r),
