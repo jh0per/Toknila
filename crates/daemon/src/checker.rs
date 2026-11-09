@@ -4,6 +4,8 @@
 
 use std::io::Read;
 use std::process::{Command, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use toknila_app::{CheckError, CheckResult, CheckSpec, Checker};
@@ -18,6 +20,8 @@ const KEEP: usize = 256 * 1024;
 #[derive(Debug, Clone)]
 pub struct ShellChecker {
     limit: Duration,
+    /// Set when the daemon stops: every running command is ended, and none starts.
+    stopped: Arc<AtomicBool>,
 }
 
 impl Default for ShellChecker {
@@ -29,7 +33,10 @@ impl Default for ShellChecker {
 impl ShellChecker {
     /// A checker that stops a command after `limit`.
     pub fn new(limit: Duration) -> Self {
-        Self { limit }
+        Self {
+            limit,
+            stopped: Arc::new(AtomicBool::new(false)),
+        }
     }
 }
 
@@ -73,7 +80,33 @@ fn drain(pipe: Option<impl Read + Send + 'static>) -> std::sync::mpsc::Receiver<
 }
 
 impl Checker for ShellChecker {
+    fn stop_all(&self) {
+        self.stopped.store(true, Ordering::SeqCst);
+    }
+
     fn run(&self, spec: &CheckSpec) -> Result<CheckResult, CheckError> {
+        let started = Instant::now();
+        let result = self.run_inner(spec);
+        let status = match &result {
+            Ok(r) if r.timed_out => "timed out".to_owned(),
+            Ok(r) => format!("exit code {:?}", r.code),
+            Err(e) => format!("error: {e}"),
+        };
+        tracing::info!(
+            dir = %spec.dir,
+            status = %status,
+            seconds = started.elapsed().as_secs_f32(),
+            "check command ended"
+        );
+        result
+    }
+}
+
+impl ShellChecker {
+    fn run_inner(&self, spec: &CheckSpec) -> Result<CheckResult, CheckError> {
+        if self.stopped.load(Ordering::SeqCst) {
+            return Err(CheckError::Io("the daemon is stopping".to_owned()));
+        }
         let mut cmd = shell(&spec.command);
         cmd.current_dir(&spec.dir)
             .stdin(Stdio::null())
@@ -89,6 +122,11 @@ impl Checker for ShellChecker {
         let err = drain(child.stderr.take());
         let started = Instant::now();
         let (status, timed_out) = loop {
+            if self.stopped.load(Ordering::SeqCst) {
+                crate::git::kill_tree(&mut child);
+                let _ = child.wait();
+                return Err(CheckError::Io("the daemon is stopping".to_owned()));
+            }
             match child.try_wait() {
                 Ok(Some(status)) => break (Some(status), false),
                 Ok(None) if started.elapsed() >= self.limit => {
@@ -159,6 +197,23 @@ mod tests {
             "it was stopped"
         );
         assert!(r.output.contains("started"), "{}", r.output);
+    }
+
+    #[test]
+    fn stopping_the_checker_kills_a_running_command_and_it_is_an_error_not_a_result() {
+        let dir = tempfile::tempdir().expect("dir");
+        let checker = ShellChecker::default();
+        let stopper = checker.clone();
+        let handle = std::thread::spawn({
+            let spec = spec("echo started; sleep 30", dir.path());
+            move || checker.run(&spec)
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        let started = Instant::now();
+        stopper.stop_all();
+        let r = handle.join().expect("joins");
+        assert!(matches!(r, Err(CheckError::Io(_))), "{r:?}");
+        assert!(started.elapsed() < Duration::from_secs(5), "it was killed");
     }
 
     #[test]

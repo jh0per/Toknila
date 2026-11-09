@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shipOf } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -145,7 +145,7 @@ try {
   // A reviewer that ends its turns without a verdict: the card goes to the person.
   tok("review-mode", "agent", "--ticket", "QA-5");
   await until("QA-5 running", () => status("QA-5") === "running");
-  const ship = JSON.parse(tok("show", "QA-5", "--json")).ship.path;
+  const ship = shipOf(tok, "QA-5");
   writeFileSync(join(ship, "work.txt"), "work\n");
   git(ship, "add", "work.txt");
   git(ship, "commit", "--quiet", "-m", "work");

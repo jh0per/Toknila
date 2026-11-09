@@ -174,6 +174,51 @@ fn running_to_waiting_on_ask_human() {
     assert_eq!(tr.ticket.status_reason, Some(StatusReason::Waiting(reason)));
 }
 
+fn waiting_with(reason: WaitingReason) -> Ticket {
+    let mut t = ticket_in(TicketStatus::Waiting);
+    t.status_reason = Some(StatusReason::Waiting(reason));
+    t
+}
+
+#[test]
+fn a_question_replaces_the_silent_reason() {
+    let reason = WaitingReason::Question {
+        text: "which flow?".to_owned(),
+    };
+    let event = TicketEvent::AskHuman {
+        reason: reason.clone(),
+    };
+    let tr = apply(&waiting_with(WaitingReason::Silent), &event, NOW).expect("replaces");
+    assert_eq!(tr.ticket.status, TicketStatus::Waiting);
+    assert_eq!(tr.ticket.status_reason, Some(StatusReason::Waiting(reason)));
+}
+
+#[test]
+fn silence_never_replaces_an_open_question() {
+    let open = WaitingReason::Question {
+        text: "which flow?".to_owned(),
+    };
+    let event = TicketEvent::AskHuman {
+        reason: WaitingReason::Silent,
+    };
+    let tr = apply(&waiting_with(open.clone()), &event, NOW).expect("kept");
+    assert_eq!(tr.ticket.status, TicketStatus::Waiting);
+    assert_eq!(tr.ticket.status_reason, Some(StatusReason::Waiting(open)));
+}
+
+#[test]
+fn a_second_question_is_still_refused() {
+    let open = WaitingReason::Question {
+        text: "first".to_owned(),
+    };
+    let event = TicketEvent::AskHuman {
+        reason: WaitingReason::Question {
+            text: "second".to_owned(),
+        },
+    };
+    assert!(apply(&waiting_with(open), &event, NOW).is_err());
+}
+
 #[test]
 fn waiting_to_running_when_instruction_delivered() {
     let tr = ok(TicketStatus::Waiting, TicketEvent::InstructionDelivered);
@@ -744,6 +789,7 @@ fn only_table_transitions_are_allowed() {
         (S::Ready, "deps_unsatisfied"),
         (S::Ready, "start"),
         (S::Running, "ask_human"),
+        (S::Waiting, "ask_human"),
         (S::Waiting, "instruction_delivered"),
         (S::Waiting, "agent_active"),
         (S::Waiting, "answered"),

@@ -36,6 +36,7 @@ async fn seeded() -> (tempfile::TempDir, Store) {
     )
     .await;
     post(&app, "/v1/tickets/DEMO-1/actions/accept", json!({})).await;
+    store.settled().await;
     (dir, store)
 }
 

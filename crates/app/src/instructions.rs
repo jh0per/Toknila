@@ -11,7 +11,10 @@ use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::instructions;
 use toknila_core::machine::TicketEvent;
-use toknila_core::{AgentProfile, Comment, CommentId, CommentKind, NodeRef, Ticket, TicketId};
+use toknila_core::{
+    Actor, AgentProfile, Comment, CommentId, CommentKind, NodeRef, StatusReason, Ticket, TicketId,
+    WaitingReason,
+};
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
@@ -64,6 +67,7 @@ fn mark<U: UnitOfWork + ?Sized>(
     if comments.is_empty() {
         return Ok(());
     }
+    let comments_were_nudges = comments.iter().all(|c| c.author == Actor::System);
     let label = uow
         .chain_view(ticket.chain_id)?
         .map(|v| v.label(NodeRef::Ticket(ticket.id)));
@@ -76,6 +80,19 @@ fn mark<U: UnitOfWork + ?Sized>(
                 comment: c,
             })?;
         }
+    }
+    // A nudge for silence says nothing to a question the agent has open: it stays open.
+    let only_nudges = comments_were_nudges;
+    let asks = uow.ticket(ticket.id)?.is_some_and(|t| {
+        matches!(
+            t.status_reason,
+            Some(StatusReason::Waiting(
+                WaitingReason::Question { .. } | WaitingReason::Permission { .. }
+            ))
+        )
+    });
+    if only_nudges && asks {
+        return Ok(());
     }
     tell_ticket(uow, ticket.id, TicketEvent::InstructionDelivered)
 }

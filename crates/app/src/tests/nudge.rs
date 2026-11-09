@@ -109,6 +109,37 @@ fn after_the_limit_the_card_waits_as_silent() {
 }
 
 #[test]
+fn a_nudge_handed_over_after_a_question_does_not_clear_it() {
+    use toknila_core::agent::AgentEvent;
+    let mut mem = quiet_run();
+    // The agent is mid-turn, so the nudge waits for its Stop hook.
+    mem.runner.reach.set(RunnerState {
+        hooks: true,
+        idle: false,
+        ..Default::default()
+    });
+    apply(&mut mem, Decision::Nudge);
+    let t = a(&mem);
+    let event = AgentEvent::AskHuman {
+        text: "which db?".to_owned(),
+        permission: false,
+        detail: None,
+    };
+    crate::agent::ticket_event(&mut mem, &t, event).expect("ask_human");
+    let t = a(&mem);
+    let claimed = crate::instructions::claim(&mut mem, &t).expect("claim");
+    assert_eq!(claimed.count, 1, "the nudge is handed over");
+    let want = WaitingReason::Question {
+        text: "which db?".to_owned(),
+    };
+    let t = a(&mem);
+    assert_eq!(
+        (t.status, t.status_reason),
+        (TicketStatus::Waiting, Some(StatusReason::Waiting(want)))
+    );
+}
+
+#[test]
 fn a_live_child_process_suppresses_the_nudge() {
     let mut mem = quiet_run();
     mem.runner.reach.set(RunnerState {

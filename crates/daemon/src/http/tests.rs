@@ -40,6 +40,7 @@ const TOKEN: &str = "test-token";
 struct Api {
     _dir: tempfile::TempDir,
     app: axum::Router,
+    store: Store,
     runners: Arc<crate::runner::Runners>,
     /// What this daemon moved to the Trash: folders land in `trash` of the test's folder.
     trash: Arc<FakeTrash>,
@@ -103,7 +104,7 @@ impl Api {
             moved: Default::default(),
         });
         let state = AppState {
-            store,
+            store: store.clone(),
             token: TOKEN.into(),
             shutdown: Arc::new(Notify::new()),
             profiles: dir.path().join("profiles"),
@@ -124,6 +125,7 @@ impl Api {
         Self {
             _dir: dir,
             app: router(state),
+            store,
             runners,
             trash,
         }
@@ -132,9 +134,13 @@ impl Api {
     /// Stops this daemon and starts another over the same database.
     fn restart(self) -> Self {
         let Self {
-            _dir, app, runners, ..
+            _dir,
+            app,
+            store,
+            runners,
+            ..
         } = self;
-        drop((app, runners));
+        drop((app, store, runners));
         Self::open(_dir, None, Arc::new(crate::tools::SystemTools))
     }
 
@@ -167,6 +173,9 @@ impl Api {
             .oneshot(req.body(body).expect("request"))
             .await
             .expect("response");
+        // The request answered at once; the host work it queued (git, merges, checks) runs in
+        // tasks of its own. A test's client waits for them before it looks at the result.
+        self.store.settled().await;
         let status = resp.status();
         let bytes = resp.into_body().collect().await.expect("body").to_bytes();
         let value = if bytes.is_empty() {

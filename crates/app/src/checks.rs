@@ -59,6 +59,9 @@ pub enum CheckError {
 pub trait Checker: std::fmt::Debug {
     /// Runs `spec.command` in `spec.dir` and waits for it, or stops it at the time limit.
     fn run(&self, spec: &CheckSpec) -> Result<CheckResult, CheckError>;
+
+    /// The host is stopping: end every command that is running (and the ones it started) now.
+    fn stop_all(&self) {}
 }
 
 /// Whether a hand-in of `t` is checked by the daemon, and the project's round limit. A card is
