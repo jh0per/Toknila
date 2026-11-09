@@ -38,7 +38,7 @@ try {
   const row = page.locator('[data-chain-item="work"]');
 
   await page.goto(url.replace("/?", "/projects/AUT/chains/work?"));
-  await expectText(status, "todo · ready", "the card is ready and nothing starts it");
+  await expectText(status, "ready", "the card is ready and nothing starts it");
   if (await toggle.isChecked()) throw new Error("the toggle shows autostart on for a chain made without it");
   console.log("PASS the header toggle shows autostart off");
   await expectText(page.locator(".autostart"), "Start cards automatically", "the header toggle is worded like the menu");

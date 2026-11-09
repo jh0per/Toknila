@@ -62,7 +62,7 @@ try {
   await expectText(page.locator("[data-testid=projects]"), "DEMO", "project listed");
   await openChain();
   await expectText(status("DEMO-1"), "running", "DEMO-1 autostarted");
-  await expectText(status("DEMO-2"), "todo · backlog", "DEMO-2 waits for DEMO-1");
+  await expectText(status("DEMO-2"), "backlog", "DEMO-2 waits for DEMO-1");
   const keyWraps = await page.locator(".node .key").evaluateAll((els) => els.filter((e) => e.getClientRects().length > 1 || e.scrollWidth > e.clientWidth).length);
   if (keyWraps) throw new Error("a card key wraps or is clipped");
   console.log("PASS card keys do not wrap");
