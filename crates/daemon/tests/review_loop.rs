@@ -390,7 +390,9 @@ async fn a_project_without_a_check_command_still_syncs_a_ship_behind_the_base() 
         .output()
         .expect("git");
     assert_eq!(
-        String::from_utf8_lossy(&out.stdout).split_whitespace().count(),
+        String::from_utf8_lossy(&out.stdout)
+            .split_whitespace()
+            .count(),
         2,
         "a merge commit, no rebase"
     );
