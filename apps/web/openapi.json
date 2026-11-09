@@ -5774,6 +5774,12 @@
           "mode": {
             "$ref": "#/components/schemas/MergeMode"
           },
+          "no_checks_timeout_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds a pull request may have no check reported before a person is asked what to do.",
+            "minimum": 0
+          },
           "pr_title": {
             "type": "string",
             "description": "Title of a pull request; `{key}` and `{title}` are the card's."
@@ -6553,6 +6559,15 @@
                 "type": "null"
               }
             ]
+          },
+          "no_checks_timeout_secs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Seconds a pull request may report no check before a person is asked (default 600).",
+            "minimum": 0
           },
           "planner_model": {
             "type": [
@@ -7355,6 +7370,21 @@
             },
             "description": "The checks at the last look; empty before any was reported."
           },
+          "merge_unchecked": {
+            "type": "boolean",
+            "description": "A person answered \"merge now\": merge although no check was ever reported."
+          },
+          "no_checks_since": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "Since when the host reported no check at all; the timer of the \"no checks\" question.\nSet by the machine, cleared when a check shows up."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "number": {
             "type": "integer",
             "format": "int64",
@@ -7766,6 +7796,21 @@
                 "type": "string",
                 "enum": [
                   "no_verdict"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Pull-request mode: the host reported no check on the pull request for the project's\ntimeout. A person decides: merge now, keep waiting, or block.",
+            "required": [
+              "note"
+            ],
+            "properties": {
+              "note": {
+                "type": "string",
+                "enum": [
+                  "no_checks"
                 ]
               }
             }
@@ -8662,7 +8707,9 @@
           "approve",
           "reject",
           "run_reviewer",
-          "ask_design"
+          "ask_design",
+          "merge_now",
+          "keep_waiting"
         ]
       },
       "TicketDetail": {

@@ -131,11 +131,11 @@ fn a_pull_request_that_is_already_open_is_watched_without_looking_again() {
     super::merges::answer(
         &mem,
         Ok(crate::MergeOutcome::PrOpen {
-            pr: toknila_core::PullRequest {
-                number: 7,
-                url: "https://example.test/pull/7".to_owned(),
-                checks: Vec::new(),
-            },
+            pr: toknila_core::PullRequest::seen(
+                7,
+                "https://example.test/pull/7".to_owned(),
+                Vec::new(),
+            ),
         }),
     );
     accept(&mut mem);

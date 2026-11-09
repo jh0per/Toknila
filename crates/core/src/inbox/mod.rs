@@ -6,6 +6,7 @@
 //! | `proposal` | a wildcard card is Proposed |
 //! | `question` | the agent is Waiting with a question or a permission prompt; a reviewer (or any run) shows a permission dialog; or a run showed no sign of life for `startup_secs` after its spawn and waits on its screen (see [`crate::question`]) |
 //! | `blocked` | the card is Blocked (the item carries the reason) |
+//! | `question` (no checks) | the card's pull request reported no check for the project's `no_checks_timeout_secs`; answers: `merge_now`, `keep_waiting`, `block` |
 //! | `review` | the card is in Review and it is the person's turn (`review.turn`; while the reviewer agent has it, or the merge is running, the card is not listed; a failed merge is a `blocked` item) |
 //! | `thread` | a thread is open and its newest version came after the person's last request |
 //! | `leftovers` | a card was done out of order and an earlier card still has open subtasks that nobody dismissed |
@@ -92,6 +93,12 @@ pub struct InboxItem {
 
 /// The text of the `review` item for a card whose reviewer gave no verdict.
 pub const NO_VERDICT_TEXT: &str = "The reviewer gave no verdict";
+
+/// The text of the `question` item for a pull request that reported no check in time; the
+/// pull request's URL follows. The answers are the card's actions `merge_now`, `keep_waiting`
+/// and `block`.
+pub const NO_CHECKS_TEXT: &str =
+    "The pull request has no checks. Merge now, keep waiting, or block";
 
 /// A thread with what the rule needs to know about it.
 #[derive(Debug, Clone)]
@@ -183,6 +190,21 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
             InboxKind::Blocked,
             reason.as_ref().map(ToString::to_string).unwrap_or_default(),
         ),
+        // The pull request has reported no check for the project's timeout: the person decides
+        // (merge now, keep waiting, block); the card's actions say which of them are open.
+        (TicketStatus::Review, _) if t.review.note == Some(ReviewNote::NoChecks) => {
+            let url = t.pr.as_ref().map(|p| p.url.as_str()).unwrap_or_default();
+            let mut i = item(
+                InboxKind::Question,
+                t,
+                t.pr.as_ref()
+                    .and_then(|p| p.no_checks_since)
+                    .unwrap_or(t.status_since),
+                format!("{NO_CHECKS_TEXT}: {url}"),
+            );
+            i.link = t.pr.as_ref().map(|p| p.url.clone());
+            return Some(i);
+        }
         // The reviewer agent still has the card (in agent mode it decides, in both mode the
         // person comes after its verdict), or the accepted work is being merged: nobody's turn.
         (TicketStatus::Review, _)

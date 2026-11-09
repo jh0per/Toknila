@@ -70,8 +70,9 @@ impl GithubMerger {
             .map_err(Into::into)
     }
 
-    /// The pull request `selector` (a branch, a number or a URL) names, if there is one.
-    fn view(&self, repo: &str, selector: &str) -> Result<Option<View>, MergeError> {
+    /// The pull request with this number or URL. One that cannot be found is a failure here: the
+    /// caller got the number from `gh` itself.
+    fn view(&self, repo: &str, selector: &str) -> Result<View, MergeError> {
         let args = [
             "pr",
             "view",
@@ -79,19 +80,34 @@ impl GithubMerger {
             "--json",
             "number,url,state,mergeable",
         ];
-        match self.gh.run(repo, &args) {
-            Ok(json) => Ok(Some(parse(&json, "pr view")?)),
-            Err(GhError::Failed { detail, .. }) if detail.contains("no pull requests found") => {
-                Ok(None)
-            }
-            Err(e) => Err(e.into()),
-        }
+        let json = self.gh.run(repo, &args)?;
+        parse(&json, "pr view")
+    }
+
+    /// The pull request of `branch`, if it has one: the open one, else the newest. `gh pr list`
+    /// answers a branch without a pull request with an empty list and exit code 0, so "none" is
+    /// read from the JSON and not from a message.
+    fn find(&self, repo: &str, branch: &str) -> Result<Option<View>, MergeError> {
+        let args = [
+            "pr",
+            "list",
+            "--head",
+            branch,
+            "--state",
+            "all",
+            "--json",
+            "number,url,state,mergeable",
+        ];
+        let json = self.gh.run(repo, &args)?;
+        let mut all: Vec<View> = parse(&json, "pr list")?;
+        all.sort_by_key(|v| (v.state == "OPEN", v.number));
+        Ok(all.pop())
     }
 
     /// The branch's open pull request, or a new one.
     fn open(&self, spec: &MergeSpec, pr: &PrSpec) -> Result<View, MergeError> {
         self.push(spec)?;
-        if let Some(found) = self.view(&spec.repo, &spec.branch)?
+        if let Some(found) = self.find(&spec.repo, &spec.branch)?
             && found.state != "CLOSED"
         {
             return Ok(found);
@@ -111,28 +127,32 @@ impl GithubMerger {
         // The last line `gh pr create` prints is the new pull request's URL.
         let out = self.gh.run(&spec.repo, &create)?;
         let url = out.lines().last().unwrap_or_default().trim().to_owned();
-        self.view(&spec.repo, &url)?.ok_or_else(|| MergeError::Gh {
-            command: "pr create".to_owned(),
-            detail: format!("the new pull request {url} cannot be found"),
-        })
+        self.view(&spec.repo, &url)
     }
 
     /// The checks as `gh` reports them; none yet is an empty list.
+    ///
+    /// `gh pr checks` exits non-zero while checks are pending or failed, and still prints them
+    /// as JSON. When it prints no JSON at all it either found no check or failed; which one is
+    /// told by asking `gh pr view --json statusCheckRollup` (JSON, exit code 0 when it works),
+    /// never by reading the message.
     fn checks(&self, repo: &str, number: u64) -> Result<Vec<CheckRun>, MergeError> {
         let number = number.to_string();
         let out = self
             .gh
             .output(repo, &["pr", "checks", &number, "--json", "name,bucket"])?;
-        // `gh pr checks` exits non-zero while checks are pending or failed, and still prints them.
         let stdout = String::from_utf8_lossy(&out.stdout);
         if stdout.trim().is_empty() {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            return if out.status.success() || stderr.contains("no checks reported") {
+            return if self.rollup_is_empty(repo, &number)? {
                 Ok(Vec::new())
             } else {
                 Err(MergeError::Gh {
                     command: "pr checks".to_owned(),
-                    detail: stderr.trim().to_owned(),
+                    detail: format!(
+                        "gh exited with {:?} and printed no checks: {}",
+                        out.status.code(),
+                        String::from_utf8_lossy(&out.stderr).trim()
+                    ),
                 })
             };
         }
@@ -150,15 +170,25 @@ impl GithubMerger {
             .collect())
     }
 
+    /// Whether the pull request's status rollup is an empty list: no check of any kind reported.
+    fn rollup_is_empty(&self, repo: &str, number: &str) -> Result<bool, MergeError> {
+        #[derive(Deserialize)]
+        struct Rollup {
+            #[serde(rename = "statusCheckRollup")]
+            checks: Vec<serde_json::Value>,
+        }
+        let json = self
+            .gh
+            .run(repo, &["pr", "view", number, "--json", "statusCheckRollup"])?;
+        let rollup: Rollup = parse(&json, "pr view")?;
+        Ok(rollup.checks.is_empty())
+    }
+
     /// One look at the pull request, and the merge when it is ready.
     fn step(&self, spec: &MergeSpec, pr: &PrSpec, view: View) -> Result<MergeOutcome, MergeError> {
         let repo = spec.repo.as_str();
         let checks = self.checks(repo, view.number)?;
-        let pull = PullRequest {
-            number: view.number,
-            url: view.url,
-            checks,
-        };
+        let pull = PullRequest::seen(view.number, view.url, checks);
         match view.state.as_str() {
             "MERGED" => return self.landed(spec, pull),
             "CLOSED" => return Ok(MergeOutcome::PrClosed { url: pull.url }),
@@ -167,18 +197,28 @@ impl GithubMerger {
         if view.mergeable == "CONFLICTING" {
             return Ok(MergeOutcome::PrConflict { url: pull.url });
         }
+        // A person answered "merge now" to the no-checks question: a pull request that still
+        // reports no check is merged as it is.
+        let unchecked =
+            pull.checks.is_empty() && pr.watching.as_ref().is_some_and(|w| w.merge_unchecked);
         match judge(&pull.checks) {
-            ChecksVerdict::Pending => Ok(MergeOutcome::PrOpen { pr: pull }),
+            ChecksVerdict::Pending if !unchecked => Ok(MergeOutcome::PrOpen { pr: pull }),
             ChecksVerdict::Failed(failed) => Ok(MergeOutcome::CiFailed { pr: pull, failed }),
-            ChecksVerdict::Passed => {
+            ChecksVerdict::Pending | ChecksVerdict::Passed => {
                 let number = pull.number.to_string();
                 match self
                     .gh
                     .run(repo, &["pr", "merge", &number, pr.method.flag()])
                 {
                     Ok(_) => self.landed(spec, pull),
-                    Err(GhError::Failed { detail, .. }) if conflicts(&detail) => {
-                        Ok(MergeOutcome::PrConflict { url: pull.url })
+                    // Why `gh pr merge` refused is not read from its message: the pull request
+                    // is looked at again, and GitHub says whether it conflicts.
+                    Err(refused @ GhError::Failed { .. }) => {
+                        if self.view(repo, &number)?.mergeable == "CONFLICTING" {
+                            Ok(MergeOutcome::PrConflict { url: pull.url })
+                        } else {
+                            Err(refused.into())
+                        }
                     }
                     Err(e) => Err(e.into()),
                 }
@@ -191,12 +231,6 @@ impl GithubMerger {
         self.git.run(&spec.repo, &["fetch", "origin"])?;
         Ok(MergeOutcome::PrMerged { pr })
     }
-}
-
-/// Whether `gh pr merge` refused because the branch no longer merges cleanly.
-fn conflicts(detail: &str) -> bool {
-    let detail = detail.to_lowercase();
-    detail.contains("conflict") || detail.contains("not mergeable")
 }
 
 fn parse<T: for<'de> Deserialize<'de>>(json: &str, command: &str) -> Result<T, MergeError> {
@@ -215,15 +249,9 @@ impl Merger for GithubMerger {
         };
         let view = match &pr.watching {
             Some(open) => self.view(&spec.repo, &open.number.to_string())?,
-            None => Some(self.open(spec, pr)?),
+            None => self.open(spec, pr)?,
         };
-        match view {
-            Some(view) => self.step(spec, pr, view),
-            None => Err(MergeError::Gh {
-                command: "pr view".to_owned(),
-                detail: "the pull request cannot be found any more".to_owned(),
-            }),
-        }
+        self.step(spec, pr, view)
     }
 }
 

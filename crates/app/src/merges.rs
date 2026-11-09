@@ -7,8 +7,8 @@ use toknila_core::guard::ShipProblem;
 use toknila_core::machine::TicketEvent;
 use toknila_core::pr::PrSpec;
 use toknila_core::{
-    BlockedReason, Chain, MergeMode, MergeSpec, PullRequest, ReviewTurn, ShipSpec, Ticket,
-    TicketId, TicketKey, TicketStatus,
+    BlockedReason, Chain, MergeMode, MergeSettings, MergeSpec, PullRequest, ReviewTurn, ShipSpec,
+    Ticket, TicketId, TicketKey, TicketStatus,
 };
 
 use crate::chain::tell_ticket;
@@ -238,7 +238,17 @@ fn record_pr<U: UnitOfWork + ?Sized>(
     ticket: TicketId,
     pr: PullRequest,
 ) -> AppResult<()> {
-    tell_ticket(uow, ticket, TicketEvent::PrUpdated { pr })
+    let ask_after_secs = match uow.ticket(ticket)? {
+        Some(t) => match uow.chain(t.chain_id)? {
+            Some(chain) => uow
+                .project(chain.project_id)?
+                .map(|p| p.merge.no_checks_timeout_secs),
+            None => None,
+        },
+        None => None,
+    }
+    .unwrap_or(MergeSettings::DEFAULT_NO_CHECKS_TIMEOUT_SECS);
+    tell_ticket(uow, ticket, TicketEvent::PrUpdated { pr, ask_after_secs })
 }
 
 fn block(reason: BlockedReason) -> TicketEvent {

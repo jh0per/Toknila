@@ -124,19 +124,26 @@ fn every_merge_failure_blocks_the_card_and_unblock_tries_the_merge_again() {
 }
 
 fn pull_request() -> crate::PullRequest {
-    crate::PullRequest {
-        number: 7,
-        url: "https://github.com/o/r/pull/7".to_owned(),
-        checks: vec![crate::CheckRun {
+    crate::PullRequest::seen(
+        7,
+        "https://github.com/o/r/pull/7".to_owned(),
+        vec![crate::CheckRun {
             name: "verify".to_owned(),
             state: crate::CheckState::Pending,
         }],
+    )
+}
+
+fn seen(pr: crate::PullRequest) -> TicketEvent {
+    TicketEvent::PrUpdated {
+        pr,
+        ask_after_secs: 600,
     }
 }
 
 #[test]
 fn the_pull_request_is_kept_on_the_merging_card_without_a_status_change() {
-    let tr = step(&merging(), &TicketEvent::PrUpdated { pr: pull_request() });
+    let tr = step(&merging(), &seen(pull_request()));
     assert_eq!(tr.ticket.status, TicketStatus::Review);
     assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Merging));
     assert_eq!(tr.ticket.pr, Some(pull_request()));
@@ -150,7 +157,7 @@ fn a_pull_request_update_for_a_card_that_is_not_merging_is_refused() {
         ticket_in(TicketStatus::Running),
     ] {
         assert!(matches!(
-            apply(&t, &TicketEvent::PrUpdated { pr: pull_request() }, NOW),
+            apply(&t, &seen(pull_request()), NOW),
             Err(TransitionError::NotAllowed { .. })
         ));
     }

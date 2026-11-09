@@ -3,7 +3,8 @@
 use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
 use toknila_core::{
-    AgentProfile, CommandPolicy, MergeMethod, MergeMode, Project, ProjectId, ReviewMode, schedule,
+    AgentProfile, CommandPolicy, MergeMethod, MergeMode, MergeSettings, Project, ProjectId,
+    ReviewMode, schedule,
 };
 
 use crate::{AppError, AppResult, Reader, UnitOfWork, resolve};
@@ -57,6 +58,8 @@ pub struct PatchProject {
     pub pr_title: Option<String>,
     /// How a pull request merges: `merge`, `squash` or `rebase`.
     pub merge_method: Option<MergeMethod>,
+    /// Seconds a pull request may report no check before a person is asked (default 600).
+    pub no_checks_timeout_secs: Option<u64>,
     /// The command that checks the work (`cargo xtask verify`); agents are told to run it and may
     /// without asking. An empty text clears it.
     pub check_command: Option<String>,
@@ -173,6 +176,10 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     }
     if let Some(m) = patch.merge_method {
         p.merge.method = m;
+    }
+    if let Some(secs) = patch.no_checks_timeout_secs {
+        p.merge.no_checks_timeout_secs =
+            MergeSettings::check_no_checks_timeout(secs).map_err(AppError::bad_request)?;
     }
     if let Some(c) = patch.check_command {
         p.check_command = Project::clean_check_command(&c).map_err(AppError::bad_request)?;

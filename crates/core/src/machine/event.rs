@@ -103,7 +103,16 @@ pub enum TicketEvent {
     MergeDone,
     /// Host: the pull request of the card's merge was opened or its checks changed. Only a
     /// card whose merge is running takes it; no status change.
-    PrUpdated { pr: PullRequest },
+    /// `ask_after_secs` is the project's timeout: a pull request with no check for that long
+    /// makes the card ask a person (a `no_checks` note).
+    PrUpdated {
+        pr: PullRequest,
+        ask_after_secs: u64,
+    },
+    /// `tok merge-now`: the pull request reported no checks; merge it anyway.
+    MergeUnchecked,
+    /// `tok keep-waiting`: the pull request reported no checks; wait for the timeout again.
+    KeepWaiting,
     /// Shipyard: the ticket's ship exists; the ticket learns its branch. No status change.
     ShipReady { branch: String },
     /// Graph: the milestone this ticket belongs to was released.
@@ -153,6 +162,8 @@ impl TicketEvent {
             Self::DoneOutOfOrder { .. } => "done_out_of_order",
             Self::MergeDone => "merge_done",
             Self::PrUpdated { .. } => "pr_updated",
+            Self::MergeUnchecked => "merge_now",
+            Self::KeepWaiting => "keep_waiting",
             Self::ShipReady { .. } => "ship_ready",
             Self::Released => "released",
             Self::Reopen => "reopen",

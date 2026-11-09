@@ -917,6 +917,7 @@ proptest! {
 
 mod design;
 mod merge;
+mod no_checks;
 mod out_of_order;
 mod review;
 
