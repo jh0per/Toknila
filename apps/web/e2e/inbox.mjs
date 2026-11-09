@@ -40,6 +40,8 @@ let browser;
 let failed = false;
 try {
   tok("project", "new", "INB");
+  // A new project reviews with both (a reviewer agent first); this script plays the person.
+  tok("review-mode", "human", "--project", "INB");
   const live = join(home, "live.toml");
   writeFileSync(live, chainFile("live", true, [{ id: "asks" }, { id: "blocks" }]));
   tok("chain", "import", live, "--project", "INB");
@@ -170,6 +172,7 @@ try {
   git(repo, "add", "README.md");
   git(repo, "commit", "--quiet", "-m", "init");
   tok("project", "new", "GIT", "--repo", repo, "--base", "develop");
+  tok("review-mode", "human", "--project", "GIT");
   const shipChain = join(home, "ship.toml");
   writeFileSync(shipChain, chainFile("shipped", true, [{ id: "work" }]));
   tok("chain", "import", shipChain, "--project", "GIT");
