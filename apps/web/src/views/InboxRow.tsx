@@ -119,6 +119,31 @@ function Proposal({ item, open, dispatch }: BodyProps) {
 
 /// A question: what the agent asks and how it can be answered, then Open card.
 function Question({ item, open, dispatch }: BodyProps) {
+  const [why, setWhy] = useState("");
+  if (item.allowed_actions.includes("merge_now")) {
+    // A pull request without checks: the card's own answers, not an agent's.
+    const act = (action: "merge_now" | "keep_waiting") => dispatch({ type: "ticketAction", key: item.ticket, action });
+    return (
+      <div className="row-body" data-testid="no-checks">
+        <blockquote data-testid="question">{item.text}</blockquote>
+        <div className="btns">
+          <button className="btn primary" data-testid="no-checks-merge-now" onClick={() => act("merge_now")}>Merge now</button>
+          <button className="btn" data-testid="no-checks-keep-waiting" onClick={() => act("keep_waiting")}>Keep waiting</button>
+          {open}
+        </div>
+        <form
+          className="compose"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (why.trim()) dispatch({ type: "ticketAction", key: item.ticket, action: "block", text: why.trim() });
+          }}
+        >
+          <input aria-label={`Why ${item.ticket} is blocked`} placeholder="Why block it?" value={why} onChange={(e) => setWhy(e.target.value)} />
+          <button className="btn danger" type="submit" data-testid="no-checks-block" disabled={!why.trim()}>Block</button>
+        </form>
+      </div>
+    );
+  }
   return (
     <div className="row-body">
       <Answer item={item} dispatch={dispatch} />
