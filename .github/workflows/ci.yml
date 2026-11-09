@@ -54,6 +54,20 @@ jobs:
 
       - name: cargo xtask e2e-web
         run: cargo xtask e2e-web
+        env:
+          # Failed scripts leave a screenshot and a trace here; the smoke script's shots always land here.
+          E2E_ARTIFACTS: ${{ github.workspace }}/apps/web/e2e-artifacts
+          SHOTS_DIR: ${{ github.workspace }}/apps/web/e2e-artifacts/smoke
+
+      # On failure, and on main (the smoke screenshots), so a UI test can be seen without a rerun.
+      - name: Upload e2e screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.os }}
+          path: apps/web/e2e-artifacts
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Smoke-test release binaries
         shell: bash
