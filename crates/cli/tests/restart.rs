@@ -71,12 +71,18 @@ fn an_agent_killed_from_outside_is_terminated_and_its_replacement_sees_the_earli
         tok.status("DEMO-1") == "blocked"
     });
     let reason = tok.run(&["show", "DEMO-1"])["ticket"]["status_reason"].clone();
-    assert_eq!(reason["reason"]["kind"], "terminated", "{reason}");
     let shown = tok.text(&["show", "DEMO-1"]);
-    assert!(
-        shown.contains("terminated from outside") && shown.contains("unblock starts it again"),
-        "{shown}"
-    );
+    if cfg!(unix) {
+        // A signal death is told apart from a crash; Windows has no signal to read, so a killed
+        // agent there is a crash with its exit code.
+        assert_eq!(reason["reason"]["kind"], "terminated", "{reason}");
+        assert!(
+            shown.contains("terminated from outside") && shown.contains("unblock starts it again"),
+            "{shown}"
+        );
+    } else {
+        assert_eq!(reason["reason"]["kind"], "crashed", "{reason}");
+    }
 
     tok.run(&["unblock", "DEMO-1"]);
     wait_until(&tok, "the second run to print its instructions", || {
