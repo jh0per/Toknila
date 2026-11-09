@@ -121,6 +121,10 @@ pub struct Project {
     /// later run's allow list, and a prompt one covers is answered without asking.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allowed_commands: Vec<String>,
+    /// Domains the project's reviewers may read on the web (`docs.rs`); empty: none, so a page a
+    /// card cites stays unread.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reviewer_web_domains: Vec<String>,
     /// Hidden from the sidebar; its data is kept and it can be brought back.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub archived: bool,
@@ -237,6 +241,7 @@ mod tests {
             planner_model: None,
             command_policy: Default::default(),
             allowed_commands: Vec::new(),
+            reviewer_web_domains: Vec::new(),
             archived: false,
         };
         let mut t = Ticket::new_backlog(

@@ -2123,6 +2123,11 @@ export interface components {
             reviewer?: string | null;
             /** @description The Claude model of the project's reviewers; an empty text clears it. */
             reviewer_model?: string | null;
+            /**
+             * @description The domains the project's reviewers may read on the web (`docs.rs`); the list replaces the
+             *     old one, an empty list denies the web again.
+             */
+            reviewer_web_domains?: string[] | null;
             /** @description The base branch ships start from and merges go into. */
             work_branch?: string | null;
             /**
@@ -2333,6 +2338,11 @@ export interface components {
             repo_path?: string | null;
             /** @description The Claude model of the project's reviewer agents; `None`: the person's default. */
             reviewer_model?: string | null;
+            /**
+             * @description Domains the project's reviewers may read on the web (`docs.rs`); empty: none, so a page a
+             *     card cites stays unread.
+             */
+            reviewer_web_domains?: string[];
             /** @description Branch ships start from and merge into (`develop`). */
             work_branch: string;
             /**

@@ -6537,6 +6537,16 @@
             ],
             "description": "The Claude model of the project's reviewers; an empty text clears it."
           },
+          "reviewer_web_domains": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The domains the project's reviewers may read on the web (`docs.rs`); the list replaces the\nold one, an empty list denies the web again."
+          },
           "work_branch": {
             "type": [
               "string",
@@ -7109,6 +7119,13 @@
               "null"
             ],
             "description": "The Claude model of the project's reviewer agents; `None`: the person's default."
+          },
+          "reviewer_web_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Domains the project's reviewers may read on the web (`docs.rs`); empty: none, so a page a\ncard cites stays unread."
           },
           "work_branch": {
             "type": "string",

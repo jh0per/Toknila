@@ -204,9 +204,78 @@ pub fn clean_rules(rules: Vec<String>) -> Result<Vec<String>, &'static str> {
     Ok(out)
 }
 
+/// The domains the reviewer may read as a person typed them: each a plain host name (`docs.rs`,
+/// lower-cased, no scheme, path, port or wildcard), none twice. The refusal says what is wrong.
+pub fn clean_domains(domains: Vec<String>) -> Result<Vec<String>, &'static str> {
+    let mut out: Vec<String> = Vec::new();
+    for domain in domains {
+        let domain = domain.trim().to_ascii_lowercase();
+        let label_ok = |l: &str| {
+            !l.is_empty()
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        };
+        if domain.is_empty() || !domain.split('.').all(label_ok) {
+            return Err("a domain is a plain host name such as docs.rs");
+        }
+        if !out.contains(&domain) {
+            out.push(domain);
+        }
+    }
+    Ok(out)
+}
+
+/// The reviewer's allow rules for the domains of the project (`WebFetch(domain:docs.rs)`).
+pub fn web_fetch_rules(domains: &[String]) -> Vec<String> {
+    domains
+        .iter()
+        .map(|d| format!("WebFetch(domain:{d})"))
+        .collect()
+}
+
+impl super::AgentProfile {
+    /// The profile as a card's reviewer runs it: the project's domains are allowed to `WebFetch`.
+    /// Only a reviewer that runs Claude Code is changed; everything else stays denied.
+    pub fn with_reviewer_domains(&self, domains: &[String]) -> Self {
+        let mut out = self.clone();
+        if self.role == super::AgentRole::Reviewer && self.runs_claude_code() {
+            out.permissions.allow.extend(web_fetch_rules(domains));
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn domains_are_plain_lowercase_host_names_without_repeats() {
+        let ok = |d: &[&str]| clean_domains(d.iter().map(|s| (*s).to_owned()).collect());
+        assert_eq!(
+            ok(&[" Docs.RS ", "example.com", "docs.rs"]),
+            Ok(vec!["docs.rs".to_owned(), "example.com".to_owned()])
+        );
+        assert_eq!(ok(&[]), Ok(Vec::new()));
+        for bad in [
+            "",
+            "https://docs.rs",
+            "docs.rs/x",
+            "docs.rs:80",
+            "*.docs.rs",
+            "a b",
+            "a..b",
+            "-a.com",
+            "x)",
+        ] {
+            assert!(ok(&[bad]).is_err(), "{bad}");
+        }
+        assert_eq!(
+            web_fetch_rules(&["docs.rs".to_owned()]),
+            ["WebFetch(domain:docs.rs)"]
+        );
+    }
 
     #[test]
     fn a_rule_keeps_the_first_word_and_after_a_launcher_the_second() {

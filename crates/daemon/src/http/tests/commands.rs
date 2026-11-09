@@ -238,3 +238,38 @@ async fn remembered_rules_are_replaced_as_a_list_and_a_bad_rule_is_refused_at_it
         "the last one removed: {p}"
     );
 }
+
+#[tokio::test]
+async fn reviewer_web_domains_are_empty_by_default_cleaned_kept_over_a_restart_and_refused_at_their_field()
+ {
+    let api = Api::new();
+    api.post("/v1/projects", json!({ "key": "DEMO" })).await;
+    assert!(api.get(PROJECT).await.get("reviewer_web_domains").is_none());
+
+    let (s, p) = patch(
+        &api,
+        json!({ "reviewer_web_domains": [" Docs.RS ", "example.com", "docs.rs"] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(p["reviewer_web_domains"], json!(["docs.rs", "example.com"]));
+
+    let (s, e) = patch(
+        &api,
+        json!({ "reviewer_web_domains": ["https://docs.rs/x"] }),
+    )
+    .await;
+    assert_eq!(
+        (s, e["field"].as_str()),
+        (StatusCode::BAD_REQUEST, Some("reviewer_web_domains")),
+        "{e}"
+    );
+
+    let api = api.restart();
+    assert_eq!(
+        api.get(PROJECT).await["reviewer_web_domains"],
+        json!(["docs.rs", "example.com"])
+    );
+    let (_, p) = patch(&api, json!({ "reviewer_web_domains": [] })).await;
+    assert!(p.get("reviewer_web_domains").is_none(), "cleared: {p}");
+}

@@ -535,6 +535,46 @@ fn the_commands_setting_of_the_project_picks_the_mode_and_the_allow_rules() {
     }
 }
 
+/// The allow rules in the settings file of a reviewer run for a project that lists `domains`.
+fn reviewer_allow(domains: &[&str]) -> Vec<String> {
+    let mut rig = Rig::new();
+    rig.brief.web_domains = domains.iter().map(|d| (*d).to_owned()).collect();
+    rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    let (_, text) = rig.file_of("reviewer", "settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    v["permissions"]["allow"]
+        .as_array()
+        .expect("allow")
+        .iter()
+        .map(|r| r.as_str().expect("rule").to_owned())
+        .collect()
+}
+
+#[test]
+fn the_reviewer_may_fetch_the_listed_domains_and_no_others() {
+    let allow = reviewer_allow(&["docs.rs", "example.com"]);
+    for rule in ["WebFetch(domain:docs.rs)", "WebFetch(domain:example.com)"] {
+        assert!(allow.contains(&rule.to_owned()), "{rule}: {allow:?}");
+    }
+    assert!(
+        !allow
+            .iter()
+            .any(|r| r == "WebFetch" || r == "WebSearch" || r.contains("other.org")),
+        "{allow:?}"
+    );
+    let none = reviewer_allow(&[]);
+    assert!(!none.iter().any(|r| r.starts_with("WebFetch")), "{none:?}");
+}
+
+#[test]
+fn a_worker_gets_no_domain_rules_from_the_reviewers_list() {
+    let mut rig = Rig::new();
+    rig.brief.web_domains = vec!["docs.rs".to_owned()];
+    rig.prepare(&AgentProfile::claude_code());
+    let (_, text) = rig.file("settings.json");
+    assert!(!text.contains("WebFetch"), "{text}");
+}
+
 #[test]
 fn a_reviewer_keeps_dont_ask_whatever_the_projects_setting() {
     let mut rig = Rig::new();

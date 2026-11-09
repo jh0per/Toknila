@@ -16,6 +16,7 @@ read. A change that adds a screen or a help line checks it against this table.
 | agent | profile | In Settings, "Agents" lists profiles; "default agent" is the project's default profile. |
 | simulated agent | `sim` profile | Named in the window only in a development build, or where a project uses it. |
 | When the agent wants to run a command: Let Claude decide / Ask me each time / Never ask | command policy `auto` / `ask` / `trust` (`command_policy`), Claude Code permission mode | Under a project's Agents, one line of meaning per choice. New projects start on "Let Claude decide"; projects that existed before keep "Ask me each time". `tok project set --commands`. |
+| Sites the reviewer may read | the project's `reviewer_web_domains`: plain host names that become `WebFetch(domain:<host>)` allow rules of the reviewer (a `dontAsk` run) and of nobody else; empty by default | Settings, Review and merge; `tok project show` lists them as `reviewer reads`. |
 | Allow always, Commands you allowed always | remembered allow rules (`allowed_commands`, `Bash(cargo test *)`) | A button next to Allow on a question about a command; the list with Remove is under Agents. `tok project show` lists them, `--forget-command` removes one. |
 | model | model alias | Under a project's Advanced; "leave empty to use your Claude Code default". |
 | assistant | planner | The project's main agent: "Plan with the assistant" is the first entry of a project in the sidebar. `tok planner` and the `/v1/planner` routes keep their name. |

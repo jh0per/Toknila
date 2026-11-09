@@ -185,6 +185,8 @@ pub(super) fn prepare_with(
 ) -> Result<Wiring, RunnerError> {
     // The project's setting for commands changes a worker's permission mode and allow rules.
     let profile = &profile.under_policy(cx.brief.command_policy, &cx.brief.allowed_commands);
+    // The domains the project lets a reviewer read go into the reviewer's allow rules.
+    let profile = &profile.with_reviewer_domains(&cx.brief.web_domains);
     // A planner run is labelled by its project's key; there is no card.
     let key = match cx.role {
         AgentRole::Planner => cx.key.project().to_string(),

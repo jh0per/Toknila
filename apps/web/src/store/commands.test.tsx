@@ -49,6 +49,21 @@ describe("the commands setting", () => {
   });
 });
 
+describe("the sites the reviewer may read", () => {
+  it("is empty by default, one per line in the form, a list in the patch, dirty when edited", () => {
+    expect(formOf(project).reviewer_web_domains).toBe("");
+    expect(patchOf(formOf(project)).reviewer_web_domains).toEqual([]);
+    const withSites = { ...project, reviewer_web_domains: ["docs.rs", "example.com"] } as Project;
+    const f = formOf(withSites);
+    expect(f.reviewer_web_domains).toBe("docs.rs\nexample.com");
+    expect(isDirty(f, withSites)).toBe(false);
+    expect(isDirty({ ...f, reviewer_web_domains: " docs.rs,\n\nexample.com " }, withSites)).toBe(false);
+    expect(isDirty({ ...f, reviewer_web_domains: "docs.rs" }, withSites)).toBe(true);
+    expect(patchOf({ ...f, reviewer_web_domains: "a.com, b.org\nc.net" }).reviewer_web_domains).toEqual(["a.com", "b.org", "c.net"]);
+    expect(sectionOfField("reviewer_web_domains")).toBe("review");
+  });
+});
+
 describe("Allow always", () => {
   const ask: Parameters<typeof canAllowAlways>[0] = {
     role: "worker", answers: ["allow", "deny"], text: "Claude Code asks for permission: Bash: ls -la",

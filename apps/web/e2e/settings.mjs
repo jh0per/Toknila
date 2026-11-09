@@ -203,8 +203,19 @@ try {
   await value("pr-title", "{key}: {title}", "the default title template");
   await t("pr-title").fill("[{key}] {title}");
   await t("merge-method").selectOption("squash");
+  // The sites the reviewer may read: none by default; a URL is refused at its field; then saved.
+  await value("reviewer-web-domains", "", "the reviewer may read no site by default");
+  if (tok("project", "show", "DEMO").includes("reviewer reads")) throw new Error("a new project lists sites for the reviewer");
+  await t("reviewer-web-domains").fill("https://docs.rs/x");
+  await t("save-settings").click();
+  await expectText(t("error-reviewer_web_domains"), "plain host name", "a URL is refused at the sites field");
+  await t("reviewer-web-domains").fill("Docs.rs\nexample.com");
   await t("save-settings").click();
   await expectText(t("saved"), "Saved", "review and merge settings saved");
+  if (!tok("project", "show", "DEMO").includes("reviewer reads: docs.rs, example.com")) {
+    throw new Error(`tok project show: ${tok("project", "show", "DEMO")}`);
+  }
+  console.log("PASS the reviewer's sites are saved lower-cased and tok project show lists them");
 
   // The top bar of the chain shows the new limit; a project that opens pull requests has the tab.
   await page.goto(at("/projects/DEMO/chains/demo"));
@@ -241,6 +252,9 @@ try {
   const mode = await t("review-mode").inputValue();
   if (mode !== "agent") throw new Error(`after the restart: review mode ${mode}`);
   console.log("PASS review mode agent survives a daemon restart");
+  const sites = await t("reviewer-web-domains").inputValue();
+  if (sites !== "docs.rs\nexample.com") throw new Error(`after the restart: reviewer sites ${JSON.stringify(sites)}`);
+  console.log("PASS the reviewer's sites survive a daemon restart");
   const merge = [await t("merge-mode").inputValue(), await t("pr-title").inputValue(), await t("merge-method").inputValue()];
   if (merge.join("|") !== "github|[{key}] {title}|squash") throw new Error(`after the restart: merge settings ${merge}`);
   console.log("PASS merge mode github, the title template and squash survive a daemon restart");

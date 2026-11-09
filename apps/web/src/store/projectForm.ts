@@ -20,6 +20,13 @@ export interface ProjectForm {
   merge_method: MergeMethod;
   command_policy: CommandPolicy;
   allowed_commands: string[];
+  /// The sites the reviewer may read, one per line as the person typed them.
+  reviewer_web_domains: string;
+}
+
+/// The words of a list of sites typed one per line (commas and spaces separate too).
+export function domainsOf(text: string): string[] {
+  return text.split(/[\s,]+/).filter((d) => d !== "");
 }
 
 /// The form as the project has it now.
@@ -39,6 +46,7 @@ export function formOf(p: Project): ProjectForm {
     merge_method: p.merge.method,
     command_policy: p.command_policy ?? "ask",
     allowed_commands: p.allowed_commands ?? [],
+    reviewer_web_domains: (p.reviewer_web_domains ?? []).join("\n"),
   };
 }
 
@@ -48,6 +56,7 @@ const TEXT = ["work_branch", "check_command", "worker_model", "reviewer_model", 
 export function tidy(f: ProjectForm): ProjectForm {
   const out = { ...f };
   for (const k of TEXT) out[k] = f[k].trim();
+  out.reviewer_web_domains = domainsOf(f.reviewer_web_domains).join("\n");
   return out;
 }
 
@@ -69,6 +78,7 @@ export function patchOf(f: ProjectForm): PatchProject {
     merge_method: t.merge_method,
     command_policy: t.command_policy,
     allowed_commands: t.allowed_commands,
+    reviewer_web_domains: domainsOf(t.reviewer_web_domains),
   };
 }
 
@@ -90,6 +100,7 @@ export function sectionOfField(field: string): ProjectSection {
       return "agents";
     case "review_mode":
     case "reviewer":
+    case "reviewer_web_domains":
     case "merge_mode":
     case "pr_title":
     case "merge_method":

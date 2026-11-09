@@ -50,6 +50,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 model: project.worker_model.clone(),
                 command_policy: project.command_policy,
                 allowed_commands: project.allowed_commands.clone(),
+                web_domains: Vec::new(),
                 project: None,
             },
         });
