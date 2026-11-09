@@ -86,6 +86,10 @@ a.node.moving { z-index: 6; cursor: grabbing; box-shadow: 0 6px 18px color-mix(i
 .canvas-cut { color: var(--muted); }
 .canvas-corner { position: absolute; right: 16px; bottom: 8px; display: flex; gap: var(--s2); align-items: center; pointer-events: none; z-index: 4; }
 .canvas-corner .btn { pointer-events: auto; padding: 1px 10px; font-size: var(--fs-s); }
+.canvas-zoom { display: inline-flex; align-items: center; gap: 2px; pointer-events: auto; }
+.canvas-zoom .btn { padding: 1px 8px; min-width: 24px; }
+.canvas-zoom-value { min-width: 40px; text-align: center; font-size: var(--fs-s); font-variant-numeric: tabular-nums; color: var(--muted);
+  padding: 2px 4px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--bg) 85%, transparent); }
 .canvas-legend { display: flex; gap: 12px; }
 .canvas-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--sc); font-weight: 600; }
 .canvas-legend span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sc); }

@@ -78,7 +78,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
   const inner = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const { width, height } = canvasSize(scene.nodes.map((n) => n.box));
-  const fit = useFit(root, width, height);
+  const fit = useFit(root, chainId, width, height);
   zoomRef.current = fit.zoom;
   const local = (clientX: number, clientY: number): Pt => {
     const r = inner.current?.getBoundingClientRect();
@@ -285,7 +285,8 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
       </div>
       {onEmpty && chain.tickets.length === 0 && <div className="canvas-empty" data-testid="chain-empty">{onEmpty}</div>}
       <CanvasChrome
-        fitted={fit.fitted} cut={fit.cut} onFit={fit.toggle} arrangeable={scene.nodes.some((n) => n.placed)}
+        zoom={fit.zoom} fitted={fit.fitted} cut={fit.cut} onFit={fit.fit} onZoomIn={fit.zoomIn} onZoomOut={fit.zoomOut}
+        arrangeable={scene.nodes.some((n) => n.placed)}
         onArrange={() => dispatch({ type: "arrangeChain", chain: chainId })} linking={linkingKey} onCancelLinking={() => setLinking(undefined)} />
       {menu?.kind === "cancel" && (
         <div className="ctx-menu cancel-pop" style={{ left: popAt(menu), top: menu.y }}>

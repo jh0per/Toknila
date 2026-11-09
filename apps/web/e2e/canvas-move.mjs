@@ -159,6 +159,72 @@ try {
   check((await page.locator("[data-testid=arrange]").count()) === 0, "Arrange goes away again");
   await shot("arranged");
 
+  // Zoom: a pinch (a wheel event with ctrlKey), the keys and the buttons.
+  // One frame later, so the page has drawn what the last event changed.
+  const frame = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30))));
+  const zoomNow = async () => {
+    await frame();
+    return page.evaluate(() => Number(document.querySelector(".canvas-inner").dataset.zoom));
+  };
+  const shown = async () => (await page.locator("[data-testid=zoom-value]").textContent()).trim();
+  const pinch = (deltaY) =>
+    page.evaluate((dy) => {
+      const c = document.querySelector("[data-testid=canvas]");
+      const r = c.getBoundingClientRect();
+      const ev = new WheelEvent("wheel", { deltaY: dy, ctrlKey: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2, bubbles: true, cancelable: true });
+      c.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    }, deltaY);
+  check((await zoomNow()) === 1 && (await shown()) === "100%", "the diagram starts at 100%", await shown());
+  check(await pinch(-20), "a pinch is taken by the diagram (the page does not zoom)");
+  const grown = await zoomNow();
+  check(grown > 1 && grown <= 2, "pinching out zooms in", String(grown));
+  check((await shown()) === `${Math.round(grown * 100)}%`, "the percentage follows the zoom", await shown());
+  for (let i = 0; i < 40; i++) await pinch(-100);
+  check((await zoomNow()) === 2, "zooming in stops at 200%", String(await zoomNow()));
+  check(await page.locator("[data-testid=zoom-in]").isDisabled(), "the + button is disabled at 200%");
+  for (let i = 0; i < 80; i++) await pinch(100);
+  check((await zoomNow()) === 0.4, "zooming out stops at 40%", String(await zoomNow()));
+  check((await shown()) === "40%", "the percentage says 40%", await shown());
+  await page.keyboard.press("Meta+0");
+  check((await zoomNow()) === 1, "Cmd+0 goes back to 100%", String(await zoomNow()));
+  await page.keyboard.press("Control+=");
+  check((await zoomNow()) > 1, "Ctrl+= zooms in a step", String(await zoomNow()));
+  await page.keyboard.press("Control+-");
+  await page.keyboard.press("Control+-");
+  check((await zoomNow()) < 1, "Ctrl+- zooms out a step", String(await zoomNow()));
+  await page.keyboard.press("Meta+0");
+  await page.locator("[data-testid=zoom-in]").click();
+  await page.locator("[data-testid=zoom-in]").click();
+  await page.locator("[data-testid=zoom-in]").click();
+  const z = await zoomNow();
+  check(z === 1.5, "the + button steps up", String(z));
+  await page.locator("[data-testid=fit]").click();
+  check((await zoomNow()) <= 1 && (await page.locator("[data-testid=fit]").getAttribute("aria-pressed")) === "true", "Fit sets the fitting zoom");
+  await page.locator("[data-testid=zoom-in]").click();
+  check((await page.locator("[data-testid=fit]").getAttribute("aria-pressed")) === "false", "zooming by hand ends fitting");
+  await page.keyboard.press("Meta+0");
+  for (let i = 0; i < 3; i++) await page.locator("[data-testid=zoom-in]").click();
+  await shot("zoomed");
+  // A drag at 150% lands the card where the pointer let go: the saved place moves by the
+  // pointer's distance divided by the zoom.
+  const baseOf = async (key) => {
+    const w = await where(key);
+    return { x: w.x / 1.5, y: w.y / 1.5 };
+  };
+  const from = await baseOf("MOV-2");
+  await drag("MOV-2", 150, 90);
+  const want = { x: from.x + 100, y: from.y + 60 };
+  const got = await baseOf("MOV-2");
+  check(Math.abs(got.x - want.x) <= 8 && Math.abs(got.y - want.y) <= 8, "a drag at 150% moves the card by the distance over the zoom", `${JSON.stringify(from)} -> ${JSON.stringify(got)}`);
+  const kept = savedPos("MOV-2");
+  for (let i = 0; i < 20 && !kept; i++) await page.waitForTimeout(100);
+  check(Math.abs(savedPos("MOV-2").x - want.x) <= 8, "and the saved place is in diagram pixels", JSON.stringify(savedPos("MOV-2")));
+  await open();
+  await card("MOV-3").waitFor();
+  check((await zoomNow()) === 1.5, "the zoom is remembered for the chain after a reload", String(await zoomNow()));
+  await page.keyboard.press("Meta+0");
+
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
   console.log("web canvas move: PASS");
 } catch (e) {
