@@ -1,0 +1,100 @@
+# Phase 3: the daemon carries more of the work a person did by hand in runs 3 and 4
+# (docs/runs/claude-code-e2e-3.md, docs/runs/claude-code-e2e-4.md), and the window takes a
+# non-technical person from a finished chain to a release.
+# Import: in the window, Import on the TOKNILA project; or
+#         tok chain import plans/phase-3.toml --project TOKNILA
+#
+# Cards that do not depend on each other can run in parallel; the order is the priority.
+
+[chain]
+name = "phase-3"
+goal = "A card runs from start to merge without a person fixing process slips: shell edits refused, private files unreachable, one check at a time, a ship that keeps up with main, questions that never get lost, hand-ins that say what they did; and a finished chain becomes a release from the window"
+autostart = false
+
+[[ticket]]
+id = "shell-edits"
+title = "Shell edits are refused, not asked about"
+prompt = "Every card agent in run 4 started with a python3 heredoc or a sed -i although the instructions say to use Edit and Write. Each one costs the person a prompt. In the permission hook, recognise a Bash command that writes a file through a shell (a heredoc that redirects into a file, sed -i, perl -pi, python - <<, tee into a tracked path) and deny it at once with the reason the instructions give (use Edit or Write; they are approved without asking), without an inbox item. Plain reads (cat, sed -n, grep) and writes into the agent's own scratchpad stay as they are. The rule is a pure core function with tests over a list of real commands seen in runs 3 and 4; the daemon hook test covers the deny and the reason the agent reads."
+acceptance = [
+  "A heredoc into a repository file, sed -i and perl -pi are denied with the Edit/Write reason and never reach the inbox",
+  "A heredoc into the agent's scratchpad, sed -n and cat are not affected",
+  "The decision is a core rule with tests over commands seen in the real runs",
+]
+
+[[ticket]]
+id = "read-sandbox"
+title = "An agent cannot read the person's private files"
+prompt = "An agent may read anything the person can; in run 4 one asked to copy ~/.claude/projects (every conversation of the owner). The instructions now forbid it; make the run's settings enforce it. Add Claude Code deny rules for Read, Grep, Glob and Bash on the person's private folders (the Claude Code home itself, ~/.ssh, ~/.gnupg, ~/Library/Keychains, the shell history files, the Toknila data home outside the agent's own run folder) to every worker, reviewer and planner run, in the per-run settings.json. Keep the agent's own scratchpad and the workspace fully open. Verify with a wiring unit test on the generated settings and with one live probe (claude -p --model haiku, a Read of ~/.claude/settings.json is refused)."
+acceptance = [
+  "The per-run settings.json denies Read, Grep, Glob and Bash on the listed private folders for every role",
+  "A probe with the real claude in -p mode shows the read refused while a read in the workspace works",
+  "The folder list is one core constant with a test and is documented in docs/architecture.md",
+]
+
+[[ticket]]
+id = "check-queue"
+title = "One check command at a time on this machine"
+prompt = "Two cards and the orchestrator ran three full test suites at once and the load reached 50 on 12 cores. The daemon now runs the check command itself on finished (TOKNILA-25); make it a queue: at most one check runs per machine (across projects), the others wait with the card in the Check turn and the status sentence saying it waits for another check to end; the queue position shows in the card. The agents' own test runs are told about it in the instructions: run the check once, not in a loop. Covered by daemon tests with two cards finishing at once and the fake checker holding the first one."
+acceptance = [
+  "Two hand-ins at once run their checks one after the other; the second card says it waits for the first",
+  "The queue survives a daemon restart (a check that was waiting starts after the restart)",
+  "The instructions tell the agent to run the check once",
+]
+
+[[ticket]]
+id = "keep-up-with-main"
+title = "A ship that fell behind main is brought up before Accept"
+prompt = "TOKNILA-25 had to merge main twice by hand and the person had to ask for it; TOKNILA-14 and 25 both took migration 16. Before a hand-in enters Review, the daemon checks whether the project's base moved since the ship started; if it did, it merges the base into the ship itself (a merge commit, no rebase), reruns the check, and only then starts the review. A conflict sends the card back to the worker with the conflicting files named as an instruction (a round of the loop). Accept on a ship that is behind does the same before merging. The schema migration numbers get a guard: a second migration with a number already on the base is reported in that conflict message by name."
+acceptance = [
+  "A hand-in on a ship behind main gets main merged in and the check rerun before anyone reviews",
+  "A merge conflict returns the card to the worker with the files named; the person is not asked",
+  "Two branches adding the same migration number are caught at the merge and named",
+]
+
+[[ticket]]
+id = "question-wins"
+title = "A question is never lost behind the silent state"
+prompt = "In run 4 an agent called ask_human while its card was already Waiting: silent; the tool answered that the card waits, but no question reached the inbox and the answer route said the worker asks nothing. Reproduce with the fake agent (idle past idle_secs, then ask_human) and fix the daemon: a question always replaces the silent reason, shows in the inbox with its answers, and the answer reaches the agent. Cover the reverse too: a nudge for silence must not clear an open question."
+acceptance = [
+  "ask_human after the silent nudge puts the question in the inbox and the answer is delivered",
+  "A nudge never clears an open question",
+  "Covered by a daemon test with the fake agent",
+]
+
+[[ticket]]
+id = "hand-in-says"
+title = "A hand-in says what it did"
+prompt = "Most hand-ins of run 4 were a one-line gist, so the person read the diff instead. The finished tool takes a structured summary: what changed (a few lines), each check as PASS, FAIL, NOT_RUN or BLOCKED with one line of evidence, and what is left or not covered. The daemon refuses a finished whose summary lacks the checks section or is under a small minimum, with the template in the refusal. The Review card and the inbox row show the structured summary above Accept and Return. The instructions carry the template."
+acceptance = [
+  "finished without the checks section is refused with the template; a complete one is accepted",
+  "The Review card shows what changed, the checks and what is left, each as its own block",
+  "The instructions and the glossary name the template",
+]
+
+[[ticket]]
+id = "release-from-window"
+title = "A finished chain becomes a release from the window"
+prompt = "The Finish node of a chain says 'Everything above is done' and stops there. For a non-technical person the next step is a release. When every card of a chain is merged, the Finish node (or the chain's release node) offers 'Release': the person picks a version (suggested from the last tag), Toknila runs the project's release steps on the base branch (the check command, a version bump when the project names a bump command, a tag, and a push when the project merges by pull request) through a release agent or plain git, shows each step as it runs, and marks the release node released with the tag. Nothing is pushed or tagged without the person's click, and a failure stops with the step named."
+acceptance = [
+  "A chain with every card merged shows Release on its end node; a chain with open cards does not",
+  "Release runs the check, the optional bump command, the tag and the optional push, one step at a time with its output, and stops at the first failure",
+  "The release node reads released with the tag; an e2e with a temp repository covers the happy path",
+]
+
+[[ticket]]
+id = "settings-leftovers"
+title = "Settings: the no-checks timeout and the warning mark"
+prompt = "Two small leftovers of phase 2: the pull-request no-checks timeout (TOKNILA-11) is API and CLI only; add it to the project settings page under the pull-request mode with the 10-minute default. The system check warning mark (TOKNILA-21) uses the failure colour; give it an amber token so a warning does not read as an error."
+acceptance = [
+  "The timeout is in settings next to the merge mode, saved with the Save bar, covered by the settings e2e",
+  "A warning line shows an amber mark, a failure a red one",
+]
+
+[[ticket]]
+id = "ci-dmg-retry"
+title = "The macOS release build does not fail on a busy disk image"
+prompt = "The release build on the macOS runner failed once with 'hdiutil: create failed - Resource busy' while bundling the dmg, a known runner flake. Retry the dmg step up to three times with a short pause in cargo xtask app (or the release workflow), and say in the log which attempt succeeded."
+acceptance = [
+  "A simulated busy failure on the first attempt still produces the dmg on a later attempt, covered by a unit test of the retry",
+  "The workflow log names the attempt",
+]
