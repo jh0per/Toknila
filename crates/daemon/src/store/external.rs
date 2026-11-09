@@ -7,9 +7,9 @@ use std::sync::Arc;
 use toknila_app::ships::{self, GuardError};
 use toknila_app::{
     AppError, MergeError, MergeOutcome, Merger, ShipError, Shipyard,
-    external::{self, ExternalEffect},
+    external::{self, ExternalEffect, ExternalOutcome},
 };
-use toknila_core::{Actor, MergeSpec, Ship, ShipLook, ShipSpec};
+use toknila_core::{Actor, MergeSpec, Ship, ShipLook, ShipSpec, TicketId};
 
 use super::{Store, Yard};
 
@@ -34,6 +34,7 @@ impl Store {
             if queued.is_empty() {
                 return;
             }
+            self.log_checks_starting(&queued).await;
             let runner = self.runner.clone();
             let merger = self.merger.clone();
             let checker = self.checker.clone();
@@ -54,6 +55,16 @@ impl Store {
                 Ok(outcomes) => outcomes,
                 Err(e) => return tracing::error!(error = %e, "external effects panicked"),
             };
+            let mut outcomes = outcomes;
+            if self.tasks.closing() {
+                // The daemon is stopping: a check that was killed with it did not end, and its
+                // card is handed to a person at the next start.
+                outcomes.retain(|o| !matches!(o, ExternalOutcome::CheckFinished { .. }));
+            }
+            self.log_checks_ended(&outcomes).await;
+            if outcomes.is_empty() {
+                return;
+            }
             let now = crate::server::now();
             let recorded = self
                 .commit_with_effects(Actor::System, now, move |tx| -> Result<(), AppError> {
@@ -70,6 +81,43 @@ impl Store {
 }
 
 impl Store {
+    /// The key of a ticket for the log.
+    async fn key_of(&self, ticket: TicketId) -> String {
+        match self.read(move |r| r.ticket(ticket)).await {
+            Ok(Some(t)) => t.key.to_string(),
+            _ => ticket.to_string(),
+        }
+    }
+
+    async fn log_checks_starting(&self, queued: &[ExternalEffect]) {
+        for e in queued {
+            if let ExternalEffect::RunCheck { ticket, spec } = e {
+                let key = self.key_of(*ticket).await;
+                match spec {
+                    Some(s) => {
+                        tracing::info!(ticket = %key, command = %s.command, dir = %s.dir, "check starting");
+                    }
+                    None => tracing::info!(ticket = %key, "check has nothing to run"),
+                }
+            }
+        }
+    }
+
+    async fn log_checks_ended(&self, outcomes: &[ExternalOutcome]) {
+        for o in outcomes {
+            if let ExternalOutcome::CheckFinished { ticket, result, .. } = o {
+                let key = self.key_of(*ticket).await;
+                let status = match result {
+                    Ok(r) if r.timed_out => "timed out".to_owned(),
+                    Ok(r) if r.success => "passed".to_owned(),
+                    Ok(r) => format!("failed (code {:?})", r.code),
+                    Err(e) => format!("could not run: {e}"),
+                };
+                tracing::info!(ticket = %key, status = %status, "check ended, recording the result");
+            }
+        }
+    }
+
     /// The shipyard the store's commands make ships in; `None` when tickets run without ships.
     pub fn shipyard(&self) -> Option<Yard> {
         self.yard.clone()

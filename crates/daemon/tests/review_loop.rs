@@ -49,6 +49,7 @@ fn commit_file(dir: &Path, name: &str, content: &str) {
 struct Rig {
     _tmp: tempfile::TempDir,
     app: axum::Router,
+    store: Store,
     ship: PathBuf,
 }
 
@@ -67,7 +68,7 @@ impl Rig {
         let (runners, _) =
             toknila_daemon::runner::Runners::new(tmp.path().join("runs"), tmp.path().join("p"));
         let app = router(AppState {
-            store,
+            store: store.clone(),
             token: TOKEN.into(),
             shutdown: Arc::new(Notify::new()),
             profiles: tmp.path().join("p"),
@@ -81,6 +82,7 @@ impl Rig {
         let mut rig = Rig {
             _tmp: tmp,
             app,
+            store,
             ship: PathBuf::new(),
         };
         let project = rig
@@ -126,6 +128,8 @@ impl Rig {
             .body(Body::from(body.to_string()))
             .expect("request");
         let resp = self.app.clone().oneshot(req).await.expect("response");
+        // The effects of the command (the check, git) run after the answer; wait for them.
+        self.store.settled().await;
         let status = resp.status();
         let bytes = resp.into_body().collect().await.expect("body").to_bytes();
         (

@@ -23,6 +23,9 @@ pub enum RunError {
     Other(String),
 }
 
+/// How long the daemon waits for effect tasks (git, merges, checks) when it stops.
+const EFFECTS_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// Is a daemon answering at the address in `daemon.json`?
 pub async fn probe(info: &DaemonInfo) -> bool {
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, info.port));
@@ -75,6 +78,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         None => new_token().map_err(RunError::Other)?.into(),
     };
     let shutdown = Arc::new(Notify::new());
+    let store_for_stop = store.clone();
     let state = AppState {
         store,
         token: token.clone(),
@@ -118,6 +122,10 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
             }
         })
         .await;
+
+    // A check still running is killed with the daemon (the next start hands its card to a person);
+    // other effect tasks get a few seconds to record what they did.
+    store_for_stop.shutdown(EFFECTS_GRACE).await;
 
     // Agents do not outlive the daemon that started them; the next start marks their tickets
     // `runner_lost`.

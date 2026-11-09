@@ -14,6 +14,7 @@ mod ports;
 mod projects;
 mod removal;
 mod schema;
+mod settle;
 mod ships;
 mod threads;
 mod tickets;
@@ -135,6 +136,7 @@ pub struct Store {
     merger: Merges,
     checker: Checks,
     runner: Agents,
+    tasks: Arc<settle::Tasks>,
 }
 
 impl Store {
@@ -171,6 +173,7 @@ impl Store {
             merger: Arc::new(external::NoMerger),
             checker: Arc::new(crate::checker::ShellChecker::default()),
             runner: Arc::new(NoRunner),
+            tasks: settle::Tasks::new(),
         }
     }
 
@@ -223,7 +226,9 @@ impl Store {
         F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
     {
         let (value, emitted, queued) = self.commit_with_effects(actor, now, f).await?;
-        self.after_commit(queued).await;
+        // The effects run in a task of their own: a caller that is dropped (a request whose
+        // client left) still gets them run and their outcomes recorded. Wait with `settled`.
+        self.detach_effects(queued);
         Ok((value, emitted))
     }
 

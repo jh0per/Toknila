@@ -11,7 +11,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shipOf } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -243,7 +243,7 @@ try {
 
   // The agent hands in: the card is in review. Return it with a comment: round 1.
   // The work is committed on the ship first: handing in a ship with nothing committed is refused.
-  const ship = JSON.parse(tok("show", "WEB-1", "--json")).ship.path;
+  const ship = shipOf(tok, "WEB-1");
   writeFileSync(join(ship, "work.txt"), "work\n");
   git(ship, "add", "work.txt");
   git(ship, "commit", "--quiet", "-m", "work");

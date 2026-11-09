@@ -105,6 +105,18 @@ export async function stopDaemon(tok, home) {
   }
 }
 
+/// The workspace folder of a card. The daemon makes it after the command that started the card
+/// has answered, so this waits (up to 20 s) until the card has one.
+export function shipOf(tok, key) {
+  const until = Date.now() + 20_000;
+  for (;;) {
+    const path = JSON.parse(tok("show", key, "--json")).ship?.path;
+    if (path) return path;
+    if (Date.now() > until) throw new Error(`${key} has no workspace folder`);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+  }
+}
+
 /// Final cleanup of a script: stops the daemon, waits for it, removes the temp home. A folder that
 /// cannot be removed is a warning only: the checks have already decided the exit code.
 export async function cleanup(tok, home) {

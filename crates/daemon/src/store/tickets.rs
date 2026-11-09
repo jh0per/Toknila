@@ -22,7 +22,29 @@ impl Repo<'_> {
         Ok(out)
     }
 
+    /// Says in the log when a card's review turn changes (who is awaited, or the check runs).
+    fn log_turn_change(&self, t: &Ticket) {
+        use rusqlite::OptionalExtension;
+        let old: Option<Option<String>> = self
+            .conn
+            .query_row(
+                "SELECT review_json FROM tickets WHERE id = ?1",
+                [t.id.to_string()],
+                |r| r.get(0),
+            )
+            .optional()
+            .unwrap_or(None);
+        let Some(old) = old else { return };
+        let from = old
+            .and_then(|s| serde_json::from_str::<toknila_core::Review>(&s).ok())
+            .and_then(|r| r.turn);
+        if from != t.review.turn {
+            tracing::info!(ticket = %t.key, from = ?from, to = ?t.review.turn, "review turn changed");
+        }
+    }
+
     pub fn upsert_ticket(&self, t: &Ticket) -> Result<(), StoreError> {
+        self.log_turn_change(t);
         self.conn.execute(
             &format!(
                 "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26) \
