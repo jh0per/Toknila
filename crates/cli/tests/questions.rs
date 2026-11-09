@@ -229,6 +229,16 @@ fn the_worker_process_ends_at_the_hand_in_and_a_return_starts_a_new_run_with_the
     common::git(&ship, &["add", "a.txt"]);
     common::git(&ship, &["commit", "--quiet", "-m", "a"]);
     tok.run(&["comment", "DEMO-1", "use the Edit tool"]);
+    // The command answers before the instruction is typed; only a delivered one is carried
+    // over to a new run.
+    wait_until("the instruction to be delivered", || {
+        tok.run(&["show", "DEMO-1"])["comments"]
+            .as_array()
+            .is_some_and(|c| {
+                c.iter()
+                    .any(|c| c["kind"] == "instruction" && !c["delivered_at"].is_null())
+            })
+    });
     tok.run(&["sim", "DEMO-1", "finish", "done"]);
     assert_eq!(tok.status("DEMO-1"), "review");
 

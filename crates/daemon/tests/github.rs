@@ -143,6 +143,7 @@ impl Rig {
             .body(Body::from(body.to_string()))
             .expect("request");
         let resp = self.app.clone().oneshot(req).await.expect("response");
+        self.store.settled().await;
         let ok = resp.status().is_success();
         let bytes = resp.into_body().collect().await.expect("body").to_bytes();
         let v: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
@@ -212,6 +213,7 @@ impl Rig {
 
     async fn tick(&self) {
         toknila_daemon::pr_watch::tick(&self.store).await;
+        self.store.settled().await;
     }
 
     async fn status(&self) -> String {
