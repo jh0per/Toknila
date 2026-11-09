@@ -11,6 +11,8 @@ pub struct ShipState {
     pub changed: Vec<String>,
     /// Commits on the ship's branch that its starting point does not have.
     pub ahead: u32,
+    /// The commit the worktree's HEAD is at; `None` when the host did not say.
+    pub head: Option<String>,
 }
 
 /// Why a ship's work cannot go on to review or to the base branch.
@@ -36,6 +38,38 @@ pub fn judge(state: &ShipState) -> Result<(), ShipProblem> {
         return Err(ShipProblem::Empty);
     }
     Ok(())
+}
+
+/// The Return a hand-in answers, when the ship is still at the commit that was handed in before
+/// that Return: nothing was changed, so the hand-in is refused.
+pub fn unchanged_since_return<'a>(
+    state: &ShipState,
+    review: &'a crate::Review,
+) -> Option<&'a crate::ReviewRound> {
+    let head = state.head.as_deref()?;
+    if review.handed_in.as_deref() != Some(head) {
+        return None;
+    }
+    review.open_return()
+}
+
+/// What the agent is told when its hand-in after a Return carries no new commit: the Return's
+/// text, and that the hand-in must carry new commits.
+pub fn unchanged_for_agent(round: &crate::ReviewRound, head: &str) -> String {
+    let by = crate::instructions::returned_by(round.reviewer);
+    let text = if round.comment.trim().is_empty() {
+        "(no text)".to_owned()
+    } else {
+        round.comment.trim().to_owned()
+    };
+    format!(
+        "Not finished: round {n} was returned by {by} and the branch is still at the commit you \
+         handed in before ({short}). A hand-in after a Return must carry new commits. Read the \
+         Return, make the change it asks for, commit it, then call `finished` again, naming the \
+         new commit.\n\nThe Return:\n{text}",
+        n = round.number,
+        short = crate::instructions::short_commit(head),
+    )
 }
 
 /// The paths as a short list: the first few, then how many more.
@@ -78,6 +112,7 @@ mod tests {
         ShipState {
             changed: changed.iter().map(|s| (*s).to_owned()).collect(),
             ahead,
+            head: None,
         }
     }
 
@@ -103,6 +138,58 @@ mod tests {
             judge(&state(&["new.rs"], 0)),
             Err(ShipProblem::Uncommitted { .. })
         ));
+    }
+
+    fn returned_review(commit: &str) -> crate::Review {
+        let mut r = crate::Review {
+            handed_in: Some(commit.to_owned()),
+            ..crate::Review::default()
+        };
+        r.record(
+            crate::Actor::Agent,
+            crate::Verdict::RequestChanges,
+            "Rename the flag",
+            crate::Timestamp(1),
+        );
+        r
+    }
+
+    fn at(head: Option<&str>) -> ShipState {
+        ShipState {
+            ahead: 1,
+            head: head.map(str::to_owned),
+            ..ShipState::default()
+        }
+    }
+
+    #[test]
+    fn a_hand_in_at_the_returned_commit_is_unchanged_and_a_new_commit_is_not() {
+        let review = returned_review("f8afe06aaaa");
+        let round = unchanged_since_return(&at(Some("f8afe06aaaa")), &review).expect("same");
+        let text = unchanged_for_agent(round, "f8afe06aaaa");
+        for want in [
+            "round 1",
+            "the reviewer",
+            "f8afe06",
+            "new commits",
+            "Rename the flag",
+        ] {
+            assert!(text.contains(want), "{want}: {text}");
+        }
+        assert!(unchanged_since_return(&at(Some("b0b0b0b")), &review).is_none());
+        assert!(unchanged_since_return(&at(None), &review).is_none());
+        // No Return since: the same commit is an ordinary hand-in.
+        let mut approved = returned_review("f8afe06aaaa");
+        approved.record(
+            crate::Actor::Human,
+            crate::Verdict::Approve,
+            "",
+            crate::Timestamp(2),
+        );
+        assert!(unchanged_since_return(&at(Some("f8afe06aaaa")), &approved).is_none());
+        assert!(
+            unchanged_since_return(&at(Some("f8afe06aaaa")), &crate::Review::default()).is_none()
+        );
     }
 
     #[test]

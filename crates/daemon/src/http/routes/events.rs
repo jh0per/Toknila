@@ -36,6 +36,7 @@ pub async fn agent_event(
     let (at, prices) = stamp(&state);
     // The ship is looked at here, off the store thread and before the command: git never runs
     // inside a transaction. The card stays Running when the work is not in commits.
+    let mut handed_in = None;
     if matches!(event, AgentEvent::Finished { .. }) {
         let looked = ticket.clone();
         let target = state
@@ -49,11 +50,19 @@ pub async fn agent_event(
             .await??;
         principal.owns(&target.0)?;
         if let Some(look) = target.1 {
-            state
+            let seen = state
                 .store
                 .guard_ship(look.clone())
                 .await
                 .map_err(|e| ships::refuse_finished(e, &look))?;
+            // A hand-in after a Return must carry new commits: the same commit is refused.
+            if let (Some(round), Some(head)) = (
+                toknila_core::guard::unchanged_since_return(&seen, &target.0.review),
+                seen.head.as_deref(),
+            ) {
+                return Err(ships::refuse_unchanged(round, head).into());
+            }
+            handed_in = seen.head;
         }
     }
     let ((detail, asked), _) = state
@@ -65,7 +74,7 @@ pub async fn agent_event(
             principal.may_send(&event)?;
             let asked = agent::turns_into_question(&*tx, &t, &event)?;
             // The ticket itself, or the card it proposed.
-            let answer = agent::ticket_event(tx, &t, event)?;
+            let answer = agent::ticket_event_at(tx, &t, event, handed_in)?;
             Ok((load_ticket_detail(&tx.repo(), answer, at, &prices)?, asked))
         })
         .await?;

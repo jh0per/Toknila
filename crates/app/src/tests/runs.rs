@@ -32,6 +32,9 @@ pub(super) struct FakeRunner {
     sized: RefCell<Vec<Size>>,
     /// What `state` reports for a live ticket.
     pub(super) reach: Cell<RunnerState>,
+    /// A profile that takes neither a kickoff nor an instructions file: a new process is not
+    /// told its brief.
+    pub(super) unbriefed: Cell<bool>,
 }
 
 impl Default for RunnerState {
@@ -57,6 +60,7 @@ impl Runner for FakeRunner {
         Ok(Started {
             run: run_of(req),
             reused,
+            briefed: !self.unbriefed.get(),
         })
     }
 

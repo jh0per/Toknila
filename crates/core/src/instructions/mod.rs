@@ -15,8 +15,12 @@ mod protocol;
 pub mod terminal;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_return;
+mod waiting;
 
 pub use planner::{ProjectFacts, generate_planner};
+pub use waiting::{Returned, Waiting, returned_by, short_commit, waiting};
 
 use crate::{Comment, CommentKind, template};
 
@@ -37,6 +41,11 @@ pub struct RunBrief<'a> {
     pub check_command: Option<&'a str>,
     /// Instructions a person gave to an earlier run of this card ([`earlier`]), as quoted text.
     pub earlier: &'a [String],
+    /// Instructions no run has acted on yet ([`waiting`]), as quoted text: the run reads them
+    /// first.
+    pub waiting: &'a [String],
+    /// The Return this run answers: the card came back from review with changes to make.
+    pub returned: Option<&'a Returned>,
     /// The person wants to approve a design before any code (`Ticket::design_first`).
     pub design_first: bool,
 }
@@ -119,6 +128,7 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
             " The instructions you were given earlier are in your Toknila instructions; follow them too.",
         );
     }
+    let first = waiting::kickoff_part(brief.waiting, brief.returned);
     if brief.design_first {
         checks.push_str(
             " Before any code, open a design thread with a first version and wait for the \
@@ -140,7 +150,7 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         _ => format!(
             "Start ticket {key} now. Read your Toknila instructions, work the card, commit your \
              work on this branch, then call `finished` and stop. Ask with `ask_human` when you \
-             need a decision.{checks}",
+             need a decision.{checks}{first}",
             key = brief.key
         ),
     }
@@ -181,6 +191,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
         }
     }
     out.push_str(&design_section(brief));
+    out.push_str(&waiting::sections(brief.waiting, brief.returned));
     out.push_str(&earlier_section(brief));
     out.push_str(&checks_section(
         brief,

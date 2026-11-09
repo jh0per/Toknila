@@ -40,6 +40,7 @@ impl Default for FakeYard {
             found: RefCell::new(Ok(ShipState {
                 changed: Vec::new(),
                 ahead: 1,
+                head: None,
             })),
             looked: RefCell::default(),
         }

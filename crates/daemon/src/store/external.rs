@@ -9,6 +9,7 @@ use toknila_app::{
     AppError, MergeError, MergeOutcome, Merger, ShipError, Shipyard,
     external::{self, ExternalEffect, ExternalOutcome},
 };
+use toknila_core::guard::ShipState;
 use toknila_core::{Actor, MergeSpec, Ship, ShipLook, ShipSpec, TicketId};
 
 use super::{Store, Yard};
@@ -126,12 +127,12 @@ impl Store {
     /// Looks at a ship's worktree on a blocking thread, outside any transaction, and judges it
     /// (`finished` is refused when the work is not committed). A store without a shipyard has no
     /// ships, so there is nothing to refuse.
-    pub async fn guard_ship(&self, look: ShipLook) -> Result<(), GuardError> {
+    pub async fn guard_ship(&self, look: ShipLook) -> Result<ShipState, GuardError> {
         let Some(yard) = self.yard.clone() else {
-            return Ok(());
+            return Ok(ShipState::default());
         };
         let judged = look.clone();
-        tokio::task::spawn_blocking(move || ships::guard(&*yard, &judged))
+        tokio::task::spawn_blocking(move || ships::guarded(&*yard, &judged))
             .await
             .unwrap_or_else(|e| {
                 Err(GuardError::Ship(ShipError::Io(format!(

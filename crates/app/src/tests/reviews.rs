@@ -570,13 +570,16 @@ fn a_card_in_review_with_worker_and_reviewer_alive_holds_two_slots() {
 }
 
 #[test]
-fn a_returns_comment_is_typed_to_the_live_worker_and_marked_delivered_once() {
+fn a_returns_comment_is_typed_to_a_live_worker_and_marked_delivered_once() {
     let mut mem = process_review(ReviewMode::Human);
     mem.runner.reach.set(crate::runner::RunnerState {
         hooks: true,
         idle: true,
         ..Default::default()
     });
+    // A worker that is still alive is kept by the restart: it gets the text typed.
+    let id = a(&mem).id;
+    mem.runner.live.borrow_mut().insert((id, AgentRole::Worker));
     let comment = "fix the look".to_owned();
     act(&mut mem, TicketEvent::Return { comment });
     settle(&mut mem);
@@ -603,6 +606,8 @@ fn the_reviewers_remarks_wait_for_the_stop_hook_of_a_working_worker() {
         idle: false,
         ..Default::default()
     });
+    let id = a(&mem).id;
+    mem.runner.live.borrow_mut().insert((id, AgentRole::Worker));
     verdict(&mut mem, Verdict::RequestChanges, "handle the empty list").expect("verdict");
     settle(&mut mem);
     assert!(

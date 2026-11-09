@@ -17,6 +17,7 @@ fn found(mem: &Mem, changed: &[&str], ahead: u32) {
     *mem.yard.found.borrow_mut() = Ok(ShipState {
         changed: changed.iter().map(|c| (*c).to_owned()).collect(),
         ahead,
+        head: None,
     });
 }
 

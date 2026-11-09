@@ -168,6 +168,8 @@ fn brief_of_key<'a>(cx: &'a Context<'_>, key: &'a str) -> instructions::RunBrief
         acceptance: &cx.brief.acceptance,
         check_command: cx.brief.check_command.as_deref(),
         earlier: &cx.brief.earlier,
+        waiting: &cx.brief.waiting,
+        returned: cx.brief.returned.as_ref(),
         design_first: cx.brief.design_first,
     }
 }

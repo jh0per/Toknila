@@ -28,6 +28,7 @@ mod planner;
 mod pull_requests;
 mod questions;
 mod resume;
+mod return_kickoff;
 mod reviews;
 mod runs;
 mod settings;
