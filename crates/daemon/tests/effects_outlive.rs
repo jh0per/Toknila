@@ -100,6 +100,7 @@ impl Rig {
         let store = Store::open(&tmp.path().join("t.db"))
             .expect("store")
             .with_shipyard(Arc::new(GitShipyard::new(tmp.path().join("ships"))))
+            .with_merger(Arc::new(toknila_daemon::github::Mergers::new()))
             .with_checker(checker);
         let (runners, _) =
             toknila_daemon::runner::Runners::new(tmp.path().join("runs"), tmp.path().join("p"));

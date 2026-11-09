@@ -12,19 +12,24 @@ use super::runs::settle;
 use crate::GitError;
 use crate::external::ExternalEffect;
 use crate::recovery::recover;
-use crate::{MergeError, MergeOutcome, Merger, agent, tickets};
+use crate::{MergeError, MergeOutcome, Merger, SyncOutcome, SyncSpec, agent, tickets};
 
 /// A merger that remembers what it was asked and answers what it was told to.
 #[derive(Debug)]
 pub(super) struct FakeMerger {
     pub(super) asked: RefCell<Vec<MergeSpec>>,
     answer: RefCell<Result<MergeOutcome, MergeError>>,
+    /// What bringing a ship up to its base was asked, and what it answers.
+    pub(super) synced: RefCell<Vec<SyncSpec>>,
+    pub(super) sync_answer: RefCell<Result<SyncOutcome, MergeError>>,
 }
 
 impl Default for FakeMerger {
     fn default() -> Self {
         Self {
             asked: RefCell::default(),
+            synced: RefCell::default(),
+            sync_answer: RefCell::new(Ok(SyncOutcome::UpToDate)),
             answer: RefCell::new(Ok(MergeOutcome::Merged {
                 commit: "abc".to_owned(),
             })),
@@ -36,6 +41,11 @@ impl Merger for FakeMerger {
     fn merge(&self, spec: &MergeSpec) -> Result<MergeOutcome, MergeError> {
         self.asked.borrow_mut().push(spec.clone());
         self.answer.borrow().clone()
+    }
+
+    fn sync(&self, spec: &SyncSpec) -> Result<SyncOutcome, MergeError> {
+        self.synced.borrow_mut().push(spec.clone());
+        self.sync_answer.borrow().clone()
     }
 }
 
@@ -52,6 +62,10 @@ pub(super) fn in_review() -> Mem {
     let a = mem.ticket_by_title("A");
     let summary = "done".to_owned();
     agent::ticket_event(&mut mem, &a, AgentEvent::Finished { summary }).expect("finished");
+    // The hand-in brings the ship up to its base first (no check command: only the sync runs);
+    // what the tests below count starts after it.
+    settle(&mut mem);
+    mem.merger.synced.borrow_mut().clear();
     mem
 }
 
@@ -219,4 +233,34 @@ fn a_merge_running_at_a_restart_is_queued_again() {
     assert_eq!(report.merges_resumed, ["DEMO-1"]);
     settle(&mut mem);
     assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Merged);
+}
+
+#[test]
+fn accept_on_a_ship_that_fell_behind_syncs_first_and_a_conflict_blocks_with_the_files() {
+    let mut mem = in_review();
+    *mem.merger.sync_answer.borrow_mut() = Ok(SyncOutcome::Conflict {
+        files: vec!["src/lib.rs".to_owned()],
+        migrations: Vec::new(),
+    });
+    accept(&mut mem);
+    settle(&mut mem);
+    let a = mem.ticket_by_title("A");
+    assert_eq!(mem.merger.synced.borrow().len(), 1);
+    assert!(
+        mem.merger.asked.borrow().is_empty(),
+        "the merge did not run"
+    );
+    let BlockedReason::MergeConflict { detail } = blocked_reason(&a) else {
+        panic!("expected a merge conflict");
+    };
+    assert!(detail.contains("src/lib.rs"), "{detail}");
+}
+
+#[test]
+fn accept_syncs_the_ship_before_the_merge() {
+    let mut mem = in_review();
+    accept(&mut mem);
+    settle(&mut mem);
+    assert_eq!(mem.merger.synced.borrow().len(), 1);
+    assert_eq!(mem.merger.asked.borrow().len(), 1);
 }

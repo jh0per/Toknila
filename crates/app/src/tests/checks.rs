@@ -17,7 +17,8 @@ use super::runs::{a, finish, settle, with_agents};
 use crate::checks::{CheckError, CheckResult, CheckSpec, Checker};
 use crate::external::ExternalEffect;
 use crate::recovery::recover;
-use crate::{agent, checks};
+use crate::{SyncOutcome, agent, checks};
+use toknila_core::migrations::Clash;
 
 /// A checker that remembers what it was asked and answers from a queue (a pass when empty).
 #[derive(Debug, Default)]
@@ -287,11 +288,81 @@ fn a_card_whose_check_the_restart_lost_goes_to_a_person() {
 }
 
 #[test]
-fn a_project_without_a_check_command_hands_in_as_before() {
+fn a_project_without_a_check_command_still_syncs_and_the_turn_passes_on() {
     let mut mem = running(ReviewMode::Human, 3);
     mem.project.check_command = None;
     finish(&mut mem, "done".to_owned());
+    assert_eq!(
+        a(&mem).review.turn,
+        Some(ReviewTurn::Check),
+        "the sync runs"
+    );
+    settle(&mut mem);
+    assert_eq!(mem.merger.synced.borrow().len(), 1, "the ship is synced");
+    assert!(mem.checker.asked.borrow().is_empty(), "no command ran");
+    assert_eq!(a(&mem).review.turn, Some(ReviewTurn::Person));
+}
+
+#[test]
+fn a_hand_in_brings_the_ship_up_to_its_base_before_the_check_runs() {
+    let mut mem = running(ReviewMode::Both, 3);
+    finish(&mut mem, "done".to_owned());
+    settle(&mut mem);
+    let synced = mem.merger.synced.borrow().clone();
+    assert_eq!(synced.len(), 1, "the ship is synced once");
+    assert_eq!(synced[0].path, mem.ships[0].path, "in the ship's worktree");
+    assert_eq!(mem.checker.asked.borrow().len(), 1, "then the check reruns");
+    assert_eq!(
+        a(&mem).review.turn,
+        Some(ReviewTurn::Agent { decides: false })
+    );
+}
+
+#[test]
+fn a_conflict_with_the_base_returns_the_card_to_the_worker_naming_the_files_and_the_migration() {
+    let mut mem = running(ReviewMode::Human, 3);
+    *mem.merger.sync_answer.borrow_mut() = Ok(SyncOutcome::Conflict {
+        files: vec!["src/lib.rs".to_owned()],
+        migrations: vec![Clash {
+            number: 16,
+            ship: "mine".to_owned(),
+            base: "theirs".to_owned(),
+        }],
+    });
+    finish(&mut mem, "done".to_owned());
+    settle(&mut mem);
+
     let t = a(&mem);
+    assert_eq!(t.status, TicketStatus::Running, "back to the worker");
+    assert_eq!(t.review.turn, None, "nobody is asked");
+    assert!(
+        mem.checker.asked.borrow().is_empty(),
+        "the check does not run on a ship that did not merge"
+    );
+    let sent: Vec<_> = mem
+        .comments
+        .iter()
+        .filter(|c| c.kind == CommentKind::Instruction)
+        .collect();
+    assert_eq!(sent.len(), 1, "{:?}", instructions(&mem));
+    assert_eq!(sent[0].author, Actor::System);
+    let text = format!(
+        "{} {}",
+        sent[0].body.gist,
+        sent[0].body.what.clone().unwrap_or_default()
+    );
+    assert!(text.contains("src/lib.rs"), "{text}");
+    assert!(text.contains("migration 16 is taken twice"), "{text}");
+    assert!(text.contains("\"theirs\""), "{text}");
+}
+
+#[test]
+fn a_sync_that_cannot_run_sends_the_card_to_the_person() {
+    let mut mem = running(ReviewMode::Human, 3);
+    *mem.merger.sync_answer.borrow_mut() = Err(crate::MergeError::Io("disk".to_owned()));
+    finish(&mut mem, "done".to_owned());
+    settle(&mut mem);
+    let t = a(&mem);
+    assert_eq!(t.status, TicketStatus::Review);
     assert_eq!(t.review.turn, Some(ReviewTurn::Person));
-    assert!(t.review.rounds.is_empty());
 }

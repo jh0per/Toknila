@@ -422,7 +422,9 @@ fn a_reviewer_that_exits_without_a_verdict_hands_the_card_to_a_person() {
     let t = a(&mem);
     assert_eq!(t.status, TicketStatus::Review);
     assert_eq!(t.review.turn, Some(ReviewTurn::Person));
-    assert!(t.review.rounds.is_empty());
+    // Only the daemon's own pass (the ship brought up to its base) is on the card.
+    assert_eq!(t.review.rounds.len(), 1);
+    assert_eq!(t.review.rounds[0].reviewer, Actor::System);
     let report = mem
         .comments
         .iter()

@@ -57,6 +57,8 @@ describe("the status sentence", () => {
       .toBe("In review: read the agent's report below, then Accept or Return");
     expect(statusLine(card("review"), detail([], { by: "agent", decides: true }), pace()).text)
       .toBe("In review: the reviewer agent is checking the work");
+    expect(statusLine(card("review"), detail([], { by: "check" }), pace()).text)
+      .toBe("In review: bringing the ship up to main");
     expect(statusLine(card("review"), detail([], { by: "merging" }), pace()).text)
       .toBe("Approved: merging into the main branch");
   });

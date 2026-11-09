@@ -66,6 +66,7 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
       if (turn?.by === "agent") {
         return { tone: "going", text: "In review: the reviewer agent is checking the work", next: "You can read the agent's report below meanwhile." };
       }
+      if (turn?.by === "check") return { tone: "going", text: "In review: bringing the ship up to main" };
       if (turn?.by === "merging") return { tone: "going", text: "Approved: merging into the main branch" };
       return { tone: "needs", text: "In review: read the agent's report below, then Accept or Return" };
     }
