@@ -241,7 +241,8 @@ try {
   await expectText(page.locator("[data-testid=comments]"), "also cover the empty case", "the instruction is on the card");
   await expectText(page.locator("[data-testid=comments] [data-kind=instruction]"), "instruction", "it is an instruction comment");
 
-  // The agent hands in: the card is in review. Return it with a comment: round 1.
+  // The agent hands in: the card is in review. Round 1 is the hand-in's own check (a card with a
+  // ship is brought up to its base and checked); a Return with a comment is round 2.
   // The work is committed on the ship first: handing in a ship with nothing committed is refused.
   const ship = shipOf(tok, "WEB-1");
   writeFileSync(join(ship, "work.txt"), "work\n");
@@ -253,7 +254,7 @@ try {
   await page.getByLabel("What to change").fill("handle the error case");
   await page.getByRole("button", { name: "Send back" }).click();
   await expectText(status, "running", "Return sends the card back to the agent");
-  await expectText(page.locator("[data-testid=rounds]"), "Round 1: you asked for changes — handle the error case", "the return is a review round");
+  await expectText(page.locator("[data-testid=rounds]"), "Round 2: you asked for changes — handle the error case", "the return is a review round");
 
   // Hand in again and accept: merged, and the run's end shows in the terminal. A hand-in after a
   // Return carries a new commit: the same commit is refused.

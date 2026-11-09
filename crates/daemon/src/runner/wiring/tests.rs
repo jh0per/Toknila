@@ -436,12 +436,13 @@ fn every_role_denies_read_grep_glob_and_bash_on_the_private_folders() {
         let mut private = toknila_core::private::private_paths(&home);
         private.push(other.display().to_string());
         private.push(rig.dir.path().join("runs").join("t2").display().to_string());
+        // The rules are spelled in Claude Code's rooted form (`//c/Users/...` on Windows), so
+        // they are compared as rules, not as the raw paths.
         for path in &private {
-            for tool in toknila_core::private::GUARDED_TOOLS {
+            for rule in toknila_core::private::deny_rules_for(path, &home) {
                 assert!(
-                    deny.iter().any(|r| r.starts_with(&format!("{tool}("))
-                        && r.contains(path.trim_start_matches('/'))),
-                    "{dir}: {tool} {path} missing in {deny:?}"
+                    deny.contains(&rule.as_str()),
+                    "{dir}: {rule} missing in {deny:?}"
                 );
             }
         }
