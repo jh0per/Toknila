@@ -7,10 +7,11 @@
 use std::collections::HashSet;
 
 use toknila_core::machine::TicketEvent;
-use toknila_core::{ReviewTurn, Ticket, TicketId, TicketKey, TicketStatus};
+use toknila_core::{ReviewTurn, ShipSpec, Ticket, TicketId, TicketKey, TicketStatus};
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
+use crate::sync::SyncSpec;
 use crate::{AppResult, ChainTx, Reader, UnitOfWork, projects, reviews};
 
 /// The most characters of a check's output a round and the worker's instruction keep (the end of
@@ -48,6 +49,9 @@ pub enum CheckError {
     /// The command could not be started.
     #[error("the check command could not start: {0}")]
     Io(String),
+    /// The base branch could not be brought into the ship.
+    #[error("the ship could not be brought up to its base: {0}")]
+    Sync(String),
 }
 
 /// What the application needs from the host to check a hand-in. The daemon runs the command in
@@ -75,15 +79,48 @@ pub(crate) fn queue_run<U: UnitOfWork + ?Sized>(
         return Ok(());
     };
     let project = projects::of_ticket(uow, t)?;
-    let dir = uow.ship(ticket)?.map(|s| s.path);
+    let ship = uow.ship(ticket)?;
+    // The base goes into the ship before the check runs, when the base moved.
+    let sync = match (&ship, uow.chain(t.chain_id)?) {
+        (Some(ship), Some(chain)) => ShipSpec::for_ticket(&project, &chain, t).map(|spec| {
+            let merge = ShipSpec {
+                branch: ship.branch.clone(),
+                ..spec
+            }
+            .merge_spec(&t.title, &ship.path);
+            SyncSpec::of(&merge)
+        }),
+        _ => None,
+    };
+    let dir = ship.map(|s| s.path);
     uow.defer(ExternalEffect::RunCheck {
         ticket,
         spec: project
             .check_command
             .zip(dir)
             .map(|(command, dir)| CheckSpec { command, dir }),
+        sync,
     });
     Ok(())
+}
+
+/// Bringing the ship up to its base conflicted: the card goes back to the worker with `text`, a
+/// round of the loop, like a check that failed.
+pub(crate) fn sync_conflict<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    text: String,
+) -> AppResult<()> {
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(());
+    };
+    let event = TicketEvent::CheckDone {
+        passed: false,
+        output: text,
+        mode: reviews::mode_of(uow, &t)?,
+        max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
+    };
+    tell_ticket(uow, ticket, event)
 }
 
 /// What a worker reads (and a round keeps) about a check that ran: the command, how it ended and

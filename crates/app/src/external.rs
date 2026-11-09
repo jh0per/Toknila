@@ -13,6 +13,7 @@ use toknila_core::{
 use crate::checks::{self, CheckError, CheckResult, CheckSpec, Checker};
 use crate::merges::{self, MergeError, MergeOutcome, Merger};
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError};
+use crate::sync::{SyncOutcome, SyncSpec};
 use crate::{
     AppResult, ShipError, Shipyard, UnitOfWork, instructions as deliver_instructions, reviews,
     runs, ships, ships::BranchFate,
@@ -67,9 +68,11 @@ pub enum ExternalEffect {
     DeliverInstruction { ticket: TicketId, comment: Comment },
     /// Run the project's check command in the ticket's ship. `None` when the card has no ship
     /// or the project no command: the host says so.
+    /// `sync` first merges the base into the ship when it moved.
     RunCheck {
         ticket: TicketId,
         spec: Option<CheckSpec>,
+        sync: Option<SyncSpec>,
     },
 }
 
@@ -124,6 +127,11 @@ pub enum ExternalOutcome {
         ticket: TicketId,
         spec: Option<CheckSpec>,
         result: Result<CheckResult, CheckError>,
+    },
+    /// The base could not be merged into the ship; the check did not run.
+    SyncConflict {
+        ticket: TicketId,
+        text: String,
     },
 }
 
@@ -249,10 +257,21 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 type_line(host.runner, ticket, AgentRole::Reviewer, &message);
             }
             ExternalEffect::DeliverInstruction { .. } => {}
-            ExternalEffect::RunCheck { ticket, spec } => {
-                let result = match &spec {
-                    Some(spec) => host.checker.run(spec),
-                    None => Err(CheckError::NothingToRun),
+            ExternalEffect::RunCheck { ticket, spec, sync } => {
+                let synced = match &sync {
+                    Some(sync) => host.merger.sync(sync),
+                    None => Ok(SyncOutcome::UpToDate),
+                };
+                let result = match (&spec, synced) {
+                    (_, Ok(SyncOutcome::Conflict { files, migrations })) => {
+                        let base = sync.as_ref().map(|s| s.base.as_str()).unwrap_or_default();
+                        let text = crate::sync::conflict_text(base, &files, &migrations);
+                        outcomes.push(ExternalOutcome::SyncConflict { ticket, text });
+                        continue;
+                    }
+                    (_, Err(e)) => Err(CheckError::Sync(e.to_string())),
+                    (Some(spec), Ok(_)) => host.checker.run(spec),
+                    (None, Ok(_)) => Err(CheckError::NothingToRun),
                 };
                 outcomes.push(ExternalOutcome::CheckFinished {
                     ticket,
@@ -328,6 +347,9 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             }
             ExternalOutcome::InstructionTyped { ticket, comment } => {
                 deliver_instructions::typed(uow, ticket, comment)?;
+            }
+            ExternalOutcome::SyncConflict { ticket, text } => {
+                checks::sync_conflict(uow, ticket, text)?;
             }
             ExternalOutcome::CheckFinished {
                 ticket,

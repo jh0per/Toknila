@@ -277,3 +277,114 @@ fn a_git_older_than_the_merge_needs_is_refused_with_both_versions() {
     );
     assert_eq!(check_version("git version 2.38.0"), Ok(()));
 }
+
+fn sync_spec(f: &Fixture) -> SyncSpec {
+    SyncSpec::of(&spec(f))
+}
+
+/// Commits `schema.rs` (the migration file) in `dir` with `content`.
+fn commit_schema(dir: &Path, content: &str, message: &str) {
+    let folder = dir.join("crates/daemon/src/store");
+    std::fs::create_dir_all(&folder).expect("dirs");
+    commit_file(dir, "crates/daemon/src/store/schema.rs", content, message);
+}
+
+#[test]
+fn a_ship_that_is_not_behind_is_left_alone() {
+    let f = setup();
+    let before = tip(&f.ship, "ship/x");
+    assert_eq!(
+        GitMerger::new().sync(&sync_spec(&f)),
+        Ok(SyncOutcome::UpToDate)
+    );
+    assert_eq!(tip(&f.ship, "ship/x"), before);
+}
+
+#[test]
+fn a_ship_behind_gets_the_base_merged_in_with_a_merge_commit() {
+    let f = setup();
+    commit_file(&f.repo, "other.txt", "other\n", "base moves on");
+    let base = tip(&f.repo, "develop");
+    let ship_before = tip(&f.ship, "ship/x");
+    let Ok(SyncOutcome::Merged { commit }) = GitMerger::new().sync(&sync_spec(&f)) else {
+        panic!("expected a merge");
+    };
+    assert_eq!(tip(&f.ship, "ship/x"), commit);
+    let parents = git(&f.ship, &["rev-list", "--parents", "-n", "1", &commit]);
+    assert_eq!(parents, format!("{commit} {ship_before} {base}"));
+    assert!(
+        f.ship.join("other.txt").is_file(),
+        "the ship has the base's file"
+    );
+}
+
+#[test]
+fn a_conflict_names_the_files_and_leaves_the_ship_untouched() {
+    let f = setup();
+    commit_file(
+        &f.repo,
+        "feature.txt",
+        "base version\n",
+        "base edits feature",
+    );
+    let before = tip(&f.ship, "ship/x");
+    let outcome = GitMerger::new().sync(&sync_spec(&f));
+    assert_eq!(
+        outcome,
+        Ok(SyncOutcome::Conflict {
+            files: vec!["feature.txt".to_owned()],
+            migrations: Vec::new(),
+        })
+    );
+    assert_eq!(tip(&f.ship, "ship/x"), before);
+    assert_eq!(git(&f.ship, &["status", "--porcelain"]), "");
+}
+
+#[test]
+fn a_migration_number_both_branches_took_is_named_even_when_git_merges_cleanly() {
+    let f = setup();
+    commit_schema(&f.repo, "head\n// 15: old\ntail\n", "schema");
+    git(&f.ship, &["merge", "--quiet", "develop"]);
+    commit_schema(
+        &f.ship,
+        "head\n// 15: old\ntail\n// 16: ship thing\n",
+        "ship migration",
+    );
+    commit_schema(
+        &f.repo,
+        "// 16: base thing\nhead\n// 15: old\ntail\n",
+        "base migration",
+    );
+    let before = tip(&f.ship, "ship/x");
+    let Ok(SyncOutcome::Conflict { files, migrations }) = GitMerger::new().sync(&sync_spec(&f))
+    else {
+        panic!("expected a conflict");
+    };
+    assert!(files.is_empty(), "git itself would merge this: {files:?}");
+    assert_eq!(migrations.len(), 1);
+    assert_eq!(migrations[0].number, 16);
+    assert_eq!(migrations[0].ship, "ship thing");
+    assert_eq!(migrations[0].base, "base thing");
+    assert_eq!(tip(&f.ship, "ship/x"), before, "nothing was merged");
+}
+
+#[test]
+fn different_migration_numbers_merge() {
+    let f = setup();
+    commit_schema(&f.repo, "head\n// 15: old\ntail\n", "schema");
+    git(&f.ship, &["merge", "--quiet", "develop"]);
+    commit_schema(
+        &f.ship,
+        "head\n// 15: old\ntail\n// 16: ship thing\n",
+        "ship migration",
+    );
+    commit_schema(
+        &f.repo,
+        "// 17: base thing\nhead\n// 15: old\ntail\n",
+        "base migration",
+    );
+    assert!(matches!(
+        GitMerger::new().sync(&sync_spec(&f)),
+        Ok(SyncOutcome::Merged { .. })
+    ));
+}

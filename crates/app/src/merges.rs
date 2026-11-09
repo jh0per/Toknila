@@ -14,6 +14,7 @@ use toknila_core::{
 use crate::chain::tell_ticket;
 use crate::external::{ExternalEffect, Host};
 use crate::ships::{self, GuardError};
+use crate::sync::{self, SyncOutcome, SyncSpec};
 use crate::{AppResult, GitError, UnitOfWork};
 
 /// How a merge ended when nothing went wrong on the host.
@@ -29,6 +30,8 @@ pub enum MergeOutcome {
     ShipEmpty,
     /// The branches changed the same files; the base branch is untouched.
     Conflict { files: Vec<String> },
+    /// Bringing the ship up to the base failed to merge; `detail` names the files and migrations.
+    BaseConflict { detail: String },
     /// The base branch is checked out at `path` with local changes; nothing was changed.
     BaseCheckoutDirty { path: String },
     /// Pull-request mode: the pull request is open and its checks have not all finished.
@@ -91,6 +94,15 @@ pub trait Merger: std::fmt::Debug {
     /// the pull request is merged when every check passed. Each call is one step: while checks
     /// run the answer is [`MergeOutcome::PrOpen`] and the caller asks again later.
     fn merge(&self, spec: &MergeSpec) -> Result<MergeOutcome, MergeError>;
+
+    /// Merges the base into the ship's worktree when the base moved since the ship started (a
+    /// merge commit, no rebase). A conflict, or a migration number both branches took, leaves the
+    /// ship untouched and is [`SyncOutcome::Conflict`].
+    fn sync(&self, _spec: &SyncSpec) -> Result<SyncOutcome, MergeError> {
+        Err(MergeError::Io(
+            "this merger cannot bring a ship up to its base".to_owned(),
+        ))
+    }
 }
 
 /// Runs one step of a merge on the host. When the step would push or merge the ship's work (a
@@ -109,6 +121,17 @@ pub(crate) fn run(host: &Host<'_>, spec: &MergeSpec) -> Result<MergeOutcome, Mer
             Err(GuardError::Ship(e)) => {
                 return Err(MergeError::Io(format!("cannot look at the ship: {e}")));
             }
+        }
+    }
+    if !watching {
+        // Accept on a ship that fell behind: the base goes into the ship first.
+        match host.merger.sync(&SyncSpec::of(spec))? {
+            SyncOutcome::Conflict { files, migrations } => {
+                return Ok(MergeOutcome::BaseConflict {
+                    detail: sync::conflict_text(&spec.look.start, &files, &migrations),
+                });
+            }
+            SyncOutcome::UpToDate | SyncOutcome::Merged { .. } => {}
         }
     }
     host.merger.merge(spec)
@@ -211,6 +234,7 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
                 "GitHub reports a merge conflict on {url}. Resolve it on the ship (merge the base branch into it), unblock pushes it and watches the pull request again."
             ),
         }),
+        Ok(MergeOutcome::BaseConflict { detail }) => block(BlockedReason::MergeConflict { detail }),
         Ok(MergeOutcome::Conflict { files }) => block(BlockedReason::MergeConflict {
             detail: format!(
                 "conflicting files: {}. Resolve them on the ship (merge the base branch into it), then unblock.",

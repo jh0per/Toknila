@@ -30,6 +30,7 @@ pub mod runs;
 pub mod schedule;
 pub mod ships;
 pub mod strays;
+pub mod sync;
 pub mod threads;
 pub mod tickets;
 pub mod wildcards;
@@ -41,6 +42,7 @@ pub use merges::{MergeError, MergeOutcome, Merger};
 pub use ports::{Reader, UnitOfWork};
 pub use runner::{Runner, RunnerError};
 pub use ships::{BranchFate, ShipError, Shipyard};
+pub use sync::{SyncOutcome, SyncSpec};
 
 #[cfg(test)]
 mod tests;

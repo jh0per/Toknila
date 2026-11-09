@@ -50,6 +50,8 @@ struct Rig {
     _tmp: tempfile::TempDir,
     app: axum::Router,
     ship: PathBuf,
+    /// The person's checkout, on the base branch `develop`.
+    repo: PathBuf,
 }
 
 impl Rig {
@@ -63,7 +65,8 @@ impl Rig {
 
         let store = Store::open(&tmp.path().join("t.db"))
             .expect("store")
-            .with_shipyard(Arc::new(GitShipyard::new(tmp.path().join("ships"))));
+            .with_shipyard(Arc::new(GitShipyard::new(tmp.path().join("ships"))))
+            .with_merger(Arc::new(toknila_daemon::github::Mergers::new()));
         let (runners, _) =
             toknila_daemon::runner::Runners::new(tmp.path().join("runs"), tmp.path().join("p"));
         let app = router(AppState {
@@ -82,6 +85,7 @@ impl Rig {
             _tmp: tmp,
             app,
             ship: PathBuf::new(),
+            repo: repo.clone(),
         };
         let project = rig
             .post(
@@ -320,4 +324,56 @@ async fn a_card_that_passes_the_check_and_the_reviewer_reaches_the_person_with_t
             ("agent".into(), "approve".into())
         ]
     );
+}
+
+#[tokio::test]
+async fn a_hand_in_on_a_ship_behind_the_base_gets_the_base_merged_in_before_anyone_reviews() {
+    let rig = Rig::new(3).await;
+    commit_file(&rig.repo, "from-base.txt", "base\n");
+    rig.finish("ok.txt").await;
+    let card = rig
+        .settled("the reviewer's turn", |c| {
+            c["review"]["awaiting"] == json!({ "by": "agent", "decides": false })
+        })
+        .await;
+    assert_eq!(
+        rounds(&card),
+        [("system".into(), "approve".into())],
+        "the check passed on the merged ship"
+    );
+    assert!(rig.ship.join("from-base.txt").is_file(), "base merged in");
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(&rig.ship)
+        .args(["log", "-1", "--format=%p"])
+        .output()
+        .expect("git");
+    let parents = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        parents.split_whitespace().count(),
+        2,
+        "a merge commit, no rebase"
+    );
+}
+
+#[tokio::test]
+async fn a_conflict_with_the_base_returns_the_card_to_the_worker_with_the_files_named() {
+    let rig = Rig::new(3).await;
+    commit_file(&rig.repo, "README.md", "base edit\n");
+    commit_file(&rig.ship, "README.md", "ship edit\n");
+    rig.finish("ok.txt").await;
+    let card = rig
+        .settled("the conflict to return the card", |c| {
+            c["ticket"]["status"] == "running" && !rounds(c).is_empty()
+        })
+        .await;
+    let sent = instructions(&card);
+    assert_eq!(sent.len(), 1, "{sent:?}");
+    assert!(
+        sent[0].contains("Conflicting files: README.md"),
+        "{}",
+        sent[0]
+    );
+    assert!(sent[0].contains("git merge develop"), "{}", sent[0]);
+    assert_eq!(card["review"]["awaiting"], Value::Null, "nobody is asked");
 }
