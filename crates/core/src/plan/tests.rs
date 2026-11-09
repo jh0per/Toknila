@@ -25,9 +25,30 @@ fn shape(view: &ChainView) -> Vec<(String, String, EdgeKind)> {
     e
 }
 
-fn texts(lists: Vec<Checklist>) -> HashMap<crate::TicketId, Vec<String>> {
-    let text = |c: Checklist| c.subtasks.into_iter().map(|s| s.0).collect();
-    lists.into_iter().map(|c| (c.ticket, text(c))).collect()
+fn texts(lists: Vec<Checklist>) -> HashMap<crate::TicketId, Vec<(String, bool)>> {
+    lists.into_iter().map(|c| (c.ticket, c.subtasks)).collect()
+}
+
+#[test]
+fn export_then_import_keeps_subtask_states() {
+    let plan = parse(DEMO).expect("demo parses");
+    let (view, lists) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
+    let mut subtasks = texts(lists);
+    let a = view.tickets.iter().find(|t| t.title == "A").expect("A");
+    subtasks.get_mut(&a.id).expect("A has subtasks")[1].1 = true;
+    let text = export(&view, &subtasks);
+    assert!(text.contains("done_subtasks = [2]"), "{text}");
+    let again = parse(&text).unwrap_or_else(|e| panic!("{e}\n{text}"));
+    let (view2, lists2) = again.instantiate(ProjectId::new(), Timestamp(0), keys());
+    let st2 = texts(lists2);
+    let a2 = view2.tickets.iter().find(|t| t.title == "A").expect("A");
+    assert_eq!(
+        st2[&a2.id],
+        [
+            ("write the test".to_owned(), false),
+            ("make it pass".to_owned(), true)
+        ]
+    );
 }
 
 fn err(text: &str) -> PlanError {
@@ -94,7 +115,8 @@ fn export_then_import_gives_the_same_graph() {
     assert_eq!(view.releases[0].start_mode, view2.releases[0].start_mode);
     let st2 = texts(subtasks2);
     let a2 = view2.tickets.iter().find(|t| t.title == "A").expect("A");
-    assert_eq!(st2[&a2.id], ["write the test", "make it pass"]);
+    let a_texts: Vec<&str> = st2[&a2.id].iter().map(|s| s.0.as_str()).collect();
+    assert_eq!(a_texts, ["write the test", "make it pass"]);
     // A second export is byte-identical: the format is stable.
     assert_eq!(text, export(&view2, &st2));
 }
