@@ -4,8 +4,6 @@
 //! after the command committed ([`crate::external`]); this module queues that work and turns the
 //! outcome into an event for the ticket: `CheckDone`, or `CheckLost` when it could not run.
 
-use std::collections::HashSet;
-
 use toknila_core::machine::TicketEvent;
 use toknila_core::{ReviewTurn, ShipSpec, Ticket, TicketId, TicketKey, TicketStatus};
 
@@ -64,6 +62,27 @@ pub trait Checker: std::fmt::Debug {
     fn stop_all(&self) {}
 }
 
+/// A check's turn in the line; dropping it hands the turn to the next card.
+pub trait CheckTurn {}
+impl<T> CheckTurn for T {}
+
+/// The line the checks of a machine stand in: only one runs at a time, across projects.
+pub trait CheckGate: std::fmt::Debug + Sync {
+    /// The card joins the line (when it is not in it) and waits for its turn; the turn lasts
+    /// until the returned guard is dropped.
+    fn enter(&self, ticket: TicketId) -> Box<dyn CheckTurn + '_>;
+}
+
+/// A gate with no line: every check starts at once (tests of the use cases, no host).
+#[derive(Debug, Default, Clone, Copy)]
+pub struct OpenGate;
+
+impl CheckGate for OpenGate {
+    fn enter(&self, _ticket: TicketId) -> Box<dyn CheckTurn + '_> {
+        Box::new(())
+    }
+}
+
 /// Whether a hand-in of `t` is checked by the daemon, and the project's round limit. A card is
 /// checked (brought up to its base, and the command run when there is one) whenever it has a ship.
 pub fn plan_of<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<(bool, u32)> {
@@ -81,6 +100,11 @@ pub(crate) fn queue_run<U: UnitOfWork + ?Sized>(
     let Some(t) = ctx.view.tickets.iter().find(|t| t.id == ticket) else {
         return Ok(());
     };
+    queue_for(uow, t)
+}
+
+fn queue_for<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket) -> AppResult<()> {
+    let ticket = t.id;
     let project = projects::of_ticket(uow, t)?;
     let ship = uow.ship(ticket)?;
     // The base goes into the ship before the check runs, when the base moved.
@@ -183,27 +207,21 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
     tell_ticket(uow, ticket, event)
 }
 
-/// After a daemon start: a card still being checked lost its check with the process, and goes to
-/// a person (`live` is empty today: checks do not outlive the daemon). Returns their keys.
-pub fn mark_lost<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    live: &HashSet<TicketId>,
-) -> AppResult<Vec<TicketKey>> {
-    let mut moved = Vec::new();
+/// After a daemon start: a card still in the `Check` turn lost its place in the line (or its
+/// running check) with the process, so it is queued again, oldest hand-in first. Running a
+/// check twice is safe. Returns their keys, in the order they are queued.
+pub fn resume<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Vec<TicketKey>> {
+    let mut waiting: Vec<Ticket> = Vec::new();
     for chain in uow.chains(None)? {
-        let lost: Vec<(TicketId, TicketKey)> = uow
-            .tickets(Some(chain.id))?
-            .iter()
-            .filter(|t| t.status == TicketStatus::Review)
-            .filter(|t| t.review.turn == Some(ReviewTurn::Check))
-            .filter(|t| !live.contains(&t.id))
-            .map(|t| (t.id, t.key.clone()))
-            .collect();
-        for (id, key) in lost {
-            let detail = "the daemon restarted while it was checking".to_owned();
-            tell_ticket(uow, id, TicketEvent::CheckLost { detail })?;
-            moved.push(key);
-        }
+        waiting.extend(uow.tickets(Some(chain.id))?.into_iter().filter(|t| {
+            t.status == TicketStatus::Review && t.review.turn == Some(ReviewTurn::Check)
+        }));
     }
-    Ok(moved)
+    waiting.sort_by_key(|t| (t.status_since, t.key.to_string()));
+    let mut resumed = Vec::new();
+    for t in waiting {
+        queue_for(uow, &t)?;
+        resumed.push(t.key);
+    }
+    Ok(resumed)
 }

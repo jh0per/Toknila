@@ -36,6 +36,11 @@ pub struct ReviewView {
     pub used_rounds: u32,
     /// Every verdict so far, oldest first.
     pub rounds: Vec<ReviewRound>,
+    /// Where the card's check stands in the machine's line of checks: 0 it runs now, n it is
+    /// the n-th that waits for another check to end (1 is next). Absent when no check is in the
+    /// line; only the daemon knows the line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_queue: Option<u32>,
 }
 
 fn context<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<(Chain, Project)> {
@@ -64,6 +69,7 @@ pub fn view<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<ReviewView> {
         max_rounds: project.max_review_rounds,
         used_rounds: t.review.auto_returns(),
         rounds: t.review.rounds.clone(),
+        check_queue: None,
     })
 }
 

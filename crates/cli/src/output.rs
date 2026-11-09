@@ -201,7 +201,10 @@ fn review(d: &TicketDetail) {
         Some(toknila_core::ReviewTurn::Person) => ", waiting for a person".to_owned(),
         Some(toknila_core::ReviewTurn::Agent { .. }) => ", waiting for the reviewer".to_owned(),
         Some(toknila_core::ReviewTurn::Merging) => ", merging".to_owned(),
-        Some(toknila_core::ReviewTurn::Check) => ", being checked".to_owned(),
+        Some(toknila_core::ReviewTurn::Check) => match r.check_queue {
+            Some(n) if n > 0 => format!(", waits for another check to end (place {n} in line)"),
+            _ => ", being checked".to_owned(),
+        },
         None => String::new(),
     };
     println!(

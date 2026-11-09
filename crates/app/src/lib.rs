@@ -36,7 +36,7 @@ pub mod tickets;
 pub mod wildcards;
 
 pub use chain::{ChainTx, with_chain};
-pub use checks::{CheckError, CheckResult, CheckSpec, Checker};
+pub use checks::{CheckError, CheckGate, CheckResult, CheckSpec, Checker, OpenGate};
 pub use error::{AppError, AppResult, ErrorKind, GitError};
 pub use merges::{MergeError, MergeOutcome, Merger};
 pub use ports::{Reader, UnitOfWork};

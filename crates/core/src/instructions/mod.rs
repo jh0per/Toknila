@@ -162,7 +162,8 @@ fn checks_section(brief: &RunBrief<'_>, who: &str) -> String {
         Some(c) => format!(
             "\n## Checks\n\nThe project's check command is `{c}`. {who} Run it exactly as \
              given, with no `cd` or `export` in front, so that it is approved without asking; \
-             the ship is already your working directory.\n"
+             the ship is already your working directory. Run it once, not in a loop: only one \
+             check runs on this machine at a time, so another run makes the others wait.\n"
         ),
         None => String::new(),
     }

@@ -50,7 +50,7 @@ Other agents and the person work on this machine at the same time.
 - Run one build or test run at a time. Do not start load loops or repeat a suite many times unless the task asks for it; then use a few workers under `nice`, with a trap that stops them.
 - Stop only processes you started, by pid. Never stop processes by name or pattern (`pkill -f`, `killall`): that has killed other agents' work.
 - Do not install browsers, system packages or tools, and do not download anything, without asking with `ask_human`; use what the repository's docs name.
-- Run the project's check command exactly as given. When it fails, fix the cause or report it; do not work around the command.
+- Run the project's check command exactly as given. When it fails, fix the cause or report it; do not work around the command. Run it once, not in a loop: only one check runs on this machine at a time, and the daemon runs it again on your hand-in.
 - Clean up what you started: test daemons and servers, temporary folders, placeholder files.
 
 ## Hand in once
