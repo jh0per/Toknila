@@ -7,7 +7,7 @@
 //! | Ready | Backlog | `DepsUnsatisfied` |
 //! | Ready | Ready (queued) | `Request` (a person's start; the schedule turns it into `Start` when a slot is free) |
 //! | Ready | Running | `Start` (the schedule decides; see `schedule`) |
-//! | Running | Waiting | `AskHuman` |
+//! | Running | Waiting | `AskHuman` (while Waiting silent, a question replaces the reason; silence never replaces a question) |
 //! | Waiting | Running | `InstructionDelivered`, `AgentActive`, `Answered` (a person answered and it reached the agent) |
 //! | Running | Review | `Finished` (with a check command: Review with the check running) |
 //! | Review (checking) | Review / Running | `CheckDone`: a pass goes on to the reviewer or the person; a failure returns the card to the worker, a round, until the round limit |
@@ -123,6 +123,7 @@ pub fn apply(
         (S::Running, TicketEvent::AskHuman { reason }) => {
             (S::Waiting, Some(StatusReason::Waiting(reason.clone())))
         }
+        (S::Waiting, TicketEvent::AskHuman { reason }) => ask_again(ticket, reason, event)?,
         (
             S::Waiting,
             TicketEvent::InstructionDelivered | TicketEvent::AgentActive | TicketEvent::Answered,
@@ -391,7 +392,7 @@ pub fn apply(
 mod checks;
 mod review;
 pub use checks::person_only;
-use checks::{block, non_empty, run_on_ship, run_on_ship_with, stale_start};
+use checks::{ask_again, block, non_empty, run_on_ship, run_on_ship_with, stale_start};
 mod invariants;
 
 pub use invariants::check_invariants;
