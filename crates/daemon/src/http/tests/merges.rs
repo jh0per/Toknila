@@ -92,15 +92,58 @@ async fn accept_merges_the_ship_into_develop_with_a_merge_commit_and_keeps_the_c
 }
 
 #[tokio::test]
-async fn a_conflict_blocks_with_the_file_names_and_unblock_after_the_fix_merges() {
+async fn a_conflict_met_at_the_hand_in_returns_the_card_to_the_worker_and_the_fix_merges() {
     let e = env().await;
     add(&e.api, json!({ "title": "Edit readme" })).await;
     let ship = ship_path(&card(&e.api, "DEMO-1").await);
     commit_file(&ship, "README.md", "ship says hi\n", "ship edit");
     commit_file(&e.repo, "README.md", "base says hi\n", "base edit");
-    let base = git(&e.repo, &["rev-parse", "develop"]);
 
+    e.api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "finished", "summary": "done" }),
+        )
+        .await;
+
+    let d = card(&e.api, "DEMO-1").await;
+    assert_eq!(status(&d), "running", "{d}");
+    let comments = d["comments"].as_array().expect("comments");
+    let last = comments.last().expect("an instruction was sent");
+    assert_eq!(last["kind"], "instruction", "{d}");
+    assert!(last["body"].to_string().contains("README.md"), "{d}");
+    assert!(
+        d["questions"].as_array().is_none_or(|q| q.is_empty()),
+        "nobody is asked: {d}"
+    );
+
+    // The worker resolves it in the ship and hands in again.
+    git(&ship, &["merge", "--no-edit", "-s", "ours", "develop"]);
     hand_in_and_accept(&e.api, "DEMO-1").await;
+    let d = card(&e.api, "DEMO-1").await;
+    assert_eq!(status(&d), "merged", "{d}");
+    assert_eq!(git(&e.repo, &["show", "develop:README.md"]), "ship says hi");
+    assert_eq!(git(&e.repo, &["status", "--porcelain"]), "");
+}
+
+#[tokio::test]
+async fn a_conflict_met_at_accept_blocks_with_the_file_names_and_unblock_after_the_fix_merges() {
+    let e = env().await;
+    add(&e.api, json!({ "title": "Edit readme" })).await;
+    let ship = ship_path(&card(&e.api, "DEMO-1").await);
+    commit_file(&ship, "README.md", "ship says hi\n", "ship edit");
+    // Hand in while the base has not moved: the check passes and the card waits for Accept.
+    e.api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "finished", "summary": "done" }),
+        )
+        .await;
+    commit_file(&e.repo, "README.md", "base says hi\n", "base edit");
+    let base = git(&e.repo, &["rev-parse", "develop"]);
+    e.api
+        .post("/v1/tickets/DEMO-1/actions/accept", json!({}))
+        .await;
 
     let d = card(&e.api, "DEMO-1").await;
     assert_eq!(status(&d), "blocked");
