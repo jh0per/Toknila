@@ -28,7 +28,7 @@ export function useCardDrag(
   useEffect(() => () => stop.current?.(), []);
 
   const press = (id: string, at: Pt, e: ReactPointerEvent) => {
-    if (e.button !== 0 || (e.target as Element).closest("button, input, textarea, .pr")) return;
+    if (e.button !== 0 || (e.target as Element).closest("button, input, textarea, .pr, .grip")) return;
     stop.current?.();
     const down = { x: e.clientX, y: e.clientY };
     let far = false;

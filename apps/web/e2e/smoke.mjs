@@ -104,7 +104,10 @@ try {
 
   // A change made from the CLI shows live, in the canvas, the inbox and the Details tab.
   tok("sim", "DEMO-1", "ask", "which way?");
-  await expectText(status("DEMO-1"), "in progress · waiting", "a waiting card is in progress, not blocked");
+  await expectText(status("DEMO-1"), "waiting", "a waiting card shows its fine status");
+  if (!(await page.locator('a[data-key="DEMO-1"]').getAttribute("class"))?.includes("g-in_progress")) {
+    throw new Error("a waiting card is in progress, not blocked");
+  }
   await expectText(page.locator("[data-testid=status-sentence]"), "Waiting for your answer", "Details lead with the status sentence");
   await expectText(page.locator("[data-testid=details]"), "which way?", "the question is shown");
   await expectText(page.locator("[data-testid=chain-status]"), "needs human", "chain needs a human");

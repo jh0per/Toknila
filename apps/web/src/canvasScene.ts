@@ -2,9 +2,12 @@
 // left and the end node on the right, with the implicit lines that join every card to them. The
 // implicit lines are derived on every draw and never stored.
 
-import type { ChainDetail, Pos } from "./api/types";
+import type { ChainDetail, Pos, Size } from "./api/types";
 import { type LaidEdge, layoutChain, nodeKey } from "./layout";
-import { type Box, x, y } from "./views/canvasGeometry";
+import { type Box, GAP_Y, H, PAD, W, columnXs, laneYs } from "./views/canvasGeometry";
+
+/// The size a card is drawn at, and whether it is the card's own (a person gave it).
+export type CardSize = Size & { own: boolean };
 
 /// The node keys of the two bookends; a chain has one of each.
 export const START = "start:chain";
@@ -29,6 +32,8 @@ export interface SceneNode {
   box: Box;
   /// The card has a place of its own.
   placed: boolean;
+  /// The card has a size of its own.
+  sized: boolean;
 }
 
 export interface Scene {
@@ -64,30 +69,52 @@ function endRelease(c: ChainDetail, edges: LaidEdge[], keys: string[]): string |
 
 /// The whole canvas of a chain. `posOf` gives a card's own place (saved, or being dragged), if
 /// any; every other node is placed by the automatic layout: Start in column 0, cards from
-/// column 1, the end node after the last of them, Start and the end node in the middle lane.
-export function sceneOf(c: ChainDetail, posOf: (ticketId: string) => Pos | undefined): Scene {
+/// column 1, the end node after the last of them. Each column is as wide as its widest node and
+/// each lane as tall as its tallest (a card that was dragged away still counts in its own
+/// column and lane, so dragging one never moves the others), and Start and the end node sit at
+/// the middle of that height. `sizeOf` gives a card's size; a node without one is `W` x `H`.
+export function sceneOf(
+  c: ChainDetail,
+  posOf: (ticketId: string) => Pos | undefined,
+  sizeOf: (ticketId: string) => CardSize | undefined = () => undefined,
+): Scene {
   const lay = layoutChain(c);
   const keys = lay.nodes.map(nodeKey);
   const endKey = endRelease(c, lay.edges, keys) ?? FINISH;
-  const middle = Math.max(0, lay.lanes - 1) / 2;
   const lastCol = lay.nodes.reduce((m, n) => (nodeKey(n) === endKey ? m : Math.max(m, n.col + 1)), 0);
+  const card = (n: { kind: string; id: string }): CardSize =>
+    (n.kind === "ticket" ? sizeOf(n.id) : undefined) ?? { w: W, h: H, own: false };
+  const widths = Array.from({ length: lastCol + 2 }, () => W);
+  const tall = Array.from({ length: Math.max(1, lay.lanes) }, () => 0);
+  for (const n of lay.nodes) {
+    const col = nodeKey(n) === endKey ? lastCol + 1 : n.col + 1;
+    widths[col] = Math.max(widths[col], card(n).w);
+    tall[n.lane] = Math.max(tall[n.lane], card(n).h);
+  }
+  // A lane with no node (the chain is empty) is as tall as a node of the bookends.
+  const heights = tall.map((h) => h || H);
+  const xs = columnXs(widths);
+  const ys = laneYs(heights);
+  const total = heights.reduce((a, h) => a + h, 0) + GAP_Y * (heights.length - 1);
+  const mid = PAD + Math.round((total - H) / 2);
   const nodes: SceneNode[] = [
-    { key: START, kind: "start", id: c.chain.name, col: 0, lane: middle, box: { x: x(0), y: y(middle) }, placed: false },
+    { key: START, kind: "start", id: c.chain.name, col: 0, lane: 0, box: { x: xs[0], y: mid, w: W, h: H }, placed: false, sized: false },
   ];
   for (const n of lay.nodes) {
     const key = nodeKey(n);
     if (key === endKey) continue;
-    const own = n.kind === "ticket" ? posOf(n.id) : undefined;
+    const at = n.kind === "ticket" ? posOf(n.id) : undefined;
     const col = n.col + 1;
+    const { w, h, own } = card(n);
     nodes.push({
-      key, kind: n.kind, id: n.id, col, lane: n.lane, placed: Boolean(own),
-      box: own ? { x: own.x, y: own.y } : { x: x(col), y: y(n.lane) },
+      key, kind: n.kind, id: n.id, col, lane: n.lane, placed: Boolean(at), sized: own,
+      box: { x: at ? at.x : xs[col], y: at ? at.y : ys[n.lane], w, h },
     });
   }
   const end = lay.nodes.find((n) => nodeKey(n) === endKey);
   nodes.push({
     key: endKey, kind: end ? "release" : "finish", id: end?.id ?? c.chain.name,
-    col: lastCol + 1, lane: middle, box: { x: x(lastCol + 1), y: y(middle) }, placed: false,
+    col: lastCol + 1, lane: 0, box: { x: xs[lastCol + 1], y: mid, w: W, h: H }, placed: false, sized: false,
   });
   return { nodes, edges: lay.edges, lines: bookendLines(keys, lay.edges, endKey) };
 }

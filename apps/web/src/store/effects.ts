@@ -207,6 +207,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         runEdgeEffect(e, dispatch);
         return;
       case "placeCard":
+      case "sizeCard":
       case "arrangeChain":
         runPlacementEffect(e, dispatch);
         return;

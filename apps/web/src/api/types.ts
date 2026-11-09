@@ -15,6 +15,7 @@ export type Release = Schemas["Release"];
 export type StatusReason = Schemas["StatusReason"];
 export type Ticket = Schemas["Ticket"];
 export type Pos = Schemas["Pos"];
+export type Size = Schemas["Size"];
 export type InboxItem = Schemas["InboxItem"];
 export type InboxKind = Schemas["InboxKind"];
 export type AnswerKind = Schemas["AnswerKind"];

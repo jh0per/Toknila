@@ -49,6 +49,52 @@ describe("card places in the store", () => {
   });
 });
 
+describe("card sizes in the store", () => {
+  const size = (w: number, h: number): Msg => ({ type: "sizeCard", chain: "c1", ticket: "t1", key: "DEMO-1", size: { w, h } });
+
+  it("shows a resized card at its new size at once and asks the daemon to save it", () => {
+    const [s, fx] = reduce(start(), size(280, 120));
+    expect(s.placement.sizes).toEqual({ t1: { w: 280, h: 120 } });
+    expect(fx).toEqual([{ type: "sizeCard", chain: "c1", ticket: "t1", key: "DEMO-1", size: { w: 280, h: 120 } }]);
+  });
+
+  it("makes the size the card's own when confirmed, and null takes it away", () => {
+    const sized = run(start(), size(280, 120), { type: "cardSized", chain: "c1", ticket: "t1", size: { w: 280, h: 120 } });
+    expect(sized.placement.sizes).toEqual({});
+    expect(sized.chains.c1.tickets[0].size).toEqual({ w: 280, h: 120 });
+    const cleared = run(sized, { type: "sizeCard", chain: "c1", ticket: "t1", key: "DEMO-1", size: null }, { type: "cardSized", chain: "c1", ticket: "t1", size: null });
+    expect(cleared.chains.c1.tickets[0].size).toBeUndefined();
+  });
+
+  it("lets a newer resize win, and a refusal takes the size back", () => {
+    const s = run(start(), size(280, 120), size(300, 120), { type: "cardSized", chain: "c1", ticket: "t1", size: { w: 280, h: 120 } });
+    expect(s.placement.sizes).toEqual({ t1: { w: 300, h: 120 } });
+    const refused = run(s, { type: "cardPlaceRefused", ticket: "t1", message: "no" });
+    expect(refused.placement.sizes).toEqual({});
+  });
+
+  it("drops the sizes of the chain when it is arranged", () => {
+    const s = run(start(), size(280, 120), { type: "chainArranged", chain: chain() });
+    expect(s.placement.sizes).toEqual({});
+    expect(s.chains.c1.tickets[0].size).toBeUndefined();
+  });
+
+  it("patches the card with the size", async () => {
+    vi.stubGlobal("window", { location: { search: "?token=t" } });
+    const calls: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    const got: Msg[] = [];
+    runPlacementEffect({ type: "sizeCard", chain: "c1", ticket: "t1", key: "DEMO-1", size: null }, (m) => got.push(m));
+    await vi.waitFor(() => expect(got).toHaveLength(1));
+    expect(calls[0].init.method).toBe("PATCH");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ size: null });
+    expect(got[0].type).toBe("cardSized");
+  });
+});
+
 describe("card place requests", () => {
   afterEach(() => vi.unstubAllGlobals());
 
