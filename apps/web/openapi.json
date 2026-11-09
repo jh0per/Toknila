@@ -7743,6 +7743,13 @@
         "type": "object",
         "description": "A ticket's review state: whose turn it is while in Review, and every round so far.",
         "properties": {
+          "handed_in": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The commit the ship's branch was at when the worker last handed in; `None` before the\nfirst hand-in, or when the host could not look."
+          },
           "note": {
             "oneOf": [
               {

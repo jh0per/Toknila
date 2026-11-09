@@ -53,6 +53,10 @@ Other agents and the person work on this machine at the same time.
 
 The `finished` summary says what changed, gives each check as PASS, FAIL, NOT_RUN or BLOCKED with one line of evidence, and names what is left or not covered. Do not run the checks again after handing in.
 
+## After a Return
+
+When the card was returned, the Return text is the first thing you read in your instructions and in your first message. Do what it asks, commit the change, then hand in naming the new commit. A hand-in at the same commit as before is refused: a Return needs new commits.
+
 ## Comment template
 
 Reports, notes and decisions use this shape; leave out empty fields:

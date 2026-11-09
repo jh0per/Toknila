@@ -60,6 +60,14 @@ pub struct RunBrief {
     /// Instructions the card's earlier runs were given (`toknila_core::instructions::earlier`),
     /// for a run that replaces one.
     pub earlier: Vec<String>,
+    /// Instructions no run has acted on yet (`toknila_core::instructions::waiting`): the run
+    /// reads them first and they count as delivered once it started.
+    pub waiting: Vec<String>,
+    /// Every pending instruction comment the run takes over, including one that only repeats the
+    /// Return; the host marks them delivered when it started a new process.
+    pub waiting_ids: Vec<toknila_core::CommentId>,
+    /// The Return this run answers.
+    pub returned: Option<toknila_core::instructions::Returned>,
     /// The card must show a design for approval before any code.
     pub design_first: bool,
     /// The project's Claude model (`--model`), for a profile that runs Claude Code.
@@ -80,6 +88,9 @@ pub struct Started {
     pub run: Run,
     /// A live runner already existed and was kept; nothing new started.
     pub reused: bool,
+    /// A new process started and its first message or instructions file carries the run's brief,
+    /// including the instructions that waited for it.
+    pub briefed: bool,
 }
 
 /// A runner process that has ended, as the host reports it.

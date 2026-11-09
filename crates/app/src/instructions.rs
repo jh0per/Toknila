@@ -117,6 +117,36 @@ pub fn claim<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: &Ticket) -> AppResult<
     Ok(claimed)
 }
 
+/// A new run started with these pending comments in its kickoff and instructions file: they are
+/// delivered, so the Stop hook does not hand them out again. The card's status is not touched:
+/// the run's start is what moved it.
+pub(crate) fn read_at_start<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    comments: &[CommentId],
+) -> AppResult<()> {
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(());
+    };
+    let label = uow
+        .chain_view(t.chain_id)?
+        .map(|v| v.label(NodeRef::Ticket(ticket)));
+    for mut c in pending(uow, ticket)? {
+        if !comments.contains(&c.id) {
+            continue;
+        }
+        c.delivered_at = Some(uow.now());
+        uow.upsert_comment(&c)?;
+        if let Some(label) = &label {
+            uow.emit(&DomainEvent::CommentDelivered {
+                ticket: label.clone(),
+                comment: c,
+            })?;
+        }
+    }
+    Ok(())
+}
+
 /// The host typed the comment into the terminal: it is delivered now.
 pub(crate) fn typed<U: UnitOfWork + ?Sized>(
     uow: &mut U,

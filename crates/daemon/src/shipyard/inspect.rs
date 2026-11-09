@@ -49,7 +49,12 @@ impl GitShipyard {
                 detail: format!("unexpected answer {count:?}"),
             })
         })?;
-        Ok(ShipState { changed, ahead })
+        let head = self.git(dir, ["rev-parse", "HEAD"]).ok();
+        Ok(ShipState {
+            changed,
+            ahead,
+            head,
+        })
     }
 }
 

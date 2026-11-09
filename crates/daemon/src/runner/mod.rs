@@ -298,6 +298,7 @@ impl Runner for Runners {
             return Ok(Started {
                 run: a.run().clone(),
                 reused: true,
+                briefed: false,
             });
         }
         let run = Run {
@@ -327,7 +328,11 @@ impl Runner for Runners {
         self.prompts.reset(req.ticket, req.role);
         self.tokens.spawned(grant, crate::server::now(), startup);
         map.insert((req.ticket, req.role), active);
-        Ok(Started { run, reused: false })
+        Ok(Started {
+            run,
+            reused: false,
+            briefed: profile.reads_brief(),
+        })
     }
 
     fn stop(&self, ticket: TicketId) {

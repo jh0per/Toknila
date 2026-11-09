@@ -2585,6 +2585,11 @@ export interface components {
         RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing";
         /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
         Review: {
+            /**
+             * @description The commit the ship's branch was at when the worker last handed in; `None` before the
+             *     first hand-in, or when the host could not look.
+             */
+            handed_in?: string | null;
             note?: components["schemas"]["ReviewNote"] | null;
             /** @description The reviewer was already nudged for a verdict in this round of review. */
             nudged?: boolean;

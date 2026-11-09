@@ -26,6 +26,8 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         acceptance,
         check_command: None,
         earlier: &[],
+        waiting: &[],
+        returned: None,
         design_first: false,
     }
 }
@@ -90,6 +92,8 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         acceptance: &[],
         check_command: None,
         earlier: &[],
+        waiting: &[],
+        returned: None,
         design_first: false,
     });
     assert!(!text.contains("## Acceptance"));
@@ -171,6 +175,8 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         acceptance: &[],
         check_command: check,
         earlier: &[],
+        waiting: &[],
+        returned: None,
         design_first: false,
     }
 }
@@ -259,6 +265,8 @@ fn the_instructions_of_a_replacement_run_carry_the_earlier_ones_and_the_kickoff_
     let texts = earlier(&[sent("use the Edit tool", 2, true)]);
     let brief = RunBrief {
         earlier: &texts,
+        waiting: &[],
+        returned: None,
         ..pinned_brief(&acceptance)
     };
     assert_pinned(&generate(&brief), "run_replacement.md");

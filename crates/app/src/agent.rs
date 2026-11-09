@@ -32,6 +32,17 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
     t: &Ticket,
     event: AgentEvent,
 ) -> AppResult<TicketId> {
+    ticket_event_at(uow, t, event, None)
+}
+
+/// [`ticket_event`] for a hand-in whose ship the host looked at: `head` is the commit the ship's
+/// branch was at, remembered as the commit handed in.
+pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    t: &Ticket,
+    event: AgentEvent,
+    head: Option<String>,
+) -> AppResult<TicketId> {
     // A report of work shows the agent is working again. A question, a crash, and talk with the
     // owner (a proposal, a thread) do not: the card may well be waiting on the answer.
     let resumed = match event {
@@ -131,7 +142,11 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
                     check,
                     max_rounds,
                 };
-                Ok(ctx.ticket_event(t.id, event)?)
+                ctx.ticket_event(t.id, event)?;
+                if let Some(mine) = ctx.view.tickets.iter_mut().find(|x| x.id == t.id) {
+                    mine.review.handed_in = head.or(mine.review.handed_in.take());
+                }
+                Ok(())
             })
         }
         AgentEvent::ReviewVerdict {

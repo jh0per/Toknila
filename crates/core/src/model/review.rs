@@ -162,12 +162,20 @@ pub struct Review {
     /// Why the card is for a person, when the reviewer gave no verdict.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<ReviewNote>,
+    /// The commit the ship's branch was at when the worker last handed in; `None` before the
+    /// first hand-in, or when the host could not look.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handed_in: Option<String>,
 }
 
 impl Review {
     /// True before the first review: nothing to show or store.
     pub fn is_empty(&self) -> bool {
-        self.turn.is_none() && self.rounds.is_empty() && !self.nudged && self.note.is_none()
+        self.turn.is_none()
+            && self.rounds.is_empty()
+            && !self.nudged
+            && self.note.is_none()
+            && self.handed_in.is_none()
     }
 
     /// How many times the loop (the check or the reviewer agent) has sent the card back since a
@@ -183,6 +191,14 @@ impl Review {
             .filter(|r| r.verdict == Verdict::RequestChanges)
             .count();
         u32::try_from(n).unwrap_or(u32::MAX)
+    }
+
+    /// The last round when it asked for changes and no later one has decided: the Return the
+    /// worker is working on, if the card is back with it.
+    pub fn open_return(&self) -> Option<&ReviewRound> {
+        self.rounds
+            .last()
+            .filter(|r| r.verdict == Verdict::RequestChanges)
     }
 
     /// Adds a round by `reviewer`; its number follows the last one.

@@ -83,6 +83,7 @@ pub trait Shipyard: std::fmt::Debug {
         Ok(ShipState {
             changed: Vec::new(),
             ahead: 1,
+            head: None,
         })
     }
     /// Gets the place the project's planner reads the code from, fresh as far as the network
@@ -137,8 +138,20 @@ pub enum GuardError {
 
 /// Looks at a ship through the yard and judges it. Runs on the host, never inside a unit of work.
 pub fn guard(yard: &dyn Shipyard, look: &ShipLook) -> Result<(), GuardError> {
+    guarded(yard, look).map(|_| ())
+}
+
+/// [`guard`] that also hands back what it saw, for the hand-in to record the commit.
+pub fn guarded(yard: &dyn Shipyard, look: &ShipLook) -> Result<ShipState, GuardError> {
     let state = yard.inspect(look).map_err(GuardError::Ship)?;
-    guard::judge(&state).map_err(GuardError::Problem)
+    guard::judge(&state).map_err(GuardError::Problem)?;
+    Ok(state)
+}
+
+/// The error `finished` answers with when the card was returned and the ship is still at the
+/// commit that was handed in: it quotes the Return, and the card stays Running.
+pub fn refuse_unchanged(round: &toknila_core::ReviewRound, head: &str) -> AppError {
+    AppError::conflict(guard::unchanged_for_agent(round, head))
 }
 
 /// Where to look at the ticket's ship when its agent says `finished`; `None` for a ticket

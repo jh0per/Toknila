@@ -214,6 +214,8 @@ mod tests {
             acceptance: &[],
             check_command: None,
             earlier: &[],
+            waiting: &[],
+            returned: None,
             design_first: false,
         };
         let text = crate::instructions::kickoff(AgentRole::Planner, &brief);

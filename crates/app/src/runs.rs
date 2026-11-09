@@ -36,6 +36,9 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
         .project(ctx.view.chain.project_id)?
         .ok_or_else(|| AppError::not_found("project of the chain"))?;
     if runs_process(&project, t) {
+        let comments = uow.comments(ticket)?;
+        let returned = toknila_core::instructions::Returned::of(&t.review);
+        let waiting = toknila_core::instructions::waiting(&comments, returned.as_ref());
         uow.defer(ExternalEffect::StartRunner {
             ticket,
             key: t.key.clone(),
@@ -45,7 +48,10 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 prompt: t.prompt.clone(),
                 acceptance: t.acceptance.clone(),
                 check_command: project.check_command.clone(),
-                earlier: toknila_core::instructions::earlier(&uow.comments(ticket)?),
+                earlier: toknila_core::instructions::earlier(&comments),
+                waiting: waiting.texts,
+                waiting_ids: waiting.ids,
+                returned,
                 design_first: t.design_first,
                 model: project.worker_model.clone(),
                 command_policy: project.command_policy,

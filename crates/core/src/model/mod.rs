@@ -6,6 +6,7 @@ mod comment;
 mod ids;
 mod keys;
 mod profile;
+mod profile_brief;
 mod project;
 mod release;
 mod review;

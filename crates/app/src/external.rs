@@ -114,6 +114,12 @@ pub enum ExternalOutcome {
         ticket: TicketId,
         error: RunnerError,
     },
+    /// A new run started with these instructions in its kickoff and instructions file: they are
+    /// delivered.
+    InstructionsRead {
+        ticket: TicketId,
+        comments: Vec<CommentId>,
+    },
     /// The instruction was typed into the agent's terminal.
     InstructionTyped {
         ticket: TicketId,
@@ -142,6 +148,7 @@ pub struct Host<'a> {
 pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutcome> {
     let mut dirs: HashMap<TicketId, String> = HashMap::new();
     let mut failed: HashSet<TicketId> = HashSet::new();
+    let mut taken: HashSet<CommentId> = HashSet::new();
     let mut outcomes = Vec::new();
     // Typing an instruction takes a moment, so it goes last: it must not hold up ships and
     // runners that the same command queued, and it sees the runner as they left it.
@@ -189,6 +196,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 if failed.contains(&ticket) {
                     continue;
                 }
+                let waiting_ids = brief.waiting_ids.clone();
                 let result = dirs
                     .get(&ticket)
                     .ok_or(RunnerError::NoWorkingDir)
@@ -205,6 +213,14 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                     });
                 match result {
                     Ok(started) if !started.reused => {
+                        // The new process read them in its kickoff and instructions file.
+                        if started.briefed && !waiting_ids.is_empty() {
+                            taken.extend(waiting_ids.iter().copied());
+                            outcomes.push(ExternalOutcome::InstructionsRead {
+                                ticket,
+                                comments: waiting_ids,
+                            });
+                        }
                         outcomes.push(ExternalOutcome::RunnerStarted { run: started.run });
                     }
                     Ok(_) => {}
@@ -264,6 +280,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
     }
     for effect in deliveries {
         if let ExternalEffect::DeliverInstruction { ticket, comment } = effect
+            && !taken.contains(&comment.id)
             && deliver(host.runner, ticket, &comment)
         {
             outcomes.push(ExternalOutcome::InstructionTyped {
@@ -325,6 +342,9 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             }
             ExternalOutcome::ReviewerFailed { ticket, error } => {
                 reviews::start_failed(uow, ticket, &error)?;
+            }
+            ExternalOutcome::InstructionsRead { ticket, comments } => {
+                deliver_instructions::read_at_start(uow, ticket, &comments)?;
             }
             ExternalOutcome::InstructionTyped { ticket, comment } => {
                 deliver_instructions::typed(uow, ticket, comment)?;
