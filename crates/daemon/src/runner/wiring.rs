@@ -108,15 +108,21 @@ const AUTO_MEMORY_OFF: (&str, &str) = ("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1");
 
 /// The settings file of every role: auto memory off (a ship is a worktree of the person's own
 /// repository, whose personal notes were written for another session), the tools of [`DENIED_TOOLS`] denied,
+/// Read, Grep, Glob and Bash denied on the person's private folders (`toknila_core::private`),
 /// the hooks and the status line of [`hook_settings`], and the profile's allow rules, when it has
 /// any for this project, are what the agent may do without asking.
-fn settings(bin: &Path, hooks: bool, rules: &[String]) -> Value {
+fn settings(bin: &Path, hooks: bool, rules: &[String], private: &[String]) -> Value {
     let mut out = serde_json::Map::new();
     if hooks && let Value::Object(h) = hook_settings(bin) {
         out.extend(h);
     }
     out.insert("autoMemoryEnabled".to_owned(), json!(false));
-    let mut permissions = json!({ "deny": DENIED_TOOLS });
+    let deny: Vec<&str> = DENIED_TOOLS
+        .iter()
+        .copied()
+        .chain(private.iter().map(String::as_str))
+        .collect();
+    let mut permissions = json!({ "deny": deny });
     if !rules.is_empty() {
         permissions["allow"] = json!(rules);
     }
@@ -240,7 +246,12 @@ pub(super) fn prepare_with(
             true,
             profile.hooks.settings_flag.as_deref(),
             "settings.json",
-            settings(cx.bin, profile.hooks.enabled, &rules),
+            settings(
+                cx.bin,
+                profile.hooks.enabled,
+                &rules,
+                &super::private::deny_rules(cx.dir),
+            ),
         ),
     ];
     for (enabled, flag, name, content) in files {

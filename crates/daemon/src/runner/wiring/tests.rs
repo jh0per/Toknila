@@ -392,9 +392,64 @@ fn a_profile_without_rules_and_hooks_still_gets_the_isolation_settings() {
     let v: Value = serde_json::from_str(&text).expect("json");
     assert_eq!(
         v,
-        json!({ "autoMemoryEnabled": false, "permissions": { "deny": DENIED }}),
+        json!({ "autoMemoryEnabled": false, "permissions": { "deny": denied_with_private() }}),
         "{text}"
     );
+}
+
+/// [`DENIED`] followed by the rules for the person's private folders (no data-home entries: the
+/// rig's data home holds only the run folder).
+fn denied_with_private() -> Vec<String> {
+    let home = dirs::home_dir().expect("home").display().to_string();
+    DENIED
+        .iter()
+        .map(|s| (*s).to_owned())
+        .chain(toknila_core::private::deny_rules(&home, &[]))
+        .collect()
+}
+
+#[test]
+fn every_role_denies_read_grep_glob_and_bash_on_the_private_folders() {
+    let rig = Rig::new();
+    let home = dirs::home_dir().expect("home").display().to_string();
+    let other = rig.dir.path().join("tokens");
+    std::fs::create_dir_all(&other).expect("mkdir");
+    std::fs::create_dir_all(rig.dir.path().join("runs").join("t2")).expect("mkdir");
+    for (role, dir, profile) in [
+        (AgentRole::Worker, "worker", AgentProfile::claude_code()),
+        (
+            AgentRole::Reviewer,
+            "reviewer",
+            AgentProfile::claude_code_reviewer(),
+        ),
+    ] {
+        // The planner needs a project's facts; its own test (`planner.rs`) checks its deny list.
+        rig.prepare_as(&profile, role);
+        let (_, text) = rig.file_of(dir, "settings.json");
+        let v: Value = serde_json::from_str(&text).expect("json");
+        let deny: Vec<&str> = v["permissions"]["deny"]
+            .as_array()
+            .expect("deny")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        let mut private = toknila_core::private::private_paths(&home);
+        private.push(other.display().to_string());
+        private.push(rig.dir.path().join("runs").join("t2").display().to_string());
+        for path in &private {
+            for tool in toknila_core::private::GUARDED_TOOLS {
+                assert!(
+                    deny.iter().any(|r| r.starts_with(&format!("{tool}("))
+                        && r.contains(path.trim_start_matches('/'))),
+                    "{dir}: {tool} {path} missing in {deny:?}"
+                );
+            }
+        }
+        // The run's own folder and the workspace stay open.
+        let own = rig.dir.path().join("runs").join("t1").display().to_string();
+        assert!(!deny.iter().any(|r| r.contains(&own)), "{dir}: {deny:?}");
+        assert!(deny.contains(&"Agent"), "{dir}");
+    }
 }
 
 #[test]
@@ -412,7 +467,11 @@ fn every_role_runs_without_auto_memory_and_without_the_denied_tools() {
         let (_, text) = rig.file_of(dir, "settings.json");
         let v: Value = serde_json::from_str(&text).expect("json");
         assert_eq!(v["autoMemoryEnabled"], false, "{dir}: {text}");
-        assert_eq!(v["permissions"]["deny"], json!(DENIED), "{dir}: {text}");
+        assert_eq!(
+            v["permissions"]["deny"],
+            json!(denied_with_private()),
+            "{dir}: {text}"
+        );
         assert!(
             w.env
                 .contains(&("CLAUDE_CODE_DISABLE_AUTO_MEMORY".to_owned(), "1".to_owned())),
@@ -508,7 +567,11 @@ fn mode_and_allow(
             .map(|r| r.as_str().expect("rule").to_owned())
             .collect()
     };
-    assert_eq!(rules("deny"), DENIED_TOOLS, "denied in every mode");
+    assert_eq!(
+        rules("deny")[..DENIED_TOOLS.len()],
+        DENIED_TOOLS,
+        "denied in every mode"
+    );
     (mode, rules("allow"))
 }
 

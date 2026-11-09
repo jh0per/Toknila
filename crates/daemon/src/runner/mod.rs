@@ -15,6 +15,7 @@ mod active;
 mod drain;
 mod facts;
 mod logs;
+mod private;
 mod prompts;
 mod pty;
 mod reviewer;
