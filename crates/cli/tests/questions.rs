@@ -159,7 +159,7 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
 fn a_long_permission_request_shows_its_full_command_in_the_inbox_and_in_tok_show() {
     let dir = tempfile::tempdir().expect("tempdir");
     let tok = Tok::in_dir(dir.path());
-    let command = format!("python3 - <<EOF\\n{}\\nEOF", "print(1)\\n".repeat(100));
+    let command = format!("echo start\\n{}\\necho EOF", "echo 1\\n".repeat(100));
     let body = format!(r#"{{"tool":"Bash: {command}"}}"#);
     tok.profile(
         "hooked",
@@ -182,13 +182,16 @@ fn a_long_permission_request_shows_its_full_command_in_the_inbox_and_in_tok_show
         .detail
         .clone()
         .expect("the full command travels with it");
-    assert!(detail.starts_with("Bash: python3 - <<EOF\n"), "{detail}");
-    assert!(detail.ends_with("\nEOF"), "the end is not cut: {detail}");
+    assert!(detail.starts_with("Bash: echo start\n"), "{detail}");
+    assert!(
+        detail.ends_with("\necho EOF"),
+        "the end is not cut: {detail}"
+    );
     assert!(detail.chars().count() > 600);
 
     let shown = tok.text(&["show", "DEMO-1"]);
     assert!(shown.contains("the full request:"), "{shown}");
-    assert!(shown.contains("  EOF"), "{shown}");
+    assert!(shown.contains("  echo EOF"), "{shown}");
     tok.run(&["cancel", "DEMO-1", "done"]);
 }
 

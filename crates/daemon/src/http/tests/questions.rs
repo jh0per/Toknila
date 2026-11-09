@@ -160,6 +160,46 @@ async fn a_reviewers_permission_shows_in_the_inbox_and_deny_carries_the_comment(
 }
 
 #[tokio::test]
+async fn a_workers_shell_edit_is_denied_at_once_with_the_edit_reason_and_never_reaches_the_inbox() {
+    let (api, token) = setup().await;
+    for command in [
+        "python3 - <<'EOF'\nopen('a.rs','w').write('x')\nEOF",
+        "cat > crates/core/src/lib.rs <<'EOF'\nfn x() {}\nEOF",
+        "sed -i 's/a/b/' crates/core/src/lib.rs",
+        "perl -pi -e 's/a/b/' crates/core/src/lib.rs",
+    ] {
+        let (status, reply) = permission(&api, &token, &format!("Bash: {command}")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(reply["decision"], "deny", "{command}");
+        let message = reply["message"].as_str().expect("reason");
+        assert!(
+            message.contains("Edit")
+                && message.contains("Write")
+                && message.contains("without asking"),
+            "{message}"
+        );
+        assert!(questions(&api).await.is_empty(), "{command}");
+        assert_eq!(api.status("DEMO-1").await, "running", "{command}");
+    }
+    // A write into the scratchpad and a plain read are asked about as before.
+    api.runners.set_permission_wait(Duration::from_millis(60));
+    for command in [
+        "cat > /tmp/claude-1/p/scratchpad/n.md <<'EOF'\nhi\nEOF",
+        "sed -n '1,5p' src/lib.rs",
+    ] {
+        let (_, reply) = permission(&api, &token, &format!("Bash: {command}")).await;
+        assert_eq!(reply, json!({ "decision": "ask" }), "{command}");
+        api.call_with(
+            &token,
+            Method::POST,
+            "/v1/tickets/DEMO-1/activity",
+            Some(json!({ "signal": "hook:post_tool_use" })),
+        )
+        .await;
+    }
+}
+
+#[tokio::test]
 async fn a_hook_nobody_answers_in_time_lets_the_agent_show_its_own_dialog() {
     let (api, token) = setup().await;
     api.runners.set_permission_wait(Duration::from_millis(60));
@@ -244,14 +284,14 @@ async fn a_long_tool_summary_is_capped() {
 async fn a_multiline_request_keeps_its_lines_for_the_worker_and_the_reviewer_and_a_short_one_has_none()
  {
     let (api, token) = setup().await;
-    let script = "python3 - <<'EOF'\nprint('hi')\nEOF";
+    let script = "cargo test -p toknila-core\n  -- --nocapture";
     let tool = format!("Bash: {script}");
     let hook = permission(&api, &token, &tool);
     let person = async {
         let q = wait_for(&api, 1).await;
         assert_eq!(
             q[0]["text"],
-            "Claude Code asks for permission: Bash: python3 - <<'EOF' print('hi') EOF"
+            "Claude Code asks for permission: Bash: cargo test -p toknila-core -- --nocapture"
         );
         assert_eq!(q[0]["detail"], format!("Bash: {script}"));
         let shown = api.get("/v1/tickets/DEMO-1").await;
