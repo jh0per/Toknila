@@ -141,6 +141,9 @@ pub enum ReviewNote {
     /// The reviewer ended its turn (or its process) without a verdict, even after one nudge.
     /// `lines` are the last lines of its screen, ANSI removed (at most 15; may be empty).
     NoVerdict { lines: Vec<String> },
+    /// Pull-request mode: the host reported no check on the pull request for the project's
+    /// timeout. A person decides: merge now, keep waiting, or block.
+    NoChecks,
 }
 
 /// A ticket's review state: whose turn it is while in Review, and every round so far.

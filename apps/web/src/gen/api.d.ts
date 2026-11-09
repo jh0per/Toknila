@@ -1868,6 +1868,11 @@ export interface components {
         MergeSettings: {
             method: components["schemas"]["MergeMethod"];
             mode: components["schemas"]["MergeMode"];
+            /**
+             * Format: int64
+             * @description Seconds a pull request may have no check reported before a person is asked what to do.
+             */
+            no_checks_timeout_secs?: number;
             /** @description Title of a pull request; `{key}` and `{title}` are the card's. */
             pr_title: string;
         };
@@ -2143,6 +2148,11 @@ export interface components {
             max_review_rounds?: number | null;
             merge_method?: components["schemas"]["MergeMethod"] | null;
             merge_mode?: components["schemas"]["MergeMode"] | null;
+            /**
+             * Format: int64
+             * @description Seconds a pull request may report no check before a person is asked (default 600).
+             */
+            no_checks_timeout_secs?: number | null;
             /** @description The Claude model of the project's planner; an empty text clears it. */
             planner_model?: string | null;
             /** @description Title of the pull requests; `{key}` and `{title}` are the card's. */
@@ -2448,6 +2458,9 @@ export interface components {
         PullRequest: {
             /** @description The checks at the last look; empty before any was reported. */
             checks: components["schemas"]["CheckRun"][];
+            /** @description A person answered "merge now": merge although no check was ever reported. */
+            merge_unchecked?: boolean;
+            no_checks_since?: components["schemas"]["Timestamp"] | null;
             /** Format: int64 */
             number: number;
             url: string;
@@ -2588,6 +2601,9 @@ export interface components {
             lines: string[];
             /** @enum {string} */
             note: "no_verdict";
+        } | {
+            /** @enum {string} */
+            note: "no_checks";
         };
         /**
          * @description One verdict on a ticket. Numbers count from 1 over every verdict, a person's and the
@@ -2879,7 +2895,7 @@ export interface components {
          * @description What a person can do with a ticket.
          * @enum {string}
          */
-        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "fast_forward_start" | "start_anyway" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject" | "run_reviewer" | "ask_design";
+        TicketAction: "start" | "pause" | "resume" | "block" | "unblock" | "fast_forward_start" | "start_anyway" | "accept" | "return" | "reopen" | "cancel" | "approve" | "reject" | "run_reviewer" | "ask_design" | "merge_now" | "keep_waiting";
         /** @description A ticket with everything attached to it. */
         TicketDetail: {
             /** @description What a person can do with the ticket now, computed by the state machine. */

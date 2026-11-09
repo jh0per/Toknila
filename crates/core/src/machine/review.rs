@@ -284,6 +284,68 @@ pub(super) fn start_merge(next: &mut Ticket, effects: &mut Vec<Effect>) {
     effects.push(Effect::Merge);
 }
 
+/// The merge is waiting on a pull request with no check reported and a person was asked.
+pub(super) fn asked_about_no_checks(ticket: &Ticket) -> bool {
+    ticket.review.turn == Some(ReviewTurn::Merging)
+        && ticket.review.note == Some(crate::ReviewNote::NoChecks)
+        && ticket.pr.is_some()
+}
+
+/// Whether `reason` is a person's block as the third answer to the no-checks question.
+pub(super) fn blocks_unasked(ticket: &Ticket, reason: &crate::BlockedReason) -> bool {
+    asked_about_no_checks(ticket) && matches!(reason, crate::BlockedReason::Manual { .. })
+}
+
+/// The host looked at the pull request. The machine keeps the timers the host does not know:
+/// since when no check was reported, and a person's "merge now". When no check has been reported
+/// for `ask_after_secs` the card asks a person (once; a later look changes nothing).
+pub(super) fn pull_request_seen(
+    next: &mut Ticket,
+    mut pr: crate::PullRequest,
+    ask_after_secs: u64,
+    now: Timestamp,
+) -> Option<()> {
+    if next.review.turn != Some(ReviewTurn::Merging) {
+        return None;
+    }
+    let before = next.pr.take().filter(|p| p.number == pr.number);
+    pr.merge_unchecked = before.as_ref().is_some_and(|p| p.merge_unchecked);
+    if pr.checks.is_empty() {
+        let since = before.and_then(|p| p.no_checks_since).unwrap_or(now);
+        pr.no_checks_since = Some(since);
+        let waited = now.millis_since(since) / 1000;
+        if waited >= ask_after_secs && !pr.merge_unchecked && next.review.note.is_none() {
+            next.review.note = Some(crate::ReviewNote::NoChecks);
+        }
+    } else if next.review.note == Some(crate::ReviewNote::NoChecks) {
+        next.review.note = None;
+    }
+    next.pr = Some(pr);
+    Some(())
+}
+
+/// A person answered the no-checks question with "merge now" (the host merges although no check
+/// was reported) or "keep waiting" (the timeout starts again). `None` when nobody asked.
+pub(super) fn no_checks_answer(
+    next: &mut Ticket,
+    event: &super::TicketEvent,
+    now: Timestamp,
+    effects: &mut Vec<Effect>,
+) -> Option<()> {
+    if !asked_about_no_checks(next) {
+        return None;
+    }
+    next.review.note = None;
+    let pr = next.pr.as_mut()?;
+    if matches!(event, super::TicketEvent::MergeUnchecked) {
+        pr.merge_unchecked = true;
+        effects.push(Effect::Merge);
+    } else {
+        pr.no_checks_since = Some(now);
+    }
+    Some(())
+}
+
 /// A card whose merge is running takes no verdict and no return.
 pub(super) fn not_merging(
     ticket: &Ticket,

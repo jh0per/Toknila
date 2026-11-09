@@ -240,15 +240,23 @@ pub fn apply(
                 return Err(refuse());
             }
             next.review.turn = None;
+            next.review.note = None;
             review::merged(&mut effects);
             (S::Merged, None)
         }
-        (S::Review, TicketEvent::PrUpdated { pr }) => {
-            if next.review.turn != Some(ReviewTurn::Merging) {
-                return Err(refuse());
-            }
-            next.pr = Some(pr.clone());
+        (S::Review, TicketEvent::PrUpdated { pr, ask_after_secs }) => {
+            review::pull_request_seen(&mut next, pr.clone(), *ask_after_secs, now)
+                .ok_or_else(refuse)?;
             (S::Review, None)
+        }
+        (S::Review, TicketEvent::MergeUnchecked | TicketEvent::KeepWaiting) => {
+            review::no_checks_answer(&mut next, event, now, &mut effects).ok_or_else(refuse)?;
+            (S::Review, None)
+        }
+        // The third answer to the no-checks question: block, with the person's reason.
+        (S::Review, TicketEvent::Block { reason }) if review::blocks_unasked(ticket, reason) => {
+            review::leave(&mut next, &mut effects);
+            block(reason, ticket, &mut effects)?
         }
         (
             S::Review,

@@ -8,12 +8,15 @@ use std::process::{Command, Output};
 
 use toknila_app::MergeError;
 
+/// The exit code with which `gh` says it has no login.
+const EXIT_AUTH_REQUIRED: i32 = 4;
+
 /// Why a `gh` command did not give a result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum GhError {
     /// The program is not installed or not on the path.
     Missing,
-    /// `gh` has no GitHub login.
+    /// `gh` has no GitHub login (it exited with the authentication code).
     NotLoggedIn,
     /// The process could not be run.
     Io(String),
@@ -68,7 +71,8 @@ impl Gh {
                 ErrorKind::NotFound => GhError::Missing,
                 _ => GhError::Io(format!("cannot run {}: {e}", self.program)),
             })?;
-        if !out.status.success() && text(&out.stderr).contains("gh auth login") {
+        // `gh` documents exit code 4 as "authentication required"; the message is not read.
+        if out.status.code() == Some(EXIT_AUTH_REQUIRED) {
             return Err(GhError::NotLoggedIn);
         }
         Ok(out)

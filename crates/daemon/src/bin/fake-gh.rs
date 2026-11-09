@@ -1,8 +1,9 @@
 //! A stand-in for the GitHub CLI, for the tests of pull-request mode: no network, no account.
-//! It answers the four commands the daemon runs, from a JSON state file named by
+//! It answers the commands the daemon runs, from a JSON state file named by
 //! `FAKE_GH_STATE`; a test edits that file between steps to move checks along.
 //!
-//! - `pr view <branch|number|url> --json <fields>`: the pull request, or "no pull requests found".
+//! - `pr view <number|url> --json <fields>`: the pull request (`statusCheckRollup` is its checks).
+//! - `pr list --head <branch> --state all --json <fields>`: a list; empty (exit 0) for no pull request.
 //! - `pr create --head <branch> --base <base> --title <t> --body <b>`: opens one and prints its URL.
 //! - `pr checks <selector> --json name,bucket`: the checks; exit 8 while pending, 1 on a failure.
 //! - `pr merge <selector> --merge|--squash|--rebase`: refuses unless every check passed; else the
@@ -10,7 +11,9 @@
 //!
 //! State: `{"logged_in": true, "origin": "<bare repo>", "new_checks": [{"name", "bucket"}],
 //! "prs": [{"number", "url", "branch", "base", "title", "body", "state", "mergeable", "checks",
-//! "method"}], "calls": [[args]]}`. Not logged in, every command fails as the real one does.
+//! "method"}], "calls": [[args]], "fail": {"<command>": {"code", "text"}}, "auth_text"}`. Not
+//! logged in, every command exits 4 as the real one does; `fail` makes one command fail with
+//! the given exit code and message (the daemon must go by the code, not the words).
 //! Built only to be run by the daemon's tests.
 
 use std::process::{Command, exit};
@@ -44,13 +47,24 @@ fn flag<'a>(args: &'a [String], name: &str) -> &'a str {
 }
 
 fn run(state: &mut Value, args: &[String]) -> i32 {
+    // Like the real one: exit code 4 is "authentication required", whatever the message says.
     if state["logged_in"] != json!(true) {
-        fail(
-            4,
-            "To get started with GitHub CLI, please run:  gh auth login",
-        );
+        let text = state["auth_text"]
+            .as_str()
+            .unwrap_or("To get started with GitHub CLI, please run:  gh auth login");
+        fail(4, text);
     }
     let (cmd, sel) = (args.get(1).map_or("", String::as_str), args.get(2));
+    // A command made to fail: `"fail": {"<command>": {"code": 1, "text": "..."}}`.
+    if let Some(f) = state["fail"].get(cmd) {
+        fail(
+            f["code"]
+                .as_i64()
+                .and_then(|c| i32::try_from(c).ok())
+                .unwrap_or(1),
+            f["text"].as_str().unwrap_or("failed"),
+        );
+    }
     let sel = sel.map_or("", String::as_str);
     let prs = state["prs"].as_array().cloned().unwrap_or_default();
     let found = prs.iter().rposition(|p| {
@@ -70,19 +84,28 @@ fn run(state: &mut Value, args: &[String]) -> i32 {
             println!("{url}");
             0
         }
+        // Like the real one: a branch without a pull request is an empty list and exit code 0.
+        ("list", _) => {
+            let head = flag(args, "--head");
+            let listed: Vec<Value> = prs
+                .iter()
+                .filter(|p| p["branch"] == head)
+                .map(|p| shown(p, flag(args, "--json")))
+                .collect();
+            println!("{}", Value::Array(listed));
+            0
+        }
         ("view" | "checks" | "merge", None) => fail(1, "no pull requests found for branch"),
         ("view", Some(i)) => {
-            let pr = &prs[i];
-            let fields: Vec<&str> = flag(args, "--json").split(',').collect();
-            let shown: serde_json::Map<String, Value> = fields
-                .into_iter()
-                .filter_map(|f| pr.get(f).map(|v| (f.to_owned(), v.clone())))
-                .collect();
-            println!("{}", Value::Object(shown));
+            println!("{}", shown(&prs[i], flag(args, "--json")));
             0
         }
         ("checks", Some(i)) => {
             let checks = prs[i]["checks"].clone();
+            // Like the real one: nothing on stdout and exit code 1 when no check was reported.
+            if checks.as_array().is_none_or(Vec::is_empty) {
+                fail(1, "no checks reported on the 'branch' branch");
+            }
             println!("{checks}");
             let buckets: Vec<&str> = checks
                 .as_array()
@@ -120,6 +143,22 @@ fn run(state: &mut Value, args: &[String]) -> i32 {
         }
         _ => fail(2, "fake-gh: unsupported command"),
     }
+}
+
+/// The `--json` fields of a pull request; `statusCheckRollup` is its checks.
+fn shown(pr: &Value, fields: &str) -> Value {
+    let shown: serde_json::Map<String, Value> = fields
+        .split(',')
+        .filter_map(|f| {
+            let key = if f == "statusCheckRollup" {
+                "checks"
+            } else {
+                f
+            };
+            pr.get(key).map(|v| (f.to_owned(), v.clone()))
+        })
+        .collect();
+    Value::Object(shown)
 }
 
 fn git(dir: &str, args: &[&str]) -> String {

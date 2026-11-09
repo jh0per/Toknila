@@ -73,6 +73,10 @@ pub enum ProjectCmd {
         /// How a pull request merges: merge, squash or rebase (default: merge).
         #[arg(long)]
         merge_method: Option<String>,
+        /// Seconds a pull request may report no check before you are asked what to do (merge now,
+        /// keep waiting or block); default 600.
+        #[arg(long)]
+        no_checks_timeout: Option<u64>,
         /// The test command, optional (e.g. `cargo xtask verify`): agents run it before they hand in,
         /// and may without asking. An empty text clears it.
         #[arg(long)]
@@ -177,6 +181,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             merge,
             pr_title,
             merge_method,
+            no_checks_timeout,
             check_command,
             worker_model,
             reviewer_model,
@@ -208,6 +213,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     .as_deref()
                     .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge method {m}")))
                     .transpose()?,
+                no_checks_timeout_secs: no_checks_timeout,
                 check_command,
                 worker_model,
                 reviewer_model,

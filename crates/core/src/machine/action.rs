@@ -39,6 +39,10 @@ pub enum TicketAction {
     RunReviewer,
     /// Ask for a design to approve before any code (`tok design`).
     AskDesign,
+    /// A pull request reported no checks: merge it anyway.
+    MergeNow,
+    /// A pull request reported no checks: wait for the timeout again.
+    KeepWaiting,
 }
 
 /// The name is not an action.
@@ -59,7 +63,7 @@ impl FromStr for TicketAction {
 
 impl TicketAction {
     /// Every action, in the order a client shows them.
-    pub const ALL: [TicketAction; 15] = [
+    pub const ALL: [TicketAction; 17] = [
         Self::Start,
         Self::Pause,
         Self::Resume,
@@ -75,6 +79,8 @@ impl TicketAction {
         Self::Approve,
         Self::Reject,
         Self::RunReviewer,
+        Self::MergeNow,
+        Self::KeepWaiting,
     ];
 
     /// The name used in routes and commands.
@@ -95,6 +101,8 @@ impl TicketAction {
             Self::Reject => "reject",
             Self::RunReviewer => "run_reviewer",
             Self::AskDesign => "ask_design",
+            Self::MergeNow => "merge_now",
+            Self::KeepWaiting => "keep_waiting",
         }
     }
 
@@ -132,6 +140,8 @@ impl TicketAction {
             },
             Self::RunReviewer => TicketEvent::RunReviewer,
             Self::AskDesign => TicketEvent::AskDesign,
+            Self::MergeNow => TicketEvent::MergeUnchecked,
+            Self::KeepWaiting => TicketEvent::KeepWaiting,
         })
     }
 

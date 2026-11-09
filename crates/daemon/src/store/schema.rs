@@ -270,4 +270,9 @@ pub(super) const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE projects ADD COLUMN max_review_rounds INTEGER NOT NULL DEFAULT 3;
     "#,
+    // 18: pull-request mode: seconds a pull request may report no check before a person is asked
+    // what to do (default ten minutes).
+    r#"
+    ALTER TABLE projects ADD COLUMN no_checks_timeout_secs INTEGER NOT NULL DEFAULT 600;
+    "#,
 ];

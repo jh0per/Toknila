@@ -59,11 +59,34 @@ pub struct MergeSettings {
     /// Title of a pull request; `{key}` and `{title}` are the card's.
     pub pr_title: String,
     pub method: MergeMethod,
+    /// Seconds a pull request may have no check reported before a person is asked what to do.
+    #[serde(default = "MergeSettings::default_no_checks_timeout_secs")]
+    pub no_checks_timeout_secs: u64,
 }
 
 impl MergeSettings {
+    fn default_no_checks_timeout_secs() -> u64 {
+        Self::DEFAULT_NO_CHECKS_TIMEOUT_SECS
+    }
+
     /// Pull request title of a project that does not name one.
     pub const DEFAULT_PR_TITLE: &str = "{key}: {title}";
+    /// Ten minutes.
+    pub const DEFAULT_NO_CHECKS_TIMEOUT_SECS: u64 = 600;
+    /// The longest timeout: one week.
+    pub const MAX_NO_CHECKS_TIMEOUT_SECS: u64 = 7 * 24 * 3600;
+
+    /// `secs` as a timeout, or why it is not one.
+    pub fn check_no_checks_timeout(secs: u64) -> Result<u64, String> {
+        if (1..=Self::MAX_NO_CHECKS_TIMEOUT_SECS).contains(&secs) {
+            Ok(secs)
+        } else {
+            Err(format!(
+                "the no-checks timeout must be 1 to {} seconds",
+                Self::MAX_NO_CHECKS_TIMEOUT_SECS
+            ))
+        }
+    }
 }
 
 impl Default for MergeSettings {
@@ -72,6 +95,7 @@ impl Default for MergeSettings {
             mode: MergeMode::default(),
             pr_title: Self::DEFAULT_PR_TITLE.to_owned(),
             method: MergeMethod::default(),
+            no_checks_timeout_secs: Self::DEFAULT_NO_CHECKS_TIMEOUT_SECS,
         }
     }
 }

@@ -24,14 +24,14 @@ fn github() -> Mem {
 }
 
 fn pr(state: CheckState) -> PullRequest {
-    PullRequest {
-        number: 7,
-        url: URL.to_owned(),
-        checks: vec![CheckRun {
+    PullRequest::seen(
+        7,
+        URL.to_owned(),
+        vec![CheckRun {
             name: "verify".to_owned(),
             state,
         }],
-    }
+    )
 }
 
 fn asked(mem: &Mem) -> Vec<toknila_core::pr::PrSpec> {
@@ -275,4 +275,20 @@ fn the_merge_settings_are_saved_and_refused_when_unusable() {
         ..projects::PatchProject::default()
     };
     projects::patch(&mut mem, "DEMO", blank).expect_err("blank title");
+}
+
+#[test]
+fn the_no_checks_timeout_defaults_to_ten_minutes_and_is_kept_within_bounds() {
+    let mut mem = Mem::demo();
+    assert_eq!(mem.project.merge.no_checks_timeout_secs, 600);
+    let set = |secs| projects::PatchProject {
+        no_checks_timeout_secs: Some(secs),
+        ..projects::PatchProject::default()
+    };
+    let p = projects::patch(&mut mem, "DEMO", set(90)).expect("patch");
+    assert_eq!(p.merge.no_checks_timeout_secs, 90);
+    for bad in [0, 7 * 24 * 3600 + 1] {
+        projects::patch(&mut mem, "DEMO", set(bad)).expect_err("out of bounds");
+    }
+    assert_eq!(mem.project.merge.no_checks_timeout_secs, 90);
 }

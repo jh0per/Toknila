@@ -16,6 +16,7 @@
       "merge": {
         "method": "merge",
         "mode": "local",
+        "no_checks_timeout_secs": 600,
         "pr_title": "{key}: {title}"
       },
       "name": "DEMO",

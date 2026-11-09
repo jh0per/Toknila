@@ -335,11 +335,7 @@ fn kinds_are_ordered_for_grouping() {
 
 #[test]
 fn a_blocked_card_with_a_pull_request_carries_its_link_and_other_cards_do_not() {
-    let pr = crate::PullRequest {
-        number: 7,
-        url: "https://github.com/o/r/pull/7".to_owned(),
-        checks: Vec::new(),
-    };
+    let pr = crate::PullRequest::seen(7, "https://github.com/o/r/pull/7".to_owned(), Vec::new());
     let mut failed = blocked(
         ticket(1, TicketStatus::Review, 5),
         BlockedReason::CiFailed {

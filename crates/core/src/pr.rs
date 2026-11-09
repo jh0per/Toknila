@@ -39,6 +39,26 @@ pub struct PullRequest {
     #[serde(default)]
     #[cfg_attr(feature = "openapi", schema(required = true))]
     pub checks: Vec<CheckRun>,
+    /// Since when the host reported no check at all; the timer of the "no checks" question.
+    /// Set by the machine, cleared when a check shows up.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_checks_since: Option<crate::Timestamp>,
+    /// A person answered "merge now": merge although no check was ever reported.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub merge_unchecked: bool,
+}
+
+impl PullRequest {
+    /// A pull request as the host reports it, before the machine adds its own timers.
+    pub fn seen(number: u64, url: String, checks: Vec<CheckRun>) -> Self {
+        Self {
+            number,
+            url,
+            checks,
+            no_checks_since: None,
+            merge_unchecked: false,
+        }
+    }
 }
 
 /// What the checks of a pull request add up to.

@@ -96,6 +96,11 @@ pub enum Command {
         #[arg(long)]
         anyway: bool,
     },
+    /// Answer "the pull request has no checks": merge it now. (`tok block` and `tok keep-waiting`
+    /// are the other answers.)
+    MergeNow { ticket: String },
+    /// Answer "the pull request has no checks": keep waiting for the timeout again.
+    KeepWaiting { ticket: String },
     /// Accept a ticket in Review: it becomes Merged (Done). Remarks are optional.
     Accept {
         ticket: String,
@@ -270,6 +275,8 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
             };
             ticket::act(&c, &ticket, action, None, json_out)
         }
+        Command::MergeNow { ticket } => ticket::act(&c, &ticket, "merge_now", None, json_out),
+        Command::KeepWaiting { ticket } => ticket::act(&c, &ticket, "keep_waiting", None, json_out),
         Command::Accept { ticket, comment } => {
             ticket::act(&c, &ticket, "accept", comment.as_deref(), json_out)
         }

@@ -396,3 +396,235 @@ async fn a_pull_request_closed_or_in_conflict_on_github_blocks_with_the_link() {
         "{d}"
     );
 }
+
+// --- A pull request that reports no checks (a repository without CI) ---
+
+impl Rig {
+    /// The repository has no CI: new pull requests report no check. The question comes after one
+    /// second without a check.
+    async fn without_ci(&self) {
+        self.gh_edit(|s| s["new_checks"] = json!([]));
+        self.call(
+            Method::PATCH,
+            "/v1/projects/DEMO",
+            json!({ "no_checks_timeout_secs": 1 }),
+        )
+        .await;
+    }
+
+    /// The inbox item that asks what to do about a pull request without checks, if any.
+    async fn no_checks_question(&self) -> Option<Value> {
+        let inbox = self.get("/v1/projects/DEMO/inbox").await;
+        inbox.as_array().expect("inbox").iter().find_map(|i| {
+            let text = i["text"].as_str().unwrap_or_default();
+            (i["kind"] == "question" && text.contains("no checks")).then(|| i.clone())
+        })
+    }
+
+    async fn wait_out_the_timeout(&self) {
+        tokio::time::sleep(std::time::Duration::from_millis(1300)).await;
+    }
+
+    /// Without CI, accepted, and the timeout passed: the question is listed.
+    async fn asked(&self) -> Value {
+        self.without_ci().await;
+        self.accepted().await;
+        self.tick().await;
+        assert!(
+            self.no_checks_question().await.is_none(),
+            "not before the timeout"
+        );
+        self.wait_out_the_timeout().await;
+        self.tick().await;
+        self.no_checks_question().await.expect("the question")
+    }
+
+    fn merge_calls(&self) -> usize {
+        let calls = self.gh()["calls"].clone();
+        calls
+            .as_array()
+            .expect("calls")
+            .iter()
+            .filter(|c| c[1] == "merge")
+            .count()
+    }
+}
+
+#[tokio::test]
+async fn a_pull_request_without_checks_raises_the_question_after_the_timeout_and_merge_now_merges()
+{
+    let rig = Rig::new().await;
+    let q = rig.asked().await;
+    assert_eq!(q["ticket"], "DEMO-1");
+    assert_eq!(q["link"], "https://github.com/o/r/pull/1");
+    let actions = q["allowed_actions"].as_array().expect("actions").clone();
+    for answer in ["block", "merge_now", "keep_waiting"] {
+        assert!(actions.contains(&json!(answer)), "{answer} in {q}");
+    }
+    assert!(!actions.contains(&json!("accept")), "{q}");
+    assert_eq!(rig.status().await, "review");
+    assert_eq!(rig.merge_calls(), 0, "nothing merged while it waits");
+
+    rig.post("/v1/tickets/DEMO-1/actions/merge_now", json!({}))
+        .await;
+    assert_eq!(rig.status().await, "merged");
+    assert_eq!(rig.merge_calls(), 1);
+    assert!(rig.origin_has("develop", "login.txt"));
+    assert!(rig.no_checks_question().await.is_none());
+}
+
+#[tokio::test]
+async fn keep_waiting_withdraws_the_question_and_it_comes_back_after_another_timeout() {
+    let rig = Rig::new().await;
+    rig.asked().await;
+
+    rig.post("/v1/tickets/DEMO-1/actions/keep_waiting", json!({}))
+        .await;
+    assert_eq!(rig.status().await, "review");
+    assert!(rig.no_checks_question().await.is_none());
+    rig.tick().await;
+    assert!(
+        rig.no_checks_question().await.is_none(),
+        "the timeout started again"
+    );
+    assert_eq!(rig.merge_calls(), 0);
+
+    rig.wait_out_the_timeout().await;
+    rig.tick().await;
+    assert!(rig.no_checks_question().await.is_some(), "asked again");
+}
+
+#[tokio::test]
+async fn block_answers_the_question_by_blocking_the_card_with_the_reason() {
+    let rig = Rig::new().await;
+    rig.asked().await;
+
+    rig.post(
+        "/v1/tickets/DEMO-1/actions/block",
+        json!({ "text": "wait for the CI to be set up" }),
+    )
+    .await;
+    let d = rig.card("DEMO-1").await;
+    assert_eq!(d["ticket"]["status"], "blocked");
+    assert_eq!(reason(&d)["kind"], "manual");
+    assert_eq!(reason(&d)["text"], "wait for the CI to be set up");
+    assert_eq!(rig.merge_calls(), 0);
+    assert!(rig.no_checks_question().await.is_none());
+}
+
+#[tokio::test]
+async fn a_pull_request_with_checks_never_raises_the_question() {
+    let rig = Rig::new().await;
+    rig.call(
+        Method::PATCH,
+        "/v1/projects/DEMO",
+        json!({ "no_checks_timeout_secs": 1 }),
+    )
+    .await;
+    // Required checks that are still running (the default of the rig's new pull requests).
+    rig.accepted().await;
+    rig.wait_out_the_timeout().await;
+    rig.tick().await;
+    rig.wait_out_the_timeout().await;
+    rig.tick().await;
+    assert!(rig.no_checks_question().await.is_none());
+    assert_eq!(rig.status().await, "review");
+    assert!(rig.card("DEMO-1").await["ticket"]["review"]["note"].is_null());
+
+    // They pass; the same card merges and was never asked.
+    rig.checks("pass");
+    rig.tick().await;
+    assert_eq!(rig.status().await, "merged");
+}
+
+#[tokio::test]
+async fn a_check_that_shows_up_after_the_question_withdraws_it() {
+    let rig = Rig::new().await;
+    rig.asked().await;
+    rig.checks("pending");
+    rig.tick().await;
+    assert!(rig.no_checks_question().await.is_none());
+    rig.checks("pass");
+    rig.tick().await;
+    assert_eq!(rig.status().await, "merged");
+}
+
+// --- gh failures are told apart by exit code and JSON, never by the words ---
+
+fn blocked_detail(card: &Value) -> String {
+    assert_eq!(card["ticket"]["status"], "blocked", "{card}");
+    assert_eq!(reason(card)["kind"], "merge_failed", "{card}");
+    reason(card)["detail"].as_str().expect("detail").to_owned()
+}
+
+#[tokio::test]
+async fn exit_code_4_is_not_logged_in_whatever_gh_says_and_the_words_alone_are_not() {
+    let rig = Rig::new().await;
+    rig.gh_edit(|s| {
+        s["logged_in"] = json!(false);
+        s["auth_text"] = json!("tout est cassé");
+    });
+    rig.accepted().await;
+    let detail = blocked_detail(&rig.card("DEMO-1").await);
+    assert!(detail.contains("gh auth login"), "typed fix: {detail}");
+    assert!(!detail.contains("cassé"), "{detail}");
+
+    // Control: the same words with another exit code are an ordinary failure.
+    let rig = Rig::new().await;
+    rig.gh_edit(|s| {
+        s["fail"] = json!({ "list": { "code": 1, "text": "please run: gh auth login" } })
+    });
+    rig.accepted().await;
+    let detail = blocked_detail(&rig.card("DEMO-1").await);
+    assert!(detail.contains("pr list"), "{detail}");
+    assert!(
+        detail.contains("gh auth login"),
+        "the raw message is kept: {detail}"
+    );
+    assert!(!detail.contains("not logged in"), "{detail}");
+}
+
+#[tokio::test]
+async fn a_branch_without_a_pull_request_is_an_empty_list_and_a_failing_list_is_not() {
+    let rig = Rig::new().await;
+    rig.accepted().await;
+    assert_eq!(rig.creates(), 1, "an empty list (exit 0) means: open one");
+
+    // The same words as the old "no pull requests found" test, with a failing exit code: gh
+    // is broken, so nothing is created.
+    let rig = Rig::new().await;
+    rig.gh_edit(|s| s["fail"] = json!({ "list": { "code": 1, "text": "no pull requests found" } }));
+    rig.accepted().await;
+    blocked_detail(&rig.card("DEMO-1").await);
+    assert_eq!(rig.creates(), 0);
+}
+
+#[tokio::test]
+async fn gh_pr_checks_failing_with_checks_present_is_an_error_not_no_checks() {
+    let rig = Rig::new().await;
+    rig.without_ci().await;
+    rig.accepted().await;
+    // Control: with no checks on the pull request, `pr checks` exiting 1 means none reported.
+    rig.tick().await;
+    assert_eq!(rig.status().await, "review");
+
+    // Checks exist (pending), `pr checks` fails with the words of "no checks": it is an error.
+    let rig = Rig::new().await;
+    rig.accepted().await;
+    rig.gh_edit(|s| s["fail"] = json!({ "checks": { "code": 1, "text": "no checks reported" } }));
+    rig.tick().await;
+    let detail = blocked_detail(&rig.card("DEMO-1").await);
+    assert!(detail.contains("pr checks"), "{detail}");
+}
+
+#[tokio::test]
+async fn a_refused_merge_is_a_failure_unless_github_says_the_pull_request_conflicts() {
+    let rig = Rig::new().await;
+    rig.accepted().await;
+    rig.checks("pass");
+    // The words say conflict, the pull request says it is mergeable: not a conflict.
+    rig.gh_edit(|s| s["fail"] = json!({ "merge": { "code": 1, "text": "merge conflict!" } }));
+    rig.tick().await;
+    let detail = blocked_detail(&rig.card("DEMO-1").await);
+    assert!(detail.contains("pr merge"), "{detail}");
+}
