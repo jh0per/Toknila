@@ -7,6 +7,36 @@ fn finished(mode: ReviewMode) -> TicketEvent {
         summary: "done".to_owned(),
         open_threads: vec![],
         mode,
+        check: false,
+        max_rounds: 3,
+    }
+}
+
+fn finished_with_check(mode: ReviewMode) -> TicketEvent {
+    match finished(mode) {
+        TicketEvent::Finished {
+            summary,
+            open_threads,
+            mode,
+            max_rounds,
+            ..
+        } => TicketEvent::Finished {
+            summary,
+            open_threads,
+            mode,
+            check: true,
+            max_rounds,
+        },
+        other => other,
+    }
+}
+
+fn check_done(passed: bool, mode: ReviewMode, max_rounds: u32) -> TicketEvent {
+    TicketEvent::CheckDone {
+        passed,
+        output: "error: the thing failed".to_owned(),
+        mode,
+        max_rounds,
     }
 }
 
@@ -20,6 +50,8 @@ fn verdict(verdict: Verdict, comment: &str) -> TicketEvent {
     TicketEvent::ReviewVerdict {
         verdict,
         comment: comment.to_owned(),
+        items: vec![],
+        max_rounds: 3,
     }
 }
 
@@ -90,27 +122,58 @@ fn in_agent_mode_requested_changes_go_back_to_the_worker() {
     );
 }
 
-#[test]
-fn in_both_mode_the_agents_verdict_hands_the_card_to_a_person() {
-    for v in [Verdict::Approve, Verdict::RequestChanges] {
-        let t = in_review(ReviewTurn::Agent { decides: false });
-        let tr = step(&t, &verdict(v, "see line 3"));
-        assert_eq!(tr.ticket.status, TicketStatus::Review);
-        assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
-        assert_eq!(tr.ticket.review.rounds.len(), 1);
-        assert_eq!(tr.ticket.review.rounds[0].verdict, v);
-        assert_eq!(
-            tr.effects,
-            [Effect::StopReviewer],
-            "only the finished reviewer goes; nothing else moves until the person acts"
-        );
+fn verdict_with_limit(v: Verdict, comment: &str, max_rounds: u32) -> TicketEvent {
+    TicketEvent::ReviewVerdict {
+        verdict: v,
+        comment: comment.to_owned(),
+        items: vec![],
+        max_rounds,
     }
+}
+
+#[test]
+fn in_both_mode_an_approval_hands_the_card_to_a_person() {
+    let t = in_review(ReviewTurn::Agent { decides: false });
+    let tr = step(&t, &verdict(Verdict::Approve, "see line 3"));
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+    assert_eq!(tr.ticket.review.rounds.len(), 1);
+    assert_eq!(tr.ticket.review.rounds[0].verdict, Verdict::Approve);
+    assert_eq!(
+        tr.effects,
+        [Effect::StopReviewer],
+        "only the finished reviewer goes; nothing else moves until the person acts"
+    );
+}
+
+#[test]
+fn in_both_mode_requested_changes_return_the_card_until_the_round_limit() {
+    let t = in_review(ReviewTurn::Agent { decides: false });
+    let tr = step(&t, &verdict(Verdict::RequestChanges, "see line 3"));
+    assert_eq!(tr.ticket.status, TicketStatus::Running, "round 1 of 3");
+    assert!(tr.effects.contains(&Effect::RecordRemarks {
+        text: "see line 3".to_owned()
+    }));
+
+    // With the limit used up the same verdict is a round, and the card waits for the person.
+    let tr = step(&t, &verdict_with_limit(Verdict::RequestChanges, "again", 0));
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+    assert_eq!(tr.ticket.review.rounds.len(), 1);
+    assert!(matches!(
+        tr.effects[..],
+        [Effect::StopReviewer, Effect::RecordReport { .. }]
+    ));
 }
 
 #[test]
 fn the_person_after_the_agent_adds_a_second_round() {
     let t = in_review(ReviewTurn::Agent { decides: false });
-    let t = step(&t, &verdict(Verdict::RequestChanges, "rename it")).ticket;
+    let t = step(
+        &t,
+        &verdict_with_limit(Verdict::RequestChanges, "rename it", 0),
+    )
+    .ticket;
     let t = step(
         &t,
         &TicketEvent::Return {
@@ -368,4 +431,208 @@ fn a_reviewer_that_exits_gets_the_run_again_action_too() {
     let tr = step(&t, &failed);
     assert!(tr.ticket.review.note.is_some());
     assert!(TicketAction::allowed(&tr.ticket).contains(&TicketAction::RunReviewer));
+}
+
+fn after_hand_in_with_check(mode: ReviewMode) -> Ticket {
+    step(
+        &ticket_in(TicketStatus::Running),
+        &finished_with_check(mode),
+    )
+    .ticket
+}
+
+#[test]
+fn a_hand_in_with_a_check_waits_for_the_check_before_anyone_reviews() {
+    let tr = step(
+        &ticket_in(TicketStatus::Running),
+        &finished_with_check(ReviewMode::Both),
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Check));
+    assert!(tr.effects.contains(&Effect::RunCheck));
+    assert!(
+        !tr.effects.contains(&Effect::StartReviewer),
+        "not before the check passes"
+    );
+}
+
+#[test]
+fn a_failing_check_returns_the_card_to_the_worker_with_the_output_as_a_round() {
+    let t = after_hand_in_with_check(ReviewMode::Both);
+    let tr = step(&t, &check_done(false, ReviewMode::Both, 3));
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert_eq!(tr.ticket.review.turn, None);
+    let round = &tr.ticket.review.rounds[0];
+    assert_eq!(
+        (round.number, round.reviewer, round.verdict),
+        (1, Actor::System, Verdict::RequestChanges)
+    );
+    assert!(round.comment.contains("the thing failed"));
+    let sent = tr.effects.iter().find_map(|e| match e {
+        Effect::RecordCheckOutput { text } => Some(text.clone()),
+        _ => None,
+    });
+    let sent = sent.expect("the output goes to the worker");
+    assert!(
+        sent.contains("round 1 of 3") && sent.contains("the thing failed"),
+        "{sent}"
+    );
+    assert!(tr.effects.contains(&Effect::EnsureRunner));
+    assert!(!tr.effects.contains(&Effect::StartReviewer));
+}
+
+#[test]
+fn a_passing_check_goes_on_to_whoever_the_mode_says() {
+    for (mode, turn) in [
+        (ReviewMode::Human, ReviewTurn::Person),
+        (ReviewMode::Both, ReviewTurn::Agent { decides: false }),
+        (ReviewMode::Agent, ReviewTurn::Agent { decides: true }),
+    ] {
+        let t = after_hand_in_with_check(mode);
+        let tr = step(&t, &check_done(true, mode, 3));
+        assert_eq!(tr.ticket.status, TicketStatus::Review, "{mode:?}");
+        assert_eq!(tr.ticket.review.turn, Some(turn), "{mode:?}");
+        assert_eq!(
+            tr.effects.contains(&Effect::StartReviewer),
+            mode != ReviewMode::Human
+        );
+        let round = &tr.ticket.review.rounds[0];
+        assert_eq!(
+            (round.reviewer, round.verdict),
+            (Actor::System, Verdict::Approve)
+        );
+    }
+}
+
+#[test]
+fn after_the_round_limit_a_failing_check_leaves_the_card_to_the_person_with_the_history() {
+    let mut t = after_hand_in_with_check(ReviewMode::Both);
+    for round in 1..=2 {
+        t = step(&t, &check_done(false, ReviewMode::Both, 2)).ticket;
+        assert_eq!(t.status, TicketStatus::Running, "round {round}");
+        t = step(&t, &finished_with_check(ReviewMode::Both)).ticket;
+    }
+    let tr = step(&t, &check_done(false, ReviewMode::Both, 2));
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+    assert_eq!(tr.ticket.review.rounds.len(), 3, "the whole history");
+    assert!(
+        tr.effects
+            .iter()
+            .any(|e| matches!(e, Effect::RecordReport { summary } if summary.contains("2 rounds")))
+    );
+    assert!(
+        !tr.effects.contains(&Effect::EnsureRunner),
+        "nothing goes back to the worker"
+    );
+}
+
+#[test]
+fn a_persons_decision_starts_the_round_count_again() {
+    let mut t = after_hand_in_with_check(ReviewMode::Human);
+    t = step(&t, &check_done(false, ReviewMode::Human, 1)).ticket;
+    assert_eq!(t.review.auto_returns(), 1);
+    t = step(&t, &finished_with_check(ReviewMode::Human)).ticket;
+    t = step(&t, &check_done(true, ReviewMode::Human, 1)).ticket;
+    t = step(
+        &t,
+        &TicketEvent::Return {
+            comment: "more".to_owned(),
+        },
+    )
+    .ticket;
+    assert_eq!(t.review.auto_returns(), 0);
+}
+
+#[test]
+fn the_check_result_is_heard_only_while_the_card_is_being_checked() {
+    for t in [
+        in_review(ReviewTurn::Person),
+        ticket_in(TicketStatus::Running),
+    ] {
+        assert!(apply(&t, &check_done(true, ReviewMode::Human, 3), NOW).is_err());
+    }
+    let lost = TicketEvent::CheckLost {
+        detail: "no shell".to_owned(),
+    };
+    let t = after_hand_in_with_check(ReviewMode::Both);
+    let tr = step(&t, &lost);
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+    // A person cannot accept or return a card while its check runs.
+    for event in [
+        TicketEvent::Accept { comment: None },
+        TicketEvent::Return {
+            comment: "x".to_owned(),
+        },
+    ] {
+        assert!(apply(&t, &event, NOW).is_err(), "{event:?}");
+    }
+}
+
+fn with_acceptance(turn: ReviewTurn) -> Ticket {
+    let mut t = in_review(turn);
+    t.acceptance = vec!["first holds".to_owned(), "second holds".to_owned()];
+    t
+}
+
+fn items(outcomes: &[(u32, crate::ItemOutcome)]) -> Vec<crate::ItemVerdict> {
+    outcomes
+        .iter()
+        .map(|(item, outcome)| crate::ItemVerdict {
+            item: *item,
+            outcome: *outcome,
+            note: "seen".to_owned(),
+        })
+        .collect()
+}
+
+fn judged(v: Verdict, comment: &str, items: Vec<crate::ItemVerdict>) -> TicketEvent {
+    TicketEvent::ReviewVerdict {
+        verdict: v,
+        comment: comment.to_owned(),
+        items,
+        max_rounds: 3,
+    }
+}
+
+#[test]
+fn the_verdict_must_judge_each_acceptance_item_pass_or_fail() {
+    use crate::ItemOutcome::{Fail, Pass};
+    let t = with_acceptance(ReviewTurn::Agent { decides: true });
+    let refused = [
+        judged(Verdict::Approve, "", vec![]),
+        judged(Verdict::Approve, "", items(&[(1, Pass)])),
+        judged(Verdict::Approve, "", items(&[(1, Pass), (1, Pass)])),
+        judged(Verdict::Approve, "", items(&[(1, Pass), (3, Pass)])),
+        judged(Verdict::Approve, "", items(&[(1, Pass), (2, Fail)])),
+    ];
+    for event in refused {
+        assert!(
+            matches!(apply(&t, &event, NOW), Err(TransitionError::Items(_))),
+            "{event:?}"
+        );
+    }
+    let tr = step(
+        &t,
+        &judged(Verdict::Approve, "", items(&[(2, Pass), (1, Pass)])),
+    );
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Merging));
+    assert_eq!(
+        tr.ticket.review.rounds[0].comment,
+        "PASS 1. first holds - seen\nPASS 2. second holds - seen"
+    );
+}
+
+#[test]
+fn a_failing_item_returns_the_card_with_the_item_lines_as_the_remarks() {
+    use crate::ItemOutcome::{Fail, Pass};
+    let t = with_acceptance(ReviewTurn::Agent { decides: true });
+    let tr = step(
+        &t,
+        &judged(Verdict::RequestChanges, "", items(&[(1, Pass), (2, Fail)])),
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert!(tr.effects.contains(&Effect::RecordRemarks {
+        text: "PASS 1. first holds - seen\nFAIL 2. second holds - seen".to_owned()
+    }));
 }

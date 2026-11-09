@@ -137,6 +137,7 @@ pub(super) fn settle(mem: &mut Mem) {
             yard: &mem.yard,
             merger: &mem.merger,
             runner: &mem.runner,
+            checker: &mem.checker,
         };
         let outcomes = external::execute(host, queued);
         external::apply(mem, outcomes).expect("apply outcomes");

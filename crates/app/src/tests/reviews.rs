@@ -33,6 +33,7 @@ fn verdict(mem: &mut Mem, verdict: Verdict, comment: &str) -> crate::AppResult<(
     let event = AgentEvent::ReviewVerdict {
         verdict,
         comment: comment.to_owned(),
+        items: Vec::new(),
     };
     agent::ticket_event(mem, &t, event).map(|_| ())
 }
@@ -124,7 +125,7 @@ fn both_mode_the_agent_speaks_first_and_a_person_decides_with_its_remarks() {
         Some(ReviewTurn::Agent { decides: false })
     );
 
-    verdict(&mut mem, Verdict::RequestChanges, "rename the helper").expect("verdict");
+    verdict(&mut mem, Verdict::Approve, "rename the helper later").expect("verdict");
     let t = a(&mem);
     assert_eq!(
         t.status,
@@ -143,10 +144,19 @@ fn both_mode_the_agent_speaks_first_and_a_person_decides_with_its_remarks() {
             .map(|(n, who, v, _)| (*n, *who, *v))
             .collect::<Vec<_>>(),
         [
-            (1, Actor::Agent, Verdict::RequestChanges),
+            (1, Actor::Agent, Verdict::Approve),
             (2, Actor::Human, Verdict::RequestChanges)
         ]
     );
+}
+
+#[test]
+fn both_mode_the_agents_request_for_changes_returns_the_card_without_a_person() {
+    let mut mem = sim_in_review(ReviewMode::Both);
+    verdict(&mut mem, Verdict::RequestChanges, "rename the helper").expect("verdict");
+    let t = a(&mem);
+    assert_eq!(t.status, TicketStatus::Running, "back to the worker");
+    assert_eq!(t.review.turn, None);
 }
 
 #[test]
@@ -632,6 +642,7 @@ fn a_recorded_verdict_stops_the_reviewer_and_its_slot_starts_the_next_card() {
     let verdict = AgentEvent::ReviewVerdict {
         verdict: Verdict::Approve,
         comment: "fine".to_owned(),
+        items: Vec::new(),
     };
     agent::ticket_event(&mut mem, &one, verdict).expect("verdict");
     assert!(

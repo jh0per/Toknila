@@ -24,6 +24,7 @@ fn project() -> Project {
         default_review_mode: ReviewMode::Human,
         default_reviewer: None,
         max_parallel: 2,
+        max_review_rounds: 3,
         merge: Default::default(),
         check_command: None,
         worker_model: None,

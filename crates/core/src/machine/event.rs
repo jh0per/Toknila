@@ -4,8 +4,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Actor, BlockedReason, NodeRef, PullRequest, ReviewMode, StalePolicy, TicketKey, Verdict,
-    WaitingReason, thread::OpenThread,
+    Actor, BlockedReason, ItemVerdict, NodeRef, PullRequest, ReviewMode, StalePolicy, TicketKey,
+    Verdict, WaitingReason, thread::OpenThread,
 };
 
 /// Something that happened to a ticket.
@@ -41,7 +41,28 @@ pub enum TicketEvent {
         /// decides who the card waits for in Review.
         #[serde(skip)]
         mode: ReviewMode,
+        /// The daemon runs the project's check command on the ship before anyone reviews (the
+        /// project names one and the card has a ship), resolved by the caller.
+        #[serde(skip)]
+        check: bool,
+        /// The project's round limit of the loop, resolved by the caller.
+        #[serde(skip)]
+        max_rounds: u32,
     },
+    /// Host: the check command ran on the ship. `output` is what a worker reads (the command
+    /// and the end of its output). A pass goes on to whoever `mode` says; a failure sends the
+    /// card back to the worker, a round, until `max_rounds` rounds were used.
+    CheckDone {
+        passed: bool,
+        output: String,
+        #[serde(skip)]
+        mode: ReviewMode,
+        #[serde(skip)]
+        max_rounds: u32,
+    },
+    /// Host: the check could not run at all (no shell, no ship, the daemon restarted). A person
+    /// decides.
+    CheckLost { detail: String },
     /// Agent crash, runner loss, dependency reopened, merge conflict, or `tok block`.
     Block { reason: BlockedReason },
     /// `tok unblock`.
@@ -57,7 +78,16 @@ pub enum TicketEvent {
     Accept { comment: Option<String> },
     /// Reviewer agent: its decision about the work. In agent mode it moves the card (approve
     /// merges, request-changes returns); in both mode the card then waits for a person.
-    ReviewVerdict { verdict: Verdict, comment: String },
+    ReviewVerdict {
+        verdict: Verdict,
+        comment: String,
+        /// The judgement of each acceptance item; required when the ticket has any.
+        #[serde(default)]
+        items: Vec<ItemVerdict>,
+        /// The project's round limit, resolved by the caller.
+        #[serde(skip)]
+        max_rounds: u32,
+    },
     /// The reviewer agent could not start, or ended without a verdict: a person decides.
     ReviewerFailed { detail: String },
     /// Host: the reviewer ended a turn (its Stop hook, or silence) while the card still waits for
@@ -108,6 +138,8 @@ impl TicketEvent {
             Self::AgentActive => "agent_active",
             Self::Answered => "answered",
             Self::Finished { .. } => "finished",
+            Self::CheckDone { .. } => "check_done",
+            Self::CheckLost { .. } => "check_lost",
             Self::Block { .. } => "block",
             Self::Unblock => "unblock",
             Self::FastForwardStart => "fast_forward_start",
@@ -158,6 +190,11 @@ pub enum Effect {
     StopRunner,
     /// Stop the worker's runner only (the hand-in ended its run); a reviewer keeps running.
     StopWorker,
+    /// Run the project's check command on the ticket's ship (bounded time, output kept). The
+    /// outcome comes back as `CheckDone` or `CheckLost`.
+    RunCheck,
+    /// Store the failing check's output as an instruction comment for the worker.
+    RecordCheckOutput { text: String },
     /// Run the reviewer agent next to the worker (its own runner, on the same ship).
     StartReviewer,
     /// Stop the reviewer's runner, if any; the worker keeps running.

@@ -387,6 +387,22 @@ the agent hands in and passes it to the machine in the `Finished` event.
   `TicketDetail.review` adds the resolved `mode` and `reviewer` profile; `TicketDetail.allowed_actions`
   lists what a person may do now. Core computes it (`TicketAction::allowed`: each action tried
   against the transition table), so no client keeps a copy of the rules.
+- **The loop: check, review, return, up to N rounds.** The daemon does not trust `finished`. When
+  the project names a check command and the card has a ship, the hand-in puts the card in Review
+  with `review.turn = check` and the machine asks for `RunCheck`; the host (`Checker` port, the
+  daemon's `ShellChecker`: the platform shell in the ship, a 30 minute limit, the end of the output
+  kept) runs it after the commit and answers `CheckDone` (or `CheckLost` when it could not run, or
+  the daemon restarted meanwhile: a person decides). A pass is a round by the `system` actor and
+  hands the card on as the review mode says (reviewer agent, or the person, who then sees a card that
+  already passes). A failure is a round too, and the card goes back to the worker at once with the
+  command's output as an instruction (`RecordCheckOutput`), no person involved. The reviewer's
+  `request_changes` returns the card the same way in `agent` and `both` mode. Each return counts
+  against the project's `max_review_rounds` (default 3, `tok project set --review-rounds`); the
+  count restarts when a person decides (`Review::auto_returns`). Past the limit the card waits for
+  the person with every round in its history. The reviewer's verdict must judge each acceptance
+  item (`items`: `pass`/`fail` by position; an approval with a failing item, or an item left out, is
+  refused) and the round keeps one `PASS`/`FAIL` line per item. New projects start in review mode
+  `both`; existing projects keep theirs.
 - **A person may always decide**, also while the reviewer is still running: `accept` or `return`
   stops the reviewer (`StopReviewer`) and records the person's round. `accept` takes optional
   remarks (`tok accept <ticket> [comment]`).

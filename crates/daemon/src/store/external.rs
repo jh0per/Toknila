@@ -36,6 +36,7 @@ impl Store {
             }
             let runner = self.runner.clone();
             let merger = self.merger.clone();
+            let checker = self.checker.clone();
             let yard = yard.clone();
             let outcomes = match tokio::task::spawn_blocking(move || {
                 external::execute(
@@ -43,6 +44,7 @@ impl Store {
                         yard: &*yard,
                         merger: &*merger,
                         runner: &*runner,
+                        checker: &*checker,
                     },
                     queued,
                 )

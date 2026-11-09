@@ -16,13 +16,98 @@ pub enum Verdict {
     RequestChanges,
 }
 
+/// How one acceptance item stands, in the reviewer's eyes.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ItemOutcome {
+    /// The item holds.
+    Pass,
+    /// The item does not hold.
+    Fail,
+}
+
+/// The reviewer's judgement of one acceptance item.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ItemVerdict {
+    /// The item's 1-based position in the ticket's acceptance list.
+    pub item: u32,
+    pub outcome: ItemOutcome,
+    /// One line of evidence.
+    #[serde(default)]
+    pub note: String,
+}
+
+/// Why the reviewer's item verdicts are not a judgement of the ticket's acceptance list.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ItemsError {
+    #[error(
+        "the verdict must judge every acceptance item: {0} is missing (give `items` with pass or fail for each)"
+    )]
+    Missing(u32),
+    #[error("acceptance item {0} does not exist, or is judged twice")]
+    Unknown(u32),
+    #[error("an approval cannot have a failing acceptance item ({0})")]
+    ApprovedWithFailure(u32),
+}
+
+/// Checks that `items` judge each of the `acceptance` items exactly once, and that an approval
+/// has none failing. A ticket without acceptance items takes no item verdicts.
+pub fn check_items(
+    acceptance: &[String],
+    items: &[ItemVerdict],
+    verdict: Verdict,
+) -> Result<(), ItemsError> {
+    let count = u32::try_from(acceptance.len()).unwrap_or(u32::MAX);
+    let mut seen = std::collections::HashSet::new();
+    for i in items {
+        if i.item == 0 || i.item > count || !seen.insert(i.item) {
+            return Err(ItemsError::Unknown(i.item));
+        }
+    }
+    if let Some(missing) = (1..=count).find(|n| !seen.contains(n)) {
+        return Err(ItemsError::Missing(missing));
+    }
+    if verdict == Verdict::Approve
+        && let Some(f) = items.iter().find(|i| i.outcome == ItemOutcome::Fail)
+    {
+        return Err(ItemsError::ApprovedWithFailure(f.item));
+    }
+    Ok(())
+}
+
+/// The verdict as the round and the worker read it: one `PASS`/`FAIL` line per acceptance item
+/// in the list's order, then the reviewer's own remarks.
+pub fn render_items(acceptance: &[String], items: &[ItemVerdict], comment: &str) -> String {
+    let mut sorted: Vec<&ItemVerdict> = items.iter().collect();
+    sorted.sort_by_key(|i| i.item);
+    let mut out = String::new();
+    for i in sorted {
+        let text = acceptance
+            .get((i.item as usize).saturating_sub(1))
+            .map_or("", String::as_str);
+        let word = match i.outcome {
+            ItemOutcome::Pass => "PASS",
+            ItemOutcome::Fail => "FAIL",
+        };
+        out.push_str(&format!("{word} {}. {text}", i.item));
+        if !i.note.trim().is_empty() {
+            out.push_str(&format!(" - {}", i.note.trim()));
+        }
+        out.push('\n');
+    }
+    out.push_str(comment.trim());
+    out.trim().to_owned()
+}
+
 /// One verdict on a ticket. Numbers count from 1 over every verdict, a person's and the
 /// reviewer agent's, in the order they were given.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewRound {
     pub number: u32,
-    /// A person (`human`) or the reviewer agent (`agent`).
+    /// A person (`human`), the reviewer agent (`agent`) or the daemon's check (`system`).
     pub reviewer: Actor,
     pub verdict: Verdict,
     /// The remarks; empty when the reviewer had none.
@@ -35,6 +120,9 @@ pub struct ReviewRound {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "by", rename_all = "snake_case")]
 pub enum ReviewTurn {
+    /// The daemon is running the project's check command on the ship. Nobody is awaited; the
+    /// result arrives as an event (`CheckDone`).
+    Check,
     /// The reviewer agent is looking at it. With `decides` its verdict moves the card (agent
     /// mode); without, the card then waits for a person (both mode).
     Agent { decides: bool },
@@ -77,6 +165,21 @@ impl Review {
     /// True before the first review: nothing to show or store.
     pub fn is_empty(&self) -> bool {
         self.turn.is_none() && self.rounds.is_empty() && !self.nudged && self.note.is_none()
+    }
+
+    /// How many times the loop (the check or the reviewer agent) has sent the card back since a
+    /// person last decided. A person's decision starts the count again.
+    pub fn auto_returns(&self) -> u32 {
+        let since = self
+            .rounds
+            .iter()
+            .rposition(|r| r.reviewer == Actor::Human)
+            .map_or(0, |i| i + 1);
+        let n = self.rounds[since..]
+            .iter()
+            .filter(|r| r.verdict == Verdict::RequestChanges)
+            .count();
+        u32::try_from(n).unwrap_or(u32::MAX)
     }
 
     /// Adds a round by `reviewer`; its number follows the last one.
@@ -151,6 +254,7 @@ mod tests {
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
             max_parallel: 2,
+            max_review_rounds: 3,
             merge: Default::default(),
             check_command: None,
             worker_model: None,

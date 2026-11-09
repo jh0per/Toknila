@@ -158,6 +158,7 @@ mod tests {
             default_review_mode: crate::ReviewMode::Human,
             default_reviewer: None,
             max_parallel: 2,
+            max_review_rounds: crate::Project::DEFAULT_REVIEW_ROUNDS,
             merge: crate::MergeSettings::default(),
             check_command: None,
             worker_model: None,

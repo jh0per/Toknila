@@ -45,6 +45,12 @@ fn actions(detail: &Value) -> Vec<String> {
 async fn human_mode_the_card_waits_for_a_person_who_accepts_with_remarks() {
     let api = Api::new();
     api.demo_with(&["A"]).await;
+    api.call(
+        Method::PATCH,
+        "/v1/projects/DEMO",
+        Some(json!({ "review_mode": "human" })),
+    )
+    .await;
     finish(&api, "DEMO-1").await;
 
     let t = api.get("/v1/tickets/DEMO-1").await;

@@ -8,8 +8,8 @@
 use super::checks::{non_empty, run_on_ship};
 use super::{Effect, TransitionError};
 use crate::{
-    Actor, ReviewMode, ReviewNote, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp,
-    Verdict,
+    Actor, ItemVerdict, ReviewMode, ReviewNote, ReviewTurn, StatusReason, Ticket, TicketStatus,
+    Timestamp, Verdict, check_items, render_items,
 };
 
 /// What the reviewer is told when it ends its turn without a verdict.
@@ -56,13 +56,114 @@ pub(super) fn person_decides(
 /// Where a card goes after a verdict, as a status and its reason.
 pub(super) type Outcome = (TicketStatus, Option<StatusReason>);
 
-/// The reviewer agent gave its verdict. It is only heard while the card waits for the agent.
-/// In agent mode the verdict moves the card; in both mode the card then waits for a person, who
-/// sees the round.
+/// The daemon starts checking the hand-in: the card waits for the check command's result.
+pub(super) fn enter_check(next: &mut Ticket, effects: &mut Vec<Effect>) {
+    effects.push(Effect::RunCheck);
+    next.review.turn = Some(ReviewTurn::Check);
+    next.review.nudged = false;
+    next.review.note = None;
+}
+
+/// The check ran. A pass goes on to whoever the review mode says (the reviewer agent, or the
+/// person, who then sees a card that already passes). A failure sends the card back to the
+/// worker with the output, a round of the loop, until the project's round limit is used: then
+/// the card waits for the person with every round in its history.
+pub(super) fn check_done(
+    next: &mut Ticket,
+    (passed, output): (bool, &str),
+    (mode, max_rounds): (ReviewMode, u32),
+    now: Timestamp,
+    effects: &mut Vec<Effect>,
+) -> Result<Outcome, TransitionError> {
+    if next.review.turn != Some(ReviewTurn::Check) {
+        return Err(TransitionError::NotAllowed {
+            event: "check_done",
+            from: next.status,
+        });
+    }
+    if passed {
+        next.review
+            .record(Actor::System, Verdict::Approve, "The check passed.", now);
+        enter(next, mode, effects);
+        return Ok((TicketStatus::Review, None));
+    }
+    next.review
+        .record(Actor::System, Verdict::RequestChanges, output, now);
+    send_back(next, max_rounds, "The check failed", output, effects, true)
+}
+
+/// A round of the loop asked for changes: the card goes back to the worker with `text`, unless
+/// `max_rounds` returns were already used since a person last decided; then it waits for the
+/// person. `by_check` says whether the text is the check's (and so not the reviewer's remarks).
+fn send_back(
+    next: &mut Ticket,
+    max_rounds: u32,
+    what: &str,
+    text: &str,
+    effects: &mut Vec<Effect>,
+    by_check: bool,
+) -> Result<Outcome, TransitionError> {
+    let used = next.review.auto_returns();
+    next.review.nudged = false;
+    if used > max_rounds {
+        next.review.turn = Some(ReviewTurn::Person);
+        effects.push(Effect::RecordReport {
+            summary: format!(
+                "{what} again, and the {max_rounds} rounds of the loop are used; it is for a person to decide."
+            ),
+        });
+        return Ok((TicketStatus::Review, None));
+    }
+    next.review.turn = None;
+    effects.push(if by_check {
+        Effect::RecordCheckOutput {
+            text: format!(
+                "{what} (round {used} of {max_rounds}). Fix what it reports, then finish again.\n\n{text}"
+            ),
+        }
+    } else {
+        Effect::RecordRemarks {
+            text: text.to_owned(),
+        }
+    });
+    run_on_ship(effects);
+    Ok((TicketStatus::Running, None))
+}
+
+/// The check could not run: the card waits for a person.
+pub(super) fn check_lost(
+    next: &mut Ticket,
+    detail: &str,
+    effects: &mut Vec<Effect>,
+) -> Result<Outcome, TransitionError> {
+    if next.review.turn != Some(ReviewTurn::Check) {
+        return Err(TransitionError::NotAllowed {
+            event: "check_lost",
+            from: next.status,
+        });
+    }
+    next.review.turn = Some(ReviewTurn::Person);
+    effects.push(Effect::RecordReport {
+        summary: format!("The check could not run ({detail}); it is for a person to decide."),
+    });
+    Ok((TicketStatus::Review, None))
+}
+
+/// What the reviewer agent said, as the machine takes it.
+pub(super) struct AgentVerdict<'a> {
+    pub verdict: Verdict,
+    pub comment: &'a str,
+    pub items: &'a [ItemVerdict],
+    pub max_rounds: u32,
+}
+
+/// The reviewer agent gave its verdict. It is only heard while the card waits for the agent, and
+/// it must judge every acceptance item. An approval that decides starts the merge (and in both
+/// mode waits for the person); a request for changes returns the card to the worker, a round of
+/// the loop, until the project's round limit is used.
 pub(super) fn agent_decides(
     next: &mut Ticket,
-    verdict: Verdict,
-    comment: &str,
+    said: AgentVerdict<'_>,
     now: Timestamp,
     effects: &mut Vec<Effect>,
 ) -> Result<Outcome, TransitionError> {
@@ -72,31 +173,34 @@ pub(super) fn agent_decides(
             from: next.status,
         });
     };
-    if verdict == Verdict::RequestChanges {
-        non_empty(comment, "request_changes")?;
+    check_items(&next.acceptance, said.items, said.verdict)?;
+    let text = render_items(&next.acceptance, said.items, said.comment);
+    if said.verdict == Verdict::RequestChanges {
+        non_empty(&text, "request_changes")?;
     }
-    next.review.record(Actor::Agent, verdict, comment, now);
+    next.review.record(Actor::Agent, said.verdict, &text, now);
     // The reviewer is done once its verdict is recorded: its process ends and its parallel slot
     // is free again. The worker's runner stays; a Return goes to that session.
     effects.push(Effect::StopReviewer);
-    if !decides {
-        next.review.turn = Some(ReviewTurn::Person);
-        return Ok((TicketStatus::Review, None));
-    }
-    next.review.turn = None;
-    Ok(match verdict {
+    match said.verdict {
+        Verdict::Approve if !decides => {
+            next.review.turn = Some(ReviewTurn::Person);
+            Ok((TicketStatus::Review, None))
+        }
         Verdict::Approve => {
+            next.review.turn = None;
             start_merge(next, effects);
-            (TicketStatus::Review, None)
+            Ok((TicketStatus::Review, None))
         }
-        Verdict::RequestChanges => {
-            effects.push(Effect::RecordRemarks {
-                text: comment.trim().to_owned(),
-            });
-            run_on_ship(effects);
-            (TicketStatus::Running, None)
-        }
-    })
+        Verdict::RequestChanges => send_back(
+            next,
+            said.max_rounds,
+            "The reviewer asked for changes",
+            &text,
+            effects,
+            false,
+        ),
+    }
 }
 
 /// The reviewer could not give a verdict: the card waits for a person instead.
@@ -185,7 +289,10 @@ pub(super) fn not_merging(
     ticket: &Ticket,
     event: &super::TicketEvent,
 ) -> Result<(), TransitionError> {
-    if ticket.review.turn == Some(ReviewTurn::Merging) {
+    if matches!(
+        ticket.review.turn,
+        Some(ReviewTurn::Merging | ReviewTurn::Check)
+    ) {
         Err(TransitionError::NotAllowed {
             event: event.name(),
             from: ticket.status,

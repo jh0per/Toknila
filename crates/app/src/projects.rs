@@ -24,6 +24,8 @@ pub struct NewProject {
     pub default_reviewer: Option<String>,
     /// Most agents working at once; default 2.
     pub max_parallel: Option<u32>,
+    /// How many times the loop (check, reviewer) may return a card to its worker; default 3.
+    pub max_review_rounds: Option<u32>,
     /// The command that checks the work; an empty text names none.
     pub check_command: Option<String>,
     /// Where accepted work lands; default `local`.
@@ -38,6 +40,9 @@ pub struct NewProject {
 pub struct PatchProject {
     /// Most agents working at once (1 to 64).
     pub max_parallel: Option<u32>,
+    /// How many times the loop (check, reviewer) may return a card to its worker before the
+    /// card waits for a person (0 to 20).
+    pub max_review_rounds: Option<u32>,
     /// Who reviews finished cards of the project unless a chain or ticket says.
     pub review_mode: Option<ReviewMode>,
     /// Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`.
@@ -103,7 +108,15 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
         default_profile: draft
             .default_profile
             .unwrap_or_else(|| AgentProfile::SIM.to_owned()),
-        default_review_mode: draft.default_review_mode.unwrap_or_default(),
+        // The loop first (check, reviewer), then the person sees a card that already passes.
+        default_review_mode: draft.default_review_mode.unwrap_or(ReviewMode::Both),
+        max_review_rounds: draft
+            .max_review_rounds
+            .map_or(
+                Ok(Project::DEFAULT_REVIEW_ROUNDS),
+                Project::check_review_rounds,
+            )
+            .map_err(AppError::bad_request)?,
         default_reviewer: draft.default_reviewer.filter(|r| !r.trim().is_empty()),
         max_parallel: draft
             .max_parallel
@@ -141,6 +154,9 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     if let Some(n) = patch.max_parallel {
         p.max_parallel =
             schedule::check_limit(n).map_err(|e| AppError::bad_request(e.to_string()))?;
+    }
+    if let Some(n) = patch.max_review_rounds {
+        p.max_review_rounds = Project::check_review_rounds(n).map_err(AppError::bad_request)?;
     }
     let name = |what: &str, v: String| match v.trim() {
         "" => Err(AppError::bad_request(format!("{what} cannot be blank"))),

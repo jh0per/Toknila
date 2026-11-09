@@ -255,6 +255,8 @@ fn running_to_review_on_finished_records_report() {
             summary: "зроблено X".to_owned(),
             open_threads: vec![],
             mode: crate::ReviewMode::Human,
+            check: false,
+            max_rounds: 3,
         },
     );
     assert_eq!(tr.ticket.status, TicketStatus::Review);
@@ -709,6 +711,8 @@ fn sample_events() -> Vec<TicketEvent> {
             summary: "s".to_owned(),
             open_threads: vec![],
             mode: crate::ReviewMode::Human,
+            check: false,
+            max_rounds: 3,
         },
         TicketEvent::Block { reason: manual() },
         TicketEvent::Unblock,
@@ -833,6 +837,17 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
                 crate::ReviewMode::Agent,
                 crate::ReviewMode::Both
             ][usize::from(n) % 3],
+            check: n % 2 == 0,
+            max_rounds: 3,
+        }),
+        any::<bool>().prop_map(|passed| TicketEvent::CheckDone {
+            passed,
+            output: "out".to_owned(),
+            mode: crate::ReviewMode::Both,
+            max_rounds: 1,
+        }),
+        Just(TicketEvent::CheckLost {
+            detail: "d".to_owned()
         }),
         (any::<bool>(), "[a-z]{0,2}").prop_map(|(approve, comment)| TicketEvent::ReviewVerdict {
             verdict: if approve {
@@ -841,6 +856,8 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
                 crate::Verdict::RequestChanges
             },
             comment,
+            items: vec![],
+            max_rounds: 1,
         }),
         Just(TicketEvent::ReviewerFailed {
             detail: "d".to_owned()

@@ -167,6 +167,13 @@ pub async fn patch_project(
             e.to_string(),
         ));
     }
+    if let Some(Err(e)) = patch.max_review_rounds.map(Project::check_review_rounds) {
+        return Err(FormError::field(
+            "max_review_rounds",
+            "rounds_out_of_range",
+            e,
+        ));
+    }
     if let Some(Err(e)) = patch
         .check_command
         .as_deref()

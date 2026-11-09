@@ -46,7 +46,8 @@
   "queue_position": null,
   "review": {
     "awaiting": null,
-    "mode": "human",
+    "max_rounds": 3,
+    "mode": "both",
     "reviewer": "sim-reviewer",
     "rounds": [
       {
@@ -56,7 +57,8 @@
         "reviewer": "human",
         "verdict": "approve"
       }
-    ]
+    ],
+    "used_rounds": 0
   },
   "ship": null,
   "subtasks": [],

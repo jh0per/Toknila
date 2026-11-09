@@ -7,6 +7,7 @@
 pub mod agent;
 pub mod chain;
 pub mod chains;
+pub mod checks;
 pub mod error;
 pub mod external;
 pub mod inbox;
@@ -34,6 +35,7 @@ pub mod tickets;
 pub mod wildcards;
 
 pub use chain::{ChainTx, with_chain};
+pub use checks::{CheckError, CheckResult, CheckSpec, Checker};
 pub use error::{AppError, AppResult, ErrorKind, GitError};
 pub use merges::{MergeError, MergeOutcome, Merger};
 pub use ports::{Reader, UnitOfWork};

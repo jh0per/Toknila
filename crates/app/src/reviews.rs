@@ -30,6 +30,10 @@ pub struct ReviewView {
     pub reviewer: String,
     /// Whose verdict the card waits for; `None` outside Review.
     pub awaiting: Option<ReviewTurn>,
+    /// The project's round limit of the loop, and how many returns the loop has used since a
+    /// person last decided.
+    pub max_rounds: u32,
+    pub used_rounds: u32,
     /// Every verdict so far, oldest first.
     pub rounds: Vec<ReviewRound>,
 }
@@ -57,6 +61,8 @@ pub fn view<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<ReviewView> {
         mode: resolve_review_mode(t, &chain, &project),
         reviewer: resolve_reviewer(t, &chain, &project),
         awaiting: t.review.turn,
+        max_rounds: project.max_review_rounds,
+        used_rounds: t.review.auto_returns(),
         rounds: t.review.rounds.clone(),
     })
 }

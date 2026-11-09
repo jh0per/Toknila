@@ -195,6 +195,13 @@ try {
   await t("settings-nav-review").click();
   await expectPath("/projects/DEMO/settings/review", "Review and merge has its own address");
   await absent(t("saved"), "the Saved of another page does not follow");
+  // A new project reviews with both (the loop first, then the person), three rounds of it.
+  await value("review-mode", "both", "a new project defaults to review mode both");
+  await value("review-rounds", "3", "the round limit shows next to the review mode, default 3");
+  await t("review-rounds").fill("21");
+  await t("save-settings").click();
+  await expectText(t("error-max_review_rounds"), "0 to 20", "an out-of-range round limit is refused at its field");
+  await t("review-rounds").fill("5");
   await t("review-mode").selectOption("agent");
   if ((await t("merge-mode").inputValue()) !== "local") throw new Error("the default merge mode should be local");
   await expectText(page.locator("[data-testid=project-review]"), "When a card is approved", "the merge setting says when it applies");
@@ -252,6 +259,7 @@ try {
   const mode = await t("review-mode").inputValue();
   if (mode !== "agent") throw new Error(`after the restart: review mode ${mode}`);
   console.log("PASS review mode agent survives a daemon restart");
+  await value("review-rounds", "5", "the round limit 5 survives a daemon restart");
   const sites = await t("reviewer-web-domains").inputValue();
   if (sites !== "docs.rs\nexample.com") throw new Error(`after the restart: reviewer sites ${JSON.stringify(sites)}`);
   console.log("PASS the reviewer's sites survive a daemon restart");

@@ -4143,6 +4143,13 @@
                   "review_verdict"
                 ]
               },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ItemVerdict"
+                },
+                "description": "PASS or FAIL for each acceptance item of the ticket (required when it has any)."
+              },
               "verdict": {
                 "$ref": "#/components/schemas/Verdict"
               }
@@ -5665,6 +5672,37 @@
           }
         }
       },
+      "ItemOutcome": {
+        "type": "string",
+        "description": "How one acceptance item stands, in the reviewer's eyes.",
+        "enum": [
+          "pass",
+          "fail"
+        ]
+      },
+      "ItemVerdict": {
+        "type": "object",
+        "description": "The reviewer's judgement of one acceptance item.",
+        "required": [
+          "item",
+          "outcome"
+        ],
+        "properties": {
+          "item": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The item's 1-based position in the ticket's acceptance list.",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string",
+            "description": "One line of evidence."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ItemOutcome"
+          }
+        }
+      },
       "ListedProfile": {
         "type": "object",
         "description": "A profile and where it comes from.",
@@ -6045,6 +6083,15 @@
             ],
             "format": "int32",
             "description": "Most agents working at once; default 2.",
+            "minimum": 0
+          },
+          "max_review_rounds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How many times the loop (check, reviewer) may return a card to its worker; default 3.",
             "minimum": 0
           },
           "merge_mode": {
@@ -6474,6 +6521,15 @@
             ],
             "format": "int32",
             "description": "Most agents working at once (1 to 64).",
+            "minimum": 0
+          },
+          "max_review_rounds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How many times the loop (check, reviewer) may return a card to its worker before the\ncard waits for a person (0 to 20).",
             "minimum": 0
           },
           "merge_method": {
@@ -7086,6 +7142,12 @@
             "type": "integer",
             "format": "int32",
             "description": "Most agents of this project that work at once (`schedule`); a card that starts beyond it\nis queued.",
+            "minimum": 0
+          },
+          "max_review_rounds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many times the daemon's loop (the check, then the reviewer agent) may send a card\nback to its worker before the card waits for a person.",
             "minimum": 0
           },
           "merge": {
@@ -7736,7 +7798,7 @@
           },
           "reviewer": {
             "$ref": "#/components/schemas/Actor",
-            "description": "A person (`human`) or the reviewer agent (`agent`)."
+            "description": "A person (`human`), the reviewer agent (`agent`) or the daemon's check (`system`)."
           },
           "verdict": {
             "$ref": "#/components/schemas/Verdict"
@@ -7745,6 +7807,21 @@
       },
       "ReviewTurn": {
         "oneOf": [
+          {
+            "type": "object",
+            "description": "The daemon is running the project's check command on the ship. Nobody is awaited; the\nresult arrives as an event (`CheckDone`).",
+            "required": [
+              "by"
+            ],
+            "properties": {
+              "by": {
+                "type": "string",
+                "enum": [
+                  "check"
+                ]
+              }
+            }
+          },
           {
             "type": "object",
             "description": "The reviewer agent is looking at it. With `decides` its verdict moves the card (agent\nmode); without, the card then waits for a person (both mode).",
@@ -7803,6 +7880,8 @@
         "required": [
           "mode",
           "reviewer",
+          "max_rounds",
+          "used_rounds",
           "rounds"
         ],
         "properties": {
@@ -7816,6 +7895,12 @@
                 "type": "null"
               }
             ]
+          },
+          "max_rounds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The project's round limit of the loop, and how many returns the loop has used since a\nperson last decided.",
+            "minimum": 0
           },
           "mode": {
             "$ref": "#/components/schemas/ReviewMode",
@@ -7831,6 +7916,11 @@
               "$ref": "#/components/schemas/ReviewRound"
             },
             "description": "Every verdict so far, oldest first."
+          },
+          "used_rounds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },

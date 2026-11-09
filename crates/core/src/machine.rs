@@ -9,7 +9,9 @@
 //! | Ready | Running | `Start` (the schedule decides; see `schedule`) |
 //! | Running | Waiting | `AskHuman` |
 //! | Waiting | Running | `InstructionDelivered`, `AgentActive`, `Answered` (a person answered and it reached the agent) |
-//! | Running | Review | `Finished` |
+//! | Running | Review | `Finished` (with a check command: Review with the check running) |
+//! | Review (checking) | Review / Running | `CheckDone`: a pass goes on to the reviewer or the person; a failure returns the card to the worker, a round, until the round limit |
+//! | Review (checking) | Review | `CheckLost` (the check could not run: a person decides) |
 //! | Running, Waiting | Blocked | `Block` (Review too, for a merge conflict) |
 //! | Blocked | previous status | `Unblock` |
 //! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
@@ -77,6 +79,8 @@ pub enum TransitionError {
     DesignNotApproved(TicketKey),
     #[error("a card is done out of order only when a card before it is still open")]
     NothingBehind,
+    #[error(transparent)]
+    Items(#[from] crate::ItemsError),
     #[error("only a person can {event} a card; this came from {actor:?}")]
     PersonOnly { event: &'static str, actor: Actor },
 }
@@ -129,6 +133,8 @@ pub fn apply(
                 summary,
                 open_threads,
                 mode,
+                check,
+                ..
             },
         ) => {
             crate::thread::require_none_open(&ticket.key, open_threads)?;
@@ -137,8 +143,30 @@ pub fn apply(
             });
             // The hand-in ends the worker's run: a Return starts a replacement run.
             effects.push(Effect::StopWorker);
-            review::enter(&mut next, *mode, &mut effects);
+            if *check {
+                review::enter_check(&mut next, &mut effects);
+            } else {
+                review::enter(&mut next, *mode, &mut effects);
+            }
             (S::Review, None)
+        }
+        (
+            S::Review,
+            TicketEvent::CheckDone {
+                passed,
+                output,
+                mode,
+                max_rounds,
+            },
+        ) => review::check_done(
+            &mut next,
+            (*passed, output),
+            (*mode, *max_rounds),
+            now,
+            &mut effects,
+        )?,
+        (S::Review, TicketEvent::CheckLost { detail }) => {
+            review::check_lost(&mut next, detail, &mut effects)?
         }
         (S::Running | S::Waiting, TicketEvent::Block { reason }) => {
             block(reason, ticket, &mut effects)?
@@ -222,9 +250,25 @@ pub fn apply(
             next.pr = Some(pr.clone());
             (S::Review, None)
         }
-        (S::Review, TicketEvent::ReviewVerdict { verdict, comment }) => {
-            review::agent_decides(&mut next, *verdict, comment, now, &mut effects)?
-        }
+        (
+            S::Review,
+            TicketEvent::ReviewVerdict {
+                verdict,
+                comment,
+                items,
+                max_rounds,
+            },
+        ) => review::agent_decides(
+            &mut next,
+            review::AgentVerdict {
+                verdict: *verdict,
+                comment,
+                items,
+                max_rounds: *max_rounds,
+            },
+            now,
+            &mut effects,
+        )?,
         (S::Review, TicketEvent::ReviewerFailed { detail }) => {
             review::agent_failed(&mut next, detail, &mut effects)?
         }

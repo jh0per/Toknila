@@ -10,6 +10,7 @@ use toknila_core::{
     AgentRole, Comment, CommentId, MergeSpec, Run, Ship, ShipSpec, TicketId, TicketKey,
 };
 
+use crate::checks::{self, CheckError, CheckResult, CheckSpec, Checker};
 use crate::merges::{self, MergeError, MergeOutcome, Merger};
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError};
 use crate::{
@@ -64,6 +65,12 @@ pub enum ExternalEffect {
     NudgeReviewer { ticket: TicketId, message: String },
     /// Get a person's instruction to the ticket's live agent (see [`crate::instructions`]).
     DeliverInstruction { ticket: TicketId, comment: Comment },
+    /// Run the project's check command in the ticket's ship. `None` when the card has no ship
+    /// or the project no command: the host says so.
+    RunCheck {
+        ticket: TicketId,
+        spec: Option<CheckSpec>,
+    },
 }
 
 /// What happened on the host.
@@ -112,6 +119,12 @@ pub enum ExternalOutcome {
         ticket: TicketId,
         comment: CommentId,
     },
+    /// The check ended: it ran and has a result, or it could not run.
+    CheckFinished {
+        ticket: TicketId,
+        spec: Option<CheckSpec>,
+        result: Result<CheckResult, CheckError>,
+    },
 }
 
 /// The host's ports for [`execute`].
@@ -120,6 +133,7 @@ pub struct Host<'a> {
     pub yard: &'a dyn Shipyard,
     pub merger: &'a dyn Merger,
     pub runner: &'a dyn Runner,
+    pub checker: &'a dyn Checker,
 }
 
 /// Runs the effects on the host, in order. Touches no database. A runner starts where the
@@ -235,6 +249,17 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 type_line(host.runner, ticket, AgentRole::Reviewer, &message);
             }
             ExternalEffect::DeliverInstruction { .. } => {}
+            ExternalEffect::RunCheck { ticket, spec } => {
+                let result = match &spec {
+                    Some(spec) => host.checker.run(spec),
+                    None => Err(CheckError::NothingToRun),
+                };
+                outcomes.push(ExternalOutcome::CheckFinished {
+                    ticket,
+                    spec,
+                    result,
+                });
+            }
         }
     }
     for effect in deliveries {
@@ -304,6 +329,16 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             ExternalOutcome::InstructionTyped { ticket, comment } => {
                 deliver_instructions::typed(uow, ticket, comment)?;
             }
+            ExternalOutcome::CheckFinished {
+                ticket,
+                spec,
+                result,
+            } => checks::finished(
+                uow,
+                ticket,
+                spec.as_ref().map(|s| s.command.as_str()),
+                result,
+            )?,
         }
     }
     Ok(())
