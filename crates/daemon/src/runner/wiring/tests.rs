@@ -592,3 +592,70 @@ fn a_reviewer_keeps_dont_ask_whatever_the_projects_setting() {
         "{text}"
     );
 }
+
+/// The shell Claude Code runs hook commands in: Git Bash on Windows (not the WSL `bash` that may
+/// come first on `PATH`), the system `sh` elsewhere.
+fn hook_shell() -> PathBuf {
+    if !cfg!(windows) {
+        return PathBuf::from("sh");
+    }
+    std::env::var_os("GIT_BASH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Program Files\Git\bin\bash.exe"))
+}
+
+#[test]
+fn every_hook_command_runs_under_the_hook_shell_with_a_path_that_has_a_space() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let bin_dir = tmp.path().join("with space");
+    std::fs::create_dir_all(&bin_dir).expect("dir");
+    let out = tmp.path().join("out.txt");
+    let bin = bin_dir.join("toknila");
+    // A stand-in `toknila` that records how it was called.
+    let script = format!(
+        "#!/bin/sh\necho \"$@\" >> \"{}\"\n",
+        out.display().to_string().replace('\\', "/")
+    );
+    std::fs::write(&bin, script).expect("script");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    }
+    let settings = hook_settings(&bin);
+    let mut commands: Vec<String> = settings["hooks"]
+        .as_object()
+        .expect("hooks")
+        .values()
+        .map(|e| {
+            e[0]["hooks"][0]["command"]
+                .as_str()
+                .expect("command")
+                .to_owned()
+        })
+        .collect();
+    commands.push(
+        settings["statusLine"]["command"]
+            .as_str()
+            .expect("status")
+            .to_owned(),
+    );
+    for command in &commands {
+        let status = std::process::Command::new(hook_shell())
+            .arg("-c")
+            .arg(command)
+            .status()
+            .expect("the hook shell starts");
+        assert!(status.success(), "{command}: {status}");
+    }
+    let got = std::fs::read_to_string(&out).expect("the stand-in ran");
+    let lines: Vec<&str> = got.lines().map(str::trim).collect();
+    assert_eq!(lines.len(), commands.len(), "{got:?}");
+    assert!(lines.contains(&"statusline"), "{got:?}");
+    assert!(
+        lines
+            .iter()
+            .all(|l| l.starts_with("hook ") || *l == "statusline"),
+        "{got:?}"
+    );
+}
