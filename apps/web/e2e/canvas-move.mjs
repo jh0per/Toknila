@@ -149,7 +149,12 @@ try {
   await page.locator("[data-testid=arrange]").click();
   await waitPos("MOV-3", undefined, "Arrange clears the place the daemon kept");
   await waitPos("MOV-2", undefined, "for every card");
-  const back = await where("MOV-3");
+  // The daemon forgot the place first; the window redraws a moment later.
+  let back = await where("MOV-3");
+  for (const until = Date.now() + 10_000; Date.now() < until && (back.x !== before.x || back.y !== before.y); ) {
+    await page.waitForTimeout(100);
+    back = await where("MOV-3");
+  }
   check(back.x === before.x && back.y === before.y, "and the card is back where the layout puts it", JSON.stringify(back));
   check((await page.locator("[data-testid=arrange]").count()) === 0, "Arrange goes away again");
   await shot("arranged");
