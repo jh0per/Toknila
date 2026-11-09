@@ -911,6 +911,18 @@ those sequences into console key events that a line read never returns (the CI l
 ptys only; core's tests cover the bytes each answer sends on every OS, and Windows with a real
 agent has not been exercised.
 
+*Windows: what CI covers and the manual check.* Windows CI runs the runner test that finds a bare
+`claude` as `claude.cmd` on `PATH` and launches it through ConPTY (the `.cmd` runs the fake agent),
+and the test that runs every generated hook and status-line command under Git Bash from a path with
+a space. The arrow keys through ConPTY are the one gap; it needs a Windows machine with Claude Code
+installed and a repository it has not trusted yet:
+
+1. Start a ticket whose profile runs `claude` in a fresh ship; the "trust this folder" dialog opens.
+2. In the ticket's terminal press Down, then Enter, from the question card's "Yes" quick key.
+3. Expect the dialog to accept and the run to proceed; Enter alone must decline.
+
+If Down does nothing, ConPTY did not deliver `ESC [ B` to the agent; report it as a bug.
+
 **Leftovers.** One item per earlier card, naming the cards done before it. The decision is
 `POST /v1/tickets/{ticket}/leftovers/{move|close|leave}` on that earlier card; a person only, and
 `409` when nothing is left to decide. The rules are `inbox::leftovers` in core:

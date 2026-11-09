@@ -807,3 +807,31 @@ fn a_down_arrow_chooses_the_unnumbered_yes_of_a_trust_dialog_and_enter_alone_dec
         rig.runners.stop(rig.ticket);
     }
 }
+
+/// A profile whose command is the bare name `claude`, as users have it, found as `claude.cmd`
+/// on `PATH` (how npm installs it on Windows) and launched through ConPTY. The `.cmd` runs the
+/// fake agent, so the lookup and the launch are the real ones.
+#[cfg(windows)]
+#[test]
+fn a_bare_claude_is_found_as_claude_cmd_on_path_and_launched() {
+    let rig = Rig::new();
+    let bin = rig.dir.path().join("npm bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    std::fs::write(
+        bin.join("claude.cmd"),
+        format!("@echo off\r\n\"{AGENT}\" %*\r\n"),
+    )
+    .expect("claude.cmd");
+    let path = format!(
+        "{};{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let text =
+        format!("command = ['claude', 'print', 'from-claude-cmd']\n[env]\nPATH = '{path}'\n");
+    std::fs::write(rig.dir.path().join("profiles").join("claude.toml"), text).expect("profile");
+    rig.start("claude");
+    let out = rig.wait_for("from-claude-cmd");
+    assert!(out.contains("from-claude-cmd"), "{out:?}");
+    rig.runners.stop(rig.ticket);
+}
