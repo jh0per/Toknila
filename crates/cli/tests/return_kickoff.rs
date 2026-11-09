@@ -95,8 +95,10 @@ fn a_return_is_in_the_new_runs_kickoff_and_a_hand_in_at_the_same_commit_is_refus
     });
     let seen = screen(&tok);
     let short = &first[..7];
+    // Round 1 is the hand-in's own check (every card with a ship is brought up to its base and
+    // checked); the Return is round 2.
     assert!(
-        seen.contains("This card was returned: round 1, by the person"),
+        seen.contains("This card was returned: round 2, by the person"),
         "{seen}"
     );
     assert!(

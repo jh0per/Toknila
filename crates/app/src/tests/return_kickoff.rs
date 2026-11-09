@@ -50,7 +50,9 @@ fn the_hand_in_commit_is_remembered_and_a_return_restarts_the_worker_with_it() {
     settle(&mut mem);
     let brief = last_worker_brief(&mem);
     let returned = brief.returned.expect("the kickoff names the Return");
-    assert_eq!(returned.round, 1);
+    // Round 1 is the hand-in's own check (a card with a ship is brought up to its base and
+    // checked); the Return is round 2.
+    assert_eq!(returned.round, 2);
     assert_eq!(returned.commit.as_deref(), Some("f8afe06c0ffee"));
     assert_eq!(returned.text, "Rename the flag");
     assert_eq!(a(&mem).review.handed_in.as_deref(), Some("f8afe06c0ffee"));
