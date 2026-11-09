@@ -61,7 +61,7 @@ jobs:
 
       # On failure, and on main (the smoke screenshots), so a UI test can be seen without a rerun.
       - name: Upload e2e screenshots and traces
-        if: failure() || (success() && github.ref == 'refs/heads/main')
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-${{ matrix.os }}
