@@ -156,6 +156,56 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
 }
 
 #[test]
+fn a_question_asked_after_the_silent_nudge_reaches_the_inbox_and_the_answer_reaches_the_agent() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tok = Tok::in_dir(dir.path());
+    // Quiet for a second and no nudges allowed: the first look of the ticker (every 5 s) gives up
+    // and the card waits as silent. The agent then asks, still alive, and reads the answer.
+    tok.profile(
+        "quiet",
+        &[
+            "sleep",
+            "9000",
+            "post",
+            "/tickets/{ticket}/events",
+            r#"{"event":"ask_human","text":"which db?"}"#,
+            "echo",
+            "sleep",
+            "30000",
+        ],
+        "[nudge]\nidle_secs = 1\nmax_nudges = 0\n",
+    );
+    setup(&tok, dir.path(), "quiet");
+    let client = tok.client();
+
+    wait_until("the silent wait", || tok.status("DEMO-1") == "waiting");
+    assert!(questions(&client).is_empty(), "nothing is asked yet");
+
+    wait_until("the question", || !questions(&client).is_empty());
+    let q = questions(&client);
+    assert_eq!(q.len(), 1);
+    assert_eq!(q[0].text, "which db?");
+    assert_eq!(tok.status("DEMO-1"), "waiting");
+
+    // A question of ask_human is answered with a comment, typed into the agent's terminal.
+    tok.run(&["comment", "DEMO-1", "sqlite"]);
+    wait_until("the agent to get the answer", || {
+        tok.logs("DEMO-1").contains("got:")
+    });
+    assert!(
+        tok.logs("DEMO-1").contains("sqlite"),
+        "{}",
+        tok.logs("DEMO-1")
+    );
+    assert_eq!(tok.status("DEMO-1"), "running");
+    assert!(
+        questions(&client).is_empty(),
+        "the answered question is gone"
+    );
+    tok.run(&["cancel", "DEMO-1", "done"]);
+}
+
+#[test]
 fn a_long_permission_request_shows_its_full_command_in_the_inbox_and_in_tok_show() {
     let dir = tempfile::tempdir().expect("tempdir");
     let tok = Tok::in_dir(dir.path());

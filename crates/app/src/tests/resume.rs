@@ -88,6 +88,32 @@ fn a_silent_card_returns_to_running_on_activity() {
 }
 
 #[test]
+fn a_question_while_silent_replaces_the_silent_reason() {
+    let mut mem = running();
+    let t = a(&mem);
+    let reason = WaitingReason::Silent;
+    tickets::act(&mut mem, &t, TicketEvent::AskHuman { reason }).expect("silent");
+    ask(&mut mem, "which db?", false);
+    let want = WaitingReason::Question {
+        text: "which db?".to_owned(),
+    };
+    assert_eq!(a(&mem).status_reason, Some(StatusReason::Waiting(want)));
+}
+
+#[test]
+fn a_silent_give_up_never_clears_an_open_question() {
+    let mut mem = running();
+    ask(&mut mem, "which db?", false);
+    let t = a(&mem);
+    let reason = WaitingReason::Silent;
+    tickets::act(&mut mem, &t, TicketEvent::AskHuman { reason }).expect("kept");
+    let want = WaitingReason::Question {
+        text: "which db?".to_owned(),
+    };
+    assert_eq!(a(&mem).status_reason, Some(StatusReason::Waiting(want)));
+}
+
+#[test]
 fn activity_of_a_running_card_changes_nothing() {
     let mut mem = running();
     let t = a(&mem);

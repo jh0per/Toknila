@@ -1,7 +1,7 @@
 //! Small guards the transition table shares.
 
 use super::{Effect, TicketEvent, TransitionError};
-use crate::{Actor, BlockedReason, StalePolicy, StatusReason, Ticket, TicketStatus};
+use crate::{Actor, BlockedReason, StalePolicy, StatusReason, Ticket, TicketStatus, WaitingReason};
 
 /// Wildcard decisions belong to a person; an agent or the system cannot make them.
 pub fn person_only(by: Actor, event: &'static str) -> Result<(), TransitionError> {
@@ -10,6 +10,25 @@ pub fn person_only(by: Actor, event: &'static str) -> Result<(), TransitionError
     } else {
         Err(TransitionError::PersonOnly { event, actor: by })
     }
+}
+
+/// The reason of a card that is already Waiting when the agent asks again: a question replaces
+/// the silent reason (a person must see what is asked), and silence never replaces a question.
+/// Another question over an open one is refused.
+pub(super) fn ask_again(
+    ticket: &Ticket,
+    asked: &WaitingReason,
+    event: &TicketEvent,
+) -> Result<(TicketStatus, Option<StatusReason>), TransitionError> {
+    let reason = match &ticket.status_reason {
+        Some(StatusReason::Waiting(WaitingReason::Silent)) => StatusReason::Waiting(asked.clone()),
+        Some(open @ StatusReason::Waiting(_)) if *asked == WaitingReason::Silent => open.clone(),
+        _ => {
+            let (event, from) = (event.name(), ticket.status);
+            return Err(TransitionError::NotAllowed { event, from });
+        }
+    };
+    Ok((TicketStatus::Waiting, Some(reason)))
 }
 
 pub(super) fn non_empty(text: &str, what: &'static str) -> Result<(), TransitionError> {
