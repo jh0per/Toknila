@@ -168,6 +168,18 @@ pub async fn agent_permission(
     let at = now();
     let prompts = state.runners.prompts();
     let tool = ask.tool.or_else(|| prompts.last_tool(t.id, role));
+    // A worker's shell edit is refused at once, without a question: Edit and Write are approved.
+    if role == AgentRole::Worker
+        && let Some(Decision::Deny { message }) = tool.as_deref().and_then(|tool| {
+            let scratch = [std::env::temp_dir().to_string_lossy().into_owned()];
+            question::shell_edit_denial(tool, &scratch)
+        })
+    {
+        return Ok(Json(PermissionReply {
+            decision: PermissionDecision::Deny,
+            message: Some(message),
+        }));
+    }
     // A command the person allowed always (the project remembers a rule for it) is not asked
     // again, not even by an agent that started before the rule was made.
     if role == AgentRole::Worker

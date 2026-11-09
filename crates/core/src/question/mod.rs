@@ -11,6 +11,7 @@
 
 mod keys;
 mod screen;
+mod shell_edit;
 
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +19,7 @@ use crate::{AgentRole, TicketId, TicketStatus, Timestamp};
 
 pub use keys::{expand_keys, has_named_keys};
 pub use screen::{SCREEN_LINES, last_lines, screen_hash};
+pub use shell_edit::{SHELL_EDIT_DENIAL, shell_edit_denial};
 
 /// Seconds after spawn without a sign of life before an agent counts as waiting on its screen.
 pub const DEFAULT_STARTUP_SECS: u64 = 20;
