@@ -68,6 +68,9 @@ pub struct PatchProject {
     /// The commands remembered with "Allow always" (`Bash(cargo test *)`); the list replaces the
     /// remembered ones, so a rule is removed by sending the list without it.
     pub allowed_commands: Option<Vec<String>>,
+    /// The domains the project's reviewers may read on the web (`docs.rs`); the list replaces the
+    /// old one, an empty list denies the web again.
+    pub reviewer_web_domains: Option<Vec<String>>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -119,6 +122,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
         planner_model: None,
         command_policy: draft.command_policy.unwrap_or(CommandPolicy::NEW_PROJECT),
         allowed_commands: Vec::new(),
+        reviewer_web_domains: Vec::new(),
         archived: false,
     };
     uow.insert_project(&p)?;
@@ -172,6 +176,10 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     if let Some(rules) = patch.allowed_commands {
         p.allowed_commands =
             toknila_core::command_policy::clean_rules(rules).map_err(AppError::bad_request)?;
+    }
+    if let Some(domains) = patch.reviewer_web_domains {
+        p.reviewer_web_domains =
+            toknila_core::command_policy::clean_domains(domains).map_err(AppError::bad_request)?;
     }
     if let Some(m) = patch.merge_mode {
         if m == MergeMode::Github && p.repo_path.as_deref().is_none_or(|r| r.trim().is_empty()) {

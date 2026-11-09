@@ -261,4 +261,8 @@ pub(super) const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE tickets ADD COLUMN design_first INTEGER NOT NULL DEFAULT 0;
     "#,
+    // 16: the domains a project's reviewers may read on the web (a JSON list, empty by default).
+    r#"
+    ALTER TABLE projects ADD COLUMN reviewer_web_domains TEXT NOT NULL DEFAULT '[]';
+    "#,
 ];

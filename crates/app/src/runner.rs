@@ -68,6 +68,8 @@ pub struct RunBrief {
     pub command_policy: toknila_core::CommandPolicy,
     /// The rules a person remembered in the project with "Allow always" (a worker only).
     pub allowed_commands: Vec<String>,
+    /// The domains the project's reviewer may read on the web (a reviewer only).
+    pub web_domains: Vec<String>,
     /// What a planner is told about its project; `None` for a card's agent.
     pub project: Option<toknila_core::instructions::ProjectFacts>,
 }

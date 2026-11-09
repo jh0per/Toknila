@@ -91,6 +91,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
             check_command: project.check_command.clone(),
             earlier: Vec::new(),
             model: project.reviewer_model.clone(),
+            web_domains: project.reviewer_web_domains.clone(),
             project: None,
             ..RunBrief::default()
         },
