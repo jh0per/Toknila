@@ -47,10 +47,23 @@ pub(super) fn list(role: AgentRole) -> Vec<Value> {
 fn review_verdict() -> Value {
     tool(
         "review_verdict",
-        "Give your verdict on the finished work and end your review. Approve it, or request changes with a comment saying exactly what to change. Call it once, when you have read the diff.",
+        "Give your verdict on the finished work and end your review. Judge every acceptance item PASS or FAIL in `items`, then approve (only when every item passes) or request changes with a comment saying exactly what to change. Call it once, when you have read the diff.",
         json!({
             "verdict": { "type": "string", "enum": ["approve", "request_changes"] },
-            "comment": text("What to change (required with request_changes); optional remarks otherwise"),
+            "items": {
+                "type": "array",
+                "description": "One entry per acceptance item of the ticket, by its 1-based position; required when the ticket has acceptance items",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "item": { "type": "integer", "minimum": 1 },
+                        "outcome": { "type": "string", "enum": ["pass", "fail"] },
+                        "note": text("One line of evidence"),
+                    },
+                    "required": ["item", "outcome"],
+                },
+            },
+            "comment": text("What to change (required with request_changes unless an item fails); optional remarks otherwise"),
         }),
         &["verdict"],
     )

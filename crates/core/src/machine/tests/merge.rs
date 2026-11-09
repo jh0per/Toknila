@@ -43,6 +43,8 @@ fn an_agent_approval_that_decides_starts_the_merge_too() {
     let event = TicketEvent::ReviewVerdict {
         verdict: Verdict::Approve,
         comment: "ok".to_owned(),
+        items: vec![],
+        max_rounds: 3,
     };
     let tr = step(&t, &event);
     assert_eq!(tr.ticket.status, TicketStatus::Review);

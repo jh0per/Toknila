@@ -157,6 +157,8 @@ fn finish_and_accept(v: &mut ChainView, n: NodeRef) {
             summary: "done".to_owned(),
             open_threads: vec![],
             mode: crate::ReviewMode::Human,
+            check: false,
+            max_rounds: 3,
         },
     );
     event(v, n, TicketEvent::Accept { comment: None });
@@ -332,6 +334,8 @@ fn gate_chain_with_manual_release() {
             summary: "зроблено X".to_owned(),
             open_threads: vec![],
             mode: crate::ReviewMode::Human,
+            check: false,
+            max_rounds: 3,
         },
     );
     event(

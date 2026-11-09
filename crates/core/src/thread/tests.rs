@@ -212,6 +212,8 @@ fn hand_in_is_refused_while_a_thread_is_open_and_names_it() {
             summary: "done".to_owned(),
             open_threads: open_threads(threads),
             mode: crate::ReviewMode::Human,
+            check: false,
+            max_rounds: 3,
         };
         step(&running, &event, NOW).map(|t| t.ticket.status)
     };

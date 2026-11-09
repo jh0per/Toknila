@@ -188,7 +188,7 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
         (TicketStatus::Review, _)
             if matches!(
                 t.review.turn,
-                Some(ReviewTurn::Agent { .. } | ReviewTurn::Merging)
+                Some(ReviewTurn::Check | ReviewTurn::Agent { .. } | ReviewTurn::Merging)
             ) =>
         {
             return None;

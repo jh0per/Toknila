@@ -344,6 +344,7 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
         default_review_mode: crate::ReviewMode::Human,
         default_reviewer: None,
         max_parallel: 2,
+        max_review_rounds: 3,
         merge: Default::default(),
         check_command: None,
         worker_model: None,

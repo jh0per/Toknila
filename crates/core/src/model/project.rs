@@ -98,6 +98,10 @@ pub struct Project {
     /// Most agents of this project that work at once (`schedule`); a card that starts beyond it
     /// is queued.
     pub max_parallel: u32,
+    /// How many times the daemon's loop (the check, then the reviewer agent) may send a card
+    /// back to its worker before the card waits for a person.
+    #[serde(default = "Project::default_review_rounds")]
+    pub max_review_rounds: u32,
     /// Where accepted work lands: the local base branch or a GitHub pull request.
     pub merge: MergeSettings,
     /// The command that checks the project's work (`cargo xtask verify`). Both agent roles are
@@ -131,6 +135,23 @@ impl Project {
     pub const DEFAULT_WORK_BRANCH: &str = "develop";
     /// Release branch of a project that does not name one.
     pub const DEFAULT_RELEASE_BRANCH: &str = "main";
+    /// Rounds of the loop a project allows when it names no limit.
+    pub const DEFAULT_REVIEW_ROUNDS: u32 = 3;
+    /// The most rounds a project may allow.
+    pub const MAX_REVIEW_ROUNDS: u32 = 20;
+
+    /// [`Self::DEFAULT_REVIEW_ROUNDS`], for serde.
+    pub fn default_review_rounds() -> u32 {
+        Self::DEFAULT_REVIEW_ROUNDS
+    }
+
+    /// Checks a round limit a person typed (0 sends nothing back: the card goes to the person).
+    pub fn check_review_rounds(n: u32) -> Result<u32, &'static str> {
+        if n > Self::MAX_REVIEW_ROUNDS {
+            return Err("the round limit is 0 to 20");
+        }
+        Ok(n)
+    }
 
     /// The check command as a person typed it: trimmed, and `None` when empty (it clears the
     /// setting). It is one line without parentheses, because it goes into an agent's permission
@@ -230,6 +251,7 @@ mod tests {
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
             max_parallel: crate::schedule::DEFAULT_LIMIT,
+            max_review_rounds: Project::DEFAULT_REVIEW_ROUNDS,
             merge: Default::default(),
             check_command: None,
             worker_model: None,

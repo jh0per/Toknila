@@ -32,8 +32,9 @@ pub use profile::{
 pub use project::{MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use review::{
-    Review, ReviewNote, ReviewRound, ReviewTurn, Verdict, resolve_mode as resolve_review_mode,
-    resolve_reviewer, reviewer_profile,
+    ItemOutcome, ItemVerdict, ItemsError, Review, ReviewNote, ReviewRound, ReviewTurn, Verdict,
+    check_items, render_items, resolve_mode as resolve_review_mode, resolve_reviewer,
+    reviewer_profile,
 };
 pub use run::{ProcessExit, Run};
 pub use ship::{MergeSpec, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec, slugify};

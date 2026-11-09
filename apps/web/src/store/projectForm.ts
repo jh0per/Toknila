@@ -14,6 +14,7 @@ export interface ProjectForm {
   reviewer_model: string;
   planner_model: string;
   review_mode: ReviewMode;
+  max_review_rounds: string;
   reviewer: string;
   merge_mode: MergeMode;
   pr_title: string;
@@ -33,6 +34,7 @@ export function formOf(p: Project): ProjectForm {
     reviewer_model: p.reviewer_model ?? "",
     planner_model: p.planner_model ?? "",
     review_mode: p.default_review_mode,
+    max_review_rounds: String(p.max_review_rounds ?? 3),
     reviewer: p.default_reviewer ?? "",
     merge_mode: p.merge.mode,
     pr_title: p.merge.pr_title,
@@ -63,6 +65,7 @@ export function patchOf(f: ProjectForm): PatchProject {
     reviewer_model: t.reviewer_model,
     planner_model: t.planner_model,
     review_mode: t.review_mode,
+    max_review_rounds: Number(t.max_review_rounds),
     reviewer: t.reviewer,
     merge_mode: t.merge_mode,
     pr_title: t.pr_title,
@@ -89,6 +92,7 @@ export function sectionOfField(field: string): ProjectSection {
     case "allowed_commands":
       return "agents";
     case "review_mode":
+    case "max_review_rounds":
     case "reviewer":
     case "merge_mode":
     case "pr_title":

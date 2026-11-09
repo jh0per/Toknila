@@ -86,6 +86,14 @@ export function ReviewSection({ state, form, set }: FormProps) {
           {REVIEW_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
       </Field>
+      <Field
+        label="Rounds before it waits for you"
+        name="max_review_rounds"
+        error={fieldError(s, "max_review_rounds")}
+        hint="How many times the check and the reviewer agent may send a card back to its worker before it waits for you."
+      >
+        <input data-testid="review-rounds" type="number" min={0} max={20} value={form.max_review_rounds} onChange={(e) => set("max_review_rounds", e.target.value)} />
+      </Field>
       <Field label="Reviewer agent" name="reviewer" error={fieldError(s, "reviewer")}>
         <select data-testid="reviewer" value={form.reviewer} onChange={(e) => set("reviewer", e.target.value)}>
           <option value="">The default for the card's agent</option>

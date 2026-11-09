@@ -57,6 +57,9 @@ pub enum AgentEvent {
         verdict: Verdict,
         #[serde(default)]
         comment: String,
+        /// PASS or FAIL for each acceptance item of the ticket (required when it has any).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        items: Vec<crate::ItemVerdict>,
     },
     /// The agent found work nobody planned: a wildcard card on the ticket's chain, found during
     /// this ticket, that waits for a person's approval. The answer is the new card.
@@ -220,6 +223,7 @@ mod tests {
                 AgentEvent::ReviewVerdict {
                     verdict: Verdict::RequestChanges,
                     comment: "handle the empty list".into(),
+                    items: Vec::new(),
                 },
                 r#"{"event":"review_verdict","verdict":"request_changes","comment":"handle the empty list"}"#,
             ),

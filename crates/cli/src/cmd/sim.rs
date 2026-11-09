@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use toknila_api_types::{AgentEvent, ReleaseEvent};
 use toknila_client::Client;
-use toknila_core::{CommentBody, Verdict};
+use toknila_core::{CommentBody, ItemOutcome, ItemVerdict, Verdict};
 
 use super::thread::{PostArgs, kind_of};
 use super::{CardArgs, emit};
@@ -37,8 +37,11 @@ pub enum SimCmd {
     Review {
         #[arg(value_parser = ["approve", "request-changes"])]
         verdict: String,
-        /// What to change; required with request-changes.
+        /// What to change; required with request-changes unless an item fails.
         comment: Option<String>,
+        /// The judgement of an acceptance item, `N=pass` or `N=fail` (repeat for each item).
+        #[arg(long = "item")]
+        items: Vec<String>,
     },
     /// The agent found work nobody planned: a wildcard card that waits for your approval.
     Propose {
@@ -64,6 +67,25 @@ pub enum SimThreadCmd {
         #[command(flatten)]
         post: PostArgs,
     },
+}
+
+/// `N=pass` or `N=fail` as the judgement of acceptance item N.
+fn item_verdict(text: &str) -> Result<ItemVerdict> {
+    let (n, outcome) = text
+        .split_once('=')
+        .with_context(|| format!("{text:?}: give an item as N=pass or N=fail"))?;
+    Ok(ItemVerdict {
+        item: n
+            .trim()
+            .parse()
+            .with_context(|| format!("{n:?} is not an item number"))?,
+        outcome: match outcome.trim() {
+            "pass" => ItemOutcome::Pass,
+            "fail" => ItemOutcome::Fail,
+            other => anyhow::bail!("{other:?}: an item is judged pass or fail"),
+        },
+        note: String::new(),
+    })
 }
 
 pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> Result<()> {
@@ -111,13 +133,21 @@ pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> R
             },
         },
         SimCmd::Crash { detail } => AgentEvent::Crashed { detail },
-        SimCmd::Review { verdict, comment } => AgentEvent::ReviewVerdict {
+        SimCmd::Review {
+            verdict,
+            comment,
+            items,
+        } => AgentEvent::ReviewVerdict {
             verdict: if verdict == "approve" {
                 Verdict::Approve
             } else {
                 Verdict::RequestChanges
             },
             comment: comment.unwrap_or_default(),
+            items: items
+                .iter()
+                .map(|i| item_verdict(i))
+                .collect::<Result<_>>()?,
         },
         SimCmd::Propose { card } => AgentEvent::Propose(card.into()),
         SimCmd::Thread(_) => unreachable!("handled above"),

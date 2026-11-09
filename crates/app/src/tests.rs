@@ -17,6 +17,7 @@ use crate::{
     AppError, AppResult, ErrorKind, Reader, UnitOfWork, agent, chains, resolve, tickets, with_chain,
 };
 
+mod checks;
 mod deletion;
 mod import_done;
 mod leftovers;
@@ -47,6 +48,7 @@ struct Mem {
     ships: Vec<Ship>,
     yard: ships::FakeYard,
     merger: merges::FakeMerger,
+    checker: checks::FakeChecker,
     runner: runs::FakeRunner,
     /// Work queued for after the command, as the daemon collects it.
     deferred: Vec<crate::external::ExternalEffect>,
@@ -71,6 +73,7 @@ impl Mem {
             default_review_mode: ReviewMode::Human,
             default_reviewer: None,
             max_parallel: 2,
+            max_review_rounds: 3,
             merge: Default::default(),
             check_command: None,
             worker_model: None,
@@ -127,6 +130,7 @@ impl Mem {
             ships: vec![],
             yard: ships::FakeYard::default(),
             merger: merges::FakeMerger::default(),
+            checker: checks::FakeChecker::default(),
             runner: runs::FakeRunner::default(),
             deferred: vec![],
             events: vec![],

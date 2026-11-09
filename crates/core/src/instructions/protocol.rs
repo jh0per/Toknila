@@ -103,10 +103,13 @@ compare the result with the task and each acceptance item. Do not edit files and
 
 You have one tool, `review_verdict`, of the MCP server `toknila`. Call it once, when you are done:
 
-- `verdict: approve`: the work does what the task asks and every acceptance item holds. `comment` \
-is optional.
-- `verdict: request_changes`: something is missing or wrong. `comment` is required: say exactly \
-what to change, one point per line, so the worker can act on it without asking.
+- `items`: one entry per acceptance item of the ticket, by its position (1, 2, ...), each with \
+`outcome: pass` or `outcome: fail` and a one-line `note` of evidence. Judge every item; a verdict \
+that leaves one out is refused.
+- `verdict: approve`: the work does what the task asks and every item passes. `comment` is \
+optional. An approval with a failing item is refused.
+- `verdict: request_changes`: something is missing or wrong. Say exactly what to change in \
+`comment`, one point per line, so the worker can act on it without asking.
 
 A call that is refused comes back as an error text; read it and adapt. After the verdict you are \
 done: stop.

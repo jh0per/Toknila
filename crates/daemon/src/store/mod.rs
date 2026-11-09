@@ -53,6 +53,8 @@ pub type Yard = Arc<dyn Shipyard + Send + Sync>;
 
 /// Where a command's merges run; shared by every command of the store.
 pub type Merges = Arc<dyn Merger + Send + Sync>;
+/// The runner of a hand-in's check command, shared with the blocking thread that runs effects.
+pub type Checks = Arc<dyn toknila_app::Checker + Send + Sync>;
 
 /// Where a command's agents run; shared by every command of the store.
 pub type Agents = Arc<dyn Runner + Send + Sync>;
@@ -131,6 +133,7 @@ pub struct Store {
     path: PathBuf,
     yard: Option<Yard>,
     merger: Merges,
+    checker: Checks,
     runner: Agents,
 }
 
@@ -166,6 +169,7 @@ impl Store {
             path,
             yard: None,
             merger: Arc::new(external::NoMerger),
+            checker: Arc::new(crate::checker::ShellChecker::default()),
             runner: Arc::new(NoRunner),
         }
     }
@@ -179,6 +183,12 @@ impl Store {
     /// Lets accepted cards merge into their base branch; without one a merge is a typed failure.
     pub fn with_merger(mut self, merger: Merges) -> Store {
         self.merger = merger;
+        self
+    }
+
+    /// Chooses how a hand-in's check command runs; the default runs it through the shell.
+    pub fn with_checker(mut self, checker: Checks) -> Store {
+        self.checker = checker;
         self
     }
 

@@ -119,20 +119,25 @@ fn the_three_modes_with_simulated_reviewers() {
         ]
     );
 
-    // Both: the agent speaks first, the card then waits for a person who sees its remarks.
+    // Both: the agent speaks first. Its request for changes returns the card to the worker (a
+    // round of the loop); its approval leaves the card to a person, who sees its remarks.
     let b = hand_in(&tok, "DEMO-3");
     assert_eq!(b["review"]["awaiting"]["decides"], false);
-    let waits = tok.run(&["sim", "DEMO-3", "review", "request-changes", "rename it"]);
+    let back = tok.run(&["sim", "DEMO-3", "review", "request-changes", "rename it"]);
+    assert_eq!(back["ticket"]["status"], "running");
+    assert_eq!(back["review"]["used_rounds"], 1);
+    tok.run(&["sim", "DEMO-3", "finish", "renamed"]);
+    let waits = tok.run(&["sim", "DEMO-3", "review", "approve", "fine now"]);
     assert_eq!(waits["ticket"]["status"], "review");
     assert_eq!(waits["review"]["awaiting"]["by"], "person");
-    assert_eq!(rounds(&waits), ["1:agent:request_changes:rename it"]);
     let sent_back = tok.run(&["return", "DEMO-3", "agreed, and fix the look"]);
     assert_eq!(sent_back["ticket"]["status"], "running");
     assert_eq!(
         rounds(&sent_back),
         [
             "1:agent:request_changes:rename it",
-            "2:human:request_changes:agreed, and fix the look"
+            "2:agent:approve:fine now",
+            "3:human:request_changes:agreed, and fix the look"
         ]
     );
 }
@@ -162,5 +167,9 @@ fn a_review_mode_needs_something_to_set_and_a_known_mode() {
     );
     let p = tok.run(&["review-mode", "--reviewer", "strict", "--project", "DEMO"]);
     assert_eq!(p["default_reviewer"], "strict");
-    assert_eq!(p["default_review_mode"], "human", "kept");
+    assert_eq!(
+        p["default_review_mode"], "both",
+        "kept: a new project reviews with both"
+    );
+    assert_eq!(p["max_review_rounds"], 3);
 }

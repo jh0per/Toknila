@@ -15,7 +15,7 @@ pub(crate) mod testing;
 
 /// Kills the child and what it started: the whole process group on Unix (it leads its own), the
 /// process tree through `taskkill /T` on Windows. The child alone is the fallback.
-fn kill_tree(child: &mut std::process::Child) {
+pub(crate) fn kill_tree(child: &mut std::process::Child) {
     #[cfg(unix)]
     {
         use nix::sys::signal::{Signal, killpg};

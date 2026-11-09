@@ -9,7 +9,9 @@ use toknila_core::{
 };
 
 use crate::notes::{add_comment, body_from_text, update_subtask};
-use crate::{AppError, AppResult, UnitOfWork, reviews, threads, wildcards, with_chain};
+use crate::{
+    AppError, AppResult, UnitOfWork, checks, projects, reviews, threads, wildcards, with_chain,
+};
 
 /// An agent holds a grant for one ticket and acts on that ticket only.
 pub fn ensure_granted(granted: TicketId, t: &Ticket) -> AppResult<()> {
@@ -117,19 +119,34 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
             }
             let open_threads = threads::open_threads(uow, t)?;
             let mode = reviews::mode_of(uow, t)?;
+            let (check, max_rounds) = checks::plan_of(uow, t)?;
             with_chain(uow, t.chain_id, |ctx| {
                 let event = TicketEvent::Finished {
                     summary,
                     open_threads,
                     mode,
+                    check,
+                    max_rounds,
                 };
                 Ok(ctx.ticket_event(t.id, event)?)
             })
         }
-        AgentEvent::ReviewVerdict { verdict, comment } => with_chain(uow, t.chain_id, |ctx| {
-            let event = TicketEvent::ReviewVerdict { verdict, comment };
-            Ok(ctx.ticket_event(t.id, event)?)
-        }),
+        AgentEvent::ReviewVerdict {
+            verdict,
+            comment,
+            items,
+        } => {
+            let max_rounds = projects::of_ticket(uow, t)?.max_review_rounds;
+            with_chain(uow, t.chain_id, |ctx| {
+                let event = TicketEvent::ReviewVerdict {
+                    verdict,
+                    comment,
+                    items,
+                    max_rounds,
+                };
+                Ok(ctx.ticket_event(t.id, event)?)
+            })
+        }
         AgentEvent::Crashed { detail } => with_chain(uow, t.chain_id, |ctx| {
             let reason = BlockedReason::Crashed { detail };
             Ok(ctx.ticket_event(t.id, TicketEvent::Block { reason })?)

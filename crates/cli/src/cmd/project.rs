@@ -59,6 +59,10 @@ pub enum ProjectCmd {
         /// Most agents working at once (1 to 64, default 2); more started cards wait in a queue.
         #[arg(long)]
         parallel: Option<u32>,
+        /// How many times the loop (the check, then the reviewer agent) may return a card to its
+        /// worker before it waits for you (0 to 20, default 3).
+        #[arg(long)]
+        review_rounds: Option<u32>,
         /// What happens when a card is approved: `local` (merge into the main branch) or `github`
         /// (open a pull request, merge it there when its checks pass).
         #[arg(long)]
@@ -169,6 +173,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             commands,
             forget_command,
             parallel,
+            review_rounds,
             merge,
             pr_title,
             merge_method,
@@ -193,6 +198,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 command_policy: commands.as_deref().map(policy).transpose()?,
                 allowed_commands,
                 max_parallel: parallel,
+                max_review_rounds: review_rounds,
                 merge_mode: merge
                     .as_deref()
                     .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge mode {m}")))
@@ -221,6 +227,11 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 if let Some(c) = &p.check_command {
                     println!("test command: {c}");
                 }
+                println!(
+                    "review: {}, up to {} rounds of the loop",
+                    output::w(&p.default_review_mode),
+                    p.max_review_rounds
+                );
                 print_commands(p);
                 for (what, model) in [
                     ("worker", &p.worker_model),

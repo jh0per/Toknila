@@ -9,7 +9,9 @@ use toknila_core::{
 };
 
 use crate::notes::{add_comment, body_from_text, deliver_to_sim};
-use crate::{AppError, AppResult, ErrorKind, UnitOfWork, merges, reviews, runs, schedule, ships};
+use crate::{
+    AppError, AppResult, ErrorKind, UnitOfWork, checks, merges, reviews, runs, schedule, ships,
+};
 
 /// A chain being changed by one command. Every step is journaled by the graph
 /// ([`ChainView::record`]) so each transition, including intermediate ones
@@ -283,6 +285,11 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
                 continue;
             }
             Effect::RecordRemarks { text } => (Actor::Agent, CommentKind::Instruction, text),
+            Effect::RecordCheckOutput { text } => (Actor::System, CommentKind::Instruction, text),
+            Effect::RunCheck => {
+                checks::queue_run(uow, ctx, ticket)?;
+                continue;
+            }
             _ => continue,
         };
         add_comment(uow, &ctx.view, ticket, author, kind, body_from_text(&text))?;

@@ -1289,6 +1289,8 @@ export interface components {
             comment?: string;
             /** @enum {string} */
             event: "review_verdict";
+            /** @description PASS or FAIL for each acceptance item of the ticket (required when it has any). */
+            items?: components["schemas"]["ItemVerdict"][];
             verdict: components["schemas"]["Verdict"];
         } | (components["schemas"]["Proposal"] & {
             /** @enum {string} */
@@ -1812,6 +1814,22 @@ export interface components {
             /** @description The instructions as one text for the agent, in the comment template; empty when none. */
             reason: string;
         };
+        /**
+         * @description How one acceptance item stands, in the reviewer's eyes.
+         * @enum {string}
+         */
+        ItemOutcome: "pass" | "fail";
+        /** @description The reviewer's judgement of one acceptance item. */
+        ItemVerdict: {
+            /**
+             * Format: int32
+             * @description The item's 1-based position in the ticket's acceptance list.
+             */
+            item: number;
+            /** @description One line of evidence. */
+            note?: string;
+            outcome: components["schemas"]["ItemOutcome"];
+        };
         /** @description A profile and where it comes from. */
         ListedProfile: {
             /** @description File name in the profiles folder; `None` for a built-in profile. */
@@ -1951,6 +1969,11 @@ export interface components {
              * @description Most agents working at once; default 2.
              */
             max_parallel?: number | null;
+            /**
+             * Format: int32
+             * @description How many times the loop (check, reviewer) may return a card to its worker; default 3.
+             */
+            max_review_rounds?: number | null;
             merge_mode?: components["schemas"]["MergeMode"] | null;
             name?: string | null;
             release_branch?: string | null;
@@ -2103,6 +2126,12 @@ export interface components {
              * @description Most agents working at once (1 to 64).
              */
             max_parallel?: number | null;
+            /**
+             * Format: int32
+             * @description How many times the loop (check, reviewer) may return a card to its worker before the
+             *     card waits for a person (0 to 20).
+             */
+            max_review_rounds?: number | null;
             merge_method?: components["schemas"]["MergeMethod"] | null;
             merge_mode?: components["schemas"]["MergeMode"] | null;
             /** @description The Claude model of the project's planner; an empty text clears it. */
@@ -2312,6 +2341,12 @@ export interface components {
              *     is queued.
              */
             max_parallel: number;
+            /**
+             * Format: int32
+             * @description How many times the daemon's loop (the check, then the reviewer agent) may send a card
+             *     back to its worker before the card waits for a person.
+             */
+            max_review_rounds?: number;
             /** @description Where accepted work lands: the local base branch or a GitHub pull request. */
             merge: components["schemas"]["MergeSettings"];
             name: string;
@@ -2544,12 +2579,15 @@ export interface components {
             decided_at: components["schemas"]["Timestamp"];
             /** Format: int32 */
             number: number;
-            /** @description A person (`human`) or the reviewer agent (`agent`). */
+            /** @description A person (`human`), the reviewer agent (`agent`) or the daemon's check (`system`). */
             reviewer: components["schemas"]["Actor"];
             verdict: components["schemas"]["Verdict"];
         };
         /** @description Whose verdict a card in Review waits for. */
         ReviewTurn: {
+            /** @enum {string} */
+            by: "check";
+        } | {
             /** @enum {string} */
             by: "agent";
             decides: boolean;
@@ -2563,12 +2601,20 @@ export interface components {
         /** @description How a ticket is reviewed now, and what has been decided so far. */
         ReviewView: {
             awaiting?: components["schemas"]["ReviewTurn"] | null;
+            /**
+             * Format: int32
+             * @description The project's round limit of the loop, and how many returns the loop has used since a
+             *     person last decided.
+             */
+            max_rounds: number;
             /** @description The review mode that applies: the ticket's, the chain's or the project's. */
             mode: components["schemas"]["ReviewMode"];
             /** @description The reviewer agent profile that applies. */
             reviewer: string;
             /** @description Every verdict so far, oldest first. */
             rounds: components["schemas"]["ReviewRound"][];
+            /** Format: int32 */
+            used_rounds: number;
         };
         /** @description Identifies a [`crate::Run`] of a runner process. */
         RunId: string;

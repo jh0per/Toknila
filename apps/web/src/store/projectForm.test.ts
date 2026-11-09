@@ -28,7 +28,7 @@ describe("the project form", () => {
     const patch = patchOf({ ...formOf(project), max_parallel: "4", check_command: " npm test ", worker_model: "sonnet" });
     expect(patch).toEqual({
       work_branch: "main", default_profile: "claude-code", max_parallel: 4, check_command: "npm test",
-      worker_model: "sonnet", reviewer_model: "", planner_model: "opus", review_mode: "human", reviewer: "",
+      worker_model: "sonnet", reviewer_model: "", planner_model: "opus", review_mode: "human", max_review_rounds: 3, reviewer: "",
       merge_mode: "local", pr_title: "{key}: {title}", merge_method: "merge",
       command_policy: "ask", allowed_commands: [],
     });

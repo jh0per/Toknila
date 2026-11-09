@@ -55,6 +55,8 @@ fn finish(mem: &mut Mem, n: usize) {
         summary: "done".to_owned(),
         open_threads: Vec::new(),
         mode: toknila_core::ReviewMode::Human,
+        check: false,
+        max_rounds: 3,
     };
     act(mem, n, event);
 }

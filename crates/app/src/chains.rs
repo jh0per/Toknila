@@ -168,6 +168,8 @@ fn next_merge_event(ctx: &ChainTx, id: TicketId) -> Option<TicketEvent> {
             open_threads: Vec::new(),
             // Nothing was done to review: a person's accept follows at once.
             mode: ReviewMode::Human,
+            check: false,
+            max_rounds: 0,
         }),
         // The work is already in the repository: the merge is done as soon as it is asked for.
         TicketStatus::Review if t.review.turn == Some(ReviewTurn::Merging) => {
