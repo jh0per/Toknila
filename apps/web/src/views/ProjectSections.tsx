@@ -100,6 +100,15 @@ export function ReviewSection({ state, form, set }: FormProps) {
           {profileOptions(state, "reviewer", form.reviewer).map((n) => <option key={n}>{n}</option>)}
         </select>
       </Field>
+      <Field
+        label="Sites the reviewer may read" name="reviewer_web_domains" error={fieldError(s, "reviewer_web_domains")}
+        hint="One per line, such as docs.rs. A page a card cites on any other site stays unread. Empty: none."
+      >
+        <textarea
+          data-testid="reviewer-web-domains" rows={3} spellCheck={false} value={form.reviewer_web_domains}
+          onChange={(e) => set("reviewer_web_domains", e.target.value)}
+        />
+      </Field>
       <Field label="When a card is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
         <select data-testid="merge-mode" value={form.merge_mode} onChange={(e) => set("merge_mode", e.target.value as MergeMode)}>
           {MERGE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}

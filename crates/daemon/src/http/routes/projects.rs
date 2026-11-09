@@ -201,6 +201,17 @@ pub async fn patch_project(
     {
         return Err(FormError::field("allowed_commands", "rule_invalid", e));
     }
+    if let Some(Err(e)) = patch
+        .reviewer_web_domains
+        .clone()
+        .map(toknila_core::command_policy::clean_domains)
+    {
+        return Err(FormError::field(
+            "reviewer_web_domains",
+            "domain_invalid",
+            e,
+        ));
+    }
     if let Some(profile) = &patch.default_profile {
         let catalog = crate::profiles::load(&state.profiles);
         if !catalog

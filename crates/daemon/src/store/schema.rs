@@ -261,7 +261,11 @@ pub(super) const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE tickets ADD COLUMN design_first INTEGER NOT NULL DEFAULT 0;
     "#,
-    // 16: how many times the loop (check, reviewer) may return a card before a person decides.
+    // 16: the domains a project's reviewers may read on the web (a JSON list, empty by default).
+    r#"
+    ALTER TABLE projects ADD COLUMN reviewer_web_domains TEXT NOT NULL DEFAULT '[]';
+    "#,
+    // 17: how many times the loop (check, reviewer) may return a card before a person decides.
     // Existing projects keep their review mode; only the limit is new.
     r#"
     ALTER TABLE projects ADD COLUMN max_review_rounds INTEGER NOT NULL DEFAULT 3;

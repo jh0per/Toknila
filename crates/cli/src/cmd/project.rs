@@ -297,6 +297,9 @@ fn print_commands(p: &toknila_core::Project) {
     for rule in &p.allowed_commands {
         println!("allowed always: {rule}");
     }
+    if !p.reviewer_web_domains.is_empty() {
+        println!("reviewer reads: {}", p.reviewer_web_domains.join(", "));
+    }
 }
 
 /// Asks the person to type the project's key before its folder goes to the Trash. Refuses when

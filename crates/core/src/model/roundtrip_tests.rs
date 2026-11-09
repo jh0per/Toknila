@@ -70,6 +70,7 @@ fn project_roundtrips() {
         planner_model: None,
         command_policy: Default::default(),
         allowed_commands: Vec::new(),
+        reviewer_web_domains: Vec::new(),
         archived: false,
     });
 }
