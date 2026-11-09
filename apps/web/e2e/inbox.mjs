@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shipOf } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -176,7 +176,7 @@ try {
   const shipChain = join(home, "ship.toml");
   writeFileSync(shipChain, chainFile("shipped", true, [{ id: "work" }]));
   tok("chain", "import", shipChain, "--project", "GIT");
-  const ship = JSON.parse(tok("show", "GIT-1", "--json")).ship.path;
+  const ship = shipOf(tok, "GIT-1");
   writeFileSync(join(ship, "done.txt"), "done\n");
   git(ship, "add", "done.txt");
   git(ship, "commit", "--quiet", "-m", "done");
@@ -205,7 +205,7 @@ try {
   const revChain = join(home, "reviewed.toml");
   writeFileSync(revChain, chainFile("reviewed", true, [{ id: "rev" }, { id: "back" }]));
   tok("chain", "import", revChain, "--project", "GIT");
-  const rship = JSON.parse(tok("show", "GIT-2", "--json")).ship.path;
+  const rship = shipOf(tok, "GIT-2");
   writeFileSync(join(rship, "rev.txt"), "rev\n");
   git(rship, "add", "rev.txt");
   git(rship, "commit", "--quiet", "-m", "rev");
@@ -234,7 +234,7 @@ try {
   await expectText(t("ship-path"), rship, "Technical details hold the workspace folder");
   await expectText(t("ship-branch"), "ship/", "and its branch");
   // Return from the row: it asks what to change, sends the card back to its agent, and the row goes.
-  const bship = JSON.parse(tok("show", "GIT-3", "--json")).ship.path;
+  const bship = shipOf(tok, "GIT-3");
   writeFileSync(join(bship, "back.txt"), "back\n");
   git(bship, "add", "back.txt");
   git(bship, "commit", "--quiet", "-m", "back");

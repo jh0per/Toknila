@@ -15,7 +15,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shipOf } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -30,7 +30,14 @@ const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOK
 const git = (dir, ...args) =>
   run("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const logs = (key) => tok("logs", key);
+// Nothing to read until the daemon has started the card's run, which is after the command answered.
+const logs = (key) => {
+  try {
+    return tok("logs", key);
+  } catch {
+    return "";
+  }
+};
 const show = (key) => JSON.parse(tok("show", key, "--json"));
 
 async function until(what, f) {
@@ -103,7 +110,7 @@ try {
 
   // 3. The hand-in is refused until a version is approved (the ship has a commit, so only the
   // missing approval stands in the way).
-  const ship = show("DS-1").ship.path;
+  const ship = shipOf(tok, "DS-1");
   writeFileSync(join(ship, "login.txt"), "login\n");
   git(ship, "add", "login.txt");
   git(ship, "commit", "--quiet", "-m", "login");
