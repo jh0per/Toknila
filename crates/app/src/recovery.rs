@@ -24,8 +24,10 @@ pub struct Recovery {
     pub running: usize,
     /// Keys of the tickets whose runner the restart lost; they are Blocked now.
     pub lost: Vec<String>,
-    /// Keys of the cards whose reviewer or check the restart lost; a person has them now.
+    /// Keys of the cards whose reviewer the restart lost; a person has them now.
     pub reviews_lost: Vec<String>,
+    /// Keys of the cards that were running or waiting for their check; queued again, in order.
+    pub checks_resumed: Vec<String>,
     /// Keys of the cards whose merge was running; it is queued again.
     pub merges_resumed: Vec<String>,
     /// Entities whose stored state differs from their last journal snapshot. The database stays
@@ -40,12 +42,9 @@ pub fn recover<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Recovery> {
     let lost = runs::mark_lost(uow, &HashSet::new())?;
     report.lost = lost.iter().map(ToString::to_string).collect();
     let reviews = reviews::mark_lost(uow, &HashSet::new())?;
-    let checks = crate::checks::mark_lost(uow, &HashSet::new())?;
-    report.reviews_lost = reviews
-        .iter()
-        .chain(&checks)
-        .map(ToString::to_string)
-        .collect();
+    report.reviews_lost = reviews.iter().map(ToString::to_string).collect();
+    let checks = crate::checks::resume(uow)?;
+    report.checks_resumed = checks.iter().map(ToString::to_string).collect();
     let resumed = merges::resume(uow)?;
     report.merges_resumed = resumed.iter().map(ToString::to_string).collect();
     let chains = uow.chains(None)?;

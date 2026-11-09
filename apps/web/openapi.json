@@ -7959,6 +7959,15 @@
               }
             ]
           },
+          "check_queue": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Where the card's check stands in the machine's line of checks: 0 it runs now, n it is\nthe n-th that waits for another check to end (1 is next). Absent when no check is in the\nline; only the daemon knows the line.",
+            "minimum": 0
+          },
           "max_rounds": {
             "type": "integer",
             "format": "int32",

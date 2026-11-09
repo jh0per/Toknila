@@ -135,6 +135,8 @@ pub struct Store {
     yard: Option<Yard>,
     merger: Merges,
     checker: Checks,
+    /// Where the hand-in checks of this machine wait for their turn, one at a time.
+    line: Arc<crate::check_line::CheckLine>,
     runner: Agents,
     tasks: Arc<settle::Tasks>,
 }
@@ -172,6 +174,7 @@ impl Store {
             yard: None,
             merger: Arc::new(external::NoMerger),
             checker: Arc::new(crate::checker::ShellChecker::default()),
+            line: Arc::default(),
             runner: Arc::new(NoRunner),
             tasks: settle::Tasks::new(),
         }
@@ -193,6 +196,11 @@ impl Store {
     pub fn with_checker(mut self, checker: Checks) -> Store {
         self.checker = checker;
         self
+    }
+
+    /// The line the hand-in checks wait in; a card's place in it is shown on the card.
+    pub fn check_line(&self) -> Arc<crate::check_line::CheckLine> {
+        self.line.clone()
     }
 
     /// Lets commands start and stop agents; without one a non-simulated ticket cannot start.

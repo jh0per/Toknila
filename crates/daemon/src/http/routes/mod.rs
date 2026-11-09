@@ -50,9 +50,30 @@ fn scrollback_response(chunk: crate::runner::Chunk) -> Response {
     (headers, chunk.bytes).into_response()
 }
 
+/// What an answer is costed with, and the machine's line of checks as it stood when the command
+/// began (a card's place in it is part of its detail). Reads as the price table.
+struct Pricing {
+    prices: PriceTable,
+    checks: Vec<TicketId>,
+}
+
+impl std::ops::Deref for Pricing {
+    type Target = PriceTable;
+    fn deref(&self) -> &PriceTable {
+        &self.prices
+    }
+}
+
 /// The time of a command, and the prices its answer is costed with.
-fn stamp(state: &AppState) -> (Timestamp, PriceTable) {
-    (now(), state.usage.prices().0)
+fn stamp(state: &AppState) -> (Timestamp, Pricing) {
+    let checks = state.store.check_line().snapshot();
+    (
+        now(),
+        Pricing {
+            prices: state.usage.prices().0,
+            checks,
+        },
+    )
 }
 
 fn load_chain_detail(
@@ -77,13 +98,20 @@ fn load_ticket_detail(
     repo: &Repo<'_>,
     ticket: TicketId,
     at: Timestamp,
-    prices: &PriceTable,
+    prices: &Pricing,
 ) -> ApiResult<TicketDetail> {
     let t = repo
         .ticket(ticket)?
         .ok_or_else(|| AppError::not_found(format!("ticket {ticket}")))?;
     let chain = repo.chain(t.chain_id)?.map(|c| c.name).unwrap_or_default();
-    let review = toknila_app::reviews::view(repo, &t)?;
+    let mut review = toknila_app::reviews::view(repo, &t)?;
+    if review.awaiting == Some(toknila_core::ReviewTurn::Check) {
+        review.check_queue = prices
+            .checks
+            .iter()
+            .position(|c| *c == t.id)
+            .and_then(|i| u32::try_from(i).ok());
+    }
     let rows = repo.usage_rows(RowFilter {
         ticket: Some(t.id),
         ..RowFilter::default()

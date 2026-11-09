@@ -2645,6 +2645,13 @@ export interface components {
             awaiting?: components["schemas"]["ReviewTurn"] | null;
             /**
              * Format: int32
+             * @description Where the card's check stands in the machine's line of checks: 0 it runs now, n it is
+             *     the n-th that waits for another check to end (1 is next). Absent when no check is in the
+             *     line; only the daemon knows the line.
+             */
+            check_queue?: number | null;
+            /**
+             * Format: int32
              * @description The project's round limit of the loop, and how many returns the loop has used since a
              *     person last decided.
              */

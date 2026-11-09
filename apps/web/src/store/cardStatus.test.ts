@@ -59,6 +59,14 @@ describe("the status sentence", () => {
       .toBe("In review: the reviewer agent is checking the work");
     expect(statusLine(card("review"), detail([], { by: "check" }), pace()).text)
       .toBe("In review: bringing the ship up to main");
+    const waiting = (place: number) => {
+      const d = detail([], { by: "check" });
+      d.review = { ...d.review, check_queue: place };
+      return statusLine(card("review"), d, pace()).text;
+    };
+    expect(waiting(0)).toBe("In review: bringing the ship up to main");
+    expect(waiting(1)).toBe("In review: waits for another check to end (next in line)");
+    expect(waiting(3)).toBe("In review: waits for another check to end (#3 in line)");
     expect(statusLine(card("review"), detail([], { by: "merging" }), pace()).text)
       .toBe("Approved: merging into the main branch");
   });

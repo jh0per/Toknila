@@ -148,6 +148,8 @@ pub struct Host<'a> {
     pub merger: &'a dyn Merger,
     pub runner: &'a dyn Runner,
     pub checker: &'a dyn Checker,
+    /// The line the checks of the machine wait in, one at a time.
+    pub gate: &'a dyn crate::checks::CheckGate,
 }
 
 /// Runs the effects on the host, in order. Touches no database. A runner starts where the
@@ -274,6 +276,8 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
             }
             ExternalEffect::DeliverInstruction { .. } => {}
             ExternalEffect::RunCheck { ticket, spec, sync } => {
+                // One check at a time on the machine: wait for the turn, hold it until done.
+                let _turn = host.gate.enter(ticket);
                 let synced = match &sync {
                     Some(sync) => host.merger.sync(sync),
                     None => Ok(SyncOutcome::UpToDate),

@@ -278,13 +278,20 @@ fn a_check_that_cannot_run_leaves_the_card_to_the_person() {
 }
 
 #[test]
-fn a_card_whose_check_the_restart_lost_goes_to_a_person() {
+fn a_card_whose_check_the_restart_cut_short_is_queued_again_and_checked() {
     let mut mem = running(ReviewMode::Both, 3);
     finish(&mut mem, "done".to_owned());
-    mem.deferred.clear();
-    let moved = checks::mark_lost(&mut mem, &std::collections::HashSet::new()).expect("lost");
-    assert_eq!(moved.len(), 1);
-    assert_eq!(a(&mem).review.turn, Some(ReviewTurn::Person));
+    mem.deferred.clear(); // the daemon stopped before the host ran it
+    let resumed = checks::resume(&mut mem).expect("resume");
+    assert_eq!(resumed.len(), 1);
+    assert_eq!(a(&mem).review.turn, Some(ReviewTurn::Check));
+    assert_eq!(mem.deferred.len(), 1, "the check is queued for the host");
+    settle(&mut mem);
+    assert_eq!(
+        a(&mem).review.turn,
+        Some(ReviewTurn::Agent { decides: false })
+    );
+    assert_eq!(mem.checker.asked.borrow().len(), 1);
 }
 
 #[test]

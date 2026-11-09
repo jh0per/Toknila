@@ -43,6 +43,9 @@ export function awaitingText(review: ReviewView): string {
   if (!turn) return "";
   if (turn.by === "person") return "waiting for you";
   if (turn.by === "merging") return "merging into the main branch";
-  if (turn.by === "check") return "the check is running";
+  if (turn.by === "check") {
+    const place = review.check_queue ?? 0;
+    return place > 0 ? `the check waits for another check to end (${place === 1 ? "next in line" : `#${place} in line`})` : "the check is running";
+  }
   return turn.decides ? "waiting for the reviewer agent" : "waiting for the reviewer agent, then you";
 }
