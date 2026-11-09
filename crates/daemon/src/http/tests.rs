@@ -420,7 +420,43 @@ async fn a_card_keeps_the_place_it_was_put_at_until_the_chain_is_arranged() {
         248
     );
 
-    // The positions are not in the chain file.
+    // A size is kept like a place: a patch without it keeps it, `null` clears it.
+    let (s, sized) = api
+        .call(
+            Method::PATCH,
+            "/v1/tickets/DEMO-1",
+            Some(json!({ "size": { "w": 300, "h": 120 } })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{sized}");
+    assert_eq!(sized["ticket"]["size"], json!({ "w": 300, "h": 120 }));
+    assert_eq!(sized["ticket"]["pos"], json!({ "x": 248, "y": 40 }));
+    api.call(
+        Method::PATCH,
+        "/v1/tickets/DEMO-1",
+        Some(json!({ "title": "A3" })),
+    )
+    .await;
+    assert_eq!(
+        api.get("/v1/tickets/DEMO-1").await["ticket"]["size"]["w"],
+        300
+    );
+    let (_, unsized_) = api
+        .call(
+            Method::PATCH,
+            "/v1/tickets/DEMO-1",
+            Some(json!({ "size": null })),
+        )
+        .await;
+    assert!(unsized_["ticket"].get("size").is_none(), "{unsized_}");
+    api.call(
+        Method::PATCH,
+        "/v1/tickets/DEMO-1",
+        Some(json!({ "size": { "w": 300, "h": 120 } })),
+    )
+    .await;
+
+    // The positions and sizes are not in the chain file.
     let toml = api.get("/v1/chains/demo/export").await["toml"]
         .as_str()
         .unwrap_or_default()
@@ -442,7 +478,7 @@ async fn a_card_keeps_the_place_it_was_put_at_until_the_chain_is_arranged() {
             .as_array()
             .expect("tickets")
             .iter()
-            .all(|t| t.get("pos").is_none())
+            .all(|t| t.get("pos").is_none() && t.get("size").is_none())
     );
     let (s, _) = api
         .call(Method::POST, "/v1/chains/nope/arrange", None)

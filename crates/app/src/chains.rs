@@ -281,19 +281,22 @@ pub fn move_ticket<U: UnitOfWork + ?Sized>(
     })
 }
 
-/// Hands every card of the chain back to the automatic layout (clears the places a person put
-/// them at). Cards that have none are left alone.
+/// Hands every card of the chain back to the automatic layout (clears the places and sizes a
+/// person gave them). Cards that have none are left alone.
 pub fn arrange<U: UnitOfWork + ?Sized>(uow: &mut U, chain: &str) -> AppResult<ChainId> {
     change(uow, chain, |ctx| {
         let placed: Vec<_> = ctx
             .view
             .tickets
             .iter()
-            .filter(|t| t.pos.is_some())
+            .filter(|t| t.pos.is_some() || t.size.is_some())
             .map(|t| t.id)
             .collect();
         for id in placed {
-            ctx.edit_ticket(id, |t| t.pos = None)?;
+            ctx.edit_ticket(id, |t| {
+                t.pos = None;
+                t.size = None;
+            })?;
         }
         Ok(())
     })

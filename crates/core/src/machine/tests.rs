@@ -56,6 +56,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         pr: None,
         review: crate::Review::default(),
         pos: None,
+        size: None,
     }
 }
 

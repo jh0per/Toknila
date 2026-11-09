@@ -63,6 +63,18 @@ pub struct Ticket {
     /// to the automatic layout. Only the window reads it: it is not in chain files.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pos: Option<Pos>,
+    /// The size a person gave the card on the canvas (canvas pixels); `None` lets the card fit its
+    /// text. Only the window reads it: it is not in chain files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<Size>,
+}
+
+/// The width and height of a card on a chain's canvas, in whole canvas pixels.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Size {
+    pub w: i32,
+    pub h: i32,
 }
 
 /// A place on a chain's canvas, in whole canvas pixels.
@@ -174,6 +186,7 @@ impl Ticket {
             pr: None,
             review: Review::default(),
             pos: None,
+            size: None,
         }
     }
 
@@ -226,19 +239,31 @@ pub struct TicketPatch {
     )]
     #[cfg_attr(feature = "openapi", schema(value_type = Option<Pos>, nullable))]
     pub pos: Option<Option<Pos>>,
+    /// The card's own size: a size, `null` to let it fit its text again, left out to keep it.
+    #[serde(
+        default,
+        deserialize_with = "some_or_null",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[cfg_attr(feature = "openapi", schema(value_type = Option<Size>, nullable))]
+    pub size: Option<Option<Size>>,
 }
 
 /// Tells a field that is `null` from one that is left out: `Some(None)` against `None`.
-fn some_or_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<Pos>>, D::Error> {
-    Option::<Pos>::deserialize(d).map(Some)
+fn some_or_null<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Option<T>>, D::Error> {
+    Option::<T>::deserialize(d).map(Some)
 }
 
 impl TicketPatch {
-    /// Whether the patch only moves the card on the canvas (allowed on a finished card too).
+    /// Whether the patch only moves or resizes the card on the canvas (allowed on a finished card
+    /// too).
     pub fn only_moves(&self) -> bool {
-        self.pos.is_some()
+        (self.pos.is_some() || self.size.is_some())
             && Self {
                 pos: None,
+                size: None,
                 ..self.clone()
             } == Self::default()
     }
@@ -271,6 +296,9 @@ impl TicketPatch {
         }
         if let Some(v) = self.pos {
             t.pos = v;
+        }
+        if let Some(v) = self.size {
+            t.size = v;
         }
     }
 }
