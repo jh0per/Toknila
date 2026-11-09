@@ -412,5 +412,6 @@ fn tasks_without_ids_match_by_text() {
     );
 }
 
+mod new_subtasks;
 mod out_of_order;
 mod preamble;

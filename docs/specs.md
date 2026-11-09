@@ -56,8 +56,12 @@ so the window imports the same way, and each chain remembers its folder as `sour
   one, by their whole text).
 - A card that did not come from the file (for example an approved wildcard card) is appended as a
   new `## Phase N: <card title>` section, its tasks numbered after the highest T-id in the file.
-- Every other byte stays, line endings included (LF or CRLF). Nothing is deleted; subtasks added
-  in Toknila to a card that is in the file are not written yet.
+- A subtask added in Toknila to a card that is in the file is written as a new task line after
+  that phase's last task, with the next free T-id.
+- Every other byte stays, line endings included (LF or CRLF). Nothing is deleted.
+
+The TOML chain export (`tok chain export`) carries each subtask's state as `done_subtasks`, so
+export then import keeps ticked subtasks.
 
 Exporting right after an import, or twice in a row, leaves the file byte-identical. The file is
 only written when it changes.

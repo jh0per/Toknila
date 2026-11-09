@@ -8,10 +8,11 @@ use crate::wire::wire_name;
 use crate::{EdgeKind, NodeRef, Release, Ticket, TicketId};
 
 /// Writes a chain as a file that [`super::parse`] reads back into the same graph. Ticket keys
-/// and release versions become the local ids. `subtasks` maps ticket ids to checklist texts.
+/// and release versions become the local ids. `subtasks` maps ticket ids to checklist items
+/// (text, ticked); ticked positions are written as `done_subtasks`.
 /// Wildcard cards that are not in the plan (proposed or rejected) are left out; no edge touches
 /// them, so the file stays whole.
-pub fn export(view: &ChainView, subtasks: &HashMap<TicketId, Vec<String>>) -> String {
+pub fn export(view: &ChainView, subtasks: &HashMap<TicketId, Vec<(String, bool)>>) -> String {
     let mut out = Lines::default();
     chain_section(view, &mut out);
     for node in view.topo_order() {
@@ -71,7 +72,12 @@ fn chain_section(view: &ChainView, out: &mut Lines) {
     }
 }
 
-fn ticket_section(view: &ChainView, t: &Ticket, subtasks: Option<&Vec<String>>, out: &mut Lines) {
+fn ticket_section(
+    view: &ChainView,
+    t: &Ticket,
+    subtasks: Option<&Vec<(String, bool)>>,
+    out: &mut Lines,
+) {
     let node = NodeRef::Ticket(t.id);
     out.raw("\n[[ticket]]");
     out.str("id", &t.key.to_string());
@@ -80,7 +86,17 @@ fn ticket_section(view: &ChainView, t: &Ticket, subtasks: Option<&Vec<String>>, 
         out.str("prompt", &t.prompt);
     }
     out.list("acceptance", &t.acceptance);
-    out.list("subtasks", subtasks.map_or(&[], Vec::as_slice));
+    let items = subtasks.map_or(&[][..], Vec::as_slice);
+    let texts: Vec<String> = items.iter().map(|s| s.0.clone()).collect();
+    out.list("subtasks", &texts);
+    let done: Vec<String> = (1..)
+        .zip(items)
+        .filter(|(_, s)| s.1)
+        .map(|(i, _)| i.to_string())
+        .collect();
+    if !done.is_empty() {
+        out.raw(&format!("done_subtasks = [{}]", done.join(", ")));
+    }
     out.list("after", &incoming(view, node, EdgeKind::Normal));
     out.list(
         "after_release",

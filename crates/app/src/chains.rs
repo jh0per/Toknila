@@ -188,7 +188,11 @@ pub fn export<R: Reader + ?Sized>(repo: &R, chain: &str) -> AppResult<String> {
         .ok_or_else(|| AppError::not_found(format!("chain {chain}")))?;
     let mut subtasks = HashMap::new();
     for t in &view.tickets {
-        let texts: Vec<String> = repo.subtasks(t.id)?.into_iter().map(|s| s.text).collect();
+        let texts: Vec<(String, bool)> = repo
+            .subtasks(t.id)?
+            .into_iter()
+            .map(|s| (s.text, s.done))
+            .collect();
         subtasks.insert(t.id, texts);
     }
     Ok(toknila_core::plan::export(&view, &subtasks))
