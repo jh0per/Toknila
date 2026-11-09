@@ -1,11 +1,37 @@
 // What the browser e2e scripts share: the checks on a page, and launching the browser.
 
-import { readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { basename, join } from "node:path";
 import { chromium } from "playwright";
 
-export const launch = () =>
-  chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+/// Launches the browser. With `E2E_ARTIFACTS` set (CI), every page is traced, and when the script
+/// has failed by the time it closes the browser (`process.exitCode` is set), a screenshot of each
+/// page and its trace are written to `$E2E_ARTIFACTS/<script>/` for the CI artifact.
+export async function launch() {
+  const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+  const dir = process.env.E2E_ARTIFACTS;
+  if (!dir) return browser;
+  const out = join(dir, basename(process.argv[1] ?? "e2e", ".mjs"));
+  const pages = [];
+  const newPage = browser.newPage.bind(browser);
+  browser.newPage = async (...args) => {
+    const page = await newPage(...args);
+    await page.context().tracing.start({ screenshots: true, snapshots: true });
+    pages.push(page);
+    return page;
+  };
+  const close = browser.close.bind(browser);
+  browser.close = async (...args) => {
+    const failed = Boolean(process.exitCode);
+    if (failed) mkdirSync(out, { recursive: true });
+    for (const [i, page] of pages.entries()) {
+      if (failed) await page.screenshot({ path: join(out, `failed-${i}.png`) }).catch(() => {});
+      await page.context().tracing.stop(failed ? { path: join(out, `trace-${i}.zip`) } : {}).catch(() => {});
+    }
+    return close(...args);
+  };
+  return browser;
+}
 
 /// Checks bound to a page; each prints `PASS ...` or throws with what it saw instead.
 export function checks(page) {
