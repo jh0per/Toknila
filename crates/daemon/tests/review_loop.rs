@@ -210,8 +210,7 @@ async fn the_loop_returns_the_card_until_the_round_limit_and_then_waits_for_the_
     rig.finish("other.txt").await;
     let card = rig
         .settled("the failing check to return the card", |c| {
-            c["ticket"]["status"] == "running"
-                && !c["review"]["rounds"].as_array().unwrap().is_empty()
+            c["ticket"]["status"] == "running" && !rounds(c).is_empty()
         })
         .await;
     assert_eq!(rounds(&card), [("system".into(), "request_changes".into())]);
