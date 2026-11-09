@@ -147,7 +147,7 @@ async fn a_deleted_chain_leaves_its_branch_in_the_list() {
     commit_file(&ship, "login.txt", "login\n", "add login");
     api.post(
         "/v1/tickets/DEMO-1/events",
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     let (status, _) = api.call(Method::DELETE, "/v1/chains/auth", None).await;

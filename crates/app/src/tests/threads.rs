@@ -41,7 +41,7 @@ fn version(body: &str) -> NewVersion {
 
 fn finish(mem: &mut Mem) -> crate::AppResult<toknila_core::TicketId> {
     let a = mem.ticket_by_title("A");
-    let summary = "done".to_owned();
+    let summary = toknila_core::handin::from_plain("done");
     agent::ticket_event(mem, &a, AgentEvent::Finished { summary })
 }
 

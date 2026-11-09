@@ -37,7 +37,9 @@ async fn a_person_and_the_agent_settle_a_thread_and_the_hand_in_follows() {
         .call(
             Method::POST,
             "/v1/tickets/DEMO-1/events",
-            Some(json!({ "event": "finished", "summary": "done" })),
+            Some(
+                json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
+            ),
         )
         .await;
     assert_eq!(s, StatusCode::CONFLICT, "{err}");
@@ -110,7 +112,9 @@ async fn a_person_and_the_agent_settle_a_thread_and_the_hand_in_follows() {
         (StatusCode::CONFLICT, &json!("thread is already approved"))
     );
 
-    let done = ev(json!({ "event": "finished", "summary": "done" })).await;
+    let done =
+        ev(json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }))
+            .await;
     assert_eq!(
         (&done["ticket"]["status"], &done["phase"]),
         (&json!("review"), &json!("implement"))

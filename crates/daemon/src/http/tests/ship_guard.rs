@@ -45,7 +45,7 @@ impl Env {
             .call(
                 Method::POST,
                 "/v1/tickets/DEMO-1/events",
-                Some(json!({ "event": "finished", "summary": "done" })),
+                Some(json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") })),
             )
             .await
     }
@@ -200,7 +200,9 @@ async fn a_ticket_without_a_ship_is_not_held_by_the_guard() {
         .call(
             Method::POST,
             "/v1/tickets/DEMO-1/events",
-            Some(json!({ "event": "finished", "summary": "done" })),
+            Some(
+                json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
+            ),
         )
         .await;
     assert!(status.is_success(), "{body}");

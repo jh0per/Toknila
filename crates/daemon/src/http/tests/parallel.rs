@@ -91,7 +91,7 @@ async fn three_started_cards_run_two_and_queue_one_until_a_slot_frees() {
     // The first agent hands in: Review frees its slot and the queued card starts.
     api.post(
         "/v1/tickets/DEMO-1/events",
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     assert_eq!(api.status("DEMO-1").await, "review");

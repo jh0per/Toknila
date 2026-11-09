@@ -125,9 +125,8 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
             None => report(uow, t, body),
         },
         AgentEvent::Finished { summary } => {
-            if summary.trim().is_empty() {
-                return Err(AppError::bad_request("finished needs a summary"));
-            }
+            toknila_core::handin::check(&summary)
+                .map_err(|e| AppError::bad_request(format!("finished refused: {e}")))?;
             let open_threads = threads::open_threads(uow, t)?;
             if open_threads.is_empty() {
                 threads::require_design(uow, t)?;

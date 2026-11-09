@@ -542,7 +542,7 @@ fn a_card_in_review_with_worker_and_reviewer_alive_holds_two_slots() {
     settle(&mut mem);
     let one = card(&mem, 1);
     let event = AgentEvent::Finished {
-        summary: "done".to_owned(),
+        summary: toknila_core::handin::from_plain("done"),
     };
     agent::ticket_event(&mut mem, &one, event).expect("finished");
     settle(&mut mem);
@@ -634,7 +634,7 @@ fn a_recorded_verdict_stops_the_reviewer_and_its_slot_starts_the_next_card() {
     settle(&mut mem);
     let one = card(&mem, 1);
     let finished = AgentEvent::Finished {
-        summary: "done".to_owned(),
+        summary: toknila_core::handin::from_plain("done"),
     };
     agent::ticket_event(&mut mem, &one, finished).expect("finished");
     settle(&mut mem);

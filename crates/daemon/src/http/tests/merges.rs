@@ -45,7 +45,7 @@ fn ship_path(card: &Value) -> PathBuf {
 async fn hand_in_and_accept(api: &Api, key: &str) {
     api.post(
         &format!("/v1/tickets/{key}/events"),
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     api.post(&format!("/v1/tickets/{key}/actions/accept"), json!({}))
@@ -102,7 +102,7 @@ async fn a_conflict_met_at_the_hand_in_returns_the_card_to_the_worker_and_the_fi
     e.api
         .post(
             "/v1/tickets/DEMO-1/events",
-            json!({ "event": "finished", "summary": "done" }),
+            json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
         )
         .await;
 
@@ -136,7 +136,7 @@ async fn a_conflict_met_at_accept_blocks_with_the_file_names_and_unblock_after_t
     e.api
         .post(
             "/v1/tickets/DEMO-1/events",
-            json!({ "event": "finished", "summary": "done" }),
+            json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
         )
         .await;
     commit_file(&e.repo, "README.md", "base says hi\n", "base edit");

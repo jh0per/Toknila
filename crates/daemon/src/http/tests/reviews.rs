@@ -10,7 +10,7 @@ use super::Api;
 async fn finish(api: &Api, key: &str) {
     api.post(
         &format!("/v1/tickets/{key}/events"),
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
 }
@@ -110,7 +110,7 @@ async fn agent_mode_only_the_reviewers_token_may_give_the_verdict() {
             &reviewer,
             Method::POST,
             events,
-            Some(json!({ "event": "finished", "summary": "x" })),
+            Some(json!({ "event": "finished", "summary": toknila_core::handin::from_plain("x") })),
         )
         .await;
     assert_eq!(status, StatusCode::FORBIDDEN, "{body}");

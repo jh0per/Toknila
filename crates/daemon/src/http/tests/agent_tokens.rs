@@ -235,7 +235,8 @@ async fn drive(api: &Api, token: &str, key: &str) -> Vec<Value> {
         json!({ "text": "Solid" }),
     )
     .await;
-    for e in [json!({ "event": "finished", "summary": "did X" })] {
+    for e in [json!({ "event": "finished", "summary": toknila_core::handin::from_plain("did X") })]
+    {
         let (s, v) = api
             .call_with(token, Method::POST, &uri, Some(e.clone()))
             .await;
@@ -292,7 +293,7 @@ async fn events_for_a_ticket_the_run_does_not_own_are_rejected_and_change_nothin
     let (token, _) = api.agent_token("DEMO-1").await;
     let events = [
         json!({ "event": "ask_human", "text": "hijack" }),
-        json!({ "event": "finished", "summary": "not mine" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("not mine") }),
         json!({ "event": "propose", "title": "sneaky" }),
         json!({ "event": "open_thread", "kind": "design", "title": "x" }),
     ];

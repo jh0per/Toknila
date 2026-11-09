@@ -60,7 +60,7 @@ pub(super) fn in_review() -> Mem {
     recover(&mut mem).expect("settle");
     settle(&mut mem);
     let a = mem.ticket_by_title("A");
-    let summary = "done".to_owned();
+    let summary = toknila_core::handin::from_plain("done");
     agent::ticket_event(&mut mem, &a, AgentEvent::Finished { summary }).expect("finished");
     // The hand-in brings the ship up to its base first (no check command: only the sync runs);
     // what the tests below count starts after it.
@@ -215,7 +215,7 @@ fn a_project_without_a_repository_has_nothing_to_merge_and_the_card_is_merged() 
     let mut mem = Mem::demo();
     recover(&mut mem).expect("settle");
     let a = mem.ticket_by_title("A");
-    let summary = "done".to_owned();
+    let summary = toknila_core::handin::from_plain("done");
     agent::ticket_event(&mut mem, &a, AgentEvent::Finished { summary }).expect("finished");
     accept(&mut mem);
     assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Review);

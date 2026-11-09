@@ -116,7 +116,11 @@ fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
         &[
             call(1, "subtask_done", json!({ "position": 1 })),
             call(2, "note", json!({ "body": { "gist": "half way" } })),
-            call(3, "finished", json!({ "summary": "did it" })),
+            call(
+                3,
+                "finished",
+                json!({ "summary": toknila_core::handin::from_plain("did it") }),
+            ),
         ],
     );
     assert!(
@@ -184,7 +188,11 @@ fn a_refused_event_and_a_bad_token_come_back_as_tool_errors_and_change_nothing()
                 "open_thread",
                 json!({ "kind": "design", "title": "List" }),
             ),
-            call(2, "finished", json!({ "summary": "x" })),
+            call(
+                2,
+                "finished",
+                json!({ "summary": toknila_core::handin::from_plain("x") }),
+            ),
         ],
     );
     assert_eq!(answers[0]["result"]["isError"], false, "{answers:?}");

@@ -51,7 +51,16 @@ Other agents and the person work on this machine at the same time.
 
 ## Hand in once
 
-The `finished` summary says what changed, gives each check as PASS, FAIL, NOT_RUN or BLOCKED with one line of evidence, and names what is left or not covered. Do not run the checks again after handing in.
+The `finished` summary is the hand-in template. The daemon refuses a summary that has no checks section or is under 40 characters, and answers with the template:
+
+```markdown
+**What changed:** a few lines
+**Checks:**
+- PASS|FAIL|NOT_RUN|BLOCKED <check>: <one line of evidence>
+**Left:** what is left or not covered
+```
+
+A person sees the three blocks apart on the Review card, above Accept and Return. Do not run the checks again after handing in.
 
 ## After a Return
 

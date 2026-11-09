@@ -29,7 +29,7 @@ async fn reviewed(tmp: &Path) -> (Api, PathBuf, PathBuf) {
     commit_file(&ship, "login.txt", "login\n", "add login");
     api.post(
         "/v1/tickets/DEMO-1/events",
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     assert_eq!(api.status("DEMO-1").await, "review");
