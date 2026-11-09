@@ -45,6 +45,8 @@ pub(super) struct RawTicket {
     #[serde(default)]
     pub(super) needs_secrets: bool,
     #[serde(default)]
+    pub(super) design_first: bool,
+    #[serde(default)]
     pub(super) paused: bool,
     /// Import the ticket as Merged (through the state machine, once its dependencies are).
     #[serde(default)]

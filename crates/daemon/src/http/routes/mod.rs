@@ -88,7 +88,14 @@ fn load_ticket_detail(
         ticket: Some(t.id),
         ..RowFilter::default()
     })?;
+    let threads = repo.threads(t.id)?;
+    let mut design_waiting = false;
+    for th in &threads {
+        let (versions, messages) = (repo.thread_versions(th.id)?, repo.thread_messages(th.id)?);
+        design_waiting |= toknila_core::thread::awaiting_person(th, &versions, &messages).is_some();
+    }
     Ok(TicketDetail {
+        design_waiting,
         usage: figures(&rows, prices),
         review,
         allowed_actions: toknila_core::machine::TicketAction::allowed(&t),
@@ -97,7 +104,7 @@ fn load_ticket_detail(
         subtasks: repo.subtasks(t.id)?,
         comments: repo.comments(t.id)?,
         in_status_ms: at.millis_since(t.status_since),
-        phase: toknila_core::thread::phase(&repo.threads(t.id)?),
+        phase: toknila_core::thread::phase(&threads),
         queue_position: schedule::queue_positions(repo)?.get(&t.id).copied(),
         ship: repo.ship(t.id)?,
         chain,

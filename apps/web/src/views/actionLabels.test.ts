@@ -19,6 +19,12 @@ describe("specsFor", () => {
     ]);
   });
 
+  it("words the request for a design and keeps it a plain button", () => {
+    const specs = specsFor(["pause", "ask_design", "cancel"]);
+    expect(specs.map((a) => a.label)).toEqual(["Pause", "Ask for a design", "Cancel"]);
+    expect(specs[1]).toEqual({ action: "ask_design", label: "Ask for a design" });
+  });
+
   it("leaves out what the bar has no field for", () => {
     expect(specsFor(["pause", "block", "cancel"]).map((a) => a.action)).toEqual(["pause", "cancel"]);
   });

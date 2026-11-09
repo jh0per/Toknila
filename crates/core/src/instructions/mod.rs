@@ -37,6 +37,24 @@ pub struct RunBrief<'a> {
     pub check_command: Option<&'a str>,
     /// Instructions a person gave to an earlier run of this card ([`earlier`]), as quoted text.
     pub earlier: &'a [String],
+    /// The person wants to approve a design before any code (`Ticket::design_first`).
+    pub design_first: bool,
+}
+
+/// The section of the instructions file for a card that must show a design first; empty
+/// otherwise.
+fn design_section(brief: &RunBrief<'_>) -> String {
+    if !brief.design_first {
+        return String::new();
+    }
+    "\n## Design first\n\n\
+     The person asked to see and approve a design before you write any code. Before you touch \
+     the code: call `open_thread` with kind `design` (kind `flow` or `architecture` when that \
+     fits the card better), then post a first version with `thread_version` that the person can \
+     judge: a Mermaid diagram, or the screen described as its states and layout. Then wait for \
+     the person's approval or request for changes; answer a request with a new version. Write \
+     code only after the person approved a version. `finished` is refused until one is approved.\n"
+        .to_owned()
 }
 
 /// How many earlier instructions a replacement run is shown, the newest ones.
@@ -101,6 +119,12 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
             " The instructions you were given earlier are in your Toknila instructions; follow them too.",
         );
     }
+    if brief.design_first {
+        checks.push_str(
+            " Before any code, open a design thread with a first version and wait for the \
+             person to approve it (see \"Design first\" in your Toknila instructions).",
+        );
+    }
     match role {
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
@@ -156,6 +180,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
+    out.push_str(&design_section(brief));
     out.push_str(&earlier_section(brief));
     out.push_str(&checks_section(
         brief,

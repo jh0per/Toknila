@@ -156,6 +156,11 @@ fn e2e_web() -> Result<(), String> {
     )?;
     run(
         "node",
+        &["e2e/design.mjs", &exe("tok"), &exe("fake-agent")],
+        &web,
+    )?;
+    run(
+        "node",
         &["e2e/planner.mjs", &exe("tok"), &exe("fake-agent")],
         &web,
     )?;

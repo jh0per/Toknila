@@ -15,6 +15,31 @@ describe("the status sentence", () => {
     expect(line).toEqual({ tone: "needs", text: "Waiting for your answer", next: "Which database?" });
   });
 
+  it("says a card waits for you to approve its design, with a link to Threads", () => {
+    const d = { ...detail([]), design_waiting: true, phase: "design" } as TicketDetail;
+    const line = statusLine(card("running", { design_first: true }), d, pace());
+    expect(line.tone).toBe("needs");
+    expect(line.text).toBe("Waiting for you to approve the design");
+    expect(line.next).toContain("approve it or ask for changes");
+    expect(line.tab).toEqual({ tab: "threads", label: "Open the design" });
+    const silent = { status: "waiting", kind: "silent" } as StatusReason;
+    expect(statusLine(card("waiting", { status_reason: silent }), d, pace()).text).toBe("Waiting for you to approve the design");
+  });
+
+  it("keeps a question as the sentence of a waiting card, even with a design on the table", () => {
+    const d = { ...detail([]), design_waiting: true, phase: "design" } as TicketDetail;
+    const reason = { status: "waiting", kind: "question", text: "Which colour?" } as StatusReason;
+    expect(statusLine(card("waiting", { status_reason: reason }), d, pace()).text).toBe("Waiting for your answer");
+  });
+
+  it("says the agent works on the design while the thread is open and nothing waits for you", () => {
+    const d = { ...detail([]), design_waiting: false, phase: "design" } as TicketDetail;
+    const line = statusLine(card("running"), d, pace());
+    expect(line.text).toBe("An agent is working on the design");
+    expect(line.tab).toBeUndefined();
+    expect(statusLine(card("running"), { ...d, phase: "implement" } as TicketDetail, pace()).text).toBe("An agent is working on it");
+  });
+
   it("says a ready card starts when a slot is free, with its place in line", () => {
     expect(statusLine(card("ready"), detail(["start"]), pace()).text).toBe("Ready: starts when a slot is free");
     expect(statusLine(card("ready"), detail(["start"]), pace({ queue: 3 })).text).toBe("Ready: starts when a slot is free (#3 in line)");

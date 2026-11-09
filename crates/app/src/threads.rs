@@ -176,6 +176,12 @@ pub fn open_threads<R: crate::Reader + ?Sized>(
     Ok(thread::open_threads(&r.threads(t.id)?))
 }
 
+/// The design gate of the hand-in: a card that must show a design first is refused until one
+/// of its threads is approved.
+pub fn require_design<R: crate::Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<()> {
+    Ok(thread::require_design(t, &r.threads(t.id)?)?)
+}
+
 fn message<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     t: &Ticket,

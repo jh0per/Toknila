@@ -229,7 +229,7 @@ try {
   await t("menu-card-start").waitFor();
   const ready = await menuShape();
   must(
-    ready === "Open,Edit,Open terminal,|Start,Pause,|Add card before,Add card after,Add dependency…,|Cancel",
+    ready === "Open,Edit,Open terminal,|Start,Pause,Ask for a design,|Add card before,Add card after,Add dependency…,|Cancel",
     `a ready card's menu is grouped (${ready})`,
   );
   must((await t("menu-card-open").locator("kbd").textContent()) === "Enter", "Open shows its key");

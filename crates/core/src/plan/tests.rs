@@ -131,6 +131,27 @@ fn cards_outside_the_plan_are_not_exported() {
 }
 
 #[test]
+fn design_first_is_read_instantiated_and_exported_only_when_set() {
+    let mut plan = parse(DEMO).expect("demo parses");
+    assert!(plan.tickets.iter().all(|t| !t.design_first));
+    plan.tickets[0].design_first = true;
+    let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
+    assert_eq!(
+        view.tickets.iter().filter(|t| t.design_first).count(),
+        1,
+        "only the first card asked for it"
+    );
+    let text = export(&view, &HashMap::new());
+    assert_eq!(text.matches("design_first = true").count(), 1, "{text}");
+    let again = parse(&text).expect("reparses");
+    assert!(again.tickets[0].design_first);
+    assert!(again.tickets[1..].iter().all(|t| !t.design_first));
+    let typed = parse("[chain]\nname = \"c\"\n\n[[ticket]]\nid = \"a\"\ndesign_first = true\n")
+        .expect("parses");
+    assert!(typed.tickets[0].design_first);
+}
+
+#[test]
 fn export_escapes_strings() {
     let mut plan = parse(DEMO).expect("demo parses");
     plan.tickets[0].title = "quote \" and\nnewline".into();

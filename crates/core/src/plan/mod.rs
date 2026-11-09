@@ -69,6 +69,9 @@ pub struct PlanTicket {
     pub profile: Option<String>,
     pub review_mode: Option<ReviewMode>,
     pub needs_secrets: bool,
+    /// Show a design for approval before any code (`design_first = true`).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub design_first: bool,
     pub paused: bool,
     /// Import as Merged: the ticket goes through the state machine once its dependencies are.
     pub done: bool,

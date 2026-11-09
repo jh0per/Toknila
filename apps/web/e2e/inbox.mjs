@@ -154,8 +154,9 @@ try {
   console.log("PASS Details have the three columns");
   if ((await t("actions").count()) !== 1) throw new Error("the action bar should be there once");
   console.log("PASS the action bar is there once");
-  // Accept of a ship whose work is not committed: the card is blocked with ship_uncommitted and
-  // the inbox says so in words. The ship is a real worktree of a temporary repository.
+  // Accept while the workspace has changes beyond the hand-in commit: refused at once, naming the
+  // file; the card stays in Review, and once the file is committed the accept merges it. The ship
+  // is a real worktree of a temporary repository.
   const git = (cwd, ...args) =>
     execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], {
       cwd,
@@ -178,13 +179,25 @@ try {
   git(ship, "commit", "--quiet", "-m", "done");
   tok("sim", "GIT-1", "finish", "all done");
   writeFileSync(join(ship, "late.txt"), "forgotten\n");
-  tok("accept", "GIT-1");
+  let refused = "";
+  try {
+    tok("accept", "GIT-1");
+  } catch (e) {
+    refused = `${e.stdout ?? ""}${e.stderr ?? ""}${e.message}`;
+  }
+  if (!refused.includes("late.txt")) throw new Error(`accept was not refused naming late.txt: ${refused}`);
+  if (!tok("show", "GIT-1").includes("review")) throw new Error("the card did not stay in review");
+  console.log("PASS accept with changes beyond the hand-in is refused and names the file");
   await page.locator("[data-testid=inbox-link]").click();
-  await row("blocked", "GIT-1").waitFor({ timeout: 10_000 });
-  await expectText(row("blocked", "GIT-1"), "not committed", "the blocked item says the ship has uncommitted changes");
-  await expectText(row("blocked", "GIT-1"), "late.txt", "the blocked item names the file");
-  if (!tok("show", "GIT-1").includes("ship_uncommitted")) throw new Error("the card is not blocked with ship_uncommitted");
-  console.log("PASS accept of an uncommitted ship is blocked as ship_uncommitted");
+  await row("review", "GIT-1").waitFor({ timeout: 10_000 });
+  git(ship, "add", "late.txt");
+  git(ship, "commit", "--quiet", "-m", "late");
+  tok("accept", "GIT-1");
+  for (const until = Date.now() + 20_000; !tok("show", "GIT-1").includes("merged"); ) {
+    if (Date.now() > until) throw new Error("the card did not merge after the file was committed");
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  console.log("PASS once the file is committed, the accept merges the card");
   // A card in review: the row has Accept and Return; Details show the report above them.
   const revChain = join(home, "reviewed.toml");
   writeFileSync(revChain, chainFile("reviewed", true, [{ id: "rev" }, { id: "back" }]));

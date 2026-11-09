@@ -71,6 +71,12 @@ pub enum TransitionError {
     EmptyText(&'static str),
     #[error("cannot hand in {0}: {open}", open = crate::thread::list(.1))]
     OpenThreads(TicketKey, Vec<OpenThread>),
+    #[error(
+        "cannot hand in {0}: it was asked to show a design first, and no design was approved. \
+         Open a design thread with `open_thread` (kind design), post a first version with \
+         `thread_version`, and wait for the person to approve it; then call `finished` again"
+    )]
+    DesignNotApproved(TicketKey),
     #[error("a card is done out of order only when a card before it is still open")]
     NothingBehind,
     #[error(transparent)]
@@ -297,6 +303,18 @@ pub fn apply(
         }
         (S::Running | S::Waiting, TicketEvent::ShipReady { branch }) => {
             next.branch = Some(branch.clone());
+            (from, ticket.status_reason.clone())
+        }
+        (S::Backlog | S::Ready | S::Running | S::Waiting | S::Blocked, TicketEvent::AskDesign) => {
+            if ticket.design_first {
+                return Err(refuse());
+            }
+            next.design_first = true;
+            if matches!(from, S::Running | S::Waiting) {
+                effects.push(Effect::RecordInstruction {
+                    text: crate::thread::ASK_DESIGN_TEXT.to_owned(),
+                });
+            }
             (from, ticket.status_reason.clone())
         }
         (_, TicketEvent::Resume) => {

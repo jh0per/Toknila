@@ -39,6 +39,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         reviewer: None,
         branch: None,
         needs_secrets: true,
+        design_first: true,
         tokens_used: 12_345,
         wildcard: None,
         done_out_of_order: None,
@@ -351,7 +352,7 @@ fn pinned_ticket_json_shape() {
             r#""acceptance":["cargo test green","no unwrap"],"status":"blocked","#,
             r#""status_reason":{"status":"blocked","reason":{"kind":"manual","text":"key"},"resume_to":"running"},"#,
             r#""status_since":1793487815000,"paused":false,"queued":false,"profile":"sim","review_mode":"both","#,
-            r#""branch":null,"needs_secrets":true,"tokens_used":12345}"#
+            r#""branch":null,"needs_secrets":true,"design_first":true,"tokens_used":12345}"#
         )
     );
 }

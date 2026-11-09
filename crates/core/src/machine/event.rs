@@ -114,6 +114,9 @@ pub enum TicketEvent {
     Pause,
     /// `tok resume`.
     Resume,
+    /// `tok design`: a person wants a design to approve before any code. A card that has not
+    /// started gets `design_first`; one that runs also gets an instruction to open a design thread.
+    AskDesign,
     /// `tok cancel <reason>`.
     Cancel { reason: String },
     /// `tok approve`: a person lets a wildcard card into the plan.
@@ -155,6 +158,7 @@ impl TicketEvent {
             Self::Reopen => "reopen",
             Self::Pause => "pause",
             Self::Resume => "resume",
+            Self::AskDesign => "ask_design",
             Self::Cancel { .. } => "cancel",
             Self::Approve { .. } => "approve",
             Self::Reject { .. } => "reject",

@@ -162,7 +162,7 @@ try {
   await card("CAN-2").click({ button: "right" });
   await page.locator("[data-testid=menu-card-start]").waitFor();
   const readyMenu = await menuLabels();
-  if (readyMenu.join("|") !== "Open|Edit|Open terminal|Start|Pause|Add card before|Add card after|Add dependency…|Cancel") throw new Error(`ready card menu: ${readyMenu}`);
+  if (readyMenu.join("|") !== "Open|Edit|Open terminal|Start|Pause|Ask for a design|Add card before|Add card after|Add dependency…|Cancel") throw new Error(`ready card menu: ${readyMenu}`);
   console.log(`PASS a ready card's menu: ${readyMenu.join(", ")}`);
   await shot("card-menu");
   await page.locator("[data-testid=menu-card-add-before]").click();

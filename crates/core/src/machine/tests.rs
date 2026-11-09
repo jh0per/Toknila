@@ -49,6 +49,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         reviewer: None,
         branch: None,
         needs_secrets: false,
+        design_first: false,
         tokens_used: 0,
         wildcard,
         done_out_of_order: None,
@@ -914,6 +915,7 @@ proptest! {
     }
 }
 
+mod design;
 mod merge;
 mod out_of_order;
 mod review;
@@ -944,6 +946,7 @@ fn a_base_behind_blocks_the_start_and_offers_the_two_decisions() {
             "unblock",
             "fast_forward_start",
             "start_anyway",
+            "ask_design",
             "cancel"
         ]
     );

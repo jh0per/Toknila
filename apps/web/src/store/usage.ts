@@ -31,9 +31,14 @@ export type UsageMsg = UsageIntent | UsageResult;
 
 export type UsageEffect =
   | { type: "loadUsage"; days: Days }
-  | { type: "saveUsageSettings"; machine_scan: boolean; days: Days };
+  | { type: "saveUsageSettings"; machine_scan: boolean; days: Days }
+  | { type: "pollUsage"; days: Days };
 
 export const loadUsage = (s: State): Effect => ({ type: "loadUsage", days: s.usage.days });
+
+/// The collector saves new rows without a journal event, so the open page asks again after each
+/// answer (`POLL_MS` in the effect runner), and stops once the person leaves it.
+const again = (s: State): Effect[] => (s.route.name === "usage" ? [{ type: "pollUsage", days: s.usage.days }] : []);
 
 export function reduceUsage(s: State, msg: UsageMsg): [State, Effect[]] {
   const set = (usage: Partial<UsageState>): State => ({ ...s, usage: { ...s.usage, ...usage } });
@@ -46,9 +51,10 @@ export function reduceUsage(s: State, msg: UsageMsg): [State, Effect[]] {
       return [s, [{ type: "saveUsageSettings", machine_scan: msg.on, days: s.usage.days }]];
     case "usageLoaded":
       // An answer for a window the person has since left is stale.
-      return msg.view.summary.days === s.usage.days ? [set({ view: msg.view, error: "" }), []] : [s, []];
+      if (msg.view.summary.days !== s.usage.days) return [s, []];
+      return [set({ view: msg.view, error: "" }), again(s)];
     case "usageFailed":
-      return [set({ error: msg.error }), []];
+      return [set({ error: msg.error }), again(s)];
   }
 }
 

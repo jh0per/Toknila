@@ -25,6 +25,16 @@ describe("the usage page", () => {
     expect(loaded.usage.view?.summary.days).toBe(30);
   });
 
+  it("asks again after an answer while the page is open, and not after it was left", () => {
+    const [open] = reduce(start(), { type: "navigate", route: { name: "usage" } });
+    const [, fx] = reduce(open, { type: "usageLoaded", view: view(7) });
+    expect(fx).toEqual([{ type: "pollUsage", days: 7 }]);
+    const [, failedFx] = reduce(open, { type: "usageFailed", error: "x" });
+    expect(failedFx).toEqual([{ type: "pollUsage", days: 7 }]);
+    const [, away] = reduce(start(), { type: "usageLoaded", view: view(7) });
+    expect(away).toEqual([]);
+  });
+
   it("ignores an answer for a window the person has left", () => {
     const [s] = reduce(start(), { type: "setUsageDays", days: 90 });
     const [late] = reduce(s, { type: "usageLoaded", view: view(7) });

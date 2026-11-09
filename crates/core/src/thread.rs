@@ -15,7 +15,8 @@ use std::fmt;
 use crate::machine::TransitionError;
 use crate::{
     Actor, ArtifactFormat, MessageKind, Phase, Thread, ThreadId, ThreadKind, ThreadMessage,
-    ThreadMessageId, ThreadState, ThreadVersion, ThreadVersionId, TicketId, TicketKey, Timestamp,
+    ThreadMessageId, ThreadState, ThreadVersion, ThreadVersionId, Ticket, TicketId, TicketKey,
+    Timestamp,
 };
 
 /// Largest artifact body, in bytes (512 KiB).
@@ -257,6 +258,21 @@ pub fn require_none_open(ticket: &TicketKey, open: &[OpenThread]) -> Result<(), 
         return Ok(());
     }
     Err(TransitionError::OpenThreads(ticket.clone(), open.to_vec()))
+}
+
+/// The instruction a person's "ask for a design" sends to a card that already runs.
+pub const ASK_DESIGN_TEXT: &str = "Before you go further, open a design thread for this card and wait for approval. Use `open_thread` (kind design), post a first version the person can judge with `thread_version`, and write code only after the person approved a version.";
+
+/// The design gate of the hand-in: a card that must show a design first is refused until one of
+/// its threads is approved with a version pinned.
+pub fn require_design(ticket: &Ticket, threads: &[Thread]) -> Result<(), TransitionError> {
+    let approved = threads
+        .iter()
+        .any(|t| t.state == ThreadState::Approved && t.approved_version.is_some());
+    if !ticket.design_first || approved {
+        return Ok(());
+    }
+    Err(TransitionError::DesignNotApproved(ticket.key.clone()))
 }
 
 /// The ticket's threads that are still open. The agent's hand-in carries this list and the

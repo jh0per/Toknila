@@ -28,6 +28,9 @@ pub enum TicketCmd {
         /// Checklist item; repeatable.
         #[arg(long)]
         subtask: Vec<String>,
+        /// The agent shows a design for your approval before it writes any code.
+        #[arg(long)]
+        design_first: bool,
     },
     /// Show a ticket.
     Show { ticket: String },
@@ -51,6 +54,7 @@ pub(super) fn run(c: &Client, cmd: TicketCmd, json_out: bool) -> Result<()> {
             prompt,
             accept,
             subtask,
+            design_first,
         } => {
             let input = NewTicket {
                 title,
@@ -59,6 +63,7 @@ pub(super) fn run(c: &Client, cmd: TicketCmd, json_out: bool) -> Result<()> {
                 prompt: prompt.unwrap_or_default(),
                 acceptance: accept,
                 subtasks: subtask,
+                design_first,
                 ..NewTicket::default()
             };
             emit(

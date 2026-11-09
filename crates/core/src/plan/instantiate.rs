@@ -107,6 +107,7 @@ impl PlanTicket {
             review_mode: self.review_mode,
             reviewer: None,
             needs_secrets: self.needs_secrets,
+            design_first: self.design_first,
         }
     }
 }
