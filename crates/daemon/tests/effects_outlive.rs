@@ -349,7 +349,13 @@ async fn two_hand_ins_at_once_run_their_checks_one_after_the_other_and_the_secon
 async fn a_check_that_waited_when_the_daemon_stopped_runs_after_the_restart() {
     let (checker, release) = SlowChecker::stuck();
     let rig = Rig::new(checker.clone(), 2).await;
-    let (first, second) = (rig.hand_in(1), rig.hand_in(2));
+    // Hand-in order is commit order: the second is handed in once the first has committed.
+    let first = rig.hand_in(1);
+    until_card(&rig, 1, "its check runs", |c| {
+        c["review"]["check_queue"] == json!(0)
+    })
+    .await;
+    let second = rig.hand_in(2);
     first.await.expect("answered");
     second.await.expect("answered");
     until_card(&rig, 2, "it waits for the first", |c| {
@@ -395,4 +401,30 @@ async fn a_check_that_waited_when_the_daemon_stopped_runs_after_the_restart() {
     }
     release.send(()).expect("release the first daemon's check");
     rig.store.settled().await;
+}
+
+#[tokio::test]
+async fn hand_ins_made_at_the_same_moment_line_up_one_runs_and_the_other_waits() {
+    let (checker, release) = SlowChecker::stuck();
+    let rig = Rig::new(checker.clone(), 2).await;
+    let (a, b) = (rig.hand_in(1), rig.hand_in(2));
+    a.await.expect("answered");
+    b.await.expect("answered");
+    let until = Instant::now() + Duration::from_secs(30);
+    loop {
+        let mut places = Vec::new();
+        for n in 1..=2 {
+            places.push(rig.card(n).await["review"]["check_queue"].to_string());
+        }
+        places.sort();
+        if places == ["0", "1"] {
+            break;
+        }
+        assert!(Instant::now() < until, "one runs, one waits: {places:?}");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    release.send(()).expect("release");
+    rig.store.settled().await;
+    assert_eq!(checker.runs.load(Ordering::SeqCst), 2);
+    assert_eq!(checker.most_active.load(Ordering::SeqCst), 1);
 }
