@@ -96,6 +96,7 @@ try {
   const row = (key) => inbox.locator(`li[data-kind=question][data-key="${key}"]`);
   await expectText(row("QA-1"), "Bash: cargo test -p core", "the first card asks");
   await expectText(row("QA-2"), "cargo test --lib", "the second card asks");
+  await expectText(row("QA-1"), "Allow always: Bash(cargo test *)", "the rule is shown under the button");
   await row("QA-1").locator("[data-testid=answer-allow-always]").click();
   await row("QA-1").waitFor({ state: "detached", timeout: 10_000 });
   await row("QA-2").waitFor({ state: "detached", timeout: 10_000 });
@@ -110,9 +111,10 @@ try {
   // The same words inside a list of commands are not covered by the rule: still asked.
   tok("ticket", "new", "work", "Three", "--profile", "third");
   await expectText(row("QA-3"), "cargo test; rm -rf x", "a list of commands is still asked");
-  if ((await row("QA-3").locator("[data-testid=answer-allow-always]").count()) !== 1) {
-    throw new Error("Allow always is offered for a command question");
+  if ((await row("QA-3").locator("[data-testid=answer-allow-always]").count()) !== 0) {
+    throw new Error("Allow always is offered for a list of commands, which cannot become a rule");
   }
+  await expectText(row("QA-3"), "Allow always is not offered", "the question says why there is no rule");
 
   // The rule is listed in Settings; Remove and Save forget it.
   await page.goto(at("/projects/QA/settings/agents"));

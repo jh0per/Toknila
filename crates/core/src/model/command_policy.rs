@@ -33,6 +33,12 @@ impl CommandPolicy {
         }
     }
 
+    /// Whether a worker's permission request for any tool is allowed without asking: under trust
+    /// everything the deny list (which the agent applies before it asks) does not name.
+    pub fn allows_every_tool(self) -> bool {
+        self == Self::Trust
+    }
+
     /// The allow rules the policy adds to the run's settings, in the agent's rule syntax.
     pub fn allow_rules(self) -> &'static [&'static str] {
         match self {
@@ -68,6 +74,9 @@ const LAUNCHERS: [&str; 17] = [
 const RUNNERS: [&str; 11] = [
     "sh", "bash", "zsh", "sudo", "su", "doas", "eval", "exec", "xargs", "env", "ssh",
 ];
+
+/// The words a command may start with that set up the shell for the next command: never a rule.
+const SHELL_PREFIXES: [&str; 2] = ["cd", "export"];
 
 /// The longest command a rule is made from, in characters.
 const RULE_MAX: usize = 200;
@@ -157,7 +166,13 @@ pub fn rule_for(command: &str) -> Option<String> {
         let usable = exact.chars().count() <= RULE_MAX && !exact.contains(['*', '(', ')']);
         usable.then(|| format!("Bash({exact})"))
     };
-    if !plain(first) || first.starts_with('-') || RUNNERS.contains(&first) {
+    // A `cd` or `export` that is still first here had a prefix that is not plain (`cd "$X"; ...`):
+    // a rule on it would allow every directory change or variable, so only the exact command.
+    if !plain(first)
+        || first.starts_with('-')
+        || RUNNERS.contains(&first)
+        || SHELL_PREFIXES.contains(&first)
+    {
         return exact();
     }
     if LAUNCHERS.contains(&first) {
@@ -169,6 +184,46 @@ pub fn rule_for(command: &str) -> Option<String> {
         };
     }
     Some(format!("Bash({first} *)"))
+}
+
+/// The rule "Allow always" adds for `command`, or why none can be made (said to the person).
+pub fn rule_or_reason(command: &str) -> Result<String, &'static str> {
+    rule_for(command).ok_or_else(|| {
+        let c = command.trim();
+        if c.is_empty() {
+            "there is no command to remember"
+        } else if c.contains(['$', '`']) {
+            "a command built with $ or backticks cannot become a rule"
+        } else if c.contains(['\n', '\r']) {
+            "a command of several lines cannot become a rule"
+        } else if c.chars().count() > RULE_MAX {
+            "the command is too long to become a rule"
+        } else if c.contains(COMPOUND) || c.contains('*') {
+            "a command with several parts (; & | < > or parentheses) cannot become a rule"
+        } else {
+            "no safe rule can be made for this command"
+        }
+    })
+}
+
+/// What "Allow always" would do for a permission question that carries `text` (and its whole
+/// `detail`): `None` when the question is not about a Bash command, else the rule or the reason
+/// there is none.
+pub fn allow_always_for(detail: Option<&str>, text: &str) -> Option<Result<String, &'static str>> {
+    [detail.unwrap_or_default(), text]
+        .into_iter()
+        .find_map(bash_in_text)
+        .map(rule_or_reason)
+}
+
+/// The command after the `Bash: ` that a question's text names, if any.
+fn bash_in_text(text: &str) -> Option<&str> {
+    text.match_indices("Bash: ").find_map(|(i, marker)| {
+        let before = text[..i].chars().next_back();
+        let command = text[i + marker.len()..].trim();
+        (before.is_none_or(|c| c.is_whitespace() || c == ':') && !command.is_empty())
+            .then_some(command)
+    })
 }
 
 /// Whether `rule` (`Bash(cargo test *)`, or `Bash(make)` for exactly that command) covers
@@ -330,6 +385,54 @@ mod tests {
         ] {
             assert_eq!(rule_for(none), None, "{none:?}");
         }
+    }
+
+    #[test]
+    fn a_prefix_that_is_not_plain_never_makes_a_rule_on_cd_or_export() {
+        for command in [
+            "cd \"$WORK\"; cargo test",
+            "cd $(pwd) && cargo build",
+            "cd `pwd`; ls",
+            "export X=$(id); make check",
+            "export PATH=\"$PATH:/x\"; cargo test",
+            "cd \"$A\"; export B=1; cargo test",
+        ] {
+            assert_eq!(rule_for(command), None, "{command}");
+            assert!(rule_or_reason(command).is_err(), "{command}");
+        }
+        assert_eq!(
+            rule_or_reason("cd \"$W\"; cargo test"),
+            Err("a command built with $ or backticks cannot become a rule")
+        );
+        // Without a command behind it, the exact command is the rule.
+        assert_eq!(rule_for("cd /w/app").as_deref(), Some("Bash(cd /w/app)"));
+        assert_eq!(rule_for("export A=1").as_deref(), Some("Bash(export A=1)"));
+        // Control: the plain prefix is still stripped.
+        assert_eq!(
+            rule_for("cd /w && cargo test").as_deref(),
+            Some("Bash(cargo test *)")
+        );
+    }
+
+    #[test]
+    fn a_question_text_gives_the_rule_or_the_reason_for_a_bash_command_only() {
+        let ask = |detail, text| allow_always_for(detail, text);
+        assert_eq!(
+            ask(
+                None,
+                "Claude Code asks for permission: Bash: cargo test -p x"
+            ),
+            Some(Ok("Bash(cargo test *)".to_owned()))
+        );
+        assert_eq!(
+            ask(Some("Bash: cd \"$D\"; ls"), "Bash: cd \"$D\"; ls"),
+            Some(Err(
+                "a command built with $ or backticks cannot become a rule"
+            ))
+        );
+        assert_eq!(ask(None, "Write: src/a.rs"), None);
+        assert_eq!(ask(None, "NotBash: ls"), None);
+        assert_eq!(ask(None, "Bash: "), None);
     }
 
     #[test]

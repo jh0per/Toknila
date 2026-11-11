@@ -1760,6 +1760,16 @@ export interface components {
          */
         AnswerKind: "allow" | "deny" | "text" | "enter" | "one" | "two" | "escape" | "up" | "down";
         /**
+         * @description Answer of `POST /v1/tickets/{ticket}/runner/answer` when the person chose "Allow always":
+         *     what was added to the project, or why nothing was.
+         */
+        AnswerOutcome: {
+            /** @description One plain sentence saying what happened. */
+            note: string;
+            /** @description The rule now remembered in the project (`Bash(cargo test *)`); absent when none was made. */
+            rule_added?: string | null;
+        };
+        /**
          * @description How an artifact body is to be read.
          * @enum {string}
          */
@@ -2312,6 +2322,16 @@ export interface components {
         };
         /** @description One entry of the inbox. */
         InboxItem: {
+            /**
+             * @description The rule "Allow always" would add (`Bash(cargo test *)`), for a worker's question about a
+             *     command that can become one; absent otherwise.
+             */
+            allow_always?: string | null;
+            /**
+             * @description Why "Allow always" is not offered for a worker's question about a command (a command built
+             *     with `$` cannot become a rule); absent otherwise.
+             */
+            allow_always_none?: string | null;
             /**
              * @description What a person may do to the card now, as the state machine allows it; the window offers
              *     no other card action.
@@ -7074,6 +7094,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Delivered; the answer was Allow always, and the body says what was added */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnswerOutcome"];
+                };
+            };
             /** @description Delivered to the agent and journaled */
             204: {
                 headers: {

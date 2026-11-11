@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnswerKind, InboxItem } from "../api/types";
-import { canAllowAlways } from "../store/commands";
+import { allowAlwaysLine, allowAlwaysRule } from "../store/commands";
 import type { Intent } from "../store/msg";
 
 const ANSWER_LABEL: Record<AnswerKind, string> = {
@@ -35,7 +35,7 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
       {answers.includes("allow") && (
         <div className="btns">
           <button className="btn primary" data-testid="answer-allow" onClick={() => send("allow")}>Allow</button>
-          {canAllowAlways(item) && (
+          {allowAlwaysRule(item) && (
             <button
               className="btn" data-testid="answer-allow-always" title="Allow this command now and next time, in this project"
               onClick={() => send("allow", undefined, true)}
@@ -47,6 +47,7 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
           <button className="btn danger" data-testid="answer-deny" onClick={() => send("deny", comment)}>Deny</button>
         </div>
       )}
+      {allowAlwaysLine(item) && <p className="muted" data-testid="answer-allow-always-rule">{allowAlwaysLine(item)}</p>}
       {keys.length > 0 && (
         <div className="btns">
           {keys.map((k) => (

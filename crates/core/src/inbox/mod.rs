@@ -97,6 +97,23 @@ pub struct InboxItem {
     /// The pin to answer (`design_question` items).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pin: Option<String>,
+    /// The rule "Allow always" would add (`Bash(cargo test *)`), for a worker's question about a
+    /// command that can become one; absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow_always: Option<String>,
+    /// Why "Allow always" is not offered for a worker's question about a command (a command built
+    /// with `$` cannot become a rule); absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow_always_none: Option<String>,
+}
+
+/// Says on a worker's permission question what "Allow always" would add, or why nothing.
+fn set_allow_always(i: &mut InboxItem) {
+    match crate::model::command_policy::allow_always_for(i.detail.as_deref(), &i.text) {
+        Some(Ok(rule)) => i.allow_always = Some(rule),
+        Some(Err(why)) => i.allow_always_none = Some(why.to_owned()),
+        None => {}
+    }
 }
 
 /// The text of the `review` item for a card whose reviewer gave no verdict.
@@ -186,6 +203,8 @@ fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxIte
         answers: Vec::new(),
         lines: Vec::new(),
         pin: None,
+        allow_always: None,
+        allow_always_none: None,
     }
 }
 
@@ -255,6 +274,7 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
             &t.status_reason
         {
             i.detail.clone_from(detail);
+            set_allow_always(&mut i);
         }
     }
     Some(i)
@@ -275,6 +295,9 @@ fn question_items(data: &InboxData) -> Vec<InboxItem> {
         i.role = Some(p.role);
         i.detail.clone_from(&p.detail);
         i.answers = QuestionKind::Permission.answers();
+        if p.role == AgentRole::Worker {
+            set_allow_always(&mut i);
+        }
         items.push(i);
     }
     for run in data.runs.iter().filter(|r| r.waits_on_screen(data.now)) {

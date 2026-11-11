@@ -168,8 +168,11 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
           .catch(failed);
         return;
       case "answer":
-        void post(`/tickets/${encodeURIComponent(e.key)}/runner/answer`, { role: e.role, answer: e.answer, text: e.text, always: e.always })
-          .then(() => loadInbox())
+        void post<{ note?: string } | undefined>(`/tickets/${encodeURIComponent(e.key)}/runner/answer`, { role: e.role, answer: e.answer, text: e.text, always: e.always })
+          .then((outcome) => {
+            if (outcome?.note) dispatch({ type: "answerNoted", note: outcome.note });
+            return loadInbox();
+          })
           .catch(failed);
         return;
       case "ticketAction":

@@ -54,3 +54,15 @@ pub struct NewAnswer {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub always: bool,
 }
+
+/// Answer of `POST /v1/tickets/{ticket}/runner/answer` when the person chose "Allow always":
+/// what was added to the project, or why nothing was.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct AnswerOutcome {
+    /// The rule now remembered in the project (`Bash(cargo test *)`); absent when none was made.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_added: Option<String>,
+    /// One plain sentence saying what happened.
+    pub note: String,
+}
