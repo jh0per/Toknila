@@ -143,6 +143,18 @@ pub fn transcript(messages: &[ThreadMessage]) -> Vec<String> {
     out
 }
 
+/// How long a person's message may go without an answer before the box offers a nudge and the
+/// daemon logs a warning.
+pub const ANSWER_WAIT_SECS: u64 = 90;
+
+/// The person's message nobody has answered: the newest message or proposal is theirs.
+pub fn unanswered(messages: &[ThreadMessage]) -> Option<&ThreadMessage> {
+    messages
+        .iter()
+        .rfind(|m| matches!(m.kind, MessageKind::Message | MessageKind::EditProposal))
+        .filter(|m| m.author == Actor::Human)
+}
+
 fn one_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }

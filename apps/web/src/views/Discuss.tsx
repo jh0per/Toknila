@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Ticket } from "../api/types";
-import { awaitingAnswer, discussionOf, draftKey, entries } from "../store/discussion";
+import { awaitingAnswer, discussionOf, draftKey, entries, overdue, unansweredMessage, wakeWhenOverdue } from "../store/discussion";
 import type { Intent } from "../store/msg";
 import { draftOf, plannerOf } from "../store/planner";
 import type { State } from "../store/state";
@@ -20,7 +20,16 @@ export function Discuss({ state, card, project, dispatch }: { state: State; card
   const items = entries(thread);
   const running = plannerOf(state, project)?.running ?? false;
   const sending = state.planner.sending === draftKey(card.key);
-  const waiting = running && (sending || awaitingAnswer(thread));
+  const [now, setNow] = useState(() => Date.now());
+  const unanswered = unansweredMessage(thread);
+  useEffect(() => {
+    setNow(Date.now());
+    return wakeWhenOverdue(thread, Date.now(), () => setNow(Date.now()));
+  }, [unanswered?.id]);
+  const late = running && !sending && overdue(thread, now);
+  const waiting = running && !late && (sending || awaitingAnswer(thread));
+  const nudge = () =>
+    unanswered && dispatch({ type: "nudgeCard", project, key: card.key, thread: thread?.thread.number ?? 1, text: unanswered.text });
   const text = draftOf(state, draftKey(card.key));
   const send = () => dispatch({ type: "discussCard", project, key: card.key });
   const decide = (id: string, action: "accept_edit" | "reject_edit") =>
@@ -55,6 +64,12 @@ export function Discuss({ state, card, project, dispatch }: { state: State; card
         </ol>
       )}
       {waiting && <p className="muted" data-testid="discuss-waiting">The assistant is answering…</p>}
+      {late && (
+        <div className="row" data-testid="discuss-late">
+          <p className="muted">The assistant has not answered yet.</p>
+          <button type="button" className="btn" data-testid="discuss-nudge" onClick={nudge}>Nudge</button>
+        </div>
+      )}
       {state.planner.error &&<p className="error" role="alert" data-testid="discuss-error">{state.planner.error}</p>}
       {running ? (
         <form className="chat-box" data-testid="discuss-box" onSubmit={(e) => { e.preventDefault(); if (!waiting) send(); }}>
