@@ -35,7 +35,7 @@ fn a_discussion_is_born_approved_so_it_never_blocks_and_is_not_a_design() {
     .expect("open");
     assert_eq!(th.state, ThreadState::Approved);
     assert_eq!(th.approved_version, None);
-    assert!(thread::open_threads(std::slice::from_ref(&th)).is_empty());
+    assert!(thread::open_threads(std::slice::from_ref(&th), |_| true).is_empty());
     assert_eq!(
         thread::phase(std::slice::from_ref(&th)),
         crate::Phase::Implement

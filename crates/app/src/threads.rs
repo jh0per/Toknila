@@ -46,7 +46,17 @@ pub fn open<U: UnitOfWork + ?Sized>(
     kind: ThreadKind,
     title: &str,
 ) -> AppResult<Thread> {
-    let number = u32::try_from(uow.threads(t.id)?.len())
+    let all = uow.threads(t.id)?;
+    if uow.actor() != toknila_core::Actor::Human
+        && let Some(had) = thread::existing_of_kind(&all, kind)
+    {
+        return Err(thread::ThreadError::DuplicateKind {
+            kind,
+            number: had.number,
+        }
+        .into());
+    }
+    let number = u32::try_from(all.len())
         .unwrap_or(u32::MAX)
         .saturating_add(1);
     let th = thread::open(
@@ -164,6 +174,24 @@ pub fn post_version<U: UnitOfWork + ?Sized>(
     Ok(v)
 }
 
+/// The agent withdraws its own thread while it has no version and no person message.
+pub fn withdraw<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, th: &Thread) -> AppResult<Thread> {
+    let versions = uow.thread_versions(th.id)?.len();
+    let person_messages = uow
+        .thread_messages(th.id)?
+        .iter()
+        .filter(|m| m.author == toknila_core::Actor::Human)
+        .count();
+    let event = ThreadEvent::Withdraw {
+        by: uow.actor(),
+        versions,
+        person_messages,
+    };
+    let (next, change) = thread::apply(th, event, uow.now())?;
+    save(uow, t, &next, change)?;
+    Ok(next)
+}
+
 /// A person approves a thread; the latest version, if any, is pinned.
 pub fn approve<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, th: &Thread) -> AppResult<Thread> {
     let event = ThreadEvent::Approve {
@@ -235,7 +263,16 @@ pub fn open_threads<R: crate::Reader + ?Sized>(
     r: &R,
     t: &Ticket,
 ) -> AppResult<Vec<thread::OpenThread>> {
-    Ok(thread::open_threads(&r.threads(t.id)?))
+    let all = r.threads(t.id)?;
+    let mut with_version = std::collections::HashSet::new();
+    for th in &all {
+        if !r.thread_versions(th.id)?.is_empty() {
+            with_version.insert(th.id);
+        }
+    }
+    Ok(thread::open_threads(&all, |th| {
+        with_version.contains(&th.id)
+    }))
 }
 
 /// The design gate of the hand-in: a card that must show a design first is refused until one
@@ -286,5 +323,6 @@ fn save<U: UnitOfWork + ?Sized>(
     uow.emit(&match change {
         ThreadChange::Approved => DomainEvent::ThreadApproved { ticket, thread },
         ThreadChange::Reopened => DomainEvent::ThreadReopened { ticket, thread },
+        ThreadChange::Withdrawn => DomainEvent::ThreadWithdrawn { ticket, thread },
     })
 }

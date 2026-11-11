@@ -81,6 +81,10 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
             };
             threads::post_version(uow, t, &th, input).map(|_| ())
         }
+        AgentEvent::WithdrawThread { thread } => {
+            let th = threads::find(uow, t, &thread)?;
+            threads::withdraw(uow, t, &th).map(|_| ())
+        }
         AgentEvent::Started => with_chain(uow, t.chain_id, |ctx| {
             if t.status == TicketStatus::Ready {
                 ctx.ticket_event(t.id, TicketEvent::Start)?;

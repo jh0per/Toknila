@@ -210,7 +210,7 @@ fn hand_in_is_refused_while_a_thread_is_open_and_names_it() {
     let hand_in = |threads: &[Thread]| {
         let event = TicketEvent::Finished {
             summary: "done".to_owned(),
-            open_threads: open_threads(threads),
+            open_threads: open_threads(threads, |_| true),
             mode: crate::ReviewMode::Human,
             check: false,
             max_rounds: 3,
@@ -312,4 +312,85 @@ fn changes_requested_is_false_once_approved() {
 fn the_newest_request_decides() {
     let msgs = [ask(3), ask(8)];
     assert!(changes_requested(&thread(), &[version_at(5)], &msgs));
+}
+
+fn withdraw(
+    t: &Thread,
+    by: Actor,
+    versions: usize,
+    person_messages: usize,
+) -> Result<Thread, ThreadError> {
+    let event = ThreadEvent::Withdraw {
+        by,
+        versions,
+        person_messages,
+    };
+    apply(t, event, Timestamp(20)).map(|(t, change)| {
+        assert_eq!(change, Some(ThreadChange::Withdrawn));
+        t
+    })
+}
+
+#[test]
+fn an_agent_withdraws_its_own_empty_thread() {
+    let t = withdraw(&thread(), Actor::Agent, 0, 0).expect("withdraw");
+    assert_eq!(t.state, ThreadState::Withdrawn);
+    assert_eq!(phase(&[t]), Phase::Implement);
+}
+
+#[test]
+fn a_thread_with_a_version_or_a_person_message_is_not_withdrawn() {
+    assert_eq!(
+        withdraw(&thread(), Actor::Agent, 1, 0),
+        Err(ThreadError::NotEmpty { number: 1 })
+    );
+    assert_eq!(
+        withdraw(&thread(), Actor::Agent, 0, 1),
+        Err(ThreadError::NotEmpty { number: 1 })
+    );
+}
+
+#[test]
+fn only_the_agent_that_opened_a_thread_withdraws_it() {
+    assert_eq!(
+        withdraw(&thread(), Actor::Human, 0, 0),
+        Err(ThreadError::NotYours)
+    );
+    let mut by_person = thread();
+    by_person.opened_by = Actor::Human;
+    assert_eq!(
+        withdraw(&by_person, Actor::Agent, 0, 0),
+        Err(ThreadError::NotYours)
+    );
+    let done = approve(&thread(), Actor::Human, None).expect("approve");
+    assert_eq!(
+        withdraw(&done, Actor::Agent, 0, 0),
+        Err(ThreadError::NotOpen)
+    );
+}
+
+#[test]
+fn an_empty_thread_never_blocks_the_hand_in() {
+    let t = thread();
+    assert!(open_threads(std::slice::from_ref(&t), |_| false).is_empty());
+    let blocking = open_threads(std::slice::from_ref(&t), |_| true);
+    assert_eq!(blocking.len(), 1);
+    assert_eq!(blocking[0].number, 1);
+}
+
+#[test]
+fn a_second_thread_of_a_kind_names_the_first_unless_it_was_withdrawn() {
+    let t = thread();
+    let found = existing_of_kind(std::slice::from_ref(&t), ThreadKind::Design).map(|x| x.number);
+    assert_eq!(found, Some(1));
+    assert!(existing_of_kind(std::slice::from_ref(&t), ThreadKind::Flow).is_none());
+    let done = approve(&t, Actor::Human, None).expect("approve");
+    assert!(existing_of_kind(std::slice::from_ref(&done), ThreadKind::Design).is_some());
+    let gone = withdraw(&t, Actor::Agent, 0, 0).expect("withdraw");
+    assert!(existing_of_kind(&[gone], ThreadKind::Design).is_none());
+    let err = ThreadError::DuplicateKind {
+        kind: ThreadKind::Design,
+        number: 1,
+    };
+    assert!(err.to_string().contains("post a version"), "{err}");
 }

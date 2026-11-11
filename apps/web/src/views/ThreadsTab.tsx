@@ -34,7 +34,7 @@ export function ThreadsTab({ state, card, dispatch }: { state: State; card: Tick
   const data = state.threads[card.key];
   if (!data) return <p className="muted">Loading…</p>;
   // The discussion with the assistant has its own box on the card's page; it is not a design.
-  const designs = data.threads.filter((t) => t.thread.kind !== "discussion");
+  const designs = data.threads.filter((t) => t.thread.kind !== "discussion" && t.thread.state !== "withdrawn");
   const open = blocksHandIn(designs);
   return (
     <div className="threads" data-testid="threads">

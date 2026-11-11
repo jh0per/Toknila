@@ -235,3 +235,85 @@ async fn approving_a_thread_answers_the_question_the_worker_waits_on() {
         "{text}"
     );
 }
+
+#[tokio::test]
+async fn a_second_thread_of_a_kind_is_refused_with_a_hint_naming_the_first() {
+    let api = Api::new();
+    api.demo().await;
+    api.post("/v1/chains/demo/tickets", json!({ "title": "A" }))
+        .await;
+    let open = |kind: &str| {
+        api.call(
+            Method::POST,
+            "/v1/tickets/DEMO-1/events",
+            Some(json!({ "event": "open_thread", "kind": kind, "title": "Screen" })),
+        )
+    };
+    assert_eq!(open("design").await.0, StatusCode::OK);
+    let (s, err) = open("design").await;
+    assert_eq!(s, StatusCode::CONFLICT, "{err}");
+    let hint = err["error"].as_str().expect("error");
+    assert!(
+        hint.contains("thread 1") && hint.contains("post a version"),
+        "{hint}"
+    );
+    // Control: another kind is fine, and the refused call left no thread behind.
+    assert_eq!(open("flow").await.0, StatusCode::OK);
+    let list = api.get("/v1/tickets/DEMO-1/threads").await;
+    assert_eq!(list["threads"].as_array().expect("threads").len(), 2);
+}
+
+#[tokio::test]
+async fn an_agent_withdraws_its_empty_thread_and_it_never_blocks_finished() {
+    let api = Api::new();
+    api.demo().await;
+    api.post("/v1/chains/demo/tickets", json!({ "title": "A" }))
+        .await;
+    let ev = |v: Value| api.call(Method::POST, "/v1/tickets/DEMO-1/events", Some(v));
+    ev(json!({ "event": "open_thread", "kind": "design", "title": "Screen" })).await;
+    ev(json!({ "event": "open_thread", "kind": "flow", "title": "Steps" })).await;
+    // An empty thread does not block the hand-in.
+    let done = json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") });
+
+    // A thread with a person's message cannot be withdrawn.
+    api.post(
+        "/v1/tickets/DEMO-1/threads/2/messages",
+        json!({ "text": "wait" }),
+    )
+    .await;
+    let (s, err) = ev(json!({ "event": "withdraw_thread", "thread": "2" })).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{err}");
+
+    let (s, _) = ev(json!({ "event": "withdraw_thread", "thread": "1" })).await;
+    assert_eq!(s, StatusCode::OK);
+    let list = api.get("/v1/tickets/DEMO-1/threads").await;
+    assert_eq!(list["threads"][0]["thread"]["state"], "withdrawn");
+    assert_eq!(
+        kinds(&api, "thread").await.last().map(String::as_str),
+        Some("withdrawn")
+    );
+
+    // A thread with a version cannot be withdrawn and does block.
+    ev(json!({ "event": "thread_version", "thread": "2", "format": "mermaid", "body": "graph TD" }))
+        .await;
+    let (s, _) = ev(json!({ "event": "withdraw_thread", "thread": "2" })).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(ev(done.clone()).await.0, StatusCode::CONFLICT);
+    api.post("/v1/tickets/DEMO-1/threads/2/approve", json!({}))
+        .await;
+    assert_eq!(ev(done).await.0, StatusCode::OK);
+    assert_eq!(api.status("DEMO-1").await, "review");
+}
+
+#[tokio::test]
+async fn an_empty_thread_alone_does_not_stop_finished() {
+    let api = Api::new();
+    api.demo().await;
+    api.post("/v1/chains/demo/tickets", json!({ "title": "A" }))
+        .await;
+    let ev = |v: Value| api.call(Method::POST, "/v1/tickets/DEMO-1/events", Some(v));
+    ev(json!({ "event": "open_thread", "kind": "design", "title": "Screen" })).await;
+    let done = json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") });
+    assert_eq!(ev(done).await.0, StatusCode::OK);
+    assert_eq!(api.status("DEMO-1").await, "review");
+}

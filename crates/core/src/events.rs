@@ -185,6 +185,11 @@ pub enum DomainEvent {
         ticket: TicketKey,
         thread: Thread,
     },
+    /// An agent withdrew its own empty thread.
+    ThreadWithdrawn {
+        ticket: TicketKey,
+        thread: Thread,
+    },
     /// The assistant pinned a question on a design.
     DesignPinAsked {
         pin: DesignPin,
@@ -296,7 +301,8 @@ impl DomainEvent {
             | Self::ThreadMessagePosted { .. }
             | Self::ThreadVersionPosted { .. }
             | Self::ThreadApproved { .. }
-            | Self::ThreadReopened { .. } => "thread",
+            | Self::ThreadReopened { .. }
+            | Self::ThreadWithdrawn { .. } => "thread",
             Self::DesignPinAsked { .. } | Self::DesignPinAnswered { .. } => "design_pin",
             Self::WindowShowCard { .. }
             | Self::WindowSuggest { .. }
@@ -343,7 +349,8 @@ impl DomainEvent {
             }
             Self::ThreadOpened { thread, .. }
             | Self::ThreadApproved { thread, .. }
-            | Self::ThreadReopened { thread, .. } => thread.id.to_string(),
+            | Self::ThreadReopened { thread, .. }
+            | Self::ThreadWithdrawn { thread, .. } => thread.id.to_string(),
             Self::ThreadMessagePosted { message, .. } => message.thread_id.to_string(),
             Self::ThreadVersionPosted { thread, .. } => thread.to_string(),
             Self::DesignPinAsked { pin } | Self::DesignPinAnswered { pin } => pin.id.to_string(),
@@ -389,6 +396,7 @@ impl DomainEvent {
             Self::ThreadVersionPosted { .. } => "version_posted",
             Self::ThreadApproved { .. } => "approved",
             Self::ThreadReopened { .. } => "reopened",
+            Self::ThreadWithdrawn { .. } => "withdrawn",
             Self::DesignPinAsked { .. } => "asked",
             Self::DesignPinAnswered { .. } => "answered",
             Self::WindowShowCard { .. } => "show_card",

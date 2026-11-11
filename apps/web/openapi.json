@@ -5604,6 +5604,25 @@
                 "type": "string"
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "The agent takes back its own thread while it has no version and no person message.",
+            "required": [
+              "thread",
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "enum": [
+                  "withdraw_thread"
+                ]
+              },
+              "thread": {
+                "type": "string"
+              }
+            }
           }
         ],
         "description": "One report from the agent working on a ticket."
@@ -10912,7 +10931,8 @@
         "description": "Whether the thread still needs a decision.",
         "enum": [
           "open",
-          "approved"
+          "approved",
+          "withdrawn"
         ]
       },
       "ThreadVersion": {
