@@ -8,8 +8,8 @@ use toknila_core::guard::{self, ShipProblem, ShipState};
 use toknila_core::machine::TicketEvent;
 use toknila_core::strays::Stray;
 use toknila_core::{
-    Actor, BaseBehind, BlockedReason, Chain, CommentBody, CommentKind, PlannerSite, PlannerSpec,
-    Ship, ShipLook, ShipSpec, StalePolicy, Ticket, TicketId,
+    Actor, BaseBehind, BlockedReason, Chain, CommentBody, CommentKind, MergeMode, PlannerSite,
+    PlannerSpec, Ship, ShipLook, ShipSpec, StalePolicy, Ticket, TicketId, TicketStatus,
 };
 
 use crate::external::ExternalEffect;
@@ -220,8 +220,9 @@ pub(crate) fn queue_prepare<U: UnitOfWork + ?Sized>(
     Ok(())
 }
 
-/// `RemoveShip`: queue taking the worktree away for after the commit; a ticket without a ship is
-/// left alone.
+/// `RemoveShip`: queue taking a merged card's worktree away for after the commit; a ticket
+/// without a ship is left alone. In local merge mode the branch goes with it (it is in the base;
+/// one that is not, by a race, is kept and explained); in pull-request mode it is left to the forge.
 pub(crate) fn queue_remove<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     ctx: &ChainTx,
@@ -230,9 +231,21 @@ pub(crate) fn queue_remove<U: UnitOfWork + ?Sized>(
     let (Some(ship), Some(spec)) = (uow.ship(ticket)?, spec_for(uow, ctx, ticket)?) else {
         return Ok(());
     };
-    uow.defer(ExternalEffect::RemoveShip {
-        repo: spec.repo,
-        ship,
+    let local = uow
+        .project(ctx.view.chain.project_id)?
+        .is_some_and(|p| p.merge.mode == MergeMode::Local);
+    uow.defer(if local {
+        // The merged branch is measured against the base it was merged into.
+        ExternalEffect::RetireShip {
+            start: spec.base.clone(),
+            repo: spec.repo,
+            ship,
+        }
+    } else {
+        ExternalEffect::RemoveShip {
+            repo: spec.repo,
+            ship,
+        }
     });
     Ok(())
 }
@@ -273,10 +286,15 @@ pub(crate) fn retired<U: UnitOfWork + ?Sized>(
     let Some(view) = uow.chain_view(t.chain_id)? else {
         return Ok(());
     };
+    let (cause, base) = if t.status == TicketStatus::Merged {
+        ("the merge", "the base after the merge")
+    } else {
+        ("the cancel", "the base")
+    };
     let body = CommentBody {
         gist: format!("Branch {branch} kept: it has {ahead} commit(s) of work"),
         what: Some(format!(
-            "The worktree was removed with the cancel; the branch {branch} was kept because it holds {ahead} commit(s) not in the base."
+            "The worktree was removed with {cause}; the branch {branch} was kept because it holds {ahead} commit(s) not in {base}."
         )),
         how_to_verify: Some(format!(
             "git log {branch}; delete it with Clean up in Settings when the work is not needed."

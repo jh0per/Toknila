@@ -12,7 +12,18 @@ pub fn owned<R: Reader + ?Sized>(r: &R, project: &Project) -> AppResult<Owned> {
     let mut owned = Owned::default();
     for chain in r.chains(Some(project.id))? {
         for t in r.tickets(Some(chain.id))? {
-            if t.status == TicketStatus::Cancelled {
+            if matches!(t.status, TicketStatus::Cancelled | TicketStatus::Merged) {
+                // Done with: its branch is a leftover, named by the card it belonged to.
+                let key = t.key.to_string();
+                owned
+                    .retired
+                    .extend(t.branch.clone().map(|b| (b, key.clone())));
+                if let Some(ship) = r.ship(t.id)? {
+                    owned.retired.insert(ship.branch, key.clone());
+                }
+                owned.retired.extend(
+                    ShipSpec::for_ticket(project, &chain, &t).map(|s| (s.branch, key.clone())),
+                );
                 continue;
             }
             owned.branches.extend(t.branch.clone());

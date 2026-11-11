@@ -88,7 +88,24 @@ async fn accept_merges_the_ship_into_develop_with_a_merge_commit_and_keeps_the_c
     assert!(e.repo.join("login.txt").is_file(), "the checkout has it");
     assert_eq!(git(&e.repo, &["status", "--porcelain"]), "");
     assert!(!ship.exists(), "the worktree is removed");
-    assert!(git(&e.repo, &["branch", "--list", "ship/auth/*"]).contains("demo-1-add-login"));
+    assert_eq!(
+        git(&e.repo, &["branch", "--list", "ship/auth/*"]),
+        "",
+        "the merged branch goes with the worktree"
+    );
+    assert_eq!(d["ship"], Value::Null);
+    assert!(
+        d["comments"]
+            .as_array()
+            .expect("comments")
+            .iter()
+            .all(|c| c["author"] != "system")
+    );
+    assert_eq!(
+        git(&e.repo, &["rev-list", "-1", "develop"]).len(),
+        40,
+        "the merge itself stays in develop"
+    );
 }
 
 #[tokio::test]
