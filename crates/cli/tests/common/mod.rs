@@ -88,6 +88,27 @@ impl Tok {
             .to_owned()
     }
 
+    /// Waits until a card handed in is past its Check turn: the daemon brings a ship up to its base
+    /// and runs the check command after the hand-in answers, and a Return or an Accept is refused
+    /// meanwhile. Returns when the review waits for a person (or for anyone else), or the card is
+    /// no longer in Review.
+    pub fn wait_for_person_turn(&self, key: &str) {
+        let until = Instant::now() + Duration::from_secs(30);
+        loop {
+            let card = self.run(&["show", key]);
+            let by = &card["review"]["awaiting"]["by"];
+            if card["ticket"]["status"] != "review" || (!by.is_null() && by != "check") {
+                return;
+            }
+            assert!(
+                Instant::now() < until,
+                "timed out waiting for {key} to wait for a person: {}",
+                card["review"]
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+
     /// `KEY status` of every ticket, in key order.
     pub fn statuses(&self) -> Vec<String> {
         self.run(&["ls"])

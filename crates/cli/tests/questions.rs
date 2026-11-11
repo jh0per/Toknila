@@ -304,6 +304,7 @@ fn the_worker_process_ends_at_the_hand_in_and_a_return_starts_a_new_run_with_the
 
     // Returned, a new run starts with the earlier instructions, and its request waits for a
     // person.
+    tok.wait_for_person_turn("DEMO-1");
     tok.run(&["return", "DEMO-1", "one more thing"]);
     wait_until("the new run to print its instructions", || {
         let log = tok.logs("DEMO-1");

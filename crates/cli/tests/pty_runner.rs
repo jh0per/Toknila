@@ -265,6 +265,7 @@ fn a_return_goes_to_the_same_live_agent_session_and_is_delivered_once() {
     git(&ship, &["commit", "--quiet", "-m", "alpha"]);
     tok.run(&["sim", "DEMO-1", "finish", "first try"]);
     assert_eq!(tok.status("DEMO-1"), "review");
+    tok.wait_for_person_turn("DEMO-1");
     tok.run(&["return", "DEMO-1", "fix the look"]);
     wait_until(&tok, "the comment to reach the same session", || {
         tok.logs("DEMO-1")
