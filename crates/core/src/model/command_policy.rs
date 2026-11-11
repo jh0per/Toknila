@@ -125,6 +125,11 @@ fn without_prefixes(command: &str) -> &str {
     rest
 }
 
+/// [`without_prefixes`] for the model's other modules.
+pub(super) fn strip_leading(command: &str) -> &str {
+    without_prefixes(command)
+}
+
 /// The one simple command `command` is, after its `cd` and `export` prefixes (and a trailing
 /// `2>&1`); `None` for a pipeline, a list, a redirect, a substitution or several lines.
 pub fn simple_command(command: &str) -> Option<String> {

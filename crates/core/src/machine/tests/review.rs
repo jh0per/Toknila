@@ -600,6 +600,7 @@ fn items(outcomes: &[(u32, crate::ItemOutcome)]) -> Vec<crate::ItemVerdict> {
         .map(|(item, outcome)| crate::ItemVerdict {
             item: *item,
             outcome: *outcome,
+            basis: crate::ItemBasis::Ran,
             note: "seen".to_owned(),
         })
         .collect()
@@ -638,7 +639,7 @@ fn the_verdict_must_judge_each_acceptance_item_pass_or_fail() {
     assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Merging));
     assert_eq!(
         tr.ticket.review.rounds[0].comment,
-        "PASS 1. first holds - seen\nPASS 2. second holds - seen"
+        "PASS 1. first holds - seen [ran]\nPASS 2. second holds - seen [ran]"
     );
 }
 
@@ -652,6 +653,6 @@ fn a_failing_item_returns_the_card_with_the_item_lines_as_the_remarks() {
     );
     assert_eq!(tr.ticket.status, TicketStatus::Running);
     assert!(tr.effects.contains(&Effect::RecordRemarks {
-        text: "PASS 1. first holds - seen\nFAIL 2. second holds - seen".to_owned()
+        text: "PASS 1. first holds - seen [ran]\nFAIL 2. second holds - seen [ran]".to_owned()
     }));
 }

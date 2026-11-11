@@ -49,3 +49,23 @@ export function awaitingText(review: ReviewView): string {
   }
   return turn.decides ? "waiting for the reviewer agent" : "waiting for the reviewer agent, then you";
 }
+
+/// One acceptance item of a verdict: its judgement, and whether the reviewer ran what shows it or only read.
+export type ItemRow = { outcome: "PASS" | "FAIL"; item: number; text: string; basis: "ran" | "read" | "NOT_RUN" };
+
+const ITEM = /^(PASS|FAIL) (\d+)\. (.*) \[(ran|read|NOT_RUN)\]$/;
+
+/// The item lines of a round's remarks (the daemon writes `PASS 1. text - evidence [ran]`); other lines are left out.
+export function itemRows(comment: string): ItemRow[] {
+  const rows: ItemRow[] = [];
+  for (const line of comment.split("\n")) {
+    const m = ITEM.exec(line.trim());
+    if (m) rows.push({ outcome: m[1] as ItemRow["outcome"], item: Number(m[2]), text: m[3], basis: m[4] as ItemRow["basis"] });
+  }
+  return rows;
+}
+
+/// The basis in words for the card: "ran" for an item the reviewer ran, "read" for one judged from the diff.
+export function basisText(b: ItemRow["basis"]): string {
+  return b === "ran" ? "ran" : b === "read" ? "read only" : "NOT_RUN";
+}

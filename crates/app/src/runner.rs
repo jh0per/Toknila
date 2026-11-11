@@ -78,6 +78,9 @@ pub struct RunBrief {
     pub allowed_commands: Vec<String>,
     /// The domains the project's reviewer may read on the web (a reviewer only).
     pub web_domains: Vec<String>,
+    /// The toolchains the ship's repository holds (`cargo`, `npm`), which a reviewer may run the
+    /// tests of; filled in by the host when the reviewer starts.
+    pub repo_tools: Vec<String>,
     /// What a planner is told about its project; `None` for a card's agent.
     pub project: Option<toknila_core::instructions::ProjectFacts>,
 }

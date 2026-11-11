@@ -174,6 +174,26 @@ fn brief_of_key<'a>(cx: &'a Context<'_>, key: &'a str) -> instructions::RunBrief
     }
 }
 
+/// The toolchains the repository in `dir` holds, by the first word of their commands: `cargo` for
+/// a `Cargo.toml`, `npm`, `pnpm` or `yarn` for a `package.json` (by its lock file).
+pub(super) fn repo_tools(dir: &Path) -> Vec<String> {
+    let mut tools = Vec::new();
+    if dir.join("Cargo.toml").exists() {
+        tools.push("cargo".to_owned());
+    }
+    if dir.join("package.json").exists() {
+        let manager = if dir.join("pnpm-lock.yaml").exists() {
+            "pnpm"
+        } else if dir.join("yarn.lock").exists() {
+            "yarn"
+        } else {
+            "npm"
+        };
+        tools.push(manager.to_owned());
+    }
+    tools
+}
+
 /// Generates the files `profile` asks for and returns the flags and environment of the process.
 pub(super) fn prepare(profile: &AgentProfile, cx: &Context<'_>) -> Result<Wiring, RunnerError> {
     let inherited = std::env::vars_os().filter_map(|(k, _)| k.into_string().ok());
@@ -195,6 +215,9 @@ pub(super) fn prepare_with(
     let profile = &profile.under_policy(cx.brief.command_policy, &cx.brief.allowed_commands);
     // The domains the project lets a reviewer read go into the reviewer's allow rules.
     let profile = &profile.with_reviewer_domains(&cx.brief.web_domains);
+    // The tests and checks the hand-in names: the check command's toolchain and the repository's.
+    let profile =
+        &profile.with_reviewer_checks(cx.brief.check_command.as_deref(), &cx.brief.repo_tools);
     // A planner run is labelled by its project's key; there is no card.
     let key = match cx.role {
         AgentRole::Planner => cx.key.project().to_string(),

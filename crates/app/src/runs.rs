@@ -57,6 +57,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 command_policy: project.command_policy,
                 allowed_commands: project.allowed_commands.clone(),
                 web_domains: Vec::new(),
+                repo_tools: Vec::new(),
                 project: None,
             },
         });
