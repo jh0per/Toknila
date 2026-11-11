@@ -5,7 +5,10 @@ import type { Intent } from "../store/msg";
 import { type State, currentProject, runningAgents, slotsOf } from "../store/state";
 import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
 import { AskBox } from "./AskBox";
+import { viewOf, withView } from "../store/route";
 import { Canvas } from "./Canvas";
+import { DesignBoard } from "./DesignBoard";
+import { NavLink } from "./Link";
 import { PhaseChip } from "./PhaseChip";
 import { PanelDivider } from "./PanelDivider";
 import { Panel } from "./Panel";
@@ -19,6 +22,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
   const slots = slotsOf(state);
   const on = chain.chain.autostart;
   const project = currentProject(state);
+  const view = viewOf(state.route);
   return (
     <>
       <header className="top">
@@ -26,6 +30,16 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
           <b>{project?.key ?? ""}</b><i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
           {chain.summary.version && <span className="ver" data-testid="chain-version-top">{versionText(chain.summary)}</span>}
         </div>
+        <nav className="view-switch" aria-label="View" data-testid="view-switch">
+          {([undefined, "designs"] as const).map((v) => (
+            <NavLink
+              key={v ?? "diagram"} route={withView(state.route, v)} dispatch={dispatch} testId={`view-${v ?? "diagram"}`}
+              className={`view-tab${view === v ? " on" : ""}`}
+            >
+              {v ? "Designs" : "Diagram"}
+            </NavLink>
+          ))}
+        </nav>
         <PhaseChip phase={chain.summary.phase} />
         {/* The status pill is only for a chain that needs a person. */}
         {(chain.summary.status === "needs_human" || chain.summary.status === "blocked") && (
@@ -61,7 +75,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
           {on ? "Stop chain" : "Run chain"}
         </button>
       </header>
-      <Canvas
+      {view === "designs" ? <DesignBoard chain={chain} state={state} dispatch={dispatch} /> : <Canvas
         chain={chain} state={state} dispatch={dispatch}
         onEmpty={project && (
           <div className="empty-state">
@@ -85,7 +99,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
             </p>
           </div>
         )}
-      />
+      />}
 
       <PanelDivider />
       <Panel state={state} dispatch={dispatch} />

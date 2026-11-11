@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Route, TABS, isProjectSection, parseRoute, routePath, settingsSection, visibleTabs } from "./route";
+import { type Route, TABS, isProjectSection, parseRoute, routePath, settingsSection, viewOf, visibleTabs, withView } from "./route";
 
 describe("the settings routes", () => {
   const cases: [string, Route][] = [
@@ -44,6 +44,33 @@ describe("the settings routes", () => {
     expect(settingsSection({ section: "profiles" })).toBe("profiles");
     expect(isProjectSection("advanced")).toBe(true);
     expect(isProjectSection("checks")).toBe(false);
+  });
+});
+
+describe("the Designs view of a chain", () => {
+  const cases: [string, Route][] = [
+    ["/chains/work/designs", { name: "chain", chain: "work", view: "designs" }],
+    ["/projects/DEMO/chains/work/designs", { name: "projectChain", project: "DEMO", chain: "work", view: "designs" }],
+    ["/projects/DEMO/chains/work/cards/DEMO-1/designs", { name: "card", project: "DEMO", chain: "work", key: "DEMO-1", view: "designs" }],
+  ];
+  it.each(cases)("%s is the board and round-trips", (path, route) => {
+    expect(parseRoute(path)).toEqual(route);
+    expect(routePath(route)).toBe(path);
+    expect(viewOf(route)).toBe("designs");
+  });
+
+  it("the diagram is the address without the view", () => {
+    expect(routePath({ name: "projectChain", project: "DEMO", chain: "work" })).toBe("/projects/DEMO/chains/work");
+    expect(viewOf(parseRoute("/projects/DEMO/chains/work"))).toBeUndefined();
+    expect(parseRoute("/projects/DEMO/chains/work/nonsense")).toEqual({ name: "chains" });
+  });
+
+  it("switches the view of a chain route and leaves other routes alone", () => {
+    const card: Route = { name: "card", project: "DEMO", chain: "work", key: "DEMO-1" };
+    expect(withView(card, "designs")).toEqual({ ...card, view: "designs" });
+    expect(withView({ ...card, view: "designs" }, undefined)).toEqual(card);
+    expect("view" in withView({ ...card, view: "designs" }, undefined)).toBe(false);
+    expect(withView({ name: "inbox" }, "designs")).toEqual({ name: "inbox" });
   });
 });
 
