@@ -110,6 +110,8 @@ fn the_hand_in_is_refused_until_every_thread_is_approved() {
     let mut mem = running_demo();
     let th = open_design(&mut mem);
     let a = mem.ticket_by_title("A");
+    // A thread with no version is no design: it does not block (see the daemon tests).
+    threads::post_version(&mut mem, &a, &th, version("v1")).expect("v1");
     let before = mem.events.len();
     let e = finish(&mut mem).expect_err("open thread");
     assert_eq!(e.kind, ErrorKind::Conflict);

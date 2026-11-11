@@ -192,8 +192,7 @@ fn a_person_opens_a_thread_and_approves_it_in_words() {
         (&1.into(), &"flow".into(), &"human".into())
     );
     snapshot("thread_opened", opened);
-    let msg = tok.fails(&["sim", "DEMO-1", "finish", "done"]);
-    assert!(msg.contains("#1 \"Sign-in flow\" (Flow)"), "{msg}");
+    // A thread with no version is no design: it does not stop the hand-in (the control follows).
     let missing = tok.fails(&["thread", "approve", "DEMO-1", "9"]);
     assert!(
         missing.contains("thread 9 of DEMO-1 not found"),
@@ -224,6 +223,8 @@ fn a_person_opens_a_thread_and_approves_it_in_words() {
         ),
         (Some(1), Some(1), &"first sketch".into())
     );
+    let msg = tok.fails(&["sim", "DEMO-1", "finish", "done"]);
+    assert!(msg.contains("#1 \"Sign-in flow\" (Flow)"), "{msg}");
     let approved = tok.run(&["thread", "approve", "DEMO-1", "1"]);
     assert_eq!(approved["thread"]["approved_version"], 1);
     assert_eq!(

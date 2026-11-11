@@ -75,6 +75,8 @@ pub enum AgentEvent {
         format: ArtifactFormat,
         body: String,
     },
+    /// The agent takes back its own thread while it has no version and no person message.
+    WithdrawThread { thread: String },
 }
 
 impl AgentEvent {
@@ -261,6 +263,10 @@ mod tests {
                     body: "graph TD; A-->B".into(),
                 },
                 r#"{"event":"thread_version","thread":"1","format":"mermaid","body":"graph TD; A-->B"}"#,
+            ),
+            (
+                AgentEvent::WithdrawThread { thread: "2".into() },
+                r#"{"event":"withdraw_thread","thread":"2"}"#,
             ),
         ];
         for (event, json) in cases {

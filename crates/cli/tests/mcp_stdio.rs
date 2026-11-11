@@ -75,7 +75,8 @@ fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
             "propose",
             "open_thread",
             "thread_message",
-            "thread_version"
+            "thread_version",
+            "withdraw_thread"
         ]
     );
 
@@ -190,14 +191,20 @@ fn a_refused_event_and_a_bad_token_come_back_as_tool_errors_and_change_nothing()
             ),
             call(
                 2,
+                "thread_version",
+                json!({ "thread": "1", "format": "mermaid", "body": "graph TD" }),
+            ),
+            call(
+                3,
                 "finished",
                 json!({ "summary": toknila_core::handin::from_plain("x") }),
             ),
         ],
     );
     assert_eq!(answers[0]["result"]["isError"], false, "{answers:?}");
-    assert_eq!(answers[1]["result"]["isError"], true);
-    let text = answers[1]["result"]["content"][0]["text"]
+    assert_eq!(answers[1]["result"]["isError"], false, "{answers:?}");
+    assert_eq!(answers[2]["result"]["isError"], true);
+    let text = answers[2]["result"]["content"][0]["text"]
         .as_str()
         .unwrap_or_default();
     assert!(text.contains("cannot hand in DEMO-1"), "{text}");

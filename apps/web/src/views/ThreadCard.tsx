@@ -4,8 +4,8 @@ import type { Intent } from "../store/msg";
 import { shownVersion, threadStatus } from "../store/threads";
 import { Artifact } from "./Artifact";
 
-const STATUS_LABEL = { open: "open", changes_requested: "changes requested", approved: "approved" } as const;
-const TAG_CLASS = { open: "open", changes_requested: "chg", approved: "ok" } as const;
+const STATUS_LABEL = { draft: "draft", open: "open", changes_requested: "changes requested", approved: "approved" } as const;
+const TAG_CLASS = { draft: "muted", open: "open", changes_requested: "chg", approved: "ok" } as const;
 
 /// One thread: its artifact version, version history, messages, and what a person can do.
 export function ThreadCard(props: {
@@ -20,18 +20,22 @@ export function ThreadCard(props: {
   const version = shownVersion(detail, picked);
   const [text, setText] = useState("");
   const closed = status === "approved";
+  const draft = status === "draft";
   const act = (action: "message" | "changes" | "approve") => {
     dispatch({ type: "threadAction", key: ticket, thread: thread.id, action, text: text.trim() || undefined });
     setText("");
   };
   return (
-    <article className="thr" data-testid="thread" data-status={status} data-number={thread.number}>
+    <article className={draft ? "thr draft" : "thr"} data-testid="thread" data-status={status} data-number={thread.number}>
       <header>
         <span className="kind">{thread.kind}</span>
         <b>{thread.title}</b>
         <span className="grow" />
         <span className={`tag ${TAG_CLASS[status]}`} data-testid="thread-state">{STATUS_LABEL[status]}</span>
       </header>
+      {draft && (
+        <p className="muted" data-testid="draft-note">No version yet</p>
+      )}
       {version && (
         <div className="art">
           <Artifact version={version} />
@@ -71,7 +75,7 @@ export function ThreadCard(props: {
         />
         <button className="btn" disabled={closed || !text.trim()} onClick={() => act("message")}>Post message</button>
         <button className="btn" disabled={closed || !text.trim()} onClick={() => act("changes")}>Request changes</button>
-        <button className="btn primary" disabled={closed} onClick={() => act("approve")}>Approve</button>
+        <button className="btn primary" disabled={closed || draft} onClick={() => act("approve")}>Approve</button>
       </footer>
     </article>
   );

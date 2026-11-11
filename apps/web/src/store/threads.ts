@@ -3,17 +3,20 @@
 
 import type { ThreadDetail, ThreadVersion } from "../api/types";
 
-export type ThreadStatus = "open" | "changes_requested" | "approved";
+export type ThreadStatus = "draft" | "open" | "changes_requested" | "approved";
 
-/// Approved, changes requested (the daemon's `changes_requested`), or plain open.
+/// Approved, a draft (open, no version yet: nothing to approve), changes requested (the daemon's
+/// `changes_requested`), or plain open.
 export function threadStatus(t: ThreadDetail): ThreadStatus {
   if (t.thread.state === "approved") return "approved";
+  if (t.versions.length === 0) return "draft";
   return t.changes_requested ? "changes_requested" : "open";
 }
 
-/// How many threads still keep the card from being handed in.
+/// How many threads still keep the card from being handed in: open ones with a version. A draft
+/// is not a design and never waits for approval.
 export function blocksHandIn(threads: ThreadDetail[]): number {
-  return threads.filter((t) => t.thread.state === "open").length;
+  return threads.filter((t) => t.thread.state === "open" && t.versions.length > 0).length;
 }
 
 /// The version on screen: the one picked if it exists, else the latest.
