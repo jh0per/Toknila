@@ -187,6 +187,20 @@ pub enum ReviewTurn {
     Merging,
 }
 
+/// Where a card's check stands while its turn is `Check`. The checker reports `Syncing` and
+/// `Running`; `Queued` is the daemon's line, added when the card is shown.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "phase", rename_all = "snake_case")]
+pub enum CheckPhase {
+    /// Another check runs; this one is the `place`-th in line (1 is next).
+    Queued { place: u32 },
+    /// Its turn came: the base branch is being brought into the ship.
+    Syncing,
+    /// The project's check command runs on the ship, since `since`.
+    Running { command: String, since: Timestamp },
+}
+
 /// Why a card waits for a person in Review beyond the ordinary hand-in; shown in the inbox.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -210,6 +224,10 @@ pub struct Review {
     /// `None` outside Review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn: Option<ReviewTurn>,
+    /// While the turn is `Check`: what the checker last reported (`Syncing` or `Running`);
+    /// `None` until it reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<CheckPhase>,
     /// Oldest first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rounds: Vec<ReviewRound>,
@@ -236,6 +254,7 @@ impl Review {
     /// True before the first review: nothing to show or store.
     pub fn is_empty(&self) -> bool {
         self.turn.is_none()
+            && self.check.is_none()
             && self.rounds.is_empty()
             && !self.nudged
             && self.note.is_none()

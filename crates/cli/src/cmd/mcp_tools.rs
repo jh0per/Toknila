@@ -140,7 +140,7 @@ fn worker_tools() -> Vec<Value> {
         ),
         tool(
             "open_thread",
-            "Open a thread on this ticket to settle a design, a flow or an architecture with the person before implementing. The hand-in is refused until every thread is approved.",
+            "Open a thread on this ticket to settle a design, a flow or an architecture with the person before implementing. The hand-in is refused until every thread that has a version is approved. A card gets one thread of each kind: a second open_thread of the same kind is refused with the number of the existing thread; post a version on it with thread_version instead.",
             json!({
                 "kind": { "type": "string", "enum": ["design", "flow", "architecture", "other"] },
                 "title": text("What the thread is about"),
@@ -162,6 +162,12 @@ fn worker_tools() -> Vec<Value> {
                 "body": text("The artifact, at most 512 KiB"),
             }),
             &["thread", "format", "body"],
+        ),
+        tool(
+            "withdraw_thread",
+            "Withdraw a thread you opened by mistake, while it has no version and no person message. A thread with no version never blocks the hand-in.",
+            json!({ "thread": thread }),
+            &["thread"],
         ),
     ]
 }
@@ -210,6 +216,7 @@ mod tests {
                 "thread_version",
                 json!({ "thread": "1", "format": "mermaid", "body": "graph TD" }),
             ),
+            ("withdraw_thread", json!({ "thread": "2" })),
         ];
         let names: Vec<_> = list(AgentRole::Worker)
             .iter()

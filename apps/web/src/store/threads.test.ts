@@ -7,7 +7,7 @@ function thread(over: Partial<ThreadDetail> & { state?: "open" | "approved" } = 
   return {
     thread: { id: "th1", number: 1, kind: "design", title: "List", state, ticket_id: "t1" },
     messages: [],
-    versions: [],
+    versions: [ver(1, 1)],
     changes_requested: false,
     ...rest,
   } as unknown as ThreadDetail;
@@ -40,6 +40,19 @@ describe("shownVersion", () => {
     expect(shownVersion(t, undefined)?.number).toBe(2);
     expect(shownVersion(t, 1)?.number).toBe(1);
     expect(shownVersion(t, 7)?.number).toBe(2);
-    expect(shownVersion(thread(), undefined)).toBeUndefined();
+    expect(shownVersion(thread({ versions: [] }), undefined)).toBeUndefined();
+  });
+});
+
+describe("a thread with no version", () => {
+  const draft = thread({ versions: [] });
+  it("is a draft, and never waits for approval", () => {
+    expect(threadStatus(draft)).toBe("draft");
+    expect(blocksHandIn([draft])).toBe(0);
+    expect(blocksHandIn([draft, thread()])).toBe(1);
+  });
+
+  it("stops being a draft once it has a version", () => {
+    expect(threadStatus(thread())).toBe("open");
   });
 });

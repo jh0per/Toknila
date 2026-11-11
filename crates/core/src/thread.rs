@@ -1,12 +1,13 @@
 //! Threads on a card: the rules. A thread is opened by a person or the ticket's agent, holds
 //! messages and numbered immutable artifact versions, and ends in a person's approval. While a
-//! ticket has an open thread, the agent's hand-in is refused (see `TicketEvent::Finished`).
+//! ticket has an open thread with a version, the agent's hand-in is refused (see `TicketEvent::Finished`).
 //!
 //! | From | To | Event |
 //! |---|---|---|
 //! | Open | Approved | `Approve` (a person only; pins the latest version, if any) |
 //! | Approved | Open | `NewVersion` (by anyone), `ChangesRequested` (a person only) |
 //! | Open | Open | `NewVersion`, `ChangesRequested` |
+//! | Open | Withdrawn | `Withdraw` (the agent that opened it, while it has no version and no person message) |
 //!
 //! Everything here is pure: ids and times come in as arguments.
 
@@ -51,6 +52,16 @@ pub enum ThreadError {
     PersonOnly { action: &'static str, actor: Actor },
     #[error("thread is already approved")]
     AlreadyApproved,
+    #[error(
+        "this card already has {kind:?} thread {number}; post a version on thread {number} with thread_version instead of opening another"
+    )]
+    DuplicateKind { kind: ThreadKind, number: u32 },
+    #[error("only the agent that opened a thread can withdraw it")]
+    NotYours,
+    #[error("thread {number} has a version or a person message, so it cannot be withdrawn")]
+    NotEmpty { number: u32 },
+    #[error("thread is not open")]
+    NotOpen,
 }
 
 pub(crate) fn list(threads: &[OpenThread]) -> String {
@@ -70,6 +81,12 @@ pub enum ThreadEvent {
     NewVersion,
     /// A person asks for changes.
     ChangesRequested { by: Actor },
+    /// The agent that opened the thread takes it back; `versions` and `person_messages` count what it holds.
+    Withdraw {
+        by: Actor,
+        versions: usize,
+        person_messages: usize,
+    },
 }
 
 /// What a transition did to the thread's state, for the journal.
@@ -77,6 +94,7 @@ pub enum ThreadEvent {
 pub enum ThreadChange {
     Approved,
     Reopened,
+    Withdrawn,
 }
 
 /// A new, open thread.
@@ -202,6 +220,25 @@ pub fn apply(
             person_only(by, "request changes")?;
             reopen(&mut next)
         }
+        ThreadEvent::Withdraw {
+            by,
+            versions,
+            person_messages,
+        } => {
+            if by == Actor::Human || by != thread.opened_by {
+                return Err(ThreadError::NotYours);
+            }
+            if thread.state != ThreadState::Open {
+                return Err(ThreadError::NotOpen);
+            }
+            if versions > 0 || person_messages > 0 {
+                return Err(ThreadError::NotEmpty {
+                    number: thread.number,
+                });
+            }
+            next.state = ThreadState::Withdrawn;
+            Some(ThreadChange::Withdrawn)
+        }
     };
     Ok((next, change))
 }
@@ -284,12 +321,24 @@ pub fn require_design(ticket: &Ticket, threads: &[Thread]) -> Result<(), Transit
     Err(TransitionError::DesignNotApproved(ticket.key.clone()))
 }
 
-/// The ticket's threads that are still open. The agent's hand-in carries this list and the
-/// state machine refuses it unless it is empty.
-pub fn open_threads(threads: &[Thread]) -> Vec<OpenThread> {
+/// The thread of `kind` that a new one would duplicate: open or approved (a withdrawn one is gone).
+/// A discussion is exempt, it is one per card by its own rule.
+pub fn existing_of_kind(threads: &[Thread], kind: ThreadKind) -> Option<&Thread> {
+    if kind == ThreadKind::Discussion {
+        return None;
+    }
     threads
         .iter()
-        .filter(|t| t.state == ThreadState::Open)
+        .find(|t| t.kind == kind && matches!(t.state, ThreadState::Open | ThreadState::Approved))
+}
+
+/// The ticket's threads that are still open and hold a version: a thread with no version is not a
+/// design and never blocks. `has_version` says whether a thread has one. The agent's hand-in
+/// carries this list and the state machine refuses it unless it is empty.
+pub fn open_threads(threads: &[Thread], has_version: impl Fn(&Thread) -> bool) -> Vec<OpenThread> {
+    threads
+        .iter()
+        .filter(|t| t.state == ThreadState::Open && has_version(t))
         .map(|t| OpenThread {
             number: t.number,
             kind: t.kind,

@@ -13,7 +13,7 @@ use toknila_core::{
 use crate::checks::{self, CheckError, CheckResult, CheckSpec, Checker};
 use crate::merges::{self, MergeError, MergeOutcome, Merger};
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError};
-use crate::sync::{SyncOutcome, SyncSpec};
+use crate::sync::SyncSpec;
 use crate::{
     AppResult, ShipError, Shipyard, UnitOfWork, instructions as deliver_instructions, reviews,
     runs, ships, ships::BranchFate,
@@ -155,6 +155,8 @@ pub struct Host<'a> {
     pub checker: &'a dyn Checker,
     /// The line the checks of the machine wait in, one at a time.
     pub gate: &'a dyn crate::checks::CheckGate,
+    /// Where a running check reports its phase to the card.
+    pub progress: &'a dyn crate::checks::CheckProgress,
 }
 
 /// Runs the effects on the host, in order. Touches no database. A runner starts where the
@@ -281,29 +283,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
             }
             ExternalEffect::DeliverInstruction { .. } => {}
             ExternalEffect::RunCheck { ticket, spec, sync } => {
-                // One check at a time on the machine: wait for the turn, hold it until done.
-                let _turn = host.gate.enter(ticket);
-                let synced = match &sync {
-                    Some(sync) => host.merger.sync(sync),
-                    None => Ok(SyncOutcome::UpToDate),
-                };
-                outcomes.extend(crate::sync::recorded(ticket, &synced));
-                let result = match (&spec, synced) {
-                    (_, Ok(SyncOutcome::Conflict { files, migrations })) => {
-                        let base = sync.as_ref().map(|s| s.base.as_str()).unwrap_or_default();
-                        let text = crate::sync::conflict_text(base, &files, &migrations);
-                        outcomes.push(ExternalOutcome::SyncConflict { ticket, text });
-                        continue;
-                    }
-                    (_, Err(e)) => Err(CheckError::Sync(e.to_string())),
-                    (Some(spec), Ok(_)) => host.checker.run(spec),
-                    (None, Ok(_)) => Err(CheckError::NothingToRun),
-                };
-                outcomes.push(ExternalOutcome::CheckFinished {
-                    ticket,
-                    spec,
-                    result,
-                });
+                checks::run_on_host(&host, ticket, spec, sync.as_ref(), &mut outcomes);
             }
         }
     }

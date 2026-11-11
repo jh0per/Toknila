@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use toknila_app::ships::{self, GuardError};
 use toknila_app::{
-    AppError, MergeError, MergeOutcome, Merger, ShipError, Shipyard,
+    AppError, CheckProgress, CheckStage, MergeError, MergeOutcome, Merger, ShipError, Shipyard,
+    checks,
     external::{self, ExternalEffect, ExternalOutcome},
 };
 use toknila_core::guard::ShipState;
@@ -54,6 +55,10 @@ impl Store {
             let merger = self.merger.clone();
             let checker = self.checker.clone();
             let line = self.line.clone();
+            let progress = StoreProgress {
+                store: self.clone(),
+                runtime: tokio::runtime::Handle::current(),
+            };
             let yard = yard.clone();
             let outcomes = tokio::task::spawn_blocking(move || {
                 external::execute(
@@ -63,6 +68,7 @@ impl Store {
                         runner: &*runner,
                         checker: &*checker,
                         gate: &*line,
+                        progress: &progress,
                     },
                     queued,
                 )
@@ -100,6 +106,30 @@ impl Store {
             };
         }
         tracing::error!("external effects kept queueing more; stopped");
+    }
+}
+
+/// Records the stages of a running check on its card, each as one transaction of its own.
+#[derive(Debug)]
+struct StoreProgress {
+    store: Store,
+    runtime: tokio::runtime::Handle,
+}
+
+impl CheckProgress for StoreProgress {
+    fn stage(&self, ticket: TicketId, stage: CheckStage) {
+        // Runs on the blocking thread of the effect task, never on a runtime worker.
+        let store = self.store.clone();
+        let now = crate::server::now();
+        let recorded = self.runtime.block_on(store.commit_with_effects(
+            Actor::System,
+            now,
+            false,
+            move |tx| -> Result<(), AppError> { checks::stage_reached(tx, ticket, stage) },
+        ));
+        if let Err(e) = recorded {
+            tracing::warn!(error = %e, "recording the check's stage failed");
+        }
     }
 }
 

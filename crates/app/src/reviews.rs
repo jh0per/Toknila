@@ -11,8 +11,8 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    AgentProfile, Chain, Project, ReviewMode, ReviewRound, ReviewTurn, Ticket, TicketId, TicketKey,
-    TicketStatus, resolve_review_mode, resolve_reviewer,
+    AgentProfile, Chain, CheckPhase, Project, ReviewMode, ReviewRound, ReviewTurn, Ticket,
+    TicketId, TicketKey, TicketStatus, resolve_review_mode, resolve_reviewer,
 };
 
 use crate::chain::tell_ticket;
@@ -41,6 +41,10 @@ pub struct ReviewView {
     /// line; only the daemon knows the line.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_queue: Option<u32>,
+    /// While the check runs: `queued` with its place in the line, `syncing` with main, or
+    /// `running` the check command with its start time. Absent before the checker reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<CheckPhase>,
 }
 
 fn context<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<(Chain, Project)> {
@@ -70,6 +74,7 @@ pub fn view<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<ReviewView> {
         used_rounds: t.review.auto_returns(),
         rounds: t.review.rounds.clone(),
         check_queue: None,
+        check: t.review.check.clone(),
     })
 }
 

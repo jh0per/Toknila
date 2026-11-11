@@ -37,7 +37,7 @@ export function Comments(
 function CommentItem({ c }: { c: Comment }) {
   return (
     <li data-kind={c.kind}>
-      <span className="kind">{c.kind}</span> <b>{c.body.gist}</b> <span className="muted">{c.author}</span>
+      <span className="kind">{c.kind}</span> <b>{c.body.gist}</b> <span className="muted">{c.author === "system" ? "Toknila" : c.author}</span>
       {c.body.what && <div>{c.body.what}</div>}
       {c.body.why && <div className="muted">{c.body.why}</div>}
     </li>

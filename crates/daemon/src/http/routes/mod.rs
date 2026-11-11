@@ -113,6 +113,9 @@ fn load_ticket_detail(
             .iter()
             .position(|c| *c == t.id)
             .and_then(|i| u32::try_from(i).ok());
+        if let Some(place) = review.check_queue.filter(|p| *p > 0) {
+            review.check = Some(toknila_core::CheckPhase::Queued { place });
+        }
     }
     let rows = repo.usage_rows(RowFilter {
         ticket: Some(t.id),

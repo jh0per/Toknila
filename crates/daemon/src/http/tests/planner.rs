@@ -176,6 +176,18 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{thread}");
     assert_eq!(thread["thread"]["opened_by"], "agent");
+    let (s, again) = call(
+        Method::POST,
+        "/v1/planner/cards/DEMO-1/threads",
+        Some(json!({ "kind": "design", "title": "Order again" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{again}");
+    let hint = again["error"].as_str().expect("error");
+    assert!(
+        hint.contains("thread 1") && hint.contains("post a version"),
+        "{hint}"
+    );
     let (s, said) = call(
         Method::POST,
         "/v1/planner/cards/DEMO-1/threads/1/messages",
