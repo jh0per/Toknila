@@ -1,7 +1,7 @@
 //! `/system/checks`, `/system/cli` and `/repos/check`: what the window needs to set a project up
 //! and to put `tok` on the person's command line.
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::extract::State;
 use toknila_api_types::{CliLink, Places};
 use toknila_core::Project;

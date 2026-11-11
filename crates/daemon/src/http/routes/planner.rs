@@ -3,9 +3,10 @@
 //! cases of `toknila_app::planner` keep each reference inside that project. These are the only
 //! routes a planner's token reaches (`PLANNER_ROUTES`): nothing that starts, accepts or merges.
 
+use crate::http::body::Json;
+use axum::Extension;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::{Extension, Json};
 use toknila_api_types::{PlannerDesign, PlannerPlan};
 use toknila_app::planner::{self, CardEdit, DesignPick, NewCard, NewPlanChain, NewSuggestion};
 use toknila_app::threads::{self, NewMessage, NewThread, NewVersion};

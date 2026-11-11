@@ -42,6 +42,7 @@ mod ships;
 mod smart_defaults;
 mod strays;
 mod threads;
+mod unknown_fields;
 mod usage;
 
 const TOKEN: &str = "test-token";

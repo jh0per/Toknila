@@ -151,6 +151,34 @@ mod tests {
         assert_eq!(enc("0.1.0"), "0.1.0");
     }
 
+    /// A daemon refusing a body answers 400 with its message; the client's error is that message
+    /// and nothing else, which is what `tok` prints after `error: `.
+    #[test]
+    fn a_refused_body_surfaces_the_daemons_message() {
+        use std::io::{Read, Write};
+        let message = "unknown field `review_modee`, expected one of `max_parallel`, `review_mode`";
+        let body = serde_json::json!({ "code": "bad_request", "error": message }).to_string();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let base = format!("http://{}", listener.local_addr().expect("addr"));
+        let server = std::thread::spawn(move || {
+            let (mut s, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 4096];
+            let _ = s.read(&mut buf);
+            let reply = format!(
+                "HTTP/1.1 400 Bad Request\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            s.write_all(reply.as_bytes()).expect("write");
+        });
+        let err = Client::new(base, "t0k").projects().expect_err("refused");
+        server.join().expect("server");
+        assert!(
+            matches!(err, ClientError::Api { status: 400, .. }),
+            "{err:?}"
+        );
+        assert_eq!(err.to_string(), message);
+    }
+
     #[test]
     fn stream_url_is_websocket_with_token() {
         let c = Client::new("http://127.0.0.1:4100", "t0k");

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_app::removal::{self, Removed};

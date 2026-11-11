@@ -1,6 +1,6 @@
 //! `/projects`.
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use toknila_app::removal::{self, Removed};

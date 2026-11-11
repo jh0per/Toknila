@@ -13,10 +13,48 @@ use crate::{AppError, AppResult, UnitOfWork, resolve, with_chain};
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct NewWildcard {
-    #[serde(flatten)]
-    pub card: Proposal,
+    pub title: String,
+    /// The task for whoever does it.
+    #[serde(default)]
+    pub prompt: String,
+    /// Acceptance criteria, one per entry.
+    #[serde(default)]
+    pub acceptance: Vec<String>,
+    /// Nodes the card waits for.
+    #[serde(default)]
+    pub after: Vec<String>,
+    /// Nodes that wait for the card; none of them may have started when it is approved.
+    #[serde(default)]
+    pub before: Vec<String>,
     /// The ticket during which the work was found: key, id or title.
+    #[serde(default)]
     pub from: Option<String>,
+}
+
+impl NewWildcard {
+    /// The body of a proposal found during `from`.
+    pub fn new(card: Proposal, from: Option<String>) -> Self {
+        Self {
+            title: card.title,
+            prompt: card.prompt,
+            acceptance: card.acceptance,
+            after: card.after,
+            before: card.before,
+            from,
+        }
+    }
+
+    /// The proposed card and the ticket it was found during.
+    pub fn into_parts(self) -> (Proposal, Option<String>) {
+        let card = Proposal {
+            title: self.title,
+            prompt: self.prompt,
+            acceptance: self.acceptance,
+            after: self.after,
+            before: self.before,
+        };
+        (card, self.from)
+    }
 }
 
 /// Proposes a wildcard card on a chain, by the command's actor. It lands in Proposed with its

@@ -1,6 +1,6 @@
 //! The inbox of a project and the person's decisions about leftovers.
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::extract::{Path, State};
 use toknila_app::leftovers::{self, LeftoverAction};
 use toknila_app::{inbox, resolve};

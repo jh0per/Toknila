@@ -1,9 +1,10 @@
 //! The assistant's pins on designs: the planner pins a question (`/planner/pins`), the window
 //! lists a project's pins and a person answers one in place.
 
+use crate::http::body::Json;
+use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::{Extension, Json};
 use toknila_api_types::{DesignPin, NewDesignPin, PinAnswer};
 use toknila_app::pins::{self, NewPin};
 use toknila_app::{AppError, resolve};

@@ -101,10 +101,7 @@ async fn a_chain_with_every_card_merged_offers_release_and_a_chain_with_an_open_
     let e = env().await;
     merge_card(&e, "First", "a.txt").await;
     e.api
-        .post(
-            "/v1/chains/auth/tickets",
-            json!({ "title": "Open", "autostart": false }),
-        )
+        .post("/v1/chains/auth/tickets", json!({ "title": "Open" }))
         .await;
 
     let chain = e.api.get("/v1/chains/auth").await;

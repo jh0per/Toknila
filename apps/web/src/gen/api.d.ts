@@ -2317,11 +2317,8 @@ export interface components {
              * @default false
              */
             enabled: boolean;
-            /**
-             * @description Flag of the agent's command that takes the path of a generated hook settings file.
-             * @default null
-             */
-            settings_flag: string | null;
+            /** @description Flag of the agent's command that takes the path of a generated hook settings file. */
+            settings_flag?: string | null;
         };
         /** @description `POST /v1/projects/{project}/import-path`: what the daemon is to read and import. */
         ImportPath: {
@@ -2490,11 +2487,8 @@ export interface components {
          *     file under the data home and passes its path with `config_flag`.
          */
         McpWiring: {
-            /**
-             * @description Flag of the agent's command that takes the path of a generated MCP config.
-             * @default null
-             */
-            config_flag: string | null;
+            /** @description Flag of the agent's command that takes the path of a generated MCP config. */
+            config_flag?: string | null;
             /**
              * @description Whether the launcher wires the MCP server into this agent.
              * @default false
@@ -2726,9 +2720,18 @@ export interface components {
             message?: string | null;
         };
         /** @description `POST /v1/chains/{chain}/wildcards`: a person proposes a card. */
-        NewWildcard: components["schemas"]["Proposal"] & {
+        NewWildcard: {
+            /** @description Acceptance criteria, one per entry. */
+            acceptance?: string[];
+            /** @description Nodes the card waits for. */
+            after?: string[];
+            /** @description Nodes that wait for the card; none of them may have started when it is approved. */
+            before?: string[];
             /** @description The ticket during which the work was found: key, id or title. */
             from?: string | null;
+            /** @description The task for whoever does it. */
+            prompt?: string;
+            title: string;
         };
         /** @description The next milestone on the graph. */
         NextRelease: {
