@@ -16,12 +16,19 @@ pub fn supervise(store: Store, mut ended: UnboundedReceiver<RunEnded>) -> JoinHa
         while let Some(e) = ended.recv().await {
             let key = e.run.key.clone();
             let result = store
-                .write(Actor::System, now(), move |tx| -> Result<(), AppError> {
+                .write(Actor::System, now(), move |tx| -> Result<bool, AppError> {
                     runs::ended(tx, e)
                 })
                 .await;
-            if let Err(error) = result {
-                tracing::error!(ticket = %key, %error, "recording the end of a runner failed");
+            match result {
+                Ok((true, _)) => tracing::info!(
+                    ticket = %key,
+                    "a worker ended with its card still running and no agent; starting a new run"
+                ),
+                Ok((false, _)) => {}
+                Err(error) => {
+                    tracing::error!(ticket = %key, %error, "recording the end of a runner failed");
+                }
             }
         }
     })

@@ -340,6 +340,42 @@ fn a_live_runner_is_kept_not_started_twice() {
 }
 
 #[test]
+fn a_run_told_to_end_is_never_reused_by_the_next_start() {
+    let mut rig = Rig::new();
+    rig.profile("fake", &["print", "up", "hold"], "");
+    let first = rig.start("fake");
+    rig.wait_for("up");
+    rig.runners.stop_role(rig.ticket, AgentRole::Worker);
+    // The process is still on its way out, but the run is not live for anyone any more.
+    assert!(
+        rig.runners
+            .live_run(rig.ticket, AgentRole::Worker)
+            .is_none()
+    );
+    assert_eq!(
+        rig.runners
+            .write(rig.ticket, AgentRole::Worker, b"x")
+            .expect_err("a dying terminal takes nothing"),
+        RunnerError::NotRunning
+    );
+    let second = rig.start("fake");
+    assert!(!second.reused);
+    assert_ne!(first.run.id, second.run.id);
+    let end = rig.wait_end();
+    assert!(end.stopped);
+    assert_eq!(end.run.id, first.run.id);
+    assert_eq!(
+        rig.runners
+            .live_run(rig.ticket, AgentRole::Worker)
+            .map(|r| r.id),
+        Some(second.run.id)
+    );
+    rig.runners.stop_all();
+    let end = rig.wait_end();
+    assert_eq!(end.run.id, second.run.id);
+}
+
+#[test]
 fn the_scrollback_keeps_the_last_lines_the_profile_allows_and_the_log_keeps_all() {
     let mut rig = Rig::new();
     let steps: Vec<String> = (1..=30)

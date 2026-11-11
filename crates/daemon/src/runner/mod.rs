@@ -22,6 +22,7 @@ mod reviewer;
 mod screens;
 mod scrollback;
 mod silence;
+mod stopping;
 mod supervise;
 mod tokens;
 mod tree;
@@ -153,7 +154,7 @@ impl Runners {
     pub fn live_in(&self, role: AgentRole) -> Vec<TicketId> {
         self.active()
             .iter()
-            .filter(|((_, r), a)| *r == role && !a.is_over())
+            .filter(|((_, r), a)| *r == role && !a.is_over() && !a.stopping())
             .map(|((t, _), _)| *t)
             .collect()
     }
@@ -161,7 +162,9 @@ impl Runners {
     /// The run of `role` that is alive for `ticket` now, if any.
     pub fn live_run(&self, ticket: TicketId, role: AgentRole) -> Option<Run> {
         let active = self.active().get(&(ticket, role)).cloned();
-        active.filter(|a| !a.is_over()).map(|a| a.run().clone())
+        active
+            .filter(|a| !a.is_over() && !a.stopping())
+            .map(|a| a.run().clone())
     }
 
     /// Kills every live process, for a daemon that is shutting down.
@@ -297,8 +300,12 @@ impl Runners {
 impl Runner for Runners {
     fn start(&self, req: &RunRequest) -> Result<Started, RunnerError> {
         let profile = self.profile(&req.profile)?;
+        stopping::wait_out(self, req);
         let mut map = self.active();
-        if let Some(a) = map.get(&(req.ticket, req.role)).filter(|a| !a.is_over()) {
+        if let Some(a) = map
+            .get(&(req.ticket, req.role))
+            .filter(|a| !a.is_over() && !a.stopping())
+        {
             return Ok(Started {
                 run: a.run().clone(),
                 reused: true,
@@ -362,7 +369,7 @@ impl Runner for Runners {
 
     fn write(&self, ticket: TicketId, role: AgentRole, bytes: &[u8]) -> Result<(), RunnerError> {
         let active = self.active().get(&(ticket, role)).cloned();
-        match active.filter(|a| !a.is_over()) {
+        match active.filter(|a| !a.is_over() && !a.stopping()) {
             Some(a) => a.write(bytes),
             None => Err(RunnerError::NotRunning),
         }
@@ -370,7 +377,7 @@ impl Runner for Runners {
 
     fn state(&self, ticket: TicketId) -> Option<RunnerState> {
         let active = self.active().get(&(ticket, AgentRole::Worker)).cloned();
-        active?.state()
+        active.filter(|a| !a.stopping())?.state()
     }
 
     fn resize(&self, ticket: TicketId, size: Size) -> Result<(), RunnerError> {
@@ -384,7 +391,7 @@ impl Runner for Runners {
         size: Size,
     ) -> Result<(), RunnerError> {
         let active = self.active().get(&(ticket, role)).cloned();
-        match active.filter(|a| !a.is_over()) {
+        match active.filter(|a| !a.is_over() && !a.stopping()) {
             Some(a) => a.resize(size),
             None => Err(RunnerError::NotRunning),
         }
