@@ -1,6 +1,7 @@
 // Browser test of the project's setting for commands and "Allow always", against a real daemon
 // and the workspace's `fake-agent` (never a real agent), in a real git ship.
 // Usage: node e2e/commands.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
+// needs: fake-agent
 //
 // A new project starts on "Let Claude decide". In Settings, Agents, the person chooses "Ask me
 // each time" and saves (`tok project show` agrees). Two cards then play an agent's permission hook

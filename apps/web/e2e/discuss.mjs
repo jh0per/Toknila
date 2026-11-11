@@ -3,6 +3,7 @@
 // with its run token: it reads a line from its terminal, answers in the card's discussion thread
 // (`thread_message`) and proposes an edit (`edit_card`).
 // Usage: node e2e/discuss.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
+// needs: fake-agent
 //
 // One round, end to end: the assistant is not running, so the box offers to start it; running, a
 // message goes to the planner with the card as context and its answer shows in the same box; the

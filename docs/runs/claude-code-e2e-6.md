@@ -27,8 +27,8 @@ Result: every card of the chain reached **Merged** into the local `main`.
 Six changes landed beside the cards, done by the orchestrator's own agents and merged by hand,
 all of them daemon bugs the run exposed: the daemon's PATH (U12), the dying runner (U13), the
 reviewer that could run nothing (U14), the thread approval that never reached a waiting agent
-(U15), the stopping run that asked a question (U16) and a Windows path spelling in a test (U17).
-Release 0.2.10 (tag on `b6b9d53`) carries them with cards 40 to 44, 46, 48 and 49; 45 and 47 come
+(U15), the stopping run that asked a question (U16) and a Windows path spelling in a test (U17);
+a seventh (U18, the e2e list and the stale bundle) followed the run. Release 0.2.10 (tag on `b6b9d53`) carries them with cards 40 to 44, 46, 48 and 49; 45 and 47 come
 with the next release.
 
 ## Setup
@@ -93,8 +93,10 @@ with the next release.
    to wait, not to ask.
 5. **The hand-in met a `main` that moved.** The TOKNILA-29 rule caught it every time, and the
    agent resolved it in one round each; the cost was a round and the conflicts were always the same
-   two files: the e2e list in `xtask/src/main.rs` and the migration array. Candidates: the e2e
-   runner discovers its specs from the folder; migrations by name instead of position.
+   two files: the e2e list in `xtask/src/main.rs` and the migration array. After the run, U18 made
+   the e2e runner discover its specs from the folder (`smoke` first, then alphabetical; a spec that
+   drives the fake agent says `// needs: fake-agent`), so a new spec is a new file and never a
+   conflict. Still a candidate: migrations by name instead of position.
 6. **A second thread when the first was approved.** TOKNILA-48 posted its mockups as a new thread
    instead of a new version of the approved one, then could not hand in. The design-first text of
    U15 now says: never a second thread for the same design, answer with a new version in the same
@@ -103,11 +105,12 @@ with the next release.
 7. **A Return read as a Return.** After U12 and U14 the agents of 40 and 48 handed in an empty
    commit with the quoted gate lines, as told, which is the right move for an environment failure.
    Instruction candidate kept: when a check failure is about the environment, say so and stop.
-8. **The e2e bundle.** `e2e-web` should build the web bundle when the dist is older than the
-   sources, or say which bundle it tests.
+8. **The e2e bundle.** The `tok` binary embeds `apps/web/dist` when it is compiled, so `e2e-web`
+   tested whatever bundle the last `web` had built. Fixed in U18: `e2e-web` rebuilds the bundle
+   before the cargo builds when `dist` is older than the sources, and says so.
 
-Findings 1 to 4 are fixed on `main` after this run; 5, 6 and 8 are open as cards or instruction
-text; 7 is an instruction candidate.
+Findings 1 to 4 and 8 are fixed on `main` after this run, and 5 for the e2e list; the migration
+numbers and 6 are open as cards or instruction text; 7 is an instruction candidate.
 
 ## What the owner can do now that was not possible before
 

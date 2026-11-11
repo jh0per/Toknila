@@ -1,6 +1,7 @@
 // Browser test of the assistant's pins on designs, against a real daemon. No real agent is
 // launched: the planner profile runs `fake-agent`, which pins a question with its run token.
 // Usage: node e2e/design-pins.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
+// needs: fake-agent
 //
 // The fake planner pins a question on a design a card references. The inbox lists it as a
 // question of the assistant; the card page shows the numbered marker on the mockup with the text;

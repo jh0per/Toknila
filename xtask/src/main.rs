@@ -6,6 +6,7 @@
 //!   and build it (needs Node), so the daemon embeds it.
 //!   Run it before `verify` or a release build; CI does.
 //! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
+//!   Runs every `apps/web/e2e/*.mjs` spec, rebuilds the bundle when it is stale.
 //!   With `CI` set it first installs Chromium; locally it uses an installed one.
 //! - `dist <target>`: release archive for one target triple in `dist/` (web page embedded).
 //! - `app [--target <triple>]`: the macOS `Toknila.app`, `.dmg` and the signed update archive
@@ -87,17 +88,29 @@ fn web() -> Result<(), String> {
     // The TypeScript types must match the pinned API document (apps/web/openapi.json).
     run(npm, &["run", "gen:check"], &dir)?;
     run(npm, &["test"], &dir)?;
-    run(npm, &["run", "build"], &dir)?;
+    web_build(&dir)?;
+    eprintln!("xtask web: PASS");
+    Ok(())
+}
+
+/// The production build of `apps/web` into `dist/` (the step `web` ends with).
+fn web_build(dir: &std::path::Path) -> Result<(), String> {
+    let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
+    run(npm, &["run", "build"], dir)?;
     if !dir.join("dist/index.html").is_file() {
         return Err("apps/web/dist/index.html was not produced".to_owned());
     }
-    eprintln!("xtask web: PASS");
     Ok(())
 }
 
 fn e2e_web() -> Result<(), String> {
     let root = app::root()?;
     let web = root.join("apps/web");
+    let specs = e2e_specs(&web.join("e2e"))?;
+    let names: Vec<&str> = specs.iter().map(|(name, _)| name.as_str()).collect();
+    eprintln!("xtask e2e-web: specs: {}", names.join(" "));
+    // Before the cargo builds: the daemon embeds `dist` when it is compiled.
+    ensure_web_bundle(&web)?;
     cargo(&["build", "--locked", "--bin", "tok"])?;
     cargo(&[
         "build",
@@ -126,62 +139,95 @@ fn e2e_web() -> Result<(), String> {
             .to_string_lossy()
             .into_owned()
     };
-    run("node", &["e2e/smoke.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/settings.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/planning.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/plans.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/inbox.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/usage.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/edges.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/chain-delete.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/phase.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/epic.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/designs.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/card-designs.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/design-board.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/autostart.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/canvas.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/canvas-move.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/card-size.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/plan-screen.mjs", &exe("tok")], &web)?;
-    run("node", &["e2e/chat-keys.mjs", &exe("tok")], &web)?;
-    run(
-        "node",
-        &["e2e/terminal.mjs", &exe("tok"), &exe("fake-agent")],
-        &web,
-    )?;
-    run(
-        "node",
-        &["e2e/questions.mjs", &exe("tok"), &exe("fake-agent")],
-        &web,
-    )?;
-    run(
-        "node",
-        &["e2e/commands.mjs", &exe("tok"), &exe("fake-agent")],
-        &web,
-    )?;
-    run(
-        "node",
-        &["e2e/design.mjs", &exe("tok"), &exe("fake-agent")],
-        &web,
-    )?;
-    run(
-        "node",
-        &["e2e/planner.mjs", &exe("tok"), &exe("fake-agent")],
-        &web,
-    )?;
-    run(
-        "node",
-        &["e2e/discuss.mjs", &exe("tok"), &exe("fake-agent")],
-        &web,
-    )?;
-    run(
-        "node",
-        &["e2e/design-pins.mjs", &exe("tok"), &exe("fake-agent")],
-        &web,
-    )?;
+    for (name, needs_agent) in &specs {
+        let script = format!("e2e/{name}.mjs");
+        let tok = exe("tok");
+        if *needs_agent {
+            run("node", &[&script, &tok, &exe("fake-agent")], &web)?;
+        } else {
+            run("node", &[&script, &tok], &web)?;
+        }
+    }
     eprintln!("xtask e2e-web: PASS");
     Ok(())
+}
+
+/// The specs in `dir` as (name without extension, needs the fake agent): `smoke` first, the rest
+/// alphabetical. `helpers.mjs` is a shared module, not a spec. A spec declares the fake agent
+/// with `// needs: fake-agent` within its first 15 lines.
+fn e2e_specs(dir: &std::path::Path) -> Result<Vec<(String, bool)>, String> {
+    let entries =
+        std::fs::read_dir(dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
+    let mut specs = Vec::new();
+    for entry in entries {
+        let path = entry
+            .map_err(|e| format!("cannot read {}: {e}", dir.display()))?
+            .path();
+        if path.extension().and_then(|e| e.to_str()) != Some("mjs") {
+            continue;
+        }
+        let Some(name) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if name == "helpers" {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path)
+            .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+        let needs_agent = text
+            .lines()
+            .take(15)
+            .any(|line| line.trim() == "// needs: fake-agent");
+        specs.push((name.to_owned(), needs_agent));
+    }
+    if specs.is_empty() {
+        return Err(format!("no e2e spec (*.mjs) found in {}", dir.display()));
+    }
+    specs.sort_by(|a, b| (a.0 != "smoke", &a.0).cmp(&(b.0 != "smoke", &b.0)));
+    Ok(specs)
+}
+
+/// Latest modification time of a file under `path` (a file or a folder walked recursively).
+fn newest_mtime(path: &std::path::Path) -> Result<Option<std::time::SystemTime>, String> {
+    let err = |e: std::io::Error| format!("cannot read {}: {e}", path.display());
+    let meta = std::fs::metadata(path).map_err(err)?;
+    if !meta.is_dir() {
+        return Ok(Some(meta.modified().map_err(err)?));
+    }
+    let mut newest = None;
+    for entry in std::fs::read_dir(path).map_err(err)? {
+        let found = newest_mtime(&entry.map_err(err)?.path())?;
+        newest = newest.max(found);
+    }
+    Ok(newest)
+}
+
+/// Builds the web bundle when `apps/web/dist` is missing or older than its sources.
+fn ensure_web_bundle(web: &std::path::Path) -> Result<(), String> {
+    let mut sources = vec![
+        web.join("src"),
+        web.join("index.html"),
+        web.join("package.json"),
+    ];
+    if let Ok(entries) = std::fs::read_dir(web) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if name.to_string_lossy().starts_with("vite.config.") {
+                sources.push(entry.path());
+            }
+        }
+    }
+    let mut newest = None;
+    for source in sources.iter().filter(|p| p.exists()) {
+        newest = newest.max(newest_mtime(source)?);
+    }
+    let built = newest_mtime(&web.join("dist/index.html")).ok().flatten();
+    if built.is_some() && built >= newest {
+        eprintln!("xtask e2e-web: the web bundle is current");
+        return Ok(());
+    }
+    eprintln!("xtask e2e-web: building the web bundle (dist is older than the sources)");
+    web_build(web)
 }
 
 /// Archive name part for a target triple.

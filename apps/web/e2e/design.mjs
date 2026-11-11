@@ -1,6 +1,7 @@
 // Browser test of "design first", against a real daemon and the workspace's `fake-agent` (never
 // a real agent), in a real git ship.
 // Usage: node e2e/design.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
+// needs: fake-agent
 //
 // A card made with "Show me a design before the code" runs with an agent that opens a design
 // thread and posts a diagram: the agent's instructions carry the "Design first" section, the

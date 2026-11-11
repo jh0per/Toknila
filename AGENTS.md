@@ -58,6 +58,10 @@ Running the gates on a developer Mac:
 - `cargo xtask e2e-web` uses the browser that is already installed: set
   `PW_CHROMIUM="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`. Never run
   `playwright install`; nothing is downloaded for a gate.
+- A new browser spec is a new file in `apps/web/e2e` and nothing else: `e2e-web` runs every
+  `*.mjs` there (`smoke` first, the rest alphabetical; `helpers.mjs` is a shared module). Put
+  `// needs: fake-agent` on one of its first 15 lines when it drives a fake agent. `e2e-web`
+  rebuilds the web bundle itself when `apps/web/dist` is older than the sources.
 - When `apps/web/node_modules` is missing, run `npm ci --no-audit --no-fund` in `apps/web` first.
   Do not link or copy `node_modules` from another checkout.
 - macOS has no `timeout` command; do not wrap commands in it.
