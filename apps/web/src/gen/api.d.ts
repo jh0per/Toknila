@@ -3293,7 +3293,6 @@ export interface components {
             nudged?: boolean;
             /** @description Oldest first. */
             rounds?: components["schemas"]["ReviewRound"][];
-            /** @description What changed since the Return, for a hand-in that answers one. */
             since_return?: components["schemas"]["SinceReturn"] | null;
             /**
              * @description The merge commits the daemon made itself to bring the ship up to its base since the
