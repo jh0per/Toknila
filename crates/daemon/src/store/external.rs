@@ -87,9 +87,12 @@ impl Store {
             }
             let now = crate::server::now();
             let recorded = self
-                .commit_with_effects(Actor::System, now, move |tx| -> Result<(), AppError> {
-                    external::apply(tx, outcomes)
-                })
+                .commit_with_effects(
+                    Actor::System,
+                    now,
+                    false,
+                    move |tx| -> Result<(), AppError> { external::apply(tx, outcomes) },
+                )
                 .await;
             queued = match recorded {
                 Ok(((), _, more)) => more,
