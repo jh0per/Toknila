@@ -506,6 +506,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/designs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The project's designs, oldest first, and whether it has a Figma token. */
+        get: operations["list_designs"];
+        put?: never;
+        /**
+         * Keeps an uploaded png, jpg, webp or pdf (the raw file as the body, its name in `name`). The
+         *     kind comes from the file's bytes; a pdf is kept as one design.
+         */
+        post: operations["upload_design"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/designs/figma": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keeps a Figma frame link as a design. With a token saved the frame is fetched as a png and
+         *     kept next to the uploads; without one, or when Figma refuses, the link stays with a hint.
+         */
+        post: operations["add_figma_design"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/designs/{design}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Removes a design and its file. */
+        delete: operations["delete_design"];
+        options?: never;
+        head?: never;
+        /** Renames a design. */
+        patch: operations["rename_design"];
+        trace?: never;
+    };
+    "/projects/{project}/designs/{design}/fetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fetches a Figma design's frame again (after a token was saved, or a fetch failed). */
+        post: operations["fetch_design"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/designs/{design}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The kept file as it was stored, with its media type. It serves as the thumbnail too: the page
+         *     scales it.
+         */
+        get: operations["design_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/figma-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Saves the project's Figma personal access token as a file under the data home's `secrets`
+         *     folder (readable by its owner only). It is never sent back and never written to a log.
+         */
+        put: operations["put_figma_token"];
+        post?: never;
+        /** Forgets the project's Figma token. */
+        delete: operations["delete_figma_token"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/import": {
         parameters: {
             query?: never;
@@ -1686,6 +1803,44 @@ export interface components {
             /** @description Also move the repository folder to the system Trash. Without it the folder stays. */
             trash_folder?: boolean;
         };
+        /** @description One design of a project. */
+        Design: {
+            created_at: components["schemas"]["Timestamp"];
+            figma?: components["schemas"]["FigmaRef"] | null;
+            /** @description Whether a file is kept, served at `.../designs/{id}/file`. */
+            has_file: boolean;
+            /**
+             * @description What the person can do about a link without an image: export the frame, or why the fetch
+             *     failed. Never holds the token.
+             */
+            hint?: string | null;
+            id: components["schemas"]["DesignId"];
+            kind: components["schemas"]["DesignKind"];
+            /** @description Media type of the kept file; absent for a Figma link whose frame was not fetched. */
+            mime?: string | null;
+            name: string;
+            /**
+             * Format: int64
+             * @description Bytes of the kept file; zero without one.
+             */
+            size: number;
+            /** @description Whether the file can be shown as a picture (everything kept but a pdf). */
+            thumb: boolean;
+        };
+        /** @description Identifies a design of a project. */
+        DesignId: string;
+        /**
+         * @description What a design is.
+         * @enum {string}
+         */
+        DesignKind: "image" | "pdf" | "figma";
+        /** @description Answer of `GET /v1/projects/{project}/designs`. */
+        DesignList: {
+            /** @description Oldest first. */
+            designs: components["schemas"]["Design"][];
+            /** @description Whether the project has a Figma token; the token itself is never sent. */
+            figma_token: boolean;
+        };
         /** @description Dependency edge: `to` cannot start before `from` is done. */
         Edge: {
             chain_id: components["schemas"]["ChainId"];
@@ -1728,6 +1883,18 @@ export interface components {
             payload: Record<string, never>;
             /** Format: int64 */
             seq: number;
+        };
+        /** @description The frame a Figma link points at. */
+        FigmaRef: {
+            file_key: string;
+            /** @description The frame's node id, `12:34`. */
+            node_id: string;
+            /** @description The link as the person gave it. */
+            url: string;
+        };
+        /** @description Body of `PUT /v1/projects/{project}/figma-token`. */
+        FigmaToken: {
+            token: string;
         };
         /**
          * @description What became of a deleted project's repository folder.
@@ -2024,6 +2191,13 @@ export interface components {
             body?: components["schemas"]["CommentBody"] | null;
             kind?: components["schemas"]["CommentKind"] | null;
             text?: string | null;
+        };
+        /** @description Body of `POST /v1/projects/{project}/designs/figma`. */
+        NewFigmaDesign: {
+            /** @description A name; the link's file key when empty. */
+            name?: string | null;
+            /** @description The link of a frame (Copy link to selection). */
+            url: string;
         };
         /** @description Body of `.../messages` and `.../changes`. */
         NewMessage: {
@@ -2655,6 +2829,10 @@ export interface components {
          * @enum {string}
          */
         ReleaseStep: "check" | "bump" | "tag" | "push";
+        /** @description Body of `PATCH /v1/projects/{project}/designs/{design}`. */
+        RenameDesign: {
+            name: string;
+        };
         /** @description The answer to "may this folder be a project's repository, with this base branch?". */
         RepoCheck: {
             /**
@@ -4584,6 +4762,337 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_designs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignList"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    upload_design: {
+        parameters: {
+            query: {
+                /** @description The file's name */
+                name: string;
+            };
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": number[];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Design"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    add_figma_design: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewFigmaDesign"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Design"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_design: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+                /** @description Design id */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    rename_design: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+                /** @description Design id */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameDesign"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Design"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    fetch_design: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+                /** @description Design id */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Design"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    design_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+                /** @description Design id */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": number[];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    put_figma_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FigmaToken"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_figma_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

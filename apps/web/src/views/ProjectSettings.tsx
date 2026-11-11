@@ -4,6 +4,7 @@ import type { Intent } from "../store/msg";
 import { type ProjectForm, SECTION_LABEL, formOf, isDirty, patchOf } from "../store/projectForm";
 import { PROJECT_SECTIONS, type ProjectSection } from "../store/route";
 import { type State, activeProjects } from "../store/state";
+import { DesignsSection } from "./DesignsSection";
 import { NavLink } from "./Link";
 import { PlansSection } from "./PlansSection";
 import { AdvancedSection } from "./ProjectAdvanced";
@@ -80,6 +81,8 @@ function Body({ project, state, dispatch, section }: Omit<Props, "project"> & { 
       </nav>
       {section === "plans" ? (
         <PlansSection project={project} state={state} dispatch={dispatch} />
+      ) : section === "designs" ? (
+        <DesignsSection project={project} />
       ) : (
         <form
           className="project-form" noValidate data-testid="project-form"

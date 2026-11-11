@@ -41,6 +41,8 @@ pub async fn after_delete(
         trash: state.trash.clone(),
         home: state.home.clone(),
     };
+    // The project's designs and its Figma token go with it.
+    crate::designs::Designs::new(&state.home, removed.project.id).delete_all();
     let mut fallback = report(&removed);
     match tokio::task::spawn_blocking(move || clean(&host, removed, trash_folder)).await {
         Ok(out) => out,

@@ -5,6 +5,7 @@
 
 mod agents;
 mod chains;
+mod designs;
 mod events;
 mod planner;
 mod plans;
@@ -21,6 +22,7 @@ mod usage;
 
 pub use agents::{ProjectAgents, QueuedCard};
 pub use chains::{ChainDetail, ChainItem, EdgeInput, MoveInput, ReleaseMember};
+pub use designs::{Design, DesignList, FigmaToken, NewFigmaDesign, RenameDesign};
 pub use events::{ErrorBody, EventQuery, EventRecord, InstructionClaim, NewActivity};
 pub use planner::{PlannerState, StartPlanner};
 pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedChain};

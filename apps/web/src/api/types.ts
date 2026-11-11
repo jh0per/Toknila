@@ -81,5 +81,7 @@ export type ProjectDeletion = Schemas["ProjectDeletion"];
 export type PlannerState = Schemas["PlannerState"];
 export type ChainDeletion = Schemas["ChainDeletion"];
 export type Stray = Schemas["Stray"];
+export type Design = Schemas["Design"];
+export type DesignList = Schemas["DesignList"];
 export type Strays = Schemas["Strays"];
 export type StraysCleaned = Schemas["StraysCleaned"];

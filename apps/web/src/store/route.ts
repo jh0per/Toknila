@@ -14,7 +14,7 @@ export type Route =
   | { name: "card"; project: string; chain: string; key: string };
 
 /// The sections of a project's settings, tabs of the Projects page.
-export type ProjectSection = "general" | "agents" | "review" | "plans" | "advanced";
+export type ProjectSection = "general" | "agents" | "review" | "plans" | "designs" | "advanced";
 
 /// The pages of the settings list that are not about one project.
 export type AppSection = "profiles" | "updates" | "about" | "checks";
@@ -23,7 +23,7 @@ export type AppSection = "profiles" | "updates" | "about" | "checks";
 /// checks) and, under Projects, the focused project's sections.
 export type SettingsSection = AppSection | ProjectSection;
 
-export const PROJECT_SECTIONS: ProjectSection[] = ["general", "agents", "review", "plans", "advanced"];
+export const PROJECT_SECTIONS: ProjectSection[] = ["general", "agents", "review", "plans", "designs", "advanced"];
 export const APP_SECTIONS: AppSection[] = ["profiles", "updates", "about", "checks"];
 const ALL_SECTIONS: SettingsSection[] = [...APP_SECTIONS, ...PROJECT_SECTIONS];
 

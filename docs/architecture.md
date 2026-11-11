@@ -810,6 +810,29 @@ the cards; the owner starts cards and accepts work.
   `threads`, so core's rules (cycles, dependency checks, `can_edit`, `can_move`, thread states)
   apply, events are journaled, and the window's diagram updates from the stream as for any edit.
 
+## Designs
+
+A project keeps a library of designs: png, jpg and webp files, pdfs (one design each, served as
+they are) and Figma frame links. They are files, not rows: `daemon/src/designs` keeps
+`<home>/designs/<project id>/index.json` and one `<design id>.<ext>` per design; nothing is in the
+repository or the database. Core's `design` module holds the rules (the kind comes from the
+file's first bytes, never its name; the link parser; names lose their path).
+
+- **Routes.** `GET|POST /v1/projects/{project}/designs` (list with `figma_token: bool`; upload
+  with the raw file as the body and `?name=`), `POST .../designs/figma` (a link),
+  `POST|PATCH|DELETE .../designs/{design}[/fetch]`, `GET .../designs/{design}/file` (the stored
+  bytes with their media type; also the thumbnail, the page scales it; `?token=` authenticates an
+  `<img>`), `PUT|DELETE /v1/projects/{project}/figma-token`.
+- **Figma.** A link keeps `file_key` and `node_id`. With a token the daemon asks
+  `GET /v1/images/{key}?ids={node}&format=png` (`X-Figma-Token`) through the system's `curl` and
+  keeps the png beside the uploads; without one, or when Figma refuses, the link stays with a hint
+  to export the frame. `curl` reads the token from its standard input, never from an argument.
+- **The token** is a file, `<home>/secrets/figma-<project id>.token` (mode 0600 on Unix), written
+  and read only by the daemon. No API answer, index, log, chain export or repository file holds
+  it. Deleting the project deletes its designs and the token.
+- **Chain export** names the project's designs by file name in `[chain] designs = [...]`; an
+  import reads the list and ignores it.
+
 ## Data safety
 
 The database is the only copy of the plan, so an upgrade must not lose it.
