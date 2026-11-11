@@ -61,6 +61,11 @@ pub enum TransitionError {
         event: &'static str,
         from: TicketStatus,
     },
+    #[error(
+        "cannot {event} yet: the card is still being checked (brought up to main \
+         and the check command run); Return or Accept once it waits for a person"
+    )]
+    BeingChecked { event: &'static str },
     #[error("ticket is paused; resume it first")]
     Paused,
     #[error("ticket is already started and waits for a free slot")]

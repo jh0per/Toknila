@@ -88,6 +88,7 @@ fn a_return_is_in_the_new_runs_kickoff_and_a_hand_in_at_the_same_commit_is_refus
     let log_before = tok.logs("DEMO-1").len();
     assert!(!screen(&tok).contains("This card was returned"));
 
+    tok.wait_for_person_turn("DEMO-1");
     tok.run(&["return", "DEMO-1", "Rename the flag"]);
     wait_until("the new run to print the Return", || {
         let log = tok.logs("DEMO-1");

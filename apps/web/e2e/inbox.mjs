@@ -181,6 +181,11 @@ try {
   git(ship, "add", "done.txt");
   git(ship, "commit", "--quiet", "-m", "done");
   tok("sim", "GIT-1", "finish", "all done");
+  // The hand-in's check runs after `finished` answers; Accept is refused until it waits for a person.
+  for (const until = Date.now() + 30_000; JSON.parse(tok("show", "GIT-1", "--json")).review.awaiting?.by === "check"; ) {
+    if (Date.now() > until) throw new Error("GIT-1 stayed in its check turn");
+    await new Promise((r) => setTimeout(r, 100));
+  }
   writeFileSync(join(ship, "late.txt"), "forgotten\n");
   let refused = "";
   try {
