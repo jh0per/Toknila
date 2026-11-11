@@ -51,3 +51,20 @@ impl Client {
         )
     }
 }
+
+impl Client {
+    /// `GET /projects/{project}/strays`: the leftover ships no live card owns.
+    pub fn strays(&self, project: &str) -> ClientResult<toknila_api_types::Strays> {
+        self.call(
+            "GET",
+            &format!("/projects/{}/strays", enc(project)),
+            NO_BODY,
+        )
+    }
+
+    /// `POST /projects/{project}/strays/clean`: delete them.
+    pub fn clean_strays(&self, project: &str) -> ClientResult<toknila_api_types::StraysCleaned> {
+        let path = format!("/projects/{}/strays/clean", enc(project));
+        self.call("POST", &path, Some(&serde_json::json!({})))
+    }
+}

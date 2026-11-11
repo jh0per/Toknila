@@ -22,6 +22,8 @@ pub(super) struct FakeYard {
     pub(super) removed: RefCell<Vec<Ship>>,
     /// What `retire` says happened to the branch.
     pub(super) fate: RefCell<BranchFate>,
+    /// The start points `retire` was asked with.
+    pub(super) retired: RefCell<Vec<String>>,
     pub(super) fail_prepare: RefCell<Option<ShipError>>,
     fail_remove: RefCell<Option<ShipError>>,
     /// What `inspect` finds: a clean ship with one commit unless a test says otherwise.
@@ -35,6 +37,7 @@ impl Default for FakeYard {
             prepared: RefCell::default(),
             removed: RefCell::default(),
             fate: RefCell::new(BranchFate::Deleted),
+            retired: RefCell::default(),
             fail_prepare: RefCell::default(),
             fail_remove: RefCell::default(),
             found: RefCell::new(Ok(ShipState {
@@ -67,7 +70,8 @@ impl Shipyard for FakeYard {
         Ok(())
     }
 
-    fn retire(&self, repo: &str, ship: &Ship, _start: &str) -> Result<BranchFate, ShipError> {
+    fn retire(&self, repo: &str, ship: &Ship, start: &str) -> Result<BranchFate, ShipError> {
+        self.retired.borrow_mut().push(start.to_owned());
         self.remove(repo, ship)?;
         Ok(*self.fate.borrow())
     }
