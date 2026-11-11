@@ -14,6 +14,7 @@ use crate::server::AppState;
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Toknila daemon API", description = "Local API of the Toknila daemon. Every /v1 route needs `Authorization: Bearer <token>` from daemon.json."),
+    components(schemas(dto::SizeLimits)),
     modifiers(&BearerAuth),
     security(("bearer" = [])),
 )]

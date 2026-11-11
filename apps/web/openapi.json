@@ -10189,6 +10189,35 @@
           }
         }
       },
+      "SizeLimits": {
+        "type": "object",
+        "description": "The limits of a card's size by hand, as the API document states them.",
+        "required": [
+          "min_w",
+          "max_w",
+          "max_h"
+        ],
+        "properties": {
+          "max_h": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Tallest height.",
+            "default": 320
+          },
+          "max_w": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Widest width.",
+            "default": 480
+          },
+          "min_w": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Narrowest width.",
+            "default": 196
+          }
+        }
+      },
       "StartMode": {
         "type": "string",
         "description": "Whether the milestone cuts itself or waits for a person.",
@@ -11081,6 +11110,17 @@
               {
                 "$ref": "#/components/schemas/Ship",
                 "description": "The ticket's worktree and branch while it has them; `null` before it started, after it\nmerged, or when its project has no repository."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size_clamped": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Size",
+                "description": "Set by `PATCH` when the size it asked for was out of range: that size, which the card\ndoes not have (it has the nearest one inside the limits)."
               },
               {
                 "type": "null"

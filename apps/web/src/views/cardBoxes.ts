@@ -11,7 +11,7 @@ export function contentOf(
   const proposal = t.status === "proposed" && (allows(detail, "approve") || allows(detail, "reject"));
   const extras = Boolean(subtaskProgress(detail) || queued !== undefined || t.pr || t.done_out_of_order || usage || t.designs?.length);
   const foot: Foot = proposal ? "actions" : extras ? "extras" : "none";
-  return { title: t.title, pill: t.status === "proposed" ? "awaiting approval" : t.status, key: t.key, foot };
+  return { title: t.title, pill: t.status === "proposed" ? "awaiting approval" : t.status, key: t.key, foot, description: t.prompt };
 }
 
 /// The box of every card of the chain, by ticket id. `sizeOf` says the size a card has right now

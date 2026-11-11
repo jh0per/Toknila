@@ -3353,6 +3353,27 @@ export interface components {
             /** Format: int32 */
             w: number;
         };
+        /** @description The limits of a card's size by hand, as the API document states them. */
+        SizeLimits: {
+            /**
+             * Format: int32
+             * @description Tallest height.
+             * @default 320
+             */
+            max_h: number;
+            /**
+             * Format: int32
+             * @description Widest width.
+             * @default 480
+             */
+            max_w: number;
+            /**
+             * Format: int32
+             * @description Narrowest width.
+             * @default 196
+             */
+            min_w: number;
+        };
         /**
          * @description Whether the milestone cuts itself or waits for a person.
          * @enum {string}
@@ -3650,6 +3671,7 @@ export interface components {
             /** @description How the card is reviewed (mode, reviewer, whose turn) and the rounds so far. */
             review: components["schemas"]["ReviewView"];
             ship?: components["schemas"]["Ship"] | null;
+            size_clamped?: components["schemas"]["Size"] | null;
             subtasks: components["schemas"]["Subtask"][];
             ticket: components["schemas"]["Ticket"];
             /**
