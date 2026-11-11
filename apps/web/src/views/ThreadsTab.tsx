@@ -33,7 +33,9 @@ export function NoThreads({ card, canAsk, dispatch }: { card: Ticket; canAsk: bo
 export function ThreadsTab({ state, card, dispatch }: { state: State; card: Ticket; dispatch: (i: Intent) => void }) {
   const data = state.threads[card.key];
   if (!data) return <p className="muted">Loading…</p>;
-  const open = blocksHandIn(data.threads);
+  // The discussion with the assistant has its own box on the card's page; it is not a design.
+  const designs = data.threads.filter((t) => t.thread.kind !== "discussion");
+  const open = blocksHandIn(designs);
   return (
     <div className="threads" data-testid="threads">
       <div className="phase-row">
@@ -49,8 +51,8 @@ export function ThreadsTab({ state, card, dispatch }: { state: State; card: Tick
           {open} open {open === 1 ? "thread blocks" : "threads block"} hand-in to review until approved.
         </p>
       )}
-      {data.threads.length === 0 && <NoThreads card={card} canAsk={state.details[card.key]?.allowed_actions.includes("ask_design") ?? false} dispatch={dispatch} />}
-      {data.threads.map((t) => (
+      {designs.length === 0 && <NoThreads card={card} canAsk={state.details[card.key]?.allowed_actions.includes("ask_design") ?? false} dispatch={dispatch} />}
+      {designs.map((t) => (
         <ThreadCard key={t.thread.id} ticket={card.key} detail={t} picked={state.versionPick[t.thread.id]} dispatch={dispatch} />
       ))}
     </div>

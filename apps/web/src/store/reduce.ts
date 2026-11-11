@@ -276,6 +276,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       const there = s.route.name === "planner" && s.route.project === msg.project;
       return fx.length && !there ? then(next, fx, { name: "planner", project: msg.project }) : [next, fx];
     }
+    case "discussCard":
     case "startPlanner":
     case "stopPlanner":
     case "refreshPlanner":

@@ -32,9 +32,13 @@ const USAGE_POLL_MS = 20_000;
 
 const ACTION_PATH = { message: "messages", changes: "changes", approve: "approve" } as const;
 
+/// A person's decision on an edit the assistant proposed: `text` is the proposal's message id.
 function threadPath(e: ThreadAction): string {
-  const ticket = encodeURIComponent(e.key);
-  return `/tickets/${ticket}/threads/${encodeURIComponent(e.thread)}/${ACTION_PATH[e.action]}`;
+  const thread = `/tickets/${encodeURIComponent(e.key)}/threads/${encodeURIComponent(e.thread)}`;
+  if (e.action === "accept_edit" || e.action === "reject_edit") {
+    return `${thread}/edits/${encodeURIComponent(e.text ?? "")}/${e.action === "accept_edit" ? "accept" : "reject"}`;
+  }
+  return `${thread}/${ACTION_PATH[e.action]}`;
 }
 
 /// A card command is a POST that answers with the card's new detail.

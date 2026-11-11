@@ -10,6 +10,7 @@
 //!   would, and print `post=<status> <body>`. `{ticket}` in the path is the run's ticket key. The
 //!   daemon's address, the token and the ticket come from the `TOKNILA_*` environment the runner
 //!   sets. This is how a test plays the hooks of a real agent (`/activity`, `/permission`).
+//! - `patch <path> <json>`: the same with PATCH (the planner's `edit_card`).
 //! - `stop`: post the `hook:stop` activity, as an agent's Stop hook does when a turn ends (a
 //!   reviewer that ends a turn without a verdict).
 //! - `trust`: show a folder trust dialog whose options are not numbered, with "No" preselected, and
@@ -53,6 +54,11 @@ fn child_command() -> std::process::Command {
 
 /// One HTTP/1.1 POST with a JSON body to the daemon; the status line's code and the body.
 fn post(path: &str, json: &str) -> String {
+    send("POST", path, json)
+}
+
+/// [`post`] with another method (`PATCH`).
+fn send(method: &str, path: &str, json: &str) -> String {
     use std::io::Read;
     let var = |name: &str| std::env::var(name).unwrap_or_default();
     let url = var("TOKNILA_URL");
@@ -62,7 +68,7 @@ fn post(path: &str, json: &str) -> String {
         .to_owned();
     let path = path.replace("{ticket}", &var("TOKNILA_TICKET"));
     let request = format!(
-        "POST /v1{path} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {}\r\n\
+        "{method} /v1{path} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {}\r\n\
          Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{json}",
         var("TOKNILA_RUN_TOKEN"),
         json.len()
@@ -113,6 +119,11 @@ fn main() {
                 let path = args.next().unwrap_or_default();
                 let json = args.next().unwrap_or_default();
                 say(&post(&path, &json));
+            }
+            "patch" => {
+                let path = args.next().unwrap_or_default();
+                let json = args.next().unwrap_or_default();
+                say(&send("PATCH", &path, &json));
             }
             "stop" => say(&post(
                 "/tickets/{ticket}/activity",

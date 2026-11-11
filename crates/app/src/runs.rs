@@ -49,6 +49,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 acceptance: t.acceptance.clone(),
                 check_command: project.check_command.clone(),
                 earlier: toknila_core::instructions::earlier(&comments),
+                discussion: crate::discussion::transcript(uow, ticket)?,
                 waiting: waiting.texts,
                 waiting_ids: waiting.ids,
                 returned,

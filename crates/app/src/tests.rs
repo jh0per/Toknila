@@ -20,6 +20,7 @@ use crate::{
 
 mod checks;
 mod deletion;
+mod discussion;
 mod epic;
 mod import_done;
 mod leftovers;

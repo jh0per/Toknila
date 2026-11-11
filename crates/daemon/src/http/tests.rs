@@ -19,6 +19,7 @@ mod chain_version;
 mod commands;
 mod design;
 mod designs;
+mod discussion;
 mod inbox;
 mod merges;
 mod parallel;
@@ -999,6 +1000,7 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/actions/{action}",
             "/tickets/{ticket}/activity",
             "/tickets/{ticket}/comments",
+            "/tickets/{ticket}/discussion",
             "/tickets/{ticket}/events",
             "/tickets/{ticket}/instructions/claim",
             "/tickets/{ticket}/leftovers/{action}",
@@ -1012,6 +1014,8 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/threads",
             "/tickets/{ticket}/threads/{thread}/approve",
             "/tickets/{ticket}/threads/{thread}/changes",
+            "/tickets/{ticket}/threads/{thread}/edits/{message}/accept",
+            "/tickets/{ticket}/threads/{thread}/edits/{message}/reject",
             "/tickets/{ticket}/threads/{thread}/messages",
             "/tickets/{ticket}/threads/{thread}/versions",
             "/usage",

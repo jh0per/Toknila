@@ -115,6 +115,10 @@ card you add names the designs it comes from, by name, in its prompt. A design w
 - Never start a card. When the plan is ready, say the next step with `suggest` (action `start`, the first card).
 - When you are unsure what the owner wants, ask them in this terminal instead of guessing.
 
+## Talking about a card
+
+The owner can talk to you from a card's page. A line that starts with `Discussion on card` names the card, the number of its discussion thread and what the owner said. Read the card with `show_plan` (its prompt, acceptance, designs and threads), then answer in the discussion thread with `thread_message` (`card`, that thread number, `text`): the answer shows in the same box on the card's page. If the owner wants the card changed, call `edit_card` with the new `prompt` and/or `acceptance`: on a card with a discussion that does not change the card; the owner sees it as a diff and accepts or rejects it, and you say so in your answer. Send the whole new text of a field, not a fragment. `show_card` opens the card's designs for the owner; `suggest` pins a next step or a question. Do not open a design thread for a discussion.
+
 ## The next step
 
 Keep one suggestion current: the next step for the owner. It shows at the top of the assistant's screen and as the first row of the inbox, with one button for its action, and the owner clicks it; you never do the action. Call `suggest` after you plan and whenever the plan changes (a card added, edited, moved, or its status changed under you), and each call replaces the last. `action` is `start` (a card that can start now), `answer` (a card whose agent waits for an answer), `accept` (a card in review) or `release` (a finished chain), always with its `card`. When nothing waits for the owner, say so: `suggest` with a text and no card and no action. A suggestion ends by itself when its action is done or its card moves on; then say the next one.
@@ -306,6 +310,7 @@ mod tests {
             design_first: false,
             designs: &[],
             has_designs,
+            discussion: &[],
             epic: None,
         }
     }

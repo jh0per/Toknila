@@ -4,7 +4,7 @@
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use toknila_app::{resolve, threads};
+use toknila_app::{discussion, resolve, threads};
 use toknila_core::{Actor, ThreadId, Ticket};
 
 use super::{ApiResult, load_thread_detail, read};
@@ -15,6 +15,7 @@ use crate::store::WriteTx;
 
 const TICKET: &str = "Ticket id or key, e.g. DEMO-3";
 const THREAD: &str = "Thread number on the ticket (1, 2, ...) or thread id";
+const EDIT: &str = "Id of the proposal message in the thread";
 
 #[utoipa::path(get, path = "/tickets/{ticket}/threads", tag = "threads",
     params(("ticket" = String, Path, description = TICKET)),
@@ -120,6 +121,61 @@ pub async fn request_thread_changes(
     thread_write(&state, ticket, move |tx, t| {
         let th = threads::find(&*tx, t, &thread)?;
         threads::request_changes(tx, t, &th, &input.text)?;
+        Ok(th.id)
+    })
+    .await
+}
+
+#[utoipa::path(post, path = "/tickets/{ticket}/discussion", tag = "threads", request_body = NewMessage,
+    params(("ticket" = String, Path, description = TICKET)),
+    responses((status = 200, body = ThreadDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// A person says something to the project's assistant about the card: the message goes in the
+/// card's discussion thread (opened by the first one). The text for the planner's terminal is the
+/// window's to send.
+pub async fn post_discussion(
+    State(state): State<AppState>,
+    Path(ticket): Path<String>,
+    Json(input): Json<NewMessage>,
+) -> ApiResult<Json<ThreadDetail>> {
+    thread_write(&state, ticket, move |tx, t| {
+        Ok(discussion::say(tx, t, &input.text)?.0.id)
+    })
+    .await
+}
+
+#[utoipa::path(post, path = "/tickets/{ticket}/threads/{thread}/edits/{message}/accept", tag = "threads",
+    params(("ticket" = String, Path, description = TICKET), ("thread" = String, Path, description = THREAD), ("message" = String, Path, description = EDIT)),
+    responses((status = 200, body = ThreadDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// A person accepts the assistant's proposed edit of the card: it lands now. Refused when the card
+/// changed since it was proposed.
+pub async fn accept_edit(
+    State(state): State<AppState>,
+    Path((ticket, thread, message)): Path<(String, String, String)>,
+) -> ApiResult<Json<ThreadDetail>> {
+    decide_edit(&state, ticket, thread, message, true).await
+}
+
+#[utoipa::path(post, path = "/tickets/{ticket}/threads/{thread}/edits/{message}/reject", tag = "threads",
+    params(("ticket" = String, Path, description = TICKET), ("thread" = String, Path, description = THREAD), ("message" = String, Path, description = EDIT)),
+    responses((status = 200, body = ThreadDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// A person rejects the assistant's proposed edit: the card stays as it is.
+pub async fn reject_edit(
+    State(state): State<AppState>,
+    Path((ticket, thread, message)): Path<(String, String, String)>,
+) -> ApiResult<Json<ThreadDetail>> {
+    decide_edit(&state, ticket, thread, message, false).await
+}
+
+async fn decide_edit(
+    state: &AppState,
+    ticket: String,
+    thread: String,
+    message: String,
+    accept: bool,
+) -> ApiResult<Json<ThreadDetail>> {
+    thread_write(state, ticket, move |tx, t| {
+        let th = threads::find(&*tx, t, &thread)?;
+        discussion::decide(tx, t, &th, &message, accept)?;
         Ok(th.id)
     })
     .await

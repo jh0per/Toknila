@@ -4,6 +4,7 @@
 // the refusal of the last command, and what is typed to the assistant before it is sent.
 
 import type { PlannerState } from "../api/types";
+import { draftKey } from "./discussion";
 import type { Effect } from "./msg";
 import type { State } from "./state";
 
@@ -44,13 +45,18 @@ export type PlannerIntent =
   /// Typing in one of the boxes that talk to the assistant.
   | { type: "editPlannerDraft"; where: string; text: string }
   /// Send the project's draft to the assistant: start it if it is not running, then type the text.
-  | { type: "askPlanner"; project: string };
+  | { type: "askPlanner"; project: string }
+  /// Send the card's draft (the Talk to the assistant box on its page): the daemon keeps it in the
+  /// card's discussion, then the planner is told the card and the words, through the same
+  /// terminal path as any message to it.
+  | { type: "discussCard"; project: string; key: string };
 
 /// What the daemon answered.
 export type PlannerResult =
   | { type: "plannerLoaded"; project: string; state: PlannerState }
-  /// The text reached the planner's terminal.
-  | { type: "plannerAsked"; project: string }
+  /// The text reached the planner's terminal; `draft` is the place whose text it was (the
+  /// project's key unless it was said about a card).
+  | { type: "plannerAsked"; project: string; draft?: string }
   | { type: "plannerFailed"; error: string };
 
 export type PlannerMsg = PlannerIntent | PlannerResult;
@@ -58,9 +64,12 @@ export type PlannerMsg = PlannerIntent | PlannerResult;
 export type PlannerEffect = {
   type: "plannerCall";
   project: string;
-  call: "load" | "start" | "stop" | "ask";
+  call: "load" | "start" | "stop" | "ask" | "discuss";
   /// The profile a start uses.
   profile?: string;
+  /// `discuss`: the card (key) the words are about, and the draft place they were typed in.
+  card?: string;
+  draft?: string;
   /// `ask`: the message, on one line (the terminal submits a line).
   text?: string;
   /// `ask`: the planner has to start first, so wait for its screen to settle before typing.
@@ -86,8 +95,17 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
         [{ type: "plannerCall", project: msg.project, call: "ask", profile: s.planner.profile, text, wait: !running }],
       ];
     }
+    case "discussCard": {
+      const draft = draftKey(msg.key);
+      const text = (s.planner.drafts[draft] ?? "").trim();
+      if (!text || s.planner.sending) return [s, []];
+      return [
+        set({ error: "", sending: draft }),
+        [{ type: "plannerCall", project: msg.project, call: "discuss", card: msg.key, draft, text, profile: s.planner.profile }],
+      ];
+    }
     case "plannerAsked":
-      return [set({ sending: undefined, drafts: { ...s.planner.drafts, [msg.project]: "" } }), []];
+      return [set({ sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } }), []];
     case "startPlanner":
       return [
         set({ error: "" }),

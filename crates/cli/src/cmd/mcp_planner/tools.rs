@@ -63,7 +63,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
         ),
         tool(
             "edit_card",
-            "Change a card that has not started: its title, prompt, acceptance (replaced as a whole), checklist items to add or to rename.",
+            "Change a card that has not started: its title, prompt, acceptance (replaced as a whole), checklist items to add or to rename. On a card the person is discussing with you, a prompt or acceptance edit becomes a proposal shown as a diff that the person accepts or rejects; it lands only on accept.",
             json!({
                 "card": card,
                 "title": text("New title"),

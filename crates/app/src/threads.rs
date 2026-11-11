@@ -113,6 +113,11 @@ pub fn post_version<U: UnitOfWork + ?Sized>(
     th: &Thread,
     input: NewVersion,
 ) -> AppResult<ThreadVersion> {
+    if th.kind == ThreadKind::Discussion {
+        return Err(AppError::bad_request(
+            "a discussion has no design versions; open a design thread",
+        ));
+    }
     let number = latest_number(uow, th)?.unwrap_or(0).saturating_add(1);
     let (by, now) = (uow.actor(), uow.now());
     let v = thread::version(
@@ -192,7 +197,7 @@ fn last_person_message<R: crate::Reader + ?Sized>(r: &R, th: &Thread) -> AppResu
 /// path as `tok comment`: typed into the live agent or kept for its next hook. A worker that
 /// waits on its own `ask_human` question is answered by it; a permission prompt is not a
 /// question about the thread and stays open, and a card in any other status is left alone.
-fn tell_worker<U: UnitOfWork + ?Sized>(
+pub(crate) fn tell_worker<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     t: &Ticket,
     head: String,
@@ -239,7 +244,7 @@ pub fn require_design<R: crate::Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult
     Ok(thread::require_design(t, &r.threads(t.id)?)?)
 }
 
-fn message<U: UnitOfWork + ?Sized>(
+pub(crate) fn message<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     t: &Ticket,
     th: &Thread,

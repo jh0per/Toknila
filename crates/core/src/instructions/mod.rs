@@ -52,9 +52,30 @@ pub struct RunBrief<'a> {
     pub designs: &'a [BriefDesign],
     /// A planner's project has designs the planner must look at first.
     pub has_designs: bool,
+    /// What the person and the project's assistant said about this card
+    /// ([`crate::discussion::transcript`]), oldest first.
+    pub discussion: &'a [String],
     /// The chain the card belongs to, as its epic: the chain's name and its goal, which is what
     /// every card of the chain works toward. `None` or an empty goal says nothing.
     pub epic: Option<(&'a str, &'a str)>,
+}
+
+/// The section that carries the discussion of the card with the assistant; empty when there is
+/// none.
+fn discussion_section(brief: &RunBrief<'_>) -> String {
+    if brief.discussion.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        "\n## Discussion with the assistant\n\n\
+         The person talked this card over with the project's assistant. The Task and Acceptance \
+         above already hold every edit the person accepted; a proposal that is rejected or still \
+         waiting is not part of the card. Oldest first:\n\n",
+    );
+    for line in brief.discussion {
+        out.push_str(&format!("- {line}\n"));
+    }
+    out
 }
 
 /// The section of the instructions file that names the epic (the chain's goal); empty without one.
@@ -264,6 +285,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
     out.push_str(&epic_section(brief));
     out.push_str(&designs_section(brief));
     out.push_str(&design_section(brief));
+    out.push_str(&discussion_section(brief));
     out.push_str(&waiting::sections(brief.waiting, brief.returned));
     out.push_str(&earlier_section(brief));
     out.push_str(&checks_section(

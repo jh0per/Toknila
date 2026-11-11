@@ -60,6 +60,8 @@ pub struct RunBrief {
     /// Instructions the card's earlier runs were given (`toknila_core::instructions::earlier`),
     /// for a run that replaces one.
     pub earlier: Vec<String>,
+    /// The card's discussion with the assistant (`toknila_core::discussion::transcript`).
+    pub discussion: Vec<String>,
     /// Instructions no run has acted on yet (`toknila_core::instructions::waiting`): the run
     /// reads them first and they count as delivered once it started.
     pub waiting: Vec<String>,
