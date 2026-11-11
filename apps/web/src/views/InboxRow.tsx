@@ -3,7 +3,7 @@ import { post } from "../api/http";
 import type { InboxItem, InboxKind, TicketDetail } from "../api/types";
 import { MAX_ANSWER, answerProblem } from "../store/pins";
 import { finishReport } from "../store/permissionReports";
-import { HandIn } from "./HandIn";
+import { HandIn, InboxHandInBlocks } from "./HandIn";
 import type { Intent } from "../store/msg";
 import type { Route } from "../store/route";
 import type { State } from "../store/state";
@@ -201,7 +201,7 @@ function Review({ item, open, dispatch, detail }: BodyProps & { detail: TicketDe
     <div className="row-body" data-testid="no-verdict" data-no-verdict={noVerdict}>
       {(noVerdict || item.text) && <blockquote data-testid="question">{item.text}</blockquote>}
       {item.lines && item.lines.length > 0 && <pre className="screen" data-testid="screen">{item.lines.join("\n")}</pre>}
-      {report && <HandIn report={report} />}
+      {item.hand_in ? <InboxHandInBlocks handIn={item.hand_in} /> : report && <HandIn report={report} />}
       <div className="btns">
         {can("accept") && <button className="btn primary" data-testid="review-accept" onClick={() => act("accept")}>Accept</button>}
         {can("return") && (

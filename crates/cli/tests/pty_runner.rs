@@ -99,7 +99,7 @@ fn wait_line(rx: &mpsc::Receiver<String>, want: &str) {
 
 #[test]
 fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_daemon() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
     tok.profile(
@@ -188,7 +188,7 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
 
 #[test]
 fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the_panel() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
     // No hooks are wired, so the way in is the terminal.
@@ -237,7 +237,7 @@ fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the
 
 #[test]
 fn a_return_goes_to_the_same_live_agent_session_and_is_delivered_once() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
     // The agent stays alive after its hand-in and reads one line, as a session would.

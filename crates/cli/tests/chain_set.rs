@@ -8,7 +8,7 @@ use common::Tok;
 
 /// Two projects, each with a chain `work` without autostart; returns the id of DEMO's.
 fn tok() -> (tempfile::TempDir, Tok, String) {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO"]);
     tok.run(&["project", "new", "OTHR"]);

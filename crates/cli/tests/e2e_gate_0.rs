@@ -10,7 +10,7 @@ const DEMO: &str = include_str!("../../../examples/demo.toml");
 
 #[test]
 fn gate_0() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, DEMO).expect("write demo");

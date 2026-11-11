@@ -44,6 +44,7 @@ fn an_open_pin_is_a_design_question_of_its_card() {
     assert_eq!(i.kind, InboxKind::DesignQuestion);
     assert_eq!(i.ticket, card.key);
     assert_eq!(i.text, "home.png: Is the logo fixed?");
+    assert_eq!(i.design.as_deref(), Some("home.png"));
     assert_eq!(i.pin.as_deref(), Some(p.id.to_string().as_str()));
     assert_eq!(i.since, Timestamp(500));
 }

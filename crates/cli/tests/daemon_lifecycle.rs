@@ -7,10 +7,15 @@ use serde_json::Value;
 mod common;
 
 fn tok(home: &std::path::Path, args: &[&str]) -> Value {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_tok"));
-    cmd.args(args).arg("--json").env("TOKNILA_HOME", home);
-    common::isolate(&mut cmd, home);
-    let out = cmd.output().expect("run tok");
+    let out = if args == ["daemon", "start"] {
+        // The daemon is started with a lifeline, so it dies with this test binary.
+        common::start_daemon(home)
+    } else {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_tok"));
+        cmd.args(args).arg("--json").env("TOKNILA_HOME", home);
+        common::isolate(&mut cmd, home);
+        cmd.output().expect("run tok")
+    };
     assert!(
         out.status.success(),
         "tok {args:?} failed: {}\n{}",
@@ -35,7 +40,7 @@ fn status_code(r: Result<ureq::Response, ureq::Error>) -> u16 {
 
 #[test]
 fn start_status_auth_stop() {
-    let home = tempfile::tempdir().expect("tempdir");
+    let home = common::tempdir();
     let h = home.path();
     // Stops the daemon even when an assertion fails or the run is interrupted.
     let _stop = common::DaemonGuard::new(h);
