@@ -106,6 +106,16 @@ try {
   if (await hit("EDG-1>EDG-2").count()) throw new Error("the old line is still there");
   await expectText(card("EDG-2").locator("[data-testid=status]"), "ready", "the card that no longer waits is ready again");
 
+  // The CLI's move is the same one request: it lands whole, and a refusal (EDG-4 has started)
+  // leaves the line where it was.
+  tok("dep", "mv", "EDG-1", "EDG-3", "--new-to", "EDG-2");
+  await hit("EDG-1>EDG-2").waitFor({ state: "attached" });
+  if (await hit("EDG-1>EDG-3").count()) throw new Error("tok dep mv left the old line");
+  refusal("dep", "mv", "EDG-1", "EDG-2", "--new-to", "EDG-4");
+  tok("dep", "mv", "EDG-1", "EDG-2", "--new-to", "EDG-3");
+  await hit("EDG-1>EDG-3").waitFor({ state: "attached" });
+  await waitEdges(1, "tok dep mv moves a line whole and a refused move changes nothing");
+
   // A cycle is refused with the daemon's own message; nothing changes.
   const cycle = refusal("dep", "add", "EDG-3", "EDG-1");
   await drag(handle("EDG-3"), card("EDG-1"));

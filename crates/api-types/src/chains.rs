@@ -87,6 +87,26 @@ pub struct EdgeInput {
     pub kind: EdgeKind,
 }
 
+/// `POST /v1/chains/{chain}/edges/move`: replace a dependency by another, all or nothing.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EdgeMoveInput {
+    /// The dependency that is dropped (its `kind` is ignored).
+    pub old: EdgeInput,
+    /// The dependency that takes its place.
+    pub new: EdgeInput,
+}
+
+/// `POST /v1/tickets/{ticket}/designs/{index}/move`: give a design reference to another card.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DesignMoveInput {
+    /// Key of the card of the same chain that receives the reference.
+    pub target: String,
+}
+
 /// `POST /v1/chains/{chain}/tickets/{ticket}/move`: put the card directly before or after
 /// another card of the chain.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
