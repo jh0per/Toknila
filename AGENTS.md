@@ -109,6 +109,9 @@ Running the gates on a developer Mac:
   tests; `expect("why this cannot fail")` when an invariant guarantees it.
 - IDs are ULIDs; humans address tickets by short keys like `DEMO-3`.
 - Serialisation with `serde`; any JSON a user or another process sees is pinned by a snapshot test.
+- A type the store reads back never carries `#[serde(deny_unknown_fields)]`; strictness against
+  unknown fields lives in the HTTP body extractor (`serde_ignored`), so an old or newer row with
+  an extra field still loads.
 - Public items get a one-line doc comment saying what, not how.
 
 ## Verification discipline
