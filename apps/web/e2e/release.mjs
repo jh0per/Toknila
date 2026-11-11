@@ -5,7 +5,8 @@
 // check command. The Finish node offers Release; its dialog suggests 0.1.0 and lists the steps;
 // Release runs the check and the tag, the dialog reads released, and the Finish node reads
 // released with the tag v0.1.0, which is a real tag of the repository. The picture of the
-// finished dialog goes to docs/runs/release.png.
+// finished dialog goes to apps/web/e2e-artifacts/release.png, or to docs/runs/release.png when
+// TOKNILA_E2E_DOCS=1 is set (the one committed picture).
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -27,7 +28,9 @@ const git = (cwd, ...args) =>
     cwd,
     encoding: "utf8",
   }).trim();
-const shot = join(dirname(fileURLToPath(import.meta.url)), "../../../docs/runs/release.png");
+const here = dirname(fileURLToPath(import.meta.url));
+// The picture goes to the ignored e2e artefacts folder; TOKNILA_E2E_DOCS=1 refreshes the committed one.
+const shot = process.env.TOKNILA_E2E_DOCS === "1" ? join(here, "../../../docs/runs/release.png") : join(here, "../e2e-artifacts/release.png");
 
 let browser;
 try {
