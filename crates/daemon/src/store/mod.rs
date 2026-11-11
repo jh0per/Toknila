@@ -17,6 +17,7 @@ mod removal;
 mod schema;
 mod settle;
 mod ships;
+mod suggestions;
 mod threads;
 mod tickets;
 mod usage;
@@ -92,8 +93,26 @@ impl<'c> WriteTx<'c> {
     }
 
     /// Journals a domain event in this transaction.
+    ///
+    /// An event that ends the project's standing suggestion (its card moved on, or the release it
+    /// names was made) ends it here, in the same transaction, whoever caused the event.
     pub fn emit(&mut self, event: &DomainEvent) -> Result<(), StoreError> {
-        self.append(event.entity(), event.entity_id(), event.kind(), event)
+        self.append(event.entity(), event.entity_id(), event.kind(), event)?;
+        if let Some(ends) = toknila_core::suggestion::ends(event) {
+            for (project, project_key) in self.repo().end_suggestions(&ends)? {
+                let cleared = DomainEvent::WindowSuggestionCleared {
+                    project,
+                    project_key,
+                };
+                self.append(
+                    cleared.entity(),
+                    cleared.entity_id(),
+                    cleared.kind(),
+                    &cleared,
+                )?;
+            }
+        }
+        Ok(())
     }
 
     /// Appends a raw journal entry; [`Self::emit`] is the typed way in.

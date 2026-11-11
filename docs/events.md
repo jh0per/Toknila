@@ -260,6 +260,15 @@ changes. A window follows it once per event (by `seq`) and only when it shows th
 assistant or a chain of it; it then opens the card's page with a notice and Back. Any other
 window ignores it. `tok watch` prints it as `window show_card DEMO-2`.
 
+The planner's `suggest` tool (`POST /v1/planner/suggestion`) keeps one standing suggestion per
+project, the owner's next step, and journals `window` kind `suggest` (`{"project","suggestion"}`;
+the suggestion is `{"project","text","card","chain","action","at"}`, `action` one of `start`,
+`answer`, `accept`, `release`, absent with no card when nothing waits for the owner). A new one
+replaces the old. In the transaction of an event that ends it (a `ticket` `status_changed` of its
+card, or a release of its chain made or moved) the store removes it and journals `window` kind
+`suggestion_cleared` (`{"project","project_key"}`). A window reads it with
+`GET /v1/projects/{project}/suggestion` (`null` when none) and reloads on both events.
+
 Deleting a project (`POST /v1/projects/{project}/delete`) first removes the journal entries
 about the project and everything in it (its chains, cards, milestones, comments, subtasks and
 threads), then journals one `chain` kind `deleted` (`{"chain"}`, the chain as it was) per chain

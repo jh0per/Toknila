@@ -92,6 +92,8 @@ const TABLE: Record<string, Words> = {
   "thread.approved": (p) => `Thread approved: ${str(p.thread?.title)}`,
   "thread.reopened": (p) => `Thread reopened: ${str(p.thread?.title)}`,
   "window.show_card": (p) => `The assistant opened ${str(p.ticket) || "a card"}`,
+  "window.suggest": (p) => `The assistant says the next step: ${str(p.suggestion?.text)}`,
+  "window.suggestion_cleared": () => "The assistant's next step is done",
 };
 
 /// Every (entity, kind) the journal has words for.
