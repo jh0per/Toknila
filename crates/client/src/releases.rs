@@ -36,9 +36,15 @@ impl Client {
     }
 
     /// `POST /chains/{chain}/release`: the click on Release; the run goes on in the daemon.
-    pub fn start_release(&self, chain: &str, version: &str) -> ClientResult<ChainDetail> {
+    pub fn start_release(
+        &self,
+        chain: &str,
+        version: &str,
+        resume: bool,
+    ) -> ClientResult<ChainDetail> {
         let body = toknila_api_types::StartRelease {
             version: version.to_owned(),
+            resume,
         };
         self.call(
             "POST",

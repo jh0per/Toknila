@@ -22,10 +22,27 @@ pub async fn recover(store: &Store) -> Result<Recovery, ApiError> {
                     "database integrity check: {check}"
                 ))));
             }
+            interrupt_release_runs(tx)?;
             Ok(toknila_app::recovery::recover(tx)?)
         })
         .await?;
     Ok(report)
+}
+
+/// A release run that was going when the daemon stopped is marked interrupted at the step it was
+/// in: its steps are in the journal, and a person can run it again from there.
+fn interrupt_release_runs(tx: &mut crate::store::WriteTx<'_>) -> Result<(), StoreError> {
+    use crate::store::release_runs::{Entry, interrupted_at};
+    for id in tx.repo().release_run_ids()? {
+        let Some(run) = tx.repo().release_run(id)? else {
+            continue;
+        };
+        if run.state == toknila_api_types::RunState::Running {
+            let step = interrupted_at(&run);
+            tx.journal_release_run(id, &Entry::RunInterrupted { step })?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

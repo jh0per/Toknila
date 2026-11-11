@@ -19,6 +19,9 @@ pub struct ReleaseOffer {
     pub steps: Vec<ReleaseStep>,
     /// The branch the release is made on.
     pub base: String,
+    /// The last run of the chain's own release, read from the journal; `None` before the first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<ReleaseRun>,
 }
 
 /// Body of `POST /v1/chains/{chain}/release`: the person's click on Release.
@@ -27,6 +30,9 @@ pub struct ReleaseOffer {
 pub struct StartRelease {
     /// The version, such as `1.4.0`; it becomes the tag `v1.4.0`.
     pub version: String,
+    /// Run an interrupted release again from the step it stopped at; what passed is not redone.
+    #[serde(default)]
+    pub resume: bool,
 }
 
 /// Where one step of a release run is.
@@ -38,6 +44,8 @@ pub enum StepState {
     Running,
     Done,
     Failed,
+    /// The daemon stopped while the step ran.
+    Interrupted,
 }
 
 /// One step of a release run with what it printed.
@@ -61,6 +69,8 @@ pub enum RunState {
     Failed,
     /// Every step passed and the release node reads released.
     Done,
+    /// The daemon stopped while the run was going; it can be run again from `resume_from`.
+    Interrupted,
 }
 
 /// Answer of `GET /v1/releases/{release}/run`: the last release run of a milestone.
@@ -75,6 +85,9 @@ pub struct ReleaseRun {
     /// Why the run stopped, naming the step; only when it failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// The step an interrupted run was in; only when it is interrupted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_from: Option<ReleaseStep>,
 }
 
 /// Answer of `GET /v1/projects/{project}/next-version`: the version a new chain suggests.
