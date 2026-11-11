@@ -42,6 +42,8 @@ export interface State {
   events: EventRecord[];
   loaded: boolean;
   error: string;
+  /// What the daemon said an answer did ("Allowed always in this project: Bash(cargo test *)").
+  notice: string;
   link: Link;
   /// Newest journal seq applied; the stream resumes after it.
   lastSeq: number;
@@ -99,6 +101,7 @@ export function initialState(route: Route): State {
     events: [],
     loaded: false,
     error: "",
+    notice: "",
     link: "connecting",
     lastSeq: 0,
     retryMs: FIRST_RETRY_MS,

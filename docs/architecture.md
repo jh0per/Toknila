@@ -105,7 +105,14 @@ A new agent is a new file, not new code.
   the project's `allowed_commands`. The rules go into the allow list of every later worker run,
   and the daemon answers a prompt a rule covers (`rule_covers`: one simple command only, never a
   list, pipe, redirect or substitution) without asking, also for agents already running, and
-  answers the same kind of prompt other cards of the project already show.
+  answers the same kind of prompt other cards of the project already show. A `cd` or `export`
+  prefix that is not plain (it holds `$` or a backtick) is not dropped and never becomes a rule on
+  `cd` or `export`: the exact command is the rule, or there is none. The inbox item says which
+  (`allow_always`: the rule, or `allow_always_none`: the reason, from `allow_always_for`); the
+  window shows it under the button and hides the button without a rule, `tok ticket show` prints
+  it, and the answer (200 `AnswerOutcome`, only after Allow always) says what was added. Under
+  `trust` the permission hook allows every tool a worker asks about, because the deny list is
+  applied before the agent asks: trust allows everything the deny list does not name.
 - **Environment.** The agent's process gets the daemon's environment minus `CLAUDECODE` and
   `CLAUDE_CODE_*` (they describe the session that started the daemon: the child-session marker
   turns transcript saving off), unless the profile's own `env` sets the variable

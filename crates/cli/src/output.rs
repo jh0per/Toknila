@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 use toknila_api_types::{ChainDetail, EventRecord, TicketDetail, TicketItem};
 use toknila_core::wire::wire_name;
-use toknila_core::{Actor, CommentKind, NodeRef, StatusReason, WaitingReason};
+use toknila_core::{Actor, CommentKind, NodeRef, StatusReason};
 
 use crate::check_words::check_words_now;
 
@@ -235,13 +235,7 @@ pub fn ticket(d: &TicketDetail) {
     if !r.is_empty() {
         println!("reason: {r}");
     }
-    if let Some(StatusReason::Waiting(WaitingReason::Permission {
-        detail: Some(full), ..
-    })) = &t.status_reason
-    {
-        println!("the full request:");
-        full.lines().for_each(|line| println!("  {line}"));
-    }
+    crate::allow_always::print_request(t.status_reason.as_ref());
     println!(
         "chain: {}  profile: {}",
         d.chain,

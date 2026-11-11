@@ -6,10 +6,14 @@
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
-use toknila_api_types::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
+use toknila_api_types::{
+    AnswerOutcome, NewAnswer, PermissionAsk, PermissionDecision, PermissionReply,
+};
 use toknila_app::{AppError, Reader, agent, projects, questions, resolve, runs};
 use toknila_core::agent::AgentEvent;
+use toknila_core::command_policy::allow_always_for;
 use toknila_core::question::{self, AnswerKind, Decision, Delivery, QuestionKind};
 use toknila_core::{
     Actor, AgentRole, StatusReason, Ticket, TicketId, TicketStatus, Timestamp, WaitingReason, hook,
@@ -52,7 +56,7 @@ fn open_question(
 #[utoipa::path(post, path = "/tickets/{ticket}/runner/answer", tag = "runner",
     params(("ticket" = String, Path, description = "Ticket id or key")),
     request_body = NewAnswer,
-    responses((status = 204, description = "Delivered to the agent and journaled"), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+    responses((status = 204, description = "Delivered to the agent and journaled"), (status = 200, body = AnswerOutcome, description = "Delivered; the answer was Allow always, and the body says what was added"), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
 /// A person's answer to what the ticket's worker or reviewer asks: allow or deny a permission, or
 /// a key or text for an agent that waits on its screen. Core says which answers the open question
 /// takes; an answer to a permission goes to the agent's waiting hook, else to its terminal. The
@@ -61,7 +65,7 @@ pub async fn runner_answer(
     State(state): State<AppState>,
     Path(ticket): Path<String>,
     Json(body): Json<NewAnswer>,
-) -> ApiResult<StatusCode> {
+) -> ApiResult<Response> {
     let t = state
         .store
         .read(move |repo| Ok(resolve::ticket(repo, &ticket)))
@@ -104,36 +108,64 @@ pub async fn runner_answer(
     }
     let answer = body.answer;
     let others = runners.prompts().worker_hook_dialogs();
-    let (covered, _) = state
+    let remember_tool = remember.clone();
+    let asked_always = body.always && answer == AnswerKind::Allow && role == AgentRole::Worker;
+    let ((covered, added), _) = state
         .store
-        .write(Actor::Human, at, move |tx| -> ApiResult<Vec<TicketId>> {
-            let mut covered = Vec::new();
-            if let Some(tool) = &remember
-                && projects::remember_command(tx, &t, tool)?.is_some()
-            {
-                // The new rule also answers what other cards of the project already ask.
-                let project = projects::of_ticket(tx, &t)?;
-                for (id, other_tool) in &others {
-                    let Some(other) = tx.ticket(*id)? else {
-                        continue;
-                    };
-                    let same = projects::of_ticket(tx, &other)?.id == project.id;
-                    if *id != t.id && same && project.allows_tool(other_tool) {
-                        questions::answered(tx, &other, AgentRole::Worker, AnswerKind::Allow)?;
-                        covered.push(*id);
+        .write(
+            Actor::Human,
+            at,
+            move |tx| -> ApiResult<(Vec<TicketId>, Option<String>)> {
+                let mut covered = Vec::new();
+                let mut added = None;
+                if let Some(tool) = &remember
+                    && let Some(rule) = projects::remember_command(tx, &t, tool)?
+                {
+                    added = Some(rule);
+                    // The new rule also answers what other cards of the project already ask.
+                    let project = projects::of_ticket(tx, &t)?;
+                    for (id, other_tool) in &others {
+                        let Some(other) = tx.ticket(*id)? else {
+                            continue;
+                        };
+                        let same = projects::of_ticket(tx, &other)?.id == project.id;
+                        if *id != t.id && same && project.allows_tool(other_tool) {
+                            questions::answered(tx, &other, AgentRole::Worker, AnswerKind::Allow)?;
+                            covered.push(*id);
+                        }
                     }
                 }
-            }
-            questions::answered(tx, &t, role, answer)?;
-            Ok(covered)
-        })
+                questions::answered(tx, &t, role, answer)?;
+                Ok((covered, added))
+            },
+        )
         .await?;
     for id in covered {
         runners
             .prompts()
             .resolve(id, AgentRole::Worker, Decision::Allow);
     }
-    Ok(StatusCode::NO_CONTENT)
+    if !asked_always {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    }
+    let note = match &added {
+        Some(rule) => format!("Allowed always in this project: {rule}"),
+        None => {
+            let why = match remember_tool
+                .as_deref()
+                .and_then(|t| allow_always_for(None, t))
+            {
+                Some(Err(why)) => why,
+                _ => "the question is not about a command",
+            };
+            format!("Allowed this time only, no rule was added: {why}")
+        }
+    };
+    Ok(Json(AnswerOutcome {
+        rule_added: added,
+        note,
+    })
+    .into_response())
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/permission", tag = "agent", request_body = PermissionAsk,
@@ -183,14 +215,17 @@ pub async fn agent_permission(
         }));
     }
     // A command the person allowed always (the project remembers a rule for it) is not asked
-    // again, not even by an agent that started before the rule was made.
-    if role == AgentRole::Worker
-        && let Some(tool) = tool.clone()
-    {
+    // again, not even by an agent that started before the rule was made. Under trust every tool
+    // that reaches this hook is allowed: the tools the deny list names never get this far.
+    if role == AgentRole::Worker {
+        let tool = tool.clone().unwrap_or_default();
         let ticket = t.clone();
         let covered = state
             .store
-            .read(move |repo| Ok(projects::of_ticket(repo, &ticket).map(|p| p.allows_tool(&tool))))
+            .read(move |repo| {
+                Ok(projects::of_ticket(repo, &ticket)
+                    .map(|p| p.command_policy.allows_every_tool() || p.allows_tool(&tool)))
+            })
             .await??;
         if covered {
             return Ok(Json(PermissionReply {
