@@ -236,6 +236,12 @@ impl Active {
         lock(&self.state).exit.is_some()
     }
 
+    /// The run was told to end (see [`Active::kill`]); its process may still be on its way out.
+    /// Such a run is not one to reuse, write to or count as alive for a new start.
+    pub fn stopping(&self) -> bool {
+        self.stopped.load(Ordering::SeqCst)
+    }
+
     /// The output from `cursor` (same run) or from the first retained byte.
     pub fn read(&self, cursor: Option<(toknila_core::RunId, u64)>) -> Chunk {
         let state = lock(&self.state);

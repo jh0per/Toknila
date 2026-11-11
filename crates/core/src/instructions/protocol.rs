@@ -126,6 +126,13 @@ fails to start), do not pass it silently: say `NOT_RUN` and why. Give each item 
 `ran` when you ran what shows it and quoted the result, `read` when you judged it from the diff \
 and the files, `not_run` when the check or test it names could not be run.
 
+The ship is your working directory, so run every command plain from it: no `cd`, no `&&` or `;` \
+chain, no `VAR=value` prefix, no `sh -c`; one command per Bash call, exactly as the hand-in names \
+it. If a command is refused, do not try another shape and do not FAIL the item: mark it \
+`not_run`, name the refused command in the verdict, and judge the rest by reading. A verdict \
+with nothing run is for the person, not a return: an item you could not run is never a `fail`, \
+and `request_changes` is for what you ran or read and found wrong.
+
 ## Give your verdict through the Toknila MCP tool
 
 You have one tool, `review_verdict`, of the MCP server `toknila`. Call it once, when you are done:

@@ -53,9 +53,9 @@ pub fn deny_rules_for(abs: &str, home: &str) -> Vec<String> {
     out
 }
 
-/// The allow rule for reading exactly one file (not a folder, no wildcard).
-pub fn read_rule(abs_file: &str) -> String {
-    format!("Read(/{})", rooted(abs_file))
+/// The allow rule that lets an agent `Read` exactly one absolute file (nothing below or beside it).
+pub fn read_allow_rule(abs: &str) -> String {
+    format!("Read(/{})", rooted(abs))
 }
 
 /// The absolute private paths below `home`.
@@ -119,8 +119,11 @@ mod tests {
 
     #[test]
     fn a_read_rule_names_one_file_in_the_same_spelling_as_a_deny_rule() {
-        assert_eq!(read_rule("/d/designs/p/x.png"), "Read(//d/designs/p/x.png)");
-        assert_eq!(read_rule(r"C:\d\x.png"), "Read(//c/d/x.png)");
+        assert_eq!(
+            read_allow_rule("/d/designs/p/x.png"),
+            "Read(//d/designs/p/x.png)"
+        );
+        assert_eq!(read_allow_rule(r"C:\d\x.png"), "Read(//c/d/x.png)");
         // Control: the deny rule of the same file is spelled the same way.
         assert_eq!(
             deny_rules_for("/d/designs/p/x.png", "/u")[0],

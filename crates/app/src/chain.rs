@@ -28,7 +28,7 @@ pub struct ChainTx {
 const MAX_ROUNDS: usize = 10_000;
 
 impl ChainTx {
-    fn new(view: ChainView, now: Timestamp) -> Self {
+    pub(crate) fn new(view: ChainView, now: Timestamp) -> Self {
         Self {
             view,
             now,

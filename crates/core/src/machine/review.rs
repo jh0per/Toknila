@@ -9,7 +9,7 @@ use super::checks::{non_empty, run_on_ship};
 use super::{Effect, TransitionError};
 use crate::{
     Actor, ItemVerdict, ReviewMode, ReviewNote, ReviewTurn, StatusReason, Ticket, TicketStatus,
-    Timestamp, Verdict, check_items, render_items,
+    Timestamp, Verdict, check_items, render_items, request_is_unfounded,
 };
 
 /// What the reviewer is told when it ends its turn without a verdict.
@@ -181,10 +181,10 @@ pub(super) struct AgentVerdict<'a> {
     pub max_rounds: u32,
 }
 
-/// The reviewer agent gave its verdict. It is only heard while the card waits for the agent, and
-/// it must judge every acceptance item. An approval that decides starts the merge (and in both
-/// mode waits for the person); a request for changes returns the card to the worker, a round of
-/// the loop, until the project's round limit is used.
+/// The reviewer agent gave its verdict, heard while the card waits for the agent; it must judge
+/// every acceptance item. An approval that decides starts the merge (in both mode the person
+/// follows); a request for changes is a round that returns the card to the worker until the
+/// round limit is used, unless it is unfounded (nothing run or read fails): then no round.
 pub(super) fn agent_decides(
     next: &mut Ticket,
     said: AgentVerdict<'_>,
@@ -202,9 +202,11 @@ pub(super) fn agent_decides(
     if said.verdict == Verdict::RequestChanges {
         non_empty(&text, "request_changes")?;
     }
+    if said.verdict == Verdict::RequestChanges && request_is_unfounded(said.items, said.comment) {
+        return super::unfounded::wait_for_person(next, &text, effects);
+    }
     next.review.record(Actor::Agent, said.verdict, &text, now);
-    // The reviewer is done once its verdict is recorded: its process ends and its parallel slot
-    // is free again. The worker's runner stays; a Return goes to that session.
+    // The reviewer is done: its process ends and its slot is free. The worker's runner stays.
     effects.push(Effect::StopReviewer);
     match said.verdict {
         Verdict::Approve if !decides => {
@@ -278,8 +280,7 @@ pub(super) fn agent_stopped(
     Ok((TicketStatus::Review, None))
 }
 
-/// A person asks for the reviewer again after it gave no verdict. The person still decides after
-/// the new verdict (both mode), so a second failure cannot merge anything on its own.
+/// A person asks for the reviewer again after it gave no verdict.
 pub(super) fn rerun(
     next: &mut Ticket,
     effects: &mut Vec<Effect>,

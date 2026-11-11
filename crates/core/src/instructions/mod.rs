@@ -50,6 +50,8 @@ pub struct RunBrief<'a> {
     pub design_first: bool,
     /// The designs the card references, with the file each is kept in.
     pub designs: &'a [BriefDesign],
+    /// A planner's project has designs the planner must look at first.
+    pub has_designs: bool,
 }
 
 /// A design a card references, as the instructions name it: the file the agent may read and the
@@ -177,6 +179,13 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         );
     }
     match role {
+        crate::AgentRole::Planner if brief.has_designs => format!(
+            "You are the planner of project {key}. Read your Toknila instructions, call \
+             `show_plan`. The project has designs: Read every design file `show_plan` lists \
+             first, say in a few lines what screens and flows you see, then propose the cards, \
+             and name the designs each card you add comes from. Do not start any card.",
+            key = brief.key
+        ),
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
              `show_plan`, then tell the owner in a line or two how the plan stands and wait for \
@@ -186,8 +195,8 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         crate::AgentRole::Reviewer => format!(
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
              branch, run the check command and the tests the hand-in names and quote their \
-             result lines, mark NOT_RUN what you could not run, then call `review_verdict` \
-             once. You do not change the code.",
+             result lines (each command plain, one per call, no `cd` or `&&`), mark NOT_RUN what \
+             you could not run (never FAIL it), then call `review_verdict` once. You do not change the code.",
             key = brief.key
         ),
         _ => format!(

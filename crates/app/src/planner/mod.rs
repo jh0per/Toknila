@@ -9,6 +9,7 @@
 mod cards;
 mod plan;
 mod window;
+mod with_designs;
 
 use serde::{Deserialize, Serialize};
 use toknila_core::instructions::ProjectFacts;
@@ -25,6 +26,7 @@ pub use cards::{
 };
 pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, plan};
 pub use window::show_card;
+pub use with_designs::{request_with, start_with};
 
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError, Started};
 use crate::{AppError, AppResult, ErrorKind, Reader, UnitOfWork, chains, resolve, threads};

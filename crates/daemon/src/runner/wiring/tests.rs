@@ -8,6 +8,7 @@ use toknila_core::{AgentProfile, AgentRole, RunId};
 use super::*;
 
 mod planner;
+mod reviewer_rules;
 
 const TOKEN: &str = "secret-run-token-0123456789abcdef";
 
@@ -826,7 +827,7 @@ fn a_worker_may_read_exactly_the_design_files_of_its_card_and_is_told_them() {
         h: 30,
     };
     rig.brief.design_project = Some(project);
-    rig.brief.designs = vec![DesignRef {
+    rig.brief.card_designs = vec![DesignRef {
         design: login.id,
         region: Some(region),
     }];
@@ -838,7 +839,7 @@ fn a_worker_may_read_exactly_the_design_files_of_its_card_and_is_told_them() {
         .join("designs")
         .join(project.to_string())
         .join(format!("{}.png", login.id));
-    let rule = toknila_core::private::read_rule(&file.display().to_string());
+    let rule = toknila_core::private::read_allow_rule(&file.display().to_string());
     let (_, text) = rig.file("settings.json");
     let v: Value = serde_json::from_str(&text).expect("json");
     let allow: Vec<&str> = v["permissions"]["allow"]

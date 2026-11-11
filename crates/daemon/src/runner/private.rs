@@ -13,13 +13,28 @@ fn entries(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
+/// What of `dir` is denied when the files in `keep` stay readable: an entry that holds a kept
+/// file is opened and its other entries are denied in turn, so a kept file is the only thing
+/// readable along its path.
+fn denied_around(dir: &Path, keep: &[PathBuf]) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for entry in entries(dir) {
+        if keep.contains(&entry) {
+            continue;
+        }
+        if keep.iter().any(|k| k.starts_with(&entry)) {
+            out.extend(denied_around(&entry, keep));
+        } else {
+            out.push(entry);
+        }
+    }
+    out
+}
+
 /// The data-home paths to deny: every entry of the data home (`run_dir` is
 /// `<data home>/runs/<ticket>`) except `runs`, and every entry of `runs` except the run's own
-/// folder. A run folder that is not two levels below a data home denies nothing here.
-///
-/// The files of `keep` (design files the card agent may read) are the one exception: a folder
-/// that holds one is denied entry by entry, so that the deny rules leave exactly those files out
-/// (a deny rule would win over the allow rule for the file).
+/// folder. The files in `keep` (a planner's design files) stay readable, and nothing beside them.
+/// A run folder that is not two levels below a data home denies nothing here.
 pub(super) fn data_home_paths(run_dir: &Path, keep: &[PathBuf]) -> Vec<String> {
     let (Some(runs), Some(own)) = (run_dir.parent(), run_dir.file_name()) else {
         return Vec::new();
@@ -28,13 +43,10 @@ pub(super) fn data_home_paths(run_dir: &Path, keep: &[PathBuf]) -> Vec<String> {
         return Vec::new();
     };
     let runs_name = runs.file_name();
-    let mut out: Vec<PathBuf> = Vec::new();
-    for p in entries(data_home)
+    let mut out: Vec<PathBuf> = denied_around(data_home, keep)
         .into_iter()
-        .filter(|p| p.file_name() != runs_name)
-    {
-        deny_except(&p, keep, &mut out);
-    }
+        .filter(|p| p.file_name() != runs_name || p.parent() != Some(data_home))
+        .collect();
     out.extend(
         entries(runs)
             .into_iter()
@@ -43,22 +55,7 @@ pub(super) fn data_home_paths(run_dir: &Path, keep: &[PathBuf]) -> Vec<String> {
     out.iter().map(|p| p.display().to_string()).collect()
 }
 
-/// Adds `path` to `out`, except the files of `keep`; a folder that holds one of them is
-/// replaced by its entries, recursively.
-fn deny_except(path: &Path, keep: &[PathBuf], out: &mut Vec<PathBuf>) {
-    if keep.iter().any(|k| k == path) {
-        return;
-    }
-    if keep.iter().any(|k| k.starts_with(path)) {
-        for e in entries(path) {
-            deny_except(&e, keep, out);
-        }
-    } else {
-        out.push(path.to_owned());
-    }
-}
-
-/// The deny rules for a run whose folder is `run_dir`, leaving the files of `keep` readable.
+/// The deny rules for a run whose folder is `run_dir`.
 pub(super) fn deny_rules(run_dir: &Path, keep: &[PathBuf]) -> Vec<String> {
     let Some(home) = dirs::home_dir() else {
         return Vec::new();
@@ -94,30 +91,27 @@ mod tests {
     }
 
     #[test]
-    fn a_kept_design_file_is_the_only_thing_left_out_of_the_designs_folder() {
+    fn a_kept_design_file_is_the_only_thing_readable_along_its_path() {
         let tmp = tempfile::tempdir().expect("tempdir");
+        for d in ["runs/t1", "db", "designs/p1", "designs/p2"] {
+            std::fs::create_dir_all(tmp.path().join(d)).expect("mkdir");
+        }
         for f in [
             "designs/p1/a.png",
             "designs/p1/b.png",
             "designs/p1/index.json",
-            "designs/p2/c.png",
-            "tokens/x",
         ] {
-            let path = tmp.path().join(f);
-            std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
-            std::fs::write(path, "x").expect("write");
+            std::fs::write(tmp.path().join(f), b"x").expect("write");
         }
-        std::fs::create_dir_all(tmp.path().join("runs/t1")).expect("mkdir");
         let keep = [tmp.path().join("designs/p1/a.png")];
         let paths = data_home_paths(&tmp.path().join("runs").join("t1"), &keep);
-        // Everything else of the library stays denied, the file itself is not.
         assert_eq!(
             names_in(tmp.path(), &paths),
             [
+                "db",
                 "designs/p1/b.png",
                 "designs/p1/index.json",
-                "designs/p2",
-                "tokens"
+                "designs/p2"
             ]
         );
     }

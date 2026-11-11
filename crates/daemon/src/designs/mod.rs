@@ -13,9 +13,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use toknila_api_types::Design;
-use toknila_app::planner::DesignPick;
-use toknila_core::design::{self, DesignKind, DesignRef, FigmaRef, MAX_DESIGN_BYTES};
+use toknila_api_types::{Design, PlannerDesign};
+use toknila_core::design::{self, DesignKind, FigmaRef, MAX_DESIGN_BYTES};
 use toknila_core::{DesignId, ProjectId, Timestamp};
 
 /// One writer at a time: the index is read, changed and written back.
@@ -81,6 +80,45 @@ impl Designs {
         Some(self.dir.join(format!("{}.{ext}", d.id)))
     }
 
+    /// The designs as the planner sees them: metadata and the path of each kept file.
+    pub fn for_planner(&self) -> Result<Vec<PlannerDesign>, DesignError> {
+        Ok(self
+            .list()?
+            .into_iter()
+            .map(|d| PlannerDesign {
+                path: d
+                    .has_file
+                    .then(|| self.file_of(&d))
+                    .flatten()
+                    .map(|p| p.display().to_string()),
+                id: d.id,
+                name: d.name,
+                kind: d.kind,
+                mime: d.mime,
+                size: d.size,
+                hint: d.hint,
+            })
+            .collect())
+    }
+
+    /// The paths of the kept design files, which a planner may read.
+    pub fn file_paths(&self) -> Vec<PathBuf> {
+        self.for_planner()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|d| d.path.map(PathBuf::from))
+            .collect()
+    }
+
+    /// One design for the planner, by id or by name (any letter case).
+    pub fn find_for_planner(&self, reference: &str) -> Result<PlannerDesign, DesignError> {
+        let all = self.for_planner()?;
+        let reference = reference.trim();
+        all.into_iter()
+            .find(|d| d.id.to_string() == reference || d.name.eq_ignore_ascii_case(reference))
+            .ok_or_else(|| DesignError::NotFound(reference.to_owned()))
+    }
+
     /// Every design, oldest first, with the hint a link without an image shows.
     pub fn list(&self) -> Result<Vec<Design>, DesignError> {
         let has_token = self.has_token();
@@ -99,66 +137,6 @@ impl Designs {
         self.load()
             .map(|all| all.into_iter().map(|d| d.name).collect())
             .unwrap_or_default()
-    }
-
-    /// The designs as (id, file name) pairs, for chain files.
-    pub fn library(&self) -> Vec<(DesignId, String)> {
-        self.load()
-            .map(|all| all.into_iter().map(|d| (d.id, d.name)).collect())
-            .unwrap_or_default()
-    }
-
-    /// Turns what a planner named (a file name or an id) into references; a design the project
-    /// does not have is refused, with the names it has.
-    pub fn resolve(&self, picks: &[DesignPick]) -> Result<Vec<DesignRef>, DesignError> {
-        let all = self.load()?;
-        let refs = picks
-            .iter()
-            .map(|p| {
-                let found = all
-                    .iter()
-                    .find(|d| d.id.to_string() == p.design)
-                    .or_else(|| all.iter().find(|d| d.name == p.design));
-                found
-                    .map(|d| DesignRef {
-                        design: d.id,
-                        region: p.region,
-                    })
-                    .ok_or_else(|| {
-                        let names: Vec<&str> = all.iter().map(|d| d.name.as_str()).collect();
-                        DesignError::Invalid(format!(
-                            "the project has no design {:?}; its designs: {}",
-                            p.design,
-                            if names.is_empty() {
-                                "none".to_owned()
-                            } else {
-                                names.join(", ")
-                            }
-                        ))
-                    })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        design::check_refs(&refs).map_err(DesignError::Invalid)?;
-        Ok(refs)
-    }
-
-    /// Refuses references to a design the project does not have.
-    pub fn check_refs(&self, refs: &[DesignRef]) -> Result<(), DesignError> {
-        let all = self.load()?;
-        match refs.iter().find(|r| !all.iter().any(|d| d.id == r.design)) {
-            Some(r) => Err(DesignError::Invalid(format!(
-                "the project has no design {}",
-                r.design
-            ))),
-            None => Ok(()),
-        }
-    }
-
-    /// The kept file's path of a design, when one is kept.
-    pub fn path_of(&self, id: DesignId) -> Option<PathBuf> {
-        let d = self.load().ok()?.into_iter().find(|d| d.id == id)?;
-        let path = self.file_of(&d)?;
-        path.is_file().then_some(path)
     }
 
     /// Keeps an uploaded file. The kind comes from the bytes, not from the name.

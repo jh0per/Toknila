@@ -27,6 +27,33 @@ pub struct Design {
     pub hint: Option<String>,
 }
 
+/// A design as the planner sees it: its metadata and where its file is on this machine.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PlannerDesign {
+    pub id: DesignId,
+    pub name: String,
+    pub kind: DesignKind,
+    /// Media type of the kept file.
+    pub mime: Option<String>,
+    /// Bytes of the kept file; zero without one.
+    pub size: u64,
+    /// Absolute path of the kept file, which the planner may `Read`; absent when no file is kept.
+    pub path: Option<String>,
+    /// Why a link has no file yet, when known.
+    pub hint: Option<String>,
+}
+
+/// Answer of `GET /v1/planner/plan`: the plan and the project's designs.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PlannerPlan {
+    #[serde(flatten)]
+    pub plan: toknila_app::planner::PlanView,
+    /// Oldest first.
+    pub designs: Vec<PlannerDesign>,
+}
+
 /// Answer of `GET /v1/projects/{project}/designs`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

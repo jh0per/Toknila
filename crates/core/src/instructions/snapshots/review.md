@@ -24,6 +24,8 @@ Work in this worktree: it is the ship of the ticket, on its own branch. Read wha
 
 Do not approve by reading alone. Run the project's check command and every test the hand-in names (the `cargo test -p <crate> <name>` of a check line, say), and quote their result lines (`test result: ok. 12 passed`) as the evidence of the item. You may run the tests and checks of the project's toolchain and read-only git; nothing that writes (no commit, checkout or install) is allowed. When you could not run something (the command is refused, the tool is missing, it fails to start), do not pass it silently: say `NOT_RUN` and why. Give each item a `basis`: `ran` when you ran what shows it and quoted the result, `read` when you judged it from the diff and the files, `not_run` when the check or test it names could not be run.
 
+The ship is your working directory, so run every command plain from it: no `cd`, no `&&` or `;` chain, no `VAR=value` prefix, no `sh -c`; one command per Bash call, exactly as the hand-in names it. If a command is refused, do not try another shape and do not FAIL the item: mark it `not_run`, name the refused command in the verdict, and judge the rest by reading. A verdict with nothing run is for the person, not a return: an item you could not run is never a `fail`, and `request_changes` is for what you ran or read and found wrong.
+
 ## Give your verdict through the Toknila MCP tool
 
 You have one tool, `review_verdict`, of the MCP server `toknila`. Call it once, when you are done:

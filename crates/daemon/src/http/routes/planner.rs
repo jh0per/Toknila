@@ -6,14 +6,14 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
-use toknila_app::planner::{self, CardEdit, DesignPick, NewCard, NewPlanChain, PlanView};
+use toknila_api_types::{PlannerDesign, PlannerPlan};
+use toknila_app::planner::{self, CardEdit, DesignPick, NewCard, NewPlanChain};
 use toknila_app::threads::{self, NewMessage, NewThread, NewVersion};
 use toknila_core::design::DesignRef;
 use toknila_core::{Actor, ProjectId, ThreadId, Ticket};
 
-use crate::designs::Designs;
-
 use super::{ApiResult, chain_write, load_thread_detail, load_ticket_detail, read, stamp};
+use crate::designs::Designs;
 use crate::http::dto::{ChainDetail, EdgeInput, MoveInput, ThreadDetail, TicketDetail};
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, Principal, now};
@@ -24,17 +24,34 @@ const CARD: &str = "Card id, key or title";
 const THREAD: &str = "Thread number on the card (1, 2, ...) or thread id";
 
 #[utoipa::path(get, path = "/planner/plan", tag = "planner",
-    responses((status = 200, body = PlanView), (status = 403, body = ErrorBody)))]
-/// The whole plan of the planner's project: chains, cards in order, dependencies, threads.
+    responses((status = 200, body = PlannerPlan), (status = 403, body = ErrorBody)))]
+/// The whole plan of the planner's project: chains, cards in order, dependencies, threads, and
+/// the project's designs with the path of each file.
 pub async fn planner_plan(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
-) -> ApiResult<Json<PlanView>> {
+) -> ApiResult<Json<PlannerPlan>> {
     let project = principal.planner_project()?;
     let at = now();
-    Ok(Json(
-        read(&state, move |repo| Ok(planner::plan(repo, project, at)?)).await?,
-    ))
+    let plan = read(&state, move |repo| Ok(planner::plan(repo, project, at)?)).await?;
+    let designs = Designs::new(&state.home, project);
+    let designs = tokio::task::spawn_blocking(move || designs.for_planner()).await??;
+    Ok(Json(PlannerPlan { plan, designs }))
+}
+
+#[utoipa::path(get, path = "/planner/designs/{design}", tag = "planner",
+    params(("design" = String, Path, description = "Design id or name")),
+    responses((status = 200, body = PlannerDesign), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// One design of the planner's project: its metadata and the path of its file.
+pub async fn planner_design(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Path(design): Path<String>,
+) -> ApiResult<Json<PlannerDesign>> {
+    let project = principal.planner_project()?;
+    let designs = Designs::new(&state.home, project);
+    let found = tokio::task::spawn_blocking(move || designs.find_for_planner(&design)).await??;
+    Ok(Json(found))
 }
 
 #[utoipa::path(post, path = "/planner/chains", tag = "planner", request_body = NewPlanChain,

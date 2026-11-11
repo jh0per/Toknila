@@ -128,6 +128,8 @@ pub fn render_items(acceptance: &[String], items: &[ItemVerdict], comment: &str)
             .map_or("", String::as_str);
         let word = match i.outcome {
             ItemOutcome::Pass => "PASS",
+            // A failure that rests on nothing run is not a failure: it is recorded as not run.
+            ItemOutcome::Fail if i.basis == ItemBasis::NotRun => "NOT_RUN",
             ItemOutcome::Fail => "FAIL",
         };
         out.push_str(&format!("{word} {}. {text}", i.item));
@@ -138,6 +140,19 @@ pub fn render_items(acceptance: &[String], items: &[ItemVerdict], comment: &str)
     }
     out.push_str(comment.trim());
     out.trim().to_owned()
+}
+
+/// Whether a request for changes rests on nothing: no item fails on a basis of `ran` or `read`
+/// (every item is `not_run`, or passes), and, when there are no items at all, the comment says
+/// that nothing was run (`NOT_RUN` or "not run"). Such a verdict is for a person, not a round.
+pub fn request_is_unfounded(items: &[ItemVerdict], comment: &str) -> bool {
+    if items.is_empty() {
+        let c = comment.to_lowercase();
+        return c.contains("not_run") || c.contains("not run");
+    }
+    !items
+        .iter()
+        .any(|i| i.outcome == ItemOutcome::Fail && i.basis != ItemBasis::NotRun)
 }
 
 /// One verdict on a ticket. Numbers count from 1 over every verdict, a person's and the

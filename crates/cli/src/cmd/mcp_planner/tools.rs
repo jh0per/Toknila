@@ -12,9 +12,15 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
     vec![
         tool(
             "show_plan",
-            "Read the whole plan of the project: every chain with its cards in dependency order (the order is the priority), each card's status, prompt, acceptance, subtasks, what it waits for, threads, review results and pull request state.",
+            "Read the whole plan of the project: every chain with its cards in dependency order (the order is the priority), each card's status, prompt, acceptance, subtasks, what it waits for, threads, review results and pull request state; and `designs`, the project's designs with the path of each file you may Read.",
             json!({}),
             &[],
+        ),
+        tool(
+            "show_design",
+            "Read one design of the project: its name, kind, media type, size and the path of its file, which you may Read. Name the design by its id or its name (see `designs` in show_plan).",
+            json!({ "design": text("The design: its id or its name") }),
+            &["design"],
         ),
         tool(
             "new_chain",
