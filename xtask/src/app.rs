@@ -164,21 +164,24 @@ pub fn app() -> Result<(), String> {
     )?;
     link_applications(&stage)?;
     let dmg = out.join(format!("Toknila-{version}-{arch}.dmg"));
-    run(
-        "hdiutil",
-        &[
-            "create",
-            "-volname",
-            "Toknila",
-            "-srcfolder",
-            &path(&stage),
-            "-ov",
-            "-format",
-            "UDZO",
-            &path(&dmg),
-        ],
-        &out,
-    )?;
+    // `hdiutil create` fails now and then on a busy runner ("Resource busy"): try again.
+    retry(DMG_ATTEMPTS, DMG_PAUSE, "dmg", || {
+        run(
+            "hdiutil",
+            &[
+                "create",
+                "-volname",
+                "Toknila",
+                "-srcfolder",
+                &path(&stage),
+                "-ov",
+                "-format",
+                "UDZO",
+                &path(&dmg),
+            ],
+            &out,
+        )
+    })?;
     let _ = std::fs::remove_dir_all(&stage);
     let archive = updates::package(&out, &version, &arch)?;
     eprintln!("xtask app: PASS");
@@ -186,6 +189,37 @@ pub fn app() -> Result<(), String> {
     eprintln!("  dmg: {}", dmg.display());
     eprintln!("  update archive: {}", archive.display());
     Ok(())
+}
+
+/// How many times the dmg step is tried, and the pause between tries.
+const DMG_ATTEMPTS: u32 = 3;
+const DMG_PAUSE: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Runs `step` up to `attempts` times, sleeping `pause` between failures, and says in the log
+/// which attempt succeeded. Returns the last error when every attempt fails.
+fn retry(
+    attempts: u32,
+    pause: std::time::Duration,
+    name: &str,
+    mut step: impl FnMut() -> Result<(), String>,
+) -> Result<(), String> {
+    let mut last = String::new();
+    for attempt in 1..=attempts {
+        match step() {
+            Ok(()) => {
+                eprintln!("xtask app: {name} succeeded on attempt {attempt} of {attempts}");
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("xtask app: {name} attempt {attempt} of {attempts} failed: {e}");
+                last = e;
+                if attempt < attempts {
+                    std::thread::sleep(pause);
+                }
+            }
+        }
+    }
+    Err(format!("{name} failed after {attempts} attempts: {last}"))
 }
 
 /// The value of `--target <triple>` among the arguments after the task name, if given.
@@ -296,6 +330,32 @@ mod tests {
             built_dir(Path::new("t"), Some("x86_64-apple-darwin"), "release"),
             Path::new("t/x86_64-apple-darwin/release")
         );
+    }
+
+    #[test]
+    fn a_busy_first_attempt_is_retried_until_it_succeeds() {
+        let mut calls = 0;
+        let r = retry(3, std::time::Duration::ZERO, "dmg", || {
+            calls += 1;
+            if calls == 1 {
+                Err("hdiutil: create failed - Resource busy".to_owned())
+            } else {
+                Ok(())
+            }
+        });
+        assert_eq!(r, Ok(()));
+        assert_eq!(calls, 2);
+    }
+
+    #[test]
+    fn the_retry_gives_up_after_the_last_attempt() {
+        let mut calls = 0;
+        let r = retry(3, std::time::Duration::ZERO, "dmg", || {
+            calls += 1;
+            Err("busy".to_owned())
+        });
+        assert_eq!(calls, 3);
+        assert_eq!(r, Err("dmg failed after 3 attempts: busy".to_owned()));
     }
 
     #[test]
