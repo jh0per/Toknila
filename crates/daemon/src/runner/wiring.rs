@@ -199,6 +199,7 @@ fn brief_of_key<'a>(
         returned: cx.brief.returned.as_ref(),
         design_first: cx.brief.design_first,
         has_designs: !cx.brief.designs.is_empty(),
+        discussion: &cx.brief.discussion,
     }
 }
 

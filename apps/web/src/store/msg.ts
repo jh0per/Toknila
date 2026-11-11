@@ -61,7 +61,7 @@ export type ThreadAction = {
   type: "threadAction";
   key: string;
   thread: string;
-  action: "message" | "changes" | "approve";
+  action: "message" | "changes" | "approve" | "accept_edit" | "reject_edit";
   text?: string;
 };
 

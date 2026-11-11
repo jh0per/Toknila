@@ -1148,6 +1148,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tickets/{ticket}/discussion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A person says something to the project's assistant about the card: the message goes in the
+         *     card's discussion thread (opened by the first one). The text for the planner's terminal is the
+         *     window's to send.
+         */
+        post: operations["post_discussion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets/{ticket}/events": {
         parameters: {
             query?: never;
@@ -1375,6 +1396,43 @@ export interface paths {
         put?: never;
         /** A person asks for changes: a message that keeps the thread open, or reopens it. */
         post: operations["request_thread_changes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/threads/{thread}/edits/{message}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A person accepts the assistant's proposed edit of the card: it lands now. Refused when the card
+         *     changed since it was proposed.
+         */
+        post: operations["accept_edit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/threads/{thread}/edits/{message}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person rejects the assistant's proposed edit: the card stays as it is. */
+        post: operations["reject_edit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2191,7 +2249,7 @@ export interface components {
          * @description Plain message, or a person's request for changes.
          * @enum {string}
          */
-        MessageKind: "message" | "changes_requested";
+        MessageKind: "message" | "changes_requested" | "edit_proposal" | "edit_accepted" | "edit_rejected";
         /**
          * @description `POST /v1/chains/{chain}/tickets/{ticket}/move`: put the card directly before or after
          *     another card of the chain.
@@ -3298,7 +3356,7 @@ export interface components {
          * @description What a thread settles before the agent implements the card.
          * @enum {string}
          */
-        ThreadKind: "design" | "flow" | "architecture" | "other";
+        ThreadKind: "design" | "flow" | "architecture" | "discussion" | "other";
         /** @description One message in a thread. */
         ThreadMessage: {
             author: components["schemas"]["Actor"];
@@ -6307,6 +6365,48 @@ export interface operations {
             };
         };
     };
+    post_discussion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewMessage"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     agent_event: {
         parameters: {
             query?: never;
@@ -6879,6 +6979,90 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    accept_edit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+                /** @description Thread number on the ticket (1, 2, ...) or thread id */
+                thread: string;
+                /** @description Id of the proposal message in the thread */
+                message: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reject_edit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key, e.g. DEMO-3 */
+                ticket: string;
+                /** @description Thread number on the ticket (1, 2, ...) or thread id */
+                thread: string;
+                /** @description Id of the proposal message in the thread */
+                message: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

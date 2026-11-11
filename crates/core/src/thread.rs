@@ -93,17 +93,23 @@ pub fn open(
     if title.is_empty() {
         return Err(ThreadError::EmptyTitle);
     }
+    // A discussion has nothing to approve: it starts settled so it never blocks the hand-in.
+    let talk = kind == ThreadKind::Discussion;
     Ok(Thread {
         id,
         ticket_id: ticket,
         number,
         kind,
         title: title.to_owned(),
-        state: ThreadState::Open,
+        state: if talk {
+            ThreadState::Approved
+        } else {
+            ThreadState::Open
+        },
         opened_by: by,
         created_at: now,
         approved_version: None,
-        approved_at: None,
+        approved_at: talk.then_some(now),
     })
 }
 
@@ -121,6 +127,9 @@ pub fn message(
         return Err(ThreadError::EmptyText(match kind {
             MessageKind::Message => "message",
             MessageKind::ChangesRequested => "request for changes",
+            MessageKind::EditProposal | MessageKind::EditAccepted | MessageKind::EditRejected => {
+                "edit proposal"
+            }
         }));
     }
     Ok(ThreadMessage {

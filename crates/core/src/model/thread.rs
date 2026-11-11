@@ -13,6 +13,9 @@ pub enum ThreadKind {
     Flow,
     /// An architecture diagram.
     Architecture,
+    /// A person's talk with the project's assistant about the card. It is born approved: it never
+    /// blocks the hand-in and never counts as an approved design.
+    Discussion,
     Other,
 }
 
@@ -42,6 +45,13 @@ pub enum ArtifactFormat {
 pub enum MessageKind {
     Message,
     ChangesRequested,
+    /// The assistant's proposed change of a card's prompt or acceptance (the text is a
+    /// [`crate::discussion::EditProposal`] as JSON); it lands only when a person accepts it.
+    EditProposal,
+    /// A person accepted the proposal whose message id is the text.
+    EditAccepted,
+    /// A person rejected the proposal whose message id is the text.
+    EditRejected,
 }
 
 /// Where a ticket is: settling its design while any thread is open, implementing otherwise.

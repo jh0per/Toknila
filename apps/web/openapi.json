@@ -3717,6 +3717,65 @@
         }
       }
     },
+    "/tickets/{ticket}/discussion": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A person says something to the project's assistant about the card: the message goes in the\ncard's discussion thread (opened by the first one). The text for the planner's terminal is the\nwindow's to send.",
+        "operationId": "post_discussion",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/events": {
       "post": {
         "tags": [
@@ -4539,6 +4598,140 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/threads/{thread}/edits/{message}/accept": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A person accepts the assistant's proposed edit of the card: it lands now. Refused when the card\nchanged since it was proposed.",
+        "operationId": "accept_edit",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "description": "Thread number on the ticket (1, 2, ...) or thread id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "message",
+            "in": "path",
+            "description": "Id of the proposal message in the thread",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/threads/{thread}/edits/{message}/reject": {
+      "post": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "A person rejects the assistant's proposed edit: the card stays as it is.",
+        "operationId": "reject_edit",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key, e.g. DEMO-3",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "in": "path",
+            "description": "Thread number on the ticket (1, 2, ...) or thread id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "message",
+            "in": "path",
+            "description": "Id of the proposal message in the thread",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -6838,7 +7031,10 @@
         "description": "Plain message, or a person's request for changes.",
         "enum": [
           "message",
-          "changes_requested"
+          "changes_requested",
+          "edit_proposal",
+          "edit_accepted",
+          "edit_rejected"
         ]
       },
       "MoveInput": {
@@ -9979,6 +10175,7 @@
           "design",
           "flow",
           "architecture",
+          "discussion",
           "other"
         ]
       },

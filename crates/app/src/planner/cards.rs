@@ -9,6 +9,9 @@ use toknila_core::{ProjectId, TicketId, TicketPatch};
 use super::{card, chain};
 use crate::tickets;
 use crate::tickets::NewTicket;
+use toknila_core::discussion::EditProposal;
+
+use crate::discussion;
 use crate::{AppResult, UnitOfWork, notes};
 
 /// What the planner gives for a new card.
@@ -131,10 +134,21 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
 ) -> AppResult<TicketId> {
     let t = card(uow, project, card_ref)?;
     planner::ensure_card_editable(&t)?;
+    let (mut prompt, mut acceptance) = (edit.prompt, edit.acceptance);
+    // On a card the person talks over with the assistant, a new prompt or acceptance is a proposal
+    // the person accepts or rejects; it lands only then.
+    if (prompt.is_some() || acceptance.is_some())
+        && let Some(th) = discussion::find(&*uow, &t)?
+    {
+        let proposal = EditProposal::of(&t.prompt, &t.acceptance, prompt.take(), acceptance.take());
+        if !proposal.is_empty() {
+            discussion::propose(uow, &t, &th, &proposal)?;
+        }
+    }
     let patch = TicketPatch {
         title: edit.title,
-        prompt: edit.prompt,
-        acceptance: edit.acceptance,
+        prompt,
+        acceptance,
         design_first: edit.design_first,
         designs,
         ..TicketPatch::default()

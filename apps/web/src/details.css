@@ -20,3 +20,15 @@
 .technical { margin-top: var(--s3); }
 .technical dl { margin: 0; }
 .details .facts code { overflow-wrap: anywhere; }
+
+/* Talk to the assistant: the discussion on a card, with the assistant's proposed edit as a diff. */
+.discuss { display: flex; flex-direction: column; gap: var(--s2); margin: 0 0 var(--s3); padding: var(--s3); border: 1px solid var(--line); border-radius: var(--r-m); }
+.discuss h4 { margin: 0; }
+.discuss .bubble.proposal { max-width: 100%; align-self: stretch; }
+.discuss .row { display: flex; gap: var(--s2); }
+.diff { display: flex; flex-direction: column; gap: var(--s2); }
+.diff h5 { margin: 0 0 var(--s1); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.diff-lines { margin: 0; padding: var(--s1) 0; font-family: var(--mono, monospace); font-size: 0.8125rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-line { display: block; padding: 0 var(--s2); }
+.diff-line.add { background: color-mix(in srgb, var(--done) 18%, transparent); }
+.diff-line.del { background: color-mix(in srgb, var(--danger) 18%, transparent); }

@@ -2,7 +2,8 @@
 // answer goes to the reducer.
 
 import { get, getBytes, post, postBytes } from "../api/http";
-import type { PlannerState } from "../api/types";
+import type { PlannerState, ThreadDetail } from "../api/types";
+import { askLine } from "./discussion";
 import type { Msg } from "./msg";
 import type { PlannerEffect } from "./planner";
 
@@ -38,7 +39,16 @@ async function ask(base: string, e: PlannerEffect, dispatch: Dispatch): Promise<
   await postBytes(`${base}/input`, typing.encode(e.text ?? ""));
   await sleep(150);
   await postBytes(`${base}/input`, typing.encode("\r"));
-  dispatch({ type: "plannerAsked", project: e.project });
+  dispatch({ type: "plannerAsked", project: e.project, draft: e.draft });
+}
+
+/// What the person says about a card: kept in the card's discussion by the daemon (which opens it
+/// with the first message), then typed to the planner as a line that names the card and the
+/// thread its answer goes in.
+async function discuss(base: string, e: PlannerEffect, dispatch: Dispatch): Promise<void> {
+  const card = e.card ?? "";
+  const said = await post<ThreadDetail>(`/tickets/${encodeURIComponent(card)}/discussion`, { text: e.text });
+  await ask(base, { ...e, text: askLine(card, said.thread.number, e.text ?? ""), wait: false }, dispatch);
 }
 
 /// Runs one effect of the planner.
@@ -48,6 +58,10 @@ export function runPlannerEffect(e: PlannerEffect, dispatch: Dispatch): void {
     dispatch({ type: "plannerFailed", error: String(err instanceof Error ? err.message : err) });
   if (e.call === "ask") {
     ask(base, e, dispatch).catch(failed);
+    return;
+  }
+  if (e.call === "discuss") {
+    discuss(base, e, dispatch).catch(failed);
     return;
   }
   const request =

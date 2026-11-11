@@ -8,6 +8,7 @@ pub mod agent;
 pub mod chain;
 pub mod chains;
 pub mod checks;
+pub mod discussion;
 pub mod error;
 pub mod external;
 pub mod inbox;

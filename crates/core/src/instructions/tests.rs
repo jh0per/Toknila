@@ -31,6 +31,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         design_first: false,
         designs: &[],
         has_designs: false,
+        discussion: &[],
     }
 }
 
@@ -121,6 +122,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         design_first: false,
         designs: &[],
         has_designs: false,
+        discussion: &[],
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -206,6 +208,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         design_first: false,
         designs: &[],
         has_designs: false,
+        discussion: &[],
     }
 }
 
@@ -361,4 +364,25 @@ fn a_card_with_designs_is_told_the_files_and_the_regions() {
     assert!(text.contains("- frame: no image is kept"), "{text}");
     // Control: a card without designs has no such section.
     assert!(!generate(&pinned_brief(&acceptance)).contains("## Designs"));
+}
+
+#[test]
+fn a_card_with_a_discussion_is_told_what_was_said_and_one_without_is_told_nothing() {
+    let acceptance = vec!["The discussion is in the file".to_owned()];
+    let said = vec![
+        "person: make it stricter".to_owned(),
+        "assistant proposed an edit (rejected: the card is unchanged); prompt to: p2".to_owned(),
+    ];
+    let with = RunBrief {
+        discussion: &said,
+        ..pinned_brief(&acceptance)
+    };
+    let text = generate(&with);
+    assert!(text.contains("## Discussion with the assistant"), "{text}");
+    assert!(text.contains("- person: make it stricter\n"));
+    assert!(text.contains(
+        "- assistant proposed an edit (rejected: the card is unchanged); prompt to: p2\n"
+    ));
+    assert!(!generate(&pinned_brief(&acceptance)).contains("Discussion"));
+    assert!(!generate_review(&with).contains("Discussion"));
 }
