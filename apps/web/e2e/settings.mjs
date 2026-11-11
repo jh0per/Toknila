@@ -80,6 +80,25 @@ try {
   const bad = await page.locator("[data-testid=checks] li:not([data-status=ok])").count();
   const hints = await page.locator("[data-testid=checks] .hint").count();
   if (bad !== hints) throw new Error(`${bad} checks failed but ${hints} hints are shown`);
+  // A warning mark is amber (--warn) and a failure mark red (--danger): probe the real stylesheet.
+  const marks = await page.evaluate(() => {
+    const list = document.querySelector("[data-testid=checks] ul.checks");
+    const color = (cls, varName) => {
+      const mark = document.createElement("span");
+      mark.className = cls;
+      const ref = document.createElement("span");
+      ref.style.color = `var(${varName})`;
+      list.append(mark, ref);
+      const out = [getComputedStyle(mark).color, getComputedStyle(ref).color];
+      mark.remove();
+      ref.remove();
+      return out;
+    };
+    return { warning: color("mark st-warning", "--warn"), failure: color("mark st-missing", "--danger"), amber: color("mark st-ok", "--warn")[1], red: color("mark st-ok", "--danger")[1] };
+  });
+  if (marks.warning[0] !== marks.warning[1] || marks.failure[0] !== marks.failure[1]) throw new Error(`mark colours ${JSON.stringify(marks)}`);
+  if (marks.amber === marks.red) throw new Error("the warning token must differ from the failure colour");
+  console.log("PASS a warning mark is amber (--warn) and a failure mark red (--danger)");
   console.log(`PASS every failing check has a fix hint (${bad} failing here)`);
   // The Claude Code trust step is one line with a How to, not a paragraph.
   await expectText(t("trust-note"), "asks once to trust a project folder", "the trust step is one line");
@@ -210,6 +229,8 @@ try {
   await value("pr-title", "{key}: {title}", "the default title template");
   await t("pr-title").fill("[{key}] {title}");
   await t("merge-method").selectOption("squash");
+  await value("no-checks-timeout", "10", "the no-checks timeout defaults to 10 minutes");
+  await t("no-checks-timeout").fill("25");
   // The sites the reviewer may read: none by default; a URL is refused at its field; then saved.
   await value("reviewer-web-domains", "", "the reviewer may read no site by default");
   if (tok("project", "show", "DEMO").includes("reviewer reads")) throw new Error("a new project lists sites for the reviewer");
@@ -266,6 +287,7 @@ try {
   const merge = [await t("merge-mode").inputValue(), await t("pr-title").inputValue(), await t("merge-method").inputValue()];
   if (merge.join("|") !== "github|[{key}] {title}|squash") throw new Error(`after the restart: merge settings ${merge}`);
   console.log("PASS merge mode github, the title template and squash survive a daemon restart");
+  await value("no-checks-timeout", "25", "the no-checks timeout of 25 minutes survives a daemon restart");
 
   // The other pages of the list: Agents (profiles), Updates, About, System checks; old addresses still open.
   await t("settings-page-profiles").click();

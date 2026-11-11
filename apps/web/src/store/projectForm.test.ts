@@ -29,9 +29,18 @@ describe("the project form", () => {
     expect(patch).toEqual({
       work_branch: "main", default_profile: "claude-code", max_parallel: 4, check_command: "npm test",
       worker_model: "sonnet", reviewer_model: "", planner_model: "opus", review_mode: "human", max_review_rounds: 3, reviewer: "",
-      merge_mode: "local", pr_title: "{key}: {title}", merge_method: "merge",
+      merge_mode: "local", pr_title: "{key}: {title}", merge_method: "merge", no_checks_timeout_secs: 600,
       command_policy: "ask", allowed_commands: [], reviewer_web_domains: [],
     });
+  });
+
+  it("shows the no-checks timeout in minutes (default 10) and sends seconds", () => {
+    const f = formOf(project);
+    expect(f.no_checks_timeout_min).toBe("10");
+    expect(isDirty({ ...f, no_checks_timeout_min: "25" }, project)).toBe(true);
+    expect(patchOf({ ...f, no_checks_timeout_min: "25" }).no_checks_timeout_secs).toBe(1500);
+    const set = { ...project, merge: { ...project.merge, no_checks_timeout_secs: 90 } } as Project;
+    expect(formOf(set).no_checks_timeout_min).toBe("1.5");
   });
 
   it("says which section a refused field is in", () => {

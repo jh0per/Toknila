@@ -124,6 +124,15 @@ export function ReviewSection({ state, form, set }: FormProps) {
               {METHODS.map((m) => <option key={m}>{m}</option>)}
             </select>
           </Field>
+          <Field
+            label="Minutes to wait for checks" name="no_checks_timeout_secs" error={fieldError(s, "no_checks_timeout_secs")}
+            hint="A pull request that reports no check for this long asks you what to do. Default 10."
+          >
+            <input
+              data-testid="no-checks-timeout" type="number" min={1} step="any" value={form.no_checks_timeout_min}
+              onChange={(e) => set("no_checks_timeout_min", e.target.value)}
+            />
+          </Field>
         </>
       )}
     </div>

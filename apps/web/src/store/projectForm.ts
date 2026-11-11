@@ -19,6 +19,8 @@ export interface ProjectForm {
   merge_mode: MergeMode;
   pr_title: string;
   merge_method: MergeMethod;
+  /// Minutes a pull request may report no check before a person is asked (the API counts seconds).
+  no_checks_timeout_min: string;
   command_policy: CommandPolicy;
   allowed_commands: string[];
   /// The sites the reviewer may read, one per line as the person typed them.
@@ -46,6 +48,7 @@ export function formOf(p: Project): ProjectForm {
     merge_mode: p.merge.mode,
     pr_title: p.merge.pr_title,
     merge_method: p.merge.method,
+    no_checks_timeout_min: String((p.merge.no_checks_timeout_secs ?? 600) / 60),
     command_policy: p.command_policy ?? "ask",
     allowed_commands: p.allowed_commands ?? [],
     reviewer_web_domains: (p.reviewer_web_domains ?? []).join("\n"),
@@ -79,6 +82,7 @@ export function patchOf(f: ProjectForm): PatchProject {
     merge_mode: t.merge_mode,
     pr_title: t.pr_title,
     merge_method: t.merge_method,
+    no_checks_timeout_secs: Math.round(Number(t.no_checks_timeout_min) * 60),
     command_policy: t.command_policy,
     allowed_commands: t.allowed_commands,
     reviewer_web_domains: domainsOf(t.reviewer_web_domains),
@@ -108,6 +112,7 @@ export function sectionOfField(field: string): ProjectSection {
     case "merge_mode":
     case "pr_title":
     case "merge_method":
+    case "no_checks_timeout_secs":
       return "review";
     case "worker_model":
     case "reviewer_model":
