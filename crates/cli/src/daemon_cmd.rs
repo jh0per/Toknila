@@ -14,13 +14,21 @@ use toknila_daemon::paths::Paths;
 #[derive(Debug, Subcommand)]
 pub enum DaemonCmd {
     /// Start the daemon in the background (no-op if it is already running).
-    Start,
+    Start {
+        /// Hand the daemon this process's stdin as a lifeline: it stops when that pipe closes.
+        #[arg(long)]
+        exit_with_parent: bool,
+    },
     /// Ask the running daemon to shut down cleanly.
     Stop,
     /// Show whether the daemon is running, and where.
     Status,
     /// Run the daemon in the foreground (what `start` launches).
-    Run,
+    Run {
+        /// Stop (agents included) when stdin, a pipe the parent holds open, closes.
+        #[arg(long)]
+        exit_with_parent: bool,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -53,9 +61,9 @@ fn agents_in_use(info: &DaemonInfo) -> Option<u32> {
 pub fn run(cmd: DaemonCmd, json: bool) -> Result<()> {
     let paths = Paths::resolve().map_err(anyhow::Error::msg)?;
     match cmd {
-        DaemonCmd::Run => run_foreground(paths),
-        DaemonCmd::Start => {
-            let info = start(&paths)?;
+        DaemonCmd::Run { exit_with_parent } => run_foreground(paths, exit_with_parent),
+        DaemonCmd::Start { exit_with_parent } => {
+            let info = start_with(&paths, exit_with_parent)?;
             print_status(&paths, Some(&info), json);
             Ok(())
         }
@@ -100,13 +108,16 @@ fn print_status(paths: &Paths, info: Option<&DaemonInfo>, json: bool) {
     }
 }
 
-fn run_foreground(paths: Paths) -> Result<()> {
+fn run_foreground(paths: Paths, exit_with_parent: bool) -> Result<()> {
     std::fs::create_dir_all(&paths.home)
         .with_context(|| format!("create {}", paths.home.display()))?;
     // First, while this is the only thread: logging and the runtime start threads.
     let appended = toknila_daemon::adopt_agent_path();
     let _guard = toknila_daemon::server::init_logging(&paths).map_err(anyhow::Error::msg)?;
     toknila_daemon::log_adopted_path(&appended);
+    if exit_with_parent {
+        toknila_daemon::server::exit_with_parent();
+    }
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -129,6 +140,11 @@ pub fn running(paths: &Paths) -> Result<Option<DaemonInfo>> {
 
 /// Starts the daemon if needed and waits until it answers.
 pub fn start(paths: &Paths) -> Result<DaemonInfo> {
+    start_with(paths, false)
+}
+
+/// [`start`]; with `lifeline` the daemon shares this process's stdin and stops when it closes.
+pub fn start_with(paths: &Paths, lifeline: bool) -> Result<DaemonInfo> {
     // A daemon that is up but busy (a loaded machine) can miss one health probe; a refused
     // connection answers at once, so a dead daemon's stale file costs only the pauses.
     for attempt in 0..3 {
@@ -149,9 +165,12 @@ pub fn start(paths: &Paths) -> Result<DaemonInfo> {
     if toknila_daemon::paths::platform_home().as_deref() != Some(paths.home.as_path()) {
         cmd.env(toknila_daemon::paths::HOME_ENV, &paths.home);
     }
-    cmd.stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+    if lifeline {
+        cmd.arg("--exit-with-parent").stdin(Stdio::inherit());
+    } else {
+        cmd.stdin(Stdio::null());
+    }
+    cmd.stdout(Stdio::null()).stderr(Stdio::null());
     detach(&mut cmd);
     #[cfg(windows)]
     crate::win::stop_inheriting_stdio();

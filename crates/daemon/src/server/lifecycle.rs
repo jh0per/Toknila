@@ -146,7 +146,34 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
     result.map_err(RunError::Io)
 }
 
+/// Set when the lifeline pipe closed: the process that started this daemon is gone.
+static PARENT_GONE: Notify = Notify::const_new();
+
+/// Makes the daemon stop when its stdin, a pipe held open by its parent, reaches end of file.
+/// The pipe closes when the parent dies for any reason, a kill included.
+pub fn exit_with_parent() {
+    let spawned = std::thread::Builder::new()
+        .name("lifeline".to_owned())
+        .spawn(|| {
+            let mut sink = [0u8; 256];
+            let mut stdin = std::io::stdin().lock();
+            // Anything the parent writes is ignored; only the close matters.
+            while std::io::Read::read(&mut stdin, &mut sink).is_ok_and(|n| n > 0) {}
+            PARENT_GONE.notify_one();
+        });
+    if spawned.is_err() {
+        tracing::warn!("cannot watch the parent; the daemon will not follow it");
+    }
+}
+
 async fn terminate_signal() {
+    tokio::select! {
+        () = PARENT_GONE.notified() => tracing::info!("parent process is gone"),
+        () = os_signal() => {}
+    }
+}
+
+async fn os_signal() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};

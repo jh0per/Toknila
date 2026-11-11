@@ -21,6 +21,7 @@ pub(super) fn pin_items(data: &InboxData) -> Vec<InboxItem> {
                 format!("{}: {}", p.design_name, p.text),
             );
             i.pin = Some(p.id.to_string());
+            i.design = Some(p.design_name.clone());
             Some(i)
         })
         .collect()

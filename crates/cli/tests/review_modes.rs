@@ -30,7 +30,7 @@ profile = "sim"
 "#;
 
 fn setup() -> (tempfile::TempDir, Tok) {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, CHAIN).expect("write chain");

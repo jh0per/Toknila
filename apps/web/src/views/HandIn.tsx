@@ -1,4 +1,4 @@
-import type { Comment, SinceReturn } from "../api/types";
+import type { Comment, InboxHandIn, SinceReturn } from "../api/types";
 
 const CHECK = /^[-*]?\s*(PASS|FAIL|NOT_RUN|BLOCKED)\b[\s:]*(.*)$/;
 
@@ -54,30 +54,50 @@ export function HandIn({ report, since }: { report: Comment; since?: SinceReturn
       </div>
     );
   }
-  const checks = (b.how_to_verify ?? "").split("\n").filter((l) => l.trim());
+  const checks = (b.how_to_verify ?? "")
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((l) => {
+      const c = parseCheck(l);
+      return c ? { status: c.status, text: c.text } : { text: l };
+    });
+  return <HandInBlocks gist={b.gist} what={b.what} checks={checks} left={b.consequences} since={since} />;
+}
+
+/// The hand-in the inbox item carries (core's `InboxHandIn`): the same three blocks, no request.
+export function InboxHandInBlocks({ handIn }: { handIn: InboxHandIn }) {
+  return <HandInBlocks gist={handIn.gist} what={handIn.what} checks={handIn.checks} left={handIn.left} since={handIn.since_return} />;
+}
+
+type Parts = {
+  gist: string;
+  what?: string | null;
+  checks: { status?: string | null; text: string }[];
+  left?: string | null;
+  since?: SinceReturn | null;
+};
+
+function HandInBlocks({ gist, what, checks, left, since }: Parts) {
   return (
     <div className="report hand-in" data-testid="agent-report">
       <div data-testid="handin-changed">
         <h5>What changed</h5>
-        <p className="report-gist">{b.gist}</p>
-        {b.what && <p>{b.what}</p>}
+        <p className="report-gist">{gist}</p>
+        {what && <p>{what}</p>}
       </div>
       <div data-testid="handin-checks">
         <h5>Checks</h5>
         <ul className="checks">
-          {checks.map((l, i) => {
-            const c = parseCheck(l);
-            return (
-              <li key={i} data-status={c?.status}>
-                {c ? <><span className="status">{c.status}</span> {c.text}</> : l}
-              </li>
-            );
-          })}
+          {checks.map((c, i) => (
+            <li key={i} data-status={c.status ?? undefined}>
+              {c.status ? <><span className="status">{c.status}</span> {c.text}</> : c.text}
+            </li>
+          ))}
         </ul>
       </div>
       <div data-testid="handin-left">
         <h5>What is left</h5>
-        <p>{b.consequences ?? "Nothing was named."}</p>
+        <p>{left ?? "Nothing was named."}</p>
       </div>
       {since && <SinceReturnBlock since={since} />}
     </div>

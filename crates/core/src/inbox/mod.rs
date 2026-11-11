@@ -16,6 +16,7 @@
 //! reject, unblock, a comment, approve a thread) plus the three leftover actions in
 //! [`leftovers`].
 
+pub mod hand_in;
 pub mod leftovers;
 mod pins;
 
@@ -26,8 +27,8 @@ use serde::{Deserialize, Serialize};
 use crate::design::pin::DesignPin;
 use crate::question::{self, AnswerKind, PendingPermission, QuestionKind, RunFacts};
 use crate::{
-    AgentRole, ChainId, ReviewNote, ReviewTurn, StatusReason, Subtask, Thread, ThreadMessage,
-    ThreadVersion, Ticket, TicketKey, TicketStatus, Timestamp, WaitingReason,
+    AgentRole, ChainId, Comment, ReviewNote, ReviewTurn, StatusReason, Subtask, Thread,
+    ThreadMessage, ThreadVersion, Ticket, TicketKey, TicketStatus, Timestamp, WaitingReason,
     machine::TicketAction, thread,
 };
 
@@ -105,6 +106,13 @@ pub struct InboxItem {
     /// with `$` cannot become a rule); absent otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allow_always_none: Option<String>,
+    /// The hand-in of the card (`review` items whose agent handed in with the template); absent
+    /// otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hand_in: Option<hand_in::InboxHandIn>,
+    /// The name of the design a pin is about (`design_question` items).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub design: Option<String>,
 }
 
 /// Says on a worker's permission question what "Allow always" would add, or why nothing.
@@ -150,6 +158,8 @@ pub struct InboxData {
     pub permissions: Vec<PendingPermission>,
     /// The live runs.
     pub runs: Vec<RunFacts>,
+    /// The comments of the cards in review (the hand-in is read from them).
+    pub comments: Vec<Comment>,
 }
 
 impl Default for InboxData {
@@ -162,6 +172,7 @@ impl Default for InboxData {
             pins: Vec::new(),
             permissions: Vec::new(),
             runs: Vec::new(),
+            comments: Vec::new(),
         }
     }
 }
@@ -177,6 +188,11 @@ pub fn compute(data: &InboxData) -> Vec<InboxItem> {
     items.extend(leftover_items(data));
     items.extend(question_items(data));
     items.extend(pins::pin_items(data));
+    for i in items.iter_mut().filter(|i| i.kind == InboxKind::Review) {
+        if let Some(t) = data.tickets.iter().find(|t| t.key == i.ticket) {
+            i.hand_in = hand_in::of_card(t, &data.comments);
+        }
+    }
     items.sort_by(|a, b| b.since.cmp(&a.since).then_with(|| a.ticket.cmp(&b.ticket)));
     items
 }
@@ -205,6 +221,8 @@ fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxIte
         pin: None,
         allow_always: None,
         allow_always_none: None,
+        hand_in: None,
+        design: None,
     }
 }
 

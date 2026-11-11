@@ -42,7 +42,7 @@ fn queued_note(tok: &Tok, key: &str) -> Option<u64> {
 
 #[test]
 fn a_card_started_beyond_the_limit_waits_and_the_limit_is_settable() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, CHAIN).expect("write chain");

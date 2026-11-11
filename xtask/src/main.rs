@@ -17,10 +17,12 @@
 //!   clippy on it (needs the platform web view; CI runs it on macOS).
 
 use std::process::{Command, ExitCode};
+use std::time::Duration;
 
 mod app;
 mod bump;
 mod guards;
+mod leaks;
 mod updates;
 mod versions;
 
@@ -29,6 +31,13 @@ fn main() -> ExitCode {
     let result = match task.as_str() {
         "verify" => verify(),
         "guards" => guards(),
+        // The leak check alone: under TOKNILA_TEST_ROOT, or every temp-home daemon when unset.
+        "leaks" => leaks::check(
+            std::env::var_os(leaks::ROOT_VAR)
+                .map(std::path::PathBuf::from)
+                .as_deref(),
+            Duration::ZERO,
+        ),
         "web" => web(),
         "e2e-web" => e2e_web(),
         "dist" => dist(std::env::args().nth(2)),
@@ -58,6 +67,10 @@ fn main() -> ExitCode {
 }
 
 fn verify() -> Result<(), String> {
+    leaks::with_run_root(verify_in)
+}
+
+fn verify_in(root: &std::path::Path) -> Result<(), String> {
     cargo(&["fmt", "--all", "--check"])?;
     cargo(&[
         "clippy",
@@ -68,8 +81,9 @@ fn verify() -> Result<(), String> {
         "-D",
         "warnings",
     ])?;
-    cargo(&["test", "--workspace", "--locked"])?;
+    leaks::cargo_test(&cargo_bin(), root)?;
     guards()?;
+    leaks::check(Some(root), Duration::from_secs(5))?;
     eprintln!("xtask verify: PASS");
     Ok(())
 }
