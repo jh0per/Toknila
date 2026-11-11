@@ -9,7 +9,7 @@ const LABEL: Record<ReleaseStep, string> = {
   push: "Push",
 };
 
-const MARK = { pending: "○", running: "…", done: "✓", failed: "✗" } as const;
+const MARK = { pending: "○", running: "…", done: "✓", failed: "✗", interrupted: "⏸" } as const;
 
 /// The Release dialog of a finished chain: the version (suggested from the last tag), the steps
 /// the project has, and then each step as it runs with its output. Nothing is tagged or pushed
@@ -20,6 +20,8 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
   if (!chain) return null;
   const running = r.busy || r.run?.state === "running";
   const done = r.run?.state === "done";
+  const interrupted = r.run?.state === "interrupted";
+  const from = interrupted && r.run?.resume_from ? LABEL[r.run.resume_from] : undefined;
   const offer = r.offer;
   return (
     <div className="card-block form" data-testid="release-dialog">
@@ -31,7 +33,7 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
             <span>Version{offer.last_tag ? ` (last tag ${offer.last_tag})` : ""}</span>
             <input
               value={r.version}
-              disabled={running || done}
+              disabled={running || done || interrupted}
               data-testid="release-version"
               onChange={(e) => dispatch({ type: "setReleaseVersion", version: e.target.value })}
             />
@@ -58,6 +60,12 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
           <p>Nothing after that step ran. Fix it, then release again.</p>
         </div>
       )}
+      {interrupted && (
+        <div className="error" role="alert" data-testid="release-interrupted">
+          <p>The daemon stopped while this release was going{from ? `, at the step ${from}` : ""}.</p>
+          <p>Steps that passed are not done again.</p>
+        </div>
+      )}
       {r.error && (
         <div className="error" role="alert" data-testid="release-error"><p>{r.error}</p></div>
       )}
@@ -66,9 +74,9 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
           <button
             type="button" className="btn primary" data-testid="release-confirm"
             disabled={!offer || !offer.releasable || running || !r.version.trim()}
-            onClick={() => dispatch({ type: "startRelease", chain: id, version: r.version })}
+            onClick={() => dispatch({ type: "startRelease", chain: id, version: r.version, ...(interrupted ? { resume: true } : {}) })}
           >
-            {r.run?.state === "failed" ? "Release again" : "Release"}
+            {interrupted ? `Run again from ${from ?? "the start"}` : r.run?.state === "failed" ? "Release again" : "Release"}
           </button>
         )}
         <button type="button" className="btn" data-testid="release-close" onClick={() => dispatch({ type: "closeDialog" })}>

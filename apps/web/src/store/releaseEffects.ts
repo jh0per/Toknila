@@ -22,6 +22,7 @@ async function follow(release: string, dispatch: Dispatch): Promise<void> {
     const run = await get<ReleaseRun>(`/releases/${encodeURIComponent(release)}/run`);
     dispatch({ type: "releaseRun", run });
     if (run.state !== "running") return;
+    // Only a run that is going is followed; done, failed and interrupted ones stand still.
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
 }
@@ -35,7 +36,7 @@ export function runReleaseEffect(e: ReleaseEffect, dispatch: Dispatch): void {
         .catch(refused(dispatch));
       return;
     case "startRelease":
-      post<ChainDetail>(`/chains/${encodeURIComponent(e.chain)}/release`, { version: e.version })
+      post<ChainDetail>(`/chains/${encodeURIComponent(e.chain)}/release`, { version: e.version, resume: e.resume ?? false })
         .then((chain) => {
           // The release that was just cut is the one whose steps are followed.
           const cut = [...chain.releases].reverse().find((r) => r.state === "cut");

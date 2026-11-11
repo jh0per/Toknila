@@ -93,7 +93,9 @@ function ReleaseForm({ chain, project, state, dispatch }: FormProps) {
       <div className="row-actions">
         <button type="submit" className="btn primary" data-testid="epic-save" disabled={!changed || locked || state.epic.busy}>Save</button>
         {chain.summary.releasable && (
-          <button type="button" className="btn" data-testid="panel-release" onClick={() => dispatch({ type: "openRelease", chain: chain.chain.id })}>Release…</button>
+          <button type="button" className="btn" data-testid="panel-release" onClick={() => dispatch({ type: "openRelease", chain: chain.chain.id })}>
+            {f?.state === "again" ? "Release again…" : chain.releases.some((r) => r.state === "cut") ? "Continue release…" : "Release…"}
+          </button>
         )}
       </div>
       {state.epic.error && <p className="error" role="alert" data-testid="epic-error">{state.epic.error}</p>}

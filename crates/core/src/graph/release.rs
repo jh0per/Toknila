@@ -98,6 +98,7 @@ impl ChainView {
         let release = self.finish_release();
         let version = self.version()?;
         let state = match release.map(|r| r.state) {
+            Some(ReleaseState::Released) if self.releasable() => FinishState::Again,
             Some(ReleaseState::Released) => FinishState::Released,
             _ if self.releasable() => FinishState::Ready,
             _ => FinishState::Planned,

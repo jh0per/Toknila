@@ -75,6 +75,17 @@ pub fn clean_version(text: &str) -> Result<String, &'static str> {
     }
 }
 
+/// The steps a run takes again after it was interrupted, given the steps that had passed. A
+/// passed step is not redone, except the bump while the tag has not passed: its commit lives only
+/// in the run's throwaway worktree, and the tag step is what moves the base branch to it.
+pub fn resume_steps(all: &[ReleaseStep], passed: &[ReleaseStep]) -> Vec<ReleaseStep> {
+    let tagged = passed.contains(&ReleaseStep::Tag);
+    all.iter()
+        .copied()
+        .filter(|s| !passed.contains(s) || (*s == ReleaseStep::Bump && !tagged))
+        .collect()
+}
+
 /// The tag a version gets: `v1.4.0`.
 pub fn tag_name(version: &str) -> String {
     format!("v{version}")
@@ -141,6 +152,18 @@ mod tests {
         assert_eq!(suggest_version(&["nightly", "2.0", "v1.9.9"]), "2.0.1");
         assert_eq!(suggest_version(&["v3.0.0-rc.1", "v2.9.9"]), "2.9.10");
         assert_eq!(suggest_version(&["latest"]), "0.1.0");
+    }
+
+    #[test]
+    fn an_interrupted_run_redoes_what_did_not_pass_and_never_the_tag() {
+        use ReleaseStep::*;
+        let all = [Check, Bump, Tag, Push];
+        assert_eq!(resume_steps(&all, &[]), all);
+        // The check passed; the bump's commit was only in the worktree: bump again.
+        assert_eq!(resume_steps(&all, &[Check, Bump]), [Bump, Tag, Push]);
+        // Tagged: the tag is on the base branch and is not redone.
+        assert_eq!(resume_steps(&all, &[Check, Bump, Tag]), [Push]);
+        assert_eq!(resume_steps(&all, &all), Vec::<ReleaseStep>::new());
     }
 
     #[test]

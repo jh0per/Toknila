@@ -1,16 +1,12 @@
 //! A release run: the project's release steps on the base branch, one at a time, with `git` and
 //! the project's own commands. The steps run in a throwaway worktree of the base branch, so the
 //! person's checkout is never touched; only the last step that changes the repository moves the
-//! base branch (a bump commit) and creates the tag. The state of the last run of each milestone
-//! is kept in memory for the page (`GET /releases/{release}/run`); what lasts is the milestone's
-//! state and tag in the database.
+//! base branch (a bump commit) and creates the tag. Every step is reported to a journal sink as
+//! it goes (see `store::release_runs`): what lasts is the journal, not this process.
 
-use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
-use toknila_api_types::{ReleaseRun, RunState, RunStep, StepState};
 use toknila_app::{CheckSpec, Checker};
 use toknila_core::ReleaseId;
 use toknila_core::release_run::{ReleaseStep, bump_command};
@@ -18,28 +14,13 @@ use toknila_core::release_run::{ReleaseStep, bump_command};
 use crate::checker::ShellChecker;
 use crate::git::Git;
 use crate::merger::GitMerger;
+use crate::store::release_runs::{Entry, tail};
 
 /// How long a push may take.
 const PUSH_LIMIT: Duration = Duration::from_secs(300);
-/// The most bytes of a step's output kept for the page (the end of it).
-const KEEP: usize = 64 * 1024;
 
-fn runs() -> &'static Mutex<HashMap<ReleaseId, ReleaseRun>> {
-    static RUNS: OnceLock<Mutex<HashMap<ReleaseId, ReleaseRun>>> = OnceLock::new();
-    RUNS.get_or_init(Mutex::default)
-}
-
-fn with_runs<T>(f: impl FnOnce(&mut HashMap<ReleaseId, ReleaseRun>) -> T) -> T {
-    let mut guard = runs()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    f(&mut guard)
-}
-
-/// The last release run of a milestone, if this daemon ran one.
-pub fn run_of(release: ReleaseId) -> Option<ReleaseRun> {
-    with_runs(|m| m.get(&release).cloned())
-}
+/// Where a run reports its steps; an error stops the run (the journal could not be written).
+pub type Journal<'a> = &'a (dyn Fn(Entry) -> Result<(), String> + Sync);
 
 /// Everything a run needs, from the project and the milestone.
 #[derive(Debug, Clone)]
@@ -53,86 +34,14 @@ pub struct Plan {
     pub check: Option<String>,
     pub bump: Option<String>,
     pub push: bool,
+    /// Every step the project's release has.
     pub steps: Vec<ReleaseStep>,
+    /// The steps this run takes: all of them, or what is left after an interruption.
+    pub todo: Vec<ReleaseStep>,
+    /// This run goes on after an interruption.
+    pub resuming: bool,
     /// A folder the run may make its worktree in.
     pub scratch: PathBuf,
-}
-
-/// Registers a new run with every step pending. `false`: the milestone's last run is still going.
-pub fn begin(plan: &Plan) -> bool {
-    with_runs(|m| {
-        if m.get(&plan.release)
-            .is_some_and(|r| r.state == RunState::Running)
-        {
-            return false;
-        }
-        let steps = plan
-            .steps
-            .iter()
-            .map(|s| RunStep {
-                step: *s,
-                label: s.label().to_owned(),
-                state: StepState::Pending,
-                output: String::new(),
-            })
-            .collect();
-        m.insert(
-            plan.release,
-            ReleaseRun {
-                release: plan.release.to_string(),
-                version: plan.version.clone(),
-                tag: plan.tag.clone(),
-                state: RunState::Running,
-                steps,
-                error: None,
-            },
-        );
-        true
-    })
-}
-
-/// Marks the run done: every step passed and the milestone is released.
-pub fn done(release: ReleaseId) {
-    with_runs(|m| {
-        if let Some(r) = m.get_mut(&release) {
-            r.state = RunState::Done;
-        }
-    });
-}
-
-/// Marks the run failed with `why`, naming no step (the milestone could not be saved).
-pub fn failed(release: ReleaseId, why: String) {
-    with_runs(|m| {
-        if let Some(r) = m.get_mut(&release) {
-            r.state = RunState::Failed;
-            r.error = Some(why);
-        }
-    });
-}
-
-fn set_step(release: ReleaseId, step: ReleaseStep, state: StepState, output: Option<String>) {
-    with_runs(|m| {
-        if let Some(s) = m
-            .get_mut(&release)
-            .and_then(|r| r.steps.iter_mut().find(|s| s.step == step))
-        {
-            s.state = state;
-            if let Some(out) = output {
-                s.output = tail(out);
-            }
-        }
-    });
-}
-
-fn tail(mut text: String) -> String {
-    if text.len() > KEEP {
-        let mut from = text.len() - KEEP;
-        while !text.is_char_boundary(from) {
-            from += 1;
-        }
-        text = text[from..].to_owned();
-    }
-    text
 }
 
 /// The repository's tags, newest version first.
@@ -145,12 +54,15 @@ pub fn tags(repo: &str) -> Vec<String> {
 
 /// Runs the plan's steps in order and stops at the first failure, which is named in the error.
 /// Blocking: call it from a blocking task.
-pub fn execute(plan: &Plan) -> Result<(), String> {
+pub fn execute(plan: &Plan, journal: Journal<'_>) -> Result<(), String> {
+    let Some(first) = plan.todo.first().copied() else {
+        return Ok(());
+    };
     let git = Git::new("git");
     let dir = plan.scratch.join(format!("release-{}", plan.release));
     let tip = match prepare(&git, plan, &dir) {
         Ok(tip) => tip,
-        Err(e) => return Err(stop(plan, plan.steps[0], &e)),
+        Err(e) => return stop(journal, first, &e),
     };
     let ctx = Ctx {
         plan,
@@ -159,12 +71,24 @@ pub fn execute(plan: &Plan) -> Result<(), String> {
         tip,
     };
     let mut result = Ok(());
-    for step in &plan.steps {
-        set_step(plan.release, *step, StepState::Running, None);
+    for step in &plan.todo {
+        if let Err(e) = journal(Entry::StepStarted { step: *step }) {
+            result = Err(e);
+            break;
+        }
         match ctx.run(*step) {
-            Ok(out) => set_step(plan.release, *step, StepState::Done, Some(out)),
+            Ok(output) => {
+                let entry = Entry::StepPassed {
+                    step: *step,
+                    output: tail(output),
+                };
+                if let Err(e) = journal(entry) {
+                    result = Err(e);
+                    break;
+                }
+            }
             Err(e) => {
-                result = Err(stop(plan, *step, &e));
+                result = stop(journal, *step, &e);
                 break;
             }
         }
@@ -174,20 +98,14 @@ pub fn execute(plan: &Plan) -> Result<(), String> {
     result
 }
 
-/// Records the failure of `step` and returns the message that names it.
-fn stop(plan: &Plan, step: ReleaseStep, detail: &str) -> String {
-    let message = format!("{} failed: {}", step.label(), first_line(detail));
-    with_runs(|m| {
-        if let Some(r) = m.get_mut(&plan.release) {
-            r.state = RunState::Failed;
-            r.error = Some(message.clone());
-            if let Some(s) = r.steps.iter_mut().find(|s| s.step == step) {
-                s.state = StepState::Failed;
-                s.output = tail(detail.to_owned());
-            }
-        }
-    });
-    message
+/// Journals the failure of `step` and returns the message that names it.
+fn stop(journal: Journal<'_>, step: ReleaseStep, detail: &str) -> Result<(), String> {
+    let entry = Entry::StepFailed {
+        step,
+        output: tail(detail.to_owned()),
+    };
+    journal(entry)?;
+    Err(format!("{} failed: {}", step.label(), first_line(detail)))
 }
 
 fn first_line(text: &str) -> &str {
@@ -211,6 +129,14 @@ fn prepare(git: &Git, plan: &Plan, dir: &std::path::Path) -> Result<String, Stri
         .map_err(|_| format!("the base branch {} does not exist", plan.base))?;
     std::fs::create_dir_all(&plan.scratch)
         .map_err(|e| format!("cannot make {}: {e}", plan.scratch.display()))?;
+    // A worktree an interrupted run left behind is in the way.
+    if dir.exists() {
+        let _ = git.run(
+            &plan.repo,
+            &["worktree", "remove", "--force", &dir.to_string_lossy()],
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
     let _ = git.run(&plan.repo, &["worktree", "prune"]);
     git.run(
         &plan.repo,
@@ -299,6 +225,11 @@ impl Ctx<'_> {
 
     fn tag(&self) -> Result<String, String> {
         let plan = self.plan;
+        if plan.resuming
+            && let Some(done) = self.left_by_interruption()
+        {
+            return Ok(done);
+        }
         let message = format!("Release {}", plan.version);
         let mut args = self.identity();
         args.extend(["tag", "--annotate", "--message", &message, &plan.tag]);
@@ -326,6 +257,32 @@ impl Ctx<'_> {
             }
         }
         Ok(out)
+    }
+
+    /// A tag an interrupted run left: when it is on the base branch the step is done (`Some`);
+    /// when it is not (the run stopped before the branch moved) it is removed and the step is
+    /// done afresh.
+    fn left_by_interruption(&self) -> Option<String> {
+        let plan = self.plan;
+        let tag_ref = format!("refs/tags/{}", plan.tag);
+        let exists = self
+            .git
+            .succeeds(&plan.repo, &["rev-parse", "--verify", "--quiet", &tag_ref])
+            .unwrap_or(false);
+        if !exists {
+            return None;
+        }
+        let commit = format!("{tag_ref}^{{commit}}");
+        let base = format!("refs/heads/{}", plan.base);
+        let on_base = self
+            .git
+            .succeeds(&plan.repo, &["merge-base", "--is-ancestor", &commit, &base])
+            .unwrap_or(false);
+        if on_base {
+            return Some(format!("{} was already made on {}", plan.tag, plan.base));
+        }
+        let _ = self.git.run(&plan.repo, &["tag", "--delete", &plan.tag]);
+        None
     }
 
     fn push(&self) -> Result<String, String> {

@@ -79,6 +79,40 @@ fn a_released_end_release_reads_released_with_its_tag_and_date() {
 }
 
 #[test]
+fn a_released_chain_offers_release_again_when_a_card_merges_after_the_release() {
+    let mut b = Builder::new(false);
+    let a = b.ticket();
+    let r = b.release("1.4.0", StartMode::Manual);
+    b.edge(a, r);
+    merged(&mut b, 0);
+    b.view.cut_release(rid(r), T).expect("cut");
+    b.view
+        .tag_release(rid(r), "v1.4.0".to_owned())
+        .expect("tag");
+    b.view
+        .complete_release(rid(r), Timestamp(2_000))
+        .expect("release");
+    assert_eq!(
+        b.view.finish().map(|f| f.state),
+        Some(FinishState::Released)
+    );
+    assert!(!b.view.releasable());
+
+    // A new card is open: still released. Once it is merged the chain can be released again.
+    b.ticket();
+    assert_eq!(
+        b.view.finish().map(|f| f.state),
+        Some(FinishState::Released)
+    );
+    merged(&mut b, 1);
+    assert!(b.view.releasable());
+    let finish = b.view.finish().expect("a finish");
+    assert_eq!(finish.state, FinishState::Again);
+    assert_eq!(finish.tag.as_deref(), Some("v1.4.0"), "the last release");
+    assert!(b.view.summary(T).releasable);
+}
+
+#[test]
 fn a_planned_end_release_waits_for_the_cards_nothing_else_waits_for() {
     let mut b = Builder::new(false);
     let (a, c) = (b.ticket(), b.ticket());

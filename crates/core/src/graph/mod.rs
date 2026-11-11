@@ -185,6 +185,8 @@ pub enum FinishState {
     /// Every card is in the work branch: the Release button is offered.
     Ready,
     Released,
+    /// Released once, and a card merged after it: the Release button is offered again.
+    Again,
 }
 
 /// The chain's end release as its Finish node shows it: `Release v0.3.0`, its state, and, once

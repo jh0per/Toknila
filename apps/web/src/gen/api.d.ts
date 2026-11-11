@@ -2268,7 +2268,7 @@ export interface components {
          * @description Where a chain's release stands: the Finish node's state.
          * @enum {string}
          */
-        FinishState: "planned" | "ready" | "released";
+        FinishState: "planned" | "ready" | "released" | "again";
         /**
          * @description What became of a deleted project's repository folder.
          * @enum {string}
@@ -3286,6 +3286,7 @@ export interface components {
             last_tag?: string | null;
             /** @description Every card is merged: the end node offers Release. */
             releasable: boolean;
+            run?: components["schemas"]["ReleaseRun"] | null;
             /** @description The steps the run will take, in order. */
             steps: components["schemas"]["ReleaseStep"][];
             /**
@@ -3299,6 +3300,7 @@ export interface components {
             /** @description Why the run stopped, naming the step; only when it failed. */
             error?: string | null;
             release: string;
+            resume_from?: components["schemas"]["ReleaseStep"] | null;
             state: components["schemas"]["RunState"];
             steps: components["schemas"]["RunStep"][];
             tag: string;
@@ -3464,7 +3466,7 @@ export interface components {
          * @description Where a release run is as a whole.
          * @enum {string}
          */
-        RunState: "running" | "failed" | "done";
+        RunState: "running" | "failed" | "done" | "interrupted";
         /** @description One step of a release run with what it printed. */
         RunStep: {
             label: string;
@@ -3551,6 +3553,8 @@ export interface components {
         };
         /** @description Body of `POST /v1/chains/{chain}/release`: the person's click on Release. */
         StartRelease: {
+            /** @description Run an interrupted release again from the step it stopped at; what passed is not redone. */
+            resume?: boolean;
             /** @description The version, such as `1.4.0`; it becomes the tag `v1.4.0`. */
             version: string;
         };
@@ -3577,7 +3581,7 @@ export interface components {
          * @description Where one step of a release run is.
          * @enum {string}
          */
-        StepState: "pending" | "running" | "done" | "failed";
+        StepState: "pending" | "running" | "done" | "failed" | "interrupted";
         /**
          * @description Where the chain stopped: the first ticket, in graph order, that waits on a person (Waiting or
          *     Blocked first, then Review, then a card to approve).

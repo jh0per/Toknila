@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 use clap::Subcommand;
-use toknila_api_types::NewRelease;
+use toknila_api_types::{NewRelease, ReleaseRun, RunState, StepState};
 use toknila_client::Client;
 use toknila_core::StartMode;
 use toknila_core::wire::from_wire_name;
@@ -30,10 +30,63 @@ pub enum ReleaseCmd {
     },
     /// Cut a manual milestone (release/<version> leaves develop).
     Start { release: String },
+    /// Release a finished chain: runs the check, the bump, the tag and the push.
+    Run {
+        chain: String,
+        version: String,
+        /// Run an interrupted or failed release again from its step; passed steps are not redone.
+        #[arg(long)]
+        resume: bool,
+    },
+    /// Show the steps of a release's last run, as the journal has them (also after a restart).
+    Steps { release: String },
+}
+
+/// The steps of a run, one line each, then why it stopped.
+fn steps(run: &ReleaseRun) {
+    println!("Release {} ({}): {}", run.version, run.tag, state_word(run));
+    for s in &run.steps {
+        let mark = match s.state {
+            StepState::Pending => "o",
+            StepState::Running => "…",
+            StepState::Done => "ok",
+            StepState::Failed => "FAILED",
+            StepState::Interrupted => "INTERRUPTED",
+        };
+        println!("  {mark:<11} {}", s.label);
+    }
+    if let Some(e) = &run.error {
+        println!("{e}");
+    }
+    if let Some(step) = run.resume_from {
+        println!(
+            "Interrupted at {}: tok release run <chain> {} --resume",
+            step.label(),
+            run.version
+        );
+    }
+}
+
+fn state_word(run: &ReleaseRun) -> &'static str {
+    match run.state {
+        RunState::Running => "running",
+        RunState::Failed => "failed",
+        RunState::Done => "released",
+        RunState::Interrupted => "interrupted",
+    }
 }
 
 pub(super) fn run(c: &Client, cmd: ReleaseCmd, json_out: bool) -> Result<()> {
     let detail = match cmd {
+        ReleaseCmd::Steps { release } => {
+            emit(json_out, &c.release_run(&release)?, steps);
+            return Ok(());
+        }
+        ReleaseCmd::Run {
+            chain,
+            version,
+            resume,
+        } => c.start_release(&chain, &version, resume)?,
         ReleaseCmd::New {
             chain,
             version,
