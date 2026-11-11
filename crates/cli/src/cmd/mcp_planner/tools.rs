@@ -69,6 +69,17 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             &["card"],
         ),
         tool(
+            "suggest",
+            "Say the owner's next step. It shows at the top of the assistant's screen and as the first row of the inbox, with one button for its action; it replaces your previous suggestion, and it ends by itself when the action is done or the card moves on. `action` is one of start, answer, accept, release and goes with the `card` it is about (for release, any card of the chain). With neither, it says that nothing waits for the owner. You never do the action: the owner clicks.",
+            json!({
+                "text": text("The step in a line or two"),
+                "card": { "type": "string", "description": "The card the step is about (id, key or title)" },
+                "action": { "type": "string", "enum": ["start", "answer", "accept", "release"],
+                    "description": "What the button does; needs `card`" },
+            }),
+            &["text"],
+        ),
+        tool(
             "add_dependency",
             "Make `to` wait for `from` in a chain. Refused in a chain that starts its cards by itself.",
             json!({ "chain": chain, "from": text("Card key"), "to": text("Card key") }),

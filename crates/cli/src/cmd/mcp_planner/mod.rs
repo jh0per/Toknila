@@ -7,8 +7,8 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 use toknila_api_types::{
-    CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain, NewThread,
-    NewVersion, TicketDetail,
+    CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain, NewSuggestion,
+    NewThread, NewVersion, TicketDetail,
 };
 use toknila_client::Client;
 use toknila_core::graph::Place;
@@ -36,6 +36,7 @@ pub(super) enum PlannerCall {
         card: String,
         edit: CardEdit,
     },
+    Suggest(NewSuggestion),
     ShowCard {
         card: String,
     },
@@ -162,6 +163,7 @@ pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolErr
             let EditCard { card, edit } = args(arguments)?;
             PlannerCall::EditCard { card, edit }
         }
+        "suggest" => PlannerCall::Suggest(args(arguments)?),
         "show_card" => {
             let ShowCard { card } = args(arguments)?;
             PlannerCall::ShowCard { card }
@@ -268,6 +270,16 @@ pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<String, String
             .planner_edit_card(card, edit)
             .map(|d| card_line("updated", &d))
             .map_err(e),
+        PlannerCall::Suggest(s) => client
+            .planner_suggest(s)
+            .map(|s| match s.card {
+                Some(card) => format!(
+                    "next step kept: {} {card}",
+                    s.action.map_or("", |a| a.as_str())
+                ),
+                None => "next step kept".to_owned(),
+            })
+            .map_err(e),
         PlannerCall::ShowCard { card } => client
             .planner_show_card(card)
             .map(|d| {
@@ -366,9 +378,9 @@ mod tests {
     }
 
     #[test]
-    fn the_planner_has_its_twelve_tools_and_none_that_starts_or_accepts_anything() {
+    fn the_planner_has_its_thirteen_tools_and_none_that_starts_or_accepts_anything() {
         let names = names();
-        assert_eq!(names.len(), 12, "{names:?}");
+        assert_eq!(names.len(), 13, "{names:?}");
         for forbidden in [
             "start", "pause", "resume", "cancel", "accept", "return", "reopen", "merge", "approve",
             "unblock", "block", "finished", "started",
@@ -445,6 +457,24 @@ mod tests {
         ));
         assert!(matches!(
             call("show_card", &json!({})),
+            Err(ToolError::BadArguments(_))
+        ));
+        match c(
+            "suggest",
+            json!({ "text": "Start A", "card": "DEMO-1", "action": "start" }),
+        ) {
+            PlannerCall::Suggest(s) => {
+                assert_eq!(s.text, "Start A");
+                assert_eq!(s.card.as_deref(), Some("DEMO-1"));
+                assert_eq!(
+                    s.action,
+                    Some(toknila_core::suggestion::SuggestionAction::Start)
+                );
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(matches!(
+            call("suggest", &json!({ "text": "x", "action": "fly" })),
             Err(ToolError::BadArguments(_))
         ));
         assert!(matches!(

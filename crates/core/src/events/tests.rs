@@ -406,3 +406,43 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
     assert_eq!(payload(&gone)["chain"]["name"], "auth");
     assert_eq!(payload(&gone)["chain"]["source"], "/w/demo/specs/001-auth");
 }
+
+#[test]
+fn suggestion_events_are_window_events_of_the_project() {
+    let project = "01JBQ7ZJ0000000000000000P1"
+        .parse::<ProjectId>()
+        .expect("id");
+    let suggestion = Suggestion {
+        project: "DEMO".parse().expect("key"),
+        text: "Start DEMO-2".into(),
+        card: Some("DEMO-2".parse().expect("key")),
+        chain: None,
+        action: Some(crate::suggestion::SuggestionAction::Start),
+        at: Timestamp(7),
+    };
+    let set = DomainEvent::WindowSuggest {
+        project,
+        suggestion: suggestion.clone(),
+    };
+    assert_eq!(
+        (set.entity(), set.kind(), set.entity_id().as_str()),
+        ("window", "suggest", "01JBQ7ZJ0000000000000000P1")
+    );
+    assert_eq!(
+        payload(&set),
+        json!({ "project": "01JBQ7ZJ0000000000000000P1",
+                "suggestion": serde_json::to_value(&suggestion).expect("s") })
+    );
+    let cleared = DomainEvent::WindowSuggestionCleared {
+        project,
+        project_key: "DEMO".parse().expect("key"),
+    };
+    assert_eq!(
+        (cleared.entity(), cleared.kind()),
+        ("window", "suggestion_cleared")
+    );
+    assert_eq!(
+        payload(&cleared),
+        json!({ "project": "01JBQ7ZJ0000000000000000P1", "project_key": "DEMO" })
+    );
+}

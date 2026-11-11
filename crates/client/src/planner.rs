@@ -2,11 +2,12 @@
 //! itself (a client with its run token) reads and edits the plan.
 
 use toknila_api_types::{
-    CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain, NewThread,
-    NewVersion, PlannerDesign, PlannerPlan, PlannerState, StartPlanner, TerminalSize, ThreadDetail,
-    TicketDetail,
+    CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain, NewSuggestion,
+    NewThread, NewVersion, PlannerDesign, PlannerPlan, PlannerState, StartPlanner, TerminalSize,
+    ThreadDetail, TicketDetail,
 };
 use toknila_core::RunId;
+use toknila_core::suggestion::Suggestion;
 
 use crate::{Client, ClientResult, NO_BODY, Scrollback, enc, transport_error};
 
@@ -145,6 +146,17 @@ impl Client {
     pub fn planner_show_card(&self, card: &str) -> ClientResult<TicketDetail> {
         let path = format!("/planner/cards/{}/show", enc(card));
         self.call("POST", &path, NO_BODY)
+    }
+
+    /// `POST /planner/suggestion`: keeps the planner's next step, replacing the last one.
+    pub fn planner_suggest(&self, s: &NewSuggestion) -> ClientResult<Suggestion> {
+        self.call("POST", "/planner/suggestion", Some(s))
+    }
+
+    /// `GET /projects/{project}/suggestion`: the planner's standing suggestion, if any.
+    pub fn suggestion(&self, project: &str) -> ClientResult<Option<Suggestion>> {
+        let path = format!("/projects/{}/suggestion", enc(project));
+        self.call("GET", &path, NO_BODY)
     }
 
     /// `POST /planner/cards/{card}/threads`.
