@@ -356,6 +356,7 @@ fn recovery_settles_and_reports_drift_without_a_journal() {
             running: 0,
             lost: vec![],
             reviews_lost: vec![],
+            checks_resumed: vec![],
             merges_resumed: vec![],
             drift: vec!["DEMO-1".to_owned(), "DEMO-2".to_owned()],
         }

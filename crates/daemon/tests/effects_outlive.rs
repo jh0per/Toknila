@@ -38,6 +38,9 @@ fn git(dir: &Path, args: &[&str]) {
 struct SlowChecker {
     hold: Duration,
     runs: AtomicUsize,
+    /// How many runs are inside `run` now, and the most there ever were at once.
+    active: AtomicUsize,
+    most_active: AtomicUsize,
     release: Mutex<Option<mpsc::Receiver<()>>>,
 }
 
@@ -46,6 +49,8 @@ impl SlowChecker {
         Arc::new(Self {
             hold,
             runs: AtomicUsize::new(0),
+            active: AtomicUsize::new(0),
+            most_active: AtomicUsize::new(0),
             release: Mutex::new(None),
         })
     }
@@ -56,6 +61,8 @@ impl SlowChecker {
         let c = Arc::new(Self {
             hold: Duration::ZERO,
             runs: AtomicUsize::new(0),
+            active: AtomicUsize::new(0),
+            most_active: AtomicUsize::new(0),
             release: Mutex::new(Some(rx)),
         });
         (c, tx)
@@ -65,12 +72,16 @@ impl SlowChecker {
 impl Checker for SlowChecker {
     fn run(&self, _spec: &CheckSpec) -> Result<CheckResult, CheckError> {
         self.runs.fetch_add(1, Ordering::SeqCst);
-        match self.release.lock().expect("lock").take() {
+        let now = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+        self.most_active.fetch_max(now, Ordering::SeqCst);
+        let held = self.release.lock().expect("lock").take();
+        match held {
             Some(rx) => {
                 let _ = rx.recv();
             }
             None => std::thread::sleep(self.hold),
         }
+        self.active.fetch_sub(1, Ordering::SeqCst);
         Ok(CheckResult {
             success: true,
             code: Some(0),
@@ -78,6 +89,22 @@ impl Checker for SlowChecker {
             output: "fine".to_owned(),
         })
     }
+}
+
+fn app_for(store: &Store, home: &Path) -> axum::Router {
+    let (runners, _) = toknila_daemon::runner::Runners::new(home.join("runs"), home.join("p"));
+    router(AppState {
+        store: store.clone(),
+        token: TOKEN.into(),
+        shutdown: Arc::new(Notify::new()),
+        profiles: home.join("p"),
+        runners,
+        tools: Arc::new(toknila_daemon::tools::SystemTools),
+        usage: Arc::new(toknila_daemon::usage::Usage::disabled()),
+        home: home.to_owned(),
+        ships: home.join("ships"),
+        trash: Arc::new(toknila_daemon::trash::NoTrash),
+    })
 }
 
 struct Rig {
@@ -102,20 +129,7 @@ impl Rig {
             .with_shipyard(Arc::new(GitShipyard::new(tmp.path().join("ships"))))
             .with_merger(Arc::new(toknila_daemon::github::Mergers::new()))
             .with_checker(checker);
-        let (runners, _) =
-            toknila_daemon::runner::Runners::new(tmp.path().join("runs"), tmp.path().join("p"));
-        let app = router(AppState {
-            store: store.clone(),
-            token: TOKEN.into(),
-            shutdown: Arc::new(Notify::new()),
-            profiles: tmp.path().join("p"),
-            runners,
-            tools: Arc::new(toknila_daemon::tools::SystemTools),
-            usage: Arc::new(toknila_daemon::usage::Usage::disabled()),
-            home: tmp.path().to_owned(),
-            ships: tmp.path().join("ships"),
-            trash: Arc::new(toknila_daemon::trash::NoTrash),
-        });
+        let app = app_for(&store, tmp.path());
         let mut rig = Rig {
             _tmp: tmp,
             app,
@@ -265,7 +279,7 @@ async fn shutdown_does_not_wait_for_an_effect_that_never_ends() {
         abandoned.len() == 1 && abandoned[0].contains("RunCheck"),
         "the stuck check is named: {abandoned:?}"
     );
-    // The card was never given a result: the next start hands it to a person.
+    // The card was never given a result: the next start queues its check again.
     assert_eq!(rig.awaiting(1).await, json!({ "by": "check" }));
     release.send(()).expect("release");
     rig.store.settled().await;
@@ -274,4 +288,111 @@ async fn shutdown_does_not_wait_for_an_effect_that_never_ends() {
         json!({ "by": "check" }),
         "a result that comes after the shutdown began is not recorded"
     );
+}
+
+/// Waits until `check` holds for card `n` (polling its detail), or fails the test.
+async fn until_card(rig: &Rig, n: usize, what: &str, check: impl Fn(&Value) -> bool) {
+    let until = Instant::now() + Duration::from_secs(10);
+    loop {
+        let card = rig.card(n).await;
+        if check(&card) {
+            return;
+        }
+        assert!(Instant::now() < until, "card {n}: {what}: {card}");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+#[tokio::test]
+async fn two_hand_ins_at_once_run_their_checks_one_after_the_other_and_the_second_says_it_waits() {
+    let (checker, release) = SlowChecker::stuck();
+    let rig = Rig::new(checker.clone(), 2).await;
+    let first = rig.hand_in(1);
+    until_card(&rig, 1, "its check runs", |c| {
+        c["review"]["check_queue"] == json!(0)
+    })
+    .await;
+    let second = rig.hand_in(2);
+    first.await.expect("answered");
+    second.await.expect("answered");
+    until_card(&rig, 2, "it waits for the first", |c| {
+        c["review"]["check_queue"] == json!(1)
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(
+        checker.runs.load(Ordering::SeqCst),
+        1,
+        "the second check did not start while the first is held"
+    );
+    assert_eq!(
+        rig.awaiting(2).await,
+        json!({ "by": "check" }),
+        "still in the Check turn"
+    );
+    release.send(()).expect("release");
+    rig.store.settled().await;
+    assert_eq!(checker.runs.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        checker.most_active.load(Ordering::SeqCst),
+        1,
+        "never two checks at once"
+    );
+    for n in 1..=2 {
+        let card = rig.card(n).await;
+        assert_eq!(card["review"]["rounds"][0]["verdict"], "approve", "{card}");
+        assert!(card["review"]["check_queue"].is_null(), "{card}");
+    }
+}
+
+#[tokio::test]
+async fn a_check_that_waited_when_the_daemon_stopped_runs_after_the_restart() {
+    let (checker, release) = SlowChecker::stuck();
+    let rig = Rig::new(checker.clone(), 2).await;
+    let (first, second) = (rig.hand_in(1), rig.hand_in(2));
+    first.await.expect("answered");
+    second.await.expect("answered");
+    until_card(&rig, 2, "it waits for the first", |c| {
+        c["review"]["check_queue"] == json!(1)
+    })
+    .await;
+    // The daemon is gone with the line it held: a second one starts on the same database.
+    let again = SlowChecker::holding(Duration::from_millis(100));
+    let tmp = rig._tmp.path();
+    let store = Store::open(&tmp.join("t.db"))
+        .expect("reopen")
+        .with_shipyard(Arc::new(GitShipyard::new(tmp.join("ships"))))
+        .with_merger(Arc::new(toknila_daemon::github::Mergers::new()))
+        .with_checker(again.clone());
+    assert!(
+        store.check_line().snapshot().is_empty(),
+        "the line starts empty"
+    );
+    let report = toknila_daemon::recovery::recover(&store)
+        .await
+        .expect("recover");
+    assert_eq!(
+        report.checks_resumed,
+        ["DEMO-1", "DEMO-2"],
+        "in hand-in order"
+    );
+    store.settled().await;
+    let restarted = Rig {
+        app: app_for(&store, tmp),
+        store: store.clone(),
+        ships: Vec::new(),
+        _tmp: tempfile::tempdir().expect("unused"),
+    };
+    assert_eq!(
+        again.runs.load(Ordering::SeqCst),
+        2,
+        "both checks ran after the restart"
+    );
+    assert_eq!(again.most_active.load(Ordering::SeqCst), 1);
+    for n in 1..=2 {
+        let card = restarted.card(n).await;
+        assert_eq!(card["review"]["rounds"][0]["verdict"], "approve", "{card}");
+    }
+    release.send(()).expect("release the first daemon's check");
+    rig.store.settled().await;
 }

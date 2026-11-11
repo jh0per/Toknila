@@ -36,23 +36,39 @@ impl Store {
                 return;
             }
             self.log_checks_starting(&queued).await;
+            // The checks take their places now, so a card shows that it waits at once.
+            let joined: Vec<TicketId> = queued
+                .iter()
+                .filter_map(|e| match e {
+                    ExternalEffect::RunCheck { ticket, .. } => Some(*ticket),
+                    _ => None,
+                })
+                .collect();
+            for t in &joined {
+                self.line.join(*t);
+            }
             let runner = self.runner.clone();
             let merger = self.merger.clone();
             let checker = self.checker.clone();
+            let line = self.line.clone();
             let yard = yard.clone();
-            let outcomes = match tokio::task::spawn_blocking(move || {
+            let outcomes = tokio::task::spawn_blocking(move || {
                 external::execute(
                     external::Host {
                         yard: &*yard,
                         merger: &*merger,
                         runner: &*runner,
                         checker: &*checker,
+                        gate: &*line,
                     },
                     queued,
                 )
             })
-            .await
-            {
+            .await;
+            for t in &joined {
+                self.line.leave(*t);
+            }
+            let outcomes = match outcomes {
                 Ok(outcomes) => outcomes,
                 Err(e) => return tracing::error!(error = %e, "external effects panicked"),
             };

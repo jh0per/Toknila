@@ -75,6 +75,28 @@ fn the_check_command_is_to_be_run_as_given_and_files_changed_with_the_edit_tools
 }
 
 #[test]
+fn both_roles_are_told_to_run_the_check_once_not_in_a_loop() {
+    let brief = RunBrief {
+        check_command: Some("cargo xtask verify"),
+        ..pinned_brief(&[])
+    };
+    for text in [
+        protocol().to_owned(),
+        generate(&brief),
+        generate_review(&brief),
+    ] {
+        assert!(
+            text.contains("Run it once, not in a loop"),
+            "the check is run once: {text}"
+        );
+        assert!(
+            text.contains("only one check runs on this machine at a time"),
+            "{text}"
+        );
+    }
+}
+
+#[test]
 fn both_roles_are_told_to_work_alone_and_to_quote_paths() {
     for text in [protocol(), review_protocol()] {
         assert!(text.contains("Do not start subagents or background agents"));
