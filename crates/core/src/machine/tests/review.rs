@@ -569,6 +569,25 @@ fn the_check_result_is_heard_only_while_the_card_is_being_checked() {
     }
 }
 
+#[test]
+fn a_return_while_the_card_is_being_checked_says_so() {
+    let t = after_hand_in_with_check(ReviewMode::Both);
+    let err = apply(
+        &t,
+        &TicketEvent::Return {
+            comment: "x".to_owned(),
+        },
+        NOW,
+    )
+    .expect_err("refused")
+    .to_string();
+    assert_eq!(
+        err,
+        "cannot return yet: the card is still being checked (brought up to main \
+         and the check command run); Return or Accept once it waits for a person"
+    );
+}
+
 fn with_acceptance(turn: ReviewTurn) -> Ticket {
     let mut t = in_review(turn);
     t.acceptance = vec!["first holds".to_owned(), "second holds".to_owned()];

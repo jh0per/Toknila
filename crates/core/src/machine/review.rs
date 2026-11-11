@@ -346,15 +346,16 @@ pub(super) fn no_checks_answer(
     Some(())
 }
 
-/// A card whose merge is running takes no verdict and no return.
+/// A card whose merge is running or whose check is running takes no verdict and no return.
 pub(super) fn not_merging(
     ticket: &Ticket,
     event: &super::TicketEvent,
 ) -> Result<(), TransitionError> {
-    if matches!(
-        ticket.review.turn,
-        Some(ReviewTurn::Merging | ReviewTurn::Check)
-    ) {
+    if ticket.review.turn == Some(ReviewTurn::Check) {
+        Err(TransitionError::BeingChecked {
+            event: event.name(),
+        })
+    } else if ticket.review.turn == Some(ReviewTurn::Merging) {
         Err(TransitionError::NotAllowed {
             event: event.name(),
             from: ticket.status,

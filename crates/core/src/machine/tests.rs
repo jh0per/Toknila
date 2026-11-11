@@ -2,7 +2,7 @@ use proptest::prelude::*;
 
 use super::*;
 use crate::{
-    BlockedReason, ChainId, NodeRef, StalePolicy, TicketDraft, TicketId, TicketKey, Wildcard,
+    Actor, BlockedReason, ChainId, NodeRef, StalePolicy, TicketDraft, TicketId, TicketKey, Wildcard,
 };
 
 const T0: Timestamp = Timestamp(1_000);
