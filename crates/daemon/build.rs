@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("set by cargo"));
+    migrations(&manifest);
     let dist = manifest.join("../../apps/web/dist");
     println!("cargo:rerun-if-changed={}", dist.display());
 
@@ -28,6 +29,35 @@ fn main() {
     let target =
         PathBuf::from(std::env::var("OUT_DIR").expect("set by cargo")).join("web_assets.rs");
     std::fs::write(target, out).expect("write web_assets.rs");
+}
+
+/// Collects every `src/store/migrations/*.sql` into one list, ordered by file name, so adding a
+/// migration is adding a file and no shared line changes.
+fn migrations(manifest: &Path) {
+    let dir = manifest.join("src/store/migrations");
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files: Vec<(String, String)> = std::fs::read_dir(&dir)
+        .expect("read src/store/migrations")
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            name.ends_with(".sql").then(|| {
+                let abs = e.path().canonicalize().unwrap_or_else(|_| e.path());
+                (name, abs.to_string_lossy().into_owned())
+            })
+        })
+        .collect();
+    files.sort();
+    let mut out = String::from(
+        "/// Migration files: (file name, SQL), in file-name order.\nstatic FILES: &[(&str, &str)] = &[\n",
+    );
+    for (name, abs) in &files {
+        let _ = writeln!(out, "    ({name:?}, include_str!({abs:?})),");
+    }
+    out.push_str("];\n");
+    let target =
+        PathBuf::from(std::env::var("OUT_DIR").expect("set by cargo")).join("migration_files.rs");
+    std::fs::write(target, out).expect("write migration_files.rs");
 }
 
 fn collect(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) {

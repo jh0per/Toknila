@@ -1,19 +1,19 @@
 use rusqlite::Connection;
 
-use super::super::schema::MIGRATIONS;
-use super::super::{SCHEMA_VERSION, Store, StoreError};
+use super::super::migrations;
+use super::super::{Store, StoreError};
 use super::*;
+
+fn total() -> usize {
+    migrations::all().expect("list").len()
+}
 
 /// A database as an older build left it: the first `version` migrations applied, plus a project.
 fn old_db(path: &Path, version: usize) {
     let conn = Connection::open(path).expect("open");
     conn.pragma_update(None, "journal_mode", "WAL")
         .expect("wal");
-    for sql in &MIGRATIONS[..version] {
-        conn.execute_batch(sql).expect("migration");
-    }
-    conn.pragma_update(None, "user_version", version as i64)
-        .expect("version");
+    migrations::old_store(&conn, version);
     conn.execute(
         "INSERT INTO projects (id, key, name, work_branch, release_branch, default_profile, default_review_mode)
          VALUES ('p1', 'DEMO', 'Demo', 'develop', 'main', 'sim', 'human')",
@@ -66,7 +66,11 @@ fn migrating_an_older_database_backs_it_up_and_keeps_the_data() {
     let backup = dir.path().join("backups").join(&kept[0]);
     assert_eq!(version_of(&backup), 1);
     assert_eq!(projects(&backup), ["DEMO"]);
-    assert_eq!(version_of(&db), SCHEMA_VERSION);
+    let recorded: i64 = Connection::open(&db)
+        .expect("open")
+        .query_row("SELECT count(*) FROM schema_migrations", [], |r| r.get(0))
+        .expect("count");
+    assert_eq!(recorded, total() as i64);
     assert_eq!(projects(&db), ["DEMO"]);
 }
 
@@ -80,7 +84,7 @@ fn a_fresh_database_needs_no_backup() {
 #[test]
 fn a_database_that_is_current_needs_no_backup() {
     let dir = tempfile::tempdir().expect("dir");
-    old_db(&dir.path().join("toknila.db"), MIGRATIONS.len());
+    old_db(&dir.path().join("toknila.db"), total());
     Store::open(&dir.path().join("toknila.db")).expect("open");
     assert!(names(&dir.path().join("backups")).is_empty());
 }
@@ -144,7 +148,7 @@ fn only_the_newest_five_backups_stay() {
 fn a_damaged_database_is_refused_naming_the_newest_backup() {
     let dir = tempfile::tempdir().expect("dir");
     let db = dir.path().join("toknila.db");
-    old_db(&db, MIGRATIONS.len());
+    old_db(&db, total());
     {
         let conn = Connection::open(&db).expect("open");
         conn.execute_batch("CREATE INDEX events_at ON events(at)")

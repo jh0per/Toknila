@@ -37,6 +37,11 @@ before moving code between crates. Summary of what holds today:
   lines; `cargo xtask guards` enforces it. Files already over it may only shrink, and their entry
   in `xtask/src/guards.rs` is lowered or removed in the same PR that shrinks them.
 - A rule that two places need moves one layer down; it is never copied.
+- Adding a migration: a new file `crates/daemon/src/store/migrations/<slug>.sql` (the slug starts
+  with a letter; the card key is a safe choice) whose first line is `-- name: <unique-slug>`.
+  Nothing else is edited: a build step collects the files. Never edit a released migration, and
+  never number one; start the file name with a letter so it sorts after the legacy `0001_`
+  to `0024_` files (a test fails otherwise); a duplicate name stops the daemon at start, naming both files.
 - The database is the source of truth. TOML chain files are import/export only. Chain status,
   progress and "where it stopped" are computed, never stored.
 
