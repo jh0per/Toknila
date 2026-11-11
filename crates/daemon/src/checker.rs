@@ -204,11 +204,17 @@ mod tests {
         let dir = tempfile::tempdir().expect("dir");
         let checker = ShellChecker::default();
         let stopper = checker.clone();
+        let marker = dir.path().join("started");
         let handle = std::thread::spawn({
-            let spec = spec("echo started; sleep 30", dir.path());
+            let spec = spec("touch started; echo started; sleep 30", dir.path());
             move || checker.run(&spec)
         });
-        std::thread::sleep(Duration::from_millis(300));
+        // The command is running once it has made its mark; a ceiling, not a delay.
+        let until = Instant::now() + Duration::from_secs(60);
+        while !marker.exists() {
+            assert!(Instant::now() < until, "the command never started");
+            std::thread::sleep(Duration::from_millis(10));
+        }
         let started = Instant::now();
         stopper.stop_all();
         let r = handle.join().expect("joins");

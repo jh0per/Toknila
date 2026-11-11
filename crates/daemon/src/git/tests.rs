@@ -69,18 +69,25 @@ fn a_timeout_ends_the_helper_processes_too() {
     .expect("script");
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     let g = Git::new(&script.to_string_lossy());
-    // The limit must pass after the script has started its helper: on a loaded machine starting a
-    // shell can take seconds, and a kill before that leaves no helper to look for. The limit is
-    // this test's own time, so it is generous but the pid file is awaited, not assumed.
-    let err = g
-        .run_within("/", &["fetch"], Duration::from_secs(8))
-        .expect_err("times out");
-    assert!(matches!(err, GitError::Failed { .. }), "{err:?}");
-    let pid: i32 = std::fs::read_to_string(&pid_file)
-        .expect("the script started its helper within the limit")
-        .trim()
-        .parse()
-        .expect("number");
+    // The limit must pass after the script has started its helper (its pid file exists); a kill
+    // before that leaves no helper to look for, and how long a shell takes to start is the
+    // machine's business. So the limit grows until a run did start its helper: the pid file is
+    // the event, not a guess of how long starting takes.
+    let mut limit = Duration::from_secs(1);
+    let pid: i32 = loop {
+        let err = g.run_within("/", &["fetch"], limit).expect_err("times out");
+        assert!(matches!(err, GitError::Failed { .. }), "{err:?}");
+        if let Ok(text) = std::fs::read_to_string(&pid_file)
+            && let Ok(pid) = text.trim().parse()
+        {
+            break pid;
+        }
+        assert!(
+            limit < Duration::from_secs(64),
+            "the script never started its helper"
+        );
+        limit *= 2;
+    };
     let alive = || nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok();
     // The helper's end is awaited, with a ceiling far above what it takes.
     let until = Instant::now() + Duration::from_secs(60);

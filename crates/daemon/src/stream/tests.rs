@@ -36,6 +36,9 @@ fn connect(port: u16, since: i64) -> Ws {
 /// Reads seqs until the socket is quiet.
 fn read_seqs(ws: &mut Ws, want: usize) -> Vec<i64> {
     let mut out = Vec::new();
+    // Silence only counts as "quiet" once the wanted events are in; before that the read waits on
+    // the events themselves, up to a ceiling far above what delivery takes.
+    let until = std::time::Instant::now() + Duration::from_secs(60);
     while out.len() < want + 1 {
         match ws.read() {
             Ok(tungstenite::Message::Text(t)) => {
@@ -43,7 +46,8 @@ fn read_seqs(ws: &mut Ws, want: usize) -> Vec<i64> {
                 out.push(v["seq"].as_i64().expect("seq"));
             }
             Ok(_) => {}
-            Err(_) => break, // timeout: quiet
+            Err(_) if out.len() < want && std::time::Instant::now() < until => {}
+            Err(_) => break, // timeout once everything wanted arrived: quiet
         }
     }
     out
