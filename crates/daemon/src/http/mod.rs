@@ -95,6 +95,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(planner_input))
         .routes(routes!(planner_size))
         .routes(routes!(planner_plan))
+        .routes(routes!(planner_design))
         .routes(routes!(planner_new_chain))
         .routes(routes!(planner_add_card))
         .routes(routes!(planner_edit_card))

@@ -950,6 +950,7 @@ async fn openapi_describes_every_route() {
             "/planner/chains/{chain}/cards",
             "/planner/chains/{chain}/cards/{card}/move",
             "/planner/chains/{chain}/edges",
+            "/planner/designs/{design}",
             "/planner/plan",
             "/profiles",
             "/projects",
