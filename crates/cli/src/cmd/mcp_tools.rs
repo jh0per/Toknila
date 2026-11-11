@@ -111,8 +111,8 @@ fn worker_tools() -> Vec<Value> {
         ),
         tool(
             "finished",
-            "Hand the ticket in for review, with a summary of what you did. Refused while a thread is still open. Do not call it after an ordinary reply: only when the work is done.",
-            json!({ "summary": text("What was done and how to check it") }),
+            "Hand the ticket in for review, with the hand-in template as the summary. Refused while a thread is still open or when the summary has no checks section. Do not call it after an ordinary reply: only when the work is done.",
+            json!({ "summary": text("**What changed:** ...\n**Checks:**\n- PASS|FAIL|NOT_RUN|BLOCKED <check>: <evidence>\n**Left:** ...") }),
             &["summary"],
         ),
         tool(

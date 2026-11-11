@@ -197,7 +197,8 @@ impl Rig {
             .header("authorization", format!("Bearer {TOKEN}"))
             .header("content-type", "application/json")
             .body(Body::from(
-                json!({ "event": "finished", "summary": "done" }).to_string(),
+                json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") })
+                    .to_string(),
             ))
             .expect("request");
         tokio::spawn(async move {

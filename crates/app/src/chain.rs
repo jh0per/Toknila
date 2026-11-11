@@ -292,7 +292,13 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
             }
             _ => continue,
         };
-        add_comment(uow, &ctx.view, ticket, author, kind, body_from_text(&text))?;
+        // A hand-in keeps its blocks (what changed, checks, what is left) as the report's fields.
+        let body = match kind {
+            CommentKind::Report => toknila_core::handin::to_body(&text),
+            _ => None,
+        };
+        let body = body.unwrap_or_else(|| body_from_text(&text));
+        add_comment(uow, &ctx.view, ticket, author, kind, body)?;
     }
     Ok(())
 }

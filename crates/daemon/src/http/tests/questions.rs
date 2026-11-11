@@ -395,7 +395,7 @@ async fn a_worker_that_handed_in_gets_a_denial_at_once_and_the_card_stays_in_rev
         &token,
         Method::POST,
         "/v1/tickets/DEMO-1/events",
-        Some(json!({ "event": "finished", "summary": "done" })),
+        Some(json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") })),
     )
     .await;
     assert_eq!(api.status("DEMO-1").await, "review");

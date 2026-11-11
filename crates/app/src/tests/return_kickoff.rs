@@ -21,7 +21,7 @@ fn in_review() -> Mem {
         &mut mem,
         &t,
         AgentEvent::Finished {
-            summary: "done".to_owned(),
+            summary: toknila_core::handin::from_plain("done"),
         },
         Some("f8afe06c0ffee".to_owned()),
     )

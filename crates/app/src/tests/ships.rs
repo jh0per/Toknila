@@ -87,7 +87,7 @@ fn with_repo() -> Mem {
 
 fn finish_a(mem: &mut Mem) -> AppResult<()> {
     let a = mem.ticket_by_title("A");
-    let summary = "done".to_owned();
+    let summary = toknila_core::handin::from_plain("done");
     agent::ticket_event(mem, &a, AgentEvent::Finished { summary })?;
     // Only the sync runs for a project without a check command.
     super::runs::settle(mem);

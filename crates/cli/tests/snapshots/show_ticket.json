@@ -31,7 +31,9 @@
     {
       "author": "agent",
       "body": {
-        "gist": "B is done"
+        "consequences": "nothing is known to be left",
+        "gist": "B is done",
+        "how_to_verify": "- NOT_RUN all: handed in by hand, no check was run"
       },
       "created_at": 0,
       "delivered_at": null,

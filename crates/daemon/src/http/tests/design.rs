@@ -145,7 +145,7 @@ async fn ask_design_on_a_running_card_sends_an_instruction_and_review_refuses_it
     assert_eq!(api.get("/v1/tickets/DEMO-1").await["design_waiting"], false);
     api.post(
         "/v1/tickets/DEMO-1/events",
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     let review = api.get("/v1/tickets/DEMO-1").await;
@@ -171,7 +171,9 @@ async fn finished_is_refused_on_a_design_first_card_until_a_version_is_approved(
         api.call(
             Method::POST,
             "/v1/tickets/DEMO-1/events",
-            Some(json!({ "event": "finished", "summary": "done" })),
+            Some(
+                json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
+            ),
         )
     };
     let (s, e) = finish().await;

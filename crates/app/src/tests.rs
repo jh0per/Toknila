@@ -401,7 +401,7 @@ fn finished_moves_to_review_and_keeps_the_report() {
     recover(&mut mem).expect("settle");
     let a = mem.ticket_by_title("A");
     let summary = AgentEvent::Finished {
-        summary: "done\nall green".to_owned(),
+        summary: "**What changed:** done\nall green\n**Checks:**\n- PASS verify: 12 tests\n**Left:** nothing".to_owned(),
     };
     agent::ticket_event(&mut mem, &a, summary).expect("finished");
     assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Review);
@@ -411,6 +411,30 @@ fn finished_moves_to_review_and_keeps_the_report() {
         (Actor::Agent, CommentKind::Report, "done")
     );
     assert_eq!(report.body.what.as_deref(), Some("all green"));
+    assert_eq!(
+        report.body.how_to_verify.as_deref(),
+        Some("- PASS verify: 12 tests")
+    );
+    assert_eq!(report.body.consequences.as_deref(), Some("nothing"));
+}
+
+#[test]
+fn a_hand_in_without_checks_is_refused_with_the_template_and_nothing_changes() {
+    let mut mem = Mem::demo();
+    recover(&mut mem).expect("settle");
+    let a = mem.ticket_by_title("A");
+    let summary =
+        "**What changed:** a long enough description of the change that was made".to_owned();
+    let e =
+        agent::ticket_event(&mut mem, &a, AgentEvent::Finished { summary }).expect_err("no checks");
+    assert_eq!(e.kind, ErrorKind::BadRequest);
+    assert!(e.message.contains("no checks section"), "{}", e.message);
+    assert!(
+        e.message.contains(toknila_core::handin::TEMPLATE),
+        "{}",
+        e.message
+    );
+    assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Running);
 }
 
 #[test]
@@ -423,10 +447,8 @@ fn agent_events_are_checked_before_anything_changes() {
         summary: " ".to_owned(),
     };
     let e = agent::ticket_event(&mut mem, &a, empty).expect_err("empty summary");
-    assert_eq!(
-        (e.kind, e.message.as_str()),
-        (ErrorKind::BadRequest, "finished needs a summary")
-    );
+    assert_eq!(e.kind, ErrorKind::BadRequest);
+    assert!(e.message.contains("too short"), "{}", e.message);
     let b = mem.ticket_by_title("B");
     let e = agent::ticket_event(&mut mem, &b, AgentEvent::Started).expect_err("backlog");
     assert_eq!(e.kind, ErrorKind::Conflict);

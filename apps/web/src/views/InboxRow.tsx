@@ -1,5 +1,7 @@
 import { useState } from "react";
-import type { InboxItem, InboxKind } from "../api/types";
+import type { InboxItem, InboxKind, TicketDetail } from "../api/types";
+import { finishReport } from "../store/permissionReports";
+import { HandIn } from "./HandIn";
 import type { Intent } from "../store/msg";
 import type { Route } from "../store/route";
 import type { State } from "../store/state";
@@ -36,14 +38,14 @@ export function InboxRow({ state, item, dispatch }: { state: State; item: InboxI
         {route ? <NavLink route={route} dispatch={dispatch} className="key">{item.ticket}</NavLink> : <span className="key">{item.ticket}</span>}
       </div>
       <div className="row-kind muted" data-testid="inbox-kind">{KIND_LINE[item.kind]}</div>
-      <Body item={item} route={route} open={open} dispatch={dispatch} />
+      <Body item={item} route={route} open={open} dispatch={dispatch} detail={state.details[item.ticket]} />
     </li>
   );
 }
 
 type BodyProps = { item: InboxItem; open: React.ReactNode; dispatch: Dispatch };
 
-function Body({ item, route, open, dispatch }: BodyProps & { route: Route | undefined }) {
+function Body({ item, route, open, dispatch, detail }: BodyProps & { route: Route | undefined; detail: TicketDetail | undefined }) {
   switch (item.kind) {
     case "proposal": return <Proposal item={item} open={open} dispatch={dispatch} />;
     case "question": return <Question item={item} open={open} dispatch={dispatch} />;
@@ -60,7 +62,7 @@ function Body({ item, route, open, dispatch }: BodyProps & { route: Route | unde
           </div>
         </div>
       );
-    case "review": return <Review item={item} open={open} dispatch={dispatch} />;
+    case "review": return <Review item={item} open={open} dispatch={dispatch} detail={detail} />;
     case "thread":
       return (
         <div className="row-body">
@@ -154,7 +156,8 @@ function Question({ item, open, dispatch }: BodyProps) {
 
 /// A card for the person to review: Accept, Return (with what to change), and, when the reviewer
 /// gave no verdict, the end of its screen and Run the reviewer again. The same actions as the card.
-function Review({ item, open, dispatch }: BodyProps) {
+function Review({ item, open, dispatch, detail }: BodyProps & { detail: TicketDetail | undefined }) {
+  const report = finishReport(detail?.comments ?? []);
   const [returning, setReturning] = useState(false);
   const [comment, setComment] = useState("");
   const act = (action: "accept" | "run_reviewer") => dispatch({ type: "ticketAction", key: item.ticket, action });
@@ -164,6 +167,7 @@ function Review({ item, open, dispatch }: BodyProps) {
     <div className="row-body" data-testid="no-verdict" data-no-verdict={noVerdict}>
       {(noVerdict || item.text) && <blockquote data-testid="question">{item.text}</blockquote>}
       {item.lines && item.lines.length > 0 && <pre className="screen" data-testid="screen">{item.lines.join("\n")}</pre>}
+      {report && <HandIn report={report} />}
       <div className="btns">
         {can("accept") && <button className="btn primary" data-testid="review-accept" onClick={() => act("accept")}>Accept</button>}
         {can("return") && (

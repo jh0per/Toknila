@@ -167,6 +167,7 @@ pub(super) fn act(mem: &mut Mem, event: TicketEvent) {
 
 pub(super) fn finish(mem: &mut Mem, summary: String) {
     let t = a(mem);
+    let summary = toknila_core::handin::from_plain(&summary);
     agent::ticket_event(mem, &t, AgentEvent::Finished { summary }).expect("finished");
 }
 

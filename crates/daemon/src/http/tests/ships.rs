@@ -67,7 +67,7 @@ async fn start_makes_the_worktree_and_merged_removes_it_but_keeps_the_branch() {
     commit_file(&path, "login.txt", "login\n", "add login");
     api.post(
         "/v1/tickets/DEMO-1/events",
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     assert!(
@@ -206,7 +206,7 @@ async fn a_repository_that_disappears_blocks_the_accept_with_merge_failed() {
     commit_file(&ship, "login.txt", "login\n", "add login");
     api.post(
         "/v1/tickets/DEMO-1/events",
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     // The repository disappears under the ship: git can neither merge nor remove the worktree.

@@ -1082,7 +1082,7 @@ async fn sim_agent_events_drive_a_ticket() {
     let t = api
         .post(
             "/v1/tickets/DEMO-1/events",
-            json!({ "event": "finished", "summary": "зроблено X" }),
+            json!({ "event": "finished", "summary": toknila_core::handin::from_plain("зроблено X") }),
         )
         .await;
     assert_eq!(t["ticket"]["status"], "review");
@@ -1127,7 +1127,7 @@ async fn release_agent_finishes_a_cut_release() {
     .await;
     api.post(
         "/v1/tickets/DEMO-1/events",
-        json!({ "event": "finished", "summary": "done" }),
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     api.post("/v1/tickets/DEMO-1/actions/accept", json!({}))

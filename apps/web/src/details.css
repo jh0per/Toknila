@@ -12,6 +12,10 @@
 .report { display: flex; flex-direction: column; gap: var(--s1); }
 .report p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .report-gist { font-weight: 600; }
+.hand-in h5 { margin: 0 0 var(--s1); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted, inherit); }
+.hand-in .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); overflow-wrap: anywhere; }
+.hand-in .status { font-weight: 600; font-family: var(--mono, monospace); font-size: 0.8125rem; }
+.hand-in li[data-status="FAIL"] .status, .hand-in li[data-status="BLOCKED"] .status { color: var(--danger, inherit); }
 .review-block .actions { padding-top: var(--s1); }
 .technical { margin-top: var(--s3); }
 .technical dl { margin: 0; }

@@ -154,7 +154,10 @@ pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> R
         // A ticket first; if no ticket has this name, a release.
         SimCmd::Finish { summary } => match c.ticket(target) {
             Ok(_) => AgentEvent::Finished {
-                summary: summary.context("finish needs a summary for a ticket")?,
+                // A person at the terminal types plain words; the hand-in shape is the agent's.
+                summary: toknila_core::handin::from_plain(
+                    &summary.context("finish needs a summary for a ticket")?,
+                ),
             },
             Err(_) => {
                 let detail = c.release_event(target, &ReleaseEvent::Finished)?;
