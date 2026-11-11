@@ -91,6 +91,7 @@ const TABLE: Record<string, Words> = {
   "thread.version_posted": (p) => (typeof p.number === "number" ? `Version ${p.number} of a thread posted` : "New version of a thread posted"),
   "thread.approved": (p) => `Thread approved: ${str(p.thread?.title)}`,
   "thread.reopened": (p) => `Thread reopened: ${str(p.thread?.title)}`,
+  "window.show_card": (p) => `The assistant opened ${str(p.ticket) || "a card"}`,
 };
 
 /// Every (entity, kind) the journal has words for.

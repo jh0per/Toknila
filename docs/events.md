@@ -254,6 +254,12 @@ the kinds `opened` (`{"ticket","thread"}`), `message_posted` (`{"ticket","messag
 journaled), `approved` and `reopened` (`{"ticket","thread"}`). A change of review settings is
 `project`/`chain` kind `updated` (`{"project"}` / `{"chain"}`).
 
+The planner's `show_card` tool journals the entity `window` (id: the project's) with the kind
+`show_card` (`{"project","project_key","chain","ticket"}`, actor `agent`); nothing in the plan
+changes. A window follows it once per event (by `seq`) and only when it shows that project's
+assistant or a chain of it; it then opens the card's page with a notice and Back. Any other
+window ignores it. `tok watch` prints it as `window show_card DEMO-2`.
+
 Deleting a project (`POST /v1/projects/{project}/delete`) first removes the journal entries
 about the project and everything in it (its chains, cards, milestones, comments, subtasks and
 threads), then journals one `chain` kind `deleted` (`{"chain"}`, the chain as it was) per chain

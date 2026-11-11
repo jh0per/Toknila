@@ -15,8 +15,9 @@ It is a normal runner role (`AgentRole::Planner`) with a built-in profile `claud
 (`--permission-mode dontAsk`; allowed: Read, Grep, Glob, read-only git, the `toknila` MCP server;
 no hooks). The daemon starts it through the existing PTY runner and profile machinery in the
 project's `repo_path`, with a run token whose grant has the role `planner`. Its tools are MCP tools
-of `tok mcp` in that role: `show_plan`, `new_chain`, `add_card`, `edit_card`, `add_dependency`,
-`remove_dependency`, `move_card`, `open_thread`, `thread_message`, `thread_version`. Each tool calls
+of `tok mcp` in that role: `show_plan`, `new_chain`, `add_card`, `edit_card`, `show_card`,
+`add_dependency`, `remove_dependency`, `move_card`, `open_thread`, `thread_message`,
+`thread_version` (`show_card` only asks the window to open a card; it changes nothing). Each tool calls
 a `/v1/planner/...` route, which runs a use case of `toknila_app::planner`, which calls the same
 use cases as the window and the CLI (`chains`, `tickets`, `threads`). The owner starts and stops it
 (window or `tok planner start|stop|logs`) and types to it in its terminal.

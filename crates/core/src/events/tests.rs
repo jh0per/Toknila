@@ -218,6 +218,27 @@ fn thread_events_pin_their_names_and_payloads() {
 }
 
 #[test]
+fn show_card_is_a_window_event_of_the_project_and_names_the_card() {
+    let e = DomainEvent::WindowShowCard {
+        project: "01JBQ7ZJ0000000000000000P1"
+            .parse::<ProjectId>()
+            .expect("id"),
+        project_key: "DEMO".parse().expect("key"),
+        chain: "plan".into(),
+        ticket: "DEMO-1".parse().expect("key"),
+    };
+    assert_eq!(
+        (e.entity(), e.kind(), e.entity_id().as_str()),
+        ("window", "show_card", "01JBQ7ZJ0000000000000000P1")
+    );
+    assert_eq!(
+        payload(&e),
+        json!({ "project": "01JBQ7ZJ0000000000000000P1", "project_key": "DEMO",
+                "chain": "plan", "ticket": "DEMO-1" })
+    );
+}
+
+#[test]
 fn ship_events_belong_to_the_ticket_and_carry_branch_and_path() {
     let ship = Ship {
         ticket_id: "01JBQ7ZJ0000000000000000T1"

@@ -6,6 +6,7 @@ import { Dialogs } from "./Dialogs";
 import { EmptyChains } from "./EmptyChains";
 import { Inbox } from "./Inbox";
 import { Onboarding } from "./Onboarding";
+import { OpenedNotice } from "./OpenedNotice";
 import { PlannerScreen } from "./PlannerScreen";
 import { Settings } from "./Settings";
 import { SettingsSidebar } from "./SettingsSidebar";
@@ -57,6 +58,7 @@ export function App() {
         )}
         {/* Last in main, after the top bar the divider measures from, so it reads the panel's height. */}
         <UpdateBanner state={state} dispatch={dispatch} />
+        <OpenedNotice state={state} dispatch={dispatch} />
       </main>
       <Dialogs state={state} dispatch={dispatch} inline={onboarding} />
       <Shortcuts state={state} dispatch={dispatch} />
