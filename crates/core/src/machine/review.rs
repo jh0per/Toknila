@@ -36,6 +36,7 @@ pub(super) fn leave(next: &mut Ticket, effects: &mut Vec<Effect>) {
         effects.push(Effect::StopReviewer);
     }
     next.review.turn = None;
+    next.review.check = None;
     next.review.nudged = false;
     next.review.note = None;
 }
@@ -56,14 +57,6 @@ pub(super) fn person_decides(
 /// Where a card goes after a verdict, as a status and its reason.
 pub(super) type Outcome = (TicketStatus, Option<StatusReason>);
 
-/// The daemon starts checking the hand-in: the card waits for the check command's result.
-pub(super) fn enter_check(next: &mut Ticket, effects: &mut Vec<Effect>) {
-    effects.push(Effect::RunCheck);
-    next.review.turn = Some(ReviewTurn::Check);
-    next.review.nudged = false;
-    next.review.note = None;
-}
-
 /// The check ran. A pass goes on to whoever the review mode says (the reviewer agent, or the
 /// person, who then sees a card that already passes). A failure sends the card back to the
 /// worker with the output, a round of the loop, until the project's round limit is used: then
@@ -81,6 +74,7 @@ pub(super) fn check_done(
             from: next.status,
         });
     }
+    next.review.check = None;
     if passed {
         next.review
             .record(Actor::System, Verdict::Approve, "The check passed.", now);
@@ -107,7 +101,7 @@ fn send_back(
     next.review.nudged = false;
     if used > max_rounds {
         next.review.turn = Some(ReviewTurn::Person);
-        effects.push(Effect::RecordReport {
+        effects.push(Effect::RecordNotice {
             summary: format!(
                 "{what} again, and the {max_rounds} rounds of the loop are used; it is for a person to decide."
             ),
@@ -128,49 +122,6 @@ fn send_back(
     });
     run_on_ship(effects);
     Ok((TicketStatus::Running, None))
-}
-
-/// The check could not run: the card waits for a person.
-pub(super) fn check_lost(
-    next: &mut Ticket,
-    detail: &str,
-    effects: &mut Vec<Effect>,
-) -> Result<Outcome, TransitionError> {
-    if next.review.turn != Some(ReviewTurn::Check) {
-        return Err(TransitionError::NotAllowed {
-            event: "check_lost",
-            from: next.status,
-        });
-    }
-    next.review.turn = Some(ReviewTurn::Person);
-    effects.push(Effect::RecordReport {
-        summary: format!("The check could not run ({detail}); it is for a person to decide."),
-    });
-    Ok((TicketStatus::Review, None))
-}
-
-/// The check command's program was not found on this machine: the worker's work was never
-/// judged, so no round is recorded and nothing is sent back. The card waits for a person, with a
-/// note and a report that say what to fix on the machine.
-pub(super) fn check_cannot_run(
-    next: &mut Ticket,
-    command: &str,
-    effects: &mut Vec<Effect>,
-) -> Result<Outcome, TransitionError> {
-    if next.review.turn != Some(ReviewTurn::Check) {
-        return Err(TransitionError::NotAllowed {
-            event: "check_cannot_run",
-            from: next.status,
-        });
-    }
-    next.review.turn = Some(ReviewTurn::Person);
-    next.review.note = Some(ReviewNote::CheckCannotRun {
-        command: command.to_owned(),
-    });
-    effects.push(Effect::RecordReport {
-        summary: crate::toolpath::cannot_run_text(command),
-    });
-    Ok((TicketStatus::Review, None))
 }
 
 /// What the reviewer agent said, as the machine takes it.
@@ -244,7 +195,7 @@ pub(super) fn agent_failed(
     next.review.turn = Some(ReviewTurn::Person);
     next.review.note = Some(ReviewNote::NoVerdict { lines: Vec::new() });
     effects.push(Effect::StopReviewer);
-    effects.push(Effect::RecordReport {
+    effects.push(Effect::RecordNotice {
         summary: format!("The reviewer gave no verdict ({detail}); it is for a person to decide."),
     });
     Ok((TicketStatus::Review, None))

@@ -20,6 +20,23 @@ use crate::http::dto::{
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
 
+/// Where the check of `t` stands: queued behind others in the machine's `line`, else what the
+/// checker last reported. `None` outside the check turn.
+fn check_phase_of(
+    t: &toknila_core::Ticket,
+    line: &[toknila_core::TicketId],
+) -> Option<toknila_core::CheckPhase> {
+    if t.review.turn != Some(ReviewTurn::Check) {
+        return None;
+    }
+    line.iter()
+        .position(|c| *c == t.id)
+        .and_then(|i| u32::try_from(i).ok())
+        .filter(|p| *p > 0)
+        .map(|place| toknila_core::CheckPhase::Queued { place })
+        .or_else(|| t.review.check.clone())
+}
+
 /// Refuses design references to a design the project does not have.
 async fn check_design_ids(
     state: &AppState,
@@ -84,6 +101,7 @@ pub async fn list_tickets(
     Query(q): Query<TicketQuery>,
 ) -> ApiResult<Json<Vec<TicketItem>>> {
     let at = now();
+    let line = state.store.check_line().snapshot();
     let items = read(&state, move |repo| {
         let chain = q
             .chain
@@ -105,6 +123,7 @@ pub async fn list_tickets(
                 in_status_ms: at.millis_since(t.status_since),
                 needs_human: t.status.needs_human(),
                 queue_position: queue.get(&t.id).copied(),
+                check: check_phase_of(&t, &line),
                 ticket: t,
             })
             .collect())

@@ -1971,6 +1971,24 @@ export interface components {
             /** @description The version the tool reported, when it did. */
             version?: string | null;
         };
+        /**
+         * @description Where a card's check stands while its turn is `Check`. The checker reports `Syncing` and
+         *     `Running`; `Queued` is the daemon's line, added when the card is shown.
+         */
+        CheckPhase: {
+            /** @enum {string} */
+            phase: "queued";
+            /** Format: int32 */
+            place: number;
+        } | {
+            /** @enum {string} */
+            phase: "syncing";
+        } | {
+            command: string;
+            /** @enum {string} */
+            phase: "running";
+            since: components["schemas"]["Timestamp"];
+        };
         /** @description One check of a pull request. */
         CheckRun: {
             name: string;
@@ -3260,6 +3278,7 @@ export interface components {
         RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing";
         /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
         Review: {
+            check?: components["schemas"]["CheckPhase"] | null;
             /**
              * @description The commit the ship's branch was at when the worker last handed in; `None` before the
              *     first hand-in, or when the host could not look.
@@ -3322,6 +3341,7 @@ export interface components {
         /** @description How a ticket is reviewed now, and what has been decided so far. */
         ReviewView: {
             awaiting?: components["schemas"]["ReviewTurn"] | null;
+            check?: components["schemas"]["CheckPhase"] | null;
             /**
              * Format: int32
              * @description Where the card's check stands in the machine's line of checks: 0 it runs now, n it is
@@ -3685,6 +3705,7 @@ export interface components {
         /** @description A ticket in a list. */
         TicketItem: {
             chain: string;
+            check?: components["schemas"]["CheckPhase"] | null;
             /** Format: int64 */
             in_status_ms: number;
             needs_human: boolean;

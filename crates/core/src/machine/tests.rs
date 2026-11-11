@@ -900,6 +900,13 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(TicketEvent::CheckLost {
             detail: "d".to_owned()
         }),
+        Just(TicketEvent::CheckSyncing),
+        Just(TicketEvent::CheckRunning {
+            command: "c".to_owned()
+        }),
+        Just(TicketEvent::CheckSkipped {
+            mode: crate::ReviewMode::Human
+        }),
         (any::<bool>(), "[a-z]{0,2}").prop_map(|(approve, comment)| TicketEvent::ReviewVerdict {
             verdict: if approve {
                 crate::Verdict::Approve

@@ -17,6 +17,8 @@ describe("roundText", () => {
   it("words the daemon's check as passed or failed, and keeps only the first line of its output", () => {
     expect(roundText(round({ reviewer: "system", verdict: "approve", comment: "The check passed." })))
       .toBe("Round 1: the check passed — The check passed.");
+    const none = round({ reviewer: "system", verdict: "approve", comment: "Brought up to main; the project has no check command." });
+    expect(roundText(none)).toBe("Round 1: brought up to main; the project has no check command");
     const failed = round({ reviewer: "system", comment: "`cargo xtask verify` exited with code 101.\n\n```\nlong output\n```" });
     expect(roundText(failed)).toBe("Round 1: the check failed — `cargo xtask verify` exited with code 101.");
   });
@@ -34,7 +36,9 @@ describe("awaitingText", () => {
     expect(awaitingText(view({ by: "agent", decides: true }))).toBe("waiting for the reviewer agent");
     expect(awaitingText(view({ by: "agent", decides: false }))).toBe("waiting for the reviewer agent, then you");
     expect(awaitingText(view({ by: "merging" }))).toBe("merging into the main branch");
-    expect(awaitingText(view({ by: "check" }))).toBe("the check is running");
+    expect(awaitingText(view({ by: "check" }))).toBe("being checked: starting");
+    const running = { ...view({ by: "check" }), check: { phase: "running", command: "cargo xtask verify", since: 0 } } as ReviewView;
+    expect(awaitingText(running, 3 * 60_000)).toBe("being checked: cargo xtask verify, 3 min");
     expect(awaitingText(view(null))).toBe("");
   });
 });

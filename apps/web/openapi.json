@@ -6464,6 +6464,70 @@
           }
         }
       },
+      "CheckPhase": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Another check runs; this one is the `place`-th in line (1 is next).",
+            "required": [
+              "place",
+              "phase"
+            ],
+            "properties": {
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "queued"
+                ]
+              },
+              "place": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Its turn came: the base branch is being brought into the ship.",
+            "required": [
+              "phase"
+            ],
+            "properties": {
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "syncing"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The project's check command runs on the ship, since `since`.",
+            "required": [
+              "command",
+              "since",
+              "phase"
+            ],
+            "properties": {
+              "command": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "running"
+                ]
+              },
+              "since": {
+                "$ref": "#/components/schemas/Timestamp"
+              }
+            }
+          }
+        ],
+        "description": "Where a card's check stands while its turn is `Check`. The checker reports `Syncing` and\n`Running`; `Queued` is the daemon's line, added when the card is shown."
+      },
       "CheckRun": {
         "type": "object",
         "description": "One check of a pull request.",
@@ -9900,6 +9964,17 @@
         "type": "object",
         "description": "A ticket's review state: whose turn it is while in Review, and every round so far.",
         "properties": {
+          "check": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CheckPhase",
+                "description": "While the turn is `Check`: what the checker last reported (`Syncing` or `Running`);\n`None` until it reports."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "handed_in": {
             "type": [
               "string",
@@ -10129,6 +10204,17 @@
               {
                 "$ref": "#/components/schemas/ReviewTurn",
                 "description": "Whose verdict the card waits for; `None` outside Review."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "check": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CheckPhase",
+                "description": "While the check runs: `queued` with its place in the line, `syncing` with main, or\n`running` the check command with its start time. Absent before the checker reports."
               },
               {
                 "type": "null"
@@ -11182,6 +11268,17 @@
         "properties": {
           "chain": {
             "type": "string"
+          },
+          "check": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CheckPhase",
+                "description": "While the card's check runs: queued (place in the line), syncing with main, or running the\ncheck command since a time. Absent otherwise, and before the checker reports."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "in_status_ms": {
             "type": "integer",

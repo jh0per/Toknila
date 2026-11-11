@@ -351,6 +351,7 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
                 continue;
             }
             Effect::RecordReport { summary } => (Actor::Agent, CommentKind::Report, summary),
+            Effect::RecordNotice { summary } => (Actor::System, CommentKind::Report, summary),
             Effect::RecordInstruction { text } => (Actor::Human, CommentKind::Instruction, text),
             Effect::EnsureRunner => {
                 runs::queue_start(uow, ctx, ticket)?;
