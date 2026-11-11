@@ -5,6 +5,7 @@ mod agent;
 mod chain;
 mod chain_rm;
 mod hook;
+mod inbox;
 mod logs;
 mod mcp;
 mod mcp_planner;
@@ -169,6 +170,12 @@ pub enum Command {
     },
     /// Show one ticket with its subtasks and comments.
     Show { ticket: String },
+    /// What waits on a person: a review shows the hand-in's gist and its checks.
+    Inbox {
+        /// A project (key); the only one when none is named.
+        #[arg(long)]
+        project: Option<String>,
+    },
     /// Print what a ticket's agent has written to its terminal; `--follow` keeps going live.
     Logs {
         ticket: String,
@@ -313,6 +320,7 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
         Command::Sim { target, action } => sim::run(&c, &target, action, json_out),
         Command::Ls { needs_human, chain } => ticket::ls(&c, needs_human, chain, json_out),
         Command::Show { ticket } => ticket::run(&c, TicketCmd::Show { ticket }, json_out),
+        Command::Inbox { project } => inbox::run(&c, project, json_out),
         Command::Logs {
             ticket,
             follow,

@@ -2268,6 +2268,11 @@ export interface components {
             relative: string;
         };
         /**
+         * @description How a check ended, as the agent wrote it in its hand-in.
+         * @enum {string}
+         */
+        HandInStatus: "PASS" | "FAIL" | "NOT_RUN" | "BLOCKED";
+        /**
          * @description How an agent reports through hooks, a second event source: the runner writes a settings file
          *     under the data home and passes its path with `settings_flag`.
          */
@@ -2320,6 +2325,24 @@ export interface components {
             /** @description Subtasks of all cards. */
             tasks: number;
         };
+        /** @description One line of the checks block. */
+        InboxCheck: {
+            status?: components["schemas"]["HandInStatus"] | null;
+            /** @description The evidence, or the whole line when it has no status. */
+            text: string;
+        };
+        /** @description The hand-in of a card in review. */
+        InboxHandIn: {
+            /** @description The checks, in the order the agent wrote them. */
+            checks: components["schemas"]["InboxCheck"][];
+            /** @description The one-line gist of what changed. */
+            gist: string;
+            /** @description What is left or not covered. */
+            left?: string | null;
+            since_return?: components["schemas"]["SinceReturn"] | null;
+            /** @description The lines under "What changed", when the agent wrote any. */
+            what?: string | null;
+        };
         /** @description One entry of the inbox. */
         InboxItem: {
             /**
@@ -2343,6 +2366,8 @@ export interface components {
              */
             answers?: components["schemas"]["AnswerKind"][];
             chain: components["schemas"]["ChainId"];
+            /** @description The name of the design a pin is about (`design_question` items). */
+            design?: string | null;
             /**
              * @description The whole command of a permission request, when `text` carries only its summary (cut for
              *     lists); absent otherwise.
@@ -2350,6 +2375,7 @@ export interface components {
             detail?: string | null;
             /** @description The cards done out of order that these subtasks are behind (`leftovers` items). */
             done_cards: components["schemas"]["TicketKey"][];
+            hand_in?: components["schemas"]["InboxHandIn"] | null;
             kind: components["schemas"]["InboxKind"];
             /**
              * @description The last lines of the agent's screen, ANSI removed (`question` items of an agent that
