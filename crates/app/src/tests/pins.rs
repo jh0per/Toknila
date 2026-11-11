@@ -52,17 +52,19 @@ fn a_bad_region_text_or_card_is_refused() {
     let mut bad = new_pin(design, "Q?", None);
     bad.region.w = 0;
     assert_eq!(
-        ask(&mut mem, project, bad).unwrap_err().kind,
+        ask(&mut mem, project, bad).expect_err("bad region").kind,
         ErrorKind::BadRequest
     );
     let empty = new_pin(design, "   ", None);
     assert_eq!(
-        ask(&mut mem, project, empty).unwrap_err().kind,
+        ask(&mut mem, project, empty).expect_err("empty text").kind,
         ErrorKind::BadRequest
     );
     let ghost = new_pin(design, "Q?", Some("DEMO-99"));
     assert_eq!(
-        ask(&mut mem, project, ghost).unwrap_err().kind,
+        ask(&mut mem, project, ghost)
+            .expect_err("no such card")
+            .kind,
         ErrorKind::NotFound
     );
     assert!(mem.pins.is_empty());
@@ -122,7 +124,7 @@ fn a_pin_of_another_project_cannot_be_answered() {
     let project = mem.project.id;
     let pin = ask(&mut mem, project, new_pin(design, "Q?", None)).expect("ask");
     let other = toknila_core::ProjectId::new();
-    let err = answer(&mut mem, other, pin.id, "A.").unwrap_err();
+    let err = answer(&mut mem, other, pin.id, "A.").expect_err("another project");
     assert_eq!(err.kind, ErrorKind::NotFound);
     assert!(mem.pins[0].is_open());
 }

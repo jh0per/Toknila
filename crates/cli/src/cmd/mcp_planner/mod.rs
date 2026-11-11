@@ -387,9 +387,10 @@ mod tests {
     }
 
     #[test]
-    fn the_planner_has_its_thirteen_tools_and_none_that_starts_or_accepts_anything() {
+    fn the_planner_has_its_fourteen_tools_and_none_that_starts_or_accepts_anything() {
         let names = names();
-        assert_eq!(names.len(), 13, "{names:?}");
+        assert_eq!(names.len(), 14, "{names:?}");
+        assert!(names.iter().any(|n| n == "design_question"));
         for forbidden in [
             "start", "pause", "resume", "cancel", "accept", "return", "reopen", "merge", "approve",
             "unblock", "block", "finished", "started",
@@ -417,6 +418,19 @@ mod tests {
         ));
         assert!(matches!(
             call("show_design", &json!({})),
+            Err(ToolError::BadArguments(_))
+        ));
+        let PlannerCall::DesignQuestion(q) = c(
+            "design_question",
+            json!({ "design": "Home", "region": { "x": 1, "y": 2, "w": 3, "h": 4 },
+                    "text": "Tax?", "card": "DEMO-1" }),
+        ) else {
+            panic!("design_question is a DesignQuestion");
+        };
+        assert_eq!((q.design.as_str(), q.text.as_str()), ("Home", "Tax?"));
+        assert_eq!((q.region.w, q.card.as_deref()), (3, Some("DEMO-1")));
+        assert!(matches!(
+            call("design_question", &json!({ "design": "Home" })),
             Err(ToolError::BadArguments(_))
         ));
         assert!(matches!(
