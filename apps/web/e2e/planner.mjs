@@ -2,6 +2,7 @@
 // the planner profile runs `fake-agent`, which plays what the planner's tools do with its run
 // token (it creates a chain and two cards over the planner routes).
 // Usage: node e2e/planner.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
+// needs: fake-agent
 //
 // The sidebar has a "Plan with the assistant" entry at the top of the project's section; it opens
 // the assistant's panel: not running, a centred box (no terminal yet). A project without chains

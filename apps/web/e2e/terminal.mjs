@@ -1,5 +1,6 @@
 // Browser test of the card's live terminal and actions against a real daemon.
 // Usage: node e2e/terminal.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
+// needs: fake-agent
 //
 // A project whose profile runs `fake-agent` in a real git ship: start the card from the page,
 // see the terminal's live output, type a line and see the agent echo it, send an instruction

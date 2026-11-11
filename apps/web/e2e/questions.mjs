@@ -1,6 +1,7 @@
 // Browser test of what agents ask and a person answers from the Inbox, against a real daemon
 // and the workspace's `fake-agent` (never a real agent), in a real git ship.
 // Usage: node e2e/questions.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
+// needs: fake-agent
 //
 // Three cards run: two play an agent's permission hook (the call waits for the person), one shows
 // a screen and no sign of life. From the inbox: Allow one permission, Deny the other with a
