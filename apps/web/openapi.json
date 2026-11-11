@@ -4392,6 +4392,16 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "description": "Delivered; the answer was Allow always, and the body says what was added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerOutcome"
+                }
+              }
+            }
+          },
           "204": {
             "description": "Delivered to the agent and journaled"
           },
@@ -5725,6 +5735,26 @@
           "up",
           "down"
         ]
+      },
+      "AnswerOutcome": {
+        "type": "object",
+        "description": "Answer of `POST /v1/tickets/{ticket}/runner/answer` when the person chose \"Allow always\":\nwhat was added to the project, or why nothing was.",
+        "required": [
+          "note"
+        ],
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "One plain sentence saying what happened."
+          },
+          "rule_added": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rule now remembered in the project (`Bash(cargo test *)`); absent when none was made."
+          }
+        }
       },
       "ArtifactFormat": {
         "type": "string",
@@ -7396,6 +7426,20 @@
           "allowed_actions"
         ],
         "properties": {
+          "allow_always": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rule \"Allow always\" would add (`Bash(cargo test *)`), for a worker's question about a\ncommand that can become one; absent otherwise."
+          },
+          "allow_always_none": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why \"Allow always\" is not offered for a worker's question about a command (a command built\nwith `$` cannot become a rule); absent otherwise."
+          },
           "allowed_actions": {
             "type": "array",
             "items": {

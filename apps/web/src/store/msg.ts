@@ -80,6 +80,7 @@ export type Msg =
   | { type: "detailLoaded"; detail: TicketDetail }
   | { type: "threadsLoaded"; threads: TicketThreads }
   | { type: "loadFailed"; error: string }
+  | { type: "answerNoted"; note: string }
   | { type: "linkOpened" }
   | { type: "linkClosed" }
   | { type: "event"; event: EventRecord }
