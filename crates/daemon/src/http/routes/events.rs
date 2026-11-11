@@ -37,7 +37,7 @@ pub async fn agent_event(
     let (at, prices) = stamp(&state);
     // The ship is looked at here, off the store thread and before the command: git never runs
     // inside a transaction. The card stays Running when the work is not in commits.
-    let mut handed_in = None;
+    let (mut handed_in, mut since) = (None, None);
     if matches!(event, AgentEvent::Finished { .. }) {
         let looked = ticket.clone();
         let target = state
@@ -63,6 +63,13 @@ pub async fn agent_event(
             ) {
                 return Err(ships::refuse_unchanged(round, head).into());
             }
+            // The work since the Return, derived from the returned HEAD to the new one.
+            if let Some(head) = seen.head.as_deref() {
+                since = state
+                    .store
+                    .since_return(look.clone(), target.0.review.clone(), head.to_owned())
+                    .await;
+            }
             handed_in = seen.head;
         }
     }
@@ -75,7 +82,7 @@ pub async fn agent_event(
             principal.may_send(&event)?;
             let asked = agent::turns_into_question(&*tx, &t, &event)?;
             // The ticket itself, or the card it proposed.
-            let answer = agent::ticket_event_at(tx, &t, event, handed_in)?;
+            let answer = agent::ticket_event_at(tx, &t, event, handed_in, since)?;
             Ok((load_ticket_detail(&tx.repo(), answer, at, &prices)?, asked))
         })
         .await?;

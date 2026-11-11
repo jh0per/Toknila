@@ -33,16 +33,18 @@ pub fn ticket_event<U: UnitOfWork + ?Sized>(
     t: &Ticket,
     event: AgentEvent,
 ) -> AppResult<TicketId> {
-    ticket_event_at(uow, t, event, None)
+    ticket_event_at(uow, t, event, None, None)
 }
 
 /// [`ticket_event`] for a hand-in whose ship the host looked at: `head` is the commit the ship's
-/// branch was at, remembered as the commit handed in.
+/// branch was at, remembered as the commit handed in; `since` is what changed since the Return
+/// this hand-in answers, kept with it.
 pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     t: &Ticket,
     event: AgentEvent,
     head: Option<String>,
+    since: Option<toknila_core::SinceReturn>,
 ) -> AppResult<TicketId> {
     // A report of work leaves a card that waits on a question or a permission where it is: only
     // the answer closes those. The hand-in goes on, and an open question is overtaken by it.
@@ -151,6 +153,9 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
                 ctx.ticket_event(t.id, event)?;
                 if let Some(mine) = ctx.view.tickets.iter_mut().find(|x| x.id == t.id) {
                     mine.review.handed_in = head.or(mine.review.handed_in.take());
+                    // A new hand-in starts the ship's line over: earlier syncs are behind it.
+                    mine.review.synced.clear();
+                    mine.review.since_return = since;
                 }
                 Ok(())
             })
