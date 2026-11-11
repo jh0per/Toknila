@@ -10,12 +10,12 @@ mod codec;
 mod commit;
 mod error;
 mod external;
+mod migrations;
 mod notes;
 mod pins;
 mod ports;
 mod projects;
 mod removal;
-mod schema;
 mod settle;
 mod ships;
 mod suggestions;
@@ -173,7 +173,7 @@ impl Store {
         conn.pragma_update(None, "foreign_keys", "ON")?;
         let backups = path.parent().unwrap_or(Path::new("")).join("backups");
         backup::check(&conn, path, &backups)?;
-        migrate(&mut conn, &backups)?;
+        migrations::migrate(&mut conn, &backups, &migrations::all()?)?;
         Ok(Self::spawn(conn, path.to_owned()))
     }
 
@@ -290,38 +290,6 @@ fn panic_message(p: &Box<dyn std::any::Any + Send>) -> String {
         .map(|s| (*s).to_owned())
         .or_else(|| p.downcast_ref::<String>().cloned())
         .unwrap_or_else(|| "unknown panic".to_owned())
-}
-
-/// Current schema version this build writes.
-pub const SCHEMA_VERSION: i64 = schema::MIGRATIONS.len() as i64;
-
-fn migrate(conn: &mut Connection, backups: &Path) -> Result<(), StoreError> {
-    let found: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-    if found > SCHEMA_VERSION {
-        return Err(StoreError::TooNew {
-            found,
-            supported: SCHEMA_VERSION,
-        });
-    }
-    // A fresh database (version 0) has nothing to lose; an older one is copied first.
-    if found > 0 && found < SCHEMA_VERSION {
-        backup::before_migration(conn, backups, found)?;
-    }
-    for (i, sql) in schema::MIGRATIONS
-        .iter()
-        .enumerate()
-        .skip(usize::try_from(found).unwrap_or(0))
-    {
-        let tx = conn.transaction()?;
-        tx.execute_batch(sql)?;
-        tx.pragma_update(
-            None,
-            "user_version",
-            i64::try_from(i + 1).unwrap_or(i64::MAX),
-        )?;
-        tx.commit()?;
-    }
-    Ok(())
 }
 
 /// Highest journal seq, or 0 for an empty journal.
