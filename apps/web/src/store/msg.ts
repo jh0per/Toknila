@@ -11,6 +11,7 @@ import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
 import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
 import type { QuickIntent } from "./quick";
 import type { PlannerEffect, PlannerIntent, PlannerResult } from "./planner";
+import type { ReleaseEffect, ReleaseIntent, ReleaseResult } from "./release";
 import type { RemovalEffect, RemovalIntent, RemovalResult } from "./removal";
 import type { Route, Tab } from "./route";
 import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
@@ -32,6 +33,7 @@ export type Intent =
   | PlannerIntent
   | ImportIntent
   | RemovalIntent
+  | ReleaseIntent
   | EdgeIntent
   | PlacementIntent
   | AutostartIntent
@@ -82,6 +84,7 @@ export type Msg =
   | PlannerResult
   | ImportResult
   | RemovalResult
+  | ReleaseResult
   | EdgeResult
   | PlacementResult
   | AutostartResult
@@ -105,6 +108,7 @@ export type Effect =
   | PlannerEffect
   | ImportEffect
   | RemovalEffect
+  | ReleaseEffect
   | EdgeEffect
   | PlacementEffect
   | AutostartEffect

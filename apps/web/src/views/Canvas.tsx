@@ -3,6 +3,7 @@ import type { ChainDetail, Pos, Size, Ticket, TicketAction } from "../api/types"
 import { FINISH, START, sceneOf } from "../canvasScene";
 import { type LaidEdge, nodeKey } from "../layout";
 import { type EdgeRef, idOf } from "../store/edges";
+import { canRelease } from "../store/release";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
 import { ContextMenu, type MenuEntry } from "./ContextMenu";
@@ -242,10 +243,13 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
             {scene.nodes.map((n) => {
               const style = { left: n.box.x, top: n.box.y, width: n.box.w, height: n.box.h };
               if (n.kind === "start") return <StartNode key={n.key} goal={chain.chain.goal} style={style} />;
-              if (n.kind === "finish") return <FinishNode key={n.key} style={style} />;
+              // Every card merged: the end node offers Release.
+              const onRelease = canRelease(chain) ? () => dispatch({ type: "openRelease", chain: chainId }) : undefined;
+              if (n.kind === "finish") return <FinishNode key={n.key} style={style} onRelease={onRelease} />;
               const over = drag?.over === n.key;
               const r = n.kind === "release" ? releases.get(n.id) : undefined;
-              if (r) return <ReleaseNode key={n.key} release={r} nodeKey={n.key} style={style} over={over} end={n.key === endKey} />;
+              const isEnd = n.key === endKey;
+              if (r) return <ReleaseNode key={n.key} release={r} nodeKey={n.key} style={style} over={over} end={isEnd} onRelease={isEnd ? onRelease : undefined} />;
               const t = tickets.get(n.id);
               const layout = layouts.get(n.id);
               if (!t || !layout) return null;

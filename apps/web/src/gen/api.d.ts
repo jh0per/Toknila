@@ -118,6 +118,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chains/{chain}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["release_offer"];
+        put?: never;
+        /**
+         * The person's click on Release: cuts the chain's release milestone and starts the run in the
+         *     background. The answer is the chain with the milestone cut; the steps are read from
+         *     `GET /releases/{release}/run`, and the milestone reads released when the last one passes.
+         */
+        post: operations["start_release"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chains/{chain}/releases": {
         parameters: {
             query?: never;
@@ -733,6 +754,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["release_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/releases/{release}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["release_run"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1530,6 +1567,11 @@ export interface components {
             /** @description Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`. */
             done: number;
             next_release?: components["schemas"]["NextRelease"] | null;
+            /**
+             * @description Every card of the plan is in the work branch and one of them is not released yet: the
+             *     chain's end node offers Release.
+             */
+            releasable: boolean;
             released: number;
             status: components["schemas"]["ChainStatus"];
             stopped_at?: components["schemas"]["StoppedAt"] | null;
@@ -2135,6 +2177,11 @@ export interface components {
              */
             allowed_commands?: string[] | null;
             /**
+             * @description The command a release runs to bump the version (`npm version {version}
+             *     --no-git-tag-version`; `{version}` is the version). An empty text clears it.
+             */
+            bump_command?: string | null;
+            /**
              * @description The command that checks the work (`cargo xtask verify`); agents are told to run it and may
              *     without asking. An empty text clears it.
              */
@@ -2353,6 +2400,11 @@ export interface components {
             /** @description Hidden from the sidebar; its data is kept and it can be brought back. */
             archived?: boolean;
             /**
+             * @description The command a release runs to put its version into the project's files (`npm version
+             *     {version} --no-git-tag-version`; `{version}` is the version). `None`: no bump step.
+             */
+            bump_command?: string | null;
+            /**
              * @description The command that checks the project's work (`cargo xtask verify`). Both agent roles are
              *     told to use it, and may run it without asking. `None`: the project names none.
              */
@@ -2520,6 +2572,8 @@ export interface components {
             released_at?: components["schemas"]["Timestamp"] | null;
             start_mode: components["schemas"]["StartMode"];
             state: components["schemas"]["ReleaseState"];
+            /** @description The git tag of the release (`v1.4.0`), set when a release run made it. */
+            tag?: string | null;
             version: string;
         };
         /**
@@ -2539,11 +2593,42 @@ export interface components {
             release: components["schemas"]["ReleaseId"];
             ticket: components["schemas"]["TicketId"];
         };
+        /** @description Answer of `GET /v1/chains/{chain}/release`: what the Release dialog shows. */
+        ReleaseOffer: {
+            /** @description The branch the release is made on. */
+            base: string;
+            /** @description The last tag of the repository, if it has one. */
+            last_tag?: string | null;
+            /** @description Every card is merged: the end node offers Release. */
+            releasable: boolean;
+            /** @description The steps the run will take, in order. */
+            steps: components["schemas"]["ReleaseStep"][];
+            /**
+             * @description The version to suggest: the chain's own release when it has one, else the next patch of
+             *     the last tag.
+             */
+            version: string;
+        };
+        /** @description Answer of `GET /v1/releases/{release}/run`: the last release run of a milestone. */
+        ReleaseRun: {
+            /** @description Why the run stopped, naming the step; only when it failed. */
+            error?: string | null;
+            release: string;
+            state: components["schemas"]["RunState"];
+            steps: components["schemas"]["RunStep"][];
+            tag: string;
+            version: string;
+        };
         /**
          * @description Milestone lifecycle (gitflow): planned, then `release/<version>` is cut, then shipped.
          * @enum {string}
          */
         ReleaseState: "planned" | "cut" | "released";
+        /**
+         * @description One step of a release run, in the order it runs.
+         * @enum {string}
+         */
+        ReleaseStep: "check" | "bump" | "tag" | "push";
         /** @description The answer to "may this folder be a project's repository, with this base branch?". */
         RepoCheck: {
             /**
@@ -2674,6 +2759,19 @@ export interface components {
         };
         /** @description Identifies a [`crate::Run`] of a runner process. */
         RunId: string;
+        /**
+         * @description Where a release run is as a whole.
+         * @enum {string}
+         */
+        RunState: "running" | "failed" | "done";
+        /** @description One step of a release run with what it printed. */
+        RunStep: {
+            label: string;
+            /** @description What the step printed (the end of it when it is long). */
+            output: string;
+            state: components["schemas"]["StepState"];
+            step: components["schemas"]["ReleaseStep"];
+        };
         /** @description The worktree and branch a ticket works in, once the shipyard has made them. */
         Ship: {
             /** @description `ship/<chain>/<slug>`. */
@@ -2700,6 +2798,11 @@ export interface components {
             /** @description A planner profile from `GET /v1/profiles`; unset: `claude-code-planner`. */
             profile?: string | null;
         };
+        /** @description Body of `POST /v1/chains/{chain}/release`: the person's click on Release. */
+        StartRelease: {
+            /** @description The version, such as `1.4.0`; it becomes the tag `v1.4.0`. */
+            version: string;
+        };
         /** @description The reason attached to the current status, if that status carries one. */
         StatusReason: (components["schemas"]["WaitingReason"] & {
             /** @enum {string} */
@@ -2719,6 +2822,11 @@ export interface components {
             /** @enum {string} */
             status: "proposed";
         };
+        /**
+         * @description Where one step of a release run is.
+         * @enum {string}
+         */
+        StepState: "pending" | "running" | "done" | "failed";
         /**
          * @description Where the chain stopped: the first ticket, in graph order, that waits on a person (Waiting or
          *     Blocked first, then Review, then a card to approve).
@@ -3429,6 +3537,86 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    release_offer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseOffer"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    start_release: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartRelease"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4918,6 +5106,36 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    release_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Release id or version */
+                release: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseRun"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

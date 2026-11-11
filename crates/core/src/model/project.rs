@@ -132,6 +132,10 @@ pub struct Project {
     /// told to use it, and may run it without asking. `None`: the project names none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_command: Option<String>,
+    /// The command a release runs to put its version into the project's files (`npm version
+    /// {version} --no-git-tag-version`; `{version}` is the version). `None`: no bump step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bump_command: Option<String>,
     /// The Claude model of the project's card agents (`--model`: an alias such as `sonnet`, or a
     /// full model name). `None`: the person's own Claude Code default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -188,6 +192,16 @@ impl Project {
         let text = text.trim();
         if text.contains(['\n', '\r', '(', ')']) {
             return Err("the check command is one line without parentheses");
+        }
+        Ok(Some(text.to_owned()).filter(|c| !c.is_empty()))
+    }
+
+    /// The bump command as a person typed it: trimmed, `None` when empty (it clears the setting),
+    /// one line.
+    pub fn clean_bump_command(text: &str) -> Result<Option<String>, &'static str> {
+        let text = text.trim();
+        if text.contains(['\n', '\r']) {
+            return Err("the bump command is one line");
         }
         Ok(Some(text.to_owned()).filter(|c| !c.is_empty()))
     }
@@ -282,6 +296,7 @@ mod tests {
             max_review_rounds: Project::DEFAULT_REVIEW_ROUNDS,
             merge: Default::default(),
             check_command: None,
+            bump_command: None,
             worker_model: None,
             reviewer_model: None,
             planner_model: None,

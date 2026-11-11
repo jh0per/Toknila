@@ -114,6 +114,7 @@
       "state": "planned",
       "version": "R1"
     },
+    "releasable": false,
     "released": 0,
     "status": "running",
     "stopped_at": null,

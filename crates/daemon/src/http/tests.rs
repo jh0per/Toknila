@@ -24,6 +24,7 @@ mod planning;
 mod plans;
 mod profiles;
 mod questions;
+mod releases;
 mod removal;
 mod resume;
 mod reviews;
@@ -933,6 +934,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/arrange",
             "/chains/{chain}/edges",
             "/chains/{chain}/export",
+            "/chains/{chain}/release",
             "/chains/{chain}/releases",
             "/chains/{chain}/tickets",
             "/chains/{chain}/tickets/{ticket}/move",
@@ -968,6 +970,7 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/unarchive",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",
+            "/releases/{release}/run",
             "/repos/check",
             "/system/checks",
             "/system/cli",

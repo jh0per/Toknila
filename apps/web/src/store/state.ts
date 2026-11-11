@@ -9,6 +9,7 @@ import { type ImportState, initialImports } from "./imports";
 import { type PlanState, initialPlan } from "./plan";
 import { type QuickState, initialQuick } from "./quick";
 import { type PlannerSlice, initialPlanner } from "./planner";
+import { type ReleaseUi, initialRelease } from "./release";
 import { type RemovalState, initialRemoval } from "./removal";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
@@ -56,6 +57,8 @@ export interface State {
   imports: ImportState;
   /// Deleting a project or a chain: the dialog's answer.
   removal: RemovalState;
+  /// Releasing a finished chain: the dialog's offer and the run's steps.
+  release: ReleaseUi;
   /// Editing dependencies: the selected line and the daemon's last refusal.
   edges: EdgesState;
   placement: PlacementState;
@@ -98,6 +101,7 @@ export function initialState(route: Route): State {
     planner: initialPlanner,
     imports: initialImports,
     removal: initialRemoval,
+    release: initialRelease,
     edges: initialEdges,
     placement: initialPlacement,
     quick: initialQuick,

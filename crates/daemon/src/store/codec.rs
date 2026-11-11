@@ -70,7 +70,7 @@ pub struct Repo<'c> {
 }
 
 const RELEASE_COLS: &str =
-    "id, chain_id, version, channel, start_mode, state, branch, cut_at, released_at";
+    "id, chain_id, version, channel, start_mode, state, branch, cut_at, released_at, tag";
 
 impl<'c> Repo<'c> {
     /// A repository that knows which runners are alive.
@@ -88,10 +88,10 @@ impl<'c> Repo<'c> {
     pub fn upsert_release(&self, r: &Release) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO releases ({RELEASE_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+                "INSERT INTO releases ({RELEASE_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
                  ON CONFLICT(id) DO UPDATE SET version = excluded.version, channel = excluded.channel, \
                  start_mode = excluded.start_mode, state = excluded.state, branch = excluded.branch, \
-                 cut_at = excluded.cut_at, released_at = excluded.released_at"
+                 cut_at = excluded.cut_at, released_at = excluded.released_at, tag = excluded.tag"
             ),
             params![
                 r.id.to_string(),
@@ -103,6 +103,7 @@ impl<'c> Repo<'c> {
                 r.branch,
                 r.cut_at.map(|t| t.0),
                 r.released_at.map(|t| t.0),
+                r.tag,
             ],
         )?;
         Ok(())
@@ -119,6 +120,7 @@ impl<'c> Repo<'c> {
             Option<String>,
             Option<i64>,
             Option<i64>,
+            Option<String>,
         );
         let mut st = self.conn.prepare(&format!(
             "SELECT {RELEASE_COLS} FROM releases WHERE chain_id = ?1 ORDER BY rowid"
@@ -134,6 +136,7 @@ impl<'c> Repo<'c> {
                 r.get(6)?,
                 r.get(7)?,
                 r.get(8)?,
+                r.get(9)?,
             ))
         })?;
         rows.map(|r| {
@@ -148,6 +151,7 @@ impl<'c> Repo<'c> {
                 branch: r.6,
                 cut_at: r.7.map(Timestamp),
                 released_at: r.8.map(Timestamp),
+                tag: r.9,
             })
         })
         .collect()

@@ -310,6 +310,33 @@ A push that fails (no `origin`, no credentials) is a `merge_failed` with git's m
 `fake-gh` binary (a state file instead of GitHub: it answers `pr view`, `create`, `checks`, and
 `merge`, which moves the base in the bare repository) is first on `PATH` as `gh`.
 
+## Releasing a finished chain
+
+When every card of the plan is Merged (`ChainView::releasable`, also `ChainSummary.releasable`:
+no card is open or proposed, at least one is not yet Released), the chain's end node, the Finish
+node or its last release milestone, offers **Release**. The dialog asks `GET /chains/{chain}/release`
+for a version (the chain's own milestone, else the next patch of the newest tag,
+`release_run::suggest_version`) and the steps the project has (`release_run::steps`).
+
+Nothing is tagged or pushed before the person's click: `POST /chains/{chain}/release` with the
+version. `releases::begin` makes the milestone when the chain has none (it waits for the last
+cards) and cuts it; the daemon's `releaser` then runs the steps in a throwaway detached worktree of
+the base branch (`work_branch`), one at a time, and the person's checkout is never touched:
+
+1. **Check**: the project's check command (only when it names one).
+2. **Bump**: the project's `bump_command` (`{version}` is the version; only when it names one),
+   then a commit `Release <version>` of what it changed.
+3. **Tag**: an annotated `v<version>` on the release commit; a bump commit moves the base branch
+   the way a merge does (`GitMerger::advance_base`), and the tag is deleted if the base moved.
+4. **Push**: the base branch and the tag to `origin`, only for a project that merges by pull request.
+
+The first failing step stops the run and is named (`Check failed: ...`); the milestone stays Cut and
+releasing again starts over. When the last step passes, `releases::finish` marks the milestone
+Released with its tag (`Release.tag`) and its cards Released. The steps and their output of the
+last run of each milestone are kept in memory (`GET /releases/{release}/run`, polled by the
+dialog); what lasts is the milestone's state and tag. Plain git and the project's own commands,
+no release agent: a release agent (`AgentRole::Release`) remains for channels that need one.
+
 ## Runners
 
 A runner is the agent's process, started in a pseudo-terminal in the ticket's ship. Core decides

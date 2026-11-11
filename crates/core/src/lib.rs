@@ -24,6 +24,7 @@ pub mod pr;
 pub mod private;
 pub mod profile;
 pub mod question;
+pub mod release_run;
 pub mod removal;
 pub mod repo;
 pub mod schedule;

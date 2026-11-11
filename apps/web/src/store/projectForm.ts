@@ -10,6 +10,8 @@ export interface ProjectForm {
   default_profile: string;
   max_parallel: string;
   check_command: string;
+  /// The command a release runs to bump the version (`{version}` is the version).
+  bump_command: string;
   worker_model: string;
   reviewer_model: string;
   planner_model: string;
@@ -39,6 +41,7 @@ export function formOf(p: Project): ProjectForm {
     default_profile: p.default_profile,
     max_parallel: String(p.max_parallel),
     check_command: p.check_command ?? "",
+    bump_command: p.bump_command ?? "",
     worker_model: p.worker_model ?? "",
     reviewer_model: p.reviewer_model ?? "",
     planner_model: p.planner_model ?? "",
@@ -55,7 +58,7 @@ export function formOf(p: Project): ProjectForm {
   };
 }
 
-const TEXT = ["work_branch", "check_command", "worker_model", "reviewer_model", "planner_model", "pr_title"] as const;
+const TEXT = ["work_branch", "check_command", "bump_command", "worker_model", "reviewer_model", "planner_model", "pr_title"] as const;
 
 /// The form with its text fields trimmed, as Save sends them.
 export function tidy(f: ProjectForm): ProjectForm {
@@ -73,6 +76,7 @@ export function patchOf(f: ProjectForm): PatchProject {
     default_profile: t.default_profile,
     max_parallel: Number(t.max_parallel),
     check_command: t.check_command,
+    bump_command: t.bump_command,
     worker_model: t.worker_model,
     reviewer_model: t.reviewer_model,
     planner_model: t.planner_model,
@@ -102,6 +106,7 @@ export function sectionOfField(field: string): ProjectSection {
     case "default_profile":
     case "max_parallel":
     case "check_command":
+    case "bump_command":
     case "command_policy":
     case "allowed_commands":
       return "agents";
