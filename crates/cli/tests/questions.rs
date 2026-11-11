@@ -316,3 +316,40 @@ fn the_worker_process_ends_at_the_hand_in_and_a_return_starts_a_new_run_with_the
     assert_eq!(tok.status("DEMO-1"), "waiting");
     tok.run(&["cancel", "DEMO-1", "done"]);
 }
+
+#[test]
+fn mcp_events_after_a_question_leave_the_card_waiting_on_it() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tok = Tok::in_dir(dir.path());
+    let events = "/tickets/{ticket}/events";
+    tok.profile(
+        "chatty",
+        &[
+            "post",
+            events,
+            r#"{"event":"ask_human","text":"which db?"}"#,
+            "post",
+            events,
+            r#"{"event":"started"}"#,
+            "post",
+            events,
+            r#"{"event":"note","body":{"gist":"still here"}}"#,
+            "sleep",
+            "30000",
+        ],
+        "",
+    );
+    setup(&tok, dir.path(), "chatty");
+    let client = tok.client();
+
+    // All three posts were answered (the question, the start report, the note) ...
+    wait_until("the agent's posts", || {
+        tok.logs("DEMO-1").matches("post=200").count() == 3
+    });
+    // ... and the card is still on its question: only the answer closes it.
+    assert_eq!(tok.status("DEMO-1"), "waiting");
+    let q = questions(&client);
+    assert_eq!(q.len(), 1);
+    assert_eq!(q[0].text, "which db?");
+    tok.run(&["cancel", "DEMO-1", "done"]);
+}
