@@ -10,17 +10,20 @@
 //! | `review` | the card is in Review and it is the person's turn (`review.turn`; while the reviewer agent has it, or the merge is running, the card is not listed; a failed merge is a `blocked` item) |
 //! | `thread` | a thread is open and its newest version came after the person's last request |
 //! | `leftovers` | a card was done out of order and an earlier card still has open subtasks that nobody dismissed |
+//! | `design_question` | a pin of the assistant on a design is about the card and the person has not answered it |
 //!
 //! Items come newest first. The person's actions on them are the ordinary ones (approve,
 //! reject, unblock, a comment, approve a thread) plus the three leftover actions in
 //! [`leftovers`].
 
 pub mod leftovers;
+mod pins;
 
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
+use crate::design::pin::DesignPin;
 use crate::question::{self, AnswerKind, PendingPermission, QuestionKind, RunFacts};
 use crate::{
     AgentRole, ChainId, ReviewNote, ReviewTurn, StatusReason, Subtask, Thread, ThreadMessage,
@@ -45,6 +48,8 @@ pub enum InboxKind {
     Thread,
     /// Earlier cards have open subtasks behind a card done out of order.
     Leftovers,
+    /// The assistant pinned a question on a design and waits for the answer.
+    DesignQuestion,
 }
 
 /// One entry of the inbox.
@@ -89,6 +94,9 @@ pub struct InboxItem {
     /// waits on its screen).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lines: Vec<String>,
+    /// The pin to answer (`design_question` items).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pin: Option<String>,
 }
 
 /// The text of the `review` item for a card whose reviewer gave no verdict.
@@ -119,6 +127,8 @@ pub struct InboxData {
     /// Subtasks of the cards that were left behind (`done_out_of_order.behind`).
     pub subtasks: Vec<Subtask>,
     pub threads: Vec<ThreadFacts>,
+    /// The project's pins on its designs.
+    pub pins: Vec<DesignPin>,
     /// Permission dialogs that runs reported and no card status shows.
     pub permissions: Vec<PendingPermission>,
     /// The live runs.
@@ -132,6 +142,7 @@ impl Default for InboxData {
             tickets: Vec::new(),
             subtasks: Vec::new(),
             threads: Vec::new(),
+            pins: Vec::new(),
             permissions: Vec::new(),
             runs: Vec::new(),
         }
@@ -148,6 +159,7 @@ pub fn compute(data: &InboxData) -> Vec<InboxItem> {
     );
     items.extend(leftover_items(data));
     items.extend(question_items(data));
+    items.extend(pins::pin_items(data));
     items.sort_by(|a, b| b.since.cmp(&a.since).then_with(|| a.ticket.cmp(&b.ticket)));
     items
 }
@@ -173,6 +185,7 @@ fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxIte
         role: None,
         answers: Vec::new(),
         lines: Vec::new(),
+        pin: None,
     }
 }
 

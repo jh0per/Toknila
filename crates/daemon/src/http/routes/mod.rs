@@ -6,6 +6,7 @@ pub mod chains;
 pub mod designs;
 pub mod events;
 pub mod inbox;
+pub mod pins;
 pub mod planner;
 pub mod planner_run;
 pub mod plans;

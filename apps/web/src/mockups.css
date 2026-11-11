@@ -24,3 +24,20 @@
 .node-thumb-pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .node-thumb-pic i { position: absolute; box-sizing: border-box; border: 1px solid var(--accent); }
 .node-thumb b { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted); }
+
+/* The assistant's pins: numbered markers on the picture, and the questions under it. */
+.pin-marker { position: absolute; transform: translate(-50%, -50%); min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; border: 2px solid var(--accent); background: var(--accent); color: var(--bg); font: inherit; font-size: var(--fs-s); line-height: 18px; cursor: pointer; }
+.pin-marker[data-state="answered"] { background: var(--bg); color: var(--accent); }
+.pin-marker[aria-pressed="true"] { outline: 2px solid var(--fg); outline-offset: 2px; }
+.pin-region { position: absolute; box-sizing: border-box; border: 2px dashed var(--accent); pointer-events: none; }
+.pin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pin-item { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; display: grid; gap: 6px; }
+.pin-item[data-active="true"] { border-color: var(--accent); }
+.pin-head { display: flex; gap: 8px; align-items: center; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-align: left; color: inherit; }
+.pin-number { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 11px; background: var(--accent); color: var(--bg); font-size: var(--fs-s); }
+.pin-item[data-state="answered"] .pin-number { background: var(--bg); color: var(--accent); border: 2px solid var(--accent); }
+.pin-text, .pin-answer { margin: 0; }
+.pin-form { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pin-form input { flex: 1 1 200px; min-width: 0; }
+.design-large .mockup-stage { width: min(80vw, 900px); }
+.design-large .mockup-stage img { max-width: 100%; max-height: none; }

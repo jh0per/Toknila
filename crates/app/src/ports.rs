@@ -1,10 +1,11 @@
 //! Ports: what the use cases need from storage. The daemon implements them over SQLite.
 
 use serde_json::Value;
+use toknila_core::design::pin::DesignPin;
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
-    Actor, AgentRole, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship,
+    Actor, AgentRole, Chain, ChainId, Comment, PinId, Project, ProjectId, Release, ReleaseId, Ship,
     Subtask, Thread, ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey,
     Timestamp, suggestion::Suggestion,
 };
@@ -53,6 +54,10 @@ pub trait Reader {
     fn suggestion(&self, project: ProjectId) -> AppResult<Option<Suggestion>>;
     /// The ship a ticket has now, if any.
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>>;
+    /// The assistant's pins on a project's designs, oldest first.
+    fn design_pins(&self, project: ProjectId) -> AppResult<Vec<DesignPin>>;
+    /// One pin by id.
+    fn design_pin(&self, id: PinId) -> AppResult<Option<DesignPin>>;
     /// The runner processes that are alive now, by ticket and role, as the host reported them
     /// when this read began. The parallel limit counts them: a worker kept alive through review
     /// and the reviewer next to it each hold a slot. A host without runners has none.
@@ -98,6 +103,8 @@ pub trait UnitOfWork: Reader {
     fn insert_thread_version(&mut self, version: &ThreadVersion) -> AppResult<()>;
     /// Remembers a ticket's ship, replacing the one it had.
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()>;
+    /// Inserts a pin, or sets its answer.
+    fn upsert_design_pin(&mut self, pin: &DesignPin) -> AppResult<()>;
     /// Keeps the suggestion as the project's, replacing the one it had.
     fn save_suggestion(&mut self, project: ProjectId, s: &Suggestion) -> AppResult<()>;
     /// Forgets a ticket's ship.

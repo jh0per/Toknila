@@ -17,6 +17,7 @@ pub mod leftovers;
 pub mod merges;
 pub mod notes;
 pub mod nudge;
+pub mod pins;
 pub mod planner;
 pub mod ports;
 pub mod projects;

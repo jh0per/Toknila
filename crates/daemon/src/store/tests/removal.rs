@@ -277,3 +277,48 @@ async fn a_deleted_chain_leaves_no_row_but_its_project_and_the_other_project_kee
         "the project's own two entries (created, window) stay with the kept project's nine"
     );
 }
+
+#[tokio::test]
+async fn a_deleted_project_takes_its_design_pins_and_their_journal_entries() {
+    use toknila_core::design::Region;
+    use toknila_core::design::pin::DesignPin;
+    use toknila_core::{DesignId, PinId};
+
+    let (_dir, store) = open_temp();
+    let p = project();
+    let id = p.id;
+    let pin = DesignPin {
+        id: PinId::new(),
+        project: id,
+        design: DesignId::new(),
+        design_name: "home.png".to_owned(),
+        number: 1,
+        region: Region {
+            x: 1,
+            y: 2,
+            w: 3,
+            h: 4,
+        },
+        text: "Q?".to_owned(),
+        card: None,
+        answer: None,
+        created_at: NOW,
+        answered_at: None,
+    };
+    store
+        .write(Actor::Human, NOW, move |tx| {
+            tx.repo().insert_project(&p)?;
+            tx.repo().upsert_design_pin(&pin)?;
+            tx.emit(&DomainEvent::DesignPinAsked { pin })
+        })
+        .await
+        .expect("fill");
+    assert_eq!(count(&store, "design_pins").await, 1);
+    assert_eq!(count(&store, "events").await, 1);
+    store
+        .write(Actor::Human, NOW, move |tx| tx.repo().delete_project(id))
+        .await
+        .expect("delete");
+    assert_eq!(count(&store, "design_pins").await, 0);
+    assert_eq!(count(&store, "events").await, 0);
+}

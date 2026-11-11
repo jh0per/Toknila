@@ -94,3 +94,18 @@ impl std::fmt::Debug for FigmaToken {
         f.write_str("FigmaToken(..)")
     }
 }
+
+/// Body of `POST /v1/planner/pins`: a question the planner pins on a region of a design.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct NewDesignPin {
+    /// The design: its name or id.
+    pub design: String,
+    /// In whole percent of the image.
+    pub region: toknila_core::design::Region,
+    /// The question, at most 500 characters.
+    pub text: String,
+    /// The card it is about (id, key or title).
+    #[serde(default)]
+    pub card: Option<String>,
+}

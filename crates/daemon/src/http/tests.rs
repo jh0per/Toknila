@@ -22,6 +22,7 @@ mod designs;
 mod inbox;
 mod merges;
 mod parallel;
+mod pins;
 mod planner;
 mod planning;
 mod plans;
@@ -953,6 +954,7 @@ async fn openapi_describes_every_route() {
             "/planner/chains/{chain}/cards/{card}/move",
             "/planner/chains/{chain}/edges",
             "/planner/designs/{design}",
+            "/planner/pins",
             "/planner/plan",
             "/planner/suggestion",
             "/profiles",
@@ -961,6 +963,8 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/archive",
             "/projects/{project}/chains",
             "/projects/{project}/delete",
+            "/projects/{project}/design-pins",
+            "/projects/{project}/design-pins/{pin}/answer",
             "/projects/{project}/designs",
             "/projects/{project}/designs/figma",
             "/projects/{project}/designs/{design}",
