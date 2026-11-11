@@ -140,6 +140,7 @@ fn load_ticket_detail(
         phase: toknila_core::thread::phase(&threads),
         queue_position: schedule::queue_positions(repo)?.get(&t.id).copied(),
         ship: repo.ship(t.id)?,
+        size_clamped: None,
         chain,
         ticket: t,
     })

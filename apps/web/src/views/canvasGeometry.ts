@@ -55,7 +55,12 @@ export function curve(a: Pt, b: Pt, mid = (a.x + b.x) / 2): string {
   return `M${a.x},${a.y} C${mid},${a.y} ${mid},${b.y} ${b.x},${b.y}`;
 }
 
-/// The size of the canvas that holds every box, with the padding on every side.
+/// Room kept free at the foot of the canvas for the buttons in its corner (`.canvas-corner`, which
+/// lies over the view), so the grip of the lowest card is never under them.
+export const CORNER_ROOM = 40;
+
+/// The size of the canvas that holds every box, with the padding on every side and the room for
+/// the corner buttons below.
 export function canvasSize(boxes: Iterable<Box>): { width: number; height: number } {
   let width = PAD;
   let height = PAD;
@@ -63,7 +68,7 @@ export function canvasSize(boxes: Iterable<Box>): { width: number; height: numbe
     width = Math.max(width, b.x + b.w);
     height = Math.max(height, b.y + b.h);
   }
-  return { width: width + PAD, height: height + PAD };
+  return { width: width + PAD, height: height + PAD + CORNER_ROOM };
 }
 
 /// How one line runs: where it leaves, where it enters and where its curve turns.

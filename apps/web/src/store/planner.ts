@@ -49,7 +49,10 @@ export type PlannerIntent =
   /// Send the card's draft (the Talk to the assistant box on its page): the daemon keeps it in the
   /// card's discussion, then the planner is told the card and the words, through the same
   /// terminal path as any message to it.
-  | { type: "discussCard"; project: string; key: string };
+  | { type: "discussCard"; project: string; key: string }
+  /// Deliver the card's unanswered message to the planner again (`thread` is the discussion's
+  /// number, `text` the message), through the planner's input; nothing is stored twice.
+  | { type: "nudgeCard"; project: string; key: string; thread: number; text: string };
 
 /// What the daemon answered.
 export type PlannerResult =
@@ -64,7 +67,9 @@ export type PlannerMsg = PlannerIntent | PlannerResult;
 export type PlannerEffect = {
   type: "plannerCall";
   project: string;
-  call: "load" | "start" | "stop" | "ask" | "discuss";
+  call: "load" | "start" | "stop" | "ask" | "discuss" | "nudge";
+  /// `nudge`: the discussion's number.
+  thread?: number;
   /// The profile a start uses.
   profile?: string;
   /// `discuss`: the card (key) the words are about, and the draft place they were typed in.
@@ -104,6 +109,11 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
         [{ type: "plannerCall", project: msg.project, call: "discuss", card: msg.key, draft, text, profile: s.planner.profile }],
       ];
     }
+    case "nudgeCard":
+      return [
+        set({ error: "" }),
+        [{ type: "plannerCall", project: msg.project, call: "nudge", card: msg.key, thread: msg.thread, text: msg.text }],
+      ];
     case "plannerAsked":
       return [set({ sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } }), []];
     case "startPlanner":

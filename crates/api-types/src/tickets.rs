@@ -39,6 +39,10 @@ pub struct TicketDetail {
     /// before any run reported a transcript.
     #[serde(default)]
     pub usage: UsageFigures,
+    /// Set by `PATCH` when the size it asked for was out of range: that size, which the card
+    /// does not have (it has the nearest one inside the limits).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_clamped: Option<toknila_core::Size>,
 }
 
 /// A ticket in a list.

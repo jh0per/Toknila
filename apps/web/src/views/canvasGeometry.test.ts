@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GAP_X, GAP_Y, GRID, H, PAD, W, canvasSize, columnXs, edgeGeometry, edgeId, inPoint, laneYs, outPoint, snapPos } from "./canvasGeometry";
+import { CORNER_ROOM, GAP_X, GAP_Y, GRID, H, PAD, W, canvasSize, columnXs, edgeGeometry, edgeId, inPoint, laneYs, outPoint, snapPos } from "./canvasGeometry";
 
 const x = (col: number) => PAD + col * (W + GAP_X);
 const y = (lane: number) => PAD + lane * (H + GAP_Y);
@@ -93,9 +93,9 @@ describe("pixels", () => {
   });
 
   it("grows the canvas to fit the farthest box", () => {
-    expect(canvasSize([])).toEqual({ width: 2 * PAD, height: 2 * PAD });
+    expect(canvasSize([])).toEqual({ width: 2 * PAD, height: 2 * PAD + CORNER_ROOM });
     expect(canvasSize([{ x: PAD, y: PAD, w: W, h: H }, { x: 600, y: 300, w: 320, h: 120 }])).toEqual({
-      width: 600 + 320 + PAD, height: 300 + 120 + PAD,
+      width: 600 + 320 + PAD, height: 300 + 120 + PAD + CORNER_ROOM,
     });
   });
 });
