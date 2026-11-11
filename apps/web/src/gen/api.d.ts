@@ -3540,7 +3540,11 @@ export interface components {
             ahead?: number | null;
             /** @description For a worktree, the branch checked out in it. */
             branch?: string | null;
+            /** @description For a branch, the key of the merged or cancelled card it belonged to. */
+            card?: string | null;
             kind: components["schemas"]["StrayKind"];
+            /** @description For a branch, the commit on the base branch that merged it (the host looks it up). */
+            merge_commit?: string | null;
             /** @description The worktree's path, or the branch's name. */
             name: string;
         };

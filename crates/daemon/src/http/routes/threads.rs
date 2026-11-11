@@ -137,10 +137,21 @@ pub async fn post_discussion(
     Path(ticket): Path<String>,
     Json(input): Json<NewMessage>,
 ) -> ApiResult<Json<ThreadDetail>> {
-    thread_write(&state, ticket, move |tx, t| {
-        Ok(discussion::say(tx, t, &input.text)?.0.id)
+    let said = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let slot = said.clone();
+    let detail = thread_write(&state, ticket, move |tx, t| {
+        let (th, m) = discussion::say(tx, t, &input.text)?;
+        if let Ok(mut s) = slot.lock() {
+            *s = Some((t.id, t.key.to_string(), m.id));
+        }
+        Ok(th.id)
     })
-    .await
+    .await?;
+    let taken = said.lock().ok().and_then(|mut s| s.take());
+    if let Some((id, key, message)) = taken {
+        crate::discussion_watch::watch(state.store.clone(), id, key, message);
+    }
+    Ok(detail)
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/threads/{thread}/edits/{message}/accept", tag = "threads",

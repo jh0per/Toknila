@@ -264,3 +264,54 @@ fn accept_syncs_the_ship_before_the_merge() {
     assert_eq!(mem.merger.synced.borrow().len(), 1);
     assert_eq!(mem.merger.asked.borrow().len(), 1);
 }
+
+#[test]
+fn a_merged_card_in_local_mode_retires_its_ship_and_a_kept_branch_is_explained() {
+    for (fate, comments) in [
+        (crate::BranchFate::Deleted, 0),
+        (crate::BranchFate::Kept { ahead: 2 }, 1),
+    ] {
+        let mut mem = in_review();
+        *mem.yard.fate.borrow_mut() = fate;
+        accept(&mut mem);
+        settle(&mut mem);
+        let a = mem.ticket_by_title("A");
+        assert_eq!(a.status, TicketStatus::Merged);
+        assert_eq!(mem.yard.removed.borrow().len(), 1);
+        assert_eq!(
+            *mem.yard.retired.borrow(),
+            ["develop"],
+            "measured against the base"
+        );
+        let notes: Vec<_> = mem
+            .comments
+            .iter()
+            .filter(|c| c.ticket_id == a.id && c.author == toknila_core::Actor::System)
+            .collect();
+        assert_eq!(notes.len(), comments, "{notes:?}");
+        if let Some(n) = notes.first() {
+            assert!(
+                n.body
+                    .what
+                    .as_deref()
+                    .is_some_and(|w| w.contains("the merge"))
+            );
+        }
+    }
+}
+
+#[test]
+fn a_merged_card_in_pull_request_mode_leaves_its_branch_to_the_forge() {
+    let mut mem = in_review();
+    mem.project.merge.mode = toknila_core::MergeMode::Github;
+    *mem.yard.fate.borrow_mut() = crate::BranchFate::Deleted;
+    accept(&mut mem);
+    settle(&mut mem);
+    let a = mem.ticket_by_title("A");
+    assert_eq!(a.status, TicketStatus::Merged);
+    assert_eq!(mem.yard.removed.borrow().len(), 1, "the worktree goes");
+    assert!(
+        mem.yard.retired.borrow().is_empty(),
+        "no branch is looked at or deleted"
+    );
+}

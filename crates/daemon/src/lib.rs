@@ -7,6 +7,7 @@ pub mod checker;
 pub mod cleanup;
 mod cli_link;
 pub mod designs;
+pub mod discussion_watch;
 mod gh;
 mod git;
 pub mod github;

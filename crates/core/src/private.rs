@@ -58,6 +58,29 @@ pub fn read_allow_rule(abs: &str) -> String {
     format!("Read(/{})", rooted(abs))
 }
 
+/// The allow rule that lets an agent `Read` (so also `Grep` and `Glob`) everything below one
+/// absolute folder, in the same spelling as [`read_allow_rule`].
+pub fn read_allow_tree_rule(abs: &str) -> String {
+    format!("Read(/{}/**)", rooted(abs.trim_end_matches(['/', '\\'])))
+}
+
+/// The file tools a profile may name only with a path: a bare `Read`, `Grep` or `Glob` allow rule
+/// would reach the whole disk, so it is replaced by rooted rules.
+pub fn is_unscoped_read_rule(rule: &str) -> bool {
+    matches!(rule, "Read" | "Grep" | "Glob")
+}
+
+/// The allow rules of `rules` with every unscoped read rule dropped, plus the rooted rules for the
+/// repository folder `repo` (the ship or the project root). Design files are added by the caller.
+pub fn scope_reads(rules: Vec<String>, repo: &str) -> Vec<String> {
+    let mut out: Vec<String> = rules
+        .into_iter()
+        .filter(|r| !is_unscoped_read_rule(r))
+        .collect();
+    out.push(read_allow_tree_rule(repo));
+    out
+}
+
 /// The absolute private paths below `home`.
 pub fn private_paths(home: &str) -> Vec<String> {
     let home = home.trim_end_matches(['/', '\\']);
@@ -129,6 +152,14 @@ mod tests {
             deny_rules_for("/d/designs/p/x.png", "/u")[0],
             "Read(//d/designs/p/x.png)"
         );
+    }
+
+    #[test]
+    fn reads_are_scoped_to_the_repository_and_bare_tools_are_dropped() {
+        let rules = ["Read", "Grep", "Glob", "Bash(git status *)"].map(str::to_owned);
+        let out = scope_reads(rules.to_vec(), "/w/ship/");
+        assert_eq!(out, ["Bash(git status *)", "Read(//w/ship/**)"]);
+        assert_eq!(read_allow_tree_rule(r"C:\w\ship"), "Read(//c/w/ship/**)");
     }
 
     #[test]
