@@ -328,6 +328,7 @@ pub fn apply(
             effects.push(Effect::DependencySatisfied);
             next.paused = false;
             next.review.turn = None;
+            next.review.check = None;
             (
                 S::Cancelled,
                 Some(StatusReason::Cancelled {
