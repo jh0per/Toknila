@@ -21,7 +21,9 @@ mod tickets;
 mod usage;
 
 pub use agents::{ProjectAgents, QueuedCard};
-pub use chains::{ChainDetail, ChainItem, EdgeInput, MoveInput, ReleaseMember};
+pub use chains::{
+    ChainDetail, ChainItem, DesignMoveInput, EdgeInput, EdgeMoveInput, MoveInput, ReleaseMember,
+};
 pub use designs::{
     Design, DesignList, FigmaToken, NewDesignPin, NewFigmaDesign, PlannerDesign, PlannerPlan,
     RenameDesign,

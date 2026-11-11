@@ -16,6 +16,7 @@ pub mod inbox;
 pub mod instructions;
 pub mod leftovers;
 pub mod merges;
+pub mod moves;
 pub mod notes;
 pub mod nudge;
 pub mod pins;

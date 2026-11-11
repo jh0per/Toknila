@@ -46,6 +46,18 @@ pub enum DomainEvent {
     EdgeRemoved {
         edge: Edge,
     },
+    /// A dependency moved to another end in one step: `edge` is the new one, `was` the old.
+    EdgeMoved {
+        edge: Edge,
+        was: Edge,
+    },
+    /// A design reference moved from the card `from` to another in one step. `ticket` is the card
+    /// that received it, as it is now.
+    DesignMoved {
+        design: crate::design::DesignRef,
+        from: TicketKey,
+        ticket: Ticket,
+    },
     TicketCreated {
         ticket: Ticket,
     },
@@ -208,52 +220,6 @@ pub enum DomainEvent {
 }
 
 impl DomainEvent {
-    /// A ticket changed: `status_changed` when its status moved, `updated` otherwise.
-    pub fn ticket_changed(before: &Ticket, after: &Ticket) -> Self {
-        if before.status == after.status {
-            Self::TicketUpdated {
-                ticket: after.clone(),
-            }
-        } else {
-            Self::TicketStatusChanged {
-                key: after.key.clone(),
-                from: before.status,
-                to: after.status,
-                reason: after.status_reason.clone(),
-                ticket: after.clone(),
-            }
-        }
-    }
-
-    /// A person's decision on a wildcard card, when `before -> after` is one: it left Proposed.
-    pub fn wildcard_decided(before: &Ticket, after: &Ticket) -> Option<Self> {
-        if before.status != TicketStatus::Proposed || after.status == TicketStatus::Proposed {
-            return None;
-        }
-        let ticket = after.clone();
-        Some(match &after.status_reason {
-            Some(StatusReason::Cancelled { text }) => Self::TicketRejected {
-                key: after.key.clone(),
-                reason: text.clone(),
-                ticket,
-            },
-            _ => Self::TicketApproved {
-                key: after.key.clone(),
-                ticket,
-            },
-        })
-    }
-
-    /// A milestone changed (its state, cut or release time).
-    pub fn release_changed(before: &Release, after: &Release) -> Self {
-        Self::ReleaseStateChanged {
-            version: after.version.clone(),
-            from: before.state,
-            to: after.state,
-            release: after.clone(),
-        }
-    }
-
     /// Kind of entity the event is about: `project`, `chain`, `ticket`, `release`, `comment`,
     /// `subtask`, `thread`. Edge events belong to their chain.
     pub fn entity(&self) -> &'static str {
@@ -265,8 +231,10 @@ impl DomainEvent {
             | Self::ChainUpdated { .. }
             | Self::ChainDeleted { .. }
             | Self::EdgeAdded { .. }
-            | Self::EdgeRemoved { .. } => "chain",
-            Self::TicketCreated { .. }
+            | Self::EdgeRemoved { .. }
+            | Self::EdgeMoved { .. } => "chain",
+            Self::DesignMoved { .. }
+            | Self::TicketCreated { .. }
             | Self::TicketStatusChanged { .. }
             | Self::TicketUpdated { .. }
             | Self::TicketProposed { .. }
@@ -305,8 +273,11 @@ impl DomainEvent {
             Self::ChainCreated { chain }
             | Self::ChainUpdated { chain }
             | Self::ChainDeleted { chain } => chain.id.to_string(),
-            Self::EdgeAdded { edge } | Self::EdgeRemoved { edge } => edge.chain_id.to_string(),
-            Self::TicketCreated { ticket }
+            Self::EdgeAdded { edge }
+            | Self::EdgeRemoved { edge }
+            | Self::EdgeMoved { edge, .. } => edge.chain_id.to_string(),
+            Self::DesignMoved { ticket, .. }
+            | Self::TicketCreated { ticket }
             | Self::TicketStatusChanged { ticket, .. }
             | Self::TicketUpdated { ticket }
             | Self::TicketProposed { ticket }
@@ -353,6 +324,8 @@ impl DomainEvent {
             Self::ProjectDeleted { .. } | Self::ChainDeleted { .. } => "deleted",
             Self::EdgeAdded { .. } => "edge_added",
             Self::EdgeRemoved { .. } => "edge_removed",
+            Self::EdgeMoved { .. } => "edge_moved",
+            Self::DesignMoved { .. } => "design_moved",
             Self::TicketStatusChanged { .. } => "status_changed",
             Self::TicketUpdated { .. }
             | Self::SubtaskUpdated { .. }
@@ -386,6 +359,8 @@ impl DomainEvent {
         }
     }
 }
+
+mod constructors;
 
 #[cfg(test)]
 mod tests;
