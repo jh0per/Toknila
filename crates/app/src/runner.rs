@@ -83,6 +83,8 @@ pub struct RunBrief {
     pub repo_tools: Vec<String>,
     /// What a planner is told about its project; `None` for a card's agent.
     pub project: Option<toknila_core::instructions::ProjectFacts>,
+    /// The absolute paths of the design files a planner may read (a planner only).
+    pub designs: Vec<std::path::PathBuf>,
 }
 
 /// A runner now works for the ticket.

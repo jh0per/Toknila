@@ -14,6 +14,7 @@ use toknila_app::resolve;
 use toknila_core::{Actor, AgentProfile, AgentRole, PlannerSpec, Project, planner as rules};
 
 use super::{ApiResult, scrollback_response};
+use crate::designs::Designs;
 use crate::http::error::ErrorBody;
 use crate::server::AppState;
 use toknila_app::AppError;
@@ -80,13 +81,16 @@ pub async fn start_planner(
     } else {
         state.store.shipyard()
     };
+    let designs = Designs::new(&state.home, p.id);
     let started = {
         let p = p.clone();
         tokio::task::spawn_blocking(move || {
             // Fetches (bounded) and prepares the place the planner reads the code from.
             let site = yard
                 .and_then(|yard| PlannerSpec::for_project(&p).map(|spec| yard.planner_site(&spec)));
-            planner::start(&*runners, Actor::Human, &p, &profile, site)
+            // The design files it is told to look at first and may read.
+            let files = designs.file_paths();
+            planner::start_with(&*runners, Actor::Human, &p, &profile, site, files)
         })
         .await??
     };

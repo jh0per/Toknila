@@ -48,6 +48,8 @@ pub struct RunBrief<'a> {
     pub returned: Option<&'a Returned>,
     /// The person wants to approve a design before any code (`Ticket::design_first`).
     pub design_first: bool,
+    /// A planner's project has designs the planner must look at first.
+    pub has_designs: bool,
 }
 
 /// The section of the instructions file for a card that must show a design first; empty
@@ -136,6 +138,13 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         );
     }
     match role {
+        crate::AgentRole::Planner if brief.has_designs => format!(
+            "You are the planner of project {key}. Read your Toknila instructions, call \
+             `show_plan`. The project has designs: Read every design file `show_plan` lists \
+             first, say in a few lines what screens and flows you see, then propose the cards, \
+             and name the designs each card you add comes from. Do not start any card.",
+            key = brief.key
+        ),
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
              `show_plan`, then tell the owner in a line or two how the plan stands and wait for \

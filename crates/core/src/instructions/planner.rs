@@ -30,8 +30,12 @@ files in the repository either.
 Use the tools of the MCP server `toknila`; never change the plan any other way.
 
 - `show_plan`: the whole plan of the project: chains, cards with their status, prompt, \
-acceptance, subtasks, dependencies, threads, review results and pull request state. Call it \
-before you plan, and again after the owner or a card agent may have changed something.
+acceptance, subtasks, dependencies, threads, review results and pull request state, and the \
+project's designs (name, kind and the path of each design file). Call it before you plan, and \
+again after the owner or a card agent may have changed something.
+- `show_design` (`design`): the path and the metadata (name, kind, media type, size) of one \
+design, by its id or name. You may `Read` the design files that `show_plan` and `show_design` \
+name, and no other file outside the repository.
 - `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
 - `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`): a new card at \
 the end of the chain, or after the cards named in `after`.
@@ -63,6 +67,10 @@ the owner says they do not want to see a design first. Its agent then opens a de
 waits for the owner's approval before it writes code. Leave it off for cards the owner never \
 sees (internals, tests, build).
 - Read the repository before you plan, so a card names real files and real constraints.
+- When the project has designs, look at every one of them before you propose a card: `Read` each \
+design file, say in a few lines what screens and flows you see, then propose the cards. Every \
+card you add names the designs it comes from, by name, in its prompt. A design without a file \
+(a Figma link that was not fetched) cannot be read: say so and ask the owner for an export.
 - Never start a card. When the plan is ready, tell the owner which card to start first.
 - When you are unsure what the owner wants, ask them in this terminal instead of guessing.
 
@@ -192,6 +200,7 @@ mod tests {
     fn the_protocol_names_every_planner_tool_and_the_rules() {
         for tool in [
             "show_plan",
+            "show_design",
             "new_chain",
             "add_card",
             "edit_card",
@@ -209,9 +218,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn the_planner_is_kicked_off_to_look_at_the_plan_not_to_start_a_card() {
-        let brief = RunBrief {
+    fn kick_brief(has_designs: bool) -> RunBrief<'static> {
+        RunBrief {
             key: "DEMO",
             title: "Demo",
             prompt: "",
@@ -221,10 +229,32 @@ mod tests {
             waiting: &[],
             returned: None,
             design_first: false,
-        };
-        let text = crate::instructions::kickoff(AgentRole::Planner, &brief);
+            has_designs,
+        }
+    }
+
+    #[test]
+    fn the_planner_is_kicked_off_to_look_at_the_plan_not_to_start_a_card() {
+        let text = crate::instructions::kickoff(AgentRole::Planner, &kick_brief(false));
         assert!(text.contains("planner of project DEMO"));
         assert!(text.contains("show_plan"));
         assert!(!text.contains("finished"));
+        assert!(
+            !text.contains("design"),
+            "no designs, no word about them: {text}"
+        );
+    }
+
+    #[test]
+    fn a_project_with_designs_kicks_the_planner_off_to_look_at_them_first_and_name_them() {
+        let text = crate::instructions::kickoff(AgentRole::Planner, &kick_brief(true));
+        let at = |s: &str| text.find(s).unwrap_or_else(|| panic!("{s}: {text}"));
+        assert!(at("Read every design file") < at("what screens and flows you see"));
+        assert!(at("what screens and flows you see") < at("propose the cards"));
+        assert!(at("propose the cards") < at("name the designs each card"));
+        assert!(text.contains("Do not start any card"));
+        let file = generate_planner(&facts());
+        assert!(file.contains("`show_design`"));
+        assert!(file.contains("Every card you add names the designs it comes from"));
     }
 }
