@@ -13,6 +13,8 @@
 
 use serde::Deserialize;
 
+use crate::{TicketStatus, WaitingReason};
+
 /// The hooks Toknila subscribes to: Claude Code's name, and the name `tok hook <name>` takes.
 pub const HOOKS: [(&str, &str); 7] = [
     ("Notification", "notification"),
@@ -141,6 +143,87 @@ pub fn clears_prompt(signal: &str) -> bool {
         signal,
         "hook:post_tool_use" | "hook:user_prompt_submit" | "hook:stop" | "hook:subagent_stop"
     )
+}
+
+/// The signal of an MCP event of the agent (`started`, `subtask_done`, `note`).
+pub const SIGNAL_MCP: &str = "api";
+
+/// The signal of the agent's hand-in (`finished`).
+pub const SIGNAL_HAND_IN: &str = "api:finished";
+
+/// A sign of life of the agent, with what is known about the prompt that is open for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Sign<'a> {
+    /// What fired: `hook:<name>`, [`SIGNAL_MCP`] or [`SIGNAL_HAND_IN`].
+    pub signal: &'a str,
+    /// The tool call a `post_tool_use` hook reports as done (as [`tool_text`] writes it).
+    pub tool: Option<&'a str>,
+    /// The tool call the open permission prompt is about, when it is known.
+    pub prompted: Option<&'a str>,
+}
+
+impl<'a> Sign<'a> {
+    /// A sign that carries nothing but its signal.
+    pub fn of(signal: &'a str) -> Self {
+        Self {
+            signal,
+            tool: None,
+            prompted: None,
+        }
+    }
+}
+
+/// What a sign of life does to a card.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reaction {
+    /// The card stays as it is (the sign still feeds the nudge signals).
+    Stay,
+    /// A waiting card goes back to Running.
+    Resume,
+    /// The hand-in came while the card waited on a question or a permission: the card goes back
+    /// to Running, and the question counts as overtaken by the hand-in.
+    Overtake,
+}
+
+/// What a sign of life does to a card in `status` with the waiting `reason`. An open question is
+/// closed by its answer alone. An open permission prompt is closed by its answer in the window or
+/// by the `post_tool_use` hook of the very call it was about (a prompt answered at the terminal
+/// yields only that hook). Any other hook or MCP event leaves such a card waiting. A card that
+/// waits for no answer (silent) goes back to work on any sign of work; the hand-in always goes on.
+pub fn react(status: TicketStatus, reason: Option<&WaitingReason>, sign: &Sign<'_>) -> Reaction {
+    if status != TicketStatus::Waiting {
+        return Reaction::Stay;
+    }
+    let asked = matches!(
+        reason,
+        Some(WaitingReason::Question { .. } | WaitingReason::Permission { .. })
+    );
+    if sign.signal == SIGNAL_HAND_IN {
+        return if asked {
+            Reaction::Overtake
+        } else {
+            Reaction::Resume
+        };
+    }
+    let works = match reason {
+        Some(WaitingReason::Question { .. }) => false,
+        Some(WaitingReason::Permission { .. }) => {
+            sign.signal == "hook:post_tool_use"
+                && match (sign.tool, sign.prompted) {
+                    (Some(done), Some(prompted)) => done == prompted,
+                    // The call is not known on one side: the hook is all there is to go by.
+                    _ => true,
+                }
+        }
+        Some(WaitingReason::Silent) | None => {
+            sign.signal == SIGNAL_MCP || crate::nudge::resumes(sign.signal)
+        }
+    };
+    if works {
+        Reaction::Resume
+    } else {
+        Reaction::Stay
+    }
 }
 
 /// Whether `name` is a hook Toknila subscribes to.
@@ -312,6 +395,84 @@ mod tests {
         ] {
             assert!(!clears_prompt(s), "{s}");
         }
+    }
+
+    #[test]
+    fn every_sign_against_every_waiting_reason() {
+        use Reaction::{Overtake, Resume, Stay};
+        let question = WaitingReason::Question { text: "q".into() };
+        let permission = WaitingReason::Permission {
+            text: "p".into(),
+            detail: None,
+        };
+        let signals = [
+            "hook:post_tool_use",
+            "hook:user_prompt_submit",
+            "hook:stop",
+            "hook:subagent_stop",
+            "hook:notification",
+            "hook:pre_tool_use",
+            "hook:permission_request",
+            SIGNAL_MCP,
+            SIGNAL_HAND_IN,
+            "start",
+        ];
+        // (reason, the reaction to each of `signals`, in order)
+        let table = [
+            (
+                Some(&question),
+                [
+                    Stay, Stay, Stay, Stay, Stay, Stay, Stay, Stay, Overtake, Stay,
+                ],
+            ),
+            (
+                Some(&permission),
+                [
+                    Resume, Stay, Stay, Stay, Stay, Stay, Stay, Stay, Overtake, Stay,
+                ],
+            ),
+            (
+                Some(&WaitingReason::Silent),
+                [
+                    Resume, Resume, Stay, Stay, Stay, Stay, Stay, Resume, Resume, Stay,
+                ],
+            ),
+            (
+                None,
+                [
+                    Resume, Resume, Stay, Stay, Stay, Stay, Stay, Resume, Resume, Stay,
+                ],
+            ),
+        ];
+        for (reason, want) in table {
+            for (signal, want) in signals.iter().zip(want) {
+                let got = react(TicketStatus::Waiting, reason, &Sign::of(signal));
+                assert_eq!(got, want, "{reason:?} {signal}");
+                for status in [TicketStatus::Running, TicketStatus::Review] {
+                    assert_eq!(react(status, reason, &Sign::of(signal)), Stay);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_permission_resumes_only_on_the_hook_of_the_prompted_call() {
+        let permission = WaitingReason::Permission {
+            text: "p".into(),
+            detail: None,
+        };
+        let go = |tool, prompted| {
+            let sign = Sign {
+                signal: "hook:post_tool_use",
+                tool,
+                prompted,
+            };
+            react(TicketStatus::Waiting, Some(&permission), &sign)
+        };
+        assert_eq!(go(Some("Bash: ls"), Some("Bash: ls")), Reaction::Resume);
+        assert_eq!(go(Some("Bash: pwd"), Some("Bash: ls")), Reaction::Stay);
+        assert_eq!(go(None, Some("Bash: ls")), Reaction::Resume);
+        assert_eq!(go(Some("Bash: ls"), None), Reaction::Resume);
     }
 
     #[test]

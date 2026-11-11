@@ -123,15 +123,10 @@ async fn migrations_from_zero_and_reopen_are_idempotent() {
     let path = dir.path().join("toknila.db");
     for _ in 0..3 {
         let store = Store::open(&path).expect("open");
-        let version: i64 = store
-            .read(|repo| {
-                Ok(repo
-                    .conn
-                    .pragma_query_value(None, "user_version", |r| r.get(0))?)
-            })
-            .await
-            .expect("version");
-        assert_eq!(version, SCHEMA_VERSION);
+        assert_eq!(
+            count(&store, "schema_migrations").await,
+            migrations::all().expect("list").len() as i64
+        );
         assert_eq!(
             count(&store, "agent_profiles").await,
             1,
@@ -151,10 +146,7 @@ async fn a_phase_0_database_gains_wildcard_marks() {
     let old = ticket(c.id, 1);
     {
         let conn = Connection::open(&path).expect("raw open");
-        conn.execute_batch(schema::MIGRATIONS[0])
-            .expect("phase-0 schema");
-        conn.pragma_update(None, "user_version", 1)
-            .expect("version");
+        migrations::old_store(&conn, 1);
         insert_phase_0_rows(&conn, &p, &c);
         conn.execute(
             "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
@@ -245,11 +237,7 @@ async fn review_state_and_reviewer_settings_are_stored_and_old_rows_have_none() 
     {
         // A database from before review: the first five migrations, one ticket in Review.
         let conn = Connection::open(&path).expect("raw open");
-        for m in &schema::MIGRATIONS[..5] {
-            conn.execute_batch(m).expect("schema");
-        }
-        conn.pragma_update(None, "user_version", 5)
-            .expect("version");
+        migrations::old_store(&conn, 5);
         insert_phase_0_rows(&conn, &p, &c);
         conn.execute(
             "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
@@ -309,10 +297,7 @@ async fn a_database_before_threads_gains_them_and_keeps_every_byte_of_an_artifac
     let t = ticket(c.id, 1);
     {
         let conn = Connection::open(&path).expect("raw open");
-        conn.execute_batch(schema::MIGRATIONS[0]).expect("schema 1");
-        conn.execute_batch(schema::MIGRATIONS[1]).expect("schema 2");
-        conn.pragma_update(None, "user_version", 2)
-            .expect("version");
+        migrations::old_store(&conn, 2);
         insert_phase_0_rows(&conn, &p, &c);
         conn.execute(
             "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
@@ -401,8 +386,11 @@ async fn newer_database_is_refused() {
     let path = dir.path().join("toknila.db");
     drop(Store::open(&path).expect("open"));
     let conn = Connection::open(&path).expect("raw open");
-    conn.pragma_update(None, "user_version", SCHEMA_VERSION + 1)
-        .expect("bump");
+    conn.execute(
+        "INSERT INTO schema_migrations (name, applied_at) VALUES ('from-the-future', 1)",
+        [],
+    )
+    .expect("bump");
     drop(conn);
     assert!(matches!(Store::open(&path), Err(StoreError::TooNew { .. })));
 }
@@ -653,11 +641,7 @@ async fn a_database_before_positions_has_none_and_a_position_is_stored() {
     let old = ticket(c.id, 1);
     {
         let conn = Connection::open(&path).expect("raw open");
-        for m in &schema::MIGRATIONS[..13] {
-            conn.execute_batch(m).expect("schema");
-        }
-        conn.pragma_update(None, "user_version", 13)
-            .expect("version");
+        migrations::old_store(&conn, 13);
         insert_phase_0_rows(&conn, &p, &c);
         conn.execute(
             "INSERT INTO tickets (id, chain_id, key, title, prompt, acceptance_json, status, \
