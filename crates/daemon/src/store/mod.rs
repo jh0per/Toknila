@@ -253,6 +253,7 @@ impl Store {
     {
         let events = self.events.clone();
         let live = self.runner.live_runners();
+        let line = self.line.clone();
         let outcome = self
             .run(move |conn| {
                 let tx = match conn.transaction() {
@@ -280,6 +281,14 @@ impl Store {
                 } = w;
                 if let Err(e) = tx.commit() {
                     return Ok(Err(E::from(e.into())));
+                }
+                // The checks take their places in the line here, on the writer thread right
+                // after the commit: the line holds the hand-ins in the order they committed,
+                // whichever effect task reaches the host first.
+                for effect in &deferred {
+                    if let ExternalEffect::RunCheck { ticket, .. } = effect {
+                        line.join(*ticket);
+                    }
                 }
                 for e in &emitted {
                     // No subscribers is fine.

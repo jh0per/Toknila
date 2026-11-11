@@ -30,13 +30,19 @@ impl Store {
         let mut queued = queued;
         for _ in 0..MAX_ROUNDS {
             if only_merges {
+                // Checks that are left undone also leave the line they joined at the commit.
+                for e in &queued {
+                    if let ExternalEffect::RunCheck { ticket, .. } = e {
+                        self.line.leave(*ticket);
+                    }
+                }
                 queued.retain(|e| matches!(e, ExternalEffect::Merge { .. }));
             }
             if queued.is_empty() {
                 return;
             }
             self.log_checks_starting(&queued).await;
-            // The checks take their places now, so a card shows that it waits at once.
+            // The checks joined the line when their command committed (`commit_with_effects`).
             let joined: Vec<TicketId> = queued
                 .iter()
                 .filter_map(|e| match e {
@@ -44,9 +50,6 @@ impl Store {
                     _ => None,
                 })
                 .collect();
-            for t in &joined {
-                self.line.join(*t);
-            }
             let runner = self.runner.clone();
             let merger = self.merger.clone();
             let checker = self.checker.clone();
