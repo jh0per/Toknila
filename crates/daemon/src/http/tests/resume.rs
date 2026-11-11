@@ -118,7 +118,7 @@ async fn a_hook_of_work_never_clears_an_open_question_and_the_answer_still_does(
 }
 
 #[tokio::test]
-async fn an_mcp_event_returns_a_waiting_card_to_running() {
+async fn an_mcp_event_leaves_a_waiting_card_where_it_is() {
     let api = Api::new();
     let token = waiting(&api).await;
     event(
@@ -127,7 +127,8 @@ async fn an_mcp_event_returns_a_waiting_card_to_running() {
         json!({ "event": "note", "body": { "gist": "continuing" } }),
     )
     .await;
-    assert_eq!(status(&api, "DEMO-1").await, "running");
+    event(&api, &token, json!({ "event": "started" })).await;
+    assert_eq!(status(&api, "DEMO-1").await, "waiting");
 }
 
 #[tokio::test]
