@@ -8,6 +8,7 @@ use toknila_core::{AgentProfile, AgentRole, RunId};
 use super::*;
 
 mod planner;
+mod reviewer_rules;
 
 const TOKEN: &str = "secret-run-token-0123456789abcdef";
 

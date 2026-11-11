@@ -145,8 +145,8 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         crate::AgentRole::Reviewer => format!(
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
              branch, run the check command and the tests the hand-in names and quote their \
-             result lines, mark NOT_RUN what you could not run, then call `review_verdict` \
-             once. You do not change the code.",
+             result lines (each command plain, one per call, no `cd` or `&&`), mark NOT_RUN what \
+             you could not run (never FAIL it), then call `review_verdict` once. You do not change the code.",
             key = brief.key
         ),
         _ => format!(

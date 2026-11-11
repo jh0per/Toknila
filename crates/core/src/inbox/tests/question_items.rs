@@ -260,3 +260,36 @@ fn a_screen_answered_by_keys_stays_quiet_while_it_is_unchanged() {
     d.now = Timestamp(90_000);
     assert_eq!(compute(&d).len(), 1, "the grace has passed");
 }
+
+#[test]
+fn an_unfounded_request_for_changes_reaches_the_person_with_the_reviewers_reading() {
+    use crate::machine::{TicketEvent, apply};
+    let mut t = ticket(1, TicketStatus::Review, 5);
+    t.acceptance = vec!["it builds".to_owned()];
+    t.review.turn = Some(crate::ReviewTurn::Agent { decides: false });
+    let event = TicketEvent::ReviewVerdict {
+        verdict: crate::Verdict::RequestChanges,
+        comment: "Bash was refused".to_owned(),
+        items: vec![crate::ItemVerdict {
+            item: 1,
+            outcome: crate::ItemOutcome::Fail,
+            basis: crate::ItemBasis::NotRun,
+            note: "cargo test refused".to_owned(),
+        }],
+        max_rounds: 3,
+    };
+    let t = apply(&t, &event, crate::Timestamp(9))
+        .expect("heard")
+        .ticket;
+    let got = compute(&data(vec![t], 9));
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].kind, InboxKind::Review);
+    assert_eq!(
+        got[0].lines,
+        [
+            "NOT_RUN 1. it builds - cargo test refused [NOT_RUN]",
+            "Bash was refused"
+        ]
+    );
+    assert!(got[0].allowed_actions.contains(&TicketAction::RunReviewer));
+}

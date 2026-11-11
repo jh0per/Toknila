@@ -723,3 +723,90 @@ fn a_failing_item_returns_the_card_with_the_item_lines_as_the_remarks() {
         text: "PASS 1. first holds - seen [ran]\nFAIL 2. second holds - seen [ran]".to_owned()
     }));
 }
+
+fn item_with(
+    item: u32,
+    outcome: crate::ItemOutcome,
+    basis: crate::ItemBasis,
+) -> crate::ItemVerdict {
+    crate::ItemVerdict {
+        item,
+        outcome,
+        basis,
+        note: "could not run".to_owned(),
+    }
+}
+
+#[test]
+fn a_request_with_nothing_run_is_no_round_and_waits_for_the_person() {
+    use crate::ItemBasis::NotRun;
+    use crate::ItemOutcome::Fail;
+    let t = with_acceptance(ReviewTurn::Agent { decides: false });
+    let said = vec![item_with(1, Fail, NotRun), item_with(2, Fail, NotRun)];
+    let tr = step(
+        &t,
+        &judged(Verdict::RequestChanges, "This is not a finding", said),
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert!(tr.ticket.review.rounds.is_empty(), "no round");
+    assert_eq!(tr.ticket.review.auto_returns(), t.review.auto_returns());
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+    let Some(ReviewNote::NoVerdict { lines }) = &tr.ticket.review.note else {
+        panic!("a NoVerdict note");
+    };
+    assert_eq!(
+        lines,
+        &[
+            "NOT_RUN 1. first holds - could not run [NOT_RUN]",
+            "NOT_RUN 2. second holds - could not run [NOT_RUN]",
+            "This is not a finding"
+        ]
+    );
+    assert!(tr.effects.contains(&Effect::StopReviewer));
+    assert!(
+        !tr.effects.contains(&Effect::EnsureRunner),
+        "worker untouched"
+    );
+    assert!(
+        !tr.effects
+            .iter()
+            .any(|e| matches!(e, Effect::RecordRemarks { .. }))
+    );
+    assert!(TicketAction::allowed(&tr.ticket).contains(&TicketAction::RunReviewer));
+}
+
+#[test]
+fn a_request_without_items_that_says_nothing_was_run_is_unfounded() {
+    let t = in_review(ReviewTurn::Agent { decides: true });
+    let tr = step(
+        &t,
+        &verdict(Verdict::RequestChanges, "Everything is NOT_RUN"),
+    );
+    assert!(tr.ticket.review.rounds.is_empty());
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+}
+
+#[test]
+fn a_failing_item_that_was_not_run_is_recorded_as_not_run_beside_a_real_failure() {
+    use crate::ItemBasis::{NotRun, Ran};
+    use crate::ItemOutcome::Fail;
+    let t = with_acceptance(ReviewTurn::Agent { decides: true });
+    let said = vec![item_with(1, Fail, NotRun), item_with(2, Fail, Ran)];
+    let tr = step(&t, &judged(Verdict::RequestChanges, "", said));
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert!(tr.effects.contains(&Effect::RecordRemarks {
+        text: "NOT_RUN 1. first holds - could not run [NOT_RUN]\nFAIL 2. second holds - could not run [ran]".to_owned()
+    }));
+}
+
+#[test]
+fn one_failure_on_a_read_or_a_run_is_still_a_round_that_sends_the_worker_back() {
+    use crate::ItemBasis::{NotRun, Read};
+    use crate::ItemOutcome::Fail;
+    let t = with_acceptance(ReviewTurn::Agent { decides: false });
+    let said = vec![item_with(1, Fail, NotRun), item_with(2, Fail, Read)];
+    let tr = step(&t, &judged(Verdict::RequestChanges, "", said));
+    assert_eq!(tr.ticket.review.rounds.len(), 1);
+    assert_eq!(tr.ticket.review.auto_returns(), 1);
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+}
