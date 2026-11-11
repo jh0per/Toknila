@@ -46,24 +46,45 @@ try {
     "post", "/tickets/WEB-1/actions/start", "{}",
     // The replies are long and scroll; the line the page waits for comes last.
     "print", "planner ready",
-    "echo", "echo", "echo", "hold",
+    // After the third line the planner asks the window to show a card (the last thing it does).
+    "echo", "echo", "echo",
+    "post", "/planner/cards/WEB-1/show", "{}",
+    "print", "planner done",
+    "hold",
   ];
   const list = steps.map((s) => `'${s}'`);
   writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', ${list.join(", ")}]\nstartup_secs = 0\n`);
   tok("project", "new", "WEB", "--repo", repo, "--base", "develop");
+  // A second project, looked at by a second window: it must not follow the first one's assistant.
+  const otherRepo = join(home, "other-repo");
+  mkdirSync(otherRepo, { recursive: true });
+  git(otherRepo, "init", "--quiet");
+  git(otherRepo, "symbolic-ref", "HEAD", "refs/heads/develop");
+  writeFileSync(join(otherRepo, "README.md"), "hi\n");
+  git(otherRepo, "add", "README.md");
+  git(otherRepo, "commit", "--quiet", "-m", "init");
+  tok("project", "new", "OTH", "--repo", otherRepo, "--base", "develop");
   const { url } = JSON.parse(tok("open", "--json"));
 
   browser = await launch();
   const page = await browser.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  const elsewhere = await browser.newPage();
+  elsewhere.on("pageerror", (e) => errors.push(e.message));
+  const otherUrl = new URL(url);
+  otherUrl.pathname = "/projects/OTH/planner";
+  await elsewhere.goto(otherUrl.href);
+  await checks(elsewhere).expectPath("/projects/OTH/planner", "the second window looks at the other project's assistant");
   const { expectText, expectPath } = checks(page);
   const term = page.locator("[data-testid=term-host]");
   const shot = async (name) => {
     if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: join(process.env.SCREENSHOT_DIR, `${name}.png`) });
   };
 
-  await page.goto(url);
+  const webUrl = new URL(url);
+  webUrl.pathname = "/projects/WEB";
+  await page.goto(webUrl.href);
   // The entry is at the top of the project's section, above its chains.
   const entry = page.locator("[data-testid=chains] li").first();
   await expectText(entry, "Plan with the assistant", "the assistant entry is first in the project's section");
@@ -113,12 +134,39 @@ try {
   await term.click();
   await page.keyboard.type("typed in the terminal");
   await page.keyboard.press("Enter");
-  await expectText(term, "got:typed in the terminal", "what is typed in the terminal reaches the planner");
+  // The planner shows a card right after this line, which takes the window off the terminal;
+  // that this line reached it is checked after Back, in the scrollback.
+
+  // The planner's last act is show_card: this window, on the assistant's screen, goes to the card
+  // with a notice and Back; the window on the other project stays where it is.
+  const notice = page.locator("[data-testid=opened-notice]");
+  await expectPath("/projects/WEB/chains/roadmap/cards/WEB-1", "show_card opens the card's page");
+  await expectText(page.locator("[data-testid=panel] .who"), "Design the list", "the card's panel shows it");
+  await expectText(notice, "The assistant opened WEB-1", "a notice says the assistant opened it");
+  await shot("planner-opened-card");
+  const stream = new URL(url);
+  const events = await (await fetch(`${stream.origin}/v1/events?since=0&limit=100000`, {
+    headers: { authorization: `Bearer ${stream.searchParams.get("token")}` },
+  })).json();
+  const shown = events.filter((e) => e.entity === "window" && e.kind === "show_card");
+  if (shown.length !== 1 || shown[0].payload.ticket !== "WEB-1" || shown[0].payload.project_key !== "WEB") {
+    throw new Error(`expected one window.show_card for WEB-1 in the journal, got ${JSON.stringify(shown)}`);
+  }
+  console.log("PASS the event is in the journal: window.show_card WEB-1");
+  if (new URL(elsewhere.url()).pathname !== "/projects/OTH/planner" || (await elsewhere.locator("[data-testid=opened-notice]").count()) !== 0) {
+    throw new Error(`the window on the other project followed: ${elsewhere.url()}`);
+  }
+  console.log("PASS the window on the other project ignored it");
+  await page.locator("[data-testid=opened-back]").click();
+  await expectPath("/projects/WEB/planner", "Back returns to the assistant's screen");
+  if ((await notice.count()) !== 0) throw new Error("the notice stayed after Back");
+  console.log("PASS the notice is gone after Back");
+  await expectText(term, "got:typed in the terminal", "what was typed in the terminal reached the planner");
 
   // A reload keeps the planner running and its output.
   await page.reload();
   await expectText(page.locator("[data-testid=planner-state]"), "running", "after a reload it still runs");
-  await expectText(term, "planner ready", "after a reload the scrollback has the output");
+  await expectText(term, "planner done", "after a reload the scrollback has the output");
 
   // Stop ends it, and the panel offers Start again.
   await page.locator("[data-testid=planner-stop]").click();

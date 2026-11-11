@@ -6,9 +6,9 @@ use serde::Serialize;
 
 use crate::question::{AnswerKind, QuestionKind};
 use crate::{
-    Actor, AgentRole, ArtifactFormat, Chain, Comment, Edge, ProcessExit, Project, Release,
-    ReleaseState, Run, Ship, StatusReason, Subtask, Thread, ThreadId, ThreadMessage, Ticket,
-    TicketId, TicketKey, TicketStatus,
+    Actor, AgentRole, ArtifactFormat, Chain, Comment, Edge, ProcessExit, Project, ProjectId,
+    ProjectKey, Release, ReleaseState, Run, Ship, StatusReason, Subtask, Thread, ThreadId,
+    ThreadMessage, Ticket, TicketId, TicketKey, TicketStatus,
 };
 
 /// One change. Serialises as its payload: the variant's fields, without a tag.
@@ -172,6 +172,14 @@ pub enum DomainEvent {
         ticket: TicketKey,
         thread: Thread,
     },
+    /// The project's assistant asked the window to show a card. Only a window that looks at that
+    /// project follows it; nothing in the plan changes.
+    WindowShowCard {
+        project: ProjectId,
+        project_key: ProjectKey,
+        chain: String,
+        ticket: TicketKey,
+    },
 }
 
 impl DomainEvent {
@@ -255,6 +263,7 @@ impl DomainEvent {
             | Self::ThreadVersionPosted { .. }
             | Self::ThreadApproved { .. }
             | Self::ThreadReopened { .. } => "thread",
+            Self::WindowShowCard { .. } => "window",
         }
     }
 
@@ -297,6 +306,7 @@ impl DomainEvent {
             | Self::ThreadReopened { thread, .. } => thread.id.to_string(),
             Self::ThreadMessagePosted { message, .. } => message.thread_id.to_string(),
             Self::ThreadVersionPosted { thread, .. } => thread.to_string(),
+            Self::WindowShowCard { project, .. } => project.to_string(),
         }
     }
 
@@ -334,6 +344,7 @@ impl DomainEvent {
             Self::ThreadVersionPosted { .. } => "version_posted",
             Self::ThreadApproved { .. } => "approved",
             Self::ThreadReopened { .. } => "reopened",
+            Self::WindowShowCard { .. } => "show_card",
         }
     }
 }

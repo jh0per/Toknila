@@ -141,6 +141,12 @@ fn fill(tx: &mut WriteTx<'_>, key: &str) -> Result<(), StoreError> {
     repo.usage_ingest(&file, "claude", Some(&session), Some(a.id), &[call])?;
     repo.usage_session_set(&session, a.id, None, AgentRole::Worker, &file.path, NOW)?;
     for e in [
+        DomainEvent::WindowShowCard {
+            project: p.id,
+            project_key: p.key.clone(),
+            chain: c.name.clone(),
+            ticket: a.key.clone(),
+        },
         DomainEvent::ProjectCreated { project: p },
         DomainEvent::ChainCreated { chain: c },
         DomainEvent::TicketCreated { ticket: a.clone() },
@@ -183,7 +189,7 @@ async fn a_deleted_project_leaves_no_row_and_no_journal_entry_and_the_other_keep
         .await
         .expect("fill");
     let full = rows(&store).await;
-    assert_eq!(count(&store, "events").await, 16);
+    assert_eq!(count(&store, "events").await, 18);
     let gone = store
         .read(|repo| repo.project_by_key("GONE"))
         .await
@@ -202,8 +208,8 @@ async fn a_deleted_project_leaves_no_row_and_no_journal_entry_and_the_other_keep
     );
     assert_eq!(
         count(&store, "events").await,
-        8,
-        "the kept project's entries"
+        9,
+        "the kept project's entries, its window event among them"
     );
     let mentions = |key: &'static str| {
         let store = store.clone();
@@ -221,7 +227,7 @@ async fn a_deleted_project_leaves_no_row_and_no_journal_entry_and_the_other_keep
         }
     };
     // Every entry but the milestone's names its project's key.
-    assert_eq!((mentions("KEPT").await, mentions("GONE").await), (7, 0));
+    assert_eq!((mentions("KEPT").await, mentions("GONE").await), (8, 0));
     // The tokens were spent: both calls stay, the deleted one tied to no card.
     let tied = store
         .read(|repo| {
@@ -267,7 +273,7 @@ async fn a_deleted_chain_leaves_no_row_but_its_project_and_the_other_project_kee
     }
     assert_eq!(
         count(&store, "events").await,
-        9,
-        "the project's own entry stays with the kept project's eight"
+        11,
+        "the project's own two entries (created, window) stay with the kept project's nine"
     );
 }

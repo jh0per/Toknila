@@ -282,6 +282,8 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
             json!({ "chain": "auto", "title": "Sneaky" }),
         ),
         call(15, "show_plan", json!({})),
+        call(19, "show_card", json!({ "card": "DEMO-2" })),
+        call(20, "show_card", json!({ "card": "DEMO-99" })),
         // The owner's calls are not tools.
         call(16, "start", json!({ "card": "DEMO-1" })),
         call(17, "accept", json!({ "card": "DEMO-1" })),
@@ -318,6 +320,7 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
             "new_chain",
             "add_card",
             "edit_card",
+            "show_card",
             "add_dependency",
             "remove_dependency",
             "move_card",
@@ -352,6 +355,18 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
             text_of(by_id(id))
         );
     }
+    assert_eq!(
+        by_id(19)["result"]["isError"],
+        false,
+        "{}",
+        text_of(by_id(19))
+    );
+    assert!(
+        text_of(by_id(19)).starts_with("DEMO-2 shown in the window"),
+        "{}",
+        text_of(by_id(19))
+    );
+    assert_eq!(by_id(20)["result"]["isError"], true);
     assert_eq!(by_id(14)["result"]["isError"], true);
     assert!(
         text_of(by_id(14)).contains("only the owner starts cards"),

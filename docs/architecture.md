@@ -788,10 +788,19 @@ the cards; the owner starts cards and accepts work.
   way. The terminal connection is `terminal/connect.ts` with the project's routes
   (`openPlannerTerminal`). There is no chat transcript of the planner: the terminal is the record.
 - **Tools and routes.** `tok mcp` with `TOKNILA_ROLE=planner` offers `show_plan`, `new_chain`,
-  `add_card`, `edit_card`, `add_dependency`, `remove_dependency`, `move_card`, `open_thread`,
-  `thread_message` and `thread_version` (`cmd/mcp_planner`), each a call to `/v1/planner/...`
-  (`PLANNER_ROUTES`; `http/routes/planner.rs`) with the run's token. A planner token reaches
-  those ten routes and no other (`403`); nothing in them starts, accepts or merges.
+  `add_card`, `edit_card`, `show_card`, `add_dependency`, `remove_dependency`, `move_card`,
+  `open_thread`, `thread_message` and `thread_version` (`cmd/mcp_planner`), each a call to
+  `/v1/planner/...` (`PLANNER_ROUTES`; `http/routes/planner.rs`) with the run's token. A planner
+  token reaches those eleven routes and no other (`403`); nothing in them starts, accepts or
+  merges.
+- **Opening a card.** `show_card` (`POST /v1/planner/cards/{card}/show`,
+  `toknila_app::planner::show_card`) changes nothing in the plan: it journals one `window`
+  event, kind `show_card` (see `events.md`). The web app follows it in the reducer
+  (`store/follow.ts`, `applyWindow` in `store/reduce.ts`): a window on that project's assistant
+  or on one of its chains (or a card of one) goes to the card's page and shows a notice
+  (`views/OpenedNotice.tsx`) with Back to the page it was on, which goes away after a while or
+  when the person goes elsewhere; a window on anything else only records the event. The tail
+  read at load is never followed, and the `seq` guard makes a replayed event a no-op.
 - **Scope.** The project is the token's, never in a path. `toknila_app::planner` resolves every
   reference inside it and refuses (`403`) another project's chain, card or thread. Core's
   `planner` module holds the rules: only a card that has not started is edited; a chain that

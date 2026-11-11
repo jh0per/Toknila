@@ -19,6 +19,7 @@ import type { ShortcutIntent } from "./shortcuts";
 import type { ThemeEffect, ThemeIntent } from "./theme";
 import type { UpdateEffect, UpdateIntent, UpdateResult } from "./updates";
 import type { UsageEffect, UsageIntent, UsageResult } from "./usage";
+import type { FollowEffect, FollowIntent, FollowResult } from "./follow";
 
 /// What the person did.
 export type Intent =
@@ -41,7 +42,8 @@ export type Intent =
   | ThemeIntent
   | ShortcutIntent
   | UpdateIntent
-  | UsageIntent;
+  | UsageIntent
+  | FollowIntent;
 
 /// What a person decides about the open subtasks left behind a card done out of order.
 export type LeftoverAction = "move" | "close" | "leave";
@@ -89,7 +91,8 @@ export type Msg =
   | PlacementResult
   | AutostartResult
   | UpdateResult
-  | UsageResult;
+  | UsageResult
+  | FollowResult;
 
 /// A side effect for the runner; the reducer only describes it.
 export type Effect =
@@ -115,5 +118,6 @@ export type Effect =
   | ThemeEffect
   | UpdateEffect
   | UsageEffect
+  | FollowEffect
   | { type: "connect"; since: number; delayMs: number }
   | { type: "pushUrl"; path: string };

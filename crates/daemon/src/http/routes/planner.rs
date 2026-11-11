@@ -94,6 +94,27 @@ pub async fn planner_edit_card(
     Ok(Json(detail))
 }
 
+#[utoipa::path(post, path = "/planner/cards/{card}/show", tag = "planner",
+    params(("card" = String, Path, description = CARD)),
+    responses((status = 200, body = TicketDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// Asks the window to show a card of the planner's project (a `window.show_card` event).
+pub async fn planner_show_card(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Path(card): Path<String>,
+) -> ApiResult<Json<TicketDetail>> {
+    let project = principal.planner_project()?;
+    let (at, prices) = stamp(&state);
+    let (detail, _) = state
+        .store
+        .write(Actor::Agent, at, move |tx| -> ApiResult<TicketDetail> {
+            let t = planner::show_card(tx, project, &card)?;
+            load_ticket_detail(&tx.repo(), t.id, at, &prices)
+        })
+        .await?;
+    Ok(Json(detail))
+}
+
 #[utoipa::path(post, path = "/planner/chains/{chain}/edges", tag = "planner", request_body = EdgeInput,
     params(("chain" = String, Path, description = CHAIN)),
     responses((status = 200, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
