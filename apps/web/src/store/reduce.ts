@@ -85,6 +85,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [s, [msg]];
     case "loadFailed":
       return [{ ...s, error: msg.error }, []];
+    case "answerNoted":
+      return [{ ...s, notice: msg.note }, []];
     case "event": {
       const [next, fx] = applyEvent(s, msg.event);
       // Transcripts are not in the journal, but any activity may have moved the numbers.

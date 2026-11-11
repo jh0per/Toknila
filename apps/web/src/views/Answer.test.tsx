@@ -18,11 +18,20 @@ describe("Answer", () => {
   });
   it("offers Allow always next to Allow for a worker's command, and for nothing else", () => {
     const html = (extra: Partial<InboxItem>) => renderToStaticMarkup(<Answer item={item(extra)} dispatch={() => {}} />);
-    const bash = html({});
+    const bash = html({ allow_always: "Bash(cargo test *)" });
     expect(bash).toMatch(/data-testid="answer-allow"[^>]*>Allow<\/button><button[^>]*data-testid="answer-allow-always"[^>]*>Allow always</);
+    expect(bash).toContain("Allow always: Bash(cargo test *)");
     expect(html({ text: "Claude Code asks for permission: Write: src/lib.rs" })).not.toContain("answer-allow-always");
-    expect(html({ role: "reviewer" })).not.toContain("answer-allow-always");
-    expect(html({ answers: ["enter"] })).not.toContain("answer-allow-always");
+    expect(html({ role: "reviewer", allow_always: "Bash(ls *)" })).not.toContain("answer-allow-always");
+    expect(html({ answers: ["enter"], allow_always: "Bash(ls *)" })).not.toContain("answer-allow-always");
+  });
+  it("hides Allow always and says why when the command cannot become a rule", () => {
+    const out = renderToStaticMarkup(
+      <Answer item={item({ allow_always_none: "a command built with $ or backticks cannot become a rule" })} dispatch={() => {}} />,
+    );
+    expect(out).not.toContain('data-testid="answer-allow-always"');
+    expect(out).toContain("Allow always is not offered: a command built with $ or backticks cannot become a rule");
+    expect(out).toContain('data-testid="answer-allow"');
   });
   it("has no disclosure when the text already says everything", () => {
     const html = renderToStaticMarkup(<Answer item={item({})} dispatch={() => {}} />);

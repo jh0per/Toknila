@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Project } from "../api/types";
 import { CommandsFields } from "../views/ProjectCommands";
-import { canAllowAlways, COMMAND_CHOICES, ruleWords } from "./commands";
+import { allowAlwaysLine, allowAlwaysRule, COMMAND_CHOICES, ruleWords } from "./commands";
 import { formOf, isDirty, patchOf, sectionOfField } from "./projectForm";
 
 const project = {
@@ -65,17 +65,24 @@ describe("the sites the reviewer may read", () => {
 });
 
 describe("Allow always", () => {
-  const ask: Parameters<typeof canAllowAlways>[0] = {
-    role: "worker", answers: ["allow", "deny"], text: "Claude Code asks for permission: Bash: ls -la",
+  const ask: Parameters<typeof allowAlwaysLine>[0] = {
+    role: "worker", answers: ["allow", "deny"], allow_always: "Bash(cargo test *)",
   };
-  it("is offered for a worker's command prompt, also when only the full text names the command", () => {
-    expect(canAllowAlways(ask)).toBe(true);
-    expect(canAllowAlways({ ...ask, text: "Claude Code asks for permission", detail: "Bash: cargo test\n  -p core" })).toBe(true);
+  it("is offered with the rule it adds, which the daemon made", () => {
+    expect(allowAlwaysRule(ask)).toBe("Bash(cargo test *)");
+    expect(allowAlwaysLine(ask)).toBe("Allow always: Bash(cargo test *)");
   });
-  it("is not offered for another tool, a reviewer, or a question without Allow", () => {
-    expect(canAllowAlways({ ...ask, text: "Claude Code asks for permission: Write: a.rs" })).toBe(false);
-    expect(canAllowAlways({ ...ask, role: "reviewer" })).toBe(false);
-    expect(canAllowAlways({ ...ask, answers: ["enter"] })).toBe(false);
+  it("is hidden when there is no rule, and says why", () => {
+    const none = { ...ask, allow_always: undefined, allow_always_none: "a command built with $ or backticks cannot become a rule" };
+    expect(allowAlwaysRule(none)).toBeUndefined();
+    expect(allowAlwaysLine(none)).toBe("Allow always is not offered: a command built with $ or backticks cannot become a rule");
+  });
+  it("says nothing for another tool, a reviewer, or a question without Allow", () => {
+    const other = { ...ask, allow_always: undefined };
+    expect(allowAlwaysLine(other)).toBeUndefined();
+    expect(allowAlwaysRule({ ...ask, role: "reviewer" })).toBeUndefined();
+    expect(allowAlwaysLine({ ...ask, role: "reviewer", allow_always_none: "x", allow_always: undefined })).toBeUndefined();
+    expect(allowAlwaysRule({ ...ask, answers: ["enter"] })).toBeUndefined();
   });
   it("shows a remembered rule as the command", () => {
     expect(ruleWords("Bash(cargo test *)")).toBe("cargo test *");
