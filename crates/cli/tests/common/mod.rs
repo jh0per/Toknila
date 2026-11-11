@@ -15,6 +15,19 @@ use serde_json::Value;
 use toknila_client::Client;
 use toknila_daemon::info::DaemonInfo;
 
+/// A temporary folder for a test: under `TOKNILA_TEST_ROOT` when `cargo xtask verify` set it (so
+/// its leak check sees only the daemons of its own run), else under the plain temp dir.
+pub fn tempdir() -> tempfile::TempDir {
+    match std::env::var_os("TOKNILA_TEST_ROOT") {
+        Some(root) => {
+            let root = PathBuf::from(root);
+            std::fs::create_dir_all(&root).expect("create the test root");
+            tempfile::tempdir_in(root).expect("tempdir in the test root")
+        }
+        None => tempfile::tempdir().expect("tempdir"),
+    }
+}
+
 /// The `tok` binary of this build, run against one data folder.
 pub struct Tok {
     pub home: PathBuf,
@@ -30,6 +43,10 @@ impl Tok {
 
     /// `tok <args>` against this data folder, not yet run.
     fn command(&self, args: &[&str]) -> Command {
+        // The daemon of a test is started with a lifeline, so it dies with this process.
+        if args.first() != Some(&"daemon") && !daemon_healthy(&self.home) {
+            start_daemon(&self.home);
+        }
         let mut c = Command::new(env!("CARGO_BIN_EXE_tok"));
         c.args(args).env("TOKNILA_HOME", &self.home);
         isolate(&mut c, &self.home);
@@ -228,6 +245,55 @@ pub fn isolate(cmd: &mut Command, home: &Path) {
     cmd.env("CLAUDE_CONFIG_DIR", home.join("no-claude-config"));
 }
 
+/// Write ends of the lifeline pipes of the daemons this test binary started. A daemon reads the
+/// other end and stops when it closes, which the kernel does when this process dies, even by
+/// SIGKILL, so no daemon outlives its test binary.
+static LIFELINES: Mutex<Vec<(PathBuf, std::process::ChildStdin)>> = Mutex::new(Vec::new());
+
+fn lifelines() -> std::sync::MutexGuard<'static, Vec<(PathBuf, std::process::ChildStdin)>> {
+    LIFELINES.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Is a daemon answering for `home`?
+pub fn daemon_healthy(home: &Path) -> bool {
+    DaemonInfo::read(&home.join("daemon.json"))
+        .ok()
+        .flatten()
+        .is_some_and(|i| Client::healthy(&i.base_url()))
+}
+
+/// Runs `tok daemon start --exit-with-parent --json` in `home`, keeping the pipe it hands to the
+/// daemon open for as long as this process lives. Returns what `tok` printed.
+pub fn start_daemon(home: &Path) -> Output {
+    track(home);
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_tok"));
+    cmd.args(["daemon", "start", "--exit-with-parent", "--json"])
+        .env("TOKNILA_HOME", home);
+    isolate(&mut cmd, home);
+    let mut child = cmd
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn tok daemon start");
+    let stdin = child.stdin.take().expect("stdin");
+    lifelines().push((home.to_owned(), stdin));
+    child.wait_with_output().expect("wait for tok daemon start")
+}
+
+/// Starts `tok watch` (extra `args` after `watch`) that ends when this process dies.
+pub fn spawn_watch(home: &Path, args: &[&str]) -> std::process::Child {
+    Command::new(env!("CARGO_BIN_EXE_tok"))
+        .arg("watch")
+        .args(args)
+        .arg("--exit-with-parent")
+        .env("TOKNILA_HOME", home)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn tok watch")
+}
+
 /// The data folders whose daemon this test binary may have started.
 static HOMES: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 static HANDLER: Once = Once::new();
@@ -267,6 +333,7 @@ pub fn reap(home: &Path) {
         .args(["daemon", "stop"])
         .env("TOKNILA_HOME", home)
         .output();
+    lifelines().retain(|(h, _)| h != home);
     let Some(pid) = pid else { return };
     let until = Instant::now() + Duration::from_secs(30);
     while pid_alive(pid) && Instant::now() < until {
@@ -299,7 +366,7 @@ impl Drop for DaemonGuard {
 }
 
 #[cfg(unix)]
-fn pid_alive(pid: u32) -> bool {
+pub fn pid_alive(pid: u32) -> bool {
     Command::new("kill")
         .args(["-0", &pid.to_string()])
         .stderr(Stdio::null())
@@ -313,7 +380,7 @@ fn kill_pid(pid: u32) {
 }
 
 #[cfg(windows)]
-fn pid_alive(pid: u32) -> bool {
+pub fn pid_alive(pid: u32) -> bool {
     Command::new("tasklist")
         .args(["/FI", &format!("PID eq {pid}"), "/NH"])
         .output()

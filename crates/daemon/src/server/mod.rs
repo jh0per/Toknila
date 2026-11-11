@@ -21,7 +21,7 @@ mod logging;
 
 pub(crate) use auth::constant_time_eq;
 pub use auth::{AGENT_ROUTES, PLANNER_ROUTES, Principal};
-pub use lifecycle::{RunError, probe, run};
+pub use lifecycle::{RunError, exit_with_parent, probe, run};
 pub use logging::init_logging;
 
 /// Shared state of request handlers.

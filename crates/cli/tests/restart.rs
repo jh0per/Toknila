@@ -24,7 +24,7 @@ fn wait_until(tok: &Tok, what: &str, mut ok: impl FnMut() -> bool) {
 
 #[test]
 fn an_agent_killed_from_outside_is_terminated_and_its_replacement_sees_the_earlier_instruction() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
     tok.profile(
