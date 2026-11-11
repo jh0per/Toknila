@@ -392,6 +392,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pins a question on a region of a design of the planner's project. It shows on the mockup and
+         *     in the inbox until the person answers.
+         */
+        post: operations["planner_pin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/plan": {
         parameters: {
             query?: never;
@@ -541,6 +561,43 @@ export interface paths {
          *     `folder_error`); the deletion stands either way.
          */
         post: operations["delete_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/design-pins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The assistant's pins on the project's designs, oldest first, with the answers. */
+        get: operations["list_pins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/design-pins/{pin}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A person answers a pin (or changes the answer). The answer goes into the card's prompt under
+         *     `From the design`.
+         */
+        post: operations["answer_pin"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1911,6 +1968,27 @@ export interface components {
             design: string;
             region?: components["schemas"]["Region"] | null;
         };
+        /** @description A question of the assistant pinned on a region of a design. */
+        DesignPin: {
+            /** @description The person's answer; absent while the pin is open. */
+            answer?: string | null;
+            answered_at?: components["schemas"]["Timestamp"] | null;
+            card?: components["schemas"]["TicketKey"] | null;
+            created_at: components["schemas"]["Timestamp"];
+            design: components["schemas"]["DesignId"];
+            /** @description The design's name when the pin was made. */
+            design_name: string;
+            id: components["schemas"]["PinId"];
+            /**
+             * Format: int32
+             * @description The pin's number among the pins of its design, from 1; the marker shows it.
+             */
+            number: number;
+            project: components["schemas"]["ProjectId"];
+            region: components["schemas"]["Region"];
+            /** @description The question. */
+            text: string;
+        };
         /** @description A card's reference to a design of its project, with the part of the image that matters. */
         DesignRef: {
             design: components["schemas"]["DesignId"];
@@ -2088,6 +2166,8 @@ export interface components {
              *     closed pull request, a conflict); absent otherwise.
              */
             link?: string | null;
+            /** @description The pin to answer (`design_question` items). */
+            pin?: string | null;
             role?: components["schemas"]["AgentRole"] | null;
             /** @description Since when it waits; items are sorted by this, newest first. */
             since: components["schemas"]["Timestamp"];
@@ -2109,7 +2189,7 @@ export interface components {
          * @description What kind of thing waits on the person; the order is the order clients group them in.
          * @enum {string}
          */
-        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers";
+        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers" | "design_question";
         /**
          * @description Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
          *     worked, now handed over and marked delivered.
@@ -2268,6 +2348,17 @@ export interface components {
             body?: components["schemas"]["CommentBody"] | null;
             kind?: components["schemas"]["CommentKind"] | null;
             text?: string | null;
+        };
+        /** @description Body of `POST /v1/planner/pins`: a question the planner pins on a region of a design. */
+        NewDesignPin: {
+            /** @description The card it is about (id, key or title). */
+            card?: string | null;
+            /** @description The design: its name or id. */
+            design: string;
+            /** @description In whole percent of the image. */
+            region: components["schemas"]["Region"];
+            /** @description The question, at most 500 characters. */
+            text: string;
         };
         /** @description Body of `POST /v1/projects/{project}/designs/figma`. */
         NewFigmaDesign: {
@@ -2583,6 +2674,12 @@ export interface components {
          * @enum {string}
          */
         PhaseState: "empty" | "finished" | "active" | "waiting" | "idle";
+        /** @description What a person answers. */
+        PinAnswer: {
+            text: string;
+        };
+        /** @description Identifies a pin of the assistant on a design. */
+        PinId: string;
         /**
          * @description Where a card goes relative to another one.
          * @enum {string}
@@ -2638,6 +2735,8 @@ export interface components {
         /** @description `GET /v1/planner/plan`: the project and all of its chains. */
         PlanView: {
             chains: components["schemas"]["PlanChain"][];
+            /** @description The assistant's pins on the project's designs, with the person's answers. */
+            pins?: components["schemas"]["DesignPin"][];
             project: components["schemas"]["Project"];
         };
         /** @description A design as the planner sees it: its metadata and where its file is on this machine. */
@@ -4659,6 +4758,53 @@ export interface operations {
             };
         };
     };
+    planner_pin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDesignPin"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignPin"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     planner_plan: {
         parameters: {
             query?: never;
@@ -4995,6 +5141,80 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_pins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignPin"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    answer_pin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+                /** @description Pin id */
+                pin: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinAnswer"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignPin"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
