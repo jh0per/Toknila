@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.2.9"
+    "version": "0.2.10"
   },
   "servers": [
     {
@@ -1503,6 +1503,63 @@
         }
       }
     },
+    "/planner/pins": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Pins a question on a region of a design of the planner's project. It shows on the mockup and\nin the inbox until the person answers.",
+        "operationId": "planner_pin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewDesignPin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignPin"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/planner/plan": {
       "get": {
         "tags": [
@@ -1927,6 +1984,117 @@
             }
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/design-pins": {
+      "get": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "The assistant's pins on the project's designs, oldest first, with the answers.",
+        "operationId": "list_pins",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DesignPin"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/design-pins/{pin}/answer": {
+      "post": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "A person answers a pin (or changes the answer). The answer goes into the card's prompt under\n`From the design`.",
+        "operationId": "answer_pin",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pin",
+            "in": "path",
+            "description": "Pin id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignPin"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/json": {
                 "schema": {
@@ -6491,6 +6659,79 @@
           }
         }
       },
+      "DesignPin": {
+        "type": "object",
+        "description": "A question of the assistant pinned on a region of a design.",
+        "required": [
+          "id",
+          "project",
+          "design",
+          "design_name",
+          "number",
+          "region",
+          "text",
+          "created_at"
+        ],
+        "properties": {
+          "answer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The person's answer; absent while the pin is open."
+          },
+          "answered_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "card": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TicketKey",
+                "description": "The card the question is about, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "design": {
+            "$ref": "#/components/schemas/DesignId"
+          },
+          "design_name": {
+            "type": "string",
+            "description": "The design's name when the pin was made."
+          },
+          "id": {
+            "$ref": "#/components/schemas/PinId"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The pin's number among the pins of its design, from 1; the marker shows it.",
+            "minimum": 0
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "region": {
+            "$ref": "#/components/schemas/Region"
+          },
+          "text": {
+            "type": "string",
+            "description": "The question."
+          }
+        }
+      },
       "DesignRef": {
         "type": "object",
         "description": "A card's reference to a design of its project, with the part of the image that matters.",
@@ -6950,6 +7191,13 @@
             ],
             "description": "The card's pull request on GitHub, for a blocked card that has one (failed checks, a\nclosed pull request, a conflict); absent otherwise."
           },
+          "pin": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The pin to answer (`design_question` items)."
+          },
           "role": {
             "oneOf": [
               {
@@ -7004,7 +7252,8 @@
           "blocked",
           "review",
           "thread",
-          "leftovers"
+          "leftovers",
+          "design_question"
         ]
       },
       "InstructionClaim": {
@@ -7381,6 +7630,36 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "NewDesignPin": {
+        "type": "object",
+        "description": "Body of `POST /v1/planner/pins`: a question the planner pins on a region of a design.",
+        "required": [
+          "design",
+          "region",
+          "text"
+        ],
+        "properties": {
+          "card": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card it is about (id, key or title)."
+          },
+          "design": {
+            "type": "string",
+            "description": "The design: its name or id."
+          },
+          "region": {
+            "$ref": "#/components/schemas/Region",
+            "description": "In whole percent of the image."
+          },
+          "text": {
+            "type": "string",
+            "description": "The question, at most 500 characters."
           }
         }
       },
@@ -8269,6 +8548,22 @@
           "idle"
         ]
       },
+      "PinAnswer": {
+        "type": "object",
+        "description": "What a person answers.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "PinId": {
+        "type": "string",
+        "description": "Identifies a pin of the assistant on a design."
+      },
       "Place": {
         "type": "string",
         "description": "Where a card goes relative to another one.",
@@ -8437,6 +8732,13 @@
             "items": {
               "$ref": "#/components/schemas/PlanChain"
             }
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignPin"
+            },
+            "description": "The assistant's pins on the project's designs, with the person's answers."
           },
           "project": {
             "$ref": "#/components/schemas/Project"

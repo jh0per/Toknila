@@ -68,6 +68,7 @@ pub fn load_with<R: Reader + ?Sized>(
             });
         }
     }
+    data.pins = r.design_pins(project)?;
     data.tickets = tickets;
     Ok(compute(&data))
 }

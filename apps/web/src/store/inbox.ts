@@ -6,7 +6,7 @@ import type { Route } from "./route";
 import type { State } from "./state";
 
 /// Display order of the groups, the order of the kinds in core.
-export const KIND_ORDER: InboxKind[] = ["proposal", "question", "blocked", "review", "thread", "leftovers"];
+export const KIND_ORDER: InboxKind[] = ["proposal", "question", "blocked", "review", "thread", "leftovers", "design_question"];
 
 export const KIND_TITLE: Record<InboxKind, string> = {
   proposal: "Awaiting approval",
@@ -15,6 +15,7 @@ export const KIND_TITLE: Record<InboxKind, string> = {
   review: "Waiting for review",
   thread: "Threads to answer",
   leftovers: "Leftovers",
+  design_question: "Questions of the assistant",
 };
 
 export interface InboxGroup {
@@ -31,7 +32,7 @@ export function groupInbox(items: InboxItem[]): InboxGroup[] {
 
 /// A key that tells two items apart (a card may have several threads).
 export function itemKey(i: InboxItem): string {
-  return `${i.kind}:${i.ticket}:${i.thread ?? ""}`;
+  return `${i.kind}:${i.ticket}:${i.thread ?? ""}${i.pin ?? ""}`;
 }
 
 /// The route of the item's card, if the page knows its chain.

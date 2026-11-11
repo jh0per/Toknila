@@ -303,6 +303,13 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
             "suggest",
             json!({ "text": "x", "card": "DEMO-1", "action": "accept" }),
         ),
+        call(
+            25,
+            "design_question",
+            json!({ "design": "home.png", "region": { "x": 10, "y": 20, "w": 30, "h": 40 },
+                    "text": "Is the logo fixed?", "card": "DEMO-1" }),
+        ),
+        call(26, "show_plan", json!({})),
         // The owner's calls are not tools.
         call(16, "start", json!({ "card": "DEMO-1" })),
         call(17, "accept", json!({ "card": "DEMO-1" })),
@@ -337,6 +344,7 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         [
             "show_plan",
             "show_design",
+            "design_question",
             "new_chain",
             "add_card",
             "edit_card",
@@ -428,6 +436,20 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
     assert_eq!(one, designs[0]);
     assert_eq!(by_id(22)["result"]["isError"], true, "{}", by_id(22));
     assert!(text_of(by_id(22)).contains("nope.png"), "{}", by_id(22));
+    // design_question pins on the design; show_plan then lists the pin, open, with its place.
+    assert!(
+        text_of(by_id(25)).contains("pinned #1 on home.png"),
+        "{}",
+        text_of(by_id(25))
+    );
+    let after: Value = serde_json::from_str(&text_of(by_id(26))).expect("the plan is JSON");
+    assert_eq!(plan["pins"].as_array().map(Vec::len), Some(0), "{plan}");
+    let pins = after["pins"].as_array().expect("pins");
+    assert_eq!(pins.len(), 1, "{after}");
+    assert_eq!(pins[0]["text"], "Is the logo fixed?");
+    assert_eq!(pins[0]["card"], "DEMO-1");
+    assert_eq!(pins[0]["region"]["w"], 30);
+    assert_eq!(pins[0]["answer"], Value::Null);
     let mcp_chain = plan["chains"]
         .as_array()
         .expect("chains")

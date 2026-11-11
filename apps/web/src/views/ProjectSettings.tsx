@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Project } from "../api/types";
 import type { Intent } from "../store/msg";
 import { type ProjectForm, SECTION_LABEL, formOf, isDirty, patchOf } from "../store/projectForm";
+import { pinVersion } from "../store/pins";
 import { PROJECT_SECTIONS, type ProjectSection } from "../store/route";
 import { type State, activeProjects } from "../store/state";
 import { DesignsSection } from "./DesignsSection";
@@ -82,7 +83,7 @@ function Body({ project, state, dispatch, section }: Omit<Props, "project"> & { 
       {section === "plans" ? (
         <PlansSection project={project} state={state} dispatch={dispatch} />
       ) : section === "designs" ? (
-        <DesignsSection project={project} />
+        <DesignsSection project={project} pinSeq={pinVersion(state.events)} />
       ) : (
         <form
           className="project-form" noValidate data-testid="project-form"

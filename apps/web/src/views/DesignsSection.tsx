@@ -4,6 +4,7 @@ import { sendEmpty, uploadDesign } from "../api/designs";
 import type { Design, DesignList, Project } from "../api/types";
 import { dayText, fileUrl, kindLabel, placeholder, refusedFiles, sizeText } from "../store/designs";
 import { DesignViewer } from "./DesignViewer";
+import { usePins } from "./usePins";
 import { FigmaTokenBox } from "./FigmaTokenBox";
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -11,8 +12,13 @@ const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /// Designs: the project's library of images, pdfs and Figma frame links. Files are dropped on the
 /// section or picked; a Figma link is pasted. Each card shows a thumbnail with its name, kind and
 /// day, and renames, removes or opens large.
-export function DesignsSection({ project }: { project: Project }) {
+export function DesignsSection({ project, pinSeq = 0 }: {
+  project: Project;
+  /// The newest pin event of the journal: the pins are read again when it changes.
+  pinSeq?: number;
+}) {
   const base = `/projects/${project.key}/designs`;
+  const { pins, answer } = usePins(project.key, pinSeq);
   const [list, setList] = useState<DesignList | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -104,7 +110,12 @@ export function DesignsSection({ project }: { project: Project }) {
         </ul>
       )}
       <FigmaTokenBox project={project.key} saved={list?.figma_token ?? false} onChange={load} />
-      {open && <DesignViewer project={project.key} design={open} onClose={() => setOpen(undefined)} />}
+      {open && (
+        <DesignViewer
+          project={project.key} design={open} onClose={() => setOpen(undefined)}
+          pins={pins.filter((p) => p.design === open.id)} onAnswer={answer}
+        />
+      )}
     </div>
   );
 }

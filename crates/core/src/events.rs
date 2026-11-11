@@ -4,6 +4,7 @@
 
 use serde::Serialize;
 
+use crate::design::pin::DesignPin;
 use crate::question::{AnswerKind, QuestionKind};
 use crate::{
     Actor, AgentRole, ArtifactFormat, Chain, Comment, Edge, ProcessExit, Project, ProjectId,
@@ -172,6 +173,14 @@ pub enum DomainEvent {
         ticket: TicketKey,
         thread: Thread,
     },
+    /// The assistant pinned a question on a design.
+    DesignPinAsked {
+        pin: DesignPin,
+    },
+    /// A person answered a pin (or changed the answer).
+    DesignPinAnswered {
+        pin: DesignPin,
+    },
     /// The project's assistant asked the window to show a card. Only a window that looks at that
     /// project follows it; nothing in the plan changes.
     WindowShowCard {
@@ -274,6 +283,7 @@ impl DomainEvent {
             | Self::ThreadVersionPosted { .. }
             | Self::ThreadApproved { .. }
             | Self::ThreadReopened { .. } => "thread",
+            Self::DesignPinAsked { .. } | Self::DesignPinAnswered { .. } => "design_pin",
             Self::WindowShowCard { .. }
             | Self::WindowSuggest { .. }
             | Self::WindowSuggestionCleared { .. } => "window",
@@ -319,6 +329,7 @@ impl DomainEvent {
             | Self::ThreadReopened { thread, .. } => thread.id.to_string(),
             Self::ThreadMessagePosted { message, .. } => message.thread_id.to_string(),
             Self::ThreadVersionPosted { thread, .. } => thread.to_string(),
+            Self::DesignPinAsked { pin } | Self::DesignPinAnswered { pin } => pin.id.to_string(),
             Self::WindowShowCard { project, .. }
             | Self::WindowSuggest { project, .. }
             | Self::WindowSuggestionCleared { project, .. } => project.to_string(),
@@ -359,6 +370,8 @@ impl DomainEvent {
             Self::ThreadVersionPosted { .. } => "version_posted",
             Self::ThreadApproved { .. } => "approved",
             Self::ThreadReopened { .. } => "reopened",
+            Self::DesignPinAsked { .. } => "asked",
+            Self::DesignPinAnswered { .. } => "answered",
             Self::WindowShowCard { .. } => "show_card",
             Self::WindowSuggest { .. } => "suggest",
             Self::WindowSuggestionCleared { .. } => "suggestion_cleared",

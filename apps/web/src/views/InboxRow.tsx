@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { post } from "../api/http";
 import type { InboxItem, InboxKind, TicketDetail } from "../api/types";
+import { MAX_ANSWER, answerProblem } from "../store/pins";
 import { finishReport } from "../store/permissionReports";
 import { HandIn } from "./HandIn";
 import type { Intent } from "../store/msg";
@@ -20,6 +22,7 @@ const KIND_LINE: Record<InboxKind, string> = {
   review: "Ready for your review",
   thread: "A design thread has a new version",
   leftovers: "Subtasks were left open behind a finished card",
+  design_question: "The assistant asks about a design",
 };
 
 type Dispatch = (i: Intent) => void;
@@ -84,7 +87,38 @@ function Body({ item, route, open, dispatch, detail }: BodyProps & { route: Rout
         </div>
       );
     case "leftovers": return <Leftovers item={item} open={open} dispatch={dispatch} />;
+    case "design_question": return <DesignQuestion item={item} project={route?.name === "card" ? route.project : undefined} open={open} />;
   }
+}
+
+/// A pin of the assistant on a design: its question, the box that answers it in place, and Open
+/// card (the mockup with the pin). The row goes when the inbox is read again after the answer.
+function DesignQuestion({ item, project, open }: { item: InboxItem; project: string | undefined; open: React.ReactNode }) {
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | undefined>();
+  const send = async () => {
+    const problem = answerProblem(text);
+    if (problem) return setError(problem);
+    try {
+      await post(`/projects/${encodeURIComponent(project ?? "")}/design-pins/${item.pin}/answer`, { text: text.trim() });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <div className="row-body" data-testid="design-question">
+      <blockquote data-testid="question">{item.text}</blockquote>
+      <form className="compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+        <input
+          type="text" data-testid="inbox-pin-input" aria-label={`Answer to ${item.text}`} placeholder="Your answer"
+          maxLength={MAX_ANSWER} value={text} onChange={(e) => setText(e.target.value)}
+        />
+        <button className="btn primary" type="submit" data-testid="inbox-pin-send" disabled={!text.trim() || !project}>Answer</button>
+        {open}
+      </form>
+      {error && <span className="field-error" role="alert">{error}</span>}
+    </div>
+  );
 }
 
 function Proposal({ item, open, dispatch }: BodyProps) {

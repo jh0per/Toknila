@@ -86,5 +86,6 @@ export type Design = Schemas["Design"];
 export type DesignList = Schemas["DesignList"];
 export type Strays = Schemas["Strays"];
 export type StraysCleaned = Schemas["StraysCleaned"];
+export type DesignPin = Schemas["DesignPin"];
 export type VersionSuggestion = Schemas["VersionSuggestion"];
 export type Finish = Schemas["Finish"];

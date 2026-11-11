@@ -210,5 +210,7 @@ pub fn clean_token(raw: &str) -> Result<String, String> {
     Ok(t.to_owned())
 }
 
+pub mod pin;
+
 #[cfg(test)]
 mod tests;

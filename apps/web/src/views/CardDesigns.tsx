@@ -4,7 +4,9 @@ import type { Design, DesignList, Ticket, TicketDetail } from "../api/types";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import { type Ref, designOf, withRef } from "../store/designs";
+import { type Pin, pinVersion, pinsFor } from "../store/pins";
 import { type State, currentProject } from "../store/state";
+import { usePins } from "./usePins";
 import { DesignMockup } from "./DesignMockup";
 import { DesignPicker } from "./DesignPicker";
 
@@ -29,18 +31,19 @@ export function CardDesigns({ state, card, detail, dispatch }: {
       .catch(() => live && setLibrary([]));
     return () => { live = false; };
   }, [project, refs.length, canEdit]);
+  const { pins, answer } = usePins(project, pinVersion(state.events));
   if (!project || (refs.length === 0 && !canEdit)) return null;
   const save = (next: Ref[]) => dispatch({ type: "saveCard", key: card.key, patch: { designs: next } });
   return (
     <CardDesignsView
       project={project} library={library} refs={refs} canEdit={canEdit} busy={state.plan.busy}
-      error={planError(state.plan, "edit")} onChange={save}
+      error={planError(state.plan, "edit")} onChange={save} cardKey={card.key} pins={pins} onAnswer={answer}
     />
   );
 }
 
 /// [`CardDesigns`] with the library and the references given: what the page draws.
-export function CardDesignsView({ project, library, refs, canEdit, busy, error, onChange }: {
+export function CardDesignsView({ project, library, refs, canEdit, busy, error, onChange, cardKey, pins, onAnswer }: {
   project: string;
   /// `undefined` while the library loads.
   library: Design[] | undefined;
@@ -49,6 +52,10 @@ export function CardDesignsView({ project, library, refs, canEdit, busy, error, 
   busy: boolean;
   error?: string;
   onChange: (next: Ref[]) => void;
+  /// The card, and the assistant's pins of the project: the pins about this card show on its mockups.
+  cardKey?: string;
+  pins?: Pin[];
+  onAnswer?: (id: string, text: string) => Promise<void>;
 }) {
   /// The reference being picked: its index (past the end: a new one).
   const [picking, setPicking] = useState<number | undefined>();
@@ -65,7 +72,10 @@ export function CardDesignsView({ project, library, refs, canEdit, busy, error, 
       {library === undefined && refs.length > 0 && <p className="muted">Loading…</p>}
       {library !== undefined && refs.map((r, i) => (
         <div className="card-design" key={`${r.design}-${i}`} data-testid="card-design">
-          <DesignMockup project={project} design={designOf(library, r)} name={r.design} region={r.region} />
+          <DesignMockup
+            project={project} design={designOf(library, r)} name={r.design} region={r.region}
+            pins={cardKey ? pinsFor(pins ?? [], r.design, cardKey) : []} onAnswer={onAnswer}
+          />
           {canEdit && (
             <span className="design-actions">
               <button type="button" className="btn" data-testid="design-edit" onClick={() => setPicking(i)}>Change</button>

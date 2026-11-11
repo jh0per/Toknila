@@ -2,10 +2,11 @@
 
 use serde_json::Value;
 use toknila_app::{AppError, AppResult, Reader, UnitOfWork};
+use toknila_core::design::pin::DesignPin;
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
 use toknila_core::{
-    Actor, AgentRole, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship,
+    Actor, AgentRole, Chain, ChainId, Comment, PinId, Project, ProjectId, Release, ReleaseId, Ship,
     Subtask, Thread, ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey,
     Timestamp, suggestion::Suggestion,
 };
@@ -64,6 +65,8 @@ reader! {
     thread_messages(thread: ThreadId) -> Vec<ThreadMessage>;
     thread_versions(thread: ThreadId) -> Vec<ThreadVersion>;
     ship(ticket: TicketId) -> Option<Ship>;
+    design_pins(project: ProjectId) -> Vec<DesignPin>;
+    design_pin(id: PinId) -> Option<DesignPin>;
     suggestion(project: ProjectId) -> Option<Suggestion>;
     last_event_payload(entity: &str, entity_id: &str) -> Option<Value>;
     live_runners() -> Vec<(TicketId, AgentRole)>;
@@ -112,6 +115,10 @@ impl UnitOfWork for WriteTx<'_> {
 
     fn upsert_subtask(&mut self, subtask: &Subtask) -> AppResult<()> {
         Ok(self.repo().upsert_subtask(subtask)?)
+    }
+
+    fn upsert_design_pin(&mut self, pin: &DesignPin) -> AppResult<()> {
+        Ok(self.repo().upsert_design_pin(pin)?)
     }
 
     fn upsert_thread(&mut self, thread: &Thread) -> AppResult<()> {

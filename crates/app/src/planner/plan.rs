@@ -1,6 +1,7 @@
 //! What the planner reads: the whole plan of its project in one answer.
 
 use serde::{Deserialize, Serialize};
+use toknila_core::design::pin::DesignPin;
 use toknila_core::graph::{ChainSummary, ChainView};
 use toknila_core::{
     Chain, NodeRef, Project, ProjectId, Subtask, Thread, ThreadMessage, Ticket, Timestamp,
@@ -45,6 +46,9 @@ pub struct PlanChain {
 pub struct PlanView {
     pub project: Project,
     pub chains: Vec<PlanChain>,
+    /// The assistant's pins on the project's designs, with the person's answers.
+    #[serde(default)]
+    pub pins: Vec<DesignPin>,
 }
 
 fn chain_plan<R: Reader + ?Sized>(r: &R, view: ChainView, at: Timestamp) -> AppResult<PlanChain> {
@@ -94,5 +98,10 @@ pub fn plan<R: Reader + ?Sized>(r: &R, project: ProjectId, at: Timestamp) -> App
             chains.push(chain_plan(r, view, at)?);
         }
     }
-    Ok(PlanView { project, chains })
+    let pins = r.design_pins(project.id)?;
+    Ok(PlanView {
+        project,
+        chains,
+        pins,
+    })
 }

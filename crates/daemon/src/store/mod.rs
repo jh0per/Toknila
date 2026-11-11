@@ -11,6 +11,7 @@ mod commit;
 mod error;
 mod external;
 mod notes;
+mod pins;
 mod ports;
 mod projects;
 mod removal;

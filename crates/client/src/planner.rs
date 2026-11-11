@@ -2,9 +2,9 @@
 //! itself (a client with its run token) reads and edits the plan.
 
 use toknila_api_types::{
-    CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain, NewSuggestion,
-    NewThread, NewVersion, PlannerDesign, PlannerPlan, PlannerState, StartPlanner, TerminalSize,
-    ThreadDetail, TicketDetail,
+    CardEdit, ChainDetail, DesignPin, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain,
+    NewSuggestion, NewThread, NewVersion, PlannerDesign, PlannerPlan, PlannerState, StartPlanner,
+    TerminalSize, ThreadDetail, TicketDetail,
 };
 use toknila_core::RunId;
 use toknila_core::suggestion::Suggestion;
@@ -91,6 +91,26 @@ impl Client {
     /// `GET /planner/designs/{design}`.
     pub fn planner_design(&self, design: &str) -> ClientResult<PlannerDesign> {
         self.call("GET", &format!("/planner/designs/{}", enc(design)), NO_BODY)
+    }
+
+    /// `POST /planner/pins`.
+    pub fn planner_pin(&self, pin: &toknila_api_types::NewDesignPin) -> ClientResult<DesignPin> {
+        self.call("POST", "/planner/pins", Some(pin))
+    }
+
+    /// `GET /projects/{project}/design-pins`.
+    pub fn design_pins(&self, project: &str) -> ClientResult<Vec<DesignPin>> {
+        let path = format!("/projects/{}/design-pins", enc(project));
+        self.call("GET", &path, NO_BODY)
+    }
+
+    /// `POST /projects/{project}/design-pins/{pin}/answer`.
+    pub fn answer_pin(&self, project: &str, pin: &str, text: &str) -> ClientResult<DesignPin> {
+        let path = format!("/projects/{}/design-pins/{}/answer", enc(project), enc(pin));
+        let body = toknila_api_types::PinAnswer {
+            text: text.to_owned(),
+        };
+        self.call("POST", &path, Some(&body))
     }
 
     /// `POST /planner/chains`.

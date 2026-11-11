@@ -174,6 +174,11 @@ fn e2e_web() -> Result<(), String> {
         &["e2e/discuss.mjs", &exe("tok"), &exe("fake-agent")],
         &web,
     )?;
+    run(
+        "node",
+        &["e2e/design-pins.mjs", &exe("tok"), &exe("fake-agent")],
+        &web,
+    )?;
     eprintln!("xtask e2e-web: PASS");
     Ok(())
 }

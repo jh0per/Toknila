@@ -352,6 +352,8 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   }
   if (e.entity === "project") return [next, [{ type: "loadProjects" }, { type: "loadAgents" }]];
   if (e.entity === "thread") return [next, threadEventEffects(s, ticketOfEvent(e))];
+  // A pin of the assistant: the inbox lists the open ones; the mockups read the pins themselves.
+  if (e.entity === "design_pin") return [next, [{ type: "loadInbox" }]];
   const chain = chainOfEvent(s, e);
   if (!chain) return [next, [{ type: "loadAll" }]];
   const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadInbox" }, { type: "loadAgents" }];
