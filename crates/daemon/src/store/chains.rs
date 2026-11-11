@@ -6,7 +6,7 @@ use toknila_core::{Chain, ChainId, ProjectId};
 use super::StoreError;
 use super::codec::{Repo, opt_enum, opt_enum_from, parse};
 
-/// A chain row: id, project, name, goal, autostart, review mode, reviewer and source.
+/// A chain row: id, project, name, goal, autostart, review mode, reviewer, source and version.
 type ChainRow = (
     String,
     String,
@@ -16,9 +16,11 @@ type ChainRow = (
     Option<String>,
     Option<String>,
     Option<String>,
+    Option<String>,
 );
 
-const CHAIN_COLS: &str = "id, project_id, name, goal, autostart, review_mode, reviewer, source";
+const CHAIN_COLS: &str =
+    "id, project_id, name, goal, autostart, review_mode, reviewer, source, version";
 
 impl Repo<'_> {
     /// Reserves the next ticket number of a project.
@@ -35,7 +37,9 @@ impl Repo<'_> {
 
     pub fn insert_chain(&self, c: &Chain) -> Result<(), StoreError> {
         self.conn.execute(
-            &format!("INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"),
+            &format!(
+                "INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+            ),
             params![
                 c.id.to_string(),
                 c.project_id.to_string(),
@@ -44,7 +48,8 @@ impl Repo<'_> {
                 c.autostart,
                 opt_enum(&c.review_mode)?,
                 c.reviewer,
-                c.source
+                c.source,
+                c.version
             ],
         )?;
         Ok(())
@@ -52,14 +57,15 @@ impl Repo<'_> {
 
     pub fn update_chain(&self, c: &Chain) -> Result<(), StoreError> {
         self.conn.execute(
-            "UPDATE chains SET name = ?2, goal = ?3, autostart = ?4, review_mode = ?5, reviewer = ?6 WHERE id = ?1",
+            "UPDATE chains SET name = ?2, goal = ?3, autostart = ?4, review_mode = ?5, reviewer = ?6, version = ?7 WHERE id = ?1",
             params![
                 c.id.to_string(),
                 c.name,
                 c.goal,
                 c.autostart,
                 opt_enum(&c.review_mode)?,
-                c.reviewer
+                c.reviewer,
+                c.version
             ],
         )?;
         Ok(())
@@ -75,6 +81,7 @@ impl Repo<'_> {
             r.get(5)?,
             r.get(6)?,
             r.get(7)?,
+            r.get(8)?,
         ))
     }
 
@@ -88,6 +95,7 @@ impl Repo<'_> {
             review_mode: opt_enum_from(t.5)?,
             reviewer: t.6,
             source: t.7,
+            version: t.8,
         })
     }
 

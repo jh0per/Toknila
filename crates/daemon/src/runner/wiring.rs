@@ -200,6 +200,11 @@ fn brief_of_key<'a>(
         design_first: cx.brief.design_first,
         has_designs: !cx.brief.designs.is_empty(),
         discussion: &cx.brief.discussion,
+        epic: cx
+            .brief
+            .epic
+            .as_ref()
+            .map(|(name, goal)| (name.as_str(), goal.as_str())),
     }
 }
 

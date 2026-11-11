@@ -19,7 +19,7 @@ mod tests;
 mod tests_return;
 mod waiting;
 
-pub use planner::{ProjectFacts, generate_planner};
+pub use planner::{Epic, ProjectFacts, generate_planner};
 pub use waiting::{Returned, Waiting, returned_by, short_commit, waiting};
 
 use crate::{Comment, CommentKind, template};
@@ -55,6 +55,9 @@ pub struct RunBrief<'a> {
     /// What the person and the project's assistant said about this card
     /// ([`crate::discussion::transcript`]), oldest first.
     pub discussion: &'a [String],
+    /// The chain the card belongs to, as its epic: the chain's name and its goal, which is what
+    /// every card of the chain works toward. `None` or an empty goal says nothing.
+    pub epic: Option<(&'a str, &'a str)>,
 }
 
 /// The section that carries the discussion of the card with the assistant; empty when there is
@@ -73,6 +76,18 @@ fn discussion_section(brief: &RunBrief<'_>) -> String {
         out.push_str(&format!("- {line}\n"));
     }
     out
+}
+
+/// The section of the instructions file that names the epic (the chain's goal); empty without one.
+fn epic_section(brief: &RunBrief<'_>) -> String {
+    match brief.epic {
+        Some((name, goal)) if !goal.trim().is_empty() => format!(
+            "\n## Epic: {name}\n\nThis card is a task of the chain {name}. The chain's goal is \
+             the purpose of every card in it; keep the work toward it:\n\n{}\n",
+            goal.trim()
+        ),
+        _ => String::new(),
+    }
 }
 
 /// A design a card references, as the instructions name it: the file the agent may read and the
@@ -267,6 +282,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
+    out.push_str(&epic_section(brief));
     out.push_str(&designs_section(brief));
     out.push_str(&design_section(brief));
     out.push_str(&discussion_section(brief));

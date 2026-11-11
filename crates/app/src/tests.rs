@@ -21,6 +21,7 @@ use crate::{
 mod checks;
 mod deletion;
 mod discussion;
+mod epic;
 mod import_done;
 mod leftovers;
 mod merges;
@@ -99,6 +100,7 @@ impl Mem {
             review_mode: None,
             reviewer: None,
             source: None,
+            version: None,
         };
         let now = Timestamp(1_000);
         let tickets: Vec<Ticket> = ["A", "B"]

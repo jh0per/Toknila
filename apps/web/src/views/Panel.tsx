@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useRef } from "react";
+import { epicPanel } from "../store/epic";
 import type { Intent } from "../store/msg";
 import { type Tab, visibleTabs } from "../store/route";
 import { statusText } from "../store/groups";
@@ -7,6 +8,7 @@ import { type State, currentCard, currentProject } from "../store/state";
 import { ActionBar } from "./ActionBar";
 import { ChatTab } from "./ChatTab";
 import { Details } from "./Details";
+import { EpicPanel } from "./EpicPanel";
 import { EventsTab } from "./EventsTab";
 import { TerminalTab } from "./TerminalTab";
 import { ThreadsTab } from "./ThreadsTab";
@@ -22,6 +24,12 @@ const PR_PLACEHOLDER = "The pull request of this card, with its checks and revie
 export function Panel({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const card = currentCard(state);
   const buttons = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+  const epic = epicPanel(state);
+  const epicChain = epic && state.chains[epic.chain];
+  // The Start and Finish nodes open their own panel; it gives way to a card.
+  if (!card && epic && epicChain) {
+    return <EpicPanel chain={epicChain} kind={epic.kind} project={currentProject(state)?.key ?? ""} state={state} dispatch={dispatch} />;
+  }
   if (!card) {
     return <section className="panel empty" data-testid="panel"><p className="muted">Select a card to see it here.</p></section>;
   }

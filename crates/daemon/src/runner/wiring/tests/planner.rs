@@ -20,6 +20,11 @@ fn planner_rig() -> Rig {
         merge_method: MergeMethod::Squash,
         check_command: Some("cargo xtask verify".to_owned()),
         base_behind: None,
+        epics: vec![toknila_core::instructions::Epic {
+            chain: "checkout".to_owned(),
+            version: Some("0.3.0".to_owned()),
+            goal: "Pay with saved cards.".to_owned(),
+        }],
     });
     rig
 }
@@ -69,6 +74,10 @@ fn the_planner_reads_its_instructions_from_its_own_folder() {
     assert!(text.contains("pull request against `develop`"));
     assert!(text.contains("`cargo xtask verify`"));
     assert!(text.contains("`show_plan`"));
+    assert!(
+        text.contains("### checkout (v0.3.0)\n\nPay with saved cards."),
+        "the planner reads each epic's goal: {text}"
+    );
     assert!(w.args.contains(&path.display().to_string()));
     // The worker's and the reviewer's folders are untouched.
     assert!(!path.to_string_lossy().contains("worker"));
@@ -167,10 +176,10 @@ fn the_planner_may_read_each_design_file_and_nothing_else_outside_the_repository
     // Everything else of the data home stays denied, and so does the rest of the designs folder;
     // the design files are not denied.
     let deny = strings(&s["permissions"]["deny"]);
+    // Spelled as the rules are (a Windows drive reads `//c/...`), not as the raw path.
     let denied = |p: &std::path::Path| {
-        deny.contains(&format!(
-            "Read(/{})",
-            p.display().to_string().replace('\\', "/")
+        deny.contains(&toknila_core::private::read_allow_rule(
+            &p.display().to_string(),
         ))
     };
     let dir = rig.dir.path();

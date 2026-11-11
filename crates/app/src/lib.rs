@@ -9,6 +9,7 @@ pub mod chain;
 pub mod chains;
 pub mod checks;
 pub mod discussion;
+pub(crate) mod epic;
 pub mod error;
 pub mod external;
 pub mod inbox;

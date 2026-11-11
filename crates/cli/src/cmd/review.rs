@@ -63,7 +63,7 @@ pub(super) fn run(
             let settings = ChainSettings {
                 review_mode,
                 reviewer,
-                autostart: None,
+                ..ChainSettings::default()
             };
             emit(
                 json_out,

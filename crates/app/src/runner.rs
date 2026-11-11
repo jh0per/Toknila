@@ -91,6 +91,8 @@ pub struct RunBrief {
     pub project: Option<toknila_core::instructions::ProjectFacts>,
     /// The absolute paths of the design files a planner may read (a planner only).
     pub designs: Vec<std::path::PathBuf>,
+    /// The card's chain as its epic: the chain's name and goal (a card's agent only).
+    pub epic: Option<(String, String)>,
 }
 
 /// A runner now works for the ticket.

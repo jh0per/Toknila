@@ -56,6 +56,7 @@ impl Plan {
             review_mode: self.chain.review_mode,
             reviewer: None,
             source: None,
+            version: None,
         };
         let tickets: Vec<Ticket> = self
             .tickets
@@ -102,13 +103,14 @@ impl Plan {
                 dropped_designs: p.unknown_designs(library),
             })
             .collect();
-        let view = ChainView {
+        let mut view = ChainView {
             chain,
             tickets,
             releases,
             edges,
             release_tickets: vec![],
         };
+        view.unify_end_release(self.chain.version.as_deref());
         (view, subtasks)
     }
 }

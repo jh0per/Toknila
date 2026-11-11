@@ -53,7 +53,9 @@ export function bookendLines(nodes: string[], edges: LaidEdge[], end: string): L
   const hasAfter = new Set(edges.map((e) => e.from));
   const lines: Line[] = edges.map((e) => ({ ...e, implicit: false }));
   const inner = nodes.filter((k) => k !== end);
-  for (const k of nodes) if (!hasBefore.has(k)) lines.push({ from: START, to: k, implicit: true });
+  // The end release has nothing before it until its cards are wired to it: Start reaches it only
+  // when it is the chain's only node.
+  for (const k of nodes) if (!hasBefore.has(k) && (k !== end || inner.length === 0)) lines.push({ from: START, to: k, implicit: true });
   for (const k of inner) if (!hasAfter.has(k)) lines.push({ from: k, to: end, implicit: true });
   if (inner.length === 0 && !nodes.includes(end)) lines.push({ from: START, to: end, implicit: true });
   return lines;

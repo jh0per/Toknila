@@ -332,3 +332,78 @@ fn designs_are_read_by_name_resolved_exported_by_name_and_unknown_ones_dropped()
     let bad = WITH_DESIGNS.replace("w = 40", "w = 90");
     assert!(parse(&bad).is_err());
 }
+
+const TWO_CARDS: &str = r#"
+[chain]
+name = "epic"
+goal = "Ship it"
+version = "v0.3.0"
+
+[[ticket]]
+id = "A"
+
+[[ticket]]
+id = "B"
+after = ["A"]
+"#;
+
+#[test]
+fn a_chain_version_makes_an_end_release_that_waits_for_the_last_card() {
+    let plan = parse(TWO_CARDS).expect("parses");
+    assert_eq!(plan.chain.version.as_deref(), Some("0.3.0"), "no leading v");
+    let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
+    assert_eq!(view.chain.version.as_deref(), Some("0.3.0"));
+    assert_eq!(view.releases.len(), 1);
+    assert_eq!(view.releases[0].version, "0.3.0");
+    assert_eq!(
+        shape(&view),
+        [
+            ("DEMO-1".to_owned(), "DEMO-2".to_owned(), EdgeKind::Normal),
+            (
+                "DEMO-2".to_owned(),
+                "release 0.3.0".to_owned(),
+                EdgeKind::Normal
+            ),
+        ]
+    );
+}
+
+#[test]
+fn an_explicit_end_release_is_kept_and_gives_the_chain_its_version() {
+    let text =
+        format!("{TWO_CARDS}\n[[release]]\nid = \"R\"\nversion = \"1.0.0\"\nafter = [\"B\"]\n");
+    let (view, _) =
+        parse(&text)
+            .expect("parses")
+            .instantiate(ProjectId::new(), Timestamp(0), keys());
+    assert_eq!(view.releases.len(), 1, "no second release");
+    assert_eq!(view.chain.version.as_deref(), Some("1.0.0"));
+}
+
+#[test]
+fn a_chain_without_a_version_gets_no_release_and_a_bad_version_is_refused() {
+    let plain = TWO_CARDS.replace("version = \"v0.3.0\"\n", "");
+    let (view, _) =
+        parse(&plain)
+            .expect("parses")
+            .instantiate(ProjectId::new(), Timestamp(0), keys());
+    assert_eq!((view.chain.version, view.releases.len()), (None, 0));
+    let e = err(&TWO_CARDS.replace("v0.3.0", "soon"));
+    assert_eq!(e.line, 5, "{e}");
+    assert!(e.message.contains("soon"), "{e}");
+}
+
+#[test]
+fn the_version_is_written_to_the_file_and_read_back() {
+    let (view, lists) =
+        parse(TWO_CARDS)
+            .expect("parses")
+            .instantiate(ProjectId::new(), Timestamp(0), keys());
+    let text = export(&view, &texts(lists));
+    assert!(text.contains("version = \"0.3.0\""), "{text}");
+    let (again, _) = parse(&text)
+        .unwrap_or_else(|e| panic!("{e}\n{text}"))
+        .instantiate(ProjectId::new(), Timestamp(0), keys());
+    assert_eq!(again.chain.version.as_deref(), Some("0.3.0"));
+    assert_eq!(again.releases.len(), 1);
+}

@@ -175,6 +175,31 @@ pub struct NextRelease {
     pub state: ReleaseState,
 }
 
+/// Where a chain's release stands: the Finish node's state.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinishState {
+    /// A card is still open.
+    Planned,
+    /// Every card is in the work branch: the Release button is offered.
+    Ready,
+    Released,
+}
+
+/// The chain's end release as its Finish node shows it: `Release v0.3.0`, its state, and, once
+/// released, the date and the tag.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Finish {
+    pub version: String,
+    pub state: FinishState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub released_at: Option<Timestamp>,
+}
+
 /// What a product person sees at a glance.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -194,6 +219,12 @@ pub struct ChainSummary {
     /// Every card of the plan is in the work branch and one of them is not released yet: the
     /// chain's end node offers Release.
     pub releasable: bool,
+    /// The chain's version (its end release's, else its own); none for a chain without one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// The Finish node: the release of the version and its state; none without a version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finish: Option<Finish>,
 }
 
 mod journal;

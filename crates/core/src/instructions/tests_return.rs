@@ -31,6 +31,7 @@ fn brief(acceptance: &[String]) -> RunBrief<'_> {
         designs: &[],
         has_designs: false,
         discussion: &[],
+        epic: None,
     }
 }
 

@@ -89,6 +89,7 @@ fn chain_and_edges_roundtrip() {
         review_mode: None,
         reviewer: None,
         source: None,
+        version: None,
     };
     roundtrip(&chain);
     for kind in [EdgeKind::Normal, EdgeKind::AfterRelease] {

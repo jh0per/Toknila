@@ -2597,6 +2597,46 @@
         }
       }
     },
+    "/projects/{project}/next-version": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "The version a new chain of the project suggests: the next patch of the repository's newest\ntag, or `0.1.0` when it has none or the project has no repository.",
+        "operationId": "next_version",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSuggestion"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}/planner": {
       "get": {
         "tags": [
@@ -5783,6 +5823,13 @@
               "null"
             ],
             "description": "The spec folder or chain file the chain was imported from, as an absolute path; `null`\nfor a chain made in Toknila or imported from pasted text."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The version the chain releases, such as `0.3.0`: the epic's release. Its end release\ncarries the same version; none for a chain that was made without one."
           }
         }
       },
@@ -5938,6 +5985,20 @@
             ],
             "description": "Whether the chain starts its ready cards by itself. Turning it on starts the ready cards\nthat have a free slot, so it is a person's act; the planner cannot change a chain's graph\nwhile it is on."
           },
+          "goal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The epic's goal, markdown: what every card of the chain works toward."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The epic's name; unique in the project."
+          },
           "review_mode": {
             "oneOf": [
               {
@@ -5954,6 +6015,13 @@
               "null"
             ],
             "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The version the chain releases; refused once its release was cut."
           }
         }
       },
@@ -5986,6 +6054,17 @@
             "type": "integer",
             "description": "Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`.",
             "minimum": 0
+          },
+          "finish": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Finish",
+                "description": "The Finish node: the release of the version and its state; none without a version."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "finished_at": {
             "oneOf": [
@@ -6037,6 +6116,13 @@
             "type": "integer",
             "description": "Tickets in the plan: wildcard cards count only once approved.",
             "minimum": 0
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The chain's version (its end release's, else its own); none for a chain without one."
           }
         }
       },
@@ -6575,6 +6661,47 @@
             "type": "string"
           }
         }
+      },
+      "Finish": {
+        "type": "object",
+        "description": "The chain's end release as its Finish node shows it: `Release v0.3.0`, its state, and, once\nreleased, the date and the tag.",
+        "required": [
+          "version",
+          "state"
+        ],
+        "properties": {
+          "released_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/FinishState"
+          },
+          "tag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "FinishState": {
+        "type": "string",
+        "description": "Where a chain's release stands: the Finish node's state.",
+        "enum": [
+          "planned",
+          "ready",
+          "released"
+        ]
       },
       "FolderFate": {
         "type": "string",
@@ -7214,6 +7341,13 @@
               "null"
             ],
             "description": "Reviewer agent profile for the chain's tickets."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The version the chain releases (`0.3.0`); its end release is made with it. Optional."
           }
         }
       },
@@ -10880,6 +11014,26 @@
           "approve",
           "request_changes"
         ]
+      },
+      "VersionSuggestion": {
+        "type": "object",
+        "description": "Answer of `GET /v1/projects/{project}/next-version`: the version a new chain suggests.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "last_tag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The newest tag of the repository, if it has one."
+          },
+          "version": {
+            "type": "string",
+            "description": "The next patch of the newest tag, or `0.1.0` when the repository has none."
+          }
+        }
       },
       "WaitingReason": {
         "oneOf": [

@@ -26,6 +26,7 @@ impl World {
             review_mode: None,
             reviewer: None,
             source: None,
+            version: None,
         };
         self.chains.push(ChainView {
             chain,

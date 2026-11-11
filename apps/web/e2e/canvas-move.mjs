@@ -78,7 +78,7 @@ try {
   // Start and the end of the diagram.
   const start = page.locator("[data-testid=start-node]");
   const end = page.locator("[data-testid=end-node]");
-  await expectText(start, "Start", "the diagram begins with a Start node");
+  await expectText(start, "flow", "the diagram begins with the epic: the chain's name");
   await expectText(start, "Make the thing work", "the Start node shows the chain's goal");
   await expectText(end, "Finish", "a chain without a release ends with a Finish node");
   const [s, a, f] = [await start.boundingBox(), await card("MOV-1").boundingBox(), await end.boundingBox()];

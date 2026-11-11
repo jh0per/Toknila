@@ -120,3 +120,25 @@ a.node.moving { z-index: 6; cursor: grabbing; box-shadow: 0 6px 18px color-mix(i
 .item.dim { opacity: 0.6; }
 .finished-group > .group-toggle { width: 100%; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
 .finished-group ul { list-style: none; margin: 0; padding: 0; }
+
+/* The Start node is the chain's epic: the name, then the goal as markdown, a few lines of it. */
+.node.bookend.epic { cursor: pointer; align-items: flex-start; text-align: left; overflow: hidden; }
+.node.bookend.epic .key { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node.bookend.epic .goal { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; }
+.node.bookend.epic .md p, .node.bookend.epic .md ul { margin: 0 0 2px; }
+.node.bookend.epic .md ul { padding-left: 14px; }
+.node.bookend.epic .more-btn { font-size: 11px; padding: 0; }
+.node.bookend.epic.more { height: auto !important; min-height: 0; z-index: 4; background: var(--surface); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+.node.bookend.epic.more .goal { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.node.bookend.sel, .node.bookend:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 1px; }
+.node.bookend.finish { cursor: pointer; }
+.finish-state { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+.finish-state.s-ready { color: var(--ok, #2a8a4a); }
+.finish-state.s-released { color: var(--ok, #2a8a4a); }
+.ver { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.crumb .ver { align-self: center; }
+.item .ver { margin-left: 4px; }
+.epic-form { padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); max-width: 640px; }
+.epic-form textarea { width: 100%; }
+.epic-form .row-actions { display: flex; gap: var(--s2); }
+.epic-preview { border: 1px solid var(--line); border-radius: 4px; padding: var(--s2); min-height: 6em; }
