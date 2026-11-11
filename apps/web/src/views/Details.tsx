@@ -2,6 +2,7 @@ import type { Ticket } from "../api/types";
 import type { Intent } from "../store/msg";
 import { type State, currentChain, currentProject } from "../store/state";
 import { ActionBar } from "./ActionBar";
+import { CardDesigns } from "./CardDesigns";
 import { CardPlan } from "./CardPlan";
 import { Comments } from "./Comments";
 import { DependsOn } from "./DependsOn";
@@ -33,6 +34,7 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
       )}
       <DetailsMeta card={card} />
       <CardPlan state={state} card={card} detail={detail} chain={chain} dispatch={dispatch} />
+      <CardDesigns state={state} card={card} detail={detail} dispatch={dispatch} />
       <div className="cols">
         <section>
           <h4>Description</h4>

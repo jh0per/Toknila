@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::design::DesignRef;
+
 use super::{
     Actor, ChainId, NodeRef, PullRequest, Review, ReviewMode, StatusReason, SubtaskId, TicketId,
     TicketKey, TicketStatus, Timestamp,
@@ -67,6 +69,10 @@ pub struct Ticket {
     /// text. Only the window reads it: it is not in chain files.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<Size>,
+    /// The designs of the project this card is about, with the part of each that matters; the
+    /// first one is the card's thumbnail on the diagram.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub designs: Vec<DesignRef>,
 }
 
 /// The width and height of a card on a chain's canvas, in whole canvas pixels.
@@ -147,6 +153,7 @@ pub struct TicketDraft {
     pub reviewer: Option<String>,
     pub needs_secrets: bool,
     pub design_first: bool,
+    pub designs: Vec<DesignRef>,
 }
 
 fn is_false(v: &bool) -> bool {
@@ -187,6 +194,7 @@ impl Ticket {
             review: Review::default(),
             pos: None,
             size: None,
+            designs: draft.designs,
         }
     }
 
@@ -230,6 +238,10 @@ pub struct TicketPatch {
     pub reviewer: Option<String>,
     pub needs_secrets: Option<bool>,
     pub design_first: Option<bool>,
+    /// The card's designs, replacing the whole list (an empty list clears it); left out to keep
+    /// them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub designs: Option<Vec<DesignRef>>,
     /// Where the card sits on the canvas: a place, `null` to hand it back to the automatic
     /// layout, left out to keep it.
     #[serde(
@@ -293,6 +305,9 @@ impl TicketPatch {
         }
         if let Some(v) = self.design_first {
             t.design_first = v;
+        }
+        if let Some(v) = self.designs {
+            t.designs = v;
         }
         if let Some(v) = self.pos {
             t.pos = v;

@@ -256,7 +256,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
               const route = { name: "card" as const, project: projectKey, chain: chain.chain.name, key: t.key };
               return (
                 <TicketNode
-                  key={n.key} ticket={t} layout={layout} href={hrefOf(route)} style={style} selected={sel === t.key} moving={moving?.id === t.id} over={over}
+                  key={n.key} ticket={t} projectKey={projectKey} layout={layout} href={hrefOf(route)} style={style} selected={sel === t.key} moving={moving?.id === t.id} over={over}
                   linking={Boolean(linking) && n.key !== linking} detail={state.details[t.key]}
                   usage={chain.usage?.[t.key]} queued={queuePosition(state, t.id)} defaultProfile={project?.default_profile}
                   onHover={(on) => setHover(on ? n.key : undefined)}

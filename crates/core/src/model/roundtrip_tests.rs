@@ -40,6 +40,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         branch: None,
         needs_secrets: true,
         design_first: true,
+        designs: Vec::new(),
         tokens_used: 12_345,
         wildcard: None,
         done_out_of_order: None,

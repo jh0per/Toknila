@@ -219,6 +219,17 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         })
         .expect("token");
 
+    // A design of the project, kept the way the owner's upload keeps it.
+    let png: &[u8] = &[
+        0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D, b'I', b'H', b'D', b'R',
+    ];
+    let info = tok.info();
+    let url = format!("{}/v1/projects/DEMO/designs?name=home.png", info.base_url());
+    ureq::post(&url)
+        .set("Authorization", &format!("Bearer {}", info.token))
+        .send_bytes(png)
+        .expect("upload a design");
+
     let mut lines = vec![
         json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} }),
         json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }),
@@ -284,9 +295,11 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         call(15, "show_plan", json!({})),
         call(19, "show_card", json!({ "card": "DEMO-2" })),
         call(20, "show_card", json!({ "card": "DEMO-99" })),
-        call(21, "suggest", json!({ "text": "Nothing waits for you" })),
+        call(21, "show_design", json!({ "design": "home.png" })),
+        call(22, "show_design", json!({ "design": "nope.png" })),
+        call(23, "suggest", json!({ "text": "Nothing waits for you" })),
         call(
-            22,
+            24,
             "suggest",
             json!({ "text": "x", "card": "DEMO-1", "action": "accept" }),
         ),
@@ -323,6 +336,7 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         names,
         [
             "show_plan",
+            "show_design",
             "new_chain",
             "add_card",
             "edit_card",
@@ -375,14 +389,14 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
     );
     assert_eq!(by_id(20)["result"]["isError"], true);
     assert_eq!(
-        by_id(21)["result"]["isError"],
+        by_id(23)["result"]["isError"],
         false,
         "{}",
-        text_of(by_id(21))
+        text_of(by_id(23))
     );
-    assert_eq!(text_of(by_id(21)), "next step kept");
+    assert_eq!(text_of(by_id(23)), "next step kept");
     assert_eq!(
-        by_id(22)["result"]["isError"],
+        by_id(24)["result"]["isError"],
         true,
         "DEMO-1 is not in review"
     );
@@ -403,6 +417,17 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
 
     let plan: Value = serde_json::from_str(&text_of(by_id(15))).expect("the plan is JSON");
     assert_eq!(plan["project"]["key"], "DEMO");
+    // show_plan lists the design with the path of its file, and show_design answers the same.
+    let designs = plan["designs"].as_array().expect("designs");
+    assert_eq!(designs.len(), 1, "{plan}");
+    let path = designs[0]["path"].as_str().expect("path");
+    assert!(std::path::Path::new(path).is_file(), "{path}");
+    assert!(path.starts_with(&*tok.home.to_string_lossy()), "{path}");
+    assert_eq!(designs[0]["name"], "home.png");
+    let one: Value = serde_json::from_str(&text_of(by_id(21))).expect("the design is JSON");
+    assert_eq!(one, designs[0]);
+    assert_eq!(by_id(22)["result"]["isError"], true, "{}", by_id(22));
+    assert!(text_of(by_id(22)).contains("nope.png"), "{}", by_id(22));
     let mcp_chain = plan["chains"]
         .as_array()
         .expect("chains")

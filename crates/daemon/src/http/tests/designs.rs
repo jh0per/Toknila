@@ -16,7 +16,12 @@ use crate::designs::figma::TEST_API;
 use crate::designs::tests::PNG;
 
 /// A request with a raw body; the answer's status, content type and bytes.
-async fn raw(api: &Api, method: Method, uri: &str, body: &[u8]) -> (StatusCode, String, Vec<u8>) {
+pub(super) async fn raw(
+    api: &Api,
+    method: Method,
+    uri: &str,
+    body: &[u8],
+) -> (StatusCode, String, Vec<u8>) {
     let req = Request::builder()
         .method(method)
         .uri(uri)

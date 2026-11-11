@@ -12,9 +12,15 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
     vec![
         tool(
             "show_plan",
-            "Read the whole plan of the project: every chain with its cards in dependency order (the order is the priority), each card's status, prompt, acceptance, subtasks, what it waits for, threads, review results and pull request state.",
+            "Read the whole plan of the project: every chain with its cards in dependency order (the order is the priority), each card's status, prompt, acceptance, subtasks, what it waits for, threads, review results and pull request state; and `designs`, the project's designs with the path of each file you may Read.",
             json!({}),
             &[],
+        ),
+        tool(
+            "show_design",
+            "Read one design of the project: its name, kind, media type, size and the path of its file, which you may Read. Name the design by its id or its name (see `designs` in show_plan).",
+            json!({ "design": text("The design: its id or its name") }),
+            &["design"],
         ),
         tool(
             "new_chain",
@@ -33,6 +39,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "after": list_of_text("Cards (keys) the new card waits for; empty: the end of the chain"),
                 "subtasks": list_of_text("Checklist items"),
                 "design_first": { "type": "boolean", "description": "True for a card that changes what the person sees (screens, flows): its agent then shows a design for approval before any code" },
+                "designs": designs_param("The project's designs the card is about; the first is the card's thumbnail"),
             }),
             &["chain", "title"],
         ),
@@ -45,6 +52,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "prompt": text("New prompt"),
                 "acceptance": list_of_text("The new acceptance list; it replaces the old one"),
                 "design_first": { "type": "boolean", "description": "Whether the agent shows a design for approval before any code" },
+                "designs": designs_param("The card's designs; the list replaces the old one, [] clears it, left out keeps it"),
                 "add_subtasks": list_of_text("Checklist items to append"),
                 "edit_subtasks": { "type": "array", "description": "Checklist items to rename",
                     "items": { "type": "object", "properties": {
@@ -122,4 +130,23 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             &["card", "thread", "format", "body"],
         ),
     ]
+}
+
+/// The `designs` argument: references to designs of the project's library.
+fn designs_param(description: &str) -> Value {
+    json!({
+        "type": "array",
+        "description": description,
+        "items": { "type": "object", "properties": {
+            "design": text("The design's file name in the project's library (or its id)"),
+            "region": { "type": "object",
+                "description": "The part of the image that matters, in whole percent of its width and height; left out: the whole image",
+                "properties": {
+                    "x": { "type": "integer", "minimum": 0, "maximum": 100 },
+                    "y": { "type": "integer", "minimum": 0, "maximum": 100 },
+                    "w": { "type": "integer", "minimum": 1, "maximum": 100 },
+                    "h": { "type": "integer", "minimum": 1, "maximum": 100 },
+                }, "required": ["x", "y", "w", "h"] },
+        }, "required": ["design"] },
+    })
 }

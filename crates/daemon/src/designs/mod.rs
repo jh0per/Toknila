@@ -4,13 +4,16 @@
 //! database, and nothing here writes the token to a log.
 
 pub mod figma;
+mod locate;
+
+pub use locate::Located;
 
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use toknila_api_types::Design;
+use toknila_api_types::{Design, PlannerDesign};
 use toknila_core::design::{self, DesignKind, FigmaRef, MAX_DESIGN_BYTES};
 use toknila_core::{DesignId, ProjectId, Timestamp};
 
@@ -75,6 +78,45 @@ impl Designs {
     fn file_of(&self, d: &Design) -> Option<PathBuf> {
         let ext = ext_of(d.mime.as_deref()?)?;
         Some(self.dir.join(format!("{}.{ext}", d.id)))
+    }
+
+    /// The designs as the planner sees them: metadata and the path of each kept file.
+    pub fn for_planner(&self) -> Result<Vec<PlannerDesign>, DesignError> {
+        Ok(self
+            .list()?
+            .into_iter()
+            .map(|d| PlannerDesign {
+                path: d
+                    .has_file
+                    .then(|| self.file_of(&d))
+                    .flatten()
+                    .map(|p| p.display().to_string()),
+                id: d.id,
+                name: d.name,
+                kind: d.kind,
+                mime: d.mime,
+                size: d.size,
+                hint: d.hint,
+            })
+            .collect())
+    }
+
+    /// The paths of the kept design files, which a planner may read.
+    pub fn file_paths(&self) -> Vec<PathBuf> {
+        self.for_planner()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|d| d.path.map(PathBuf::from))
+            .collect()
+    }
+
+    /// One design for the planner, by id or by name (any letter case).
+    pub fn find_for_planner(&self, reference: &str) -> Result<PlannerDesign, DesignError> {
+        let all = self.for_planner()?;
+        let reference = reference.trim();
+        all.into_iter()
+            .find(|d| d.id.to_string() == reference || d.name.eq_ignore_ascii_case(reference))
+            .ok_or_else(|| DesignError::NotFound(reference.to_owned()))
     }
 
     /// Every design, oldest first, with the hint a link without an image shows.

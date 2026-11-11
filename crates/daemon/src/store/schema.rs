@@ -285,7 +285,11 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE projects ADD COLUMN bump_command TEXT;
     ALTER TABLE releases ADD COLUMN tag TEXT;
     "#,
-    // 21: the planner's standing suggestion, one per project (the card, chain and action are
+    // 21: the designs a card references (a JSON list of design id and optional region).
+    r#"
+    ALTER TABLE tickets ADD COLUMN designs_json TEXT;
+    "#,
+    // 22: the planner's standing suggestion, one per project (the card, chain and action are
     // kept apart from the JSON so an event can find the suggestions it ends).
     r#"
     CREATE TABLE suggestions (

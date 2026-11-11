@@ -31,6 +31,13 @@ pub(super) struct RawChain {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(super) struct RawDesign {
+    pub(super) design: String,
+    pub(super) region: Option<crate::design::Region>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct RawTicket {
     pub(super) id: Spanned<String>,
     pub(super) title: Option<String>,
@@ -50,6 +57,9 @@ pub(super) struct RawTicket {
     pub(super) needs_secrets: bool,
     #[serde(default)]
     pub(super) design_first: bool,
+    /// The project's designs the card is about, by file name.
+    #[serde(default)]
+    pub(super) designs: Vec<RawDesign>,
     #[serde(default)]
     pub(super) paused: bool,
     /// Import the ticket as Merged (through the state machine, once its dependencies are).

@@ -39,6 +39,9 @@ pub struct NewTicket {
     /// Show the person a design to approve before any code.
     #[serde(default)]
     pub design_first: bool,
+    /// Designs of the project the card is about (by id), with an optional region of each.
+    #[serde(default)]
+    pub designs: Vec<toknila_core::design::DesignRef>,
     #[serde(default)]
     pub paused: bool,
     /// Put the card after the chain's last cards (what nothing waits for yet) when `after` is
@@ -70,6 +73,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
     if title.is_empty() {
         return Err(AppError::bad_request("ticket title is empty"));
     }
+    toknila_core::design::check_refs(&input.designs).map_err(AppError::bad_request)?;
     let c = resolve::chain(uow, chain)?;
     let key = next_key(uow, c.project_id)?;
     let draft = TicketDraft {
@@ -82,6 +86,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         reviewer: input.reviewer.filter(|r| !r.trim().is_empty()),
         needs_secrets: input.needs_secrets,
         design_first: input.design_first,
+        designs: input.designs,
     };
     let t = Ticket::new_backlog(TicketId::new(), c.id, key, draft, uow.now());
     let id = t.id;
@@ -146,6 +151,9 @@ pub fn edit<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, patch: TicketPatch)
     }
     if patch.title.as_deref().is_some_and(|v| v.trim().is_empty()) {
         return Err(AppError::bad_request("ticket title is empty"));
+    }
+    if let Some(designs) = &patch.designs {
+        toknila_core::design::check_refs(designs).map_err(AppError::bad_request)?;
     }
     with_chain(uow, t.chain_id, |ctx| {
         Ok(ctx.edit_ticket(t.id, |t| patch.apply(t))?)

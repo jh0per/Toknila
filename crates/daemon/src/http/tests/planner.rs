@@ -13,7 +13,7 @@ use crate::server::{PLANNER_ROUTES, now};
 
 impl Api {
     /// A token for the planner of `project`, as the runner issues it when a planner starts.
-    async fn planner_token(&self, project: &str) -> String {
+    pub(super) async fn planner_token(&self, project: &str) -> String {
         let id = self.get(&format!("/v1/projects/{project}")).await["id"]
             .as_str()
             .and_then(|s| s.parse::<ProjectId>().ok())
@@ -27,7 +27,7 @@ impl Api {
     }
 
     /// DEMO with a chain that does not autostart, and another project with a chain of its own.
-    async fn two_projects(&self) {
+    pub(super) async fn two_projects(&self) {
         self.post("/v1/projects", json!({ "key": "DEMO", "name": "Demo" }))
             .await;
         self.post(
@@ -455,4 +455,95 @@ async fn a_suggestion_is_kept_per_project_replaced_and_cleared_when_its_card_mov
         window().await,
         ["suggest", "suggest", "suggest", "suggestion_cleared"]
     );
+}
+
+#[tokio::test]
+async fn show_plan_lists_the_designs_with_paths_and_show_design_answers_one() {
+    use crate::designs::Designs;
+    use crate::designs::tests::PNG;
+    use toknila_core::design::{self, DesignKind};
+
+    let api = Api::new();
+    api.two_projects().await;
+    let project = |key: &str| {
+        let key = key.to_owned();
+        let api = &api;
+        async move {
+            api.get(&format!("/v1/projects/{key}")).await["id"]
+                .as_str()
+                .and_then(|s| s.parse::<ProjectId>().ok())
+                .expect("project id")
+        }
+    };
+    let (demo, other) = (project("DEMO").await, project("OTHER").await);
+    let home = api._dir.path().to_owned();
+    let home_png = Designs::new(&home, demo)
+        .add_file("home.png", PNG, now())
+        .expect("png");
+    let link = Designs::new(&home, demo)
+        .add_figma(
+            "Checkout",
+            design::parse_figma("https://www.figma.com/design/abc123/App?node-id=1-2")
+                .expect("a figma link"),
+            now(),
+        )
+        .expect("link");
+    Designs::new(&home, other)
+        .add_file("theirs.png", PNG, now())
+        .expect("other png");
+    let token = api.planner_token("DEMO").await;
+
+    let (s, plan) = api
+        .call_with(&token, Method::GET, "/v1/planner/plan", None)
+        .await;
+    assert_eq!(s, StatusCode::OK, "{plan}");
+    assert!(plan["chains"].is_array(), "the plan is still there: {plan}");
+    let designs = plan["designs"].as_array().expect("designs");
+    assert_eq!(designs.len(), 2, "only this project's: {plan}");
+    let file = home
+        .join("designs")
+        .join(demo.to_string())
+        .join(format!("{}.png", home_png.id));
+    assert_eq!(designs[0]["name"], "home.png");
+    assert_eq!(designs[0]["kind"], "image");
+    assert_eq!(designs[0]["mime"], "image/png");
+    assert_eq!(designs[0]["path"], file.display().to_string());
+    assert!(file.is_file(), "the path names a kept file");
+    assert_eq!(designs[1]["name"], "Checkout");
+    assert_eq!(
+        designs[1]["path"],
+        Value::Null,
+        "a link without an image has no file"
+    );
+    assert_eq!(link.kind, DesignKind::Figma);
+
+    // show_design: by id, and by name in any letter case; the metadata and the path.
+    for reference in [home_png.id.to_string(), "HOME.PNG".to_owned()] {
+        let (s, one) = api
+            .call_with(
+                &token,
+                Method::GET,
+                &format!("/v1/planner/designs/{reference}"),
+                None,
+            )
+            .await;
+        assert_eq!(s, StatusCode::OK, "{one}");
+        assert_eq!(one["id"], home_png.id.to_string());
+        assert_eq!(one["path"], file.display().to_string());
+        assert_eq!(one["size"], PNG.len());
+    }
+    // Another project's design is not found, and a person's token is refused.
+    let (s, e) = api
+        .call_with(&token, Method::GET, "/v1/planner/designs/theirs.png", None)
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{e}");
+    let (s, _) = api
+        .call_with(
+            super::TOKEN,
+            Method::GET,
+            "/v1/planner/designs/home.png",
+            None,
+        )
+        .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
 }

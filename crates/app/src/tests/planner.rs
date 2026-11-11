@@ -180,6 +180,7 @@ fn only_a_card_that_has_not_started_is_edited_and_its_checklist_with_it() {
         prompt: Some("new prompt".to_owned()),
         acceptance: Some(vec!["a".to_owned(), "b".to_owned()]),
         design_first: Some(true),
+        designs: None,
         add_subtasks: vec!["first".to_owned()],
         edit_subtasks: vec![],
     };
@@ -462,4 +463,67 @@ fn a_suggestion_the_card_cannot_take_now_or_about_another_project_is_refused() {
     .expect_err("other project");
     assert_eq!(e.kind, ErrorKind::NotFound);
     assert_eq!(mem.suggestion, None);
+}
+
+#[test]
+fn the_planner_sets_changes_and_clears_a_cards_designs() {
+    use toknila_core::design::{DesignRef, Region};
+    let mut mem = manual_demo();
+    let p = project(&mem);
+    let (login, home) = (toknila_core::DesignId::new(), toknila_core::DesignId::new());
+    let region = Region {
+        x: 5,
+        y: 6,
+        w: 7,
+        h: 8,
+    };
+    let with = vec![
+        DesignRef {
+            design: login,
+            region: Some(region),
+        },
+        DesignRef {
+            design: home,
+            region: None,
+        },
+    ];
+    let id =
+        planner::add_card_with_designs(&mut mem, p, "demo", card("C"), with.clone()).expect("add");
+    assert_eq!(mem.ticket_by_id(id).designs, with);
+    // A change replaces the list; leaving it out keeps it.
+    let key = mem.ticket_by_id(id).key.to_string();
+    planner::edit_card(
+        &mut mem,
+        p,
+        &key,
+        CardEdit {
+            title: Some("C2".into()),
+            ..CardEdit::default()
+        },
+    )
+    .expect("edit");
+    assert_eq!(mem.ticket_by_id(id).designs, with);
+    let one = vec![DesignRef {
+        design: home,
+        region: None,
+    }];
+    planner::edit_card_with_designs(&mut mem, p, &key, CardEdit::default(), Some(one.clone()))
+        .expect("replace");
+    assert_eq!(mem.ticket_by_id(id).designs, one);
+    planner::edit_card_with_designs(&mut mem, p, &key, CardEdit::default(), Some(vec![]))
+        .expect("clear");
+    assert!(mem.ticket_by_id(id).designs.is_empty());
+    // A region outside the image is a bad request and changes nothing.
+    let bad = vec![DesignRef {
+        design: home,
+        region: Some(Region {
+            x: 90,
+            y: 0,
+            w: 20,
+            h: 5,
+        }),
+    }];
+    let e = planner::edit_card_with_designs(&mut mem, p, &key, CardEdit::default(), Some(bad))
+        .expect_err("outside");
+    assert_eq!(e.kind, crate::ErrorKind::BadRequest);
 }

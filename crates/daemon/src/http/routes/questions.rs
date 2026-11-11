@@ -158,16 +158,17 @@ pub async fn agent_permission(
         Principal::Agent(grant) => grant.role,
         Principal::Person => AgentRole::Worker,
     };
+    let at = now();
+    let prompts = state.runners.prompts();
+    let tool = ask.tool.or_else(|| prompts.last_tool(t.id, role));
     // A worker that handed in and still wants to run something is refused without asking anyone.
     if let Some(Decision::Deny { message }) = question::auto_decision(role, t.status) {
+        log_refusal(&t, role, tool.as_deref(), "handed in");
         return Ok(Json(PermissionReply {
             decision: PermissionDecision::Deny,
             message: Some(message),
         }));
     }
-    let at = now();
-    let prompts = state.runners.prompts();
-    let tool = ask.tool.or_else(|| prompts.last_tool(t.id, role));
     // A worker's shell edit is refused at once, without a question: Edit and Write are approved.
     if role == AgentRole::Worker
         && let Some(Decision::Deny { message }) = tool.as_deref().and_then(|tool| {
@@ -175,6 +176,7 @@ pub async fn agent_permission(
             question::shell_edit_denial(tool, &scratch)
         })
     {
+        log_refusal(&t, role, tool.as_deref(), "shell edit");
         return Ok(Json(PermissionReply {
             decision: PermissionDecision::Deny,
             message: Some(message),
@@ -235,6 +237,18 @@ pub async fn agent_permission(
         },
     };
     Ok(Json(reply))
+}
+
+/// One info line for a request the daemon refused without asking a person, so afterwards it can
+/// be seen what the agent tried to run (`why` names the rule that refused it).
+fn log_refusal(t: &Ticket, role: AgentRole, tool: Option<&str>, why: &str) {
+    tracing::info!(
+        ticket = %t.key,
+        role = ?role,
+        command = tool.unwrap_or("(unknown)"),
+        why,
+        "refused a permission request without asking"
+    );
 }
 
 /// Shows the dialog to the person: the worker's card asks (Running to Waiting), a reviewer's

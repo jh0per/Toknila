@@ -70,6 +70,10 @@ pub struct RunBrief {
     pub returned: Option<toknila_core::instructions::Returned>,
     /// The card must show a design for approval before any code.
     pub design_first: bool,
+    /// The designs the card references (the host turns them into files the agent may read).
+    pub card_designs: Vec<toknila_core::design::DesignRef>,
+    /// The project whose library holds `card_designs`.
+    pub design_project: Option<toknila_core::ProjectId>,
     /// The project's Claude model (`--model`), for a profile that runs Claude Code.
     pub model: Option<String>,
     /// The project's setting for when a card's agent wants to run a command (a worker only).
@@ -83,6 +87,8 @@ pub struct RunBrief {
     pub repo_tools: Vec<String>,
     /// What a planner is told about its project; `None` for a card's agent.
     pub project: Option<toknila_core::instructions::ProjectFacts>,
+    /// The absolute paths of the design files a planner may read (a planner only).
+    pub designs: Vec<std::path::PathBuf>,
 }
 
 /// A runner now works for the ticket.

@@ -24,6 +24,9 @@ pub(in crate::cmd) use tools::list;
 #[derive(Debug)]
 pub(super) enum PlannerCall {
     ShowPlan,
+    ShowDesign {
+        design: String,
+    },
     NewChain(NewPlanChain),
     AddCard {
         chain: String,
@@ -91,6 +94,11 @@ struct ShowCard {
 }
 
 #[derive(Deserialize)]
+struct ShowDesign {
+    design: String,
+}
+
+#[derive(Deserialize)]
 struct Dependency {
     chain: String,
     from: String,
@@ -142,6 +150,10 @@ pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolErr
     }
     Ok(match name {
         "show_plan" => PlannerCall::ShowPlan,
+        "show_design" => {
+            let ShowDesign { design } = args(arguments)?;
+            PlannerCall::ShowDesign { design }
+        }
         "new_chain" => PlannerCall::NewChain(args(arguments)?),
         "add_card" => {
             let AddCard { chain, card } = args(arguments)?;
@@ -238,6 +250,10 @@ pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<String, String
         PlannerCall::ShowPlan => {
             let plan = client.planner_plan().map_err(e)?;
             serde_json::to_string_pretty(&plan).map_err(|x| x.to_string())
+        }
+        PlannerCall::ShowDesign { design } => {
+            let found = client.planner_design(design).map_err(e)?;
+            serde_json::to_string_pretty(&found).map_err(|x| x.to_string())
         }
         PlannerCall::NewChain(c) => {
             let d = client.planner_new_chain(c).map_err(e)?;
@@ -362,9 +378,9 @@ mod tests {
     }
 
     #[test]
-    fn the_planner_has_its_twelve_tools_and_none_that_starts_or_accepts_anything() {
+    fn the_planner_has_its_thirteen_tools_and_none_that_starts_or_accepts_anything() {
         let names = names();
-        assert_eq!(names.len(), 12, "{names:?}");
+        assert_eq!(names.len(), 13, "{names:?}");
         for forbidden in [
             "start", "pause", "resume", "cancel", "accept", "return", "reopen", "merge", "approve",
             "unblock", "block", "finished", "started",
@@ -386,6 +402,14 @@ mod tests {
     fn every_tool_turns_its_arguments_into_its_call() {
         let c = |name, args| call(name, &args).unwrap_or_else(|e| panic!("{name}: {e:?}"));
         assert!(matches!(c("show_plan", json!({})), PlannerCall::ShowPlan));
+        assert!(matches!(
+            c("show_design", json!({ "design": "Home" })),
+            PlannerCall::ShowDesign { design } if design == "Home"
+        ));
+        assert!(matches!(
+            call("show_design", &json!({})),
+            Err(ToolError::BadArguments(_))
+        ));
         assert!(matches!(
             c("new_chain", json!({ "name": "plan", "goal": "g" })),
             PlannerCall::NewChain(n) if n.name == "plan" && n.goal.as_deref() == Some("g")
@@ -409,10 +433,21 @@ mod tests {
         let PlannerCall::EditCard { card, edit } = c(
             "edit_card",
             json!({ "card": "DEMO-2", "title": "N", "add_subtasks": ["x"],
+                    "designs": [{ "design": "login.png", "region": { "x": 1, "y": 2, "w": 3, "h": 4 } }, { "design": "home.png" }],
                     "edit_subtasks": [{ "position": 1, "text": "y" }] }),
         ) else {
             panic!("edit_card")
         };
+        let picks = edit.designs.as_ref().expect("designs");
+        assert_eq!(
+            (
+                picks.len(),
+                picks[0].design.as_str(),
+                picks[0].region.map(|r| r.w)
+            ),
+            (2, "login.png", Some(3))
+        );
+        assert!(picks[1].region.is_none());
         assert_eq!(card, "DEMO-2");
         assert_eq!(edit.title.as_deref(), Some("N"));
         assert_eq!(edit.edit_subtasks[0].position, 1);

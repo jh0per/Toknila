@@ -48,6 +48,49 @@ pub struct RunBrief<'a> {
     pub returned: Option<&'a Returned>,
     /// The person wants to approve a design before any code (`Ticket::design_first`).
     pub design_first: bool,
+    /// The designs the card references, with the file each is kept in.
+    pub designs: &'a [BriefDesign],
+    /// A planner's project has designs the planner must look at first.
+    pub has_designs: bool,
+}
+
+/// A design a card references, as the instructions name it: the file the agent may read and the
+/// part of the image that matters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BriefDesign {
+    pub name: String,
+    /// The design's kept file; `None` for a Figma link without an image.
+    pub path: Option<String>,
+    pub region: Option<crate::design::Region>,
+}
+
+/// The section that names the designs of the card, with the files the agent may read; empty
+/// when the card has none.
+fn designs_section(brief: &RunBrief<'_>) -> String {
+    if brief.designs.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        "\n## Designs\n\n\
+         The card is about these designs. Read the files (an image or a pdf) before you build \
+         what they show; you may read these files and no others of the library. A region is in \
+         percent of the image, from its top left corner.\n\n",
+    );
+    for d in brief.designs {
+        out.push_str(&format!("- {}: ", d.name));
+        match &d.path {
+            Some(p) => out.push_str(&format!("`{p}`")),
+            None => out.push_str("no image is kept for it (a Figma link)"),
+        }
+        if let Some(r) = d.region {
+            out.push_str(&format!(
+                "; region: x {}%, y {}%, width {}%, height {}%",
+                r.x, r.y, r.w, r.h
+            ));
+        }
+        out.push('\n');
+    }
+    out
 }
 
 /// The section of the instructions file for a card that must show a design first; empty
@@ -136,6 +179,13 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         );
     }
     match role {
+        crate::AgentRole::Planner if brief.has_designs => format!(
+            "You are the planner of project {key}. Read your Toknila instructions, call \
+             `show_plan`. The project has designs: Read every design file `show_plan` lists \
+             first, say in a few lines what screens and flows you see, then propose the cards, \
+             and name the designs each card you add comes from. Do not start any card.",
+            key = brief.key
+        ),
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
              `show_plan`, then tell the owner in a line or two how the plan stands, say the next step \
@@ -146,8 +196,8 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         crate::AgentRole::Reviewer => format!(
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
              branch, run the check command and the tests the hand-in names and quote their \
-             result lines, mark NOT_RUN what you could not run, then call `review_verdict` \
-             once. You do not change the code.",
+             result lines (each command plain, one per call, no `cd` or `&&`), mark NOT_RUN what \
+             you could not run (never FAIL it), then call `review_verdict` once. You do not change the code.",
             key = brief.key
         ),
         _ => format!(
@@ -194,6 +244,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
+    out.push_str(&designs_section(brief));
     out.push_str(&design_section(brief));
     out.push_str(&waiting::sections(brief.waiting, brief.returned));
     out.push_str(&earlier_section(brief));

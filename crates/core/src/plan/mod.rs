@@ -39,6 +39,7 @@ mod raw;
 pub use export::{export, export_with_designs};
 pub use instantiate::Checklist;
 pub use order::out_of_order;
+
 pub use parse::parse;
 
 /// A problem in a chain file. `line` is 1-based.
@@ -72,11 +73,21 @@ pub struct PlanTicket {
     /// Show a design for approval before any code (`design_first = true`).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub design_first: bool,
+    /// Designs of the project the card is about, by file name.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub designs: Vec<PlanDesign>,
     pub paused: bool,
     /// Import as Merged: the ticket goes through the state machine once its dependencies are.
     pub done: bool,
     /// 1-based positions of subtasks that start ticked.
     pub done_subtasks: Vec<u32>,
+}
+
+/// A design a ticket of a file refers to, by the file name of the design in the project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PlanDesign {
+    pub design: String,
+    pub region: Option<crate::design::Region>,
 }
 
 /// One milestone from a file.

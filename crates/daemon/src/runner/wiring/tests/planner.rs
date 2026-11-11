@@ -118,6 +118,87 @@ fn the_planner_settings_allow_reading_and_its_tools_and_name_no_hooks() {
     );
 }
 
+/// A rig whose project has two design files and a token file in its data home.
+fn rig_with_designs() -> (Rig, Vec<std::path::PathBuf>) {
+    let mut rig = planner_rig();
+    let folder = rig.dir.path().join("designs").join("p1");
+    std::fs::create_dir_all(&folder).expect("designs folder");
+    std::fs::create_dir_all(rig.dir.path().join("secrets")).expect("secrets");
+    std::fs::write(rig.dir.path().join("secrets").join("figma.token"), "t").expect("token");
+    let files: Vec<_> = ["a.png", "b.pdf"].iter().map(|n| folder.join(n)).collect();
+    for f in files.iter().chain([&folder.join("index.json")]) {
+        std::fs::write(f, b"x").expect("write");
+    }
+    rig.brief.designs = files.clone();
+    (rig, files)
+}
+
+fn settings_of(rig: &Rig) -> Value {
+    let (_, text) = rig.file_of("planner", "settings.json");
+    serde_json::from_str(&text).expect("json")
+}
+
+fn strings(v: &Value) -> Vec<String> {
+    v.as_array()
+        .expect("array")
+        .iter()
+        .filter_map(|s| s.as_str().map(str::to_owned))
+        .collect()
+}
+
+#[test]
+fn the_planner_may_read_each_design_file_and_nothing_else_outside_the_repository() {
+    let (rig, files) = rig_with_designs();
+    rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);
+    let s = settings_of(&rig);
+    let allow = strings(&s["permissions"]["allow"]);
+    // One explicit rule per file, spelled the way Claude Code's rules spell an absolute path.
+    let read_rules: Vec<&String> = allow
+        .iter()
+        .filter(|r| r.starts_with("Read(") && r.contains("designs"))
+        .collect();
+    let want: Vec<String> = files
+        .iter()
+        .map(|f| toknila_core::private::read_allow_rule(&f.display().to_string()))
+        .collect();
+    assert_eq!(read_rules, want.iter().collect::<Vec<_>>(), "{allow:?}");
+    assert!(want[0].starts_with("Read(//"), "{}", want[0]);
+    assert!(!allow.iter().any(|r| r.contains("**") || r.ends_with("p1)")));
+    // Everything else of the data home stays denied, and so does the rest of the designs folder;
+    // the design files are not denied.
+    let deny = strings(&s["permissions"]["deny"]);
+    let denied = |p: &std::path::Path| {
+        deny.contains(&format!(
+            "Read(/{})",
+            p.display().to_string().replace('\\', "/")
+        ))
+    };
+    let dir = rig.dir.path();
+    assert!(denied(&dir.join("secrets")), "{deny:?}");
+    assert!(denied(&dir.join("designs/p1/index.json")), "{deny:?}");
+    for f in &files {
+        assert!(!denied(f), "{f:?} must stay readable");
+    }
+}
+
+#[test]
+fn a_planner_without_designs_gets_no_design_rules_and_a_plain_kickoff() {
+    let rig = planner_rig();
+    let w = rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);
+    let allow = strings(&settings_of(&rig)["permissions"]["allow"]);
+    assert!(!allow.iter().any(|r| r.contains("designs")), "{allow:?}");
+    assert!(!w.command.last().expect("kickoff").contains("design"));
+}
+
+#[test]
+fn the_kickoff_of_a_planner_with_designs_says_to_look_at_them_first() {
+    let (rig, _) = rig_with_designs();
+    let w = rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);
+    let kickoff = w.command.last().expect("kickoff");
+    assert!(kickoff.contains("Read every design file"), "{kickoff}");
+    assert!(kickoff.contains("name the designs each card"), "{kickoff}");
+}
+
 #[test]
 fn a_planner_run_without_the_projects_facts_is_refused() {
     let mut rig = planner_rig();

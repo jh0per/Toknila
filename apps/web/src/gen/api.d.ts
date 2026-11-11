@@ -375,6 +375,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/designs/{design}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One design of the planner's project: its metadata and the path of its file. */
+        get: operations["planner_design"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/plan": {
         parameters: {
             query?: never;
@@ -382,7 +399,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The whole plan of the planner's project: chains, cards in order, dependencies, threads. */
+        /**
+         * The whole plan of the planner's project: chains, cards in order, dependencies, threads, and
+         *     the project's designs with the path of each file.
+         */
         get: operations["planner_plan"];
         put?: never;
         post?: never;
@@ -1643,6 +1663,8 @@ export interface components {
             add_subtasks?: string[];
             /** @description Whether the agent shows a design for approval before any code. */
             design_first?: boolean | null;
+            /** @description The card's designs, replacing the list (`[]` clears it); left out keeps them. */
+            designs?: components["schemas"]["DesignPick"][] | null;
             /** @description Checklist items to rename. */
             edit_subtasks?: components["schemas"]["SubtaskEdit"][];
             prompt?: string | null;
@@ -1698,6 +1720,8 @@ export interface components {
             usage?: {
                 [key: string]: components["schemas"]["UsageFigures"];
             };
+            /** @description What an import left out (a design the project does not have); only an import answers it. */
+            warnings?: string[];
         };
         /**
          * @description A chain file: body of `POST /v1/projects/{project}/import`, answer of
@@ -1878,6 +1902,19 @@ export interface components {
             designs: components["schemas"]["Design"][];
             /** @description Whether the project has a Figma token; the token itself is never sent. */
             figma_token: boolean;
+        };
+        /**
+         * @description A design the planner names: its file name (or id) in the project's library, and the part of
+         *     the image that matters. The host finds the design and gives the use case a [`DesignRef`].
+         */
+        DesignPick: {
+            design: string;
+            region?: components["schemas"]["Region"] | null;
+        };
+        /** @description A card's reference to a design of its project, with the part of the image that matters. */
+        DesignRef: {
+            design: components["schemas"]["DesignId"];
+            region?: components["schemas"]["Region"] | null;
         };
         /** @description Dependency edge: `to` cannot start before `from` is done. */
         Edge: {
@@ -2206,6 +2243,8 @@ export interface components {
              *     code.
              */
             design_first?: boolean;
+            /** @description Designs of the project the card is about, by file name or id. */
+            designs?: components["schemas"]["DesignPick"][];
             prompt?: string;
             /** @description Checklist items. */
             subtasks?: string[];
@@ -2317,6 +2356,8 @@ export interface components {
             before?: string[];
             /** @description Show the person a design to approve before any code. */
             design_first?: boolean;
+            /** @description Designs of the project the card is about (by id), with an optional region of each. */
+            designs?: components["schemas"]["DesignRef"][];
             needs_secrets?: boolean;
             paused?: boolean;
             profile?: string | null;
@@ -2481,6 +2522,11 @@ export interface components {
         PatchTicket: {
             acceptance?: string[] | null;
             design_first?: boolean | null;
+            /**
+             * @description The card's designs, replacing the whole list (an empty list clears it); left out to keep
+             *     them.
+             */
+            designs?: components["schemas"]["DesignRef"][] | null;
             needs_secrets?: boolean | null;
             pos?: components["schemas"]["Pos"] | null;
             profile?: string | null;
@@ -2593,6 +2639,28 @@ export interface components {
         PlanView: {
             chains: components["schemas"]["PlanChain"][];
             project: components["schemas"]["Project"];
+        };
+        /** @description A design as the planner sees it: its metadata and where its file is on this machine. */
+        PlannerDesign: {
+            /** @description Why a link has no file yet, when known. */
+            hint?: string | null;
+            id: components["schemas"]["DesignId"];
+            kind: components["schemas"]["DesignKind"];
+            /** @description Media type of the kept file. */
+            mime?: string | null;
+            name: string;
+            /** @description Absolute path of the kept file, which the planner may `Read`; absent when no file is kept. */
+            path?: string | null;
+            /**
+             * Format: int64
+             * @description Bytes of the kept file; zero without one.
+             */
+            size: number;
+        };
+        /** @description Answer of `GET /v1/planner/plan`: the plan and the project's designs. */
+        PlannerPlan: components["schemas"]["PlanView"] & {
+            /** @description Oldest first. */
+            designs: components["schemas"]["PlannerDesign"][];
         };
         /** @description `GET /v1/projects/{project}/planner`: the project's planner. */
         PlannerState: {
@@ -2806,6 +2874,17 @@ export interface components {
              * @description 0 to 100 (above 100 once exceeded).
              */
             used_percentage: number;
+        };
+        /** @description A rectangle of a design image, in whole percent of the image's width and height. */
+        Region: {
+            /** Format: int32 */
+            h: number;
+            /** Format: int32 */
+            w: number;
+            /** Format: int32 */
+            x: number;
+            /** Format: int32 */
+            y: number;
         };
         /** @description A release milestone between tickets on the chain graph. */
         Release: {
@@ -3264,6 +3343,11 @@ export interface components {
              *     is told to open a design thread first, and `finished` is refused until one is approved.
              */
             design_first?: boolean;
+            /**
+             * @description The designs of the project this card is about, with the part of each that matters; the
+             *     first one is the card's thumbnail on the diagram.
+             */
+            designs?: components["schemas"]["DesignRef"][];
             done_out_of_order?: components["schemas"]["OutOfOrder"] | null;
             id: components["schemas"]["TicketId"];
             key: components["schemas"]["TicketKey"];
@@ -4537,6 +4621,44 @@ export interface operations {
             };
         };
     };
+    planner_design: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Design id or name */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannerDesign"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     planner_plan: {
         parameters: {
             query?: never;
@@ -4551,7 +4673,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PlanView"];
+                    "application/json": components["schemas"]["PlannerPlan"];
                 };
             };
             403: {
