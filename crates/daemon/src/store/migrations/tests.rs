@@ -177,3 +177,61 @@ fn the_shipped_names_are_unique_and_the_legacy_ones_come_first() {
         );
     }
 }
+
+/// The legacy names, in the order the old positional list ran them.
+const LEGACY: [&str; 24] = [
+    "legacy-01-phase0-schema",
+    "legacy-02-wildcard-cards",
+    "legacy-03-threads",
+    "legacy-04-done-out-of-order",
+    "legacy-05-parallel-agents",
+    "legacy-06-review",
+    "legacy-07-pull-request-mode",
+    "legacy-08-token-usage",
+    "legacy-09-check-command",
+    "legacy-10-archived-projects",
+    "legacy-11-chain-source",
+    "legacy-12-project-models",
+    "legacy-13-command-policy",
+    "legacy-14-canvas-position",
+    "legacy-15-design-first",
+    "legacy-16-reviewer-web-domains",
+    "legacy-17-max-review-rounds",
+    "legacy-18-no-checks-timeout",
+    "legacy-19-canvas-size",
+    "legacy-20-bump-command",
+    "legacy-21-ticket-designs",
+    "legacy-22-suggestions",
+    "legacy-23-chain-version",
+    "legacy-24-design-pins",
+];
+
+/// Files that sort after the legacy ones; `0024_` is the last legacy prefix.
+fn sorts_after_legacy(file: &str) -> bool {
+    file > "0024_~"
+}
+
+#[test]
+fn the_first_24_migrations_are_the_legacy_ones_in_order() {
+    let list = all().expect("list");
+    let names: Vec<&str> = list.iter().take(24).map(|m| m.name.as_str()).collect();
+    assert_eq!(names, LEGACY, "seeding an old store takes the first N");
+    for m in &list[24..] {
+        assert!(
+            sorts_after_legacy(&m.file),
+            "{} sorts among the legacy migrations; start its file name with a letter",
+            m.file
+        );
+        assert!(!m.name.starts_with("legacy-"), "{}: legacy name", m.file);
+    }
+}
+
+#[test]
+fn a_file_that_does_not_sort_after_the_legacy_ones_is_caught() {
+    for bad in ["0010_x.sql", "0024_x.sql", "0001_a.sql"] {
+        assert!(!sorts_after_legacy(bad), "{bad}");
+    }
+    for ok in ["a_card.sql", "toknila-50.sql", "0025_x.sql"] {
+        assert!(sorts_after_legacy(ok), "{ok}");
+    }
+}
