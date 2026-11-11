@@ -24,6 +24,7 @@ fn in_review() -> Mem {
             summary: toknila_core::handin::from_plain("done"),
         },
         Some("f8afe06c0ffee".to_owned()),
+        None,
     )
     .expect("finished");
     settle(&mut mem);

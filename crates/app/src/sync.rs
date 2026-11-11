@@ -48,6 +48,20 @@ pub enum SyncOutcome {
     },
 }
 
+/// The outcome that records a base-sync merge commit the daemon made, if `synced` made one.
+pub(crate) fn recorded(
+    ticket: toknila_core::TicketId,
+    synced: &Result<SyncOutcome, crate::MergeError>,
+) -> Option<crate::external::ExternalOutcome> {
+    match synced {
+        Ok(SyncOutcome::Merged { commit }) => Some(crate::external::ExternalOutcome::Synced {
+            ticket,
+            commit: commit.clone(),
+        }),
+        _ => None,
+    }
+}
+
 /// What the worker reads about a conflict: the files, the migrations, and what to do.
 pub fn conflict_text(base: &str, files: &[String], clashes: &[Clash]) -> String {
     let mut text = format!(

@@ -34,6 +34,7 @@ export type EventRecord = Omit<Schemas["EventRecord"], "payload"> & { payload: u
 export type Project = Schemas["Project"];
 export type TicketDetail = Schemas["TicketDetail"];
 export type Comment = Schemas["Comment"];
+export type SinceReturn = Schemas["SinceReturn"];
 export type CommentKind = Schemas["CommentKind"];
 export type Subtask = Schemas["Subtask"];
 export type TicketStatus = Schemas["TicketStatus"];
