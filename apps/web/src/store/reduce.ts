@@ -279,6 +279,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return fx.length && !there ? then(next, fx, { name: "planner", project: msg.project }) : [next, fx];
     }
     case "discussCard":
+    case "nudgeCard":
     case "startPlanner":
     case "stopPlanner":
     case "refreshPlanner":

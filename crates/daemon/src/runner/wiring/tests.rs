@@ -8,6 +8,7 @@ use toknila_core::{AgentProfile, AgentRole, RunId};
 use super::*;
 
 mod planner;
+mod reads;
 mod reviewer_rules;
 
 const TOKEN: &str = "secret-run-token-0123456789abcdef";
@@ -15,6 +16,8 @@ const TOKEN: &str = "secret-run-token-0123456789abcdef";
 struct Rig {
     dir: tempfile::TempDir,
     bin: PathBuf,
+    /// The folder the agent runs in (never created: only its name matters to the rules).
+    repo: PathBuf,
     key: TicketKey,
     run: RunId,
     brief: RunBrief,
@@ -24,6 +27,7 @@ impl Rig {
     fn new() -> Rig {
         Rig {
             dir: tempfile::tempdir().expect("tempdir"),
+            repo: PathBuf::from("/w/ships/demo-1"),
             bin: PathBuf::from("/opt/toknila/bin/toknila"),
             key: "DEMO-1".parse().expect("key"),
             run: RunId::new(),
@@ -53,6 +57,7 @@ impl Rig {
             token: TOKEN,
             url: Some("http://127.0.0.1:4242"),
             bin: &self.bin,
+            repo: &self.repo,
             brief: &self.brief,
         };
         prepare(profile, &cx).expect("prepare")
@@ -413,7 +418,10 @@ fn a_profile_without_rules_and_hooks_still_gets_the_isolation_settings() {
     let v: Value = serde_json::from_str(&text).expect("json");
     assert_eq!(
         v,
-        json!({ "autoMemoryEnabled": false, "permissions": { "deny": denied_with_private() }}),
+        json!({ "autoMemoryEnabled": false, "permissions": {
+            "allow": ["Read(//w/ships/demo-1/**)"],
+            "deny": denied_with_private(),
+        }}),
         "{text}"
     );
 }
@@ -523,6 +531,7 @@ fn inherited_claude_code_variables_are_dropped_unless_the_profile_sets_them() {
         token: TOKEN,
         url: None,
         bin: &rig.bin,
+        repo: &rig.repo,
         brief: &rig.brief,
     };
     let w = prepare_with(&profile, &cx, cx_names).expect("prepare");

@@ -40,6 +40,8 @@ impl GitShipyard {
                 name: super::path_text(&path),
                 branch,
                 ahead: None,
+                card: None,
+                merge_commit: None,
             })
             .collect();
         let refs = self.git(
@@ -59,9 +61,32 @@ impl GitShipyard {
                 name: name.to_owned(),
                 branch: None,
                 ahead,
+                card: None,
+                merge_commit: self.merge_commit_of(repo, base, name),
             });
         }
         Ok(found)
+    }
+
+    /// The first merge commit on `base` that brought `branch` in; `None` when it never was merged
+    /// (or `base` is gone).
+    fn merge_commit_of(&self, repo: &str, base: &str, branch: &str) -> Option<String> {
+        let range = format!("refs/heads/{branch}..{base}");
+        let out = self
+            .git(
+                repo,
+                [
+                    "rev-list",
+                    "--merges",
+                    "--ancestry-path",
+                    "--reverse",
+                    range.as_str(),
+                ],
+            )
+            .ok()?;
+        out.lines()
+            .next()
+            .map(|l| l.trim().chars().take(12).collect())
     }
 
     pub(super) fn discard_stray(&self, repo: &str, stray: &Stray) -> Result<(), ShipError> {

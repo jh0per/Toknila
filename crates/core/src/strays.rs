@@ -30,11 +30,19 @@ pub struct Stray {
     /// loses them. `None` when the host could not count.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ahead: Option<u32>,
+    /// For a branch, the key of the merged or cancelled card it belonged to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card: Option<String>,
+    /// For a branch, the commit on the base branch that merged it (the host looks it up).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_commit: Option<String>,
 }
 
 /// What the live cards of a project hold.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Owned {
+    /// Branch name to the key of the merged or cancelled card that had it.
+    pub retired: std::collections::BTreeMap<String, String>,
     /// Worktree paths, in the host's canonical spelling.
     pub worktrees: BTreeSet<String>,
     /// Branch names.
@@ -57,6 +65,12 @@ pub fn find(found: &[Stray], owned: &Owned) -> Vec<Stray> {
             StrayKind::Branch => !owned.branches.contains(&s.name),
         })
         .cloned()
+        .map(|mut s| {
+            if s.kind == StrayKind::Branch {
+                s.card = owned.retired.get(&s.name).cloned();
+            }
+            s
+        })
         .collect()
 }
 
@@ -70,6 +84,8 @@ mod tests {
             name: path.to_owned(),
             branch: branch.map(str::to_owned),
             ahead: None,
+            card: None,
+            merge_commit: None,
         }
     }
 
@@ -79,7 +95,32 @@ mod tests {
             name: name.to_owned(),
             branch: None,
             ahead: Some(ahead),
+            card: None,
+            merge_commit: None,
         }
+    }
+
+    #[test]
+    fn a_branch_of_a_merged_or_cancelled_card_is_listed_with_the_card_key() {
+        let owned = Owned {
+            retired: [("ship/c/done".to_owned(), "DEMO-4".to_owned())].into(),
+            branches: ["ship/c/live".to_owned()].into(),
+            ..Owned::default()
+        };
+        let found = [
+            branch("ship/c/done", 0),
+            branch("ship/c/live", 0),
+            branch("ship/c/unknown", 1),
+        ];
+        let out = find(&found, &owned);
+        let got: Vec<_> = out
+            .iter()
+            .map(|s| (s.name.as_str(), s.card.as_deref()))
+            .collect();
+        assert_eq!(
+            got,
+            [("ship/c/done", Some("DEMO-4")), ("ship/c/unknown", None)]
+        );
     }
 
     #[test]
@@ -87,6 +128,7 @@ mod tests {
         let owned = Owned {
             worktrees: ["/s/a".to_owned()].into(),
             branches: ["ship/c/a".to_owned(), "ship/c/b".to_owned()].into(),
+            ..Owned::default()
         };
         let found = [
             tree("/s/a", Some("ship/c/a")),

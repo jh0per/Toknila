@@ -51,6 +51,15 @@ async function discuss(base: string, e: PlannerEffect, dispatch: Dispatch): Prom
   await ask(base, { ...e, text: askLine(card, said.thread.number, e.text ?? ""), wait: false }, dispatch);
 }
 
+/// Types the card's unanswered message into the live planner's terminal once more: the same
+/// input route and line as the first delivery. A planner that is not running is refused (409).
+async function nudge(base: string, e: PlannerEffect): Promise<void> {
+  const typing = new TextEncoder();
+  await postBytes(`${base}/input`, typing.encode(askLine(e.card ?? "", e.thread ?? 1, e.text ?? "")));
+  await sleep(150);
+  await postBytes(`${base}/input`, typing.encode("\r"));
+}
+
 /// Runs one effect of the planner.
 export function runPlannerEffect(e: PlannerEffect, dispatch: Dispatch): void {
   const base = `/projects/${encodeURIComponent(e.project)}/planner`;
@@ -58,6 +67,10 @@ export function runPlannerEffect(e: PlannerEffect, dispatch: Dispatch): void {
     dispatch({ type: "plannerFailed", error: String(err instanceof Error ? err.message : err) });
   if (e.call === "ask") {
     ask(base, e, dispatch).catch(failed);
+    return;
+  }
+  if (e.call === "nudge") {
+    nudge(base, e).catch(failed);
     return;
   }
   if (e.call === "discuss") {

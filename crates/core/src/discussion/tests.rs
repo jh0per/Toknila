@@ -112,3 +112,19 @@ fn the_transcript_says_who_spoke_and_what_became_of_each_proposal() {
         ]
     );
 }
+
+#[test]
+fn a_message_is_unanswered_until_the_assistant_says_or_proposes_something() {
+    let ask = say(MessageKind::Message, Actor::Human, "hi", 1);
+    assert_eq!(
+        unanswered(std::slice::from_ref(&ask)).map(|m| m.id),
+        Some(ask.id)
+    );
+    let reply = say(MessageKind::Message, Actor::Agent, "hello", 2);
+    assert!(unanswered(&[ask.clone(), reply]).is_none());
+    assert!(unanswered(&[]).is_none());
+    // A decision on a proposal is not a message of the person's.
+    let decided = say(MessageKind::EditRejected, Actor::Human, "x", 3);
+    let proposed = say(MessageKind::EditProposal, Actor::Agent, "{}", 2);
+    assert!(unanswered(&[ask, proposed, decided]).is_none());
+}

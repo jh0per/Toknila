@@ -39,7 +39,7 @@ async fn journal(api: &Api) -> Vec<String> {
 }
 
 #[tokio::test]
-async fn start_makes_the_worktree_and_merged_removes_it_but_keeps_the_branch() {
+async fn start_makes_the_worktree_and_merged_removes_it_and_the_branch() {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = repo(tmp.path());
     let ships = tmp.path().join("home").join("ships");
@@ -80,9 +80,10 @@ async fn start_makes_the_worktree_and_merged_removes_it_but_keeps_the_branch() {
     assert_eq!(d["ticket"]["status"], "merged");
     assert_eq!(d["ship"], Value::Null);
     assert!(!path.exists());
-    assert!(
-        git(&repo, &["branch", "--list", "ship/auth/demo-1-login"])
-            .contains("ship/auth/demo-1-login")
+    assert_eq!(
+        git(&repo, &["branch", "--list", "ship/auth/demo-1-login"]),
+        "",
+        "a merged branch is deleted with its worktree"
     );
     assert_eq!(journal(&api).await, ["ship_created", "ship_removed"]);
 }

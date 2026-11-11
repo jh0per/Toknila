@@ -10700,8 +10700,22 @@
             ],
             "description": "For a worktree, the branch checked out in it."
           },
+          "card": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a branch, the key of the merged or cancelled card it belonged to."
+          },
           "kind": {
             "$ref": "#/components/schemas/StrayKind"
+          },
+          "merge_commit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a branch, the commit on the base branch that merged it (the host looks it up)."
           },
           "name": {
             "type": "string",
