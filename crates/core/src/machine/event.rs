@@ -63,6 +63,16 @@ pub enum TicketEvent {
     /// Host: the check could not run at all (no shell, no ship, the daemon restarted). A person
     /// decides.
     CheckLost { detail: String },
+    /// Host: the project has no check command; the ship was only brought up to its base and that
+    /// went through. The round says so instead of "the check passed".
+    CheckSkipped {
+        #[serde(skip)]
+        mode: ReviewMode,
+    },
+    /// Host: the check's turn came and the ship is being brought up to the base branch.
+    CheckSyncing,
+    /// Host: the check command `command` started running on the ship.
+    CheckRunning { command: String },
     /// Host: the check command ran but its program was not found (`toolpath::command_not_found`).
     /// That is the machine's fault, not the worker's: no round, no return; a person decides.
     CheckCannotRun { command: String },
@@ -152,6 +162,9 @@ impl TicketEvent {
             Self::Finished { .. } => "finished",
             Self::CheckDone { .. } => "check_done",
             Self::CheckLost { .. } => "check_lost",
+            Self::CheckSkipped { .. } => "check_skipped",
+            Self::CheckSyncing => "check_syncing",
+            Self::CheckRunning { .. } => "check_running",
             Self::CheckCannotRun { .. } => "check_cannot_run",
             Self::Block { .. } => "block",
             Self::Unblock => "unblock",
@@ -218,6 +231,9 @@ pub enum Effect {
     NudgeReviewer { message: String },
     /// Store the agent's summary as a report comment.
     RecordReport { summary: String },
+    /// Store the daemon's own words (a lost check, a reviewer that gave no verdict) as a report
+    /// comment written by the system, never by the agent.
+    RecordNotice { summary: String },
     /// Store a person's text as an instruction comment for the agent.
     RecordInstruction { text: String },
     /// Store the reviewer agent's remarks as an instruction comment for the worker.

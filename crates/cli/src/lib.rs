@@ -2,6 +2,7 @@
 //! The CLI is a thin client of the daemon API (it starts the daemon when needed);
 //! `toknila daemon run` is the daemon itself. Business rules live in core, not here.
 
+mod check_words;
 mod client;
 mod cmd;
 mod daemon_cmd;

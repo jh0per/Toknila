@@ -8,8 +8,8 @@ use toknila_core::machine::TicketEvent;
 use toknila_core::{ReviewTurn, ShipSpec, Ticket, TicketId, TicketKey, TicketStatus, toolpath};
 
 use crate::chain::tell_ticket;
-use crate::external::ExternalEffect;
-use crate::sync::SyncSpec;
+use crate::external::{ExternalEffect, ExternalOutcome, Host};
+use crate::sync::{SyncOutcome, SyncSpec};
 use crate::{AppResult, ChainTx, Reader, UnitOfWork, projects, reviews};
 
 /// The most characters of a check's output a round and the worker's instruction keep (the end of
@@ -81,6 +81,80 @@ impl CheckGate for OpenGate {
     fn enter(&self, _ticket: TicketId) -> Box<dyn CheckTurn + '_> {
         Box::new(())
     }
+}
+
+/// What a check tells its card while it works.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CheckStage {
+    /// The base branch is being brought into the ship.
+    Syncing,
+    /// The check command `command` started.
+    Running { command: String },
+}
+
+/// Where a check reports its stage; the daemon records it on the card as an event.
+pub trait CheckProgress: std::fmt::Debug + Sync {
+    /// The check of `ticket` reached `stage`.
+    fn stage(&self, ticket: TicketId, stage: CheckStage);
+}
+
+/// A progress port that tells nobody (tests of the use cases, no host).
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoProgress;
+
+impl CheckProgress for NoProgress {
+    fn stage(&self, _ticket: TicketId, _stage: CheckStage) {}
+}
+
+/// `RunCheck` on the host: waits for the machine's one turn, brings the base into the ship, runs
+/// the command, and reports each stage on the way. Touches no database.
+pub(crate) fn run_on_host(
+    host: &Host<'_>,
+    ticket: TicketId,
+    spec: Option<CheckSpec>,
+    sync: Option<&SyncSpec>,
+) -> ExternalOutcome {
+    // One check at a time on the machine: wait for the turn, hold it until done.
+    let _turn = host.gate.enter(ticket);
+    let synced = match sync {
+        Some(sync) => {
+            host.progress.stage(ticket, CheckStage::Syncing);
+            host.merger.sync(sync)
+        }
+        None => Ok(SyncOutcome::UpToDate),
+    };
+    let result = match (&spec, synced) {
+        (_, Ok(SyncOutcome::Conflict { files, migrations })) => {
+            let base = sync.map(|s| s.base.as_str()).unwrap_or_default();
+            let text = crate::sync::conflict_text(base, &files, &migrations);
+            return ExternalOutcome::SyncConflict { ticket, text };
+        }
+        (_, Err(e)) => Err(CheckError::Sync(e.to_string())),
+        (Some(spec), Ok(_)) => {
+            let command = spec.command.clone();
+            host.progress.stage(ticket, CheckStage::Running { command });
+            host.checker.run(spec)
+        }
+        (None, Ok(_)) => Err(CheckError::NothingToRun),
+    };
+    ExternalOutcome::CheckFinished {
+        ticket,
+        spec,
+        result,
+    }
+}
+
+/// A stage of a check arrived: the card learns it. A card that has moved on ignores it.
+pub fn stage_reached<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    stage: CheckStage,
+) -> AppResult<()> {
+    let event = match stage {
+        CheckStage::Syncing => TicketEvent::CheckSyncing,
+        CheckStage::Running { command } => TicketEvent::CheckRunning { command },
+    };
+    tell_ticket(uow, ticket, event)
 }
 
 /// Whether a hand-in of `t` is checked by the daemon, and the project's round limit. A card is
@@ -187,12 +261,8 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
     };
     let event = match result {
         // No command: only the sync ran, and it went through.
-        Err(CheckError::NothingToRun) if command.is_none() => TicketEvent::CheckDone {
-            passed: true,
-            output: "The ship was brought up to its base; the project has no check command."
-                .to_owned(),
+        Err(CheckError::NothingToRun) if command.is_none() => TicketEvent::CheckSkipped {
             mode: reviews::mode_of(uow, &t)?,
-            max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
         },
         // The program was not found: the machine's problem, not a round of the loop.
         Ok(r)

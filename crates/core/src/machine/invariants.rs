@@ -33,6 +33,9 @@ pub fn check_invariants(ticket: &Ticket) -> Result<(), String> {
     if ticket.review.turn.is_some() && ticket.status != S::Review {
         return Err(format!("awaiting a verdict in {:?}", ticket.status));
     }
+    if ticket.review.check.is_some() && ticket.review.turn != Some(crate::ReviewTurn::Check) {
+        return Err("a check phase outside the check turn".to_owned());
+    }
     if ticket.paused && ticket.status != S::Backlog {
         return Err(format!("paused ticket in {:?}", ticket.status));
     }

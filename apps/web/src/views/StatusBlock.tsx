@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { Ticket, TicketDetail } from "../api/types";
 import { statusLine } from "../store/cardStatus";
 import type { Intent } from "../store/msg";
@@ -13,7 +14,15 @@ export function StatusBlock({ state, card, detail, dispatch }: {
   dispatch: (i: Intent) => void;
 }) {
   const chain = currentChain(state);
-  const line = statusLine(card, detail, { queue: queuePosition(state, card.id), autostart: chain?.chain.autostart ?? false });
+  // A running check shows how long it has run, so the sentence is read again every few seconds.
+  const [now, setNow] = useState(() => Date.now());
+  const running = detail?.review.check?.phase === "running";
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [running]);
+  const line = statusLine(card, detail, { queue: queuePosition(state, card.id), autostart: chain?.chain.autostart ?? false, now });
   // The question as the daemon offers it (its answers included), when the card waits on one.
   const asked = card.status === "waiting" ? state.inbox.find((i) => i.ticket === card.key && i.kind === "question") : undefined;
   return (

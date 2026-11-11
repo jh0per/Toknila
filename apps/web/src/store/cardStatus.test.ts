@@ -58,15 +58,17 @@ describe("the status sentence", () => {
     expect(statusLine(card("review"), detail([], { by: "agent", decides: true }), pace()).text)
       .toBe("In review: the reviewer agent is checking the work");
     expect(statusLine(card("review"), detail([], { by: "check" }), pace()).text)
-      .toBe("In review: bringing the ship up to main");
-    const waiting = (place: number) => {
+      .toBe("Being checked: starting");
+    const checking = (check: object) => {
       const d = detail([], { by: "check" });
-      d.review = { ...d.review, check_queue: place };
-      return statusLine(card("review"), d, pace()).text;
+      d.review = { ...d.review, check } as TicketDetail["review"];
+      return statusLine(card("review"), d, pace({ now: 1_000 + 3 * 60_000 + 7_000 })).text;
     };
-    expect(waiting(0)).toBe("In review: bringing the ship up to main");
-    expect(waiting(1)).toBe("In review: waits for another check to end (next in line)");
-    expect(waiting(3)).toBe("In review: waits for another check to end (#3 in line)");
+    expect(checking({ phase: "queued", place: 1 })).toBe("Being checked: queued, next in line");
+    expect(checking({ phase: "queued", place: 3 })).toBe("Being checked: queued, #3 in line");
+    expect(checking({ phase: "syncing" })).toBe("Being checked: syncing with main");
+    expect(checking({ phase: "running", command: "cargo xtask verify", since: 1_000 }))
+      .toBe("Being checked: cargo xtask verify, 3 min");
     expect(statusLine(card("review"), detail([], { by: "merging" }), pace()).text)
       .toBe("Approved: merging into the main branch");
   });
