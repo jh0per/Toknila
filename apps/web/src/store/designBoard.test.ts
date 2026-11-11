@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Design, Ticket } from "../api/types";
 import {
-  CAPTION, COLUMNS, DEFAULT_ASPECT, GAP, PAD, TILE_W, WHOLE, boardItems, dropTarget, isPicture, labelSlots, layoutBoard, moveRef,
+  CAPTION, COLUMNS, DEFAULT_ASPECT, GAP, PAD, TILE_W, WHOLE, boardItems, dropTarget, isPicture, labelSlots, layoutBoard, refIndex,
   regionOf,
 } from "./designBoard";
 
@@ -109,24 +109,22 @@ describe("the card a handle is dropped on", () => {
   });
 });
 
-describe("moving a reference", () => {
-  it("takes it from the first card and adds it at the end of the second's list", () => {
-    const moved = moveRef([{ design: "A", region: r1 }, { design: "B" }], [{ design: "C" }], { design: "A", region: r1 });
-    expect(moved).toEqual({ from: [{ design: "B" }], to: [{ design: "C" }, { design: "A", region: r1 }] });
+describe("finding the reference to move", () => {
+  it("is its index in the card's list, the number the move route takes", () => {
+    expect(refIndex([{ design: "A", region: r1 }, { design: "B" }], { design: "B" })).toBe(1);
   });
 
-  it("moves the whole-picture reference, written as a null region", () => {
-    expect(moveRef([{ design: "A" }], [], { design: "A", region: null })).toEqual({ from: [], to: [{ design: "A", region: null }] });
+  it("matches the whole-picture reference written as a null region", () => {
+    expect(refIndex([{ design: "A" }], { design: "A", region: null })).toBe(0);
   });
 
-  it("does not add the reference twice, and moves only the one with that region", () => {
+  it("picks only the one with that region", () => {
     const other = { x: 1, y: 1, w: 5, h: 5 };
-    const moved = moveRef([{ design: "A", region: r1 }, { design: "A", region: other }], [{ design: "A", region: r1 }], { design: "A", region: r1 });
-    expect(moved).toEqual({ from: [{ design: "A", region: other }], to: [{ design: "A", region: r1 }] });
+    expect(refIndex([{ design: "A", region: r1 }, { design: "A", region: other }], { design: "A", region: other })).toBe(1);
   });
 
-  it("is nothing when the first card does not hold the reference", () => {
-    expect(moveRef([{ design: "B" }], [], { design: "A" })).toBeUndefined();
-    expect(moveRef([{ design: "A", region: r1 }], [], { design: "A" })).toBeUndefined();
+  it("is nothing when the card does not hold the reference", () => {
+    expect(refIndex([{ design: "B" }], { design: "A" })).toBeUndefined();
+    expect(refIndex([{ design: "A", region: r1 }], { design: "A" })).toBeUndefined();
   });
 });

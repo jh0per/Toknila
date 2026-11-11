@@ -177,6 +177,63 @@ impl ChainTx {
         Some(e)
     }
 
+    /// Replaces a dependency by another in one step, journaled as one event. The old edge must
+    /// exist and the graph rules (unknown node, cycle) judge the chain without it.
+    pub fn move_edge(&mut self, was: Edge, new: Edge) -> Result<(), AppError> {
+        self.remove_edge(was.from, was.to)
+            .ok_or_else(|| AppError::not_found("edge"))?;
+        self.events.pop(); // the removal is part of the move, not its own event
+        self.view.add_edge(new)?;
+        self.events.push(DomainEvent::EdgeMoved { edge: new, was });
+        Ok(())
+    }
+
+    /// Moves the design reference at `index` of one card to the end of another card's list, with
+    /// its region, journaled as one event. A card that already holds exactly that reference
+    /// just loses it from the first.
+    pub fn move_design(
+        &mut self,
+        from: TicketId,
+        index: usize,
+        to: TicketId,
+    ) -> Result<(), AppError> {
+        let find = |v: &ChainView, id| v.tickets.iter().position(|t| t.id == id);
+        let (Some(a), Some(b)) = (find(&self.view, from), find(&self.view, to)) else {
+            return Err(AppError::not_found("ticket"));
+        };
+        if a == b {
+            return Err(AppError::bad_request(
+                "the reference is already on that card",
+            ));
+        }
+        for i in [a, b] {
+            let t = &self.view.tickets[i];
+            if !t.status.can_edit() {
+                return Err(AppError::conflict(format!(
+                    "{} is {}; a finished card cannot be edited",
+                    t.key,
+                    toknila_core::wire::wire_name(&t.status).unwrap_or_default()
+                )));
+            }
+        }
+        if index >= self.view.tickets[a].designs.len() {
+            return Err(AppError::not_found(format!(
+                "design reference {index} of {}",
+                self.view.tickets[a].key
+            )));
+        }
+        let design = self.view.tickets[a].designs.remove(index);
+        if !self.view.tickets[b].designs.contains(&design) {
+            self.view.tickets[b].designs.push(design.clone());
+        }
+        self.events.push(DomainEvent::DesignMoved {
+            design,
+            from: self.view.tickets[a].key.clone(),
+            ticket: self.view.tickets[b].clone(),
+        });
+        Ok(())
+    }
+
     fn settle(&mut self) -> Result<(), GraphError> {
         let settled = self.view.settle(self.now)?;
         self.events.extend(settled.events);

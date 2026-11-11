@@ -102,6 +102,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chains/{chain}/edges/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replaces a dependency by another in one transaction: a refusal changes nothing. */
+        post: operations["move_edge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chains/{chain}/export": {
         parameters: {
             query?: never;
@@ -1225,6 +1242,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tickets/{ticket}/designs/{index}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gives a design reference, region kept, to another card of the chain in one transaction. */
+        post: operations["move_design"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets/{ticket}/discussion": {
         parameters: {
             query?: never;
@@ -2052,6 +2086,11 @@ export interface components {
             /** @description Whether the project has a Figma token; the token itself is never sent. */
             figma_token: boolean;
         };
+        /** @description `POST /v1/tickets/{ticket}/designs/{index}/move`: give a design reference to another card. */
+        DesignMoveInput: {
+            /** @description Key of the card of the same chain that receives the reference. */
+            target: string;
+        };
         /**
          * @description A design the planner names: its file name (or id) in the project's library, and the part of
          *     the image that matters. The host finds the design and gives the use case a [`DesignRef`].
@@ -2106,6 +2145,13 @@ export interface components {
          * @enum {string}
          */
         EdgeKind: "normal" | "after_release";
+        /** @description `POST /v1/chains/{chain}/edges/move`: replace a dependency by another, all or nothing. */
+        EdgeMoveInput: {
+            /** @description The dependency that takes its place. */
+            new: components["schemas"]["EdgeInput"];
+            /** @description The dependency that is dropped (its `kind` is ignored). */
+            old: components["schemas"]["EdgeInput"];
+        };
         /** @description Error body of every failed request. */
         ErrorBody: {
             /** @description Stable machine code: not_found, bad_request, conflict, ambiguous, internal, unauthorized. */
@@ -4078,6 +4124,48 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_edge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EdgeMoveInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6664,6 +6752,58 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_design: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key that holds the reference */
+                ticket: string;
+                /** @description Position of the reference in the card's list */
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignMoveInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

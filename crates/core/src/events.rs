@@ -46,6 +46,18 @@ pub enum DomainEvent {
     EdgeRemoved {
         edge: Edge,
     },
+    /// A dependency moved to another end in one step: `edge` is the new one, `was` the old.
+    EdgeMoved {
+        edge: Edge,
+        was: Edge,
+    },
+    /// A design reference moved from the card `from` to another in one step. `ticket` is the card
+    /// that received it, as it is now.
+    DesignMoved {
+        design: crate::design::DesignRef,
+        from: TicketKey,
+        ticket: Ticket,
+    },
     TicketCreated {
         ticket: Ticket,
     },
@@ -260,8 +272,10 @@ impl DomainEvent {
             | Self::ChainUpdated { .. }
             | Self::ChainDeleted { .. }
             | Self::EdgeAdded { .. }
-            | Self::EdgeRemoved { .. } => "chain",
-            Self::TicketCreated { .. }
+            | Self::EdgeRemoved { .. }
+            | Self::EdgeMoved { .. } => "chain",
+            Self::DesignMoved { .. }
+            | Self::TicketCreated { .. }
             | Self::TicketStatusChanged { .. }
             | Self::TicketUpdated { .. }
             | Self::TicketProposed { .. }
@@ -299,8 +313,11 @@ impl DomainEvent {
             Self::ChainCreated { chain }
             | Self::ChainUpdated { chain }
             | Self::ChainDeleted { chain } => chain.id.to_string(),
-            Self::EdgeAdded { edge } | Self::EdgeRemoved { edge } => edge.chain_id.to_string(),
-            Self::TicketCreated { ticket }
+            Self::EdgeAdded { edge }
+            | Self::EdgeRemoved { edge }
+            | Self::EdgeMoved { edge, .. } => edge.chain_id.to_string(),
+            Self::DesignMoved { ticket, .. }
+            | Self::TicketCreated { ticket }
             | Self::TicketStatusChanged { ticket, .. }
             | Self::TicketUpdated { ticket }
             | Self::TicketProposed { ticket }
@@ -346,6 +363,8 @@ impl DomainEvent {
             Self::ProjectDeleted { .. } | Self::ChainDeleted { .. } => "deleted",
             Self::EdgeAdded { .. } => "edge_added",
             Self::EdgeRemoved { .. } => "edge_removed",
+            Self::EdgeMoved { .. } => "edge_moved",
+            Self::DesignMoved { .. } => "design_moved",
             Self::TicketStatusChanged { .. } => "status_changed",
             Self::TicketUpdated { .. }
             | Self::SubtaskUpdated { .. }

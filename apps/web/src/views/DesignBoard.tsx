@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { get, patch } from "../api/http";
-import type { ChainDetail, Design, DesignList, TicketDetail } from "../api/types";
-import { boardItems, layoutBoard, moveRef } from "../store/designBoard";
+import { get } from "../api/http";
+import type { ChainDetail, Design, DesignList } from "../api/types";
+import { boardItems, layoutBoard, refIndex } from "../store/designBoard";
+import { moveDesign } from "../store/designEffects";
 import { type Ref } from "../store/designs";
 import type { Intent } from "../store/msg";
 import { pinVersion, pinsFor } from "../store/pins";
@@ -65,16 +66,14 @@ function BoardView({ chain, state, dispatch }: { chain: ChainDetail; state: Stat
     setAspects((all) => (Math.abs((all[id] ?? 0) - a) < 0.001 ? all : { ...all, [id]: a }));
   }, []);
 
-  // The target gets the reference first, so a refusal halfway never loses it.
+  // One request: the daemon moves the reference whole or changes nothing.
   const move = useCallback(async (card: string, ref: Ref, target: string) => {
     const from = chain.tickets.find((t) => t.key === card);
-    const to = chain.tickets.find((t) => t.key === target);
-    const next = from && to && moveRef(from.designs ?? [], to.designs ?? [], ref);
-    if (!from || !to || !next) return;
+    const index = from && refIndex(from.designs ?? [], ref);
+    if (!from || index === undefined || !chain.tickets.some((t) => t.key === target)) return;
     setError(undefined);
     try {
-      await patch<TicketDetail>(`/tickets/${enc(to.key)}`, { designs: next.to });
-      await patch<TicketDetail>(`/tickets/${enc(from.key)}`, { designs: next.from });
+      await moveDesign(from.key, index, target);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
