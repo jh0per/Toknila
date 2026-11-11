@@ -7,7 +7,6 @@ use toknila_core::{Chain, Project};
 /// `POST /v1/projects/{project}/delete`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct DeleteProject {
     /// Also move the repository folder to the system Trash. Without it the folder stays.
     #[serde(default)]

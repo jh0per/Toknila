@@ -25,7 +25,6 @@ pub enum CommentKind {
 /// Template fields of a comment. Empty fields are `None` and are omitted when rendered.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct CommentBody {
     /// One-line gist, the heading of the comment.
     pub gist: String,

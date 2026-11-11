@@ -75,7 +75,6 @@ pub struct TicketQuery {
 /// Body of ticket actions. `text` is required by block, return and cancel.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct ActionInput {
     pub text: Option<String>,
 }
@@ -83,7 +82,6 @@ pub struct ActionInput {
 /// `POST /v1/tickets/{ticket}/subtasks`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewSubtask {
     pub text: String,
 }
@@ -91,7 +89,6 @@ pub struct NewSubtask {
 /// `PATCH /v1/tickets/{ticket}/subtasks/{position}`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct PatchSubtask {
     pub done: Option<bool>,
     pub text: Option<String>,

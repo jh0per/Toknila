@@ -9,7 +9,6 @@ use crate::ChainDetail;
 /// `GET /v1/chains/{chain}/export`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct ChainFile {
     pub toml: String,
 }
@@ -17,7 +16,6 @@ pub struct ChainFile {
 /// `POST /v1/projects/{project}/import-path`: what the daemon is to read and import.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct ImportPath {
     /// Absolute path of a TOML chain file, of a spec folder (one with `tasks.md`), or of a folder
     /// whose subfolders are spec folders.

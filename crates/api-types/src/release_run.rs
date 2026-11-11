@@ -24,7 +24,6 @@ pub struct ReleaseOffer {
 /// Body of `POST /v1/chains/{chain}/release`: the person's click on Release.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct StartRelease {
     /// The version, such as `1.4.0`; it becomes the tag `v1.4.0`.
     pub version: String,

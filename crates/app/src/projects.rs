@@ -12,7 +12,6 @@ use crate::{AppError, AppResult, Reader, UnitOfWork, resolve};
 /// `POST /v1/projects`: a new project; unset fields take the project defaults.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewProject {
     /// Short uppercase key, prefix of ticket keys (`DEMO`).
     pub key: String,
@@ -39,7 +38,6 @@ pub struct NewProject {
 /// `PATCH /v1/projects/{project}`: the settings to change; unset fields stay.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct PatchProject {
     /// Most agents working at once (1 to 64).
     pub max_parallel: Option<u32>,

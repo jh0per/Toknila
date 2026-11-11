@@ -16,7 +16,6 @@ use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork, resolve, with_chai
 /// `POST /v1/projects/{project}/chains`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewChain {
     pub name: String,
     pub goal: Option<String>,

@@ -78,7 +78,6 @@ pub struct ChainItem {
 /// `POST /v1/chains/{chain}/edges` and the query of `DELETE`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema, utoipa::IntoParams))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct EdgeInput {
     /// Ticket key or release version.
     pub from: String,
@@ -112,7 +111,6 @@ pub struct DesignMoveInput {
 /// another card of the chain.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct MoveInput {
     /// Ticket key of the card the moved card goes next to.
     pub anchor: String,

@@ -4,6 +4,7 @@ pub use toknila_api_types as dto;
 pub mod body;
 pub mod error;
 pub mod routes;
+mod strict;
 
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -135,7 +136,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .split_for_parts();
     // Routes are nested under /v1; say so in the document.
     api.servers = Some(vec![utoipa::openapi::Server::new("/v1")]);
-    (router, api)
+    (router, strict::close_bodies(api))
 }
 
 /// The OpenAPI document as JSON.

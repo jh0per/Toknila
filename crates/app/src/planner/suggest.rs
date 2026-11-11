@@ -11,7 +11,6 @@ use crate::{AppError, AppResult, UnitOfWork};
 /// What the planner says as its next step.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewSuggestion {
     /// The step in a line or two; with no card and no action it says nothing waits for the owner.
     pub text: String,

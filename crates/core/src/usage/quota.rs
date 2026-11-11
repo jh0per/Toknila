@@ -9,7 +9,6 @@ use crate::Timestamp;
 /// One rate-limit window.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct QuotaWindow {
     /// `five_hour` or `seven_day`.
     pub name: String,

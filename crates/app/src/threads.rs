@@ -16,7 +16,6 @@ use crate::{AppError, AppResult, UnitOfWork};
 /// `POST /v1/tickets/{ticket}/threads`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewThread {
     pub kind: ThreadKind,
     pub title: String,
@@ -25,7 +24,6 @@ pub struct NewThread {
 /// Body of `.../messages` and `.../changes`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewMessage {
     pub text: String,
 }
@@ -33,7 +31,6 @@ pub struct NewMessage {
 /// `POST /v1/tickets/{ticket}/threads/{thread}/versions`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewVersion {
     pub format: ArtifactFormat,
     pub body: String,

@@ -63,7 +63,6 @@ pub(crate) fn set_version(ctx: &mut ChainTx, text: &str) -> AppResult<()> {
 /// [`crate::projects::PatchProject`]). A field left out is kept.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct ChainSettings {
     pub review_mode: Option<ReviewMode>,
     /// Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`.

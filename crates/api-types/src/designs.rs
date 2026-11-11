@@ -67,7 +67,6 @@ pub struct DesignList {
 /// Body of `POST /v1/projects/{project}/designs/figma`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewFigmaDesign {
     /// The link of a frame (Copy link to selection).
     pub url: String,
@@ -79,7 +78,6 @@ pub struct NewFigmaDesign {
 /// Body of `PATCH /v1/projects/{project}/designs/{design}`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct RenameDesign {
     pub name: String,
 }
@@ -87,7 +85,6 @@ pub struct RenameDesign {
 /// Body of `PUT /v1/projects/{project}/figma-token`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct FigmaToken {
     pub token: String,
 }
@@ -101,7 +98,6 @@ impl std::fmt::Debug for FigmaToken {
 /// Body of `POST /v1/planner/pins`: a question the planner pins on a region of a design.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewDesignPin {
     /// The design: its name or id.
     pub design: String,

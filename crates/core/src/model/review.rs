@@ -66,7 +66,6 @@ impl ItemBasis {
 /// The reviewer's judgement of one acceptance item.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ItemVerdict {
     /// The item's 1-based position in the ticket's acceptance list.
     pub item: u32,

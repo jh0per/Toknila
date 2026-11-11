@@ -87,7 +87,6 @@ pub fn card<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> A
 /// What the planner may give for a new chain; a chain it makes never starts cards by itself.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewPlanChain {
     pub name: String,
     pub goal: Option<String>,

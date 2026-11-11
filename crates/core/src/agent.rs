@@ -11,7 +11,6 @@ use crate::{ArtifactFormat, CommentBody, ThreadKind, Verdict, WaitingReason};
 /// ticket keys, titles or release versions of the same chain.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Proposal {
     pub title: String,
     /// The task for whoever does it.
@@ -31,7 +30,7 @@ pub struct Proposal {
 /// One report from the agent working on a ticket.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "event", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "event", rename_all = "snake_case")]
 pub enum AgentEvent {
     /// The runner is up and the agent is working. Starts a Ready ticket; no-op if Running.
     Started,
@@ -133,7 +132,7 @@ impl AgentEvent {
 /// What a release agent reports about its milestone.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "event", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "event", rename_all = "snake_case")]
 pub enum ReleaseEvent {
     /// Built, shipped to the channel, merged and tagged: the milestone is released.
     Finished,

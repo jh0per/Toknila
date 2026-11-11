@@ -78,7 +78,6 @@ pub struct Ticket {
 /// The width and height of a card on a chain's canvas, in whole canvas pixels.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Size {
     pub w: i32,
     pub h: i32,
@@ -87,7 +86,6 @@ pub struct Size {
 /// A place on a chain's canvas, in whole canvas pixels.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Pos {
     pub x: i32,
     pub y: i32,
@@ -231,7 +229,6 @@ impl Ticket {
 /// not among them: it moves only through the state machine.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema), schema(as = PatchTicket))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TicketPatch {
     pub title: Option<String>,
     pub prompt: Option<String>,

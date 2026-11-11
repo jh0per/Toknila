@@ -13,7 +13,6 @@ use crate::{AppError, AppResult, UnitOfWork, with_chain};
 /// `POST /v1/chains/{chain}/releases`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewRelease {
     pub version: String,
     /// Defaults to tag_only.

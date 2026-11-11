@@ -2277,11 +2277,8 @@ export interface components {
              * @default false
              */
             enabled: boolean;
-            /**
-             * @description Flag of the agent's command that takes the path of a generated hook settings file.
-             * @default null
-             */
-            settings_flag: string | null;
+            /** @description Flag of the agent's command that takes the path of a generated hook settings file. */
+            settings_flag?: string | null;
         };
         /** @description `POST /v1/projects/{project}/import-path`: what the daemon is to read and import. */
         ImportPath: {
@@ -2429,11 +2426,8 @@ export interface components {
          *     file under the data home and passes its path with `config_flag`.
          */
         McpWiring: {
-            /**
-             * @description Flag of the agent's command that takes the path of a generated MCP config.
-             * @default null
-             */
-            config_flag: string | null;
+            /** @description Flag of the agent's command that takes the path of a generated MCP config. */
+            config_flag?: string | null;
             /**
              * @description Whether the launcher wires the MCP server into this agent.
              * @default false

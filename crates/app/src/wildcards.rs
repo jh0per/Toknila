@@ -12,7 +12,6 @@ use crate::{AppError, AppResult, UnitOfWork, resolve, with_chain};
 /// `POST /v1/chains/{chain}/wildcards`: a person proposes a card.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NewWildcard {
     pub title: String,
     /// The task for whoever does it.
