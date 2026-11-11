@@ -70,6 +70,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         branch: None,
         needs_secrets: false,
         design_first: false,
+        designs: Vec::new(),
         tokens_used: 0,
         wildcard: None,
         done_out_of_order: None,

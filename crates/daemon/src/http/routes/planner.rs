@@ -7,9 +7,10 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
 use toknila_api_types::{PlannerDesign, PlannerPlan};
-use toknila_app::planner::{self, CardEdit, NewCard, NewPlanChain};
+use toknila_app::planner::{self, CardEdit, DesignPick, NewCard, NewPlanChain};
 use toknila_app::threads::{self, NewMessage, NewThread, NewVersion};
-use toknila_core::{Actor, ThreadId, Ticket};
+use toknila_core::design::DesignRef;
+use toknila_core::{Actor, ProjectId, ThreadId, Ticket};
 
 use super::{ApiResult, chain_write, load_thread_detail, load_ticket_detail, read, stamp};
 use crate::designs::Designs;
@@ -69,6 +70,20 @@ pub async fn planner_new_chain(
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
+/// The designs a planner named, found in its project's library (a design the project lacks is a
+/// 400 that lists the ones it has).
+async fn resolve_picks(
+    state: &AppState,
+    project: ProjectId,
+    picks: Vec<DesignPick>,
+) -> ApiResult<Vec<DesignRef>> {
+    if picks.is_empty() {
+        return Ok(Vec::new());
+    }
+    let designs = Designs::new(&state.home, project);
+    Ok(tokio::task::spawn_blocking(move || designs.resolve(&picks)).await??)
+}
+
 #[utoipa::path(post, path = "/planner/chains/{chain}/cards", tag = "planner", request_body = NewCard,
     params(("chain" = String, Path, description = CHAIN)),
     responses((status = 201, body = TicketDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
@@ -81,10 +96,11 @@ pub async fn planner_add_card(
 ) -> ApiResult<(StatusCode, Json<TicketDetail>)> {
     let project = principal.planner_project()?;
     let (at, prices) = stamp(&state);
+    let designs = resolve_picks(&state, project, input.designs.clone()).await?;
     let (detail, _) = state
         .store
         .write(Actor::Agent, at, move |tx| -> ApiResult<TicketDetail> {
-            let id = planner::add_card(tx, project, &chain, input)?;
+            let id = planner::add_card_with_designs(tx, project, &chain, input, designs)?;
             load_ticket_detail(&tx.repo(), id, at, &prices)
         })
         .await?;
@@ -103,10 +119,14 @@ pub async fn planner_edit_card(
 ) -> ApiResult<Json<TicketDetail>> {
     let project = principal.planner_project()?;
     let (at, prices) = stamp(&state);
+    let designs = match edit.designs.clone() {
+        Some(picks) => Some(resolve_picks(&state, project, picks).await?),
+        None => None,
+    };
     let (detail, _) = state
         .store
         .write(Actor::Agent, at, move |tx| -> ApiResult<TicketDetail> {
-            let id = planner::edit_card(tx, project, &card, edit)?;
+            let id = planner::edit_card_with_designs(tx, project, &card, edit, designs)?;
             load_ticket_detail(&tx.repo(), id, at, &prices)
         })
         .await?;

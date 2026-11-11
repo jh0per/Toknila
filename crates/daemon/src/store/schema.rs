@@ -285,4 +285,8 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE projects ADD COLUMN bump_command TEXT;
     ALTER TABLE releases ADD COLUMN tag TEXT;
     "#,
+    // 21: the designs a card references (a JSON list of design id and optional region).
+    r#"
+    ALTER TABLE tickets ADD COLUMN designs_json TEXT;
+    "#,
 ];

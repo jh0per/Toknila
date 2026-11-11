@@ -118,6 +118,20 @@ mod tests {
     }
 
     #[test]
+    fn a_read_rule_names_one_file_in_the_same_spelling_as_a_deny_rule() {
+        assert_eq!(
+            read_allow_rule("/d/designs/p/x.png"),
+            "Read(//d/designs/p/x.png)"
+        );
+        assert_eq!(read_allow_rule(r"C:\d\x.png"), "Read(//c/d/x.png)");
+        // Control: the deny rule of the same file is spelled the same way.
+        assert_eq!(
+            deny_rules_for("/d/designs/p/x.png", "/u")[0],
+            "Read(//d/designs/p/x.png)"
+        );
+    }
+
+    #[test]
     fn a_path_outside_home_gets_no_home_spellings_and_a_drive_is_rooted() {
         let rules = deny_rules_for("/data/toknila/db", "/Users/p");
         assert_eq!(rules.len(), 3);

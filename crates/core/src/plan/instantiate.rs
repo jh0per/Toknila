@@ -1,10 +1,11 @@
 //! Turning a validated plan into a new chain.
 
 use super::{Plan, PlanNode, PlanTicket};
+use crate::design::DesignRef;
 use crate::graph::ChainView;
 use crate::{
-    Chain, ChainId, Edge, NodeRef, ProjectId, Release, ReleaseId, Ticket, TicketDraft, TicketId,
-    TicketKey, Timestamp,
+    Chain, ChainId, DesignId, Edge, NodeRef, ProjectId, Release, ReleaseId, Ticket, TicketDraft,
+    TicketId, TicketKey, Timestamp,
 };
 
 /// The subtasks of an imported ticket: text and whether it starts ticked.
@@ -16,6 +17,8 @@ pub struct Checklist {
     pub done: bool,
     /// Done, but these earlier tickets are not: it is taken to Merged out of order.
     pub behind: Vec<TicketKey>,
+    /// Designs the file names that the project does not have: the card was made without them.
+    pub dropped_designs: Vec<String>,
 }
 
 fn position(index: usize) -> u32 {
@@ -29,7 +32,20 @@ impl Plan {
         &self,
         project: ProjectId,
         now: Timestamp,
+        key: impl FnMut() -> TicketKey,
+    ) -> (ChainView, Vec<Checklist>) {
+        self.instantiate_with_designs(project, now, key, &[])
+    }
+
+    /// [`Plan::instantiate`] with the project's designs (id, file name): a ticket's design
+    /// references are found by name; a name the project lacks is dropped and reported in the
+    /// ticket's [`Checklist`].
+    pub fn instantiate_with_designs(
+        &self,
+        project: ProjectId,
+        now: Timestamp,
         mut key: impl FnMut() -> TicketKey,
+        library: &[(DesignId, String)],
     ) -> (ChainView, Vec<Checklist>) {
         let chain = Chain {
             id: ChainId::new(),
@@ -44,7 +60,7 @@ impl Plan {
         let tickets: Vec<Ticket> = self
             .tickets
             .iter()
-            .map(|t| Ticket::new_backlog(TicketId::new(), chain.id, key(), t.draft(), now))
+            .map(|t| Ticket::new_backlog(TicketId::new(), chain.id, key(), t.draft(library), now))
             .collect();
         let releases: Vec<Release> = self
             .releases
@@ -83,6 +99,7 @@ impl Plan {
                     .collect(),
                 done: p.done,
                 behind: open.iter().map(|i| tickets[*i].key.clone()).collect(),
+                dropped_designs: p.unknown_designs(library),
             })
             .collect();
         let view = ChainView {
@@ -97,8 +114,29 @@ impl Plan {
 }
 
 impl PlanTicket {
-    fn draft(&self) -> TicketDraft {
+    fn unknown_designs(&self, library: &[(DesignId, String)]) -> Vec<String> {
+        let known = |name: &str| library.iter().any(|(_, n)| n == name);
+        self.designs
+            .iter()
+            .filter(|d| !known(&d.design))
+            .map(|d| d.design.clone())
+            .collect()
+    }
+
+    fn draft(&self, library: &[(DesignId, String)]) -> TicketDraft {
+        let designs = self
+            .designs
+            .iter()
+            .filter_map(|d| {
+                let (id, _) = library.iter().find(|(_, n)| *n == d.design)?;
+                Some(DesignRef {
+                    design: *id,
+                    region: d.region,
+                })
+            })
+            .collect();
         TicketDraft {
+            designs,
             title: self.title.clone(),
             prompt: self.prompt.clone(),
             acceptance: self.acceptance.clone(),

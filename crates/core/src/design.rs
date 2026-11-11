@@ -3,6 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::DesignId;
+
 /// Most bytes one design file may have.
 pub const MAX_DESIGN_BYTES: usize = 25 * 1024 * 1024;
 
@@ -135,6 +137,61 @@ pub fn clean_name(raw: &str) -> Result<String, String> {
         return Err("A design needs a name.".to_owned());
     }
     Ok(name.chars().take(120).collect())
+}
+
+/// A rectangle of a design image, in whole percent of the image's width and height.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Region {
+    pub x: u8,
+    pub y: u8,
+    pub w: u8,
+    pub h: u8,
+}
+
+impl Region {
+    /// Whether the rectangle is not empty and lies inside the image.
+    pub fn check(&self) -> Result<(), String> {
+        let (x, y, w, h) = (
+            u16::from(self.x),
+            u16::from(self.y),
+            u16::from(self.w),
+            u16::from(self.h),
+        );
+        if w == 0 || h == 0 {
+            return Err("A region needs a width and a height above 0.".to_owned());
+        }
+        if x + w > 100 || y + h > 100 {
+            return Err(
+                "A region lies inside the image: x + w and y + h are at most 100 (percent)."
+                    .to_owned(),
+            );
+        }
+        Ok(())
+    }
+}
+
+/// A card's reference to a design of its project, with the part of the image that matters.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesignRef {
+    pub design: DesignId,
+    /// `None`: the whole image.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<Region>,
+}
+
+/// Checks a card's list of references: every region is valid and no reference repeats.
+pub fn check_refs(refs: &[DesignRef]) -> Result<(), String> {
+    for (i, r) in refs.iter().enumerate() {
+        if let Some(region) = &r.region {
+            region.check()?;
+        }
+        if refs[..i].contains(r) {
+            return Err("The same design with the same region is listed twice.".to_owned());
+        }
+    }
+    Ok(())
 }
 
 /// A personal access token as Figma issues them: printable characters without spaces or quotes.

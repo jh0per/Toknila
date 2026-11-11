@@ -4,6 +4,9 @@
 //! database, and nothing here writes the token to a log.
 
 pub mod figma;
+mod locate;
+
+pub use locate::Located;
 
 use std::fs;
 use std::io;

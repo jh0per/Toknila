@@ -1,0 +1,26 @@
+/* A card's designs: mockups large with the region outlined, the picker, the node thumbnail. */
+.card-designs { display: flex; flex-direction: column; gap: var(--s2); margin: var(--s3) 0; }
+.card-designs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+/* Looks like the page's h4 headings; it is not an h4 element only so the columns below stay the first. */
+.card-designs-title { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.card-design { display: flex; flex-direction: column; gap: var(--s1); }
+.mockup { margin: 0; display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+.mockup-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); }
+.mockup-zoom { display: inline-flex; align-items: center; gap: var(--s1); margin-left: auto; font-family: var(--mono); font-size: var(--fs-s); }
+.mockup-frame { max-height: 70vh; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-s); background: var(--surface2); }
+.mockup-stage { position: relative; max-width: none; line-height: 0; }
+.mockup-stage img { display: block; width: 100%; height: auto; user-select: none; }
+.mockup-stage.draw { cursor: crosshair; touch-action: none; border: 1px solid var(--line); max-width: min(100%, 640px); }
+/* The region: an outlined box; what lies outside it is dimmed by the shadow, which the stage's
+   (or the frame's) clip cuts off at the picture's edge. */
+.mockup-stage { overflow: hidden; }
+.mockup-region { position: absolute; box-sizing: border-box; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px color-mix(in srgb, var(--fg) 38%, transparent); pointer-events: none; }
+.mockup-pdf { width: 100%; height: 70vh; border: 1px solid var(--line); }
+.mockup-region-text, .mockup-missing { margin: 0; font-size: var(--fs-s); }
+.picker-grid { margin-bottom: var(--s2); }
+.design-thumb.pick.chosen { outline: 2px solid var(--accent); outline-offset: 1px; }
+.node-thumb { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.node-thumb-pic { position: relative; display: block; width: 28px; height: 20px; overflow: hidden; border: 1px solid var(--line); border-radius: 2px; background: var(--surface2); }
+.node-thumb-pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.node-thumb-pic i { position: absolute; box-sizing: border-box; border: 1px solid var(--accent); }
+.node-thumb b { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted); }

@@ -53,3 +53,54 @@ fn a_token_with_a_quote_or_space_is_refused() {
     assert!(clean_token("a\"b").is_err());
     assert!(clean_token("").is_err());
 }
+
+#[test]
+fn a_region_is_percent_of_the_image_and_stays_inside_it() {
+    let r = |x, y, w, h| Region { x, y, w, h };
+    assert_eq!(r(0, 0, 100, 100).check(), Ok(()));
+    assert_eq!(r(20, 10, 40, 30).check(), Ok(()));
+    // Controls: empty, out of the image, and past the edge are each refused.
+    assert!(r(20, 10, 0, 30).check().is_err());
+    assert!(r(20, 10, 40, 0).check().is_err());
+    assert!(r(101, 0, 1, 1).check().is_err());
+    assert!(r(70, 0, 40, 10).check().is_err());
+    assert!(r(0, 95, 10, 10).check().is_err());
+}
+
+#[test]
+fn design_refs_are_checked_and_have_no_double() {
+    let id = DesignId::new();
+    let one = DesignRef {
+        design: id,
+        region: Some(Region {
+            x: 1,
+            y: 2,
+            w: 3,
+            h: 4,
+        }),
+    };
+    assert_eq!(check_refs(std::slice::from_ref(&one)), Ok(()));
+    let bad = DesignRef {
+        design: id,
+        region: Some(Region {
+            x: 99,
+            y: 2,
+            w: 3,
+            h: 4,
+        }),
+    };
+    assert!(check_refs(&[bad]).is_err());
+    // The same design twice (without regions) is a mistake; with different regions it is not.
+    let plain = DesignRef {
+        design: id,
+        region: None,
+    };
+    assert!(check_refs(&[plain.clone(), plain.clone()]).is_err());
+    assert_eq!(check_refs(&[plain, one]), Ok(()));
+    let json = serde_json::to_string(&DesignRef {
+        design: id,
+        region: None,
+    })
+    .expect("json");
+    assert_eq!(json, format!("{{\"design\":\"{id}\"}}"));
+}
