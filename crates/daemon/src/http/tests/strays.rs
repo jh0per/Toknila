@@ -157,3 +157,42 @@ async fn a_deleted_chain_leaves_its_branch_in_the_list() {
     assert_eq!(strays["items"][0]["name"], BRANCH);
     assert_eq!(strays["items"][0]["kind"], "branch");
 }
+
+#[tokio::test]
+async fn a_merged_cards_branch_is_listed_with_its_key_and_merge_commit_and_cleaned() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let (api, repo, ship) = api_with_card(tmp.path()).await;
+    commit_file(&ship, "login.txt", "login\n", "add login");
+    let tip = git(&ship, &["rev-parse", "HEAD"]);
+    api.post(
+        "/v1/tickets/DEMO-1/events",
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
+    )
+    .await;
+    api.post("/v1/tickets/DEMO-1/actions/accept", json!({}))
+        .await;
+    assert_eq!(
+        api.get("/v1/tickets/DEMO-1").await["ticket"]["status"],
+        "merged"
+    );
+    assert_eq!(
+        branches(&repo),
+        "",
+        "local mode deletes it with the worktree"
+    );
+    // As in pull-request mode, where the forge owns the branch: it is still in the repository.
+    git(&repo, &["branch", BRANCH, &tip]);
+    let strays = api.get("/v1/projects/DEMO/strays").await;
+    let item = &strays["items"][0];
+    assert_eq!(item["name"], BRANCH, "{strays}");
+    assert_eq!(item["card"], "DEMO-1");
+    let merge = git(&repo, &["rev-parse", "develop"]);
+    assert_eq!(item["merge_commit"], json!(merge[..12]), "{strays}");
+    assert_eq!(item["ahead"], 0);
+    let (status, done) = api
+        .call(Method::POST, "/v1/projects/DEMO/strays/clean", None)
+        .await;
+    assert_eq!(status, StatusCode::OK, "{done}");
+    assert_eq!(done["removed"].as_array().expect("removed").len(), 1);
+    assert_eq!(branches(&repo), "");
+}

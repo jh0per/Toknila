@@ -16,6 +16,13 @@ describe("strayText", () => {
     expect(strayText(branch("ship/c/a", 3))).toBe("ship/c/a (3 commits not in the base)");
     expect(strayText(branch("ship/c/a"))).toBe("ship/c/a");
   });
+  it("names the card of a branch and the commit that merged it", () => {
+    const s: Stray = { ...branch("ship/c/a", 0), card: "DEMO-1", merge_commit: "abc123def456" };
+    expect(strayText(s)).toBe("ship/c/a (no commits of its own) [card DEMO-1, merged in abc123def456]");
+    expect(strayText({ ...branch("ship/c/a", 2), card: "DEMO-1" })).toBe(
+      "ship/c/a (2 commits not in the base) [card DEMO-1]",
+    );
+  });
 });
 
 describe("cleanedText", () => {

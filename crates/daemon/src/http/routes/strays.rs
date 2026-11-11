@@ -43,6 +43,7 @@ fn look(yard: &Yard, project: &Project, owned: &Owned) -> Result<Vec<Stray>, App
             })
             .collect(),
         branches: owned.branches.clone(),
+        retired: owned.retired.clone(),
     };
     let found = yard
         .found(repo, &project.work_branch)

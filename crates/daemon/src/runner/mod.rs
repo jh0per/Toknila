@@ -268,6 +268,7 @@ impl Runners {
             token,
             url: self.url.get().map(String::as_str),
             bin: &bin,
+            repo: Path::new(&req.dir),
             brief: &brief,
         };
         let wiring = wiring::prepare(profile, &cx)?;
