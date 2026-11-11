@@ -103,9 +103,11 @@ fn design_section(brief: &RunBrief<'_>) -> String {
      The person asked to see and approve a design before you write any code. Before you touch \
      the code: call `open_thread` with kind `design` (kind `flow` or `architecture` when that \
      fits the card better), then post a first version with `thread_version` that the person can \
-     judge: a Mermaid diagram, or the screen described as its states and layout. Then wait for \
-     the person's approval or request for changes; answer a request with a new version. Write \
-     code only after the person approved a version. `finished` is refused until one is approved.\n"
+     judge: a Mermaid diagram, or the screen described as its states and layout. Then stop and \
+     wait: the person's approval or request for changes arrives as an instruction. Do not ask \
+     for it with `ask_human`, and do not open a second thread for the same design; answer a \
+     request with a new version in the same thread. Write code only after the person approved a \
+     version. `finished` is refused until one is approved.\n"
         .to_owned()
 }
 
@@ -188,7 +190,8 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         ),
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
-             `show_plan`, then tell the owner in a line or two how the plan stands and wait for \
+             `show_plan`, then tell the owner in a line or two how the plan stands, say the next step \
+             with `suggest` (or that nothing waits for them), and wait for \
              what they want planned. Do not start any card.",
             key = brief.key
         ),

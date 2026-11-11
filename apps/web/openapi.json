@@ -1532,6 +1532,63 @@
         }
       }
     },
+    "/planner/suggestion": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Keeps the planner's next step for its project, replacing the previous one (a\n`window.suggest` event). The owner's window shows it with the button of its action; the\nplanner starts, answers and accepts nothing itself.",
+        "operationId": "planner_suggest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSuggestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suggestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/profiles": {
       "get": {
         "tags": [
@@ -2980,6 +3037,53 @@
             }
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/suggestion": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "The planner's standing suggestion for the project (the next step), or `null` when it has none.",
+        "operationId": "get_suggestion",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Suggestion"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/json": {
                 "schema": {
@@ -7167,6 +7271,37 @@
           }
         }
       },
+      "NewSuggestion": {
+        "type": "object",
+        "description": "What the planner says as its next step.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionAction",
+                "description": "What the button does: start, answer, accept or release."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "card": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card it is about (key, id or title)."
+          },
+          "text": {
+            "type": "string",
+            "description": "The step in a line or two; with no card and no action it says nothing waits for the owner."
+          }
+        }
+      },
       "NewThread": {
         "type": "object",
         "description": "`POST /v1/tickets/{ticket}/threads`.",
@@ -9633,6 +9768,70 @@
       "SubtaskId": {
         "type": "string",
         "description": "Identifies a [`crate::Subtask`]."
+      },
+      "Suggestion": {
+        "type": "object",
+        "description": "A project's standing suggestion.",
+        "required": [
+          "project",
+          "text",
+          "at"
+        ],
+        "properties": {
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionAction",
+                "description": "The one action its button does."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "card": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TicketKey",
+                "description": "The card it is about."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chain": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ChainId",
+                "description": "The chain of the card, so a client can act on the chain (release)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectKey"
+          },
+          "text": {
+            "type": "string",
+            "description": "What the planner says, in a line or two. With no card and no action it says that nothing\nwaits for the person."
+          }
+        }
+      },
+      "SuggestionAction": {
+        "type": "string",
+        "description": "What the button of a suggestion does.",
+        "enum": [
+          "start",
+          "answer",
+          "accept",
+          "release"
+        ]
       },
       "SystemChecks": {
         "type": "object",

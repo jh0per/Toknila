@@ -9,7 +9,7 @@ use crate::question::{AnswerKind, QuestionKind};
 use crate::{
     Actor, AgentRole, ArtifactFormat, Chain, Comment, Edge, ProcessExit, Project, ProjectId,
     ProjectKey, Release, ReleaseState, Run, Ship, StatusReason, Subtask, Thread, ThreadId,
-    ThreadMessage, Ticket, TicketId, TicketKey, TicketStatus,
+    ThreadMessage, Ticket, TicketId, TicketKey, TicketStatus, suggestion::Suggestion,
 };
 
 /// One change. Serialises as its payload: the variant's fields, without a tag.
@@ -189,6 +189,17 @@ pub enum DomainEvent {
         chain: String,
         ticket: TicketKey,
     },
+    /// The project's assistant set its standing suggestion (the next step for the owner); it
+    /// replaces the previous one.
+    WindowSuggest {
+        project: ProjectId,
+        suggestion: Suggestion,
+    },
+    /// The standing suggestion ended: its action was done or its card moved on.
+    WindowSuggestionCleared {
+        project: ProjectId,
+        project_key: ProjectKey,
+    },
 }
 
 impl DomainEvent {
@@ -273,7 +284,9 @@ impl DomainEvent {
             | Self::ThreadApproved { .. }
             | Self::ThreadReopened { .. } => "thread",
             Self::DesignPinAsked { .. } | Self::DesignPinAnswered { .. } => "design_pin",
-            Self::WindowShowCard { .. } => "window",
+            Self::WindowShowCard { .. }
+            | Self::WindowSuggest { .. }
+            | Self::WindowSuggestionCleared { .. } => "window",
         }
     }
 
@@ -317,7 +330,9 @@ impl DomainEvent {
             Self::ThreadMessagePosted { message, .. } => message.thread_id.to_string(),
             Self::ThreadVersionPosted { thread, .. } => thread.to_string(),
             Self::DesignPinAsked { pin } | Self::DesignPinAnswered { pin } => pin.id.to_string(),
-            Self::WindowShowCard { project, .. } => project.to_string(),
+            Self::WindowShowCard { project, .. }
+            | Self::WindowSuggest { project, .. }
+            | Self::WindowSuggestionCleared { project, .. } => project.to_string(),
         }
     }
 
@@ -358,6 +373,8 @@ impl DomainEvent {
             Self::DesignPinAsked { .. } => "asked",
             Self::DesignPinAnswered { .. } => "answered",
             Self::WindowShowCard { .. } => "show_card",
+            Self::WindowSuggest { .. } => "suggest",
+            Self::WindowSuggestionCleared { .. } => "suggestion_cleared",
         }
     }
 }

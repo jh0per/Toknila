@@ -7,9 +7,10 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
 use toknila_api_types::{PlannerDesign, PlannerPlan};
-use toknila_app::planner::{self, CardEdit, DesignPick, NewCard, NewPlanChain};
+use toknila_app::planner::{self, CardEdit, DesignPick, NewCard, NewPlanChain, NewSuggestion};
 use toknila_app::threads::{self, NewMessage, NewThread, NewVersion};
 use toknila_core::design::DesignRef;
+use toknila_core::suggestion::Suggestion;
 use toknila_core::{Actor, ProjectId, ThreadId, Ticket};
 
 use super::{ApiResult, chain_write, load_thread_detail, load_ticket_detail, read, stamp};
@@ -286,4 +287,25 @@ async fn thread_write(
         })
         .await?;
     Ok(Json(detail))
+}
+
+#[utoipa::path(post, path = "/planner/suggestion", tag = "planner", request_body = NewSuggestion,
+    responses((status = 200, body = Suggestion), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// Keeps the planner's next step for its project, replacing the previous one (a
+/// `window.suggest` event). The owner's window shows it with the button of its action; the
+/// planner starts, answers and accepts nothing itself.
+pub async fn planner_suggest(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Json(new): Json<NewSuggestion>,
+) -> ApiResult<Json<Suggestion>> {
+    let project = principal.planner_project()?;
+    let (at, _) = stamp(&state);
+    let (s, _) = state
+        .store
+        .write(Actor::Agent, at, move |tx| -> ApiResult<Suggestion> {
+            Ok(planner::suggest(tx, project, new)?)
+        })
+        .await?;
+    Ok(Json(s))
 }

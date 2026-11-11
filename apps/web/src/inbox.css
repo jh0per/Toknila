@@ -21,3 +21,10 @@
 .inbox .row-body input, .answer input { flex: 1; min-width: 12em; }
 .inbox .row-body .btns input, .answer .btns input { flex: 1 1 14em; }
 .answer { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; width: 100%; }
+
+/* The planner's next step: one row with the button of its action. */
+.suggestion { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); }
+.suggestion .t { min-width: 0; overflow-wrap: anywhere; }
+.suggestion .grow { flex: 1; }
+.inbox .suggestion { margin-bottom: var(--s3); }
+.planner-next { padding: var(--s2) var(--s4); }

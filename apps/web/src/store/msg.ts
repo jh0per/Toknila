@@ -1,7 +1,7 @@
 // Everything that changes the state: what the person did (intents), API answers, the stream.
 
 import type {
-  AgentRole, AnswerKind, ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, TicketAction, TicketDetail,
+  AgentRole, AnswerKind, ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, TicketAction, TicketDetail,
   TicketThreads,
 } from "../api/types";
 import type { AutostartEffect, AutostartIntent, AutostartResult } from "./autostart";
@@ -74,6 +74,7 @@ export type Msg =
   | { type: "agentsLoaded"; agents: ProjectAgents[] }
   | { type: "chainLoaded"; chain: ChainDetail }
   | { type: "inboxLoaded"; items: InboxItem[] }
+  | { type: "suggestionsLoaded"; suggestions: Suggestion[] }
   | { type: "detailLoaded"; detail: TicketDetail }
   | { type: "threadsLoaded"; threads: TicketThreads }
   | { type: "loadFailed"; error: string }

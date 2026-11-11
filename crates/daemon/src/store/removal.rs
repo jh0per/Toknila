@@ -52,6 +52,7 @@ impl Scope {
             journal,
             format!("DELETE FROM runners WHERE ship_id IN ({ships})"),
             format!("DELETE FROM ships WHERE ticket_id IN ({tickets})"),
+            format!("DELETE FROM suggestions WHERE chain_id IN ({chains})"),
             format!("DELETE FROM usage_sessions WHERE ticket_id IN ({tickets})"),
             format!("UPDATE usage_records SET ticket_id = NULL WHERE ticket_id IN ({tickets})"),
             format!("DELETE FROM thread_messages WHERE thread_id IN ({threads})"),
@@ -79,6 +80,7 @@ impl Repo<'_> {
         let scope = Scope::new("SELECT id FROM chains WHERE project_id = ?1");
         let mut sql =
             scope.statements(Some("(entity IN ('project', 'window') AND entity_id = ?1)"));
+        sql.push("DELETE FROM suggestions WHERE project_id = ?1".to_owned());
         sql.push("DELETE FROM projects WHERE id = ?1".to_owned());
         self.run(&sql, &project.to_string())
     }

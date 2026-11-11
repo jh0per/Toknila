@@ -8,6 +8,7 @@
 
 mod cards;
 mod plan;
+mod suggest;
 mod window;
 mod with_designs;
 
@@ -25,6 +26,7 @@ pub use cards::{
     edit_card_with_designs,
 };
 pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, plan};
+pub use suggest::{NewSuggestion, suggest};
 pub use window::show_card;
 pub use with_designs::{request_with, start_with};
 

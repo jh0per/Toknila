@@ -172,7 +172,15 @@ fn approval_pins_the_latest_version_and_a_new_version_reopens() {
     mem.events.clear();
     threads::request_changes(&mut mem, &a, &th, "one more thing").expect("changes");
     assert_eq!(mem.threads[0].state, ThreadState::Open);
-    assert_eq!(mem.kinds(), ["thread.message_posted", "thread.reopened"]);
+    assert_eq!(
+        mem.kinds(),
+        [
+            "thread.message_posted",
+            "thread.reopened",
+            "comment.added",
+            "comment.delivered"
+        ]
+    );
 }
 
 #[test]
@@ -189,7 +197,13 @@ fn a_thread_without_an_artifact_can_be_approved_in_words() {
     );
     assert_eq!(
         mem.kinds(),
-        ["thread.opened", "thread.message_posted", "thread.approved"]
+        [
+            "thread.opened",
+            "thread.message_posted",
+            "thread.approved",
+            "comment.added",
+            "comment.delivered"
+        ]
     );
 }
 

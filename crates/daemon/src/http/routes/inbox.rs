@@ -6,6 +6,7 @@ use toknila_app::leftovers::{self, LeftoverAction};
 use toknila_app::{inbox, resolve};
 use toknila_core::Actor;
 use toknila_core::inbox::InboxItem;
+use toknila_core::suggestion::Suggestion;
 
 use super::{ApiResult, read, ticket_write};
 use crate::http::dto::TicketDetail;
@@ -46,4 +47,20 @@ pub async fn resolve_leftovers(
         Ok(leftovers::resolve(tx, &t, action)?)
     })
     .await
+}
+
+#[utoipa::path(get, path = "/projects/{project}/suggestion", tag = "projects",
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Option<Suggestion>), (status = 404, body = ErrorBody)))]
+/// The planner's standing suggestion for the project (the next step), or `null` when it has none.
+pub async fn get_suggestion(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+) -> ApiResult<Json<Option<Suggestion>>> {
+    let s = read(&state, move |repo| {
+        let p = resolve::project(repo, &project)?;
+        Ok(repo.suggestion(p.id)?)
+    })
+    .await?;
+    Ok(Json(s))
 }

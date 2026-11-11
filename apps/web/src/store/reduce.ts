@@ -63,6 +63,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       const next = { ...withChain(s, msg.chain), error: "" };
       return [next, detailsWanted(next, [msg.chain])];
     }
+    case "suggestionsLoaded":
+      return [{ ...s, suggestions: msg.suggestions }, []];
     case "inboxLoaded":
       return [{ ...s, inbox: msg.items }, []];
     case "detailLoaded": {
@@ -346,6 +348,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
 /// `seq` guard of `applyEvent` makes it once per event) or ignored. A gap in `seq` still reloads.
 function applyWindow(s: State, e: EventRecord, gap: boolean): [State, Effect[]] {
   const fx: Effect[] = gap ? [{ type: "loadAll" }] : [];
+  if (e.kind === "suggest" || e.kind === "suggestion_cleared") return [s, [...fx, { type: "loadInbox" }]];
   const target = followTarget(s, e);
   if (!target) return [s, fx];
   const [moved, more] = go(s, target);
