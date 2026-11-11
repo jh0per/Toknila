@@ -7,6 +7,7 @@ import { reduceAutostart } from "./autostart";
 import { detailsWanted, knownKey } from "./cardDetails";
 import { reduceTheme } from "./theme";
 import { reduceEdges } from "./edges";
+import { followTarget, opened } from "./follow";
 import { reducePlacement } from "./placement";
 import { reduceQuick } from "./quick";
 import { type Dialog, reducePlan, withChain } from "./plan";
@@ -93,7 +94,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "selectCard":
       return go(s, { name: "card", project: msg.project, chain: msg.chain, key: msg.key });
     case "urlChanged":
-      return [calm({ ...s, route: msg.route, settingsFrom: nextSettingsFrom(s.route, msg.route, s.settingsFrom) }), enter(msg.route, s)];
+      return [calm({ ...s, route: msg.route, opened: undefined, settingsFrom: nextSettingsFrom(s.route, msg.route, s.settingsFrom) }), enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
       const key = msg.project.key;
@@ -266,6 +267,12 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "toggleShortcuts":
     case "closeShortcuts":
       return [reduceShortcuts(s, msg), []];
+    case "backFromOpened":
+      return s.opened ? go(s, s.opened.back) : [s, []];
+    case "dismissOpened":
+      return [{ ...s, opened: undefined }, []];
+    case "openedExpired":
+      return s.opened?.seq === msg.seq ? [{ ...s, opened: undefined }, []] : [s, []];
     case "setUsageDays":
     case "setUsageMetric":
     case "setMachineScan":
@@ -280,7 +287,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
 function go(s: State, route: Route): [State, Effect[]] {
   const plan = { ...s.plan, editing: undefined, moving: undefined };
   const settingsFrom = nextSettingsFrom(s.route, route, s.settingsFrom);
-  return [{ ...calm({ ...s, route, plan, settingsFrom }) }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+  // The person going anywhere ends the assistant's notice; `applyWindow` puts its own back.
+  return [{ ...calm({ ...s, route, plan, settingsFrom, opened: undefined }) }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
 }
 
 /// A settings section starts without the last section's "Saved" or refusal.
@@ -312,6 +320,7 @@ function enter(route: Route, s: State): Effect[] {
 function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq <= s.lastSeq) return [s, []];
   const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
+  if (e.entity === "window") return applyWindow(next, e, e.seq !== s.lastSeq + 1);
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
   if (e.kind === "deleted" && (e.entity === "chain" || e.entity === "project")) {
     // A deleted project or chain is dropped; a page that showed it goes home.
@@ -331,6 +340,16 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   const known = knownKey(s, ticket);
   if (known && known !== open?.key) fx.push({ type: "loadDetail", key: known });
   return [next, fx];
+}
+
+/// A window event is about what this window shows, not about the plan: it is followed once (the
+/// `seq` guard of `applyEvent` makes it once per event) or ignored. A gap in `seq` still reloads.
+function applyWindow(s: State, e: EventRecord, gap: boolean): [State, Effect[]] {
+  const fx: Effect[] = gap ? [{ type: "loadAll" }] : [];
+  const target = followTarget(s, e);
+  if (!target) return [s, fx];
+  const [moved, more] = go(s, target);
+  return [{ ...moved, opened: opened(s, target, e.seq) }, [...fx, ...more, { type: "expireOpened", seq: e.seq }]];
 }
 
 /// A thread event changes the card's threads and its phase; the hand-in gate may move its status.

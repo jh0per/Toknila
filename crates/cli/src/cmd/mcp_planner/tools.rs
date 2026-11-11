@@ -55,6 +55,12 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             &["card"],
         ),
         tool(
+            "show_card",
+            "Open a card in the owner's window (its page, with the designs on it), when they have this project's assistant or chain open. They get a small notice with a Back button. Use it to point at a card you are talking about; it changes nothing in the plan.",
+            json!({ "card": card }),
+            &["card"],
+        ),
+        tool(
             "add_dependency",
             "Make `to` wait for `from` in a chain. Refused in a chain that starts its cards by itself.",
             json!({ "chain": chain, "from": text("Card key"), "to": text("Card key") }),

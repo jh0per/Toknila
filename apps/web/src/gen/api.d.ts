@@ -238,6 +238,23 @@ export interface paths {
         patch: operations["planner_edit_card"];
         trace?: never;
     };
+    "/planner/cards/{card}/show": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asks the window to show a card of the planner's project (a `window.show_card` event). */
+        post: operations["planner_show_card"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/cards/{card}/threads": {
         parameters: {
             query?: never;
@@ -3844,6 +3861,44 @@ export interface operations {
                 "application/json": components["schemas"]["CardEdit"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_show_card: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card id, key or title */
+                card: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {

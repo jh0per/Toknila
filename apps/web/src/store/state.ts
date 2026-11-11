@@ -4,6 +4,7 @@ import type {
   ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads,
 } from "../api/types";
 import { type EdgesState, initialEdges } from "./edges";
+import type { OpenedCard } from "./follow";
 import { type PlacementState, initialPlacement } from "./placement";
 import { type ImportState, initialImports } from "./imports";
 import { type PlanState, initialPlan } from "./plan";
@@ -72,6 +73,8 @@ export interface State {
   theme: Theme;
   /// The "?" list of keyboard shortcuts is open.
   shortcutsOpen: boolean;
+  /// The card the assistant just opened here, while its notice (with Back) is up.
+  opened: OpenedCard | undefined;
 }
 
 export const FIRST_RETRY_MS = 500;
@@ -109,6 +112,7 @@ export function initialState(route: Route): State {
     updates: initialUpdates,
     theme: "system",
     shortcutsOpen: false,
+    opened: undefined,
   };
 }
 

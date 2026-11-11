@@ -33,6 +33,9 @@ pub(super) enum PlannerCall {
         card: String,
         edit: CardEdit,
     },
+    ShowCard {
+        card: String,
+    },
     AddDependency {
         chain: String,
         from: String,
@@ -79,6 +82,11 @@ struct EditCard {
     card: String,
     #[serde(flatten)]
     edit: CardEdit,
+}
+
+#[derive(Deserialize)]
+struct ShowCard {
+    card: String,
 }
 
 #[derive(Deserialize)]
@@ -141,6 +149,10 @@ pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolErr
         "edit_card" => {
             let EditCard { card, edit } = args(arguments)?;
             PlannerCall::EditCard { card, edit }
+        }
+        "show_card" => {
+            let ShowCard { card } = args(arguments)?;
+            PlannerCall::ShowCard { card }
         }
         "add_dependency" => {
             let Dependency { chain, from, to } = args(arguments)?;
@@ -240,6 +252,15 @@ pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<String, String
             .planner_edit_card(card, edit)
             .map(|d| card_line("updated", &d))
             .map_err(e),
+        PlannerCall::ShowCard { card } => client
+            .planner_show_card(card)
+            .map(|d| {
+                format!(
+                    "{} shown in the window, if it looks at this project",
+                    d.ticket.key
+                )
+            })
+            .map_err(e),
         PlannerCall::AddDependency { chain, from, to } => {
             let edge = EdgeInput {
                 from: from.clone(),
@@ -329,9 +350,9 @@ mod tests {
     }
 
     #[test]
-    fn the_planner_has_its_ten_tools_and_none_that_starts_or_accepts_anything() {
+    fn the_planner_has_its_eleven_tools_and_none_that_starts_or_accepts_anything() {
         let names = names();
-        assert_eq!(names.len(), 10, "{names:?}");
+        assert_eq!(names.len(), 11, "{names:?}");
         for forbidden in [
             "start", "pause", "resume", "cancel", "accept", "return", "reopen", "merge", "approve",
             "unblock", "block", "finished", "started",
@@ -383,6 +404,14 @@ mod tests {
         assert_eq!(card, "DEMO-2");
         assert_eq!(edit.title.as_deref(), Some("N"));
         assert_eq!(edit.edit_subtasks[0].position, 1);
+        assert!(matches!(
+            c("show_card", json!({ "card": "DEMO-2" })),
+            PlannerCall::ShowCard { card } if card == "DEMO-2"
+        ));
+        assert!(matches!(
+            call("show_card", &json!({})),
+            Err(ToolError::BadArguments(_))
+        ));
         assert!(matches!(
             c(
                 "add_dependency",

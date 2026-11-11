@@ -876,6 +876,55 @@
         }
       }
     },
+    "/planner/cards/{card}/show": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Asks the window to show a card of the planner's project (a `window.show_card` event).",
+        "operationId": "planner_show_card",
+        "parameters": [
+          {
+            "name": "card",
+            "in": "path",
+            "description": "Card id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/planner/cards/{card}/threads": {
       "post": {
         "tags": [

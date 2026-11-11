@@ -365,6 +365,7 @@ pub fn event(e: &EventRecord, offset: chrono::FixedOffset) -> String {
             s(&p["comment"]["kind"]),
             s(&p["comment"]["body"]["gist"])
         ),
+        ("window", "show_card") => format!("window show_card {}", s(&p["ticket"])),
         (entity, kind) => format!("{entity} {kind}"),
     };
     format!("{} #{} {} {what}", clock(e, offset), e.seq, w(&e.actor))
@@ -435,5 +436,21 @@ mod tests {
             "05:04:05 #4 system DEMO-1 ready -> running"
         );
         assert_eq!(event(&e, utc), "03:04:05 #4 system DEMO-1 ready -> running");
+    }
+
+    #[test]
+    fn a_show_card_event_names_the_card() {
+        let e = EventRecord {
+            seq: 9,
+            at: Timestamp(0),
+            actor: Actor::Agent,
+            entity: "window".to_owned(),
+            entity_id: "01JBQ7ZJ0000000000000000P1".to_owned(),
+            kind: "show_card".to_owned(),
+            payload: json!({"project": "01JBQ7ZJ0000000000000000P1", "project_key": "DEMO",
+                            "chain": "plan", "ticket": "DEMO-2"}),
+        };
+        let utc = chrono::FixedOffset::east_opt(0).expect("valid");
+        assert_eq!(event(&e, utc), "00:00:00 #9 agent window show_card DEMO-2");
     }
 }

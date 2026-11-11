@@ -941,6 +941,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/wildcards",
             "/events",
             "/planner/cards/{card}",
+            "/planner/cards/{card}/show",
             "/planner/cards/{card}/threads",
             "/planner/cards/{card}/threads/{thread}/messages",
             "/planner/cards/{card}/threads/{thread}/versions",

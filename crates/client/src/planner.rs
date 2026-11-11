@@ -135,6 +135,12 @@ impl Client {
         self.call("POST", &path, Some(m))
     }
 
+    /// `POST /planner/cards/{card}/show`.
+    pub fn planner_show_card(&self, card: &str) -> ClientResult<TicketDetail> {
+        let path = format!("/planner/cards/{}/show", enc(card));
+        self.call("POST", &path, NO_BODY)
+    }
+
     /// `POST /planner/cards/{card}/threads`.
     pub fn planner_open_thread(&self, card: &str, t: &NewThread) -> ClientResult<ThreadDetail> {
         let path = format!("/planner/cards/{}/threads", enc(card));

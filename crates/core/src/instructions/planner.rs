@@ -38,6 +38,9 @@ the end of the chain, or after the cards named in `after`.
 - `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `add_subtasks`, \
 `edit_subtasks`): change \
 a card that has not started. A card that is running, in review or done cannot be edited.
+- `show_card` (`card`): open a card in the owner's window (its page, with its designs) while you \
+talk about it; a window that looks at this project shows it with a small notice and a Back \
+button. It changes nothing in the plan.
 - `add_dependency` / `remove_dependency` (`chain`, `from`, `to`): `to` waits for `from`.
 - `move_card` (`chain`, `card`, `anchor`, `place`): put a card directly before or after another.
 - `open_thread` (`card`, `kind`, `title`), `thread_message` (`card`, `thread`, `text`), \
@@ -192,6 +195,7 @@ mod tests {
             "new_chain",
             "add_card",
             "edit_card",
+            "show_card",
             "add_dependency",
             "remove_dependency",
             "move_card",
