@@ -144,7 +144,9 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         ),
         crate::AgentRole::Reviewer => format!(
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
-             branch, run the checks, then call `review_verdict` once. You do not change the code.",
+             branch, run the check command and the tests the hand-in names and quote their \
+             result lines, mark NOT_RUN what you could not run, then call `review_verdict` \
+             once. You do not change the code.",
             key = brief.key
         ),
         _ => format!(
@@ -227,7 +229,7 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
     }
     out.push_str(&checks_section(
         brief,
-        "Run it to see the result for yourself, and report it as a check in your verdict.",
+        "Run it to see the result for yourself, quote its result line, and report it as a check in your verdict.",
     ));
     out.push('\n');
     out.push_str(protocol::REVIEW_PROTOCOL);

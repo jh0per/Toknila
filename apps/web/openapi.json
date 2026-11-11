@@ -5672,6 +5672,15 @@
           }
         }
       },
+      "ItemBasis": {
+        "type": "string",
+        "description": "How the reviewer came to its judgement of an item.",
+        "enum": [
+          "ran",
+          "read",
+          "not_run"
+        ]
+      },
       "ItemOutcome": {
         "type": "string",
         "description": "How one acceptance item stands, in the reviewer's eyes.",
@@ -5688,6 +5697,10 @@
           "outcome"
         ],
         "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/ItemBasis",
+            "description": "Whether the reviewer ran what shows the item or only read; `read` when it says nothing."
+          },
           "item": {
             "type": "integer",
             "format": "int32",

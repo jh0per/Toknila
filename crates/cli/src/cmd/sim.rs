@@ -84,6 +84,7 @@ fn item_verdict(text: &str) -> Result<ItemVerdict> {
             "fail" => ItemOutcome::Fail,
             other => anyhow::bail!("{other:?}: an item is judged pass or fail"),
         },
+        basis: toknila_core::ItemBasis::default(),
         note: String::new(),
     })
 }

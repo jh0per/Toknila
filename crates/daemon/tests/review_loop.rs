@@ -271,7 +271,7 @@ async fn the_loop_returns_the_card_until_the_round_limit_and_then_waits_for_the_
 
     // 4. Judged item by item, request_changes returns the card to the worker: a round.
     let both = json!([
-        { "item": 1, "outcome": "pass", "note": "works" },
+        { "item": 1, "outcome": "pass", "basis": "ran", "note": "works" },
         { "item": 2, "outcome": "fail", "note": "messy" }
     ]);
     rig.post("/v1/tickets/DEMO-1/events", verdict(both.clone()))
@@ -285,7 +285,7 @@ async fn the_loop_returns_the_card_until_the_round_limit_and_then_waits_for_the_
         .as_str()
         .expect("comment");
     assert!(
-        comment.starts_with("PASS 1. It logs in - works\nFAIL 2. It is tidy - messy"),
+        comment.starts_with("PASS 1. It logs in - works [ran]\nFAIL 2. It is tidy - messy [read]"),
         "{comment}"
     );
     assert_eq!(card["review"]["used_rounds"], 2);

@@ -273,6 +273,13 @@ fn the_first_prompt_fills_the_kickoff_placeholder_per_role() {
         r.command
     );
     assert!(r.command[3].contains("`review_verdict`"));
+    for must in [
+        "run the check command",
+        "quote their result lines",
+        "NOT_RUN",
+    ] {
+        assert!(r.command[3].contains(must), "{must} in {}", r.command[3]);
+    }
     assert!(
         !r.command
             .iter()
@@ -628,6 +635,81 @@ fn the_reviewer_may_fetch_the_listed_domains_and_no_others() {
     );
     let none = reviewer_allow(&[]);
     assert!(!none.iter().any(|r| r.starts_with("WebFetch")), "{none:?}");
+}
+
+/// The allow rules in the settings file of a reviewer for a project with `check` and a repository
+/// that holds `repo_tools`.
+fn reviewer_allow_for(check: Option<&str>, repo_tools: &[&str]) -> Vec<String> {
+    let mut rig = Rig::new();
+    rig.brief.check_command = check.map(str::to_owned);
+    rig.brief.repo_tools = repo_tools.iter().map(|t| (*t).to_owned()).collect();
+    rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    let (_, text) = rig.file_of("reviewer", "settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    v["permissions"]["allow"]
+        .as_array()
+        .expect("allow")
+        .iter()
+        .map(|r| r.as_str().expect("rule").to_owned())
+        .collect()
+}
+
+#[test]
+fn a_cargo_reviewer_may_run_cargo_test_xtask_clippy_and_the_check_but_not_write() {
+    let allow = reviewer_allow_for(Some("cargo xtask verify"), &["cargo"]);
+    for want in [
+        "Bash(cargo test *)",
+        "Bash(cargo xtask *)",
+        "Bash(cargo clippy *)",
+        "Bash(cargo xtask verify *)",
+        "Bash(git diff *)",
+    ] {
+        assert!(allow.contains(&want.to_owned()), "{want}: {allow:?}");
+    }
+    for never in [
+        "git commit",
+        "git push",
+        "git checkout",
+        "git add",
+        "install",
+        "Bash\"",
+    ] {
+        assert!(
+            !allow.iter().any(|r| r.contains(never)),
+            "{never}: {allow:?}"
+        );
+    }
+    assert!(!allow.iter().any(|r| r == "Bash"), "{allow:?}");
+}
+
+#[test]
+fn a_reviewer_without_a_check_command_still_runs_the_tests_the_repository_has() {
+    let allow = reviewer_allow_for(None, &["cargo"]);
+    assert!(
+        allow.contains(&"Bash(cargo test *)".to_owned()),
+        "{allow:?}"
+    );
+    let node = reviewer_allow_for(None, &["npm"]);
+    for want in ["Bash(npm test *)", "Bash(npm run *)"] {
+        assert!(node.contains(&want.to_owned()), "{want}: {node:?}");
+    }
+    let bare = reviewer_allow_for(None, &[]);
+    assert!(
+        !bare
+            .iter()
+            .any(|r| r.contains("cargo") || r.contains("npm")),
+        "{bare:?}"
+    );
+}
+
+#[test]
+fn the_repository_tools_come_from_the_files_of_the_ship() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    assert!(repo_tools(dir.path()).is_empty());
+    std::fs::write(dir.path().join("Cargo.toml"), "").expect("write");
+    std::fs::write(dir.path().join("package.json"), "{}").expect("write");
+    std::fs::write(dir.path().join("pnpm-lock.yaml"), "").expect("write");
+    assert_eq!(repo_tools(dir.path()), ["cargo", "pnpm"]);
 }
 
 #[test]

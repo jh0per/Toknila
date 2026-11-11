@@ -242,6 +242,7 @@ fn the_reviewers_verdict_names_each_acceptance_item() {
     let item = |n, outcome| ItemVerdict {
         item: n,
         outcome,
+        basis: toknila_core::ItemBasis::Ran,
         note: "checked".to_owned(),
     };
     let t2 = t.clone();
@@ -260,7 +261,7 @@ fn the_reviewers_verdict_names_each_acceptance_item() {
     let round = a(&mem).review.rounds.last().cloned().expect("round");
     assert_eq!(
         round.comment,
-        "PASS 1. first holds - checked\nFAIL 2. second holds - checked\nfix 2"
+        "PASS 1. first holds - checked [ran]\nFAIL 2. second holds - checked [ran]\nfix 2"
     );
 }
 

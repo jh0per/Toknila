@@ -1,5 +1,21 @@
 import type { TicketDetail } from "../api/types";
-import { awaitingText, loopText, roundText, whenText } from "../store/review";
+import { awaitingText, basisText, itemRows, loopText, roundText, whenText } from "../store/review";
+
+/// The acceptance items of a verdict, each with whether the reviewer ran what shows it or only read.
+function RoundItems({ comment }: { comment: string }) {
+  const rows = itemRows(comment);
+  if (rows.length === 0) return null;
+  return (
+    <ul className="round-items" data-testid="round-items">
+      {rows.map((row) => (
+        <li key={row.item} data-testid="round-item" data-outcome={row.outcome} data-basis={row.basis}>
+          <span className="status">{row.outcome}</span> {row.item}. {row.text}{" "}
+          <span className="basis" data-testid="item-basis">{basisText(row.basis)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /// The card's review: whose verdict it waits for, the rounds of the loop used, and each round so
 /// far (who, verdict, when), as the daemon holds them.
@@ -16,6 +32,7 @@ export function Rounds({ detail }: { detail?: TicketDetail }) {
         {review.rounds.map((r) => (
           <li key={r.number} data-testid="round">
             {roundText(r)} <time className="muted" dateTime={new Date(r.decided_at).toISOString()}>{whenText(r.decided_at)}</time>
+            <RoundItems comment={r.comment} />
           </li>
         ))}
       </ul>

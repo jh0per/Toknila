@@ -58,7 +58,12 @@ fn review_verdict() -> Value {
                     "properties": {
                         "item": { "type": "integer", "minimum": 1 },
                         "outcome": { "type": "string", "enum": ["pass", "fail"] },
-                        "note": text("One line of evidence"),
+                        "basis": {
+                            "type": "string",
+                            "enum": ["ran", "read", "not_run"],
+                            "description": "ran: you ran the check or test that shows it and quoted its result; read: you judged it from the diff and files; not_run: the check or test it names could not be run",
+                        },
+                        "note": text("One line of evidence; quote the result line of what you ran"),
                     },
                     "required": ["item", "outcome"],
                 },
