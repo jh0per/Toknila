@@ -530,11 +530,21 @@ fn a_failing_check_with_test_output_is_still_a_round() {
     assert!(command_not_found(Some(1), "sh: x: command not found"));
     assert!(command_not_found(
         Some(1),
-        "'x' is not recognized as an internal or external command"
+        "'x' is not recognized as an internal or external command,\n\
+         operable program or batch file.\n"
     ));
     assert!(!command_not_found(
         Some(101),
         "test result: FAILED. 1 passed; 2 failed"
+    ));
+    // The words quoted by a failing test, with the test output after them, are not the shell's
+    // message: the command ran.
+    assert!(!command_not_found(
+        Some(101),
+        "---- a_check_that_says_command_not_found stdout ----\n\
+         assertion failed: said.contains(\"sh: cargo: command not found\")\n\
+         failures:\n    a_check_that_says_command_not_found\n\
+         test result: FAILED. 3 passed; 1 failed"
     ));
 }
 

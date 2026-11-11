@@ -63,9 +63,19 @@ fn usual_folder(program: &str) -> Option<&'static str> {
 /// shell could not find the program (exit 127 on unix, 9009 on Windows, or the shell's own
 /// message). That is a problem of the machine, not of the worker's change.
 pub fn command_not_found(code: Option<i32>, tail: &str) -> bool {
-    matches!(code, Some(127 | 9009))
-        || tail.contains("command not found")
-        || tail.contains("is not recognized as an internal or external command")
+    if matches!(code, Some(127 | 9009)) {
+        return true;
+    }
+    // The shell's own message is the last thing printed, because the command never ran. Test
+    // output that happens to quote the words, followed by more lines, is not it.
+    tail.lines()
+        .filter(|l| !l.trim().is_empty())
+        .rev()
+        .take(2)
+        .any(|l| {
+            l.contains("command not found")
+                || l.contains("is not recognized as an internal or external command")
+        })
 }
 
 /// What a person reads when the check command `command` could not run: the program, the hint of
