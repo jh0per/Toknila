@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ThreadDetail } from "../api/types";
+import { ANSWER_WAIT_MS, overdue, wakeWhenOverdue } from "./discussion";
 import type { Msg } from "./msg";
 import { reduce } from "./reduce";
 import { type State, initialState } from "./state";
@@ -28,5 +30,46 @@ describe("talking to the assistant about a card", () => {
   it("accepts and rejects a proposed edit by its message id", () => {
     const [, fx] = reduce(start(), { type: "threadAction", key: "DEMO-1", thread: "1", action: "accept_edit", text: "m2" });
     expect(fx).toEqual([{ type: "threadAction", key: "DEMO-1", thread: "1", action: "accept_edit", text: "m2" }]);
+  });
+});
+
+describe("a message the assistant does not answer", () => {
+  const said = (at: number, author = "human") => ({ id: `m${at}`, kind: "message", author, text: "stricter", thread_id: "T", created_at: at });
+  const thread = (...messages: ReturnType<typeof said>[]) =>
+    ({ thread: { id: "T", number: 1, kind: "discussion" }, messages, versions: [] }) as unknown as ThreadDetail;
+
+  afterEach(() => vi.useRealTimers());
+
+  it("is overdue after 90 seconds on a fake clock, and the timer wakes exactly then", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    const d = thread(said(1_000_000));
+    const woke = vi.fn();
+    wakeWhenOverdue(d, Date.now(), woke);
+    expect(overdue(d, Date.now())).toBe(false);
+    vi.advanceTimersByTime(ANSWER_WAIT_MS - 1);
+    expect(woke).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(woke).toHaveBeenCalledTimes(1);
+    expect(overdue(d, Date.now())).toBe(true);
+  });
+
+  it("is not overdue once the assistant has answered, and its timer is cancelled", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(2_000_000);
+    const answered = thread(said(2_000_000 - 100_000), said(2_000_000 - 50_000, "agent"));
+    expect(overdue(answered, Date.now())).toBe(false);
+    const stop = wakeWhenOverdue(thread(said(2_000_000)), Date.now(), () => {
+      throw new Error("woke after being stopped");
+    });
+    stop();
+    vi.advanceTimersByTime(ANSWER_WAIT_MS * 2);
+  });
+
+  it("a nudge sends the same message to the planner's input without touching the draft", () => {
+    const typed = apply(start(), { type: "editPlannerDraft", where: "card:DEMO-1", text: "keep me" });
+    const [s, fx] = reduce(typed, { type: "nudgeCard", project: "DEMO", key: "DEMO-1", thread: 1, text: "stricter" });
+    expect(fx).toEqual([{ type: "plannerCall", project: "DEMO", call: "nudge", card: "DEMO-1", thread: 1, text: "stricter" }]);
+    expect(s.planner.drafts["card:DEMO-1"]).toBe("keep me");
   });
 });
