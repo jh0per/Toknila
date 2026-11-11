@@ -176,10 +176,10 @@ fn the_planner_may_read_each_design_file_and_nothing_else_outside_the_repository
     // Everything else of the data home stays denied, and so does the rest of the designs folder;
     // the design files are not denied.
     let deny = strings(&s["permissions"]["deny"]);
+    // Spelled as the rules are (a Windows drive reads `//c/...`), not as the raw path.
     let denied = |p: &std::path::Path| {
-        deny.contains(&format!(
-            "Read(/{})",
-            p.display().to_string().replace('\\', "/")
+        deny.contains(&toknila_core::private::read_allow_rule(
+            &p.display().to_string(),
         ))
     };
     let dir = rig.dir.path();
