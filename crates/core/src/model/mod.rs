@@ -13,6 +13,7 @@ mod review;
 mod reviewer_rules;
 mod run;
 mod ship;
+mod since;
 mod stale;
 mod status;
 mod thread;
@@ -41,6 +42,7 @@ pub use review::{
 pub use reviewer_rules::reviewer_check_rules;
 pub use run::{ProcessExit, Run};
 pub use ship::{MergeSpec, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec, slugify};
+pub use since::SinceReturn;
 pub use stale::{BaseBehind, BaseCourse, StalePolicy, describe as describe_base_behind};
 pub use status::{BlockedReason, StatusReason, TicketStatus, WaitingReason};
 pub use thread::{

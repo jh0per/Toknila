@@ -134,6 +134,11 @@ pub enum ExternalOutcome {
         spec: Option<CheckSpec>,
         result: Result<CheckResult, CheckError>,
     },
+    /// The daemon merged the base into the ship, making this commit (not unhanded-in work).
+    Synced {
+        ticket: TicketId,
+        commit: String,
+    },
     /// The base could not be merged into the ship; the check did not run.
     SyncConflict {
         ticket: TicketId,
@@ -282,6 +287,7 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                     Some(sync) => host.merger.sync(sync),
                     None => Ok(SyncOutcome::UpToDate),
                 };
+                outcomes.extend(crate::sync::recorded(ticket, &synced));
                 let result = match (&spec, synced) {
                     (_, Ok(SyncOutcome::Conflict { files, migrations })) => {
                         let base = sync.as_ref().map(|s| s.base.as_str()).unwrap_or_default();
@@ -372,6 +378,7 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             ExternalOutcome::InstructionTyped { ticket, comment } => {
                 deliver_instructions::typed(uow, ticket, comment)?;
             }
+            ExternalOutcome::Synced { ticket, commit } => checks::synced(uow, ticket, commit)?,
             ExternalOutcome::SyncConflict { ticket, text } => {
                 checks::sync_conflict(uow, ticket, text)?;
             }

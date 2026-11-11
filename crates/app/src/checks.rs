@@ -131,6 +131,26 @@ fn queue_for<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket) -> AppResult<()> {
     Ok(())
 }
 
+/// The daemon merged the base into the ship and made `commit`: it is recorded with the hand-in,
+/// so Accept knows it for the daemon's own and not for work that was not handed in.
+pub(crate) fn synced<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    commit: String,
+) -> AppResult<()> {
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(());
+    };
+    crate::chain::with_chain(uow, t.chain_id, |ctx| {
+        if let Some(mine) = ctx.view.tickets.iter_mut().find(|x| x.id == ticket)
+            && !mine.review.synced.contains(&commit)
+        {
+            mine.review.synced.push(commit);
+        }
+        Ok::<_, crate::AppError>(())
+    })
+}
+
 /// Bringing the ship up to its base conflicted: the card goes back to the worker with `text`, a
 /// round of the loop, like a check that failed.
 pub(crate) fn sync_conflict<U: UnitOfWork + ?Sized>(

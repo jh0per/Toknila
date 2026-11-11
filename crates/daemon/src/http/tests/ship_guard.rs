@@ -146,9 +146,17 @@ async fn accept_is_refused_naming_the_files_while_the_workspace_differs_from_the
     assert_eq!(e.api.status("DEMO-1").await, "review", "the card stays put");
     assert_eq!(git(&e.repo, &["rev-parse", "develop"]), base, "not merged");
 
-    // Commit it on the ship: the accept goes through.
+    // Commit it on the ship: that is a commit beyond the hand-in, so it is handed in again, and
+    // then the accept goes through.
     git(&e.ship, &["add", "-A"]);
     git(&e.ship, &["commit", "--quiet", "-m", "late"]);
+    e.api
+        .post(
+            "/v1/tickets/DEMO-1/actions/return",
+            json!({ "text": "again" }),
+        )
+        .await;
+    assert!(e.finish().await.0.is_success());
     let d = e.accept().await;
     assert_eq!(d["ticket"]["status"], "merged", "{d}");
     assert!(e.repo.join("late.txt").is_file());

@@ -284,6 +284,9 @@ pub fn ticket(d: &TicketDetail) {
         println!("pr: {}  checks: {}", pr.url, checks.join(", "));
     }
     review(d);
+    if let Some(since) = &t.review.since_return {
+        print!("{}", since.text());
+    }
     if let Some(wc) = &t.wildcard {
         let from = wc.from.as_ref().map(|k| format!(" during {k}"));
         let approved = if wc.approved { ", approved" } else { "" };

@@ -223,6 +223,13 @@ pub struct Review {
     /// first hand-in, or when the host could not look.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handed_in: Option<String>,
+    /// The merge commits the daemon made itself to bring the ship up to its base since the
+    /// hand-in; they are not work the agent did not hand in.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub synced: Vec<String>,
+    /// What changed since the Return, for a hand-in that answers one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since_return: Option<super::SinceReturn>,
 }
 
 impl Review {
@@ -233,6 +240,8 @@ impl Review {
             && !self.nudged
             && self.note.is_none()
             && self.handed_in.is_none()
+            && self.synced.is_empty()
+            && self.since_return.is_none()
     }
 
     /// How many times the loop (the check or the reviewer agent) has sent the card back since a

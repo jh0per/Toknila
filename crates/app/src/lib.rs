@@ -12,6 +12,7 @@ pub mod discussion;
 pub(crate) mod epic;
 pub mod error;
 pub mod external;
+pub mod hand_in;
 pub mod inbox;
 pub mod instructions;
 pub mod leftovers;

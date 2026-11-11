@@ -3224,6 +3224,13 @@ export interface components {
             nudged?: boolean;
             /** @description Oldest first. */
             rounds?: components["schemas"]["ReviewRound"][];
+            /** @description What changed since the Return, for a hand-in that answers one. */
+            since_return?: components["schemas"]["SinceReturn"] | null;
+            /**
+             * @description The merge commits the daemon made itself to bring the ship up to its base since the
+             *     hand-in; they are not work the agent did not hand in.
+             */
+            synced?: string[];
             turn?: components["schemas"]["ReviewTurn"] | null;
         };
         /**
@@ -3321,6 +3328,35 @@ export interface components {
             /** @description Absolute path of the worktree on the host. */
             path: string;
             ticket_id: components["schemas"]["TicketId"];
+        };
+        /**
+         * @description The work since the Return, derived by the daemon from the returned HEAD to the new one and
+         *     kept with the hand-in.
+         */
+        SinceReturn: {
+            /** @description Subjects of the commits made since, newest first, cut at [`MAX_COMMITS`]. */
+            commits: string[];
+            /** @description Files changed since, cut at [`MAX_FILES`]. */
+            files: string[];
+            /** @description The commit that was handed in and returned. */
+            from: string;
+            /**
+             * Format: int32
+             * @description How many more commits there were than `commits` shows.
+             */
+            more_commits?: number;
+            /**
+             * Format: int32
+             * @description How many more files changed than `files` shows.
+             */
+            more_files?: number;
+            /**
+             * Format: int32
+             * @description The round that was returned.
+             */
+            round: number;
+            /** @description The commit that is handed in now. */
+            to: string;
         };
         /** @description The width and height of a card on a chain's canvas, in whole canvas pixels. */
         Size: {

@@ -10,7 +10,7 @@ use toknila_app::{
     external::{self, ExternalEffect, ExternalOutcome},
 };
 use toknila_core::guard::ShipState;
-use toknila_core::{Actor, MergeSpec, Ship, ShipLook, ShipSpec, TicketId};
+use toknila_core::{Actor, MergeSpec, Review, Ship, ShipLook, ShipSpec, TicketId};
 
 use super::{Store, Yard};
 
@@ -164,6 +164,42 @@ impl Store {
                     "guard panicked: {e}"
                 ))))
             })
+    }
+}
+
+impl Store {
+    /// The commits on the ship beyond its hand-in that Accept refuses (the daemon's own base-sync
+    /// merges recorded in `review` are not among them). Looks on a blocking thread.
+    pub async fn extra_commits(
+        &self,
+        look: ShipLook,
+        review: Review,
+    ) -> Result<Vec<toknila_core::guard::ShipCommit>, ShipError> {
+        let Some(yard) = self.yard.clone() else {
+            return Ok(Vec::new());
+        };
+        tokio::task::spawn_blocking(move || {
+            toknila_app::hand_in::extra_commits(&*yard, &look, &review)
+        })
+        .await
+        .unwrap_or_else(|e| Err(ShipError::Io(format!("look panicked: {e}"))))
+    }
+
+    /// What changed since the Return that `review` is back from, up to `head`; `None` when no
+    /// Return is open or git cannot say (the hand-in goes on without the block).
+    pub async fn since_return(
+        &self,
+        look: ShipLook,
+        review: Review,
+        head: String,
+    ) -> Option<toknila_core::SinceReturn> {
+        let yard = self.yard.clone()?;
+        tokio::task::spawn_blocking(move || {
+            toknila_app::hand_in::since_return(&*yard, &look, &review, &head)
+        })
+        .await
+        .ok()
+        .flatten()
     }
 }
 
