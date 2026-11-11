@@ -49,6 +49,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
         )}
         <span className="muted">{chain.summary.done}/{chain.summary.total} done · {chain.summary.released} released</span>
         {state.error && <span className="error">{state.error}</span>}
+        {state.notice && <span className="muted" data-testid="answer-notice">{state.notice}</span>}
         <span className="grow" />
         <span className="pill" data-testid="slots" title="Agents working now / agents allowed at once">
           <span className={`dot${running ? " pulse" : ""}`} />

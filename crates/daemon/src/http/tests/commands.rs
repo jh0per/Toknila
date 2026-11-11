@@ -87,7 +87,14 @@ async fn allow_always_remembers_a_rule_and_a_covered_prompt_is_answered_without_
     let person = async {
         wait_for_prompt(&api).await;
         let (s, v) = answer(&api, json!({ "answer": "allow", "always": true })).await;
-        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(
+            v,
+            json!({
+                "rule_added": "Bash(cargo test *)",
+                "note": "Allowed always in this project: Bash(cargo test *)"
+            })
+        );
     };
     let ((s, reply), ()) = tokio::join!(hook, person);
     assert_eq!((s, reply), (StatusCode::OK, json!({ "decision": "allow" })));
@@ -166,7 +173,7 @@ async fn allow_always_also_answers_what_another_card_of_the_project_already_asks
                 Some(json!({ "answer": "allow", "always": true })),
             )
             .await;
-        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+        assert_eq!(s, StatusCode::OK, "{v}");
     };
     let ((s1, r1), (s2, r2), ()) = tokio::join!(first, second, person);
     assert_eq!((s1, s2), (StatusCode::OK, StatusCode::OK));
@@ -187,11 +194,90 @@ async fn allow_always_without_a_bash_call_allows_and_remembers_nothing() {
     let person = async {
         wait_for_prompt(&api).await;
         let (s, v) = answer(&api, json!({ "answer": "allow", "always": true })).await;
-        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert!(v.get("rule_added").is_none(), "{v}");
+        assert_eq!(
+            v["note"],
+            "Allowed this time only, no rule was added: the question is not about a command"
+        );
     };
     let ((_, reply), ()) = tokio::join!(hook, person);
     assert_eq!(reply, json!({ "decision": "allow" }));
     assert!(api.get(PROJECT).await.get("allowed_commands").is_none());
+}
+
+#[tokio::test]
+async fn a_question_says_which_rule_allow_always_would_add_or_why_none() {
+    let (api, token) = setup().await;
+    for (tool, rule, none) in [
+        ("Bash: cargo test -p core", Some("Bash(cargo test *)"), None),
+        (
+            "Bash: cd \"$WORK\"; cargo test",
+            None,
+            Some("a command built with $ or backticks cannot become a rule"),
+        ),
+        ("WebFetch: https://example.com", None, None),
+    ] {
+        let hook = permission(&api, &token, tool);
+        let person = async {
+            wait_for_prompt(&api).await;
+            let inbox = api.get("/v1/projects/DEMO/inbox").await;
+            let item = &inbox[0];
+            assert_eq!(item["allow_always"], json!(rule), "{tool}: {item}");
+            assert_eq!(item["allow_always_none"], json!(none), "{tool}: {item}");
+            let (s, v) = answer(&api, json!({ "answer": "deny" })).await;
+            assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+        };
+        tokio::join!(hook, person);
+    }
+    assert!(api.get(PROJECT).await.get("allowed_commands").is_none());
+}
+
+#[tokio::test]
+async fn allow_always_on_a_command_with_a_variable_prefix_adds_no_rule_and_says_why() {
+    let (api, token) = setup().await;
+    let hook = permission(&api, &token, "Bash: cd \"$WORK\"; cargo test");
+    let person = async {
+        wait_for_prompt(&api).await;
+        let (s, v) = answer(&api, json!({ "answer": "allow", "always": true })).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(
+            v["note"],
+            "Allowed this time only, no rule was added: a command built with $ or backticks cannot become a rule"
+        );
+    };
+    let ((_, reply), ()) = tokio::join!(hook, person);
+    assert_eq!(reply, json!({ "decision": "allow" }));
+    assert!(api.get(PROJECT).await.get("allowed_commands").is_none());
+}
+
+#[tokio::test]
+async fn trust_allows_every_tool_without_asking() {
+    let (api, token) = setup().await;
+    let (s, _) = patch(&api, json!({ "command_policy": "trust" })).await;
+    assert_eq!(s, StatusCode::OK);
+    for tool in [
+        "mcp__figma__get_file: abc",
+        "Write: src/lib.rs",
+        "WebFetch: https://example.com",
+    ] {
+        let (s, reply) = permission(&api, &token, tool).await;
+        assert_eq!(
+            (s, reply),
+            (StatusCode::OK, json!({ "decision": "allow" })),
+            "{tool}"
+        );
+    }
+    assert_eq!(api.get("/v1/projects/DEMO/inbox").await, json!([]));
+    // Control: under ask the same request waits for a person.
+    patch(&api, json!({ "command_policy": "ask" })).await;
+    let hook = permission(&api, &token, "mcp__figma__get_file: abc");
+    let person = async {
+        wait_for_prompt(&api).await;
+        answer(&api, json!({ "answer": "deny" })).await;
+    };
+    let ((_, reply), _) = tokio::join!(hook, person);
+    assert_eq!(reply["decision"], "deny");
 }
 
 #[tokio::test]

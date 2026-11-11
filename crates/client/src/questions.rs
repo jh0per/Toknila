@@ -1,11 +1,12 @@
 //! The question routes: a person's answer, and the agent's permission ask.
 
 use crate::{Client, ClientError, ClientResult, enc, transport_error};
-use toknila_api_types::{NewAnswer, PermissionAsk, PermissionReply};
+use toknila_api_types::{AnswerOutcome, NewAnswer, PermissionAsk, PermissionReply};
 
 impl Client {
     /// `POST /tickets/{ticket}/runner/answer`: a person's answer to what the agent asks.
-    pub fn answer(&self, ticket: &str, a: &NewAnswer) -> ClientResult<()> {
+    /// With "Allow always" the daemon says what it added; any other answer gives `None`.
+    pub fn answer(&self, ticket: &str, a: &NewAnswer) -> ClientResult<Option<AnswerOutcome>> {
         self.call(
             "POST",
             &format!("/tickets/{}/runner/answer", enc(ticket)),
