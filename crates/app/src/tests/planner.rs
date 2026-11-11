@@ -4,7 +4,7 @@
 use toknila_core::graph::Place;
 use toknila_core::{
     Actor, AgentProfile, AgentRole, ProjectId, ThreadKind, ThreadState, TicketStatus,
-    planner as rules,
+    planner as rules, suggestion::SuggestionAction,
 };
 
 use super::Mem;
@@ -384,4 +384,82 @@ fn the_planner_is_started_on_the_planner_model_of_its_project() {
     mem.project.planner_model = Some("opus".to_owned());
     let req = planner::request(&mem.project, &profile).expect("request");
     assert_eq!(req.brief.model.as_deref(), Some("opus"));
+}
+
+fn ready(mem: &mut Mem, key: &str, status: TicketStatus) {
+    let t = mem
+        .view
+        .tickets
+        .iter_mut()
+        .find(|t| t.key.to_string() == key)
+        .expect("card");
+    t.status = status;
+}
+
+fn say(text: &str, card: Option<&str>, action: Option<SuggestionAction>) -> planner::NewSuggestion {
+    planner::NewSuggestion {
+        text: text.to_owned(),
+        card: card.map(str::to_owned),
+        action,
+    }
+}
+
+#[test]
+fn a_suggestion_is_kept_with_its_card_and_replaced_by_the_next_one() {
+    let mut mem = manual_demo();
+    let p = project(&mem);
+    ready(&mut mem, "DEMO-1", TicketStatus::Ready);
+    let first = planner::suggest(
+        &mut mem,
+        p,
+        say(
+            "Start DEMO-1",
+            Some("DEMO-1"),
+            Some(SuggestionAction::Start),
+        ),
+    )
+    .expect("suggest");
+    assert_eq!(
+        first.card.as_ref().map(ToString::to_string).as_deref(),
+        Some("DEMO-1")
+    );
+    assert_eq!(first.chain, Some(mem.view.chain.id));
+    assert_eq!(mem.suggestion.as_ref(), Some(&first));
+    let second =
+        planner::suggest(&mut mem, p, say("Nothing waits for you", None, None)).expect("replace");
+    assert_eq!((&second.card, second.action), (&None, None));
+    assert_eq!(mem.suggestion.as_ref(), Some(&second));
+    assert_eq!(
+        mem.kinds()
+            .iter()
+            .filter(|k| *k == "window.suggest")
+            .count(),
+        2
+    );
+    // Nothing in the plan moved and nothing started.
+    assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Ready);
+}
+
+#[test]
+fn a_suggestion_the_card_cannot_take_now_or_about_another_project_is_refused() {
+    let mut mem = manual_demo();
+    let p = project(&mem);
+    // DEMO-1 is in Backlog: there is nothing to accept, answer or (blocked by a dependency) start.
+    for action in [SuggestionAction::Accept, SuggestionAction::Answer] {
+        let e = planner::suggest(&mut mem, p, say("x", Some("DEMO-1"), Some(action)))
+            .expect_err("not now");
+        assert_eq!(e.kind, ErrorKind::BadRequest, "{action:?}");
+    }
+    let e = planner::suggest(&mut mem, p, say("x", Some("DEMO-1"), None)).expect_err("no action");
+    assert_eq!(e.kind, ErrorKind::BadRequest);
+    let e = planner::suggest(&mut mem, p, say("", None, None)).expect_err("no text");
+    assert_eq!(e.kind, ErrorKind::BadRequest);
+    let e = planner::suggest(
+        &mut mem,
+        ProjectId::new(),
+        say("x", Some("DEMO-1"), Some(SuggestionAction::Start)),
+    )
+    .expect_err("other project");
+    assert_eq!(e.kind, ErrorKind::NotFound);
+    assert_eq!(mem.suggestion, None);
 }

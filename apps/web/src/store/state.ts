@@ -1,7 +1,7 @@
 // The page's one normalized store and the selectors the views read.
 
 import type {
-  ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads,
+  ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, Ticket, TicketDetail, TicketThreads,
 } from "../api/types";
 import { type EdgesState, initialEdges } from "./edges";
 import type { OpenedCard } from "./follow";
@@ -29,6 +29,8 @@ export interface State {
   chainOrder: string[];
   /// Everything waiting on a person, as the daemon computes it (newest first).
   inbox: InboxItem[];
+  /// The planner's standing suggestion of each project that has one (the next step).
+  suggestions: Suggestion[];
   /// Ticket details (subtasks, comments) by ticket key, for cards that were opened.
   details: Record<string, TicketDetail>;
   /// Threads (and the phase) by ticket key, for cards that were opened.
@@ -87,6 +89,7 @@ export function initialState(route: Route): State {
     chains: {},
     chainOrder: [],
     inbox: [],
+    suggestions: [],
     details: {},
     threads: {},
     versionPick: {},

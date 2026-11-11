@@ -4,6 +4,7 @@ use serde_json::Value;
 use toknila_core::agent::AgentEvent;
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
+use toknila_core::suggestion::Suggestion;
 use toknila_core::{
     Actor, AgentProfile, Chain, ChainId, Comment, CommentKind, Edge, EdgeKind, NodeRef, Project,
     ProjectId, Release, ReleaseId, ReviewMode, Ship, Subtask, Thread, ThreadId, ThreadMessage,
@@ -47,6 +48,7 @@ struct Mem {
     messages: Vec<ThreadMessage>,
     versions: Vec<ThreadVersion>,
     ships: Vec<Ship>,
+    suggestion: Option<Suggestion>,
     yard: ships::FakeYard,
     merger: merges::FakeMerger,
     checker: checks::FakeChecker,
@@ -131,6 +133,7 @@ impl Mem {
             messages: vec![],
             versions: vec![],
             ships: vec![],
+            suggestion: None,
             yard: ships::FakeYard::default(),
             merger: merges::FakeMerger::default(),
             checker: checks::FakeChecker::default(),
@@ -238,6 +241,9 @@ impl Reader for Mem {
         let all = self.versions.iter();
         Ok(all.filter(|v| v.thread_id == thread).cloned().collect())
     }
+    fn suggestion(&self, _: ProjectId) -> AppResult<Option<Suggestion>> {
+        Ok(self.suggestion.clone())
+    }
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>> {
         Ok(self.ships.iter().find(|s| s.ticket_id == ticket).cloned())
     }
@@ -330,6 +336,10 @@ impl UnitOfWork for Mem {
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()> {
         self.ships.retain(|s| s.ticket_id != ship.ticket_id);
         self.ships.push(ship.clone());
+        Ok(())
+    }
+    fn save_suggestion(&mut self, _: ProjectId, s: &Suggestion) -> AppResult<()> {
+        self.suggestion = Some(s.clone());
         Ok(())
     }
     fn delete_ship(&mut self, ticket: TicketId) -> AppResult<()> {

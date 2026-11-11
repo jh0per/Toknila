@@ -44,10 +44,14 @@ try {
     "post", "/planner/chains/roadmap/cards", JSON.stringify({ title: "Design the list", prompt: "p", acceptance: ["a"] }),
     "post", "/planner/chains/roadmap/cards", JSON.stringify({ title: "Build the list", prompt: "p" }),
     "post", "/tickets/WEB-1/actions/start", "{}",
+    "post", "/planner/suggestion", JSON.stringify({ text: "Start the design card", card: "WEB-1", action: "start" }),
     // The replies are long and scroll; the line the page waits for comes last.
     "print", "planner ready",
-    // After the third line the planner asks the window to show a card (the last thing it does).
-    "echo", "echo", "echo",
+    // The planner says its next step before it is greeted, replaces it after the second line, and
+    // after the third line asks the window to show a card (the last thing it does).
+    "echo", "echo",
+    "post", "/planner/suggestion", JSON.stringify({ text: "Nothing waits for you" }),
+    "echo",
     "post", "/planner/cards/WEB-1/show", "{}",
     "print", "planner done",
     "hold",
@@ -127,10 +131,46 @@ try {
   // The planner's attempt to start a card was refused: nothing runs.
   await expectText(page.locator("a[data-key=WEB-1] [data-testid=status]"), "ready", "the refused start left the card ready");
 
+  // The planner's next step is on its screen with the button of its action, and the first row of
+  // the inbox; the person clicks, the planner never does (its own start above was refused).
+  const next = page.locator("[data-testid=suggestion]");
+  await expectText(next, "Start the design card", "the planner's next step is on its screen");
+  await expectText(page.locator("[data-testid=suggestion-button]"), "Start WEB-1", "with a button for its action");
+  // The inbox in a window of its own, so this one keeps its terminal.
+  const inbox = await browser.newPage();
+  inbox.on("pageerror", (e) => errors.push(e.message));
+  const inboxUrl = new URL(url);
+  inboxUrl.pathname = "/inbox";
+  await inbox.goto(inboxUrl.href);
+  await checks(inbox).expectPath("/inbox", "the inbox opens");
+  await checks(inbox).expectText(inbox.locator("[data-testid=inbox] > [data-testid=suggestion]"), "Start the design card", "the next step is in the inbox");
+  const firstChild = await inbox.locator("[data-testid=inbox]").evaluate((el) => el.children[1]?.getAttribute("data-testid"));
+  if (firstChild !== "suggestion") throw new Error(`the suggestion is not the first row of the inbox: ${firstChild}`);
+  console.log("PASS the suggestion is the first row of the inbox");
+  await shot("planner-next-step");
+  // Doing its action ends it: the card starts (the simulated agent), the suggestion is cleared.
+  await page.locator("[data-testid=suggestion-button]").click();
+  await expectText(page.locator("a[data-key=WEB-1] [data-testid=status]"), "running", "the button started the card");
+  await next.waitFor({ state: "detached" });
+  await inbox.locator("[data-testid=suggestion]").waitFor({ state: "detached" });
+  console.log("PASS the suggestion is gone once its action is done, from the inbox too");
+  const tokenOf = new URL(url);
+  const journal = async () => (await fetch(`${tokenOf.origin}/v1/events?since=0&limit=100000`, {
+    headers: { authorization: `Bearer ${tokenOf.searchParams.get("token")}` },
+  })).json();
+  const kinds = (await journal()).filter((e) => e.entity === "window").map((e) => e.kind);
+  if (kinds.join() !== "suggest,suggestion_cleared") throw new Error(`expected suggest, suggestion_cleared in the journal, got ${kinds}`);
+
   // The box under the terminal is the way to talk to it; the terminal keeps working too.
   await page.locator("[data-testid=planner-ask-input]").fill("and a second message");
   await page.locator("[data-testid=planner-ask-send]").click();
-  await expectText(term, "got:and a second message", "the box under the terminal reaches the planner");
+  // The planner answers that line with its next step (and its reply to the post scrolls the echo
+  // off the small terminal), so the next step is the proof the box reached it.
+  // Its next suggestion says nothing waits for the person: text, no button.
+  await expectText(next, "Nothing waits for you", "the box under the terminal reaches the planner, which says its next step");
+  if ((await page.locator("[data-testid=suggestion-button]").count()) !== 0 || (await next.count()) !== 1) {
+    throw new Error("a suggestion without an action should be one row with no button");
+  }
   await term.click();
   await page.keyboard.type("typed in the terminal");
   await page.keyboard.press("Enter");
@@ -161,7 +201,8 @@ try {
   await expectPath("/projects/WEB/planner", "Back returns to the assistant's screen");
   if ((await notice.count()) !== 0) throw new Error("the notice stayed after Back");
   console.log("PASS the notice is gone after Back");
-  await expectText(term, "got:typed in the terminal", "what was typed in the terminal reached the planner");
+  // The planner shows the card only after reading the typed line, so the card opening above is the
+  // proof that the terminal reached it (its echo scrolls off the small terminal by now).
 
   // A reload keeps the planner running and its output.
   await page.reload();

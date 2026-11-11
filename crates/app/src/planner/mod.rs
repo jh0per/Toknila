@@ -7,6 +7,7 @@
 //! The planner's own run (start, stop, input, size) is here too: a project has at most one.
 
 mod plan;
+mod suggest;
 mod window;
 
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,7 @@ use toknila_core::{
 };
 
 pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, plan};
+pub use suggest::{NewSuggestion, suggest};
 pub use window::show_card;
 
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError, Started};

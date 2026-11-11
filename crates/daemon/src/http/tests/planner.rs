@@ -59,7 +59,7 @@ fn is_planner_route(method: &str, uri: &str) -> bool {
 }
 
 #[tokio::test]
-async fn a_planner_token_is_refused_with_403_on_every_route_but_its_own_eleven() {
+async fn a_planner_token_is_refused_with_403_on_every_route_but_its_own_twelve() {
     let api = Api::new();
     api.two_projects().await;
     let token = api.planner_token("DEMO").await;
@@ -358,5 +358,101 @@ async fn nothing_a_planner_does_starts_a_card_even_in_a_project_with_agents() {
         api.get("/v1/tickets").await.as_array().map(Vec::len),
         Some(3),
         "no card was added to it (two of ours and the other project's)"
+    );
+}
+
+#[tokio::test]
+async fn a_suggestion_is_kept_per_project_replaced_and_cleared_when_its_card_moves_on() {
+    let api = Api::new();
+    api.two_projects().await;
+    for title in ["A", "B"] {
+        api.post("/v1/chains/plan/tickets", json!({ "title": title }))
+            .await;
+    }
+    let token = api.planner_token("DEMO").await;
+    let put =
+        |body: Value| api.call_with(&token, Method::POST, "/v1/planner/suggestion", Some(body));
+    let window = || async {
+        api.get("/v1/events?since=0")
+            .await
+            .as_array()
+            .expect("events")
+            .iter()
+            .filter(|e| e["entity"] == "window")
+            .map(|e| e["kind"].as_str().unwrap_or_default().to_owned())
+            .collect::<Vec<_>>()
+    };
+
+    // Nothing yet: `null`, not an error.
+    assert_eq!(api.get("/v1/projects/DEMO/suggestion").await, Value::Null);
+
+    // Refused: another project's card, an action the card cannot take now, an action without a card.
+    let (s, e) = put(json!({ "text": "x", "card": "OTHER-1", "action": "start" })).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{e}");
+    let (s, e) = put(json!({ "text": "x", "card": "DEMO-1", "action": "accept" })).await;
+    assert_eq!(
+        (s, e["code"].as_str()),
+        (StatusCode::BAD_REQUEST, Some("bad_request")),
+        "{e}"
+    );
+    let (s, _) = put(json!({ "text": "x", "action": "start" })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(api.get("/v1/projects/DEMO/suggestion").await, Value::Null);
+    assert!(window().await.is_empty());
+
+    // Kept with the card's key and chain, and journaled.
+    let (s, kept) = put(json!({ "text": "Start A", "card": "DEMO-1", "action": "start" })).await;
+    assert_eq!(s, StatusCode::OK, "{kept}");
+    assert_eq!(api.get("/v1/projects/DEMO/suggestion").await, kept);
+    assert_eq!(
+        (
+            &kept["project"],
+            &kept["card"],
+            &kept["action"],
+            &kept["text"]
+        ),
+        (
+            &json!("DEMO"),
+            &json!("DEMO-1"),
+            &json!("start"),
+            &json!("Start A")
+        )
+    );
+    assert_eq!(api.get("/v1/projects/OTHER/suggestion").await, Value::Null);
+
+    // The next one replaces it: one suggestion per project.
+    let (s, _) = put(json!({ "text": "Nothing waits for you" })).await;
+    assert_eq!(s, StatusCode::OK);
+    let now = api.get("/v1/projects/DEMO/suggestion").await;
+    assert_eq!(
+        (&now["text"], now.get("card")),
+        (&json!("Nothing waits for you"), None)
+    );
+    assert_eq!(window().await, ["suggest", "suggest"]);
+
+    // About a card, it ends when that card moves on, and not when another one does.
+    api.post(
+        "/v1/projects/DEMO/chains",
+        json!({ "name": "side", "autostart": false }),
+    )
+    .await;
+    api.post("/v1/chains/side/tickets", json!({ "title": "C" }))
+        .await;
+    let (s, c) = put(json!({ "text": "Start C", "card": "DEMO-3", "action": "start" })).await;
+    assert_eq!(s, StatusCode::OK, "{c}");
+    api.post("/v1/tickets/DEMO-1/actions/start", json!({}))
+        .await;
+    assert_eq!(
+        api.get("/v1/projects/DEMO/suggestion").await,
+        c,
+        "DEMO-1 is not its card"
+    );
+    assert_eq!(window().await, ["suggest", "suggest", "suggest"]);
+    api.post("/v1/tickets/DEMO-3/actions/start", json!({}))
+        .await;
+    assert_eq!(api.get("/v1/projects/DEMO/suggestion").await, Value::Null);
+    assert_eq!(
+        window().await,
+        ["suggest", "suggest", "suggest", "suggestion_cleared"]
     );
 }

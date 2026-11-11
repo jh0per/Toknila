@@ -2,7 +2,7 @@
 
 import { get, post, streamUrl } from "../api/http";
 import type {
-  ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, TicketDetail, TicketThreads,
+  ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { runAutostartEffect } from "./autostartEffects";
@@ -94,6 +94,10 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     );
     const items = lists.flat().sort((a, b) => b.since - a.since);
     dispatch({ type: "inboxLoaded", items });
+    const standing = await Promise.all(
+      projects.map((p) => get<Suggestion | null>(`/projects/${encodeURIComponent(p.key)}/suggestion`)),
+    );
+    dispatch({ type: "suggestionsLoaded", suggestions: standing.filter((s): s is Suggestion => s !== null) });
   };
 
   const loadThreads = async (key: string) => {

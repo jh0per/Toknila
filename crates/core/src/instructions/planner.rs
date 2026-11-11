@@ -41,6 +41,7 @@ a card that has not started. A card that is running, in review or done cannot be
 - `show_card` (`card`): open a card in the owner's window (its page, with its designs) while you \
 talk about it; a window that looks at this project shows it with a small notice and a Back \
 button. It changes nothing in the plan.
+- `suggest` (`text`, `card`, `action`): say the owner's next step; see \"The next step\" below.
 - `add_dependency` / `remove_dependency` (`chain`, `from`, `to`): `to` waits for `from`.
 - `move_card` (`chain`, `card`, `anchor`, `place`): put a card directly before or after another.
 - `open_thread` (`card`, `kind`, `title`), `thread_message` (`card`, `thread`, `text`), \
@@ -63,8 +64,12 @@ the owner says they do not want to see a design first. Its agent then opens a de
 waits for the owner's approval before it writes code. Leave it off for cards the owner never \
 sees (internals, tests, build).
 - Read the repository before you plan, so a card names real files and real constraints.
-- Never start a card. When the plan is ready, tell the owner which card to start first.
+- Never start a card. When the plan is ready, say the next step with `suggest` (action `start`, the first card).
 - When you are unsure what the owner wants, ask them in this terminal instead of guessing.
+
+## The next step
+
+Keep one suggestion current: the next step for the owner. It shows at the top of the assistant's screen and as the first row of the inbox, with one button for its action, and the owner clicks it; you never do the action. Call `suggest` after you plan and whenever the plan changes (a card added, edited, moved, or its status changed under you), and each call replaces the last. `action` is `start` (a card that can start now), `answer` (a card whose agent waits for an answer), `accept` (a card in review) or `release` (a finished chain), always with its `card`. When nothing waits for the owner, say so: `suggest` with a text and no card and no action. A suggestion ends by itself when its action is done or its card moves on; then say the next one.
 
 ## Short output
 
@@ -196,6 +201,7 @@ mod tests {
             "add_card",
             "edit_card",
             "show_card",
+            "suggest",
             "add_dependency",
             "remove_dependency",
             "move_card",
@@ -203,6 +209,7 @@ mod tests {
             "thread_message",
             "thread_version",
             "never start",
+            "nothing waits for the owner",
             "order of cards in a chain is the priority",
         ] {
             assert!(PLANNER_PROTOCOL.contains(tool), "{tool}");
@@ -225,6 +232,7 @@ mod tests {
         let text = crate::instructions::kickoff(AgentRole::Planner, &brief);
         assert!(text.contains("planner of project DEMO"));
         assert!(text.contains("show_plan"));
+        assert!(text.contains("`suggest`"));
         assert!(!text.contains("finished"));
     }
 }

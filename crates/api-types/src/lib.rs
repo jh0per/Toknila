@@ -35,7 +35,8 @@ pub use threads::{ThreadDetail, TicketThreads};
 pub use tickets::{ActionInput, NewSubtask, PatchSubtask, TicketDetail, TicketItem, TicketQuery};
 pub use toknila_app::chains::{ChainSettings, NewChain};
 pub use toknila_app::planner::{
-    CardEdit, NewCard, NewPlanChain, PlanCard, PlanChain, PlanThread, PlanView, SubtaskEdit,
+    CardEdit, NewCard, NewPlanChain, NewSuggestion, PlanCard, PlanChain, PlanThread, PlanView,
+    SubtaskEdit,
 };
 pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;

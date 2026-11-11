@@ -6,7 +6,7 @@ use toknila_core::graph::ChainView;
 use toknila_core::{
     Actor, AgentRole, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship,
     Subtask, Thread, ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey,
-    Timestamp,
+    Timestamp, suggestion::Suggestion,
 };
 
 use crate::AppResult;
@@ -49,6 +49,8 @@ pub trait Reader {
     fn thread_messages(&self, thread: ThreadId) -> AppResult<Vec<ThreadMessage>>;
     /// A thread's artifact versions, by number.
     fn thread_versions(&self, thread: ThreadId) -> AppResult<Vec<ThreadVersion>>;
+    /// The project's standing suggestion from its planner, if it has one.
+    fn suggestion(&self, project: ProjectId) -> AppResult<Option<Suggestion>>;
     /// The ship a ticket has now, if any.
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>>;
     /// The runner processes that are alive now, by ticket and role, as the host reported them
@@ -96,6 +98,8 @@ pub trait UnitOfWork: Reader {
     fn insert_thread_version(&mut self, version: &ThreadVersion) -> AppResult<()>;
     /// Remembers a ticket's ship, replacing the one it had.
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()>;
+    /// Keeps the suggestion as the project's, replacing the one it had.
+    fn save_suggestion(&mut self, project: ProjectId, s: &Suggestion) -> AppResult<()>;
     /// Forgets a ticket's ship.
     fn delete_ship(&mut self, ticket: TicketId) -> AppResult<()>;
     /// Queues work on the host for after this command commits (see [`crate::external`]).

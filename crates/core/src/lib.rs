@@ -31,6 +31,7 @@ pub mod schedule;
 pub mod spec;
 pub mod strays;
 pub mod suggest;
+pub mod suggestion;
 pub mod system;
 pub mod template;
 pub mod thread;

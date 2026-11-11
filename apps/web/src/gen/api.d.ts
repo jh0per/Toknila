@@ -392,6 +392,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keeps the planner's next step for its project, replacing the previous one (a
+         *     `window.suggest` event). The owner's window shows it with the button of its action; the
+         *     planner starts, answers and accepts nothing itself.
+         */
+        post: operations["planner_suggest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles": {
         parameters: {
             query?: never;
@@ -722,6 +743,23 @@ export interface paths {
          *     is named in `warnings` and that leftover stays.
          */
         post: operations["clean_strays"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The planner's standing suggestion for the project (the next step), or `null` when it has none. */
+        get: operations["get_suggestion"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2072,6 +2110,14 @@ export interface components {
         NewSubtask: {
             text: string;
         };
+        /** @description What the planner says as its next step. */
+        NewSuggestion: {
+            action?: components["schemas"]["SuggestionAction"] | null;
+            /** @description The card it is about (key, id or title). */
+            card?: string | null;
+            /** @description The step in a line or two; with no card and no action it says nothing waits for the owner. */
+            text: string;
+        };
         /** @description `POST /v1/tickets/{ticket}/threads`. */
         NewThread: {
             kind: components["schemas"]["ThreadKind"];
@@ -2919,6 +2965,24 @@ export interface components {
         };
         /** @description Identifies a [`crate::Subtask`]. */
         SubtaskId: string;
+        /** @description A project's standing suggestion. */
+        Suggestion: {
+            action?: components["schemas"]["SuggestionAction"] | null;
+            at: components["schemas"]["Timestamp"];
+            card?: components["schemas"]["TicketKey"] | null;
+            chain?: components["schemas"]["ChainId"] | null;
+            project: components["schemas"]["ProjectKey"];
+            /**
+             * @description What the planner says, in a line or two. With no card and no action it says that nothing
+             *     waits for the person.
+             */
+            text: string;
+        };
+        /**
+         * @description What the button of a suggestion does.
+         * @enum {string}
+         */
+        SuggestionAction: "start" | "answer" | "accept" | "release";
         /** @description All checks, and whether every one passed. */
         SystemChecks: {
             checks: components["schemas"]["Check"][];
@@ -4313,6 +4377,53 @@ export interface operations {
             };
         };
     };
+    planner_suggest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSuggestion"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suggestion"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_profiles: {
         parameters: {
             query?: never;
@@ -5053,6 +5164,36 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_suggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suggestion"] | null;
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
