@@ -20,6 +20,7 @@ mod commands;
 mod design;
 mod designs;
 mod discussion;
+mod hand_in_only;
 mod inbox;
 mod merges;
 mod moves;
@@ -447,6 +448,26 @@ async fn a_card_keeps_the_place_it_was_put_at_until_the_chain_is_arranged() {
     assert_eq!(s, StatusCode::OK, "{sized}");
     assert_eq!(sized["ticket"]["size"], json!({ "w": 300, "h": 120 }));
     assert_eq!(sized["ticket"]["pos"], json!({ "x": 248, "y": 40 }));
+    assert!(sized.get("size_clamped").is_none(), "{sized}");
+    // A size out of range is stored clamped, and the answer says what was asked.
+    let (s, big) = api
+        .call(
+            Method::PATCH,
+            "/v1/tickets/DEMO-1",
+            Some(json!({ "size": { "w": 9000, "h": 5 } })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{big}");
+    assert_eq!(big["ticket"]["size"], json!({ "w": 480, "h": 5 }));
+    assert_eq!(big["size_clamped"], json!({ "w": 9000, "h": 5 }));
+    let (_, tall) = api
+        .call(
+            Method::PATCH,
+            "/v1/tickets/DEMO-1",
+            Some(json!({ "size": { "w": 300, "h": 120 } })),
+        )
+        .await;
+    assert_eq!(tall["ticket"]["size"], json!({ "w": 300, "h": 120 }));
     api.call(
         Method::PATCH,
         "/v1/tickets/DEMO-1",

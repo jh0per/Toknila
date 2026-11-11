@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AUTO_MAX_W, type CardContent, type Measure, MIN_W, RESIZE_MAX_H, RESIZE_MAX_W, autoCard, autoWidth, clampSize, contentHeight,
-  minHeight, sizedCard, wrapTitle,
+  descriptionLine, minHeight, sizedCard, wrapTitle,
 } from "./cardSize";
 
 /// Every character is 7 px in the title face, 6 px in the pill and 5 px in the key.
@@ -75,6 +75,25 @@ describe("card size from content", () => {
     expect(contentHeight(1, "extras")).toBeGreaterThan(one);
     expect(contentHeight(1, "actions")).toBeGreaterThan(contentHeight(1, "extras"));
     for (const h of [one, contentHeight(2, "actions")]) expect(h % 8).toBe(0);
+  });
+});
+
+describe("description line", () => {
+  const d = card("Hi", { description: "## Build the thing\n\nsecond paragraph" });
+  it("takes the first non-empty line, without Markdown marks", () => {
+    expect(descriptionLine("\n\n# Heading\nmore")).toBe("Heading");
+    expect(descriptionLine("- first item\n- second")).toBe("first item");
+    expect(descriptionLine("```\ncode")).toBe("code");
+    expect(descriptionLine("  \n")).toBeUndefined();
+    expect(descriptionLine(undefined)).toBeUndefined();
+  });
+
+  it("shows only on a card taller than its title and rows need", () => {
+    expect(autoCard(d, m).desc).toBeUndefined();
+    const need = contentHeight(1, "none");
+    expect(sizedCard(d, { w: 240, h: need }, m).desc).toBeUndefined();
+    expect(sizedCard(d, { w: 240, h: contentHeight(1, "none", true) }, m).desc).toBe("Build the thing");
+    expect(sizedCard(card("Hi"), { w: 240, h: 320 }, m).desc).toBeUndefined();
   });
 });
 

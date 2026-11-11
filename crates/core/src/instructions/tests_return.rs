@@ -130,3 +130,44 @@ fn a_card_that_was_approved_last_has_no_open_return() {
     review.record(Actor::Human, crate::Verdict::Approve, "", Timestamp(2));
     assert!(Returned::of(&review).is_none());
 }
+
+#[test]
+fn the_reviewer_of_a_hand_in_after_a_return_is_told_to_read_what_changed_since_it_first() {
+    let acceptance = vec!["Since is read first".to_owned()];
+    let mut returned = returned_round(Actor::Human, "Rename the flag");
+    let without = returned.clone();
+    let plain = RunBrief {
+        returned: Some(&without),
+        ..brief(&acceptance)
+    };
+    // A Return without a block (the host could not say) adds nothing.
+    assert!(!kickoff(crate::AgentRole::Reviewer, &plain).contains("Since the Return"));
+    returned.since = Some(crate::SinceReturn::new(
+        1,
+        "f8afe06aaaaaaaa",
+        "b0b0b0bbbbbbbbb",
+        vec!["rename flag".to_owned()],
+        vec!["flag.txt".to_owned()],
+    ));
+    let with = RunBrief {
+        returned: Some(&returned),
+        ..brief(&acceptance)
+    };
+    let first = kickoff(crate::AgentRole::Reviewer, &with);
+    for want in [
+        "\"Since the Return\"",
+        "first",
+        "f8afe06..b0b0b0b",
+        "round 1",
+    ] {
+        assert!(first.contains(want), "{want}: {first}");
+    }
+    assert!(!first.contains('\n'), "{first}");
+    let text = generate_review(&with);
+    assert!(text.contains("## Since the Return"), "{text}");
+    assert!(
+        text.contains("- rename flag") && text.contains("flag.txt"),
+        "{text}"
+    );
+    assert!(!generate_review(&plain).contains("Since the Return"));
+}

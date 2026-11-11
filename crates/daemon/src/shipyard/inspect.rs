@@ -3,7 +3,7 @@
 
 use toknila_app::{GitError, ShipError};
 use toknila_core::ShipLook;
-use toknila_core::guard::ShipState;
+use toknila_core::guard::{ShipCommit, ShipState};
 
 use super::GitShipyard;
 
@@ -24,7 +24,48 @@ pub(super) fn changed_paths(status: &[u8]) -> Vec<String> {
     paths
 }
 
+/// The commits of a `git log --format=%H%x09%s` answer, in its order.
+pub(super) fn commit_lines(log: &str) -> Vec<ShipCommit> {
+    log.lines()
+        .filter_map(|l| l.split_once('\t'))
+        .map(|(id, subject)| ShipCommit {
+            id: id.to_owned(),
+            subject: subject.to_owned(),
+        })
+        .collect()
+}
+
 impl GitShipyard {
+    /// The commits on the ship's own line (first parents) after `from`, newest first. The
+    /// commits a base-sync merge brought in come in by its second parent and are not listed.
+    pub(super) fn after(&self, look: &ShipLook, from: &str) -> Result<Vec<ShipCommit>, ShipError> {
+        let range = format!("{from}..HEAD");
+        let log = self.git(
+            &look.path,
+            ["log", "--first-parent", "--format=%H%x09%s", range.as_str()],
+        )?;
+        Ok(commit_lines(&log))
+    }
+
+    /// The commit subjects (newest first) and the changed files from `from` to `to`.
+    pub(super) fn between(
+        &self,
+        look: &ShipLook,
+        from: &str,
+        to: &str,
+    ) -> Result<(Vec<String>, Vec<String>), ShipError> {
+        let range = format!("{from}..{to}");
+        let log = self.git(
+            &look.path,
+            ["log", "--first-parent", "--format=%H%x09%s", range.as_str()],
+        )?;
+        let files = self.git(&look.path, ["diff", "--name-only", from, to])?;
+        Ok((
+            commit_lines(&log).into_iter().map(|c| c.subject).collect(),
+            files.lines().map(str::to_owned).collect(),
+        ))
+    }
+
     pub(super) fn look(&self, look: &ShipLook) -> Result<ShipState, ShipError> {
         let dir = look.path.as_str();
         let out = self

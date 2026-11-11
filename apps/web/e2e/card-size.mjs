@@ -28,14 +28,14 @@ try {
   tok("project", "new", "CSZ");
   tok("chain", "new", "sizes", "--project", "CSZ", "--goal", "Fit the text", "--no-autostart");
   tok("ticket", "new", "sizes", LONG, "--profile", "sim");
-  tok("ticket", "new", "sizes", "Short");
+  tok("ticket", "new", "sizes", "Short", "--prompt", "# Say what the card is for\n\nA second paragraph.");
   tok("ticket", "new", "sizes", "A second long title that wraps onto two lines in a card", "--after", "CSZ-1");
   tok("start", "CSZ-1");
   tok("sim", "CSZ-1", "finish", "done");
   const { url } = JSON.parse(tok("open", "--json"));
 
   browser = await launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const { expectText } = checks(page);
@@ -113,7 +113,7 @@ try {
   await shot("resized");
 
   // The limits: 480 wide and 320 tall.
-  // (On the top card, whose grip is not under the buttons at the foot of the view.)
+  // On the lowest card: the canvas keeps room for the corner buttons, so its grip is free.
   const pull = async (key, dx, dy) => {
     await card(key).hover();
     const b = await card(key).locator("[data-testid=grip]").boundingBox();
@@ -123,15 +123,29 @@ try {
     await page.mouse.move(at.x + dx, at.y + dy, { steps: 6 });
     await page.mouse.up();
   };
-  await pull("CSZ-1", 400, 400);
-  const huge = await box("CSZ-1");
+  await pull("CSZ-2", 400, 400);
+  const huge = await box("CSZ-2");
   check(huge.w === 480 && huge.h === 320, "a card is never resized past 480 x 320", JSON.stringify(huge));
+  const desc = card("CSZ-2").locator("[data-testid=desc]");
+  check((await desc.textContent()) === "Say what the card is for", "a tall card shows the first line of its description", await desc.textContent());
+  check(!(await card("CSZ-1").locator("[data-testid=desc]").count()), "a card without a description shows none");
+  // Scrolled to the end, the lowest grip is clear of every corner button.
+  await page.locator("[data-testid=canvas]").evaluate((e) => { e.scrollTop = e.scrollHeight; });
+  const gb = await card("CSZ-2").locator("[data-testid=grip]").boundingBox();
+  const buttons = page.locator(".canvas-corner .btn");
+  for (let i = 0; i < (await buttons.count()); i++) {
+    const b = await buttons.nth(i).boundingBox();
+    const hits = gb.x < b.x + b.width && gb.x + gb.width > b.x && gb.y < b.y + b.height && gb.y + gb.height > b.y;
+    check(!hits, "the lowest grip is not under a corner button", `${JSON.stringify(gb)} vs ${JSON.stringify(b)}`);
+  }
+  await waitSaved("CSZ-2", { w: 480, h: 320 }, "the daemon keeps the card at the limit");
   await shot("huge");
   // And never narrower than its content: back to the smallest.
-  await pull("CSZ-1", -huge.w + 10, -huge.h + 10);
-  const small = await box("CSZ-1");
-  check(small.w === 196 && small.h > 56, "nor narrower than 196 wide or shorter than its content", JSON.stringify(small));
-  check(small.h > long.h - 1, "a narrow card needs the height of its wrapped title", `${small.h} vs ${long.h}`);
+  await pull("CSZ-2", -huge.w + 10, -huge.h + 10);
+  await waitSaved("CSZ-2", { w: 196, h: short.h }, "the daemon keeps the smallest size");
+  const small = await box("CSZ-2");
+  check(small.w === 196 && small.h === short.h, "nor narrower than 196 wide or shorter than its content", JSON.stringify(small));
+  check(!(await desc.count()), "and a card no taller than its title shows no description");
   // Back to a size to keep for the reload.
   const g4 = await grip.boundingBox();
   const f4 = { x: g4.x + g4.width / 2, y: g4.y + g4.height / 2 };

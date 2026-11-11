@@ -48,6 +48,7 @@ a.node:hover { border-color: var(--muted); }
 /* The title is wrapped in script (cardSize.ts), one `.tl` per line, so what is measured is what is drawn. */
 .node .title { display: block; font-weight: 600; font-size: var(--fs-m); }
 .node .tl { display: block; line-height: 16px; height: 16px; white-space: nowrap; overflow: hidden; }
+.node .desc { display: block; line-height: 16px; height: 16px; font-size: var(--fs-s); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node .key { font-size: var(--fs-xs); color: var(--muted); margin-left: auto; white-space: nowrap; }
 .node .row .runner { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* The status pill is never clipped: the card is as wide as the pill and the key need. */

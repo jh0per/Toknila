@@ -107,6 +107,8 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
             acceptance: t.acceptance.clone(),
             check_command: project.check_command.clone(),
             earlier: Vec::new(),
+            // A hand-in that answers a Return names what changed since it, to read first.
+            returned: toknila_core::instructions::Returned::of(&t.review),
             model: project.reviewer_model.clone(),
             web_domains: project.reviewer_web_domains.clone(),
             project: None,

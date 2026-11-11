@@ -134,5 +134,26 @@ fn a_return_is_in_the_new_runs_kickoff_and_a_hand_in_at_the_same_commit_is_refus
     commit(&ship, "b.txt");
     tok.run(&["sim", "DEMO-1", "finish", "done again"]);
     assert_eq!(tok.status("DEMO-1"), "review");
+
+    // The hand-in after the Return carries the Since the Return block, and `tok show` prints it.
+    let shown = tok.text(&["show", "DEMO-1"]);
+    let block = shown
+        .split("Since the Return")
+        .nth(1)
+        .unwrap_or_else(|| panic!("no Since the Return block: {shown}"));
+    assert!(block.starts_with(" (round 2, "), "{shown}");
+    assert!(block.contains("  - b.txt\n"), "{shown}");
+    assert!(block.contains("Changed files: b.txt"), "{shown}");
+    assert!(!block.contains("a.txt"), "{shown}");
+
+    // A commit made after the hand-in is refused at Accept, named, with the two ways out.
+    tok.wait_for_person_turn("DEMO-1");
+    commit(&ship, "c.txt");
+    let refused = tok.fails(&["accept", "DEMO-1"]);
+    assert!(refused.contains("beyond the hand-in"), "{refused}");
+    assert!(refused.contains("c.txt"), "{refused}");
+    assert!(refused.contains("Return the card"), "{refused}");
+    assert!(refused.contains("wait for a new hand-in"), "{refused}");
+    assert_eq!(tok.status("DEMO-1"), "review");
     tok.run(&["cancel", "DEMO-1", "done"]);
 }

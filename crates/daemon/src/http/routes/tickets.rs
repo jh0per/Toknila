@@ -15,7 +15,7 @@ use toknila_core::{Actor, ChainId, ReviewTurn, TicketStatus};
 use super::{ApiResult, load_ticket_detail, read, stamp, ticket_write};
 use crate::http::dto::{
     ActionInput, DesignMoveInput, NewComment, NewSubtask, NewTicket, NewWildcard, PatchSubtask,
-    PatchTicket, TicketDetail, TicketItem, TicketQuery,
+    PatchTicket, TicketDetail, TicketItem, TicketQuery, clamp_size,
 };
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -155,8 +155,17 @@ pub async fn get_ticket(
 pub async fn patch_ticket(
     State(state): State<AppState>,
     Path(ticket): Path<String>,
-    Json(patch): Json<PatchTicket>,
+    Json(mut patch): Json<PatchTicket>,
 ) -> ApiResult<Json<TicketDetail>> {
+    // A size out of range is stored at the nearest size inside the limits; the answer says so.
+    let mut clamped = None;
+    if let Some(Some(asked)) = patch.size {
+        let kept = clamp_size(asked);
+        if kept != asked {
+            clamped = Some(asked);
+            patch.size = Some(Some(kept));
+        }
+    }
     if let Some(refs) = patch.designs.clone() {
         let key = ticket.clone();
         let project = read(&state, move |repo| {
@@ -166,10 +175,12 @@ pub async fn patch_ticket(
         .await?;
         check_design_ids(&state, project, refs).await?;
     }
-    ticket_write(&state, ticket, Actor::Human, move |tx, t| {
+    let Json(mut detail) = ticket_write(&state, ticket, Actor::Human, move |tx, t| {
         Ok(tickets::edit(tx, &t, patch)?)
     })
-    .await
+    .await?;
+    detail.size_clamped = clamped;
+    Ok(Json(detail))
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/designs/{index}/move", tag = "tickets", request_body = DesignMoveInput,
@@ -218,17 +229,26 @@ pub async fn ticket_action(
                     } else {
                         None
                     };
-                    Ok(look)
+                    Ok(look.map(|l| (l, t.review.clone())))
                 }))
             })
             .await??;
-        if let Some(look) = target {
+        if let Some((look, review)) = target {
             // Only changes beyond the hand-in commit are refused here; an empty branch or a
             // ship git cannot look at is the merge's to block with its own reason.
             if let Err(e @ GuardError::Problem(ShipProblem::Uncommitted { .. })) =
                 state.store.guard_ship(look.clone()).await
             {
                 return Err(ships::refuse_accept(e, &look).into());
+            }
+            // Nothing lands that was not handed in: commits beyond the hand-in, other than the
+            // daemon's own base-sync merges, are refused. A ship git cannot look at is the
+            // merge's to block.
+            if let Some(handed_in) = review.handed_in.clone()
+                && let Ok(extra) = state.store.extra_commits(look.clone(), review).await
+                && !extra.is_empty()
+            {
+                return Err(toknila_app::hand_in::refuse_extra(&extra, &handed_in).into());
             }
         }
     }
