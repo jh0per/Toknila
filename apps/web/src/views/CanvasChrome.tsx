@@ -1,4 +1,4 @@
-import { MAX_ZOOM, MIN_ZOOM } from "./zoomMath";
+import { ZoomControls } from "./ZoomControls";
 
 /// What sits over the diagram without scrolling with it: how to read it (bottom left), the
 /// Arrange and Fit buttons and the colours of the cards (bottom right) and, while a card is being picked for
@@ -31,28 +31,7 @@ export function CanvasChrome({ zoom, fitted, cut, onFit, onZoomIn, onZoomOut, ar
             Arrange
           </button>
         )}
-        <span className="canvas-zoom" role="group" aria-label="Zoom" data-testid="zoom-controls">
-          <button
-            type="button" className="btn" data-testid="zoom-out" aria-label="Zoom out" title="Zoom out (Cmd -)"
-            disabled={zoom <= MIN_ZOOM} onClick={onZoomOut}
-          >
-            −
-          </button>
-          <span className="canvas-zoom-value" data-testid="zoom-value" title="Cmd 0 for 100%">{Math.round(zoom * 100)}%</span>
-          <button
-            type="button" className="btn" data-testid="zoom-in" aria-label="Zoom in" title="Zoom in (Cmd +)"
-            disabled={zoom >= MAX_ZOOM} onClick={onZoomIn}
-          >
-            +
-          </button>
-        </span>
-        <button
-          type="button" className={`btn${cut && !fitted ? " primary" : ""}`} data-testid="fit" aria-pressed={fitted}
-          title={fitted ? "Back to full size" : "Zoom out to show every card"}
-          onClick={onFit}
-        >
-          {fitted ? "100%" : "Fit"}
-        </button>
+        <ZoomControls zoom={zoom} fitted={fitted} cut={cut} onFit={onFit} onZoomIn={onZoomIn} onZoomOut={onZoomOut} what="every card" />
         <p className="canvas-legend" data-testid="canvas-legend" title="The colour of a card's status">
           <span className="tone-todo">todo</span>
           <span className="tone-prog">in progress</span>
