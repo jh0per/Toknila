@@ -53,6 +53,8 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 waiting_ids: waiting.ids,
                 returned,
                 design_first: t.design_first,
+                designs: t.designs.clone(),
+                design_project: Some(project.id),
                 model: project.worker_model.clone(),
                 command_policy: project.command_policy,
                 allowed_commands: project.allowed_commands.clone(),

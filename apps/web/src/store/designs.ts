@@ -50,3 +50,61 @@ export function placeholder(d: Design): string {
   if (d.kind === "figma") return d.hint ?? "Export the frame from Figma as a png and drop it here.";
   return "";
 }
+
+/// A card's reference to a design: the design's id and the part of its image that matters, in
+/// whole percent of the image (none: the whole image).
+export interface Ref {
+  design: string;
+  region?: Region | null;
+}
+export interface Region {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/// The percent box of a region, as a style: it scales with the picture it sits on.
+export function regionStyle(r: Region): { left: string; top: string; width: string; height: string } {
+  return { left: `${r.x}%`, top: `${r.y}%`, width: `${r.w}%`, height: `${r.h}%` };
+}
+
+/// The region a drag drew, from two corners given as fractions (0 to 1) of the picture: whole
+/// percent, inside the picture, at least 1% wide and tall. `undefined` for a click that moved too
+/// little to be a region.
+export function dragRegion(a: { x: number; y: number }, b: { x: number; y: number }): Region | undefined {
+  const pct = (v: number) => Math.max(0, Math.min(100, Math.round(v * 100)));
+  const [x0, x1] = [pct(Math.min(a.x, b.x)), pct(Math.max(a.x, b.x))];
+  const [y0, y1] = [pct(Math.min(a.y, b.y)), pct(Math.max(a.y, b.y))];
+  if (x1 - x0 < 1 || y1 - y0 < 1) return undefined;
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/// A region in words: `x 20%, y 10%, 40% wide, 30% tall`.
+export function regionText(r: Region): string {
+  return `x ${r.x}%, y ${r.y}%, ${r.w}% wide, ${r.h}% tall`;
+}
+
+/// The zoom steps of a mockup, in percent of the width of its frame.
+export const ZOOMS = [50, 75, 100, 150, 200, 300, 400];
+
+/// The next zoom step up or down from `zoom`, never outside [`ZOOMS`].
+export function stepZoom(zoom: number, dir: 1 | -1): number {
+  if (dir === 1) return ZOOMS.find((z) => z > zoom) ?? ZOOMS[ZOOMS.length - 1];
+  return [...ZOOMS].reverse().find((z) => z < zoom) ?? ZOOMS[0];
+}
+
+/// The card's references with the one at `index` replaced (`ref` undefined: removed); `index`
+/// beyond the end adds.
+export function withRef(refs: Ref[], index: number, ref: Ref | undefined): Ref[] {
+  const out = refs.map((r) => ({ ...r }));
+  if (ref === undefined) out.splice(index, 1);
+  else if (index >= out.length) out.push(ref);
+  else out[index] = ref;
+  return out;
+}
+
+/// The design of a reference, when the library still has it.
+export function designOf(list: Design[], ref: Ref): Design | undefined {
+  return list.find((d) => d.id === ref.design);
+}

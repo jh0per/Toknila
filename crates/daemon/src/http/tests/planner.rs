@@ -13,7 +13,7 @@ use crate::server::{PLANNER_ROUTES, now};
 
 impl Api {
     /// A token for the planner of `project`, as the runner issues it when a planner starts.
-    async fn planner_token(&self, project: &str) -> String {
+    pub(super) async fn planner_token(&self, project: &str) -> String {
         let id = self.get(&format!("/v1/projects/{project}")).await["id"]
             .as_str()
             .and_then(|s| s.parse::<ProjectId>().ok())
@@ -27,7 +27,7 @@ impl Api {
     }
 
     /// DEMO with a chain that does not autostart, and another project with a chain of its own.
-    async fn two_projects(&self) {
+    pub(super) async fn two_projects(&self) {
         self.post("/v1/projects", json!({ "key": "DEMO", "name": "Demo" }))
             .await;
         self.post(

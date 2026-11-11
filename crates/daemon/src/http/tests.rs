@@ -13,6 +13,7 @@ use crate::server::{AppState, router};
 use crate::store::Store;
 
 mod agent_tokens;
+mod card_designs;
 mod chain_settings;
 mod commands;
 mod design;

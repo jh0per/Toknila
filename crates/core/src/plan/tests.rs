@@ -263,7 +263,10 @@ mod order;
 fn export_names_designs_by_file_name_and_import_reads_it_back() {
     let plan = parse(DEMO).expect("demo parses");
     let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
-    let names = vec!["home.png".to_owned(), "flow \"v2\".pdf".to_owned()];
+    let names = vec![
+        (crate::DesignId::new(), "home.png".to_owned()),
+        (crate::DesignId::new(), "flow \"v2\".pdf".to_owned()),
+    ];
     let text = export_with_designs(&view, &HashMap::new(), &names);
     let read: toml::Value = toml::from_str(&text).expect("toml");
     let listed: Vec<&str> = read["chain"]["designs"]
@@ -276,4 +279,56 @@ fn export_names_designs_by_file_name_and_import_reads_it_back() {
     assert!(parse(&text).is_ok());
     // No designs: no key, the file is the one an export wrote before.
     assert!(!export(&view, &HashMap::new()).contains("designs"));
+}
+
+const WITH_DESIGNS: &str = r#"
+[chain]
+name = "c"
+
+[[ticket]]
+id = "a"
+designs = [{ design = "login.png", region = { x = 20, y = 10, w = 40, h = 30 } }, { design = "gone.png" }]
+
+[[ticket]]
+id = "b"
+designs = [{ design = "login.png" }]
+"#;
+
+#[test]
+fn designs_are_read_by_name_resolved_exported_by_name_and_unknown_ones_dropped() {
+    let plan = parse(WITH_DESIGNS).expect("parses");
+    assert_eq!(plan.tickets[0].designs.len(), 2);
+    let login = crate::DesignId::new();
+    let library = vec![(login, "login.png".to_owned())];
+    let (view, lists) =
+        plan.instantiate_with_designs(ProjectId::new(), Timestamp(0), keys(), &library);
+    let region = crate::design::Region {
+        x: 20,
+        y: 10,
+        w: 40,
+        h: 30,
+    };
+    assert_eq!(
+        view.tickets[0].designs,
+        [crate::design::DesignRef {
+            design: login,
+            region: Some(region)
+        }]
+    );
+    assert_eq!(view.tickets[1].designs.len(), 1);
+    // The unknown name is dropped and reported, the card stays.
+    assert_eq!(lists[0].dropped_designs, ["gone.png"]);
+    assert!(lists[1].dropped_designs.is_empty());
+    let text = export_with_designs(&view, &HashMap::new(), &library);
+    assert!(
+        text.contains(r#"{ design = "login.png", region = { x = 20, y = 10, w = 40, h = 30 } }"#),
+        "{text}"
+    );
+    assert!(!text.contains(&login.to_string()), "{text}");
+    let again = parse(&text).expect("reparses");
+    assert_eq!(again.tickets[0].designs, plan.tickets[0].designs[..1]);
+    assert_eq!(again.tickets[1].designs, plan.tickets[1].designs);
+    // A bad region is a line error.
+    let bad = WITH_DESIGNS.replace("w = 40", "w = 90");
+    assert!(parse(&bad).is_err());
 }

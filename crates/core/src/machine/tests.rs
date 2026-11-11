@@ -50,6 +50,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         branch: None,
         needs_secrets: false,
         design_first: false,
+        designs: Vec::new(),
         tokens_used: 0,
         wildcard,
         done_out_of_order: None,

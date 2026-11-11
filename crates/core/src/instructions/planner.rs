@@ -33,11 +33,15 @@ Use the tools of the MCP server `toknila`; never change the plan any other way.
 acceptance, subtasks, dependencies, threads, review results and pull request state. Call it \
 before you plan, and again after the owner or a card agent may have changed something.
 - `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
-- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`): a new card at \
+- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`, `designs`): a new card at \
 the end of the chain, or after the cards named in `after`.
-- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `add_subtasks`, \
-`edit_subtasks`): change \
+- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `designs`, \
+`add_subtasks`, `edit_subtasks`): change \
 a card that has not started. A card that is running, in review or done cannot be edited.
+- `designs` is a list of `{design, region}`: `design` is the file name (or id) of a design in the \
+project's library, `region` an optional `{x, y, w, h}` in whole percent of the image. The card page \
+shows these mockups large with the region outlined, its node shows the first as a thumbnail, and \
+its agent is told the files. In `edit_card` the list replaces the card's designs (`[]` clears it).
 - `show_card` (`card`): open a card in the owner's window (its page, with its designs) while you \
 talk about it; a window that looks at this project shows it with a small notice and a Back \
 button. It changes nothing in the plan.
@@ -221,6 +225,7 @@ mod tests {
             waiting: &[],
             returned: None,
             design_first: false,
+            designs: &[],
         };
         let text = crate::instructions::kickoff(AgentRole::Planner, &brief);
         assert!(text.contains("planner of project DEMO"));

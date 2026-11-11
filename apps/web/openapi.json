@@ -5355,6 +5355,16 @@
             ],
             "description": "Whether the agent shows a design for approval before any code."
           },
+          "designs": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DesignPick"
+            },
+            "description": "The card's designs, replacing the list (`[]` clears it); left out keeps them."
+          },
           "edit_subtasks": {
             "type": "array",
             "items": {
@@ -5529,6 +5539,13 @@
             "propertyNames": {
               "type": "string"
             }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What an import left out (a design the project does not have); only an import answers it."
           }
         }
       },
@@ -6016,6 +6033,52 @@
           "figma_token": {
             "type": "boolean",
             "description": "Whether the project has a Figma token; the token itself is never sent."
+          }
+        }
+      },
+      "DesignPick": {
+        "type": "object",
+        "description": "A design the planner names: its file name (or id) in the project's library, and the part of\nthe image that matters. The host finds the design and gives the use case a [`DesignRef`].",
+        "required": [
+          "design"
+        ],
+        "properties": {
+          "design": {
+            "type": "string"
+          },
+          "region": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Region",
+                "description": "In whole percent of the image; left out for the whole image."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "DesignRef": {
+        "type": "object",
+        "description": "A card's reference to a design of its project, with the part of the image that matters.",
+        "required": [
+          "design"
+        ],
+        "properties": {
+          "design": {
+            "$ref": "#/components/schemas/DesignId"
+          },
+          "region": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Region",
+                "description": "`None`: the whole image."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -6741,6 +6804,13 @@
             "type": "boolean",
             "description": "The card changes what the person sees: the agent shows a design for approval before any\ncode."
           },
+          "designs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignPick"
+            },
+            "description": "Designs of the project the card is about, by file name or id."
+          },
           "prompt": {
             "type": "string"
           },
@@ -7098,6 +7168,13 @@
           "design_first": {
             "type": "boolean",
             "description": "Show the person a design to approve before any code."
+          },
+          "designs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignRef"
+            },
+            "description": "Designs of the project the card is about (by id), with an optional region of each."
           },
           "needs_secrets": {
             "type": "boolean"
@@ -7528,6 +7605,16 @@
               "boolean",
               "null"
             ]
+          },
+          "designs": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DesignRef"
+            },
+            "description": "The card's designs, replacing the whole list (an empty list clears it); left out to keep\nthem."
           },
           "needs_secrets": {
             "type": [
@@ -8372,6 +8459,38 @@
             "type": "number",
             "format": "double",
             "description": "0 to 100 (above 100 once exceeded)."
+          }
+        }
+      },
+      "Region": {
+        "type": "object",
+        "description": "A rectangle of a design image, in whole percent of the image's width and height.",
+        "required": [
+          "x",
+          "y",
+          "w",
+          "h"
+        ],
+        "properties": {
+          "h": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "w": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "x": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "y": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -9668,6 +9787,13 @@
           "design_first": {
             "type": "boolean",
             "description": "The person wants to see and approve a design (a thread version) before any code: the agent\nis told to open a design thread first, and `finished` is refused until one is approved."
+          },
+          "designs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignRef"
+            },
+            "description": "The designs of the project this card is about, with the part of each that matters; the\nfirst one is the card's thumbnail on the diagram."
           },
           "done_out_of_order": {
             "oneOf": [

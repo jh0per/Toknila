@@ -397,10 +397,21 @@ mod tests {
         let PlannerCall::EditCard { card, edit } = c(
             "edit_card",
             json!({ "card": "DEMO-2", "title": "N", "add_subtasks": ["x"],
+                    "designs": [{ "design": "login.png", "region": { "x": 1, "y": 2, "w": 3, "h": 4 } }, { "design": "home.png" }],
                     "edit_subtasks": [{ "position": 1, "text": "y" }] }),
         ) else {
             panic!("edit_card")
         };
+        let picks = edit.designs.as_ref().expect("designs");
+        assert_eq!(
+            (
+                picks.len(),
+                picks[0].design.as_str(),
+                picks[0].region.map(|r| r.w)
+            ),
+            (2, "login.png", Some(3))
+        );
+        assert!(picks[1].region.is_none());
         assert_eq!(card, "DEMO-2");
         assert_eq!(edit.title.as_deref(), Some("N"));
         assert_eq!(edit.edit_subtasks[0].position, 1);

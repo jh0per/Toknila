@@ -39,10 +39,24 @@ pub async fn import_chain(
     Path(project): Path<String>,
     Json(input): Json<ChainFile>,
 ) -> ApiResult<(StatusCode, Json<ChainDetail>)> {
-    let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(chains::import(tx, &project, &input.toml, None)?)
-    })
-    .await?;
+    // The project's designs, to find the ones a card names by file name.
+    let (home, key) = (state.home.clone(), project.clone());
+    let library = {
+        let p = read(&state, move |repo| Ok(resolve::project(repo, &key)?.id)).await?;
+        let designs = crate::designs::Designs::new(&home, p);
+        tokio::task::spawn_blocking(move || designs.library()).await?
+    };
+    let (at, prices) = stamp(&state);
+    let (detail, _) = state
+        .store
+        .write(Actor::Human, at, move |tx| -> ApiResult<ChainDetail> {
+            let (id, warnings) =
+                chains::import_with_designs(tx, &project, &input.toml, None, &library)?;
+            let mut detail = load_chain_detail(&tx.repo(), id, at, &prices)?;
+            detail.warnings = warnings;
+            Ok(detail)
+        })
+        .await?;
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
@@ -57,8 +71,8 @@ pub async fn export_chain(
     let home = state.home.clone();
     let toml = read(&state, move |repo| {
         let project = resolve::chain(repo, &chain)?.project_id;
-        let names = crate::designs::Designs::new(&home, project).names();
-        Ok(chains::export_with_designs(repo, &chain, &names)?)
+        let library = crate::designs::Designs::new(&home, project).library();
+        Ok(chains::export_with_designs(repo, &chain, &library)?)
     })
     .await?;
     Ok(Json(ChainFile { toml }))

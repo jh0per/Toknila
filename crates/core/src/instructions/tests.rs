@@ -29,6 +29,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         waiting: &[],
         returned: None,
         design_first: false,
+        designs: &[],
     }
 }
 
@@ -117,6 +118,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         waiting: &[],
         returned: None,
         design_first: false,
+        designs: &[],
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -200,6 +202,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         waiting: &[],
         returned: None,
         design_first: false,
+        designs: &[],
     }
 }
 
@@ -317,4 +320,42 @@ fn a_design_first_card_is_told_to_open_a_design_thread_before_any_code() {
     assert!(!generate(&plain).contains("Design first"));
     assert!(!kickoff(crate::AgentRole::Worker, &plain).contains("design thread"));
     assert!(!generate_review(&brief).contains("Design first"));
+}
+
+#[test]
+fn a_card_with_designs_is_told_the_files_and_the_regions() {
+    use super::BriefDesign;
+    use crate::design::Region;
+    let acceptance = vec!["x".to_owned()];
+    let designs = [
+        BriefDesign {
+            name: "login.png".to_owned(),
+            path: Some("/home/designs/p/d1.png".to_owned()),
+            region: Some(Region {
+                x: 20,
+                y: 10,
+                w: 40,
+                h: 30,
+            }),
+        },
+        BriefDesign {
+            name: "frame".to_owned(),
+            path: None,
+            region: None,
+        },
+    ];
+    let text = generate(&RunBrief {
+        designs: &designs,
+        ..pinned_brief(&acceptance)
+    });
+    assert!(text.contains("## Designs"), "{text}");
+    assert!(
+        text.contains(
+            "- login.png: `/home/designs/p/d1.png`; region: x 20%, y 10%, width 40%, height 30%"
+        ),
+        "{text}"
+    );
+    assert!(text.contains("- frame: no image is kept"), "{text}");
+    // Control: a card without designs has no such section.
+    assert!(!generate(&pinned_brief(&acceptance)).contains("## Designs"));
 }

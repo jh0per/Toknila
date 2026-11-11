@@ -1605,6 +1605,8 @@ export interface components {
             add_subtasks?: string[];
             /** @description Whether the agent shows a design for approval before any code. */
             design_first?: boolean | null;
+            /** @description The card's designs, replacing the list (`[]` clears it); left out keeps them. */
+            designs?: components["schemas"]["DesignPick"][] | null;
             /** @description Checklist items to rename. */
             edit_subtasks?: components["schemas"]["SubtaskEdit"][];
             prompt?: string | null;
@@ -1660,6 +1662,8 @@ export interface components {
             usage?: {
                 [key: string]: components["schemas"]["UsageFigures"];
             };
+            /** @description What an import left out (a design the project does not have); only an import answers it. */
+            warnings?: string[];
         };
         /**
          * @description A chain file: body of `POST /v1/projects/{project}/import`, answer of
@@ -1840,6 +1844,19 @@ export interface components {
             designs: components["schemas"]["Design"][];
             /** @description Whether the project has a Figma token; the token itself is never sent. */
             figma_token: boolean;
+        };
+        /**
+         * @description A design the planner names: its file name (or id) in the project's library, and the part of
+         *     the image that matters. The host finds the design and gives the use case a [`DesignRef`].
+         */
+        DesignPick: {
+            design: string;
+            region?: components["schemas"]["Region"] | null;
+        };
+        /** @description A card's reference to a design of its project, with the part of the image that matters. */
+        DesignRef: {
+            design: components["schemas"]["DesignId"];
+            region?: components["schemas"]["Region"] | null;
         };
         /** @description Dependency edge: `to` cannot start before `from` is done. */
         Edge: {
@@ -2168,6 +2185,8 @@ export interface components {
              *     code.
              */
             design_first?: boolean;
+            /** @description Designs of the project the card is about, by file name or id. */
+            designs?: components["schemas"]["DesignPick"][];
             prompt?: string;
             /** @description Checklist items. */
             subtasks?: string[];
@@ -2271,6 +2290,8 @@ export interface components {
             before?: string[];
             /** @description Show the person a design to approve before any code. */
             design_first?: boolean;
+            /** @description Designs of the project the card is about (by id), with an optional region of each. */
+            designs?: components["schemas"]["DesignRef"][];
             needs_secrets?: boolean;
             paused?: boolean;
             profile?: string | null;
@@ -2435,6 +2456,11 @@ export interface components {
         PatchTicket: {
             acceptance?: string[] | null;
             design_first?: boolean | null;
+            /**
+             * @description The card's designs, replacing the whole list (an empty list clears it); left out to keep
+             *     them.
+             */
+            designs?: components["schemas"]["DesignRef"][] | null;
             needs_secrets?: boolean | null;
             pos?: components["schemas"]["Pos"] | null;
             profile?: string | null;
@@ -2760,6 +2786,17 @@ export interface components {
              * @description 0 to 100 (above 100 once exceeded).
              */
             used_percentage: number;
+        };
+        /** @description A rectangle of a design image, in whole percent of the image's width and height. */
+        Region: {
+            /** Format: int32 */
+            h: number;
+            /** Format: int32 */
+            w: number;
+            /** Format: int32 */
+            x: number;
+            /** Format: int32 */
+            y: number;
         };
         /** @description A release milestone between tickets on the chain graph. */
         Release: {
@@ -3200,6 +3237,11 @@ export interface components {
              *     is told to open a design thread first, and `finished` is refused until one is approved.
              */
             design_first?: boolean;
+            /**
+             * @description The designs of the project this card is about, with the part of each that matters; the
+             *     first one is the card's thumbnail on the diagram.
+             */
+            designs?: components["schemas"]["DesignRef"][];
             done_out_of_order?: components["schemas"]["OutOfOrder"] | null;
             id: components["schemas"]["TicketId"];
             key: components["schemas"]["TicketKey"];

@@ -9,7 +9,7 @@ export function contentOf(
   t: Ticket, detail: TicketDetail | undefined, usage: UsageFigures | undefined, queued: number | undefined,
 ): CardContent {
   const proposal = t.status === "proposed" && (allows(detail, "approve") || allows(detail, "reject"));
-  const extras = Boolean(subtaskProgress(detail) || queued !== undefined || t.pr || t.done_out_of_order || usage);
+  const extras = Boolean(subtaskProgress(detail) || queued !== undefined || t.pr || t.done_out_of_order || usage || t.designs?.length);
   const foot: Foot = proposal ? "actions" : extras ? "extras" : "none";
   return { title: t.title, pill: t.status === "proposed" ? "awaiting approval" : t.status, key: t.key, foot };
 }
