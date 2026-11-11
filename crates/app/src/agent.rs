@@ -5,7 +5,8 @@ use toknila_core::graph::ChainView;
 use toknila_core::machine::TicketEvent;
 use toknila_core::nudge;
 use toknila_core::{
-    Actor, BlockedReason, CommentBody, CommentKind, Release, Ticket, TicketId, TicketStatus,
+    Actor, BlockedReason, CommentBody, CommentKind, Release, StatusReason, Ticket, TicketId,
+    TicketStatus, WaitingReason,
 };
 
 use crate::notes::{add_comment, body_from_text, update_subtask};
@@ -220,8 +221,19 @@ fn report<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, body: CommentBody) ->
 
 /// A sign of life from the agent (a hook fired). A card that waits goes back to Running when the
 /// signal shows work (`toknila_core::nudge::resumes`); otherwise nothing about the ticket changes.
+/// An open `ask_human` question is never cleared by a hook (a nudge typed into the agent fires
+/// them): only the person's answer or instruction clears it.
 pub fn activity<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, signal: &str) -> AppResult<()> {
-    if nudge::resumes(signal) {
+    if !nudge::resumes(signal) {
+        return Ok(());
+    }
+    let asking = uow.ticket(t.id)?.is_some_and(|t| {
+        matches!(
+            t.status_reason,
+            Some(StatusReason::Waiting(WaitingReason::Question { .. }))
+        )
+    });
+    if !asking {
         resume(uow, t)?;
     }
     Ok(())

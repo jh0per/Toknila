@@ -70,6 +70,54 @@ async fn a_hook_that_means_work_returns_a_waiting_card_to_running() {
 }
 
 #[tokio::test]
+async fn a_hook_of_work_never_clears_an_open_question_and_the_answer_still_does() {
+    let api = Api::new();
+    api.demo().await;
+    api.post(
+        "/v1/chains/demo/tickets",
+        json!({ "title": "A", "profile": "sim" }),
+    )
+    .await;
+    let (token, _) = api.agent_token("DEMO-1").await;
+    event(&api, &token, json!({ "event": "started" })).await;
+    event(
+        &api,
+        &token,
+        json!({ "event": "ask_human", "text": "which option?" }),
+    )
+    .await;
+    let inbox = || async {
+        api.get("/v1/projects/DEMO/inbox")
+            .await
+            .as_array()
+            .expect("items")
+            .iter()
+            .filter(|i| i["kind"] == "question")
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(inbox().await.len(), 1);
+    // A nudge typed into the agent fires these two; neither is an answer.
+    hook(&api, &token, "hook:user_prompt_submit").await;
+    hook(&api, &token, "hook:post_tool_use").await;
+    assert_eq!(status(&api, "DEMO-1").await, "waiting");
+    let q = inbox().await;
+    assert_eq!(q.len(), 1, "{q:?}");
+    assert!(
+        q[0]["text"]
+            .as_str()
+            .is_some_and(|t| t.contains("which option?"))
+    );
+    // The answer reaches the agent and returns the card to Running.
+    let t = api
+        .post("/v1/tickets/DEMO-1/comments", json!({ "text": "option b" }))
+        .await;
+    assert!(t["comments"][1]["delivered_at"].is_number(), "{t}");
+    assert_eq!(status(&api, "DEMO-1").await, "running");
+    assert!(inbox().await.is_empty());
+}
+
+#[tokio::test]
 async fn an_mcp_event_returns_a_waiting_card_to_running() {
     let api = Api::new();
     let token = waiting(&api).await;
