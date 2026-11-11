@@ -76,3 +76,13 @@ pub struct ReleaseRun {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
+
+/// Answer of `GET /v1/projects/{project}/next-version`: the version a new chain suggests.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct VersionSuggestion {
+    /// The next patch of the newest tag, or `0.1.0` when the repository has none.
+    pub version: String,
+    /// The newest tag of the repository, if it has one.
+    pub last_tag: Option<String>,
+}

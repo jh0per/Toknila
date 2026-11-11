@@ -59,3 +59,30 @@ export function storeFinishedOpen(project: string, open: boolean): void {
     // The group still opens and closes for this visit.
   }
 }
+
+/// How the Finish node reads when the chain has a version: `Release v0.3.0`, its state in words,
+/// and one line under it: how many cards are left, or the date and tag once it is released.
+export interface FinishView {
+  title: string;
+  state: "planned" | "ready" | "released";
+  stateText: string;
+  text: string;
+}
+
+const STATE_TEXT = { planned: "planned", ready: "ready to release", released: "released" } as const;
+
+/// The Finish node's words from the summary's `finish`; `undefined` for a chain without a version.
+export function finishView(s: Pick<ChainSummary, "finish" | "total" | "done">): FinishView | undefined {
+  const f = s.finish;
+  if (!f) return undefined;
+  const left = Math.max(0, s.total - s.done);
+  const tag = f.tag ? ` · ${f.tag}` : "";
+  const text =
+    f.state === "released" ? `${f.released_at == null ? "" : dayText(f.released_at)}${tag}`.replace(/^ · /, "")
+    : f.state === "ready" ? "every card is merged"
+    : `${left} left`;
+  return { title: `Release v${f.version}`, state: f.state, stateText: STATE_TEXT[f.state], text };
+}
+
+/// A chain's version for a row or a header: `v0.3.0`, or nothing.
+export const versionText = (s: Pick<ChainSummary, "version">): string => (s.version ? `v${s.version}` : "");

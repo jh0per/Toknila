@@ -119,6 +119,7 @@ mod tests {
             review_mode: None,
             reviewer: None,
             source: None,
+            version: None,
         }
     }
 

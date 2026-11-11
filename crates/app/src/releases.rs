@@ -137,7 +137,11 @@ pub fn begin<U: UnitOfWork + ?Sized>(
                     r.version
                 )));
             }
-            Some(r) => r.id,
+            Some(r) => {
+                // Cards added since the milestone was made are before it too.
+                ctx.wire_end_release(r.id)?;
+                r.id
+            }
             None => {
                 if ctx.view.releases.iter().any(|r| r.version == version) {
                     return Err(AppError::conflict(format!(

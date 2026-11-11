@@ -3,6 +3,7 @@ import type { ChainDetail, Pos, Size, Ticket, TicketAction } from "../api/types"
 import { FINISH, START, sceneOf } from "../canvasScene";
 import { type LaidEdge, nodeKey } from "../layout";
 import { type EdgeRef, idOf } from "../store/edges";
+import { epicPanel } from "../store/epic";
 import { canRelease } from "../store/release";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
@@ -242,13 +243,20 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
           >
             {scene.nodes.map((n) => {
               const style = { left: n.box.x, top: n.box.y, width: n.box.w, height: n.box.h };
-              if (n.kind === "start") return <StartNode key={n.key} goal={chain.chain.goal} style={style} />;
+              const panel = epicPanel(state);
+              const open = (kind: "epic" | "release") => () => dispatch({ type: "openEpic", chain: chainId, kind });
+              if (n.kind === "start") {
+                return <StartNode key={n.key} name={chain.chain.name} goal={chain.chain.goal} style={style} selected={panel?.kind === "epic"} onOpen={open("epic")} />;
+              }
               // Every card merged: the end node offers Release.
               const onRelease = canRelease(chain) ? () => dispatch({ type: "openRelease", chain: chainId }) : undefined;
-              if (n.kind === "finish") return <FinishNode key={n.key} style={style} summary={chain.summary} onRelease={onRelease} />;
+              if (n.kind === "finish") return <FinishNode key={n.key} style={style} summary={chain.summary} selected={panel?.kind === "release"} onRelease={onRelease} onOpen={open("release")} />;
               const over = drag?.over === n.key;
               const r = n.kind === "release" ? releases.get(n.id) : undefined;
               const isEnd = n.key === endKey;
+              if (r && isEnd) {
+                return <FinishNode key={n.key} style={style} summary={chain.summary} release={r} nodeKey={n.key} over={over} selected={panel?.kind === "release"} onRelease={onRelease} onOpen={open("release")} />;
+              }
               if (r) return <ReleaseNode key={n.key} release={r} nodeKey={n.key} style={style} over={over} end={isEnd} onRelease={isEnd ? onRelease : undefined} />;
               const t = tickets.get(n.id);
               const layout = layouts.get(n.id);

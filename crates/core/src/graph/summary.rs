@@ -102,6 +102,8 @@ impl ChainView {
             stopped_at,
             next_release,
             releasable: self.releasable(),
+            version: self.version(),
+            finish: self.finish(),
         }
     }
 

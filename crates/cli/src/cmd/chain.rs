@@ -16,6 +16,9 @@ pub enum ChainCmd {
         name: String,
         #[arg(long)]
         goal: Option<String>,
+        /// The version the chain releases, such as `0.3.0`: its end release is made with it.
+        #[arg(long)]
+        version: Option<String>,
         /// Do not start cards automatically (a person starts each one).
         #[arg(long)]
         no_autostart: bool,
@@ -48,7 +51,10 @@ pub enum ChainCmd {
         project: Option<String>,
         /// Whether the chain starts its cards automatically.
         #[arg(long, value_parser = ["on", "off"])]
-        autostart: String,
+        autostart: Option<String>,
+        /// The version the chain releases; refused once its release was cut.
+        #[arg(long)]
+        version: Option<String>,
     },
     /// Show a chain as a graph in dependency order with its status.
     Show { chain: String },
@@ -100,6 +106,7 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
         ChainCmd::New {
             name,
             goal,
+            version,
             no_autostart,
             project,
         } => {
@@ -110,6 +117,7 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
                 autostart: Some(!no_autostart),
                 review_mode: None,
                 reviewer: None,
+                version,
             };
             emit(json_out, &c.create_chain(&p, &input)?, output::chain);
         }
@@ -143,9 +151,14 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
             chain,
             project,
             autostart,
+            version,
         } => {
+            if autostart.is_none() && version.is_none() {
+                bail!("nothing to set: pass --autostart on|off or --version");
+            }
             let settings = ChainSettings {
-                autostart: Some(autostart == "on"),
+                autostart: autostart.map(|a| a == "on"),
+                version,
                 ..ChainSettings::default()
             };
             let detail = c.patch_chain(&chain, project.as_deref(), &settings)?;

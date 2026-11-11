@@ -300,4 +300,8 @@ pub(super) const MIGRATIONS: &[&str] = &[
         json TEXT NOT NULL
     );
     "#,
+    // 23: the version a chain releases (the epic's release); none for the chains that exist.
+    r#"
+    ALTER TABLE chains ADD COLUMN version TEXT;
+    "#,
 ];

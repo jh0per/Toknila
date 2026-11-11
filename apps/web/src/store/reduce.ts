@@ -7,6 +7,7 @@ import { reduceAutostart } from "./autostart";
 import { detailsWanted, knownKey } from "./cardDetails";
 import { reduceTheme } from "./theme";
 import { reduceEdges } from "./edges";
+import { reduceEpic, renamedRoute, reopen } from "./epic";
 import { followTarget, opened } from "./follow";
 import { reducePlacement } from "./placement";
 import { reduceQuick } from "./quick";
@@ -152,7 +153,10 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       // new dialog or their own; closing another dialog leaves them where they show.
       const keep = msg.type === "closeDialog" && s.plan.dialog?.kind !== "foundPlans";
       const found = keep ? next.imports.found : undefined;
-      return [{ ...next, imports: { ...initialImports, found }, removal: initialRemoval, release: initialRelease }, fx];
+      // A new chain's dialog asks for the version it suggests.
+      const d = msg.type === "openDialog" ? msg.dialog : undefined;
+      const suggest: Effect[] = d?.kind === "newChain" ? [{ type: "loadNextVersion", project: d.project }] : [];
+      return [{ ...next, imports: { ...initialImports, found }, removal: initialRemoval, release: initialRelease }, [...fx, ...suggest]];
     }
     case "textImported":
     case "importAnswered": {
@@ -199,6 +203,21 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "releaseRun":
     case "releaseRefused":
       return reduceRelease(s, msg);
+    case "openEpic":
+    case "closeEpic":
+    case "saveEpic":
+    case "epicRefused":
+    case "loadNextVersion":
+    case "nextVersion":
+      return reduceEpic(s, msg);
+    case "epicSaved": {
+      const [next, fx] = reduceEpic(s, msg);
+      // A renamed chain is on a page of its new name; the open panel goes along.
+      const name = msg.chain.chain.name;
+      if (name === msg.from) return [next, fx];
+      const [moved, more] = then(next, fx, renamedRoute(msg.project, name));
+      return [reopen(moved), more];
+    }
     case "selectEdge":
     case "dismissEdgeError":
     case "addEdge":

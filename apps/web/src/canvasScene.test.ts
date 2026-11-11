@@ -40,6 +40,12 @@ describe("bookendLines", () => {
     expect(bookendLines([], [], FINISH)).toEqual([{ from: START, to: FINISH, implicit: true }]);
   });
 
+  it("does not join Start to an end release no card is wired to yet, unless it is the only node", () => {
+    const lines = (nodes: string[]) => bookendLines(nodes, [], "R").filter((l) => l.implicit).map((l) => `${l.from}>${l.to}`);
+    expect(lines(["a", "R"])).toEqual([`${START}>a`, "a>R"]);
+    expect(lines(["R"])).toEqual([`${START}>R`]);
+  });
+
   it("does not draw a line out of the end node, or a second one into a release that is the end", () => {
     const lines = bookendLines(["a", "R"], [{ from: "a", to: "R" }], "R");
     expect(lines.filter((l) => l.implicit).map((l) => `${l.from}>${l.to}`)).toEqual([`${START}>a`]);

@@ -9,7 +9,9 @@ use toknila_app::{AppError, resolve};
 use toknila_core::{Actor, release_run};
 
 use super::{ApiResult, chain_write, read};
-use crate::http::dto::{ChainDetail, NewRelease, ReleaseOffer, ReleaseRun, StartRelease};
+use crate::http::dto::{
+    ChainDetail, NewRelease, ReleaseOffer, ReleaseRun, StartRelease, VersionSuggestion,
+};
 use crate::http::error::ErrorBody;
 use crate::releaser;
 use crate::server::{AppState, now};
@@ -182,4 +184,26 @@ pub async fn release_run(
     let run = releaser::run_of(r.id)
         .ok_or_else(|| AppError::not_found(format!("a release run of {}", r.version)))?;
     Ok(Json(run))
+}
+
+#[utoipa::path(get, path = "/projects/{project}/next-version", tag = "releases",
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = VersionSuggestion), (status = 404, body = ErrorBody)))]
+/// The version a new chain of the project suggests: the next patch of the repository's newest
+/// tag, or `0.1.0` when it has none or the project has no repository.
+pub async fn next_version(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+) -> ApiResult<Json<VersionSuggestion>> {
+    let project = read(&state, move |repo| Ok(resolve::project(repo, &project)?)).await?;
+    let tags = match project.repo_path.filter(|r| !r.trim().is_empty()) {
+        Some(repo) => tokio::task::spawn_blocking(move || releaser::tags(&repo))
+            .await
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
+    Ok(Json(VersionSuggestion {
+        version: release_run::suggest_version(&tags),
+        last_tag: tags.first().cloned(),
+    }))
 }

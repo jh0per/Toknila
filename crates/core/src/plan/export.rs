@@ -75,6 +75,9 @@ fn chain_section(view: &ChainView, designs: &[String], out: &mut Lines) {
     if !c.goal.is_empty() {
         out.str("goal", &c.goal);
     }
+    if let Some(version) = view.version() {
+        out.str("version", &version);
+    }
     out.list("designs", designs);
     if !c.autostart {
         out.raw("autostart = false");

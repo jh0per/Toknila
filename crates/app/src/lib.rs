@@ -8,6 +8,7 @@ pub mod agent;
 pub mod chain;
 pub mod chains;
 pub mod checks;
+pub(crate) mod epic;
 pub mod error;
 pub mod external;
 pub mod inbox;

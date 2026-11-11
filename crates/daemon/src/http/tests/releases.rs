@@ -15,13 +15,13 @@ use super::ships::{project, repo};
 use crate::git::testing::{commit_file, git};
 use crate::shipyard::GitShipyard;
 
-struct Env {
-    _tmp: tempfile::TempDir,
-    repo: PathBuf,
-    api: Api,
+pub(super) struct Env {
+    pub(super) _tmp: tempfile::TempDir,
+    pub(super) repo: PathBuf,
+    pub(super) api: Api,
 }
 
-async fn env() -> Env {
+pub(super) async fn env() -> Env {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = repo(tmp.path());
     let api = Api::with_yard(Some(Arc::new(GitShipyard::new(tmp.path().join("ships")))));
@@ -34,7 +34,7 @@ async fn env() -> Env {
 }
 
 /// Adds a card, commits a file on its ship and accepts it: the card is Merged.
-async fn merge_card(e: &Env, title: &str, file: &str) -> String {
+pub(super) async fn merge_card(e: &Env, title: &str, file: &str) -> String {
     let t = e
         .api
         .post("/v1/chains/auth/tickets", json!({ "title": title }))
@@ -68,7 +68,7 @@ async fn settings(e: &Env, check: &str, bump: &str) {
 }
 
 /// Waits until the last run of `version` is no longer running and returns it.
-async fn finished_run(api: &Api, version: &str) -> Value {
+pub(super) async fn finished_run(api: &Api, version: &str) -> Value {
     for _ in 0..600 {
         let (s, run) = api
             .call(Method::GET, &format!("/v1/releases/{version}/run"), None)
