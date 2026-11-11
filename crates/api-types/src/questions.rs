@@ -9,6 +9,7 @@ use toknila_core::question::AnswerKind;
 /// waits for the person's decision.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PermissionAsk {
     /// Summary of the tool call that needs permission (the command or the file); the daemon
     /// uses the last one it was told when this is absent.
@@ -40,6 +41,7 @@ pub struct PermissionReply {
 /// Body of `POST /v1/tickets/{ticket}/runner/answer`: a person's answer to what an agent asks.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NewAnswer {
     /// Whose question: the ticket's `worker` (the default) or its `reviewer`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

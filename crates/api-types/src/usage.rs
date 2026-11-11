@@ -46,6 +46,7 @@ pub struct UsageView {
 /// Body of `PUT /v1/usage/settings`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct UsageSettings {
     /// Count every Claude Code session under the user's `~/.claude/projects`, not only
     /// Toknila's runs. Local only; on by default.
@@ -55,6 +56,7 @@ pub struct UsageSettings {
 /// Body of `POST /v1/usage/quota`: the rate-limit windows an agent's status line received.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QuotaReport {
     pub windows: Vec<QuotaWindow>,
 }

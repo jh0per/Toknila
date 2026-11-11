@@ -18,6 +18,7 @@ pub struct PlannerState {
 /// `POST /v1/projects/{project}/planner/start`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StartPlanner {
     /// A planner profile from `GET /v1/profiles`; unset: `claude-code-planner`.
     pub profile: Option<String>,

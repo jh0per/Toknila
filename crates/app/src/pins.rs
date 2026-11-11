@@ -28,6 +28,7 @@ pub struct NewPin {
 /// What a person answers.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct PinAnswer {
     pub text: String,
 }

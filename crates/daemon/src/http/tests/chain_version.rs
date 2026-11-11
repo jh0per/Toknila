@@ -117,11 +117,8 @@ async fn the_version_is_written_to_the_chain_file_and_an_import_reads_it_back() 
         json!({ "name": "auth", "version": "0.3.0" }),
     )
     .await;
-    api.post(
-        "/v1/chains/auth/tickets",
-        json!({ "title": "A", "autostart": false }),
-    )
-    .await;
+    api.post("/v1/chains/auth/tickets", json!({ "title": "A" }))
+        .await;
     let file = api.get("/v1/chains/auth/export").await;
     let toml = file["toml"].as_str().expect("toml").to_owned();
     assert!(toml.contains("version = \"0.3.0\""), "{toml}");
@@ -166,10 +163,7 @@ async fn the_finish_goes_planned_ready_released_with_the_tag() {
     let (s, c) = patch(&e.api, json!({ "version": "0.3.0" })).await;
     assert_eq!(s, StatusCode::OK, "{c}");
     e.api
-        .post(
-            "/v1/chains/auth/tickets",
-            json!({ "title": "Open", "autostart": false }),
-        )
+        .post("/v1/chains/auth/tickets", json!({ "title": "Open" }))
         .await;
     let c = e.api.get("/v1/chains/auth").await;
     assert_eq!(c["summary"]["finish"]["state"], json!("planned"), "{c}");

@@ -2665,9 +2665,18 @@ export interface components {
             message?: string | null;
         };
         /** @description `POST /v1/chains/{chain}/wildcards`: a person proposes a card. */
-        NewWildcard: components["schemas"]["Proposal"] & {
+        NewWildcard: {
+            /** @description Acceptance criteria, one per entry. */
+            acceptance?: string[];
+            /** @description Nodes the card waits for. */
+            after?: string[];
+            /** @description Nodes that wait for the card; none of them may have started when it is approved. */
+            before?: string[];
             /** @description The ticket during which the work was found: key, id or title. */
             from?: string | null;
+            /** @description The task for whoever does it. */
+            prompt?: string;
+            title: string;
         };
         /** @description The next milestone on the graph. */
         NextRelease: {

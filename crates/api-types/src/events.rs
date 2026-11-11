@@ -31,6 +31,7 @@ pub struct EventRecord {
 /// Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NewActivity {
     /// What fired, for example `hook:stop`.
     pub signal: String,

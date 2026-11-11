@@ -142,6 +142,7 @@ pub fn clean_name(raw: &str) -> Result<String, String> {
 /// A rectangle of a design image, in whole percent of the image's width and height.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Region {
     pub x: u8,
     pub y: u8,
@@ -174,6 +175,7 @@ impl Region {
 /// A card's reference to a design of its project, with the part of the image that matters.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DesignRef {
     pub design: DesignId,
     /// `None`: the whole image.

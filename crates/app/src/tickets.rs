@@ -14,6 +14,7 @@ use crate::{AppError, AppResult, UnitOfWork, resolve, with_chain};
 /// `POST /v1/chains/{chain}/tickets`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NewTicket {
     pub title: String,
     #[serde(default)]
@@ -169,6 +170,7 @@ pub fn act<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, event: TicketEvent) 
 /// "what") or a full `body`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NewComment {
     /// Defaults to instruction.
     pub kind: Option<CommentKind>,

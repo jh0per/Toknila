@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 /// `POST /v1/repos/check`: the folder a person is about to make a project of.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RepoCheckRequest {
     pub repo_path: String,
     /// The base branch to look for; default `develop`.

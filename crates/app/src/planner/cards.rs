@@ -17,6 +17,7 @@ use crate::{AppResult, UnitOfWork, notes};
 /// What the planner gives for a new card.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NewCard {
     pub title: String,
     #[serde(default)]
@@ -42,6 +43,7 @@ pub struct NewCard {
 /// the image that matters. The host finds the design and gives the use case a [`DesignRef`].
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct DesignPick {
     pub design: String,
     /// In whole percent of the image; left out for the whole image.
@@ -88,6 +90,7 @@ pub fn add_card_with_designs<U: UnitOfWork + ?Sized>(
 /// A rename of a checklist item.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SubtaskEdit {
     /// 1-based position.
     pub position: u32,
@@ -97,6 +100,7 @@ pub struct SubtaskEdit {
 /// What the planner may change on a card that has not started.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct CardEdit {
     pub title: Option<String>,
     pub prompt: Option<String>,
