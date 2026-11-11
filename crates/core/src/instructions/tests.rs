@@ -30,6 +30,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         returned: None,
         design_first: false,
         has_designs: false,
+        epic: None,
     }
 }
 
@@ -119,6 +120,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         returned: None,
         design_first: false,
         has_designs: false,
+        epic: None,
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -203,6 +205,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         returned: None,
         design_first: false,
         has_designs: false,
+        epic: None,
     }
 }
 
@@ -320,4 +323,25 @@ fn a_design_first_card_is_told_to_open_a_design_thread_before_any_code() {
     assert!(!generate(&plain).contains("Design first"));
     assert!(!kickoff(crate::AgentRole::Worker, &plain).contains("design thread"));
     assert!(!generate_review(&brief).contains("Design first"));
+}
+
+#[test]
+fn a_card_reads_the_goal_of_its_chain_as_the_epic() {
+    let brief = RunBrief {
+        epic: Some(("checkout", "Pay with saved cards.\n")),
+        ..pinned_brief(&[])
+    };
+    let text = generate(&brief);
+    assert!(
+        text.contains("## Epic: checkout\n\nThis card is a task of the chain checkout."),
+        "{text}"
+    );
+    assert!(text.contains("\n\nPay with saved cards.\n"), "{text}");
+    // No goal, no section.
+    let empty = RunBrief {
+        epic: Some(("checkout", " ")),
+        ..pinned_brief(&[])
+    };
+    assert!(!generate(&empty).contains("## Epic"));
+    assert!(!generate(&pinned_brief(&[])).contains("## Epic"));
 }

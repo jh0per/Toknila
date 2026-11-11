@@ -22,7 +22,8 @@ pub fn parse(text: &str) -> Result<Plan, PlanError> {
     file.check_done_subtasks()?;
     let edges = file.edges(&ids)?;
     file.check_edges(&edges)?;
-    Ok(build(raw, edges))
+    let version = file.version()?;
+    Ok(build(raw, edges, version))
 }
 
 fn line_of(text: &str, offset: usize) -> usize {
@@ -62,6 +63,26 @@ impl Source<'_> {
             }
         }
         Ok(ids)
+    }
+
+    /// The chain's `version`, cleaned; a text that is not a version is an error at its line.
+    fn version(&self) -> Result<Option<String>, PlanError> {
+        let Some(text) = self.raw.chain.version.as_deref() else {
+            return Ok(None);
+        };
+        crate::release_run::clean_version(text)
+            .map(Some)
+            .map_err(|message| {
+                let at = self
+                    .text
+                    .lines()
+                    .position(|l| l.trim_start().starts_with("version"))
+                    .map_or(1, |i| i + 1);
+                PlanError {
+                    line: at,
+                    message: format!("chain version {text:?}: {message}"),
+                }
+            })
     }
 
     /// `done_subtasks` positions must point at existing subtasks.
@@ -170,12 +191,13 @@ impl Source<'_> {
     }
 }
 
-fn build(raw: RawFile, edges: Vec<PlanEdge>) -> Plan {
+fn build(raw: RawFile, edges: Vec<PlanEdge>, version: Option<String>) -> Plan {
     let chain = PlanChain {
         name: raw.chain.name,
         goal: raw.chain.goal,
         autostart: raw.chain.autostart.unwrap_or(Chain::DEFAULT_AUTOSTART),
         review_mode: raw.chain.review_mode,
+        version,
     };
     let tickets = raw.ticket.into_iter().map(|t| PlanTicket {
         title: t.title.unwrap_or_else(|| t.id.get_ref().clone()),

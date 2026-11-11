@@ -7,6 +7,7 @@
 //! [chain]
 //! name = "demo"
 //! goal = "Phase-0 gate"
+//! version = "0.3.0"     # optional: the chain's end release; an explicit [[release]] wins
 //!
 //! [[ticket]]
 //! id = "A"
@@ -56,6 +57,9 @@ pub struct PlanChain {
     pub goal: String,
     pub autostart: bool,
     pub review_mode: Option<ReviewMode>,
+    /// The version the chain releases, cleaned (no leading `v`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
 }
 
 /// One ticket from a file.

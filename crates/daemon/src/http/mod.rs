@@ -112,6 +112,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(runner_size))
         .routes(routes!(release_action))
         .routes(routes!(release_offer))
+        .routes(routes!(next_version))
         .routes(routes!(start_release))
         .routes(routes!(release_run))
         .routes(routes!(list_events))

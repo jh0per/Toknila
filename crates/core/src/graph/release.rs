@@ -70,6 +70,91 @@ impl ChainView {
         })
     }
 
+    /// The release the chain's Finish node stands for: its end release, or, when that one is
+    /// released, the last milestone nothing waits for (the one that was released).
+    pub fn finish_release(&self) -> Option<&Release> {
+        if let Some(r) = self.end_release() {
+            return Some(r);
+        }
+        let successors = self.successors();
+        self.topo_order().into_iter().rev().find_map(|n| match n {
+            NodeRef::Release(id) if successors.get(&n).is_none_or(Vec::is_empty) => {
+                self.release(id)
+            }
+            _ => None,
+        })
+    }
+
+    /// The chain's version: its end release's, else the one the chain itself carries.
+    pub fn version(&self) -> Option<String> {
+        self.finish_release()
+            .map(|r| r.version.clone())
+            .or_else(|| self.chain.version.clone())
+    }
+
+    /// The Finish node: the release of the chain's version and where it stands. `None` for a
+    /// chain without a version and without an end release.
+    pub fn finish(&self) -> Option<Finish> {
+        let release = self.finish_release();
+        let version = self.version()?;
+        let state = match release.map(|r| r.state) {
+            Some(ReleaseState::Released) => FinishState::Released,
+            _ if self.releasable() => FinishState::Ready,
+            _ => FinishState::Planned,
+        };
+        Some(Finish {
+            version,
+            state,
+            tag: release.and_then(|r| r.tag.clone()),
+            released_at: release.and_then(|r| r.released_at),
+        })
+    }
+
+    /// Makes the chain's end release and its version one: a chain that has an end release takes
+    /// its version; one that has none gets a planned one from `version` (when given), waiting for
+    /// the cards nothing else waits for.
+    pub fn unify_end_release(&mut self, version: Option<&str>) {
+        if let Some(own) = self.finish_release().map(|r| r.version.clone()) {
+            self.chain.version = Some(own);
+            return;
+        }
+        let Some(version) = version else { return };
+        if self.releases.iter().any(|r| r.version == version) {
+            return;
+        }
+        self.chain.version = Some(version.to_owned());
+        let release = Release::planned(
+            ReleaseId::new(),
+            self.chain.id,
+            version.to_owned(),
+            ReleaseChannel::TagOnly,
+            StartMode::Manual,
+        );
+        let id = release.id;
+        self.releases.push(release);
+        self.edges.extend(self.end_release_edges(id));
+    }
+
+    /// The dependencies that make a planned end release wait for the cards nothing else waits
+    /// for. Empty when the release is not planned or every card is already before it.
+    pub fn end_release_edges(&self, release: ReleaseId) -> Vec<Edge> {
+        if self
+            .release(release)
+            .is_none_or(|r| r.state != ReleaseState::Planned)
+        {
+            return Vec::new();
+        }
+        self.leaf_tickets()
+            .into_iter()
+            .map(|t| Edge {
+                chain_id: self.chain.id,
+                from: NodeRef::Ticket(t),
+                to: NodeRef::Release(release),
+                kind: EdgeKind::Normal,
+            })
+            .collect()
+    }
+
     /// The cards no other card waits for: a new milestone for the whole chain waits for them.
     pub fn leaf_tickets(&self) -> Vec<TicketId> {
         let successors = self.successors();

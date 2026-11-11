@@ -20,6 +20,11 @@ fn planner_rig() -> Rig {
         merge_method: MergeMethod::Squash,
         check_command: Some("cargo xtask verify".to_owned()),
         base_behind: None,
+        epics: vec![toknila_core::instructions::Epic {
+            chain: "checkout".to_owned(),
+            version: Some("0.3.0".to_owned()),
+            goal: "Pay with saved cards.".to_owned(),
+        }],
     });
     rig
 }
@@ -69,6 +74,10 @@ fn the_planner_reads_its_instructions_from_its_own_folder() {
     assert!(text.contains("pull request against `develop`"));
     assert!(text.contains("`cargo xtask verify`"));
     assert!(text.contains("`show_plan`"));
+    assert!(
+        text.contains("### checkout (v0.3.0)\n\nPay with saved cards."),
+        "the planner reads each epic's goal: {text}"
+    );
     assert!(w.args.contains(&path.display().to_string()));
     // The worker's and the reviewer's folders are untouched.
     assert!(!path.to_string_lossy().contains("worker"));

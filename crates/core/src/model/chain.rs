@@ -22,6 +22,10 @@ pub struct Chain {
     /// for a chain made in Toknila or imported from pasted text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    /// The version the chain releases, such as `0.3.0`: the epic's release. Its end release
+    /// carries the same version; none for a chain that was made without one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
 }
 
 impl Chain {

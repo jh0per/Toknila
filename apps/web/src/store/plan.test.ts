@@ -32,7 +32,8 @@ describe("dialogs", () => {
   it("open and close in the store", () => {
     const [s, fx] = reduce(loaded(), { type: "openDialog", dialog: { kind: "newChain", project: "DEMO" } });
     expect(s.plan.dialog).toEqual({ kind: "newChain", project: "DEMO" });
-    expect(fx).toEqual([]);
+    // The version the new chain suggests is asked for; nothing else is.
+    expect(fx).toEqual([{ type: "loadNextVersion", project: "DEMO" }]);
     expect(reduce(s, { type: "closeDialog" })[0].plan.dialog).toBeUndefined();
   });
 

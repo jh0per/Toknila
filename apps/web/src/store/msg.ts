@@ -6,6 +6,7 @@ import type {
 } from "../api/types";
 import type { AutostartEffect, AutostartIntent, AutostartResult } from "./autostart";
 import type { EdgeEffect, EdgeIntent, EdgeResult } from "./edges";
+import type { EpicEffect, EpicIntent, EpicResult } from "./epic";
 import type { PlacementEffect, PlacementIntent, PlacementResult } from "./placement";
 import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
 import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
@@ -35,6 +36,7 @@ export type Intent =
   | ImportIntent
   | RemovalIntent
   | ReleaseIntent
+  | EpicIntent
   | EdgeIntent
   | PlacementIntent
   | AutostartIntent
@@ -87,6 +89,7 @@ export type Msg =
   | ImportResult
   | RemovalResult
   | ReleaseResult
+  | EpicResult
   | EdgeResult
   | PlacementResult
   | AutostartResult
@@ -112,6 +115,7 @@ export type Effect =
   | ImportEffect
   | RemovalEffect
   | ReleaseEffect
+  | EpicEffect
   | EdgeEffect
   | PlacementEffect
   | AutostartEffect

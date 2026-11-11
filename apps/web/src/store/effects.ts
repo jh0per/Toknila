@@ -7,6 +7,7 @@ import type {
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { runAutostartEffect } from "./autostartEffects";
 import { runEdgeEffect } from "./edgeEffects";
+import { runEpicEffect } from "./epicEffects";
 import { runPlacementEffect } from "./placementEffects";
 import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
@@ -220,6 +221,10 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "startRelease":
       case "pollRelease":
         runReleaseEffect(e, dispatch);
+        return;
+      case "saveEpic":
+      case "loadNextVersion":
+        runEpicEffect(e, dispatch);
         return;
       case "saveTheme":
         saveTheme(e.theme);

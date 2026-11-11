@@ -285,4 +285,8 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE projects ADD COLUMN bump_command TEXT;
     ALTER TABLE releases ADD COLUMN tag TEXT;
     "#,
+    // 21: the version a chain releases (the epic's release); none for the chains that exist.
+    r#"
+    ALTER TABLE chains ADD COLUMN version TEXT;
+    "#,
 ];

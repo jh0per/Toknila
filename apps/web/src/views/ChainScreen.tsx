@@ -1,5 +1,6 @@
 import type { ChainDetail } from "../api/types";
 import { chainTone } from "../store/groups";
+import { versionText } from "../store/phase";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, runningAgents, slotsOf } from "../store/state";
 import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
@@ -23,6 +24,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
       <header className="top">
         <div className="crumb">
           <b>{project?.key ?? ""}</b><i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
+          {chain.summary.version && <span className="ver" data-testid="chain-version-top">{versionText(chain.summary)}</span>}
         </div>
         <PhaseChip phase={chain.summary.phase} />
         {/* The status pill is only for a chain that needs a person. */}

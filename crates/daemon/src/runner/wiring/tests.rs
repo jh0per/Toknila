@@ -115,6 +115,19 @@ fn the_instructions_file_holds_the_task_and_lives_outside_the_worktree() {
 }
 
 #[test]
+fn a_card_agent_reads_the_goal_of_its_chain_in_its_instructions() {
+    let mut rig = Rig::new();
+    rig.brief.epic = Some(("checkout".to_owned(), "Pay with saved cards.".to_owned()));
+    rig.prepare(&AgentProfile::claude_code());
+    let (_, text) = rig.file("instructions.md");
+    assert!(
+        text.contains("## Epic: checkout\n\nThis card is a task of the chain checkout."),
+        "{text}"
+    );
+    assert!(text.contains("Pay with saved cards."));
+}
+
+#[test]
 fn a_profile_without_an_instructions_flag_gets_no_instructions_file() {
     let rig = Rig::new();
     let mut profile = AgentProfile::claude_code();

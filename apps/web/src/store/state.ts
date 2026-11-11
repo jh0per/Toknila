@@ -4,6 +4,7 @@ import type {
   ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Ticket, TicketDetail, TicketThreads,
 } from "../api/types";
 import { type EdgesState, initialEdges } from "./edges";
+import { type EpicUi, initialEpic } from "./epic";
 import type { OpenedCard } from "./follow";
 import { type PlacementState, initialPlacement } from "./placement";
 import { type ImportState, initialImports } from "./imports";
@@ -60,6 +61,8 @@ export interface State {
   removal: RemovalState;
   /// Releasing a finished chain: the dialog's offer and the run's steps.
   release: ReleaseUi;
+  /// The epic and release panels, and the version a new chain suggests.
+  epic: EpicUi;
   /// Editing dependencies: the selected line and the daemon's last refusal.
   edges: EdgesState;
   placement: PlacementState;
@@ -105,6 +108,7 @@ export function initialState(route: Route): State {
     imports: initialImports,
     removal: initialRemoval,
     release: initialRelease,
+    epic: initialEpic,
     edges: initialEdges,
     placement: initialPlacement,
     quick: initialQuick,

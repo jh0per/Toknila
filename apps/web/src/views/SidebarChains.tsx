@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
-import { dayText, readFinishedOpen, splitChains, storeFinishedOpen } from "../store/phase";
+import { dayText, readFinishedOpen, splitChains, storeFinishedOpen, versionText } from "../store/phase";
 import { PhaseDot } from "./PhaseChip";
 import { NavLink } from "./Link";
 
@@ -38,6 +38,7 @@ export function SidebarChains({ chains, project, selected, dispatch, onMenu }: P
         >
           <PhaseDot phase={s.phase} />
           <span className="t key">{c.chain.name}</span>
+          {s.version && <span className="ver" data-testid="chain-version-row">{versionText(s)}</span>}
           <span className="phase-word">{s.phase}</span>
           {dim && s.finished_at != null && <span className="n">{dayText(s.finished_at)}</span>}
           <span className="n">{s.done}/{s.total}</span>

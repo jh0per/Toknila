@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    Chain, ChainId, Edge, EdgeKind, ReviewMode, ReviewTurn, TicketId, TicketKey, TicketStatus,
+    Chain, ChainId, Edge, EdgeKind, Release, ReleaseChannel, ReleaseId, ReviewMode, ReviewTurn,
+    StartMode, TicketId, TicketKey, TicketStatus,
 };
 
 use crate::notes::{add_subtask, update_subtask};
@@ -23,6 +24,14 @@ pub struct NewChain {
     pub review_mode: Option<ReviewMode>,
     /// Reviewer agent profile for the chain's tickets.
     pub reviewer: Option<String>,
+    /// The version the chain releases (`0.3.0`); its end release is made with it. Optional.
+    #[serde(default)]
+    pub version: Option<String>,
+}
+
+/// The version as a person typed it, or a refusal that says what a version is.
+pub(crate) fn clean_version(text: &str) -> AppResult<String> {
+    toknila_core::release_run::clean_version(text).map_err(AppError::bad_request)
 }
 
 /// Creates an empty chain in a project.
@@ -35,6 +44,12 @@ pub fn create<U: UnitOfWork + ?Sized>(
     if name.is_empty() {
         return Err(AppError::bad_request("chain name is empty"));
     }
+    let version = input
+        .version
+        .as_deref()
+        .filter(|v| !v.trim().is_empty())
+        .map(clean_version)
+        .transpose()?;
     let p = resolve::project(uow, project)?;
     let c = Chain {
         id: ChainId::new(),
@@ -45,9 +60,23 @@ pub fn create<U: UnitOfWork + ?Sized>(
         review_mode: input.review_mode,
         reviewer: input.reviewer.filter(|r| !r.trim().is_empty()),
         source: None,
+        version: version.clone(),
     };
     uow.insert_chain(&c)?;
     uow.emit(&DomainEvent::ChainCreated { chain: c.clone() })?;
+    if let Some(version) = version {
+        // The chain's end release: it waits for the cards that are added later.
+        with_chain(uow, c.id, |ctx| -> AppResult<()> {
+            ctx.add_release(Release::planned(
+                ReleaseId::new(),
+                c.id,
+                version,
+                ReleaseChannel::TagOnly,
+                StartMode::Manual,
+            ));
+            Ok(())
+        })?;
+    }
     Ok(c.id)
 }
 
@@ -313,43 +342,4 @@ pub fn arrange<U: UnitOfWork + ?Sized>(uow: &mut U, chain: &str) -> AppResult<Ch
     })
 }
 
-/// What a person may set on a chain after it is made (a project takes the review fields in
-/// [`crate::projects::PatchProject`]). A field left out is kept.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ChainSettings {
-    pub review_mode: Option<ReviewMode>,
-    /// Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`.
-    pub reviewer: Option<String>,
-    /// Whether the chain starts its ready cards by itself. Turning it on starts the ready cards
-    /// that have a free slot, so it is a person's act; the planner cannot change a chain's graph
-    /// while it is on.
-    pub autostart: Option<bool>,
-}
-
-/// Sets a chain's review mode, reviewer and autostart, journals it (`ChainUpdated`) and lets the
-/// schedule run, since turning autostart on may start cards. `project` narrows the name lookup.
-/// Returns the chain's id.
-pub fn set_settings<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    chain: &str,
-    project: Option<&str>,
-    settings: ChainSettings,
-) -> AppResult<ChainId> {
-    let c = resolve::chain_in(uow, project, chain)?;
-    with_chain(uow, c.id, |ctx| -> AppResult<()> {
-        ctx.edit_chain(|c| {
-            if let Some(m) = settings.review_mode {
-                c.review_mode = Some(m);
-            }
-            if let Some(r) = settings.reviewer {
-                c.reviewer = Some(r.trim().to_owned()).filter(|r| !r.is_empty());
-            }
-            if let Some(a) = settings.autostart {
-                c.autostart = a;
-            }
-        });
-        Ok(())
-    })?;
-    Ok(c.id)
-}
+pub use crate::epic::{ChainSettings, set_settings};

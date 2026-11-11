@@ -1,6 +1,7 @@
 use super::*;
 use crate::{ChainId, ProjectId, WaitingReason};
 
+mod finish;
 mod moves;
 mod wildcard;
 
@@ -46,6 +47,7 @@ impl Builder {
             review_mode: None,
             reviewer: None,
             source: None,
+            version: None,
         };
         let view = ChainView {
             chain,

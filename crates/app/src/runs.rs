@@ -60,6 +60,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 repo_tools: Vec::new(),
                 project: None,
                 designs: Vec::new(),
+                epic: Some((ctx.view.chain.name.clone(), ctx.view.chain.goal.clone())),
             },
         });
     }

@@ -109,9 +109,13 @@ pub fn tickets(items: &[TicketItem]) {
 /// `tok chain show` from `GET /v1/chains/{chain}`.
 pub fn chain(d: &ChainDetail) {
     let s = &d.summary;
+    let name = match &s.version {
+        Some(v) => format!("{} v{v}", d.chain.name),
+        None => d.chain.name.clone(),
+    };
     println!(
         "{}  {}  {}  done {}/{}  released {}{}",
-        d.chain.name,
+        name,
         s.phase.word(),
         w(&s.status),
         s.done,
@@ -123,6 +127,14 @@ pub fn chain(d: &ChainDetail) {
             "  (cards start only when you start them)"
         }
     );
+    if let Some(f) = &s.finish {
+        let tag = f
+            .tag
+            .as_ref()
+            .map(|t| format!(", tag {t}"))
+            .unwrap_or_default();
+        println!("Release v{}: {}{tag}", f.version, w(&f.state));
+    }
     if let Some(stop) = &s.stopped_at {
         let r = match reason(stop.reason.as_ref()) {
             r if r.is_empty() => r,

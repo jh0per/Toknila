@@ -23,6 +23,8 @@ pub(super) struct RawChain {
     pub(super) goal: String,
     pub(super) autostart: Option<bool>,
     pub(super) review_mode: Option<ReviewMode>,
+    /// The version the chain releases (`0.3.0`).
+    pub(super) version: Option<String>,
     /// File names of the project's designs, as an export writes them; read and ignored.
     #[serde(default)]
     #[allow(dead_code)]
