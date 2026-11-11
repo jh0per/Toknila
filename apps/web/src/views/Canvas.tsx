@@ -245,7 +245,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
               if (n.kind === "start") return <StartNode key={n.key} goal={chain.chain.goal} style={style} />;
               // Every card merged: the end node offers Release.
               const onRelease = canRelease(chain) ? () => dispatch({ type: "openRelease", chain: chainId }) : undefined;
-              if (n.kind === "finish") return <FinishNode key={n.key} style={style} onRelease={onRelease} />;
+              if (n.kind === "finish") return <FinishNode key={n.key} style={style} summary={chain.summary} onRelease={onRelease} />;
               const over = drag?.over === n.key;
               const r = n.kind === "release" ? releases.get(n.id) : undefined;
               const isEnd = n.key === endKey;

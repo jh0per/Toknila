@@ -124,7 +124,9 @@
   "releases": [],
   "summary": {
     "done": 2,
+    "finished_at": null,
     "next_release": null,
+    "phase": "waiting",
     "releasable": false,
     "released": 0,
     "status": "idle",

@@ -134,5 +134,6 @@ export const SECTION_LABEL: Record<ProjectSection, string> = {
   agents: "Agents",
   review: "Review and merge",
   plans: "Plans",
+  designs: "Designs",
   advanced: "Advanced",
 };

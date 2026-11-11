@@ -19,6 +19,7 @@ use crate::{ErrorKind, agent, runs, tickets};
 use toknila_core::instructions::terminal::Size;
 
 mod delivery;
+mod safety_net;
 
 /// A runner that remembers what it was asked and can be told to refuse.
 #[derive(Debug, Default)]

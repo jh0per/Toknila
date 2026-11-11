@@ -6,6 +6,7 @@ pub mod check_line;
 pub mod checker;
 pub mod cleanup;
 mod cli_link;
+pub mod designs;
 mod gh;
 mod git;
 pub mod github;

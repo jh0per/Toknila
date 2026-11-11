@@ -100,24 +100,28 @@ pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
 /// A runner process ended. The journal says so; a ticket whose agent was still working is
 /// blocked by how it ended ([`toknila_core::ProcessExit::block_reason`]), unless the host ended
 /// it on purpose. A ticket that has moved on (in Review, merged, blocked already) ignores it.
-pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<()> {
+///
+/// Returns `true` when it queued a replacement worker run (see [`replace_worker`]).
+pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<bool> {
     let RunEnded { run, exit, stopped } = ended;
     let ticket = run.ticket_id;
     let role = run.role;
     if role == AgentRole::Planner {
         // A project's planner is no card's agent: its end moves nothing, and the window learns of
         // it from the terminal stream.
-        return Ok(());
+        return Ok(false);
     }
     let reason = exit.block_reason();
     uow.emit(&DomainEvent::RunnerExited {
-        run,
+        run: run.clone(),
         exit: exit.clone(),
     })?;
     if stopped {
         // The host ended it on purpose (a reviewer whose verdict is in, an accepted card): the
         // slot it held is free now that the process is gone, so a waiting card starts.
-        return free_slot(uow, ticket);
+        let restarted = role == AgentRole::Worker && replace_worker(uow, &run)?;
+        free_slot(uow, ticket)?;
+        return Ok(restarted);
     }
     if role == AgentRole::Reviewer {
         // A reviewer reports its verdict first and exits after; one that ends while the card
@@ -130,9 +134,51 @@ pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<
             BlockedReason::Crashed { detail } => format!("it ended: {detail}"),
             other => other.to_string(),
         };
-        return reviews::failed(uow, ticket, detail);
+        reviews::failed(uow, ticket, detail)?;
+        return Ok(false);
     }
-    tell_ticket(uow, ticket, TicketEvent::Block { reason })
+    tell_ticket(uow, ticket, TicketEvent::Block { reason })?;
+    Ok(false)
+}
+
+/// A run younger than this that the host stopped gets no second replacement.
+const RESTART_GUARD_MS: i64 = 5_000;
+
+/// The safety net for a worker the host stopped: a Running card with no live worker still needs
+/// an agent (the replacement the machine asked for may have been lost to a race with this stop),
+/// so a run starts again with the kickoff that carries the open Return and the pending
+/// instructions. A card in any other state is left alone; a run that ended right after it
+/// started blocks the card instead of starting a loop. Returns whether a start was queued.
+fn replace_worker<U: UnitOfWork + ?Sized>(uow: &mut U, run: &Run) -> AppResult<bool> {
+    let ticket = run.ticket_id;
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(false);
+    };
+    if t.status != TicketStatus::Running
+        || uow.live_runners()?.contains(&(ticket, AgentRole::Worker))
+    {
+        return Ok(false);
+    }
+    let Some(view) = uow.chain_view(t.chain_id)? else {
+        return Ok(false);
+    };
+    let Some(project) = uow.project(view.chain.project_id)? else {
+        return Ok(false);
+    };
+    if !runs_process(&project, &t) {
+        return Ok(false);
+    }
+    let started = i64::try_from(run.id.0.timestamp_ms()).unwrap_or(i64::MAX);
+    if (0..RESTART_GUARD_MS).contains(&(uow.now().0 - started)) {
+        let detail = "the agent ends right after it starts".to_owned();
+        let reason = BlockedReason::Crashed { detail };
+        tell_ticket(uow, ticket, TicketEvent::Block { reason })?;
+        return Ok(false);
+    }
+    let ctx = ChainTx::new(view, uow.now());
+    crate::ships::queue_prepare(uow, &ctx, ticket, Default::default())?;
+    queue_start(uow, &ctx, ticket)?;
+    Ok(true)
 }
 
 /// Gives the slot a runner that has ended held to the cards waiting for one in its project.

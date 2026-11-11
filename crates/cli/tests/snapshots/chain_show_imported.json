@@ -108,12 +108,14 @@
   ],
   "summary": {
     "done": 0,
+    "finished_at": null,
     "next_release": {
       "channel": "tag_only",
       "release": "<id>",
       "state": "planned",
       "version": "R1"
     },
+    "phase": "active",
     "releasable": false,
     "released": 0,
     "status": "running",

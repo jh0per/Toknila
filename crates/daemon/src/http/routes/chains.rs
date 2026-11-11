@@ -53,7 +53,14 @@ pub async fn export_chain(
     State(state): State<AppState>,
     Path(chain): Path<String>,
 ) -> ApiResult<Json<ChainFile>> {
-    let toml = read(&state, move |repo| Ok(chains::export(repo, &chain)?)).await?;
+    // The designs of the chain's project, by file name only.
+    let home = state.home.clone();
+    let toml = read(&state, move |repo| {
+        let project = resolve::chain(repo, &chain)?.project_id;
+        let names = crate::designs::Designs::new(&home, project).names();
+        Ok(chains::export_with_designs(repo, &chain, &names)?)
+    })
+    .await?;
     Ok(Json(ChainFile { toml }))
 }
 

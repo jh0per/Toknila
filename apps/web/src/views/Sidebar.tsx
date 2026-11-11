@@ -4,6 +4,7 @@ import { type State, cardRoute, chainsOf, currentChain, currentProject, runningA
 import { updateReady } from "../store/updates";
 import { useChainMenu } from "./ChainMenu";
 import { NavLink } from "./Link";
+import { SidebarChains } from "./SidebarChains";
 import { SidebarProjects } from "./SidebarProjects";
 import { SlotStepper } from "./SlotStepper";
 
@@ -61,18 +62,11 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
               </NavLink>
             </li>
           )}
-          {chainsOf(state, project).map((c) => (
-            <li key={c.chain.id} data-chain-item={c.chain.name} onContextMenu={chainMenu.open(c)}>
-              <NavLink
-                route={{ name: "projectChain", project: project?.key ?? "", chain: c.chain.name }}
-                dispatch={dispatch}
-                className={`item${c.chain.id === chain?.chain.id && state.route.name !== "planner" ? " sel" : ""}`}
-              >
-                <span className="t key">{c.chain.name}</span>
-                <span className="n">{c.summary.done}/{c.summary.total}</span>
-              </NavLink>
-            </li>
-          ))}
+          <SidebarChains
+            chains={chainsOf(state, project)} project={project?.key ?? ""}
+            selected={state.route.name !== "planner" ? chain?.chain.id : undefined}
+            dispatch={dispatch} onMenu={chainMenu.open}
+          />
         </ul>
         {chainMenu.menu}
       </section>

@@ -121,7 +121,9 @@
   ],
   "summary": {
     "done": 4,
+    "finished_at": 0,
     "next_release": null,
+    "phase": "finished",
     "releasable": true,
     "released": 3,
     "status": "done",

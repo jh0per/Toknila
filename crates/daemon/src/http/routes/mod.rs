@@ -3,6 +3,7 @@
 
 pub mod agents;
 pub mod chains;
+pub mod designs;
 pub mod events;
 pub mod inbox;
 pub mod planner;

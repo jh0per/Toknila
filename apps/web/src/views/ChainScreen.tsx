@@ -5,6 +5,7 @@ import { type State, currentProject, runningAgents, slotsOf } from "../store/sta
 import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
 import { AskBox } from "./AskBox";
 import { Canvas } from "./Canvas";
+import { PhaseChip } from "./PhaseChip";
 import { PanelDivider } from "./PanelDivider";
 import { Panel } from "./Panel";
 import { ThemeButton } from "./ThemeButton";
@@ -23,9 +24,13 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
         <div className="crumb">
           <b>{project?.key ?? ""}</b><i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
         </div>
-        <span className={`pill tone-${chainTone(chain.summary.status)}`} data-testid="chain-status" data-status={chain.summary.status}>
-          {chain.summary.status.replace(/_/g, " ")}
-        </span>
+        <PhaseChip phase={chain.summary.phase} />
+        {/* The status pill is only for a chain that needs a person. */}
+        {(chain.summary.status === "needs_human" || chain.summary.status === "blocked") && (
+          <span className={`pill tone-${chainTone(chain.summary.status)}`} data-testid="chain-status" data-status={chain.summary.status}>
+            {chain.summary.status.replace(/_/g, " ")}
+          </span>
+        )}
         <span className="muted">{chain.summary.done}/{chain.summary.total} done · {chain.summary.released} released</span>
         {state.error && <span className="error">{state.error}</span>}
         <span className="grow" />
