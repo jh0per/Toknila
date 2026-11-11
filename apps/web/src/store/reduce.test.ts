@@ -23,7 +23,7 @@ function chain(id: string, name: string, ticketIds: string[]): ChainDetail {
     edges: [],
     release_tickets: [],
     order: [],
-    summary: { status: "running", total: ticketIds.length, done: 0, released: 0, releasable: false },
+    summary: { status: "running", phase: "idle", finished_at: null, total: ticketIds.length, done: 0, released: 0, releasable: false },
   } as ChainDetail;
 }
 

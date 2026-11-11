@@ -110,8 +110,9 @@ pub fn tickets(items: &[TicketItem]) {
 pub fn chain(d: &ChainDetail) {
     let s = &d.summary;
     println!(
-        "{}  {}  done {}/{}  released {}{}",
+        "{}  {}  {}  done {}/{}  released {}{}",
         d.chain.name,
+        s.phase.word(),
         w(&s.status),
         s.done,
         s.total,

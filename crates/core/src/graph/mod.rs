@@ -122,6 +122,37 @@ pub enum ChainStatus {
     Done,
 }
 
+/// Where a phase (chain) stands at a glance (never stored): finished, active, waiting, idle or
+/// empty. It answers "where is the phase"; `ChainStatus` answers "who must act".
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PhaseState {
+    /// No cards in the plan.
+    Empty,
+    /// Every planned card is merged or released and the end release, if any, is released.
+    Finished,
+    /// A card is running, waiting, in review or merging.
+    Active,
+    /// Cards are ready or queued and nothing runs.
+    Waiting,
+    /// Nothing is started yet (or the rest is paused or blocked).
+    Idle,
+}
+
+impl PhaseState {
+    /// The word every surface prints for the state.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Empty => "empty",
+            Self::Finished => "finished",
+            Self::Active => "active",
+            Self::Waiting => "waiting",
+            Self::Idle => "idle",
+        }
+    }
+}
+
 /// Where the chain stopped: the first ticket, in graph order, that waits on a person (Waiting or
 /// Blocked first, then Review, then a card to approve).
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -149,6 +180,10 @@ pub struct NextRelease {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainSummary {
     pub status: ChainStatus,
+    /// Finished, active, waiting, idle or empty.
+    pub phase: PhaseState,
+    /// When the last card of a finished chain was merged; none while the chain is not finished.
+    pub finished_at: Option<Timestamp>,
     /// Tickets in the plan: wildcard cards count only once approved.
     pub total: usize,
     /// Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`.

@@ -15,7 +15,7 @@ function chain(id: string, name: string, project: string, ticket: string): Chain
     chain: { id, name, goal: "", autostart: false, project_id: project },
     tickets: [{ id: `${id}-t`, key: ticket, chain_id: id, title: "t", status: "backlog" }],
     releases: [], edges: [], release_tickets: [], order: [],
-    summary: { status: "not_started", total: 1, done: 0, released: 0 },
+    summary: { status: "not_started", phase: "idle", finished_at: null, total: 1, done: 0, released: 0 },
   } as unknown as ChainDetail;
 }
 
