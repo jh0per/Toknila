@@ -375,6 +375,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/designs/{design}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One design of the planner's project: its metadata and the path of its file. */
+        get: operations["planner_design"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/plan": {
         parameters: {
             query?: never;
@@ -382,7 +399,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The whole plan of the planner's project: chains, cards in order, dependencies, threads. */
+        /**
+         * The whole plan of the planner's project: chains, cards in order, dependencies, threads, and
+         *     the project's designs with the path of each file.
+         */
         get: operations["planner_plan"];
         put?: never;
         post?: never;
@@ -2548,6 +2568,28 @@ export interface components {
             chains: components["schemas"]["PlanChain"][];
             project: components["schemas"]["Project"];
         };
+        /** @description A design as the planner sees it: its metadata and where its file is on this machine. */
+        PlannerDesign: {
+            /** @description Why a link has no file yet, when known. */
+            hint?: string | null;
+            id: components["schemas"]["DesignId"];
+            kind: components["schemas"]["DesignKind"];
+            /** @description Media type of the kept file. */
+            mime?: string | null;
+            name: string;
+            /** @description Absolute path of the kept file, which the planner may `Read`; absent when no file is kept. */
+            path?: string | null;
+            /**
+             * Format: int64
+             * @description Bytes of the kept file; zero without one.
+             */
+            size: number;
+        };
+        /** @description Answer of `GET /v1/planner/plan`: the plan and the project's designs. */
+        PlannerPlan: components["schemas"]["PlanView"] & {
+            /** @description Oldest first. */
+            designs: components["schemas"]["PlannerDesign"][];
+        };
         /** @description `GET /v1/projects/{project}/planner`: the project's planner. */
         PlannerState: {
             /** @description The profile it runs with (or, when it is not running, would start with). */
@@ -4473,6 +4515,44 @@ export interface operations {
             };
         };
     };
+    planner_design: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Design id or name */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannerDesign"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     planner_plan: {
         parameters: {
             query?: never;
@@ -4487,7 +4567,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PlanView"];
+                    "application/json": components["schemas"]["PlannerPlan"];
                 };
             };
             403: {
