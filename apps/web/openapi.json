@@ -5355,7 +5355,8 @@
               "null"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Actor": {
         "type": "string",
@@ -5381,7 +5382,8 @@
                   "started"
                 ]
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5410,7 +5412,8 @@
               "text": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5431,7 +5434,8 @@
                 "format": "int32",
                 "minimum": 0
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5450,7 +5454,8 @@
                   "note"
                 ]
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5469,7 +5474,8 @@
               "summary": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5488,7 +5494,8 @@
                   "crashed"
                 ]
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5517,7 +5524,8 @@
               "verdict": {
                 "$ref": "#/components/schemas/Verdict"
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "allOf": [
@@ -5537,7 +5545,8 @@
                       "propose"
                     ]
                   }
-                }
+                },
+                "additionalProperties": false
               }
             ],
             "description": "The agent found work nobody planned: a wildcard card on the ticket's chain, found during\nthis ticket, that waits for a person's approval. The answer is the new card."
@@ -5563,7 +5572,8 @@
               "title": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5586,7 +5596,8 @@
               "thread": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5613,7 +5624,8 @@
               "thread": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5632,7 +5644,8 @@
               "thread": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           }
         ],
         "description": "One report from the agent working on a ticket."
@@ -6124,7 +6137,8 @@
               "null"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Chain": {
         "type": "object",
@@ -6306,7 +6320,8 @@
           "toml": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ChainId": {
         "type": "string",
@@ -6377,7 +6392,8 @@
             ],
             "description": "The version the chain releases; refused once its release was cut."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ChainStatus": {
         "type": "string",
@@ -6744,7 +6760,8 @@
               "null"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "CommentId": {
         "type": "string",
@@ -6784,7 +6801,8 @@
             "type": "boolean",
             "description": "Also move the repository folder to the system Trash. Without it the folder stays."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Design": {
         "type": "object",
@@ -6921,7 +6939,8 @@
               }
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "DesignPin": {
         "type": "object",
@@ -7017,7 +7036,8 @@
               }
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Edge": {
         "type": "object",
@@ -7061,7 +7081,8 @@
             "type": "string",
             "description": "Ticket key or release version."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "EdgeKind": {
         "type": "string",
@@ -7184,7 +7205,8 @@
           "token": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Finish": {
         "type": "object",
@@ -7323,8 +7345,7 @@
               "string",
               "null"
             ],
-            "description": "Flag of the agent's command that takes the path of a generated hook settings file.",
-            "default": null
+            "description": "Flag of the agent's command that takes the path of a generated hook settings file."
           }
         },
         "additionalProperties": false
@@ -7340,7 +7361,8 @@
             "type": "string",
             "description": "Absolute path of a TOML chain file, of a spec folder (one with `tasks.md`), or of a folder\nwhose subfolders are spec folders."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ImportPathResult": {
         "type": "object",
@@ -7713,7 +7735,8 @@
           "outcome": {
             "$ref": "#/components/schemas/ItemOutcome"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ListedProfile": {
         "type": "object",
@@ -7743,8 +7766,7 @@
               "string",
               "null"
             ],
-            "description": "Flag of the agent's command that takes the path of a generated MCP config.",
-            "default": null
+            "description": "Flag of the agent's command that takes the path of a generated MCP config."
           },
           "enabled": {
             "type": "boolean",
@@ -7824,7 +7846,8 @@
           "place": {
             "$ref": "#/components/schemas/Place"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewActivity": {
         "type": "object",
@@ -7865,7 +7888,8 @@
             ],
             "description": "The session's transcript file, from the hook's input."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewAnswer": {
         "type": "object",
@@ -7899,7 +7923,8 @@
             ],
             "description": "The text of a `text` answer; the optional comment of a `deny`."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewCard": {
         "type": "object",
@@ -7945,7 +7970,8 @@
           "title": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewChain": {
         "type": "object",
@@ -7994,7 +8020,8 @@
             ],
             "description": "The version the chain releases (`0.3.0`); its end release is made with it. Optional."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewComment": {
         "type": "object",
@@ -8027,7 +8054,8 @@
               "null"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewDesignPin": {
         "type": "object",
@@ -8057,7 +8085,8 @@
             "type": "string",
             "description": "The question, at most 500 characters."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewFigmaDesign": {
         "type": "object",
@@ -8077,7 +8106,8 @@
             "type": "string",
             "description": "The link of a frame (Copy link to selection)."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewMessage": {
         "type": "object",
@@ -8089,7 +8119,8 @@
           "text": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewPlanChain": {
         "type": "object",
@@ -8107,7 +8138,8 @@
           "name": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewProject": {
         "type": "object",
@@ -8214,7 +8246,8 @@
               "null"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewRelease": {
         "type": "object",
@@ -8262,7 +8295,8 @@
           "version": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewSubtask": {
         "type": "object",
@@ -8274,7 +8308,8 @@
           "text": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewSuggestion": {
         "type": "object",
@@ -8305,7 +8340,8 @@
             "type": "string",
             "description": "The step in a line or two; with no card and no action it says nothing waits for the owner."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewThread": {
         "type": "object",
@@ -8321,7 +8357,8 @@
           "title": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewTicket": {
         "type": "object",
@@ -8407,7 +8444,8 @@
           "title": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewVersion": {
         "type": "object",
@@ -8430,27 +8468,53 @@
             ],
             "description": "A message posted with the version, in the same transaction."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "NewWildcard": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Proposal"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "from": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "The ticket during which the work was found: key, id or title."
-              }
-            }
-          }
+        "type": "object",
+        "description": "`POST /v1/chains/{chain}/wildcards`: a person proposes a card.",
+        "required": [
+          "title"
         ],
-        "description": "`POST /v1/chains/{chain}/wildcards`: a person proposes a card."
+        "properties": {
+          "acceptance": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Acceptance criteria, one per entry."
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Nodes the card waits for."
+          },
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Nodes that wait for the card; none of them may have started when it is approved."
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The ticket during which the work was found: key, id or title."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The task for whoever does it."
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "NextRelease": {
         "type": "object",
@@ -8756,7 +8820,8 @@
             ],
             "description": "The Claude model of the project's card agents (`sonnet`, `opus`, a full model name). An\nempty text clears it: the person's own Claude Code default."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PatchSubtask": {
         "type": "object",
@@ -8774,7 +8839,8 @@
               "null"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PatchTicket": {
         "type": "object",
@@ -8867,7 +8933,8 @@
               "null"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PermissionAsk": {
         "type": "object",
@@ -8880,7 +8947,8 @@
             ],
             "description": "Summary of the tool call that needs permission (the command or the file); the daemon\nuses the last one it was told when this is absent."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PermissionDecision": {
         "type": "string",
@@ -8954,7 +9022,8 @@
           "text": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PinId": {
         "type": "string",
@@ -9257,7 +9326,8 @@
             "type": "integer",
             "format": "int32"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PriceInfo": {
         "type": "object",
@@ -9609,7 +9679,8 @@
           "title": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PullRequest": {
         "type": "object",
@@ -9684,7 +9755,8 @@
               "$ref": "#/components/schemas/QuotaWindow"
             }
           }
-        }
+        },
+        "additionalProperties": false
       },
       "QuotaView": {
         "type": "object",
@@ -9743,7 +9815,8 @@
             "format": "double",
             "description": "0 to 100 (above 100 once exceeded)."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Region": {
         "type": "object",
@@ -9775,7 +9848,8 @@
             "format": "int32",
             "minimum": 0
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Release": {
         "type": "object",
@@ -9868,7 +9942,8 @@
                   "finished"
                 ]
               }
-            }
+            },
+            "additionalProperties": false
           }
         ],
         "description": "What a release agent reports about its milestone."
@@ -10020,7 +10095,8 @@
           "name": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "RepoCheck": {
         "type": "object",
@@ -10101,7 +10177,8 @@
             ],
             "description": "The base branch to look for; default `develop`."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "RepoField": {
         "type": "string",
@@ -10594,7 +10671,8 @@
             "type": "integer",
             "format": "int32"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "SizeLimits": {
         "type": "object",
@@ -10644,7 +10722,8 @@
             ],
             "description": "A planner profile from `GET /v1/profiles`; unset: `claude-code-planner`."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "StartRelease": {
         "type": "object",
@@ -10661,7 +10740,8 @@
             "type": "string",
             "description": "The version, such as `1.4.0`; it becomes the tag `v1.4.0`."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "StatusReason": {
         "oneOf": [
@@ -10955,7 +11035,8 @@
           "text": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "SubtaskId": {
         "type": "string",
@@ -11062,7 +11143,8 @@
             "format": "int32",
             "minimum": 0
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Thread": {
         "type": "object",
@@ -11794,7 +11876,8 @@
             "type": "boolean",
             "description": "Count every Claude Code session under the user's `~/.claude/projects`, not only\nToknila's runs. Local only; on by default."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "UsageSummary": {
         "type": "object",

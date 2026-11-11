@@ -1,8 +1,9 @@
 //! `/events` (the journal) and the agent event routes.
 
+use crate::http::body::Json;
+use axum::Extension;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::{Extension, Json};
 use toknila_app::{AppError, agent, instructions, questions, resolve, reviews, ships};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::hook::{self, Reaction, Sign};

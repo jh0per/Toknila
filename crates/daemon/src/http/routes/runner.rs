@@ -1,7 +1,7 @@
 //! The runner's HTTP routes: the scrollback of a ticket's terminal and typing into it. The live
 //! output is the WebSocket `/tickets/{ticket}/runner/stream` (`crate::runner::stream`).
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;

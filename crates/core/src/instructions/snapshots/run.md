@@ -15,7 +15,7 @@ Done means every item holds, each with evidence:
 
 ## Work alone, in plain sight
 
-Do the work yourself, in this terminal. Do not start subagents or background agents: a card is done by one agent, and a person follows it here. Quote every path in a shell command with double quotes; never backslash-escape a space. Change files with the Edit and Write tools and read them with Read and Grep: those are approved without asking in this session, while shell edits (python, sed, perl, heredocs) stop for a permission answer every time; do not probe for an interpreter to edit with. Stay inside this workspace: never read, copy or link files from other checkouts of the repository or from other people's folders; install what the work needs here, the way the repository's docs say. The person's private files are off limits even to look at: their Claude Code transcripts and settings (`~/.claude`), shell history, mail, keychains, browser data. When a measurement needs data like that, make synthetic data of the same shape in a temporary folder of your own.
+Do the work yourself, in this terminal. Do not start subagents or background agents: a card is done by one agent, and a person follows it here. Quote every path in a shell command with double quotes; never backslash-escape a space. Change files with the Edit and Write tools and read them with Read and Grep: those are approved without asking in this session, while shell edits (python, sed, perl, heredocs) are refused; do not probe for an interpreter to edit with. Stay inside this workspace: never read, copy or link files from other checkouts of the repository or from other people's folders; install what the work needs here, the way the repository's docs say. The person's private files are off limits even to look at: their Claude Code transcripts and settings (`~/.claude`), shell history, mail, keychains, browser data. When a measurement needs data like that, make synthetic data of the same shape in a temporary folder of your own.
 
 ## Report through the Toknila MCP tools
 
@@ -40,10 +40,13 @@ They arrive as a new message that starts with `# [instruction]`. Follow it befor
 
 Other agents and the person work on this machine at the same time.
 
-- Run one build or test run at a time. Do not start load loops or repeat a suite many times unless the task asks for it; then use a few workers under `nice`, with a trap that stops them.
+- Run one build or test run at a time. Do not start load loops or repeat a suite many times unless the task asks for it; then one loop, under `nice`, never more, stopped by a trap.
+- Run a long gate as `cargo xtask verify 2>&1 | tail -n 30` so the result line is on the screen; never redirect output to a file (a large output spills to a file you may not read back).
+- Before you propose a fix or a wildcard card for a failing test, run it alone once. A test that passes alone is a load problem: report it in the hand-in, do not fix it.
+- Never edit a generated file by hand (`apps/web/src/gen/api.d.ts`, `openapi.json`): run `npm run gen` and let `gen:check` prove it.
 - Stop only processes you started, by pid. Never stop processes by name or pattern (`pkill -f`, `killall`): that has killed other agents' work.
 - Do not install browsers, system packages or tools, and do not download anything, without asking with `ask_human`; use what the repository's docs name.
-- Run the project's check command exactly as given. When it fails, fix the cause or report it; do not work around the command. Run it once, not in a loop: only one check runs on this machine at a time, and the daemon runs it again on your hand-in.
+- Run the project's check command exactly as given. When it fails, fix the cause or report it; do not work around the command. When it fails about the environment (command not found, exit 127, a tool refused), say so in the hand-in and stop: do not fix the environment, do not add an empty commit. Run it once, not in a loop: only one check runs on this machine at a time, and the daemon runs it again on your hand-in.
 - Clean up what you started: test daemons and servers, temporary folders, placeholder files.
 
 ## Hand in once
@@ -56,6 +59,8 @@ The `finished` summary is the hand-in template. The daemon refuses a summary tha
 - PASS|FAIL|NOT_RUN|BLOCKED <check>: <one line of evidence>
 **Left:** what is left or not covered
 ```
+
+Before the hand-in, merge the project's work branch into the ship and resolve the conflicts, keeping every existing entry of a shared list. A Checks line quotes the gate's own result line word for word; the daemon refuses a PASS whose evidence is under 20 characters.
 
 A person sees the three blocks apart on the Review card, above Accept and Return. Do not run the checks again after handing in.
 

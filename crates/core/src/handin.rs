@@ -10,7 +10,8 @@
 //! **Left:** what is left or not covered
 //! ```
 //!
-//! [`check`] refuses a summary without the checks section or under [`MIN_CHARS`]; [`to_body`]
+//! [`check`] refuses a summary without the checks section, under [`MIN_CHARS`], or with a PASS
+//! whose evidence is under [`MIN_EVIDENCE`]; [`to_body`]
 //! splits an accepted one into the fields of a report comment so a card can show each block.
 
 use crate::CommentBody;
@@ -43,6 +44,27 @@ pub enum HandInError {
         TEMPLATE
     )]
     NoCheckLines,
+    #[error(
+        "rule: a PASS needs evidence of at least {} characters, the gate's own result line word for word; this one has {len}: \"{line}\". Use PASS only with a quoted result, else NOT_RUN or FAIL with the reason.",
+        MIN_EVIDENCE
+    )]
+    ThinEvidence { len: usize, line: String },
+}
+
+/// The shortest evidence (trimmed, in characters) a PASS line may carry.
+pub const MIN_EVIDENCE: usize = 20;
+
+/// The evidence of a PASS line (the text after the check's colon), `None` for other lines.
+fn pass_evidence(line: &str) -> Option<&str> {
+    let line = line
+        .trim_start()
+        .trim_start_matches(['-', '*'])
+        .trim_start();
+    let rest = line.strip_prefix("PASS")?;
+    if !(rest.is_empty() || rest.starts_with([' ', ':'])) {
+        return None;
+    }
+    Some(rest.split_once(':').map_or("", |(_, e)| e.trim()))
 }
 
 /// The three blocks of a hand-in; a block that is not there is empty.
@@ -131,6 +153,17 @@ pub fn check(summary: &str) -> Result<(), HandInError> {
     if !parts.checks.lines().any(is_check_line) {
         return Err(HandInError::NoCheckLines);
     }
+    for line in parts.checks.lines() {
+        if let Some(e) = pass_evidence(line) {
+            let len = e.chars().count();
+            if len < MIN_EVIDENCE {
+                return Err(HandInError::ThinEvidence {
+                    len,
+                    line: line.trim().to_owned(),
+                });
+            }
+        }
+    }
     Ok(())
 }
 
@@ -181,7 +214,7 @@ pub fn to_body(summary: &str) -> Option<CommentBody> {
 mod tests {
     use super::*;
 
-    const GOOD: &str = "**What changed:** the hand-in has a template\n**Checks:**\n- PASS cargo xtask verify: all green\n- NOT_RUN e2e-web: no browser\n**Left:** nothing";
+    const GOOD: &str = "**What changed:** the hand-in has a template\n**Checks:**\n- PASS cargo xtask verify: test result: ok. 412 passed\n- NOT_RUN e2e-web: no browser\n**Left:** nothing";
 
     #[test]
     fn a_complete_hand_in_is_accepted() {
@@ -194,6 +227,24 @@ mod tests {
         let err = check(long).expect_err("no checks");
         assert_eq!(err, HandInError::NoChecks);
         assert!(err.to_string().contains(TEMPLATE));
+    }
+
+    #[test]
+    fn a_pass_with_thin_evidence_is_refused_naming_the_rule() {
+        let s = "**What changed:** a long enough description of the change\n**Checks:**\n- PASS cargo xtask verify: all green\n**Left:** nothing";
+        let err = check(s).expect_err("thin evidence");
+        assert_eq!(
+            err,
+            HandInError::ThinEvidence {
+                len: 9,
+                line: "- PASS cargo xtask verify: all green".to_owned()
+            }
+        );
+        assert!(err.to_string().contains("at least 20 characters"));
+        let ok = s.replace("all green", "test result: ok. 9 passed");
+        assert_eq!(check(&ok), Ok(()));
+        let fail = s.replace("PASS", "FAIL");
+        assert_eq!(check(&fail), Ok(()));
     }
 
     #[test]
@@ -214,7 +265,9 @@ mod tests {
         assert_eq!(body.what, None);
         assert_eq!(
             body.how_to_verify.as_deref(),
-            Some("- PASS cargo xtask verify: all green\n- NOT_RUN e2e-web: no browser")
+            Some(
+                "- PASS cargo xtask verify: test result: ok. 412 passed\n- NOT_RUN e2e-web: no browser"
+            )
         );
         assert_eq!(body.consequences.as_deref(), Some("nothing"));
         assert_eq!(to_body("just text"), None);

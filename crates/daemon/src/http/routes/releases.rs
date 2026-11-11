@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::extract::{Path, State};
 use toknila_app::releases::{self, ReleaseAction};
 use toknila_app::{AppError, resolve};

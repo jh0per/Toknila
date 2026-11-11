@@ -255,7 +255,10 @@ fn checks_section(brief: &RunBrief<'_>, who: &str) -> String {
             "\n## Checks\n\nThe project's check command is `{c}`. {who} Run it exactly as \
              given, with no `cd` or `export` in front, so that it is approved without asking; \
              the ship is already your working directory. Run it once, not in a loop: only one \
-             check runs on this machine at a time, so another run makes the others wait.\n"
+             check runs on this machine at a time, so another run makes the others wait. A migration \
+             follows AGENTS.md's Adding a migration bullet. When `apps/web/node_modules` is \
+             missing, run `npm ci --no-audit --no-fund` in `apps/web` before the web gate; \
+             do not ask and do not skip the gate.\n"
         ),
         None => String::new(),
     }

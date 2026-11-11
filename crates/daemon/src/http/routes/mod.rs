@@ -21,7 +21,7 @@ pub mod threads;
 pub mod tickets;
 pub mod usage;
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::http::{HeaderMap, HeaderName, HeaderValue};
 use axum::response::{IntoResponse, Response};
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
