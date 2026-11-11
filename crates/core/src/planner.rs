@@ -161,6 +161,7 @@ mod tests {
             max_review_rounds: crate::Project::DEFAULT_REVIEW_ROUNDS,
             merge: crate::MergeSettings::default(),
             check_command: None,
+            bump_command: None,
             worker_model: None,
             reviewer_model: None,
             planner_model: None,

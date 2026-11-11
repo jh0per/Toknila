@@ -280,4 +280,9 @@ pub(super) const MIGRATIONS: &[&str] = &[
     ALTER TABLE tickets ADD COLUMN size_w INTEGER;
     ALTER TABLE tickets ADD COLUMN size_h INTEGER;
     "#,
+    // 20: the command a release runs to bump the version, and the git tag a release run made.
+    r#"
+    ALTER TABLE projects ADD COLUMN bump_command TEXT;
+    ALTER TABLE releases ADD COLUMN tag TEXT;
+    "#,
 ];

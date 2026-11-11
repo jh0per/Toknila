@@ -81,6 +81,10 @@ pub enum ProjectCmd {
         /// and may without asking. An empty text clears it.
         #[arg(long)]
         check_command: Option<String>,
+        /// The command a release runs to bump the version, optional (e.g. `npm version {version}
+        /// --no-git-tag-version`; `{version}` is the version). An empty text clears it.
+        #[arg(long)]
+        bump_command: Option<String>,
         /// The Claude model of card agents (`sonnet`, `opus`, `haiku`, or a full model name);
         /// passed as `--model` to profiles that run Claude Code. An empty text goes back to your
         /// Claude Code default.
@@ -183,6 +187,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             merge_method,
             no_checks_timeout,
             check_command,
+            bump_command,
             worker_model,
             reviewer_model,
             planner_model,
@@ -215,6 +220,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     .transpose()?,
                 no_checks_timeout_secs: no_checks_timeout,
                 check_command,
+                bump_command,
                 worker_model,
                 reviewer_model,
                 planner_model,
@@ -232,6 +238,9 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 );
                 if let Some(c) = &p.check_command {
                     println!("test command: {c}");
+                }
+                if let Some(c) = &p.bump_command {
+                    println!("bump command: {c}");
                 }
                 println!(
                     "review: {}, up to {} rounds of the loop",

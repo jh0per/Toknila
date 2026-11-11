@@ -9,6 +9,7 @@ import { ImportDialog } from "./ImportDialog";
 import { Modal } from "./Modal";
 import { NewCard } from "./NewCard";
 import { NewChain } from "./NewChain";
+import { ReleaseDialog } from "./ReleaseDialog";
 
 /// The dialog the store has open, if any. `inline` says the add-a-project form is already on the
 /// page (onboarding), so it does not open a second time over it.
@@ -58,6 +59,12 @@ export function Dialogs({ state, dispatch, inline }: { state: State; dispatch: (
       return (
         <Modal label="Delete a chain" testId="delete-chain-dialog" onClose={close}>
           <DeleteChain chain={d.chain} state={state} dispatch={dispatch} />
+        </Modal>
+      );
+    case "release":
+      return (
+        <Modal label="Release" testId="release-modal" onClose={close}>
+          <ReleaseDialog chain={d.chain} state={state} dispatch={dispatch} />
         </Modal>
       );
     case "deleteProject":

@@ -156,6 +156,9 @@ pub struct ChainSummary {
     pub released: usize,
     pub stopped_at: Option<StoppedAt>,
     pub next_release: Option<NextRelease>,
+    /// Every card of the plan is in the work branch and one of them is not released yet: the
+    /// chain's end node offers Release.
+    pub releasable: bool,
 }
 
 mod journal;

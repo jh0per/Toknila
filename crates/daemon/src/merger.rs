@@ -169,8 +169,34 @@ impl GitMerger {
 
     /// Moves the base branch from `old` to `new` without disturbing anyone's checkout.
     fn update_base(&self, spec: &MergeSpec, old: &str, new: &str) -> Result<Step, MergeError> {
-        let repo = spec.repo.as_str();
-        let base_ref = format!("refs/heads/{}", spec.base);
+        self.move_base(&spec.repo, &spec.base, old, new)
+    }
+
+    /// Moves `base` from `old` to `new` (a release's bump commit) the way a merge does. `false`:
+    /// the base moved meanwhile. A base checkout with changes is an error naming its folder.
+    pub(crate) fn advance_base(
+        &self,
+        repo: &str,
+        base: &str,
+        old: &str,
+        new: &str,
+    ) -> Result<bool, MergeError> {
+        match self.move_base(repo, base, old, new)? {
+            Step::Done(MergeOutcome::Merged { .. }) => Ok(true),
+            Step::Done(MergeOutcome::BaseCheckoutDirty { path }) => {
+                Err(MergeError::Git(GitError::Failed {
+                    command: format!("update {base}"),
+                    detail: format!(
+                        "the checkout of {base} at {path} has changes or is in the way"
+                    ),
+                }))
+            }
+            _ => Ok(false),
+        }
+    }
+
+    fn move_base(&self, repo: &str, base: &str, old: &str, new: &str) -> Result<Step, MergeError> {
+        let base_ref = format!("refs/heads/{base}");
         let listing = self.git.run(repo, &["worktree", "list", "--porcelain"])?;
         let Some(checkout) = checkout_of(&listing, &base_ref) else {
             let swapped = self

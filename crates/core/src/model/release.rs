@@ -52,6 +52,9 @@ pub struct Release {
     pub branch: Option<String>,
     pub cut_at: Option<Timestamp>,
     pub released_at: Option<Timestamp>,
+    /// The git tag of the release (`v1.4.0`), set when a release run made it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
 }
 
 impl Release {
@@ -73,6 +76,7 @@ impl Release {
             branch: None,
             cut_at: None,
             released_at: None,
+            tag: None,
         }
     }
 }

@@ -11,6 +11,7 @@ import { runPlacementEffect } from "./placementEffects";
 import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
 import { runPlannerEffect } from "./plannerEffects";
+import { runReleaseEffect } from "./releaseEffects";
 import { runSettingsEffect } from "./settingsEffects";
 import { saveTheme } from "./themeEffects";
 import { runUpdateEffect } from "./updatesEffects";
@@ -213,6 +214,11 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "setAutostart":
         runAutostartEffect(e, dispatch);
+        return;
+      case "loadReleaseOffer":
+      case "startRelease":
+      case "pollRelease":
+        runReleaseEffect(e, dispatch);
         return;
       case "saveTheme":
         saveTheme(e.theme);

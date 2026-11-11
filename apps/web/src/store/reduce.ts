@@ -12,6 +12,7 @@ import { reduceQuick } from "./quick";
 import { type Dialog, reducePlan, withChain } from "./plan";
 import { ONBOARDING_DRAFT, loadPlanner, reducePlanner } from "./planner";
 import { reduceShortcuts } from "./shortcuts";
+import { initialRelease, reduceRelease } from "./release";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
@@ -148,7 +149,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       // new dialog or their own; closing another dialog leaves them where they show.
       const keep = msg.type === "closeDialog" && s.plan.dialog?.kind !== "foundPlans";
       const found = keep ? next.imports.found : undefined;
-      return [{ ...next, imports: { ...initialImports, found }, removal: initialRemoval }, fx];
+      return [{ ...next, imports: { ...initialImports, found }, removal: initialRemoval, release: initialRelease }, fx];
     }
     case "textImported":
     case "importAnswered": {
@@ -187,6 +188,14 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       // The chain on screen is gone: back to its project.
       return routeGone(next) ? then(next, fx, { name: "project", project: msg.deletion.project }) : [next, fx];
     }
+    case "openRelease":
+    case "setReleaseVersion":
+    case "startRelease":
+    case "releaseOffered":
+    case "releaseStarted":
+    case "releaseRun":
+    case "releaseRefused":
+      return reduceRelease(s, msg);
     case "selectEdge":
     case "dismissEdgeError":
     case "addEdge":

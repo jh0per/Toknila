@@ -207,7 +207,7 @@ pub fn release_event<U: UnitOfWork + ?Sized>(
 ) -> AppResult<()> {
     match event {
         ReleaseEvent::Finished => {
-            with_chain(uow, r.chain_id, |ctx| Ok(ctx.complete_release(r.id)?))
+            with_chain(uow, r.chain_id, |ctx| Ok(ctx.complete_release(r.id, None)?))
         }
     }
 }

@@ -122,6 +122,7 @@
   "summary": {
     "done": 4,
     "next_release": null,
+    "releasable": true,
     "released": 3,
     "status": "done",
     "stopped_at": null,
