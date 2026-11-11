@@ -113,7 +113,8 @@ pub(crate) fn run_on_host(
     ticket: TicketId,
     spec: Option<CheckSpec>,
     sync: Option<&SyncSpec>,
-) -> ExternalOutcome {
+    outcomes: &mut Vec<ExternalOutcome>,
+) {
     // One check at a time on the machine: wait for the turn, hold it until done.
     let _turn = host.gate.enter(ticket);
     let synced = match sync {
@@ -123,11 +124,13 @@ pub(crate) fn run_on_host(
         }
         None => Ok(SyncOutcome::UpToDate),
     };
+    outcomes.extend(crate::sync::recorded(ticket, &synced));
     let result = match (&spec, synced) {
         (_, Ok(SyncOutcome::Conflict { files, migrations })) => {
             let base = sync.map(|s| s.base.as_str()).unwrap_or_default();
             let text = crate::sync::conflict_text(base, &files, &migrations);
-            return ExternalOutcome::SyncConflict { ticket, text };
+            outcomes.push(ExternalOutcome::SyncConflict { ticket, text });
+            return;
         }
         (_, Err(e)) => Err(CheckError::Sync(e.to_string())),
         (Some(spec), Ok(_)) => {
@@ -137,11 +140,11 @@ pub(crate) fn run_on_host(
         }
         (None, Ok(_)) => Err(CheckError::NothingToRun),
     };
-    ExternalOutcome::CheckFinished {
+    outcomes.push(ExternalOutcome::CheckFinished {
         ticket,
         spec,
         result,
-    }
+    });
 }
 
 /// A stage of a check arrived: the card learns it. A card that has moved on ignores it.
@@ -203,6 +206,26 @@ fn queue_for<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket) -> AppResult<()> {
         sync,
     });
     Ok(())
+}
+
+/// The daemon merged the base into the ship and made `commit`: it is recorded with the hand-in,
+/// so Accept knows it for the daemon's own and not for work that was not handed in.
+pub(crate) fn synced<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    commit: String,
+) -> AppResult<()> {
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(());
+    };
+    crate::chain::with_chain(uow, t.chain_id, |ctx| {
+        if let Some(mine) = ctx.view.tickets.iter_mut().find(|x| x.id == ticket)
+            && !mine.review.synced.contains(&commit)
+        {
+            mine.review.synced.push(commit);
+        }
+        Ok::<_, crate::AppError>(())
+    })
 }
 
 /// Bringing the ship up to its base conflicted: the card goes back to the worker with `text`, a

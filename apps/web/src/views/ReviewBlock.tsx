@@ -12,7 +12,7 @@ export function ReviewBlock({ detail, children }: { detail: TicketDetail | undef
     <section className="review-block" data-testid="review-block">
       <h4>What the agent reported</h4>
       {report ? (
-        <HandIn report={report} />
+        <HandIn report={report} since={detail?.ticket.review?.since_return} />
       ) : (
         <p className="muted" data-testid="agent-report">{detail ? "The agent left no written report." : "Loading…"}</p>
       )}

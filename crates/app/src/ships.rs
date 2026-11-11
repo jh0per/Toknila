@@ -4,7 +4,7 @@
 //! queues that work and records what came of it.
 
 use toknila_core::events::DomainEvent;
-use toknila_core::guard::{self, ShipProblem, ShipState};
+use toknila_core::guard::{self, ShipCommit, ShipProblem, ShipState};
 use toknila_core::machine::TicketEvent;
 use toknila_core::strays::Stray;
 use toknila_core::{
@@ -85,6 +85,23 @@ pub trait Shipyard: std::fmt::Debug {
             ahead: 1,
             head: None,
         })
+    }
+    /// The commits on the ship's own line (first parents) after `from`, newest first. A yard
+    /// that cannot look says none.
+    fn commits_after(&self, look: &ShipLook, from: &str) -> Result<Vec<ShipCommit>, ShipError> {
+        let _ = (look, from);
+        Ok(Vec::new())
+    }
+    /// The commit subjects (newest first) and the changed files from `from` to `to`. A yard that
+    /// cannot look says none.
+    fn changes_between(
+        &self,
+        look: &ShipLook,
+        from: &str,
+        to: &str,
+    ) -> Result<(Vec<String>, Vec<String>), ShipError> {
+        let _ = (look, from, to);
+        Ok((Vec::new(), Vec::new()))
     }
     /// Gets the place the project's planner reads the code from, fresh as far as the network
     /// allows (a fetch that fails is fine): in pull-request mode a checkout of the fetched

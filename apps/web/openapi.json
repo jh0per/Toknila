@@ -10067,6 +10067,24 @@
             },
             "description": "Oldest first."
           },
+          "since_return": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SinceReturn",
+                "description": "What changed since the Return, for a hand-in that answers one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "synced": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The merge commits the daemon made itself to bring the ship up to its base since the\nhand-in; they are not work the agent did not hand in."
+          },
           "turn": {
             "oneOf": [
               {
@@ -10382,6 +10400,59 @@
           },
           "ticket_id": {
             "$ref": "#/components/schemas/TicketId"
+          }
+        }
+      },
+      "SinceReturn": {
+        "type": "object",
+        "description": "The work since the Return, derived by the daemon from the returned HEAD to the new one and\nkept with the hand-in.",
+        "required": [
+          "round",
+          "from",
+          "to",
+          "commits",
+          "files"
+        ],
+        "properties": {
+          "commits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Subjects of the commits made since, newest first, cut at [`MAX_COMMITS`]."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Files changed since, cut at [`MAX_FILES`]."
+          },
+          "from": {
+            "type": "string",
+            "description": "The commit that was handed in and returned."
+          },
+          "more_commits": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many more commits there were than `commits` shows.",
+            "minimum": 0
+          },
+          "more_files": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many more files changed than `files` shows.",
+            "minimum": 0
+          },
+          "round": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The round that was returned.",
+            "minimum": 0
+          },
+          "to": {
+            "type": "string",
+            "description": "The commit that is handed in now."
           }
         }
       },

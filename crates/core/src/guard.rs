@@ -72,6 +72,45 @@ pub fn unchanged_for_agent(round: &crate::ReviewRound, head: &str) -> String {
     )
 }
 
+/// A commit on the ship: its id and subject.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShipCommit {
+    pub id: String,
+    pub subject: String,
+}
+
+/// The commits on the ship's own line after the hand-in (`after`, newest first) that are neither
+/// the daemon's base-sync merges (`synced`, recorded when it made them) nor the hand-in itself.
+pub fn extra_commits(after: &[ShipCommit], synced: &[String]) -> Vec<ShipCommit> {
+    after
+        .iter()
+        .filter(|c| !synced.iter().any(|s| s == &c.id))
+        .cloned()
+        .collect()
+}
+
+/// What Accept answers when the ship carries `extra` beyond the hand-in: the commits, and the two
+/// ways out.
+pub fn extra_for_person(extra: &[ShipCommit], handed_in: &str) -> String {
+    let names: Vec<String> = extra
+        .iter()
+        .take(NAMED)
+        .map(|c| format!("{} {}", crate::instructions::short_commit(&c.id), c.subject))
+        .collect();
+    let more = extra.len().saturating_sub(NAMED);
+    let tail = if more > 0 {
+        format!(" and {more} more")
+    } else {
+        String::new()
+    };
+    format!(
+        "Cannot accept: the ship carries commits beyond the hand-in ({}): {}{tail}. Return the \
+         card so the agent hands in again, or wait for a new hand-in.",
+        crate::instructions::short_commit(handed_in),
+        names.join("; "),
+    )
+}
+
 /// The paths as a short list: the first few, then how many more.
 pub fn list_files(files: &[String]) -> String {
     let mut text = files
@@ -190,6 +229,43 @@ mod tests {
         assert!(
             unchanged_since_return(&at(Some("f8afe06aaaa")), &crate::Review::default()).is_none()
         );
+    }
+
+    fn commit(id: &str, subject: &str) -> ShipCommit {
+        ShipCommit {
+            id: id.to_owned(),
+            subject: subject.to_owned(),
+        }
+    }
+
+    #[test]
+    fn recorded_syncs_are_not_extra_and_the_message_names_the_rest_and_both_ways_out() {
+        let after = [
+            commit("3333333aaa", "late work"),
+            commit("2222222bbb", "Merge main into ship"),
+        ];
+        assert_eq!(
+            extra_commits(&after, &["2222222bbb".to_owned()]),
+            [commit("3333333aaa", "late work")]
+        );
+        assert_eq!(
+            extra_commits(&after, &[]).len(),
+            2,
+            "an unrecorded merge counts"
+        );
+        let text = extra_for_person(
+            &extra_commits(&after, &["2222222bbb".to_owned()]),
+            "1111111ccc",
+        );
+        for want in [
+            "3333333 late work",
+            "1111111",
+            "Return the card",
+            "wait for a new hand-in",
+        ] {
+            assert!(text.contains(want), "{want}: {text}");
+        }
+        assert!(!text.contains("Merge main"), "{text}");
     }
 
     #[test]

@@ -7,7 +7,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use toknila_app::{BranchFate, ShipError, Shipyard};
-use toknila_core::guard::ShipState;
+use toknila_core::guard::{ShipCommit, ShipState};
 use toknila_core::strays::Stray;
 use toknila_core::{PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec};
 
@@ -165,6 +165,19 @@ impl Shipyard for GitShipyard {
 
     fn inspect(&self, look: &ShipLook) -> Result<ShipState, ShipError> {
         self.look(look)
+    }
+
+    fn commits_after(&self, look: &ShipLook, from: &str) -> Result<Vec<ShipCommit>, ShipError> {
+        self.after(look, from)
+    }
+
+    fn changes_between(
+        &self,
+        look: &ShipLook,
+        from: &str,
+        to: &str,
+    ) -> Result<(Vec<String>, Vec<String>), ShipError> {
+        self.between(look, from, to)
     }
 
     fn planner_site(&self, spec: &PlannerSpec) -> PlannerSite {

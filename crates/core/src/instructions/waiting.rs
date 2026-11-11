@@ -11,6 +11,8 @@ pub struct Returned {
     /// The commit that was handed in and returned; `None` when it was not recorded.
     pub commit: Option<String>,
     pub text: String,
+    /// What changed since the Return, once the hand-in that answers it is made.
+    pub since: Option<crate::SinceReturn>,
 }
 
 impl Returned {
@@ -21,8 +23,24 @@ impl Returned {
             by: Some(r.reviewer),
             commit: review.handed_in.clone(),
             text: r.comment.trim().to_owned(),
+            since: review.since_return.clone(),
         })
     }
+}
+
+/// The reviewer's kickoff sentence about a hand-in that answers a Return: read what changed since
+/// it first. Empty when the hand-in answers none.
+pub(super) fn reviewer_part(returned: Option<&Returned>) -> String {
+    let Some(s) = returned.and_then(|r| r.since.as_ref()) else {
+        return String::new();
+    };
+    let (from, to) = (short_commit(&s.from), short_commit(&s.to));
+    format!(
+        " This hand-in answers a Return (round {n}): read the \"Since the Return\" block of your \
+         instructions first (`git log --oneline {from}..{to}`, `git diff --stat {from}..{to}`), \
+         then the rest.",
+        n = s.round
+    )
 }
 
 /// Who returned a round, as the agent reads it.

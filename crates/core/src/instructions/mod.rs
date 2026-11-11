@@ -235,8 +235,9 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
              branch, run the check command and the tests the hand-in names and quote their \
              result lines (each command plain, one per call, no `cd` or `&&`), mark NOT_RUN what \
-             you could not run (never FAIL it), then call `review_verdict` once. You do not change the code.",
-            key = brief.key
+             you could not run (never FAIL it), then call `review_verdict` once. You do not change the code.{since}",
+            key = brief.key,
+            since = waiting::reviewer_part(brief.returned),
         ),
         _ => format!(
             "Start ticket {key} now. Read your Toknila instructions, work the card, commit your \
@@ -318,6 +319,13 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
         for item in brief.acceptance {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
+    }
+    if let Some(s) = brief.returned.and_then(|r| r.since.as_ref()) {
+        out.push_str(&format!(
+            "\n## Since the Return\n\nThis hand-in answers a Return. Read what changed since it \
+             first, then the rest:\n\n```\n{}```\n",
+            s.text()
+        ));
     }
     out.push_str(&checks_section(
         brief,
