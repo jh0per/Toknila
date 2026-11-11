@@ -21,6 +21,7 @@ mod designs;
 mod inbox;
 mod merges;
 mod parallel;
+mod pins;
 mod planner;
 mod planning;
 mod plans;

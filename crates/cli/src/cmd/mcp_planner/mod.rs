@@ -7,8 +7,8 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 use toknila_api_types::{
-    CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain, NewSuggestion,
-    NewThread, NewVersion, TicketDetail,
+    CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewDesignPin, NewMessage, NewPlanChain,
+    NewSuggestion, NewThread, NewVersion, TicketDetail,
 };
 use toknila_client::Client;
 use toknila_core::graph::Place;
@@ -37,6 +37,7 @@ pub(super) enum PlannerCall {
         edit: CardEdit,
     },
     Suggest(NewSuggestion),
+    DesignQuestion(NewDesignPin),
     ShowCard {
         card: String,
     },
@@ -164,6 +165,7 @@ pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolErr
             PlannerCall::EditCard { card, edit }
         }
         "suggest" => PlannerCall::Suggest(args(arguments)?),
+        "design_question" => PlannerCall::DesignQuestion(args(arguments)?),
         "show_card" => {
             let ShowCard { card } = args(arguments)?;
             PlannerCall::ShowCard { card }
@@ -254,6 +256,13 @@ pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<String, String
         PlannerCall::ShowDesign { design } => {
             let found = client.planner_design(design).map_err(e)?;
             serde_json::to_string_pretty(&found).map_err(|x| x.to_string())
+        }
+        PlannerCall::DesignQuestion(q) => {
+            let pin = client.planner_pin(q).map_err(e)?;
+            Ok(format!(
+                "pinned #{} on {}: the owner answers on the mockup, and the answer shows in show_plan under pins",
+                pin.number, pin.design_name
+            ))
         }
         PlannerCall::NewChain(c) => {
             let d = client.planner_new_chain(c).map_err(e)?;

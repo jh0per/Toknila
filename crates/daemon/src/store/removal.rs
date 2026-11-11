@@ -81,6 +81,12 @@ impl Repo<'_> {
         let mut sql =
             scope.statements(Some("(entity IN ('project', 'window') AND entity_id = ?1)"));
         sql.push("DELETE FROM suggestions WHERE project_id = ?1".to_owned());
+        sql.push(
+            "DELETE FROM events WHERE entity = 'design_pin' \
+             AND entity_id IN (SELECT id FROM design_pins WHERE project_id = ?1)"
+                .to_owned(),
+        );
+        sql.push("DELETE FROM design_pins WHERE project_id = ?1".to_owned());
         sql.push("DELETE FROM projects WHERE id = ?1".to_owned());
         self.run(&sql, &project.to_string())
     }

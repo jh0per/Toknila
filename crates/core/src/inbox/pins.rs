@@ -10,7 +10,10 @@ pub(super) fn pin_items(data: &InboxData) -> Vec<InboxItem> {
         .iter()
         .filter(|p| p.is_open())
         .filter_map(|p| {
-            let card = data.tickets.iter().find(|t| Some(&t.key) == p.card.as_ref())?;
+            let card = data
+                .tickets
+                .iter()
+                .find(|t| Some(&t.key) == p.card.as_ref())?;
             let mut i = item(
                 InboxKind::DesignQuestion,
                 card,

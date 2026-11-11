@@ -269,6 +269,15 @@ card, or a release of its chain made or moved) the store removes it and journals
 `suggestion_cleared` (`{"project","project_key"}`). A window reads it with
 `GET /v1/projects/{project}/suggestion` (`null` when none) and reloads on both events.
 
+The planner's `design_question` tool (`POST /v1/planner/pins`) pins a question on a region of a
+design and journals `design_pin` kind `asked` (`{"pin"}`; the pin is `{"id","project","design",
+"design_name","number","region","text","card","answer","created_at","answered_at"}`, `card` and
+`answer` absent when none). A person's answer (`POST /v1/projects/{project}/design-pins/{pin}/answer`)
+journals `design_pin` kind `answered` (`{"pin"}`) and, for a pin with a card that can still be
+edited, a `ticket` `updated` for the prompt, which gets the answered pins under `## From the
+design`. A window lists the pins with `GET /v1/projects/{project}/design-pins` and reloads on
+both events.
+
 Deleting a project (`POST /v1/projects/{project}/delete`) first removes the journal entries
 about the project and everything in it (its chains, cards, milestones, comments, subtasks and
 threads), then journals one `chain` kind `deleted` (`{"chain"}`, the chain as it was) per chain

@@ -23,6 +23,24 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             &["design"],
         ),
         tool(
+            "design_question",
+            "Pin a question on a region of a design, when the design does not say something you need (a state, a label, a behaviour). The pin shows on the mockup, on the project page and on the card page, and in the owner's inbox as a question of the assistant; the owner answers it in place with a short text. An answered pin is added to its card's prompt under `From the design`, and `show_plan` lists every pin with its answer under `pins`. Ask one thing per pin, and give the `card` it is about so the answer reaches that card.",
+            json!({
+                "design": text("The design: its file name in the project's library (or its id)"),
+                "region": { "type": "object",
+                    "description": "The part of the image the question is about, in whole percent of its width and height",
+                    "properties": {
+                        "x": { "type": "integer", "minimum": 0, "maximum": 100 },
+                        "y": { "type": "integer", "minimum": 0, "maximum": 100 },
+                        "w": { "type": "integer", "minimum": 1, "maximum": 100 },
+                        "h": { "type": "integer", "minimum": 1, "maximum": 100 },
+                    }, "required": ["x", "y", "w", "h"] },
+                "text": text("The question, at most 500 characters"),
+                "card": { "type": "string", "description": "The card it is about (key, id or title)" },
+            }),
+            &["design", "region", "text"],
+        ),
+        tool(
             "new_chain",
             "Create a chain. Its cards wait for the owner to start them: a chain you create never starts cards by itself.",
             json!({ "name": text("Short unique name"), "goal": text("What the chain is for") }),

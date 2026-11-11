@@ -25,6 +25,7 @@ mod leftovers;
 mod merges;
 mod nudge;
 mod parallel;
+mod pins;
 mod planner;
 mod pull_requests;
 mod questions;
@@ -48,6 +49,7 @@ struct Mem {
     threads: Vec<Thread>,
     messages: Vec<ThreadMessage>,
     versions: Vec<ThreadVersion>,
+    pins: Vec<toknila_core::design::pin::DesignPin>,
     ships: Vec<Ship>,
     suggestion: Option<Suggestion>,
     yard: ships::FakeYard,
@@ -133,6 +135,7 @@ impl Mem {
             threads: vec![],
             messages: vec![],
             versions: vec![],
+            pins: vec![],
             ships: vec![],
             suggestion: None,
             yard: ships::FakeYard::default(),
@@ -248,6 +251,19 @@ impl Reader for Mem {
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>> {
         Ok(self.ships.iter().find(|s| s.ticket_id == ticket).cloned())
     }
+    fn design_pins(
+        &self,
+        project: ProjectId,
+    ) -> AppResult<Vec<toknila_core::design::pin::DesignPin>> {
+        let all = self.pins.iter();
+        Ok(all.filter(|p| p.project == project).cloned().collect())
+    }
+    fn design_pin(
+        &self,
+        id: toknila_core::PinId,
+    ) -> AppResult<Option<toknila_core::design::pin::DesignPin>> {
+        Ok(self.pins.iter().find(|p| p.id == id).cloned())
+    }
     fn live_runners(&self) -> AppResult<Vec<(TicketId, toknila_core::AgentRole)>> {
         Ok(crate::Runner::live_runners(&self.runner))
     }
@@ -332,6 +348,11 @@ impl UnitOfWork for Mem {
     }
     fn insert_thread_version(&mut self, v: &ThreadVersion) -> AppResult<()> {
         self.versions.push(v.clone());
+        Ok(())
+    }
+    fn upsert_design_pin(&mut self, pin: &toknila_core::design::pin::DesignPin) -> AppResult<()> {
+        self.pins.retain(|p| p.id != pin.id);
+        self.pins.push(pin.clone());
         Ok(())
     }
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()> {

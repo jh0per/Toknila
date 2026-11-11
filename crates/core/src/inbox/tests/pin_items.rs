@@ -61,7 +61,10 @@ fn a_pin_of_no_card_of_the_project_is_not_listed() {
     let other = ticket(9, TicketStatus::Ready, 100);
     let out = with_pins(
         vec![card],
-        vec![pin(None, "General?", None), pin(Some(&other), "Other?", None)],
+        vec![
+            pin(None, "General?", None),
+            pin(Some(&other), "Other?", None),
+        ],
     );
     assert!(out.is_empty());
 }

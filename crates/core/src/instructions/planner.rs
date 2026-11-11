@@ -36,6 +36,11 @@ again after the owner or a card agent may have changed something.
 - `show_design` (`design`): the path and the metadata (name, kind, media type, size) of one \
 design, by its id or name. You may `Read` the design files that `show_plan` and `show_design` \
 name, and no other file outside the repository.
+- `design_question` (`design`, `region`, `text`, `card`): pin a question on a region of a design \
+when the design does not say what you need. It shows on the mockup (project page and card page) \
+and in the owner's inbox; the owner answers in place. An answered pin is added to its card's \
+prompt under `From the design`, and `show_plan` lists every pin and its answer under `pins`. \
+Ask one thing per pin, and name the `card`.
 - `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
 - `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`, `designs`): a new card at \
 the end of the chain, or after the cards named in `after`.
@@ -210,6 +215,7 @@ mod tests {
         for tool in [
             "show_plan",
             "show_design",
+            "design_question",
             "new_chain",
             "add_card",
             "edit_card",
