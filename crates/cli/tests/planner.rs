@@ -72,7 +72,7 @@ fn wait_for(tok: &Tok, what: &str, mut ok: impl FnMut() -> bool) {
 
 /// A project DEMO whose repository is real, and a planner profile with `steps`.
 fn setup(steps: &[&str]) -> (tempfile::TempDir, Tok, PathBuf) {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
     tok.profile(

@@ -7320,6 +7320,16 @@
           }
         }
       },
+      "HandInStatus": {
+        "type": "string",
+        "description": "How a check ended, as the agent wrote it in its hand-in.",
+        "enum": [
+          "PASS",
+          "FAIL",
+          "NOT_RUN",
+          "BLOCKED"
+        ]
+      },
       "HookWiring": {
         "type": "object",
         "description": "How an agent reports through hooks, a second event source: the runner writes a settings file\nunder the data home and passes its path with `settings_flag`.",
@@ -7433,6 +7443,76 @@
           }
         }
       },
+      "InboxCheck": {
+        "type": "object",
+        "description": "One line of the checks block.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HandInStatus",
+                "description": "The status; absent for a line that is no check (it stays text)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "type": "string",
+            "description": "The evidence, or the whole line when it has no status."
+          }
+        }
+      },
+      "InboxHandIn": {
+        "type": "object",
+        "description": "The hand-in of a card in review.",
+        "required": [
+          "gist",
+          "checks"
+        ],
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxCheck"
+            },
+            "description": "The checks, in the order the agent wrote them."
+          },
+          "gist": {
+            "type": "string",
+            "description": "The one-line gist of what changed."
+          },
+          "left": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What is left or not covered."
+          },
+          "since_return": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SinceReturn",
+                "description": "What changed since the Return this hand-in answers, when it answers one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "what": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The lines under \"What changed\", when the agent wrote any."
+          }
+        }
+      },
       "InboxItem": {
         "type": "object",
         "description": "One entry of the inbox.",
@@ -7479,6 +7559,13 @@
           "chain": {
             "$ref": "#/components/schemas/ChainId"
           },
+          "design": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the design a pin is about (`design_question` items)."
+          },
           "detail": {
             "type": [
               "string",
@@ -7492,6 +7579,17 @@
               "$ref": "#/components/schemas/TicketKey"
             },
             "description": "The cards done out of order that these subtasks are behind (`leftovers` items)."
+          },
+          "hand_in": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InboxHandIn",
+                "description": "The hand-in of the card (`review` items whose agent handed in with the template); absent\notherwise."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "kind": {
             "$ref": "#/components/schemas/InboxKind"

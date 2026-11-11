@@ -13,6 +13,18 @@ use toknila_daemon::paths::Paths;
 
 use crate::{daemon_cmd, output};
 
+/// Ends the process when stdin, a pipe the parent holds open, reaches end of file.
+pub(super) fn exit_with_parent() {
+    let _ = std::thread::Builder::new()
+        .name("lifeline".to_owned())
+        .spawn(|| {
+            let mut sink = [0u8; 256];
+            let mut stdin = std::io::stdin().lock();
+            while std::io::Read::read(&mut stdin, &mut sink).is_ok_and(|n| n > 0) {}
+            std::process::exit(0);
+        });
+}
+
 pub(super) fn run(c: &Client, paths: &Paths, since: Option<i64>, json_out: bool) -> Result<()> {
     let mut last = match since {
         Some(s) => s,

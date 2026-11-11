@@ -20,7 +20,11 @@ fn tok_cmd(home: &Path, args: &[&str]) -> Command {
 }
 
 fn tok_ok(home: &Path, args: &[&str]) -> Output {
-    let out = tok_cmd(home, args).output().expect("run tok");
+    let out = if args == ["daemon", "start"] {
+        common::start_daemon(home)
+    } else {
+        tok_cmd(home, args).output().expect("run tok")
+    };
     assert!(
         out.status.success(),
         "tok {args:?}: {}\n{}",
@@ -138,7 +142,7 @@ fn run(home: &Path, args: &[String]) -> Child {
 
 #[test]
 fn kill_9_at_20_points_loses_nothing_and_mixes_nothing() {
-    let work = tempfile::tempdir().expect("tempdir");
+    let work = common::tempdir();
     let file = work.path().join("demo.toml");
     std::fs::write(&file, DEMO).expect("write demo");
     let file = file.to_str().expect("utf-8 path").to_owned();

@@ -50,7 +50,7 @@ fn setup(tok: &Tok, dir: &Path, profile_name: &str) {
 
 #[test]
 fn the_permission_hook_waits_for_allow_from_the_window_and_the_card_resumes_at_once() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     tok.profile(
         "hooked",
@@ -104,7 +104,7 @@ fn the_permission_hook_waits_for_allow_from_the_window_and_the_card_resumes_at_o
 
 #[test]
 fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     tok.profile(
         "silent",
@@ -157,7 +157,7 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
 
 #[test]
 fn a_question_asked_after_the_silent_nudge_reaches_the_inbox_and_the_answer_reaches_the_agent() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     // Quiet for a second and no nudges allowed: the first look of the ticker (every 5 s) gives up
     // and the card waits as silent. The agent then asks, still alive, and reads the answer.
@@ -207,7 +207,7 @@ fn a_question_asked_after_the_silent_nudge_reaches_the_inbox_and_the_answer_reac
 
 #[test]
 fn a_long_permission_request_shows_its_full_command_in_the_inbox_and_in_tok_show() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let command = format!("echo start\\n{}\\necho EOF", "echo 1\\n".repeat(100));
     let body = format!(r#"{{"tool":"Bash: {command}"}}"#);
@@ -248,7 +248,7 @@ fn a_long_permission_request_shows_its_full_command_in_the_inbox_and_in_tok_show
 #[test]
 fn the_worker_process_ends_at_the_hand_in_and_a_return_starts_a_new_run_with_the_earlier_instructions()
  {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     // It prints its instructions, then waits for a line and asks to run something.
     tok.profile(
@@ -319,7 +319,7 @@ fn the_worker_process_ends_at_the_hand_in_and_a_return_starts_a_new_run_with_the
 
 #[test]
 fn mcp_events_after_a_question_leave_the_card_waiting_on_it() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let events = "/tickets/{ticket}/events";
     tok.profile(

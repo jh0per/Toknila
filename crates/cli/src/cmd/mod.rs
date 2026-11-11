@@ -5,6 +5,7 @@ mod agent;
 mod chain;
 mod chain_rm;
 mod hook;
+mod inbox;
 mod logs;
 mod mcp;
 mod mcp_planner;
@@ -174,6 +175,12 @@ pub enum Command {
     },
     /// Show one ticket with its subtasks and comments.
     Show { ticket: String },
+    /// What waits on a person: a review shows the hand-in's gist and its checks.
+    Inbox {
+        /// A project (key); the only one when none is named.
+        #[arg(long)]
+        project: Option<String>,
+    },
     /// Print what a ticket's agent has written to its terminal; `--follow` keeps going live.
     Logs {
         ticket: String,
@@ -189,6 +196,9 @@ pub enum Command {
         /// Start after this event seq (0 = from the beginning).
         #[arg(long)]
         since: Option<i64>,
+        /// Exit when stdin, a pipe the parent holds open, closes.
+        #[arg(long)]
+        exit_with_parent: bool,
     },
     /// Print the web page address of the daemon.
     Open,
@@ -319,12 +329,21 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
         Command::Sim { target, action } => sim::run(&c, &target, action, json_out),
         Command::Ls { needs_human, chain } => ticket::ls(&c, needs_human, chain, json_out),
         Command::Show { ticket } => ticket::run(&c, TicketCmd::Show { ticket }, json_out),
+        Command::Inbox { project } => inbox::run(&c, project, json_out),
         Command::Logs {
             ticket,
             follow,
             reviewer,
         } => logs::run(&c, &ticket, follow, reviewer),
-        Command::Watch { since } => watch::run(&c, &paths, since, json_out),
+        Command::Watch {
+            since,
+            exit_with_parent,
+        } => {
+            if exit_with_parent {
+                watch::exit_with_parent();
+            }
+            watch::run(&c, &paths, since, json_out)
+        }
         Command::Open => {
             let info = daemon_cmd::running(&paths)?.context("daemon is not running")?;
             let url = format!("{}/?token={}", info.base_url(), info.token);

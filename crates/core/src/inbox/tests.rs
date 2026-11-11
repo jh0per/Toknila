@@ -7,6 +7,7 @@ use crate::{
     WaitingReason, Wildcard,
 };
 
+mod hand_in_items;
 mod leftover_items;
 mod pin_items;
 mod question_items;

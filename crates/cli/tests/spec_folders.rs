@@ -35,7 +35,7 @@ fn lines(bytes: &[u8]) -> Vec<String> {
 
 #[test]
 fn spec_folder_round_trip() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let specs = dir.path().join("specs");
     copy_dir(&examples().join(FOLDER), &specs.join(FOLDER));
@@ -177,7 +177,7 @@ fn spec_folder_round_trip() {
 
 #[test]
 fn a_gap_and_early_tasks_import_and_export_unchanged() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let folder = dir.path().join("specs/010-gap");
     std::fs::create_dir_all(&folder).expect("mkdir");

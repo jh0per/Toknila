@@ -33,7 +33,7 @@ fn handshake() -> Vec<Value> {
 
 #[test]
 fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, DEMO).expect("write demo");
@@ -170,7 +170,7 @@ fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
 
 #[test]
 fn a_refused_event_and_a_bad_token_come_back_as_tool_errors_and_change_nothing() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
     tok.run(&["chain", "new", "demo", "--goal", "g"]);

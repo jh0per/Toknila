@@ -59,6 +59,10 @@ pub fn load_with<R: Reader + ?Sized>(
         data.subtasks.extend(r.subtasks(card.id)?);
     }
     for t in &tickets {
+        // The hand-in of a card in review comes with its row.
+        if t.status == toknila_core::TicketStatus::Review {
+            data.comments.extend(r.comments(t.id)?);
+        }
         for thread in r.threads(t.id)? {
             data.threads.push(ThreadFacts {
                 ticket: t.key.clone(),

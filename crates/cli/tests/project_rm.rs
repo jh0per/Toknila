@@ -30,7 +30,7 @@ fn planned(dir: &Path) -> (Tok, PathBuf) {
 
 #[test]
 fn records_only_deletes_the_project_and_keeps_its_folder() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let (tok, repo) = planned(dir.path());
     let out = tok.run(&["project", "rm", "DEMO"]);
     assert_eq!(out["project"]["key"], "DEMO");
@@ -46,7 +46,7 @@ fn records_only_deletes_the_project_and_keeps_its_folder() {
 
 #[test]
 fn trashing_the_folder_is_refused_without_a_terminal_to_type_the_key() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let (tok, repo) = planned(dir.path());
     // The key arrives on stdin, but nobody is at a terminal: refused before anything changes.
     let mut child = Command::new(env!("CARGO_BIN_EXE_tok"))

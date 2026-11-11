@@ -42,7 +42,7 @@ fn screen(tok: &Tok) -> String {
 
 #[test]
 fn a_return_is_in_the_new_runs_kickoff_and_a_hand_in_at_the_same_commit_is_refused() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     // It prints its first message and its instructions, then stays.
     tok.profile(
