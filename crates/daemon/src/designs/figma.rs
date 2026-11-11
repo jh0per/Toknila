@@ -53,10 +53,10 @@ fn curl(url: &str, token: Option<&str>) -> Result<Vec<u8>, String> {
     let mut child = cmd
         .spawn()
         .map_err(|_| "Could not run curl to reach Figma.".to_owned())?;
-    if let Some(mut stdin) = child.stdin.take() {
-        if let Some(t) = token {
-            let _ = writeln!(stdin, "header = \"X-Figma-Token: {t}\"");
-        }
+    if let Some(mut stdin) = child.stdin.take()
+        && let Some(t) = token
+    {
+        let _ = writeln!(stdin, "header = \"X-Figma-Token: {t}\"");
     }
     let out = child
         .wait_with_output()

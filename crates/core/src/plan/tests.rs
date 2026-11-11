@@ -265,10 +265,14 @@ fn export_names_designs_by_file_name_and_import_reads_it_back() {
     let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
     let names = vec!["home.png".to_owned(), "flow \"v2\".pdf".to_owned()];
     let text = export_with_designs(&view, &HashMap::new(), &names);
-    assert!(
-        text.contains("designs = [\"home.png\", \"flow \\\"v2\\\".pdf\"]"),
-        "{text}"
-    );
+    let read: toml::Value = toml::from_str(&text).expect("toml");
+    let listed: Vec<&str> = read["chain"]["designs"]
+        .as_array()
+        .expect("a list")
+        .iter()
+        .filter_map(toml::Value::as_str)
+        .collect();
+    assert_eq!(listed, ["home.png", "flow \"v2\".pdf"], "{text}");
     assert!(parse(&text).is_ok());
     // No designs: no key, the file is the one an export wrote before.
     assert!(!export(&view, &HashMap::new()).contains("designs"));

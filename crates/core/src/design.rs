@@ -87,10 +87,10 @@ pub fn parse_figma(link: &str) -> Result<FigmaRef, String> {
     let mut key = parts.next().unwrap_or("").to_owned();
     // A branch of the file has its own key.
     let rest: Vec<&str> = parts.collect();
-    if let Some(i) = rest.iter().position(|p| *p == "branch") {
-        if let Some(b) = rest.get(i + 1) {
-            (*b).clone_into(&mut key);
-        }
+    if let Some(i) = rest.iter().position(|p| *p == "branch")
+        && let Some(b) = rest.get(i + 1)
+    {
+        (*b).clone_into(&mut key);
     }
     if key.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Err("The link has no file key.".to_owned());
@@ -106,7 +106,7 @@ pub fn parse_figma(link: &str) -> Result<FigmaRef, String> {
         .unwrap_or_default();
     let digits = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
     let ok = node
-        .split(|c| c == ':' || c == ';')
+        .split([':', ';'])
         .all(|n| digits(n.trim_start_matches('I')));
     if node.is_empty() || !ok {
         return Err(
