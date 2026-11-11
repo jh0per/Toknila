@@ -9,8 +9,18 @@ pub enum StoreError {
     Sqlite(#[from] rusqlite::Error),
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("database is newer than this build (schema {found}, supported {supported})")]
-    TooNew { found: i64, supported: i64 },
+    #[error(
+        "database is newer than this build (it ran migrations this build does not have: {unknown})"
+    )]
+    TooNew { unknown: String },
+    #[error("migration name {name:?} is used by both {first} and {second}")]
+    DuplicateMigration {
+        name: String,
+        first: String,
+        second: String,
+    },
+    #[error("migration file {file} is malformed: {reason}")]
+    BadMigration { file: String, reason: String },
     #[error("cannot back up the database to {path} before migrating it: {reason}; the migration did not run", path = path.display())]
     BackupFailed { path: PathBuf, reason: String },
     #[error(
