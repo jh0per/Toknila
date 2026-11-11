@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_app::ships::GuardError;
@@ -87,7 +87,8 @@ pub async fn propose_wildcard(
     let (detail, _) = state
         .store
         .write(Actor::Human, at, move |tx| -> ApiResult<TicketDetail> {
-            let id = wildcards::propose(tx, &chain, input.card, input.from.as_deref())?;
+            let (card, from) = input.into_parts();
+            let id = wildcards::propose(tx, &chain, card, from.as_deref())?;
             load_ticket_detail(&tx.repo(), id, at, &prices)
         })
         .await?;

@@ -689,3 +689,54 @@ async fn a_database_before_positions_has_none_and_a_position_is_stored() {
     let back = store.read(move |repo| repo.ticket(id)).await.expect("read");
     assert_eq!(back.map(|t| (t.pos, t.size)), Some((None, None)));
 }
+
+/// A stored type never refuses an unknown field: a comment written by an earlier or a later
+/// daemon, whose body carries a field this one does not know, still loads.
+#[tokio::test]
+async fn a_comment_row_with_an_extra_body_field_still_loads() {
+    let (_dir, store) = open_temp();
+    let p = project();
+    let c = chain(p.id);
+    let t = ticket(c.id, 1);
+    let tid = t.id;
+    let cm = Comment {
+        id: CommentId::new(),
+        ticket_id: tid,
+        author: Actor::Agent,
+        kind: CommentKind::Report,
+        body: CommentBody {
+            gist: "Solid".into(),
+            ..CommentBody::default()
+        },
+        created_at: Timestamp(5),
+        delivered_at: None,
+    };
+    let (cm2, id) = (cm.clone(), cm.id.to_string());
+    store
+        .write(Actor::Human, NOW, move |tx| {
+            let repo = tx.repo();
+            repo.insert_project(&p)?;
+            repo.insert_chain(&c)?;
+            repo.upsert_ticket(&t)?;
+            repo.upsert_comment(&cm2)?;
+            let body: String = repo.conn.query_row(
+                "SELECT body_json FROM comments WHERE id = ?1",
+                [&id],
+                |r| r.get(0),
+            )?;
+            let mut v: serde_json::Value = serde_json::from_str(&body).expect("json");
+            v["from_a_later_daemon"] = serde_json::json!({ "x": 1 });
+            repo.conn.execute(
+                "UPDATE comments SET body_json = ?2 WHERE id = ?1",
+                params![id, v.to_string()],
+            )?;
+            Ok::<(), StoreError>(())
+        })
+        .await
+        .expect("write");
+    let comments = store
+        .read(move |repo| repo.comments(tid))
+        .await
+        .expect("a row with an extra field loads");
+    assert_eq!(comments, vec![cm]);
+}

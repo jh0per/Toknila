@@ -4,10 +4,11 @@
 //! answer travels (`toknila_core::question`); this decides nothing of its own. Nothing here
 //! writes to a terminal inside a transaction: the answer is delivered first, then journaled.
 
+use crate::http::body::Json;
+use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::{Extension, Json};
 use toknila_api_types::{
     AnswerOutcome, NewAnswer, PermissionAsk, PermissionDecision, PermissionReply,
 };

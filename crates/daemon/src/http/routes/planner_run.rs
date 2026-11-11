@@ -3,7 +3,7 @@
 //! (`crate::runner::planner_stream`). Every route here runs as a person; the planner's own routes
 //! are `/planner/...` (`planner.rs`).
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;

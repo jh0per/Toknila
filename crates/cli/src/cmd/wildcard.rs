@@ -47,10 +47,7 @@ pub(super) fn propose(
     from: Option<String>,
     json_out: bool,
 ) -> Result<()> {
-    let input = NewWildcard {
-        card: card.into(),
-        from,
-    };
+    let input = NewWildcard::new(card.into(), from);
     emit(
         json_out,
         &c.propose_wildcard(chain, &input)?,

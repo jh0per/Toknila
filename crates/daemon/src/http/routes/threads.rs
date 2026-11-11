@@ -1,7 +1,7 @@
 //! `/tickets/{ticket}/threads`: threads on a card. Every route here runs as a person; an agent
 //! reaches the same use cases through `/tickets/{ticket}/events`, where approval does not exist.
 
-use axum::Json;
+use crate::http::body::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use toknila_app::{discussion, resolve, threads};
