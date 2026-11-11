@@ -33,6 +33,9 @@ pub(super) struct Context<'a> {
     pub url: Option<&'a str>,
     /// The `toknila` binary the agent runs for `mcp` and `hook`.
     pub bin: &'a Path,
+    /// The folder the agent runs in (the ship, or the project root): the one place it may read
+    /// besides the design files.
+    pub repo: &'a Path,
     /// The ticket's task, written into the instructions file.
     pub brief: &'a RunBrief,
 }
@@ -265,7 +268,23 @@ pub(super) fn prepare_with(
         ..Wiring::default()
     };
     let dir = cx.dir.join(role_dir(cx.role));
-    let mut rules = profile.permissions.rules(cx.brief.check_command.as_deref());
+    // Reads are scoped to the repository the run works in (the ship, or the project root for a
+    // planner); a profile's bare `Read`, `Grep` or `Glob` rule never reaches the settings file.
+    let mut rules = toknila_core::private::scope_reads(
+        profile.permissions.rules(cx.brief.check_command.as_deref()),
+        &cx.repo.display().to_string(),
+    );
+    // The folder under its real name too (`/var` is `/private/var` on macOS): the agent may
+    // report either spelling of the same place.
+    if let Ok(real) = std::fs::canonicalize(cx.repo) {
+        let real = real.display().to_string();
+        let rule = toknila_core::private::read_allow_tree_rule(
+            real.strip_prefix(r"\\?\").unwrap_or(&real),
+        );
+        if !rules.contains(&rule) {
+            rules.push(rule);
+        }
+    }
     // A planner reads the project's design files and a card's agent those of its card, which sit
     // outside the repository: one explicit rule per file, nothing wider.
     let design_files: &[PathBuf] = match cx.role {
