@@ -72,6 +72,12 @@ Running the gates on a developer Mac:
 - macOS has no `timeout` command; do not wrap commands in it.
 - Run one gate at a time: other agents build and test on the same machine. Stop only processes
   you started, by pid; never `pkill -f` or `killall` (that has killed other agents).
+- Run a long gate as `cargo xtask verify 2>&1 | tail -n 30`; never redirect its output to a file.
+- A failing test is run alone once before any fix: if it passes alone it is a load problem, report
+  it. A check failing on the environment (command not found, exit 127, a tool refused) is
+  reported in the hand-in and you stop; no environment fix, no empty commit.
+- Before the hand-in merge the work branch into the ship, keeping every entry of a shared list.
+  A PASS line quotes the gate's result line; the daemon refuses evidence under 20 characters.
 - A test that starts a `tok daemon` stops it before it ends, and leaves no process behind.
 
 ## Working on a ticket
@@ -87,6 +93,8 @@ Running the gates on a developer Mac:
    below. Never hand in with uncommitted changes, and do not keep editing after handing in.
 6. Change files with the Edit and Write tools, not shell edits (python, sed, perl, heredocs):
    tool edits are approved without asking, shell edits are refused.
+   Never edit a generated file by hand (`apps/web/src/gen/api.d.ts`, `openapi.json`): run
+   `npm run gen` and let `gen:check` prove it.
 7. A new dependency is declared once in the workspace `Cargo.toml` under
    `[workspace.dependencies]` and used with `workspace = true`; `cargo add` into a crate is not
    enough. Ask before adding one.

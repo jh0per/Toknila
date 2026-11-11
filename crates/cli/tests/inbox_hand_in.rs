@@ -37,7 +37,7 @@ fn inbox_prints_the_gist_and_the_checks_of_a_review_item() {
         "sim",
         "DEMO-1",
         "finish",
-        "**What changed:** Alpha is built\n**Checks:**\n- PASS verify: green\n- FAIL e2e: red\n- PASS unit: 3 tests\n**Left:** docs",
+        "**What changed:** Alpha is built\n**Checks:**\n- PASS verify: test result: ok. 120 passed; 0 failed\n- FAIL e2e: red\n- PASS unit: test result: ok. 3 passed; 0 failed\n**Left:** docs",
     ]);
 
     let out = tok.text(&["inbox"]);
