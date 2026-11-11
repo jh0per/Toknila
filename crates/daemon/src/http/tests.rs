@@ -16,6 +16,7 @@ mod agent_tokens;
 mod chain_settings;
 mod commands;
 mod design;
+mod designs;
 mod inbox;
 mod merges;
 mod parallel;
@@ -956,6 +957,12 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/archive",
             "/projects/{project}/chains",
             "/projects/{project}/delete",
+            "/projects/{project}/designs",
+            "/projects/{project}/designs/figma",
+            "/projects/{project}/designs/{design}",
+            "/projects/{project}/designs/{design}/fetch",
+            "/projects/{project}/designs/{design}/file",
+            "/projects/{project}/figma-token",
             "/projects/{project}/import",
             "/projects/{project}/import-path",
             "/projects/{project}/inbox",

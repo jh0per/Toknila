@@ -182,6 +182,15 @@ fn next_merge_event(ctx: &ChainTx, id: TicketId) -> Option<TicketEvent> {
 
 /// A chain as a chain file.
 pub fn export<R: Reader + ?Sized>(repo: &R, chain: &str) -> AppResult<String> {
+    export_with_designs(repo, chain, &[])
+}
+
+/// A chain as a chain file that also names the project's designs, by file name only.
+pub fn export_with_designs<R: Reader + ?Sized>(
+    repo: &R,
+    chain: &str,
+    designs: &[String],
+) -> AppResult<String> {
     let c = resolve::chain(repo, chain)?;
     let view = repo
         .chain_view(c.id)?
@@ -195,7 +204,9 @@ pub fn export<R: Reader + ?Sized>(repo: &R, chain: &str) -> AppResult<String> {
             .collect();
         subtasks.insert(t.id, texts);
     }
-    Ok(toknila_core::plan::export(&view, &subtasks))
+    Ok(toknila_core::plan::export_with_designs(
+        &view, &subtasks, designs,
+    ))
 }
 
 /// Adds a dependency between two nodes of a chain. A Ready ticket that now waits again goes

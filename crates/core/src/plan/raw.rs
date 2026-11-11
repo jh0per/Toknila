@@ -23,6 +23,10 @@ pub(super) struct RawChain {
     pub(super) goal: String,
     pub(super) autostart: Option<bool>,
     pub(super) review_mode: Option<ReviewMode>,
+    /// File names of the project's designs, as an export writes them; read and ignored.
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub(super) designs: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
