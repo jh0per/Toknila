@@ -1783,6 +1783,476 @@
         }
       }
     },
+    "/projects/{project}/designs": {
+      "get": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "The project's designs, oldest first, and whether it has a Figma token.",
+        "operationId": "list_designs",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignList"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "Keeps an uploaded png, jpg, webp or pdf (the raw file as the body, its name in `name`). The\nkind comes from the file's bytes; a pdf is kept as one design.",
+        "operationId": "upload_design",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "description": "The file's name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Design"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/designs/figma": {
+      "post": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "Keeps a Figma frame link as a design. With a token saved the frame is fetched as a png and\nkept next to the uploads; without one, or when Figma refuses, the link stays with a hint.",
+        "operationId": "add_figma_design",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewFigmaDesign"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Design"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/designs/{design}": {
+      "delete": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "Removes a design and its file.",
+        "operationId": "delete_design",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "design",
+            "in": "path",
+            "description": "Design id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "Renames a design.",
+        "operationId": "rename_design",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "design",
+            "in": "path",
+            "description": "Design id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameDesign"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Design"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/designs/{design}/fetch": {
+      "post": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "Fetches a Figma design's frame again (after a token was saved, or a fetch failed).",
+        "operationId": "fetch_design",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "design",
+            "in": "path",
+            "description": "Design id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Design"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/designs/{design}/file": {
+      "get": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "The kept file as it was stored, with its media type. It serves as the thumbnail too: the page\nscales it.",
+        "operationId": "design_file",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "design",
+            "in": "path",
+            "description": "Design id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/figma-token": {
+      "put": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "Saves the project's Figma personal access token as a file under the data home's `secrets`\nfolder (readable by its owner only). It is never sent back and never written to a log.",
+        "operationId": "put_figma_token",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FigmaToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "Forgets the project's Figma token.",
+        "operationId": "delete_figma_token",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}/import": {
       "post": {
         "tags": [
@@ -5384,6 +5854,106 @@
           }
         }
       },
+      "Design": {
+        "type": "object",
+        "description": "One design of a project.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "size",
+          "created_at",
+          "has_file",
+          "thumb"
+        ],
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "figma": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FigmaRef",
+                "description": "The frame a `figma` design points at."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_file": {
+            "type": "boolean",
+            "description": "Whether a file is kept, served at `.../designs/{id}/file`."
+          },
+          "hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the person can do about a link without an image: export the frame, or why the fetch\nfailed. Never holds the token."
+          },
+          "id": {
+            "$ref": "#/components/schemas/DesignId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DesignKind"
+          },
+          "mime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Media type of the kept file; absent for a Figma link whose frame was not fetched."
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes of the kept file; zero without one.",
+            "minimum": 0
+          },
+          "thumb": {
+            "type": "boolean",
+            "description": "Whether the file can be shown as a picture (everything kept but a pdf)."
+          }
+        }
+      },
+      "DesignId": {
+        "type": "string",
+        "description": "Identifies a design of a project."
+      },
+      "DesignKind": {
+        "type": "string",
+        "description": "What a design is.",
+        "enum": [
+          "image",
+          "pdf",
+          "figma"
+        ]
+      },
+      "DesignList": {
+        "type": "object",
+        "description": "Answer of `GET /v1/projects/{project}/designs`.",
+        "required": [
+          "designs",
+          "figma_token"
+        ],
+        "properties": {
+          "designs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Design"
+            },
+            "description": "Oldest first."
+          },
+          "figma_token": {
+            "type": "boolean",
+            "description": "Whether the project has a Figma token; the token itself is never sent."
+          }
+        }
+      },
       "Edge": {
         "type": "object",
         "description": "Dependency edge: `to` cannot start before `from` is done.",
@@ -5495,6 +6065,40 @@
           "seq": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "FigmaRef": {
+        "type": "object",
+        "description": "The frame a Figma link points at.",
+        "required": [
+          "url",
+          "file_key",
+          "node_id"
+        ],
+        "properties": {
+          "file_key": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string",
+            "description": "The frame's node id, `12:34`."
+          },
+          "url": {
+            "type": "string",
+            "description": "The link as the person gave it."
+          }
+        }
+      },
+      "FigmaToken": {
+        "type": "object",
+        "description": "Body of `PUT /v1/projects/{project}/figma-token`.",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
           }
         }
       },
@@ -6159,6 +6763,26 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "NewFigmaDesign": {
+        "type": "object",
+        "description": "Body of `POST /v1/projects/{project}/designs/figma`.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A name; the link's file key when empty."
+          },
+          "url": {
+            "type": "string",
+            "description": "The link of a frame (Copy link to selection)."
           }
         }
       },
@@ -7885,6 +8509,18 @@
           "tag",
           "push"
         ]
+      },
+      "RenameDesign": {
+        "type": "object",
+        "description": "Body of `PATCH /v1/projects/{project}/designs/{design}`.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
       },
       "RepoCheck": {
         "type": "object",

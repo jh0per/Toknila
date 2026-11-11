@@ -50,6 +50,10 @@ id_type!(
     ProjectId
 );
 id_type!(
+    /// Identifies a design of a project.
+    DesignId
+);
+id_type!(
     /// Identifies a [`crate::Chain`].
     ChainId
 );

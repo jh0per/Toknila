@@ -36,7 +36,7 @@ mod order;
 mod parse;
 mod raw;
 
-pub use export::export;
+pub use export::{export, export_with_designs};
 pub use instantiate::Checklist;
 pub use order::out_of_order;
 pub use parse::parse;

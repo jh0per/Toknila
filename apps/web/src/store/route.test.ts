@@ -9,6 +9,7 @@ describe("the settings routes", () => {
     ["/projects/DEMO/settings/agents", { name: "settings", project: "DEMO", section: "agents" }],
     ["/projects/DEMO/settings/review", { name: "settings", project: "DEMO", section: "review" }],
     ["/projects/DEMO/settings/plans", { name: "settings", project: "DEMO", section: "plans" }],
+    ["/projects/DEMO/settings/designs", { name: "settings", project: "DEMO", section: "designs" }],
     ["/projects/DEMO/settings/advanced", { name: "settings", project: "DEMO", section: "advanced" }],
     ["/projects/DEMO/settings/profiles", { name: "settings", project: "DEMO", section: "profiles" }],
     ["/projects/DEMO/settings/updates", { name: "settings", project: "DEMO", section: "updates" }],
