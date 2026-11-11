@@ -25,7 +25,7 @@ fn parent_that_starts_a_daemon_and_waits() {
 
 #[test]
 fn daemon_dies_when_its_parent_is_killed() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let home = dir.path().join("home");
     // Safety net only: a failed assertion must not leave the daemon behind.
     let _stop = DaemonGuard::new(&home);

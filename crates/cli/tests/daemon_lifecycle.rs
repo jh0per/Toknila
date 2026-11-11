@@ -40,7 +40,7 @@ fn status_code(r: Result<ureq::Response, ureq::Error>) -> u16 {
 
 #[test]
 fn start_status_auth_stop() {
-    let home = tempfile::tempdir().expect("tempdir");
+    let home = common::tempdir();
     let h = home.path();
     // Stops the daemon even when an assertion fails or the run is interrupted.
     let _stop = common::DaemonGuard::new(h);

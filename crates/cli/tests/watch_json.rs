@@ -10,7 +10,7 @@ use common::{Tok, snapshot, spawn_watch};
 
 #[test]
 fn watch_json_prints_each_journal_entry_as_one_json_line() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO"]);
 
@@ -42,7 +42,7 @@ fn watch_json_prints_each_journal_entry_as_one_json_line() {
 
 #[test]
 fn watch_plain_line_starts_with_the_local_time() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO"]);
 

@@ -1,10 +1,43 @@
 //! The leak check that ends `cargo xtask verify`: a `tok daemon run` whose data home is under the
-//! temporary folder and that started during the run is a test daemon that outlived its test.
+//! run's own root (`TOKNILA_TEST_ROOT`, where the test helpers put their temp homes) is a test
+//! daemon that outlived its test. Other runs on the machine have other roots.
 //! Needs `ps`; where there is none (Windows) it checks nothing and says so.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+/// The environment variable that names the folder a run's test homes are created under.
+pub const ROOT_VAR: &str = "TOKNILA_TEST_ROOT";
+
+/// Runs `f` with a fresh run root (`<temp>/toknila-verify-<pid>`), removed afterwards.
+pub fn with_run_root(f: impl FnOnce(&Path) -> Result<(), String>) -> Result<(), String> {
+    let root = std::env::temp_dir().join(format!("toknila-verify-{}", std::process::id()));
+    std::fs::create_dir_all(&root).map_err(|e| format!("{}: {e}", root.display()))?;
+    let result = f(&root);
+    let _ = std::fs::remove_dir_all(&root);
+    result
+}
+
+/// `cargo test --workspace` with the test homes created under `root`.
+pub fn cargo_test(cargo: &str, root: &Path) -> Result<(), String> {
+    eprintln!(
+        "$ cargo test --workspace --locked ({ROOT_VAR}={})",
+        root.display()
+    );
+    let status = Command::new(cargo)
+        .args(["test", "--workspace", "--locked"])
+        .env(ROOT_VAR, root)
+        .status()
+        .map_err(|e| format!("cannot run cargo: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "`cargo test --workspace --locked` exited with {status}"
+        ))
+    }
+}
 
 /// One running `tok daemon run`.
 #[derive(Debug, PartialEq)]
@@ -15,37 +48,53 @@ pub struct Daemon {
     pub home: PathBuf,
 }
 
-/// Fails, naming them, when a daemon of this run (started within `run_age`) is still alive.
-pub fn check(run_age: Duration) -> Result<(), String> {
-    let Some(all) = daemons() else {
+/// Fails, naming them, when a daemon with a home under `root` is still alive after `grace` (a
+/// daemon told to stop takes up to a second). Without a root every temp-home daemon counts.
+pub fn check(root: Option<&Path>, grace: Duration) -> Result<(), String> {
+    let deadline = Instant::now() + grace;
+    let mut skipped = true;
+    let leaked = loop {
+        let Some(all) = daemons() else {
+            break Vec::new();
+        };
+        skipped = false;
+        let found = leaked(&all, &scopes(root));
+        if found.is_empty() || Instant::now() >= deadline {
+            break found.into_iter().map(describe).collect();
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    };
+    if skipped {
         eprintln!("xtask: daemon leak check skipped (no `ps` here)");
         return Ok(());
-    };
-    let temp = [
-        std::env::temp_dir(),
-        std::env::temp_dir().canonicalize().unwrap_or_default(),
-    ];
-    let leaked = leaked(&all, &temp, run_age.as_secs() + 2);
+    }
     if leaked.is_empty() {
         eprintln!("xtask: no test daemon left running");
         return Ok(());
     }
-    let list: Vec<String> = leaked
-        .iter()
-        .map(|d| format!("pid {} (home {}, up {}s)", d.pid, d.home.display(), d.age))
-        .collect();
     Err(format!(
         "test daemons of this run are still alive: {}",
-        list.join("; ")
+        leaked.join("; ")
     ))
 }
 
-/// The daemons under a temporary folder that are no older than `max_age` seconds.
-pub fn leaked<'a>(all: &'a [Daemon], temp: &[PathBuf], max_age: u64) -> Vec<&'a Daemon> {
+fn describe(d: &Daemon) -> String {
+    format!("pid {} (home {}, up {}s)", d.pid, d.home.display(), d.age)
+}
+
+/// The folders a leaked daemon's home may be under: the root (as given and resolved), or the
+/// temp dir when there is no root.
+fn scopes(root: Option<&Path>) -> Vec<PathBuf> {
+    let base = root.map_or_else(std::env::temp_dir, Path::to_path_buf);
+    vec![base.canonicalize().unwrap_or_default(), base]
+}
+
+/// The daemons whose home is under one of `scopes`.
+pub fn leaked<'a>(all: &'a [Daemon], scopes: &[PathBuf]) -> Vec<&'a Daemon> {
     all.iter()
-        .filter(|d| d.age <= max_age)
         .filter(|d| {
-            temp.iter()
+            scopes
+                .iter()
                 .any(|t| !t.as_os_str().is_empty() && d.home.starts_with(t))
         })
         .collect()
@@ -132,18 +181,24 @@ mod tests {
     }
 
     #[test]
-    fn leaks_are_temp_homes_started_during_the_run() {
+    fn leaks_are_homes_under_the_scope_whatever_their_age() {
         let d = |pid, age, home: &str| Daemon {
             pid,
             age,
             home: home.into(),
         };
         let all = [
-            d(1, 10, "/tmp/a/home"),
-            d(2, 9_999, "/tmp/b/home"),
-            d(3, 10, "/Users/x/.toknila"),
+            d(1, 10, "/tmp/toknila-verify-1/a/home"),
+            d(2, 9_999, "/tmp/toknila-verify-1/b/home"),
+            d(3, 10, "/tmp/toknila-verify-2/c/home"),
+            d(4, 10, "/Users/x/.toknila"),
         ];
-        let got = leaked(&all, &[PathBuf::from("/tmp")], 100);
-        assert_eq!(got, vec![&all[0]]);
+        let mine = leaked(&all, &[PathBuf::from("/tmp/toknila-verify-1")]);
+        assert_eq!(mine, vec![&all[0], &all[1]]);
+        // No root: every temp-home daemon is reported.
+        let every = leaked(&all, &[PathBuf::from("/tmp")]);
+        assert_eq!(every, vec![&all[0], &all[1], &all[2]]);
+        // An empty scope matches nothing.
+        assert!(leaked(&all, &[PathBuf::new()]).is_empty());
     }
 }

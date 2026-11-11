@@ -31,8 +31,13 @@ fn main() -> ExitCode {
     let result = match task.as_str() {
         "verify" => verify(),
         "guards" => guards(),
-        // The leak check alone, over daemons of any age (to see it fail on a daemon you left).
-        "leaks" => leaks::check(Duration::from_secs(u32::MAX.into())),
+        // The leak check alone: under TOKNILA_TEST_ROOT, or every temp-home daemon when unset.
+        "leaks" => leaks::check(
+            std::env::var_os(leaks::ROOT_VAR)
+                .map(std::path::PathBuf::from)
+                .as_deref(),
+            Duration::ZERO,
+        ),
         "web" => web(),
         "e2e-web" => e2e_web(),
         "dist" => dist(std::env::args().nth(2)),
@@ -62,7 +67,10 @@ fn main() -> ExitCode {
 }
 
 fn verify() -> Result<(), String> {
-    let began = std::time::Instant::now();
+    leaks::with_run_root(verify_in)
+}
+
+fn verify_in(root: &std::path::Path) -> Result<(), String> {
     cargo(&["fmt", "--all", "--check"])?;
     cargo(&[
         "clippy",
@@ -73,9 +81,9 @@ fn verify() -> Result<(), String> {
         "-D",
         "warnings",
     ])?;
-    cargo(&["test", "--workspace", "--locked"])?;
+    leaks::cargo_test(&cargo_bin(), root)?;
     guards()?;
-    leaks::check(began.elapsed())?;
+    leaks::check(Some(root), Duration::from_secs(5))?;
     eprintln!("xtask verify: PASS");
     Ok(())
 }

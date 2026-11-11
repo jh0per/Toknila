@@ -6,7 +6,7 @@ mod common;
 use common::Tok;
 
 fn setup() -> (tempfile::TempDir, Tok) {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
     tok.run(&[

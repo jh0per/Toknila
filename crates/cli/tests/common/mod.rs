@@ -15,6 +15,19 @@ use serde_json::Value;
 use toknila_client::Client;
 use toknila_daemon::info::DaemonInfo;
 
+/// A temporary folder for a test: under `TOKNILA_TEST_ROOT` when `cargo xtask verify` set it (so
+/// its leak check sees only the daemons of its own run), else under the plain temp dir.
+pub fn tempdir() -> tempfile::TempDir {
+    match std::env::var_os("TOKNILA_TEST_ROOT") {
+        Some(root) => {
+            let root = PathBuf::from(root);
+            std::fs::create_dir_all(&root).expect("create the test root");
+            tempfile::tempdir_in(root).expect("tempdir in the test root")
+        }
+        None => tempfile::tempdir().expect("tempdir"),
+    }
+}
+
 /// The `tok` binary of this build, run against one data folder.
 pub struct Tok {
     pub home: PathBuf,

@@ -142,7 +142,7 @@ fn run(home: &Path, args: &[String]) -> Child {
 
 #[test]
 fn kill_9_at_20_points_loses_nothing_and_mixes_nothing() {
-    let work = tempfile::tempdir().expect("tempdir");
+    let work = common::tempdir();
     let file = work.path().join("demo.toml");
     std::fs::write(&file, DEMO).expect("write demo");
     let file = file.to_str().expect("utf-8 path").to_owned();
