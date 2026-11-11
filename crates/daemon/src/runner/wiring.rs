@@ -199,6 +199,11 @@ fn brief_of_key<'a>(
         returned: cx.brief.returned.as_ref(),
         design_first: cx.brief.design_first,
         has_designs: !cx.brief.designs.is_empty(),
+        epic: cx
+            .brief
+            .epic
+            .as_ref()
+            .map(|(name, goal)| (name.as_str(), goal.as_str())),
     }
 }
 

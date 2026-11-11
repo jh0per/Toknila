@@ -300,6 +300,10 @@ pub(super) const MIGRATIONS: &[&str] = &[
         json TEXT NOT NULL
     );
     "#,
+    // 23: the version a chain releases (the epic's release); none for the chains that exist.
+    r#"
+    ALTER TABLE chains ADD COLUMN version TEXT;
+    "#,
     // 24: the assistant's pins on a project's designs (a question on a region, and the person's
     // answer). The design and the card are kept by id and key, not as references: a pin outlives
     // the design file it was made on.

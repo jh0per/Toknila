@@ -94,6 +94,32 @@ impl ChainTx {
         self.step(|v, now| v.cut_release(release, now))
     }
 
+    /// Renames a milestone (the chain's end release takes the chain's version).
+    pub fn set_release_version(
+        &mut self,
+        release: ReleaseId,
+        version: String,
+    ) -> Result<(), GraphError> {
+        self.step(|v, _| {
+            let r = v
+                .releases
+                .iter_mut()
+                .find(|r| r.id == release)
+                .ok_or(GraphError::UnknownRelease(release))?;
+            r.version = version;
+            Ok(())
+        })
+    }
+
+    /// Makes a planned end release wait for the cards nothing else waits for, so that the cards
+    /// added since it was made are before it too.
+    pub fn wire_end_release(&mut self, release: ReleaseId) -> Result<(), GraphError> {
+        for e in self.view.end_release_edges(release) {
+            self.add_edge(e)?;
+        }
+        Ok(())
+    }
+
     /// Marks a cut milestone released; its tickets move to Released.
     pub fn complete_release(
         &mut self,

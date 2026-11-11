@@ -1,12 +1,13 @@
-import type { CSSProperties, MouseEvent, PointerEvent } from "react";
+import { type CSSProperties, type MouseEvent, type PointerEvent, useState } from "react";
 import type { ChainSummary, Release, Ticket, TicketDetail, UsageFigures } from "../api/types";
 import { outOfOrderText } from "../format";
 import { nodeKey } from "../layout";
 import { allows, subtaskProgress } from "../store/cardDetails";
 import { statusClass, statusGroup } from "../store/groups";
-import { finishText } from "../store/phase";
+import { finishText, finishView } from "../store/phase";
 import { showAgentName } from "../store/profiles";
 import type { CardLayout } from "./cardSize";
+import { Markdown } from "./Markdown";
 import { NodeThumb } from "./NodeThumb";
 import { PrChip } from "./PrChip";
 import { UsageChip } from "./UsageChip";
@@ -165,23 +166,73 @@ function ReleaseButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/// Where the diagram starts: a dashed node at its left edge, with the chain's goal under the name.
-export function StartNode({ goal, style }: { goal: string; style: CSSProperties }) {
+/// Where the diagram starts: the chain's epic. The name is the epic's title, the goal (markdown) its
+/// description, a few lines of it with the rest behind "more". Opening it edits the epic.
+export function StartNode({ name, goal, style, selected, onOpen }: {
+  name: string;
+  goal: string;
+  style: CSSProperties;
+  selected: boolean;
+  onOpen: () => void;
+}) {
+  const [more, setMore] = useState(false);
+  const long = goal.split("\n").filter((l) => l.trim()).length > 3 || goal.length > 140;
   return (
-    <div className="node bookend" data-testid="start-node" style={style}>
-      <b className="key">Start</b>
-      <span className="muted goal" title={goal}>{goal.trim() || "No goal yet"}</span>
+    <div
+      className={`node bookend epic${selected ? " sel" : ""}${more ? " more" : ""}`} data-testid="start-node" style={style} role="button" tabIndex={0}
+      onClick={(e) => { e.stopPropagation(); onOpen(); }}
+      onKeyDown={(e) => { if (e.key === "Enter") onOpen(); }}
+    >
+      <b className="key" data-testid="epic-title" title={name}>{name}</b>
+      <span className="muted goal" data-testid="epic-goal" title={more ? undefined : goal}>
+        {goal.trim() ? <Markdown text={goal} /> : "No goal yet"}
+      </span>
+      {long && (
+        <button
+          type="button" className="link-btn more-btn" data-testid="epic-more"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setMore(!more); }}
+        >
+          {more ? "less ▴" : "more ▾"}
+        </button>
+      )}
     </div>
   );
 }
 
-/// Where the diagram ends when the chain has no release: a dashed node at its right edge.
-export function FinishNode({ style, summary, onRelease }: { style: CSSProperties; summary: ChainSummary; onRelease?: () => void }) {
+/// Where the diagram ends: the chain's release. With a version it reads `Release v0.3.0` and its
+/// state (planned, ready to release, released with the date and the tag); without one, the
+/// phase's words. It is the chain's end release when it has one (`release`, a milestone node).
+export function FinishNode({ style, summary, release, nodeKey, over = false, selected = false, onRelease, onOpen }: {
+  style: CSSProperties;
+  summary: ChainSummary;
+  release?: Release;
+  nodeKey?: string;
+  over?: boolean;
+  selected?: boolean;
+  onRelease?: () => void;
+  onOpen?: () => void;
+}) {
+  const view = finishView(summary);
   const text = finishText(summary);
   return (
-    <div className="node bookend" data-testid="end-node" data-end data-phase={summary.phase} style={style}>
-      <b className="key">{summary.phase === "finished" ? "Finished" : "Finish"}</b>
-      <span className="muted" data-testid="end-node-text">{text}</span>
+    <div
+      className={`node bookend finish${over ? " over" : ""}${selected ? " sel" : ""}`} data-testid="end-node" data-end data-phase={summary.phase}
+      data-state={view?.state} data-node={nodeKey} data-version={release?.version} style={style}
+      onClick={onOpen && ((e) => { e.stopPropagation(); onOpen(); })}
+    >
+      {view ? (
+        <>
+          <b className="key" data-testid="finish-title">{view.title}</b>
+          <span className={`finish-state s-${view.state}`} data-testid="finish-state">{view.stateText}</span>
+          {view.text && <span className="muted" data-testid="end-node-text">{view.text}</span>}
+        </>
+      ) : (
+        <>
+          <b className="key">{summary.phase === "finished" ? "Finished" : "Finish"}</b>
+          <span className="muted" data-testid="end-node-text">{text}</span>
+        </>
+      )}
       {onRelease && <ReleaseButton onClick={onRelease} />}
     </div>
   );

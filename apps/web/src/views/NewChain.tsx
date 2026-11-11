@@ -15,6 +15,9 @@ const REVIEW_WORDS: Record<ReviewMode, string> = {
 export function NewChain({ project, state, dispatch }: { project: string; state: State; dispatch: (i: Intent) => void }) {
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
+  // The version starts as the one the project suggests; what the person types wins.
+  const [typed, setTyped] = useState<string | undefined>(undefined);
+  const version = typed ?? state.epic.suggested ?? "";
   const [autostart, setAutostart] = useState(true);
   const [mode, setMode] = useState<ReviewMode | "">("");
   const p = state.plan;
@@ -29,7 +32,7 @@ export function NewChain({ project, state, dispatch }: { project: string; state:
         dispatch({
           type: "createChain",
           project,
-          input: { name: name.trim(), goal: goal.trim() || null, autostart, review_mode: mode || null },
+          input: { name: name.trim(), goal: goal.trim() || null, autostart, review_mode: mode || null, version: version.trim() || null },
         });
       }}
     >
@@ -39,6 +42,12 @@ export function NewChain({ project, state, dispatch }: { project: string; state:
       </Field>
       <Field label="Goal (optional)" name="chain-goal" error={undefined}>
         <textarea data-testid="chain-goal" rows={2} value={goal} onChange={(e) => setGoal(e.target.value)} />
+      </Field>
+      <Field
+        label="Version (optional)" name="chain-version" error={planError(p, "chain", "version")}
+        hint={state.epic.suggested ? `The chain ends in a release of this version; suggested: the next patch of the newest tag.` : "The chain ends in a release of this version."}
+      >
+        <input data-testid="chain-version" value={version} placeholder="0.3.0" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
       </Field>
       <label className="check">
         <input type="checkbox" data-testid="chain-autostart" checked={autostart} onChange={(e) => setAutostart(e.target.checked)} />

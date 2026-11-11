@@ -15,6 +15,7 @@ use crate::store::Store;
 mod agent_tokens;
 mod card_designs;
 mod chain_settings;
+mod chain_version;
 mod commands;
 mod design;
 mod designs;
@@ -973,6 +974,7 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/import",
             "/projects/{project}/import-path",
             "/projects/{project}/inbox",
+            "/projects/{project}/next-version",
             "/projects/{project}/planner",
             "/projects/{project}/planner/input",
             "/projects/{project}/planner/scrollback",

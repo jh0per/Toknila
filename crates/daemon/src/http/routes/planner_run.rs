@@ -11,6 +11,7 @@ use axum::response::Response;
 use toknila_api_types::{PlannerState, StartPlanner, TerminalSize};
 use toknila_app::planner;
 use toknila_app::resolve;
+use toknila_core::instructions::Epic;
 use toknila_core::{Actor, AgentProfile, AgentRole, PlannerSpec, Project, planner as rules};
 
 use super::{ApiResult, scrollback_response};
@@ -82,6 +83,24 @@ pub async fn start_planner(
         state.store.shipyard()
     };
     let designs = Designs::new(&state.home, p.id);
+    // The project's chains as epics: the planner plans toward each one's goal.
+    let project_id = p.id;
+    let epics = super::read(&state, move |repo| {
+        let mut out = Vec::new();
+        for c in repo.chains(Some(project_id))? {
+            let version = match repo.chain_view(c.id)? {
+                Some(v) => v.version(),
+                None => c.version.clone(),
+            };
+            out.push(Epic {
+                chain: c.name,
+                version,
+                goal: c.goal,
+            });
+        }
+        Ok(out)
+    })
+    .await?;
     let started = {
         let p = p.clone();
         tokio::task::spawn_blocking(move || {
@@ -90,7 +109,7 @@ pub async fn start_planner(
                 .and_then(|yard| PlannerSpec::for_project(&p).map(|spec| yard.planner_site(&spec)));
             // The design files it is told to look at first and may read.
             let files = designs.file_paths();
-            planner::start_with(&*runners, Actor::Human, &p, &profile, site, files)
+            planner::start_with(&*runners, Actor::Human, &p, &profile, site, files, epics)
         })
         .await??
     };

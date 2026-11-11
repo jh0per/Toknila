@@ -777,6 +777,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/next-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The version a new chain of the project suggests: the next patch of the repository's newest
+         *     tag, or `0.1.0` when it has none or the project has no repository.
+         */
+        get: operations["next_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/planner": {
         parameters: {
             query?: never;
@@ -1746,6 +1766,11 @@ export interface components {
              *     for a chain made in Toknila or imported from pasted text.
              */
             source?: string | null;
+            /**
+             * @description The version the chain releases, such as `0.3.0`: the epic's release. Its end release
+             *     carries the same version; none for a chain that was made without one.
+             */
+            version?: string | null;
         };
         /**
          * @description Answer of `DELETE /v1/chains/{chain}`: the chain and its cards are gone; what became of the
@@ -1805,9 +1830,15 @@ export interface components {
              *     while it is on.
              */
             autostart?: boolean | null;
+            /** @description The epic's goal, markdown: what every card of the chain works toward. */
+            goal?: string | null;
+            /** @description The epic's name; unique in the project. */
+            name?: string | null;
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
             reviewer?: string | null;
+            /** @description The version the chain releases; refused once its release was cut. */
+            version?: string | null;
         };
         /**
          * @description Computed chain status (never stored). Proposed wildcard cards are not part of the plan: they
@@ -1819,6 +1850,7 @@ export interface components {
         ChainSummary: {
             /** @description Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`. */
             done: number;
+            finish?: components["schemas"]["Finish"] | null;
             finished_at?: components["schemas"]["Timestamp"] | null;
             next_release?: components["schemas"]["NextRelease"] | null;
             /** @description Finished, active, waiting, idle or empty. */
@@ -1833,6 +1865,8 @@ export interface components {
             stopped_at?: components["schemas"]["StoppedAt"] | null;
             /** @description Tickets in the plan: wildcard cards count only once approved. */
             total: number;
+            /** @description The chain's version (its end release's, else its own); none for a chain without one. */
+            version?: string | null;
         };
         /** @description One line of the system check. */
         Check: {
@@ -2049,6 +2083,21 @@ export interface components {
         FigmaToken: {
             token: string;
         };
+        /**
+         * @description The chain's end release as its Finish node shows it: `Release v0.3.0`, its state, and, once
+         *     released, the date and the tag.
+         */
+        Finish: {
+            released_at?: components["schemas"]["Timestamp"] | null;
+            state: components["schemas"]["FinishState"];
+            tag?: string | null;
+            version: string;
+        };
+        /**
+         * @description Where a chain's release stands: the Finish node's state.
+         * @enum {string}
+         */
+        FinishState: "planned" | "ready" | "released";
         /**
          * @description What became of a deleted project's repository folder.
          * @enum {string}
@@ -2339,6 +2388,8 @@ export interface components {
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile for the chain's tickets. */
             reviewer?: string | null;
+            /** @description The version the chain releases (`0.3.0`); its end release is made with it. Optional. */
+            version?: string | null;
         };
         /**
          * @description `POST /v1/tickets/{ticket}/comments`. Give `text` (first line is the gist, the rest becomes
@@ -3664,6 +3715,13 @@ export interface components {
          * @enum {string}
          */
         Verdict: "approve" | "request_changes";
+        /** @description Answer of `GET /v1/projects/{project}/next-version`: the version a new chain suggests. */
+        VersionSuggestion: {
+            /** @description The newest tag of the repository, if it has one. */
+            last_tag?: string | null;
+            /** @description The next patch of the newest tag, or `0.1.0` when the repository has none. */
+            version: string;
+        };
         /** @description Why a ticket is Waiting. */
         WaitingReason: {
             /** @enum {string} */
@@ -5683,6 +5741,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxItem"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    next_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionSuggestion"];
                 };
             };
             404: {

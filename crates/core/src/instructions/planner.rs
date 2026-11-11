@@ -14,6 +14,37 @@ pub struct ProjectFacts {
     pub check_command: Option<String>,
     /// Local mode: the base branch is behind its upstream.
     pub base_behind: Option<BaseBehind>,
+    /// The project's chains as epics: name, version and goal of each.
+    pub epics: Vec<Epic>,
+}
+
+/// A chain as the planner reads it: an epic with a goal and the version it releases.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Epic {
+    pub chain: String,
+    pub version: Option<String>,
+    pub goal: String,
+}
+
+/// The section that lists the project's epics with a goal; empty when none has one.
+fn epics_section(epics: &[Epic]) -> String {
+    let with_goal: Vec<&Epic> = epics.iter().filter(|e| !e.goal.trim().is_empty()).collect();
+    if with_goal.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        "\n\n## The epics\n\nEach chain is an epic: its goal is the purpose every card of the \
+         chain serves, so plan cards toward it and name nothing that leaves it. A chain's \
+         version is the release it ends in.",
+    );
+    for e in with_goal {
+        out.push_str(&format!("\n\n### {}", e.chain));
+        if let Some(v) = &e.version {
+            out.push_str(&format!(" (v{v})"));
+        }
+        out.push_str(&format!("\n\n{}", e.goal.trim()));
+    }
+    out
 }
 
 pub(super) const PLANNER_PROTOCOL: &str = "\
@@ -132,9 +163,10 @@ pub fn generate_planner(facts: &ProjectFacts) -> String {
          You are the planner of project {key} for Toknila. The repository's own `CLAUDE.md` and \
          `AGENTS.md` still apply and win where they differ; this file only adds how to work with \
          Toknila.\n\n\
-         ## The project\n\n{merge}\n\n{checks}{stale}\n\n{protocol}",
+         ## The project\n\n{merge}\n\n{checks}{stale}{epics}\n\n{protocol}",
         key = facts.key,
         name = facts.name,
+        epics = epics_section(&facts.epics),
         protocol = PLANNER_PROTOCOL,
     )
 }
@@ -153,7 +185,33 @@ mod tests {
             merge_method: MergeMethod::Merge,
             check_command: Some("cargo xtask verify".to_owned()),
             base_behind: None,
+            epics: vec![],
         }
+    }
+
+    #[test]
+    fn the_planner_reads_the_goal_of_each_epic_that_has_one() {
+        let text = generate_planner(&ProjectFacts {
+            epics: vec![
+                Epic {
+                    chain: "checkout".to_owned(),
+                    version: Some("0.3.0".to_owned()),
+                    goal: "Pay with saved cards.\n".to_owned(),
+                },
+                Epic {
+                    chain: "no-goal".to_owned(),
+                    version: None,
+                    goal: "  ".to_owned(),
+                },
+            ],
+            ..facts()
+        });
+        assert!(
+            text.contains("### checkout (v0.3.0)\n\nPay with saved cards.\n\n## Your role"),
+            "{text}"
+        );
+        assert!(!text.contains("no-goal"));
+        assert!(!generate_planner(&facts()).contains("## The epics"));
     }
 
     #[test]
@@ -248,6 +306,7 @@ mod tests {
             design_first: false,
             designs: &[],
             has_designs,
+            epic: None,
         }
     }
 

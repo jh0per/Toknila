@@ -390,6 +390,7 @@ mod tests {
             review_mode: None,
             reviewer: None,
             source: None,
+            version: None,
         };
         let ticket = Ticket::new_backlog(
             TicketId::new(),

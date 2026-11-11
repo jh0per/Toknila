@@ -195,7 +195,7 @@ fn settings_on_a_chain_and_a_project_are_kept_and_journaled() {
     let settings = ChainSettings {
         review_mode: Some(ReviewMode::Both),
         reviewer: Some(" qa ".to_owned()),
-        autostart: None,
+        ..ChainSettings::default()
     };
     chains::set_settings(&mut mem, "demo", None, settings).expect("chain");
     assert_eq!(mem.view.chain.review_mode, Some(ReviewMode::Both));

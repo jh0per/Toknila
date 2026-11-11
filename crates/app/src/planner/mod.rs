@@ -104,6 +104,7 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
         autostart: Some(planner::NEW_CHAIN_AUTOSTART),
         review_mode: None,
         reviewer: None,
+        version: None,
     };
     chains::create(uow, &project.to_string(), input)
 }
@@ -183,6 +184,7 @@ fn facts(p: &Project, behind: Option<BaseBehind>) -> ProjectFacts {
         merge_method: p.merge.method,
         check_command: p.check_command.clone(),
         base_behind: behind,
+        epics: Vec::new(),
     }
 }
 

@@ -31,7 +31,9 @@ pub use planner::{PlannerState, StartPlanner};
 pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedChain};
 pub use profiles::ProfileList;
 pub use questions::{NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
-pub use release_run::{ReleaseOffer, ReleaseRun, RunState, RunStep, StartRelease, StepState};
+pub use release_run::{
+    ReleaseOffer, ReleaseRun, RunState, RunStep, StartRelease, StepState, VersionSuggestion,
+};
 pub use removal::{ChainDeletion, DeleteProject, ProjectDeletion};
 pub use runner::TerminalSize;
 pub use strays::{Strays, StraysCleaned};

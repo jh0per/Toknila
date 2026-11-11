@@ -211,6 +211,7 @@ mod tests {
             review_mode: None,
             reviewer: None,
             source: None,
+            version: None,
         };
         let draft = TicketDraft {
             title: "Add login: OAuth".into(),
