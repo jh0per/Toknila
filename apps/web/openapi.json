@@ -8150,6 +8150,25 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "The check command could not start on this machine (its program was not found), so the\nagent's work was never judged. A person decides: accept, return, or fix the machine.",
+            "required": [
+              "command",
+              "note"
+            ],
+            "properties": {
+              "command": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string",
+                "enum": [
+                  "check_cannot_run"
+                ]
+              }
+            }
           }
         ],
         "description": "Why a card waits for a person in Review beyond the ordinary hand-in; shown in the inbox."

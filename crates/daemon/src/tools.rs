@@ -212,6 +212,8 @@ pub fn system_checks_for(tools: &dyn Tools, commands: &[String], home: &Path) ->
         &home_text,
         &git(tools, &home_text, &["rev-parse", "--is-inside-work-tree"]),
     ));
+    // The check command runs with the daemon's own `PATH`, which `adopt_agent_path` extended at
+    // start, the same folders the agents get; so judging it on them tells what the check will do.
     let dirs = crate::agent_path::agent_dirs();
     let verdicts: Vec<_> = commands
         .iter()

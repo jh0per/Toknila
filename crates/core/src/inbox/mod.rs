@@ -225,6 +225,11 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
         NO_VERDICT_TEXT.clone_into(&mut i.text);
         i.lines.clone_from(lines);
     }
+    if kind == InboxKind::Review
+        && let Some(ReviewNote::CheckCannotRun { command }) = &t.review.note
+    {
+        i.text = crate::toolpath::cannot_run_text(command);
+    }
     if kind == InboxKind::Question {
         i.role = Some(AgentRole::Worker);
         i.answers = match &t.status_reason {

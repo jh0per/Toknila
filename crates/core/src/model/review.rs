@@ -183,6 +183,9 @@ pub enum ReviewNote {
     /// Pull-request mode: the host reported no check on the pull request for the project's
     /// timeout. A person decides: merge now, keep waiting, or block.
     NoChecks,
+    /// The check command could not start on this machine (its program was not found), so the
+    /// agent's work was never judged. A person decides: accept, return, or fix the machine.
+    CheckCannotRun { command: String },
 }
 
 /// A ticket's review state: whose turn it is while in Review, and every round so far.

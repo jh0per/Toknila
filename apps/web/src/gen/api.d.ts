@@ -2719,6 +2719,10 @@ export interface components {
         } | {
             /** @enum {string} */
             note: "no_checks";
+        } | {
+            command: string;
+            /** @enum {string} */
+            note: "check_cannot_run";
         };
         /**
          * @description One verdict on a ticket. Numbers count from 1 over every verdict, a person's and the

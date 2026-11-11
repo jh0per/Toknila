@@ -63,6 +63,9 @@ pub enum TicketEvent {
     /// Host: the check could not run at all (no shell, no ship, the daemon restarted). A person
     /// decides.
     CheckLost { detail: String },
+    /// Host: the check command ran but its program was not found (`toolpath::command_not_found`).
+    /// That is the machine's fault, not the worker's: no round, no return; a person decides.
+    CheckCannotRun { command: String },
     /// Agent crash, runner loss, dependency reopened, merge conflict, or `tok block`.
     Block { reason: BlockedReason },
     /// `tok unblock`.
@@ -149,6 +152,7 @@ impl TicketEvent {
             Self::Finished { .. } => "finished",
             Self::CheckDone { .. } => "check_done",
             Self::CheckLost { .. } => "check_lost",
+            Self::CheckCannotRun { .. } => "check_cannot_run",
             Self::Block { .. } => "block",
             Self::Unblock => "unblock",
             Self::FastForwardStart => "fast_forward_start",
