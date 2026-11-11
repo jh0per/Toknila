@@ -20,7 +20,8 @@ pub struct Design {
     pub figma: Option<FigmaRef>,
     /// Whether a file is kept, served at `.../designs/{id}/file`.
     pub has_file: bool,
-    /// Whether the file can be shown as a picture (everything kept but a pdf).
+    /// Whether a picture of the design is served at `.../designs/{id}/thumb`: the image itself,
+    /// or the first page of a pdf when the machine could draw it.
     pub thumb: bool,
     /// What the person can do about a link without an image: export the frame, or why the fetch
     /// failed. Never holds the token.

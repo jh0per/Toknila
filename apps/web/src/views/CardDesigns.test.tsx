@@ -85,9 +85,11 @@ describe("the design picker", () => {
 });
 
 describe("the thumbnail on a card of the diagram", () => {
-  it("is the first design's file with its region, and counts the others", () => {
+  it("is the first design's picture with its region, and counts the others", () => {
     const html = renderToStaticMarkup(<NodeThumb project="DEMO" designs={[{ design: "a", region }, { design: "b" }, { design: "c" }]} />);
-    expect(html).toContain("/v1/projects/DEMO/designs/a/file?token=");
+    // The picture, not the file: a pdf's picture is its first page.
+    expect(html).toContain("/v1/projects/DEMO/designs/a/thumb?token=");
+    expect(html).not.toContain("/designs/a/file");
     expect(html).toContain("left:20%");
     expect(html).toContain("+2");
   });

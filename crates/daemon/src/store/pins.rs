@@ -81,6 +81,13 @@ impl Repo<'_> {
         Ok(())
     }
 
+    /// Forgets a pin.
+    pub fn delete_design_pin(&self, id: PinId) -> Result<(), StoreError> {
+        self.conn
+            .execute("DELETE FROM design_pins WHERE id = ?1", [id.to_string()])?;
+        Ok(())
+    }
+
     /// The pins of a project, oldest first.
     pub fn design_pins(&self, project: ProjectId) -> Result<Vec<DesignPin>, StoreError> {
         let mut st = self.conn.prepare(&format!(

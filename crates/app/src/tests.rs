@@ -20,6 +20,7 @@ use crate::{
 
 mod checks;
 mod deletion;
+mod design_use;
 mod discussion;
 mod epic;
 mod import_done;
@@ -356,6 +357,10 @@ impl UnitOfWork for Mem {
     fn upsert_design_pin(&mut self, pin: &toknila_core::design::pin::DesignPin) -> AppResult<()> {
         self.pins.retain(|p| p.id != pin.id);
         self.pins.push(pin.clone());
+        Ok(())
+    }
+    fn delete_design_pin(&mut self, id: toknila_core::PinId) -> AppResult<()> {
+        self.pins.retain(|p| p.id != id);
         Ok(())
     }
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()> {

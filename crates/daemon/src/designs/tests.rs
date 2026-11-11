@@ -119,3 +119,71 @@ fn delete_all_takes_designs_and_token() {
     assert!(s.list().expect("list").is_empty());
     assert!(!s.has_token());
 }
+
+#[test]
+fn a_pdf_gets_a_thumbnail_only_when_the_renderer_draws_a_picture() {
+    use super::thumb::{FixedRenderer, NoRenderer};
+    let dir = tempfile::tempdir().expect("dir");
+    let s = store(dir.path());
+    let pdf = s
+        .add_file("flow.pdf", b"%PDF-1.4 x", Timestamp(0))
+        .expect("pdf");
+    assert!(!pdf.thumb);
+    // No renderer on the machine: nothing changes, nothing is left on the disk.
+    assert!(!s.make_thumb(pdf.id, &NoRenderer).expect("none").thumb);
+    assert!(s.read_thumb(pdf.id).is_err());
+    // Something that is no picture is not kept either.
+    assert!(
+        !s.make_thumb(pdf.id, &FixedRenderer(b"junk".to_vec()))
+            .expect("junk")
+            .thumb
+    );
+    assert!(!s.thumb_path(pdf.id).exists());
+
+    let made = s
+        .make_thumb(pdf.id, &FixedRenderer(PNG.to_vec()))
+        .expect("drawn");
+    assert!(made.thumb);
+    let (bytes, mime) = s.read_thumb(pdf.id).expect("thumb");
+    assert_eq!((bytes.as_slice(), mime.as_str()), (PNG, "image/png"));
+    s.remove(pdf.id).expect("remove");
+    assert!(!s.thumb_path(pdf.id).exists());
+    // An image is its own picture; a design that is no pdf is left alone.
+    let png = s.add_file("a.png", PNG, Timestamp(0)).expect("png");
+    assert_eq!(s.make_thumb(png.id, &NoRenderer).expect("image"), png);
+    assert_eq!(s.read_thumb(png.id).expect("own").0, PNG);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_renderer_that_hangs_is_killed_with_what_it_started() {
+    use super::thumb::run_within;
+    use std::time::{Duration, Instant};
+    let dir = tempfile::tempdir().expect("dir");
+    let mark = dir.path().join("alive");
+    // A shell that starts a sleeper and would touch the mark after it, if it were let live.
+    let script = format!("sleep 30 & wait; touch \"{}\"", mark.display());
+    let started = Instant::now();
+    let ok = run_within(
+        "sh",
+        &["-c".into(), script.into()],
+        Duration::from_millis(300),
+    );
+    assert!(!ok);
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "it was not killed"
+    );
+    assert!(!mark.exists());
+    // Control: a program that succeeds is reported as success.
+    assert!(run_within(
+        "sh",
+        &["-c".into(), "exit 0".into()],
+        Duration::from_secs(5)
+    ));
+    assert!(!run_within(
+        "sh",
+        &["-c".into(), "exit 3".into()],
+        Duration::from_secs(5)
+    ));
+}

@@ -672,7 +672,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Removes a design and its file. */
+        /**
+         * Removes a design and its file. A design that cards or open pins still use is refused with 409
+         *     (`used_by` names them) unless `force=true`: then the references and the open pins go in the
+         *     same transaction and each card gets a system comment saying which design went.
+         */
         delete: operations["delete_design"];
         options?: never;
         head?: never;
@@ -704,11 +708,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * The kept file as it was stored, with its media type. It serves as the thumbnail too: the page
-         *     scales it.
-         */
+        /** The kept file as it was stored, with its media type. */
         get: operations["design_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/designs/{design}/thumb": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The picture of a design: the image itself, or the first page of a pdf when one was made;
+         *     404 for a design without a picture.
+         */
+        get: operations["design_thumb"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2101,7 +2122,10 @@ export interface components {
              * @description Bytes of the kept file; zero without one.
              */
             size: number;
-            /** @description Whether the file can be shown as a picture (everything kept but a pdf). */
+            /**
+             * @description Whether a picture of the design is served at `.../designs/{id}/thumb`: the image itself,
+             *     or the first page of a pdf when the machine could draw it.
+             */
             thumb: boolean;
         };
         /** @description Identifies a design of a project. */
@@ -2157,6 +2181,16 @@ export interface components {
             design: components["schemas"]["DesignId"];
             region?: components["schemas"]["Region"] | null;
         };
+        /** @description What still uses a design. */
+        DesignUse: {
+            /** @description The cards that reference the design, in chain order. */
+            cards: components["schemas"]["TicketKey"][];
+            /**
+             * Format: int32
+             * @description How many open pins are on the design.
+             */
+            pins: number;
+        };
         /** @description Dependency edge: `to` cannot start before `from` is done. */
         Edge: {
             chain_id: components["schemas"]["ChainId"];
@@ -2195,6 +2229,7 @@ export interface components {
              *     is about one field; a form shows the message next to that field.
              */
             field?: string | null;
+            used_by?: components["schemas"]["DesignUse"] | null;
         };
         /** @description One journal entry. `seq` is increasing; clients resume from it. */
         EventRecord: {
@@ -2362,7 +2397,7 @@ export interface components {
              *     `ask_human` question, which a comment answers).
              */
             answers?: components["schemas"]["AnswerKind"][];
-            chain: components["schemas"]["ChainId"];
+            chain?: components["schemas"]["ChainId"] | null;
             /** @description The name of the design a pin is about (`design_question` items). */
             design?: string | null;
             /**
@@ -2386,6 +2421,7 @@ export interface components {
             link?: string | null;
             /** @description The pin to answer (`design_question` items). */
             pin?: string | null;
+            project?: components["schemas"]["ProjectId"] | null;
             role?: components["schemas"]["AgentRole"] | null;
             /** @description Since when it waits; items are sorted by this, newest first. */
             since: components["schemas"]["Timestamp"];
@@ -2398,16 +2434,15 @@ export interface components {
              * @description The thread's number on the card (`thread` items).
              */
             thread?: number | null;
-            /** @description The card to open and act on; for `leftovers` the earlier card that holds the subtasks. */
-            ticket: components["schemas"]["TicketKey"];
-            /** @description The card's title. */
+            ticket?: components["schemas"]["TicketKey"] | null;
+            /** @description The card's title; the design's name for a `pin`. */
             title: string;
         };
         /**
          * @description What kind of thing waits on the person; the order is the order clients group them in.
          * @enum {string}
          */
-        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers" | "design_question";
+        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers" | "design_question" | "pin";
         /**
          * @description Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
          *     worked, now handed over and marked delivered.
@@ -5712,6 +5747,14 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
         };
     };
     rename_design: {
@@ -5799,6 +5842,38 @@ export interface operations {
         };
     };
     design_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+                /** @description Design id */
+                design: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": number[];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    design_thumb: {
         parameters: {
             query?: never;
             header?: never;

@@ -23,12 +23,16 @@ export type Pos = Schemas["Pos"];
 export type Size = Schemas["Size"];
 export type InboxItem = Schemas["InboxItem"];
 export type InboxHandIn = Schemas["InboxHandIn"];
+/// An inbox item about a card: every kind but `pin`, which no card owns.
+export type CardItem = InboxItem & { ticket: string; chain: string };
+export const isCardItem = (i: InboxItem): i is CardItem => Boolean(i.ticket && i.chain);
 export type Suggestion = Schemas["Suggestion"];
 export type InboxKind = Schemas["InboxKind"];
 export type AnswerKind = Schemas["AnswerKind"];
 export type AgentRole = Schemas["AgentRole"];
 export type Actor = Schemas["Actor"];
 export type ErrorBody = Schemas["ErrorBody"];
+export type DesignUse = Schemas["DesignUse"];
 
 /// A journal entry; its payload is one domain event, read field by field where needed.
 export type EventRecord = Omit<Schemas["EventRecord"], "payload"> & { payload: unknown };

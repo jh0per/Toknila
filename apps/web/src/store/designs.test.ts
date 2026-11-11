@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Design } from "../api/types";
 import {
   dayText, designOf, dragRegion, fileUrl, kindLabel, looksLikeDesign, placeholder, refusedFiles, regionStyle, regionText,
-  sizeText, stepZoom, withRef,
+  isImage, sizeText, stepZoom, thumbUrl, usedText, withRef,
 } from "./designs";
 
 const design = (over: Partial<Design>): Design => ({
@@ -80,6 +80,22 @@ describe("card design references", () => {
     const list = [a];
     withRef(list, 0, undefined);
     expect(list).toEqual([a]);
+  });
+
+  it("asks what still uses a design in the words of the window", () => {
+    expect(usedText({ cards: ["TOKNILA-12", "TOKNILA-14"], pins: 2 })).toBe("Used by TOKNILA-12, TOKNILA-14 and 2 pins. Remove anyway?");
+    expect(usedText({ cards: ["TOKNILA-12"], pins: 0 })).toBe("Used by TOKNILA-12. Remove anyway?");
+    expect(usedText({ cards: [], pins: 1 })).toBe("Used by 1 pin. Remove anyway?");
+    expect(usedText({ cards: ["A-1"], pins: 1 })).toBe("Used by A-1 and 1 pin. Remove anyway?");
+  });
+
+  it("serves the picture of an image and of a pdf's first page from the thumb address", () => {
+    const pdf = design({ kind: "pdf", mime: "application/pdf", thumb: true });
+    expect(thumbUrl("DEMO", pdf, "t k")).toBe(`/v1/projects/DEMO/designs/${pdf.id}/thumb?token=t%20k`);
+    // A pdf's first page is a thumbnail only: the page shows the pdf itself large.
+    expect(isImage(pdf)).toBe(false);
+    expect(isImage(design({}))).toBe(true);
+    expect(isImage(design({ kind: "pdf", thumb: false }))).toBe(false);
   });
 
   it("finds the design of a reference, and none when the library lost it", () => {

@@ -42,6 +42,8 @@ describe("which designs the board shows", () => {
   it("only a kept file that can be a picture is drawn as one", () => {
     expect(isPicture(design("A"))).toBe(true);
     expect(isPicture(design("P", { kind: "pdf", thumb: false }))).toBe(false);
+    // A pdf whose first page was drawn is a picture on the board.
+    expect(isPicture(design("P", { kind: "pdf", thumb: true }))).toBe(true);
     expect(isPicture(design("F", { kind: "figma", thumb: false, has_file: false }))).toBe(false);
     expect(isPicture(undefined)).toBe(false);
   });

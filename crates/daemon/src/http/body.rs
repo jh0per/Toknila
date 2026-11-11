@@ -134,6 +134,7 @@ impl IntoResponse for BodyRejection {
             code: "bad_request".to_owned(),
             error: message,
             field: None,
+            used_by: None,
         };
         (status, axum::Json(body)).into_response()
     }

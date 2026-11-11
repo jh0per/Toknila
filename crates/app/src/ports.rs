@@ -105,6 +105,8 @@ pub trait UnitOfWork: Reader {
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()>;
     /// Inserts a pin, or sets its answer.
     fn upsert_design_pin(&mut self, pin: &DesignPin) -> AppResult<()>;
+    /// Forgets a pin.
+    fn delete_design_pin(&mut self, id: PinId) -> AppResult<()>;
     /// Keeps the suggestion as the project's, replacing the one it had.
     fn save_suggestion(&mut self, project: ProjectId, s: &Suggestion) -> AppResult<()>;
     /// Forgets a ticket's ship.

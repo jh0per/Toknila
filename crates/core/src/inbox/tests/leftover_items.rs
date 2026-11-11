@@ -44,7 +44,10 @@ fn an_earlier_card_with_open_subtasks_is_one_item_naming_the_done_cards() {
     assert_eq!(got.len(), 1);
     let i = &got[0];
     assert_eq!(i.kind, InboxKind::Leftovers);
-    assert_eq!(i.ticket.to_string(), "DEMO-1");
+    assert_eq!(
+        i.ticket.as_ref().map(ToString::to_string).as_deref(),
+        Some("DEMO-1")
+    );
     assert_eq!(i.subtasks, ["T002 wire it", "T003 test it"]);
     let done: Vec<_> = i.done_cards.iter().map(ToString::to_string).collect();
     assert_eq!(done, ["DEMO-2", "DEMO-3"]);

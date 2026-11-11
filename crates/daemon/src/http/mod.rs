@@ -49,6 +49,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(add_figma_design))
         .routes(routes!(fetch_design))
         .routes(routes!(design_file))
+        .routes(routes!(design_thumb))
         .routes(routes!(rename_design, delete_design))
         .routes(routes!(put_figma_token, delete_figma_token))
         .routes(routes!(list_pins))

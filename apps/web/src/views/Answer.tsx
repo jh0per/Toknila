@@ -13,10 +13,12 @@ const ANSWER_LABEL: Record<AnswerKind, string> = {
 export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Intent) => void }) {
   const [text, setText] = useState("");
   const [comment, setComment] = useState("");
+  // Only a card's items are answered here; a pin has its own box.
+  const ticket = item.ticket ?? "";
   const role = item.role ?? "worker";
   const answers = item.answers ?? [];
   const send = (answer: AnswerKind, body?: string, always?: boolean) =>
-    dispatch({ type: "answer", key: item.ticket, role, answer, text: body?.trim() || undefined, always });
+    dispatch({ type: "answer", key: ticket, role, answer, text: body?.trim() || undefined, always });
   const keys = answers.filter((a) => a !== "text" && a !== "allow" && a !== "deny");
   const reply = answers.includes("text") ? "screen" : role === "worker" ? "comment" : undefined;
   return (
@@ -43,7 +45,7 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
               Allow always
             </button>
           )}
-          <input aria-label={`Why ${item.ticket} is denied`} placeholder="Comment for a denial (optional)" value={comment} onChange={(e) => setComment(e.target.value)} />
+          <input aria-label={`Why ${ticket} is denied`} placeholder="Comment for a denial (optional)" value={comment} onChange={(e) => setComment(e.target.value)} />
           <button className="btn danger" data-testid="answer-deny" onClick={() => send("deny", comment)}>Deny</button>
         </div>
       )}
@@ -65,7 +67,7 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
             setText("");
           }}
         >
-          <input aria-label={`Type to ${item.ticket}`} placeholder="Type to the agent's screen" value={text} onChange={(e) => setText(e.target.value)} />
+          <input aria-label={`Type to ${ticket}`} placeholder="Type to the agent's screen" value={text} onChange={(e) => setText(e.target.value)} />
           <button className="btn primary" type="submit" disabled={!text.trim()}>Send</button>
         </form>
       ) : reply === "comment" ? (
@@ -74,11 +76,11 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
           onSubmit={(e) => {
             e.preventDefault();
             if (!text.trim()) return;
-            dispatch({ type: "addComment", key: item.ticket, kind: "instruction", text: text.trim() });
+            dispatch({ type: "addComment", key: ticket, kind: "instruction", text: text.trim() });
             setText("");
           }}
         >
-          <textarea aria-label={`Reply to ${item.ticket}`} placeholder="Answer the agent" value={text} onChange={(e) => setText(e.target.value)} />
+          <textarea aria-label={`Reply to ${ticket}`} placeholder="Answer the agent" value={text} onChange={(e) => setText(e.target.value)} />
           <button className="btn primary" type="submit" disabled={!text.trim()}>Reply</button>
         </form>
       ) : null}

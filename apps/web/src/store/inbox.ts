@@ -6,7 +6,7 @@ import type { Route } from "./route";
 import type { State } from "./state";
 
 /// Display order of the groups, the order of the kinds in core.
-export const KIND_ORDER: InboxKind[] = ["proposal", "question", "blocked", "review", "thread", "leftovers", "design_question"];
+export const KIND_ORDER: InboxKind[] = ["proposal", "question", "blocked", "review", "thread", "leftovers", "design_question", "pin"];
 
 export const KIND_TITLE: Record<InboxKind, string> = {
   proposal: "Awaiting approval",
@@ -16,6 +16,7 @@ export const KIND_TITLE: Record<InboxKind, string> = {
   thread: "Threads to answer",
   leftovers: "Leftovers",
   design_question: "Questions of the assistant",
+  pin: "Questions of the assistant about a design",
 };
 
 export interface InboxGroup {
@@ -32,11 +33,12 @@ export function groupInbox(items: InboxItem[]): InboxGroup[] {
 
 /// A key that tells two items apart (a card may have several threads).
 export function itemKey(i: InboxItem): string {
-  return `${i.kind}:${i.ticket}:${i.thread ?? ""}${i.pin ?? ""}`;
+  return `${i.kind}:${i.ticket ?? ""}:${i.thread ?? ""}${i.pin ?? ""}`;
 }
 
-/// The route of the item's card, if the page knows its chain.
+/// The route of the item's card, if it has one and the page knows its chain.
 export function itemRoute(s: State, i: InboxItem): Route | undefined {
+  if (!i.ticket || !i.chain) return undefined;
   const chain = s.chains[i.chain];
   if (!chain) return undefined;
   const project = s.projects.find((p) => p.id === chain.chain.project_id);

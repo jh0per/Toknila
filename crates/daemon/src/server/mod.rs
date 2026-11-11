@@ -44,6 +44,8 @@ pub struct AppState {
     pub ships: PathBuf,
     /// Where a deleted project's folder goes when the person asks (`SystemTrash`; tests a fake).
     pub trash: Arc<dyn crate::trash::Trasher>,
+    /// Draws the first page of an uploaded pdf (`SystemRenderer`; tests a fake).
+    pub pdf_renderer: Arc<dyn crate::designs::thumb::PdfRenderer>,
 }
 
 #[cfg(test)]
@@ -62,6 +64,7 @@ impl AppState {
             home: home.to_owned(),
             ships: home.join("ships"),
             trash: Arc::new(crate::trash::NoTrash),
+            pdf_renderer: Arc::new(crate::designs::thumb::NoRenderer),
         }
     }
 }

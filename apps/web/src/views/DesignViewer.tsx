@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Design } from "../api/types";
 import { token } from "../api/http";
-import { fileUrl, kindLabel, placeholder } from "../store/designs";
+import { fileUrl, isImage, kindLabel, placeholder } from "../store/designs";
 import type { Pin } from "../store/pins";
 import { Modal } from "./Modal";
 import { PinList, PinMarkers } from "./PinOverlay";
@@ -27,7 +27,7 @@ export function DesignViewer({ project, design: d, onClose, pins = [], onAnswer 
       <section className="card-block design-large">
         <h2>{d.name}</h2>
         <p className="muted">{kindLabel(d)}</p>
-        {d.thumb && (
+        {isImage(d) && (
           <div className="mockup-stage" data-testid="design-stage">
             <img src={url} alt={d.name} data-testid="design-large" />
             <PinMarkers pins={pins} active={active} onSelect={select} />

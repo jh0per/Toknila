@@ -1,11 +1,17 @@
 // The designs routes whose bodies are not JSON, or whose answers are empty.
 
 import { Refusal, token } from "./http";
-import type { Design } from "./types";
+import type { Design, ErrorBody } from "./types";
 
 async function refused(r: Response): Promise<Refusal> {
-  const body = (await r.json().catch(() => ({}))) as { error?: string; code?: string; field?: string };
-  return new Refusal(body.error ?? `${r.status} ${r.statusText}`, body.code ?? "", body.field);
+  const body = (await r.json().catch(() => ({}))) as Partial<ErrorBody>;
+  return new Refusal(body.error ?? `${r.status} ${r.statusText}`, body.code ?? "", body.field ?? undefined, body.used_by ?? undefined);
+}
+
+/// Removes a design. A design that cards or pins still use is refused (409, a `Refusal` whose
+/// `usedBy` names them) unless `force` asks to remove it anyway.
+export async function removeDesign(project: string, design: string, force: boolean): Promise<void> {
+  await sendEmpty("DELETE", `/projects/${encodeURIComponent(project)}/designs/${design}${force ? "?force=true" : ""}`);
 }
 
 const headers = (type?: string): HeadersInit => ({

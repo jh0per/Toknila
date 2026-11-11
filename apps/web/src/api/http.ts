@@ -1,6 +1,6 @@
 // The page's only network code: authenticated requests and the stream addresses.
 
-import type { ErrorBody } from "./types";
+import type { DesignUse, ErrorBody } from "./types";
 
 /// The token comes from the address `tok open` prints: /?token=...
 export function token(): string {
@@ -11,14 +11,20 @@ const auth = () => ({ Authorization: `Bearer ${token()}` });
 
 /// A refused request: the daemon's message, and the input it is about when it names one.
 export class Refusal extends Error {
-  constructor(message: string, readonly code: string, readonly field: string | undefined) {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly field: string | undefined,
+    /// Who uses the design a refused delete names (409).
+    readonly usedBy?: DesignUse,
+  ) {
     super(message);
   }
 }
 
 async function refusal(r: Response): Promise<Refusal> {
   const body = (await r.json().catch(() => ({}))) as Partial<ErrorBody>;
-  return new Refusal(body.error ?? `${r.status} ${r.statusText}`, body.code ?? "", body.field ?? undefined);
+  return new Refusal(body.error ?? `${r.status} ${r.statusText}`, body.code ?? "", body.field ?? undefined, body.used_by ?? undefined);
 }
 
 /// A setting: PUT a JSON body, answer with the daemon's reply.

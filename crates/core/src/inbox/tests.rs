@@ -84,9 +84,9 @@ fn a_wildcard_card_awaiting_approval_is_a_proposal() {
     let i = &got[0];
     assert_eq!(
         (i.kind, &i.ticket, i.since),
-        (InboxKind::Proposal, &t.key, Timestamp(10))
+        (InboxKind::Proposal, &Some(t.key.clone()), Timestamp(10))
     );
-    assert_eq!((i.title.as_str(), i.chain), ("card 1", t.chain_id));
+    assert_eq!((i.title.as_str(), i.chain), ("card 1", Some(t.chain_id)));
 }
 
 #[test]
@@ -233,7 +233,10 @@ fn a_card_in_other_states_is_not_listed() {
     let got = items(all);
     assert_eq!(got.len(), 1);
     assert_eq!(
-        (got[0].kind, got[0].ticket.to_string()),
+        (
+            got[0].kind,
+            got[0].ticket.clone().expect("card").to_string()
+        ),
         (InboxKind::Review, "DEMO-1".to_owned())
     );
 }
@@ -321,7 +324,7 @@ fn items_come_newest_first_and_ties_follow_the_key() {
     let c = ticket(3, TicketStatus::Review, 30);
     let keys: Vec<_> = items(vec![a, b, c])
         .iter()
-        .map(|i| i.ticket.to_string())
+        .map(|i| i.ticket.clone().expect("card").to_string())
         .collect();
     assert_eq!(keys, ["DEMO-2", "DEMO-3", "DEMO-1"]);
 }
@@ -354,7 +357,7 @@ fn a_blocked_card_with_a_pull_request_carries_its_link_and_other_cards_do_not() 
     let got = items(vec![failed, running]);
     let link = |key: &str| {
         got.iter()
-            .find(|i| i.ticket.to_string() == key)
+            .find(|i| i.ticket.as_ref().is_some_and(|t| t.to_string() == key))
             .map(|i| i.link.clone())
     };
     assert_eq!(link("DEMO-1"), Some(Some(pr.url)));

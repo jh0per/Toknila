@@ -109,6 +109,7 @@ impl Rig {
             home: tmp.path().to_owned(),
             ships: tmp.path().join("ships"),
             trash: Arc::new(toknila_daemon::trash::NoTrash),
+            pdf_renderer: Arc::new(toknila_daemon::designs::thumb::NoRenderer),
         });
         let rig = Rig {
             _tmp: tmp,

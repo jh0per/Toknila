@@ -104,6 +104,7 @@ fn app_for(store: &Store, home: &Path) -> axum::Router {
         home: home.to_owned(),
         ships: home.join("ships"),
         trash: Arc::new(toknila_daemon::trash::NoTrash),
+        pdf_renderer: Arc::new(toknila_daemon::designs::thumb::NoRenderer),
     })
 }
 

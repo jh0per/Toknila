@@ -27,7 +27,7 @@ fn items(mem: &Mem) -> Vec<(InboxKind, String)> {
     inbox::load(mem, mem.project.id)
         .expect("inbox")
         .into_iter()
-        .map(|i| (i.kind, i.ticket.to_string()))
+        .map(|i| (i.kind, i.ticket.clone().expect("card").to_string()))
         .collect()
 }
 

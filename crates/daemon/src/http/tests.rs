@@ -18,6 +18,7 @@ mod chain_settings;
 mod chain_version;
 mod commands;
 mod design;
+mod design_delete;
 mod designs;
 mod discussion;
 mod hand_in_only;
@@ -53,6 +54,8 @@ struct Api {
     runners: Arc<crate::runner::Runners>,
     /// What this daemon moved to the Trash: folders land in `trash` of the test's folder.
     trash: Arc<FakeTrash>,
+    /// The png the fake pdf renderer draws; `None`: the machine has no renderer.
+    pdf_page: crate::designs::thumb::Page,
 }
 
 /// A Trash that moves a folder into a folder of the test's own and remembers it.
@@ -112,6 +115,7 @@ impl Api {
             bin: dir.path().join("trash"),
             moved: Default::default(),
         });
+        let pdf_page = crate::designs::thumb::Page::default();
         let state = AppState {
             store: store.clone(),
             token: TOKEN.into(),
@@ -130,6 +134,7 @@ impl Api {
             home: dir.path().to_owned(),
             ships: dir.path().join("ships"),
             trash: trash.clone(),
+            pdf_renderer: Arc::new(crate::designs::thumb::SwitchRenderer(pdf_page.clone())),
         };
         Self {
             _dir: dir,
@@ -137,6 +142,7 @@ impl Api {
             store,
             runners,
             trash,
+            pdf_page,
         }
     }
 
@@ -995,6 +1001,7 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/designs/{design}",
             "/projects/{project}/designs/{design}/fetch",
             "/projects/{project}/designs/{design}/file",
+            "/projects/{project}/designs/{design}/thumb",
             "/projects/{project}/figma-token",
             "/projects/{project}/import",
             "/projects/{project}/import-path",

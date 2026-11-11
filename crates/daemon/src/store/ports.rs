@@ -121,6 +121,10 @@ impl UnitOfWork for WriteTx<'_> {
         Ok(self.repo().upsert_design_pin(pin)?)
     }
 
+    fn delete_design_pin(&mut self, id: PinId) -> AppResult<()> {
+        Ok(self.repo().delete_design_pin(id)?)
+    }
+
     fn upsert_thread(&mut self, thread: &Thread) -> AppResult<()> {
         Ok(self.repo().upsert_thread(thread)?)
     }

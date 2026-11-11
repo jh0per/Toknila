@@ -119,6 +119,7 @@ fn transport_error(e: ureq::Error) -> ClientError {
                 error: format!("HTTP {status}"),
                 code: String::new(),
                 field: None,
+                used_by: None,
             });
             ClientError::Api { status, body }
         }

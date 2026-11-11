@@ -44,6 +44,25 @@ export function fileUrl(project: string, d: Design, token: string): string {
   return `/v1/projects/${encodeURIComponent(project)}/designs/${d.id}/file?token=${encodeURIComponent(token)}`;
 }
 
+/// Where a design's picture is served: the image itself, or the first page of a pdf. Only a
+/// design with `thumb` has one.
+export function thumbUrl(project: string, d: Design, token: string): string {
+  return `/v1/projects/${encodeURIComponent(project)}/designs/${d.id}/thumb?token=${encodeURIComponent(token)}`;
+}
+
+/// Whether the design is an image the page can show large and mark regions on (a pdf's first page
+/// is only its thumbnail; the pdf itself is read in the page).
+export const isImage = (d: Design): boolean => d.thumb && d.kind !== "pdf";
+
+/// What the window asks before it removes a design that is still in use: `Used by TOKNILA-12,
+/// TOKNILA-14 and 2 pins. Remove anyway?`
+export function usedText(u: { cards: string[]; pins: number }): string {
+  const parts = [...u.cards];
+  if (u.pins > 0) parts.push(`${u.pins} ${u.pins === 1 ? "pin" : "pins"}`);
+  const used = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : (parts[0] ?? "nothing");
+  return `Used by ${used}. Remove anyway?`;
+}
+
 /// What a card shows in place of a picture: how to get one for a link, or a mark for a pdf.
 export function placeholder(d: Design): string {
   if (d.kind === "pdf") return "PDF";
