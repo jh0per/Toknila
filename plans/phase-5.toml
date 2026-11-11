@@ -1,0 +1,184 @@
+# Phase 5: the backlog. Everything the first six runs left behind (docs/runs/claude-code-e2e-4..6.md
+# and the orchestrator's notes) that the code does not do yet, checked item by item against main at
+# v0.2.11 on 2026-11-11. Each card names the files where the gap is today.
+# The owner's words (2026-11-11): "та весь беклог роби".
+# Import: in the window, Import on the TOKNILA project; or
+#         tok chain import plans/phase-5.toml --project TOKNILA
+#
+# The order is the priority. `after` names the cards whose files a card shares; cards without a
+# shared file run in parallel.
+
+[chain]
+name = "phase-5"
+goal = "Every gap the runs found is closed: two cards never fight over a migration number, a hook of work never answers a question, nothing lands that was not handed in, the review turn and the inbox say what is really happening, an empty thread never blocks a hand-in, the design library stays consistent, moves are atomic, a release survives a restart, permissions say what they allow, the assistant reads only the repository and its designs, cards keep their size honest, a merged card leaves nothing behind, a test daemon dies with its test, an unknown field is refused, the instructions carry the lessons, and talking to the assistant never hangs"
+autostart = false
+version = "0.2.12"
+
+[[ticket]]
+id = "named-migrations"
+title = "Migrations by name, never by number"
+prompt = "The store's migrations are positional: crates/daemon/src/store/schema.rs holds MIGRATIONS with `// N:` comments and crates/daemon/src/store/mod.rs derives SCHEMA_VERSION from its length, so two cards that each add a table fight over the next number at every merge (TOKNILA-42, 46, 49 and 43 did in phase 4). Replace the position with a name. Every migration has a unique name (a short slug; the card key is a safe choice), lives in its own file under crates/daemon/src/store/migrations/ collected into one list without editing a shared line, and a `schema_migrations` table records the names that ran, with the time. On start the daemon runs, in list order and each in its own transaction, the migrations whose names are not recorded; the first start on an existing store seeds the table from the old SCHEMA_VERSION (the N migrations that already ran are recorded by name, nothing is run twice); a duplicate name is a startup error naming both files. SCHEMA_VERSION goes away or becomes a count used nowhere for ordering. AGENTS.md gets a short bullet, Adding a migration: a new file, a unique name, never edit a released one. Covered by store tests: a fresh store runs them all; a fixture store at an old version is seeded and only the new ones run; a duplicate name fails; the order follows the list."
+acceptance = [
+  "A new migration is a new file with a unique name; two cards that each add one merge without a conflict and both run",
+  "An existing data home upgrades once: the migrations it already ran are recorded by name and never run again",
+  "AGENTS.md says how to add a migration; covered by store tests for the fresh, upgraded and duplicate cases",
+]
+
+[[ticket]]
+id = "hook-never-answers"
+title = "A hook of work never answers a question"
+prompt = "Hooks of work move a Waiting card back to Running when nothing was answered. Today `ticket_activity` in crates/daemon/src/http/routes/events.rs (about lines 95-185) decides, `nudge::resumes` in crates/core/src/nudge/mod.rs names the resuming hooks (post_tool_use, user_prompt_submit), `activity` in crates/app/src/agent.rs (about lines 226-240) skips the resume only for Waiting(Question) so a Waiting(Permission) card resumes on any hook, and the MCP events Started, SubtaskDone, Note and Finished (crates/app/src/agent.rs about lines 49-55) resume without looking. The rule to build: an open question is closed only by its answer; an open permission prompt is closed only by its answer in the window or by the post_tool_use hook of the very tool call that was prompted (a prompt answered at the terminal yields only that hook; `clears_prompt` in crates/core/src/hook.rs already matches it); every other hook or MCP event leaves a card waiting on a question or a permission where it is, though its activity still feeds the nudge signals. A `finished` while a question is open closes the question as overtaken by the hand-in, with a system comment, and goes on. Move the decision out of the route into core (a pure function, say `hook::react`, from status, waiting reason, signal and open prompt to a decision) and app (`agent::activity` applies it); the route becomes thin. Covered by a core table test (every signal against every waiting reason), an app test that a terminal-answered permission resumes while an unrelated post_tool_use does not, and a cli test with the fake agent for the MCP events."
+acceptance = [
+  "A card waiting on a question or a permission stays waiting through hooks of work and MCP events; only its answer, or for a permission the hook of the prompted call, resumes it",
+  "A hand-in with an open question closes the question as overtaken and goes on",
+  "The decision is one pure core function with a table test; the route only applies it",
+]
+
+[[ticket]]
+id = "handed-in-only"
+title = "Nothing lands that was not handed in"
+prompt = "Accept takes whatever the ship's HEAD is. `review.handed_in` (recorded in crates/app/src/agent.rs at the hand-in) is compared with HEAD only for a `finished` after a Return (crates/core/src/guard.rs). Build two things. First, Accept (crates/daemon/src/http/routes/tickets.rs around lines 171-196, where `guard_ship` already returns the seen head) refuses when the ship's HEAD carries commits that are neither the hand-in commit nor the daemon's own base-sync merge commits (the sync must record what it made), with a message naming the extra commits and the two ways out: return the card so the agent hands in again, or wait for a new hand-in; `tok accept` prints it and the Review card shows it. Second, a hand-in after a Return gets a Since the Return block: the daemon derives it from the returned HEAD to the new one (commit subjects and changed files, capped) and keeps it with the hand-in; the Review card (apps/web/src/views/HandIn.tsx) and `tok show` print it under the hand-in blocks, and the reviewer's kickoff names it so the reviewer reads what changed since the Return first. Covered by daemon tests (an extra commit refused, a sync merge accepted, the content of the block), a cli test and a web unit test of the block."
+acceptance = [
+  "Accept refuses a ship whose HEAD carries commits beyond the hand-in, naming them; the daemon's own base-sync merge is not an extra commit",
+  "A hand-in after a Return carries a Since the Return block in the Review card, in tok show and in the reviewer's kickoff",
+  "Covered by daemon, cli and web tests",
+]
+
+[[ticket]]
+id = "review-turn-phase"
+title = "The review turn says what it is doing"
+prompt = "During the Check turn the window says In review: bringing the ship up to main for the whole turn (apps/web/src/store/cardStatus.ts around lines 69-76), also while the check command runs for minutes; the daemon exposes only `awaiting = Check` and `check_queue` (crates/core/src/model/review.rs, crates/app/src/reviews.rs). A project with no check command still gets the fixed comment The check passed (crates/core/src/machine/review.rs around lines 84-89) so the round list reads Round 1: the check passed, The check passed (apps/web/src/store/review.ts). The lost-check comment The check could not run is recorded as the agent's (crates/app/src/chain.rs maps every RecordReport to Actor::Agent) and prints by agent. Build: the review state carries a check phase (queued n-th, syncing with main, running the check command with its start time) that the checker updates; cardStatus, the CLI status column (crates/cli/src/output.rs) and the Review card show it, for example Being checked: cargo xtask verify, 3 min; with no check command the round's comment and the round list read brought up to main; the project has no check command; the daemon's own comments (lost check, check output) have the system author, shown as Toknila in the window and by Toknila in tok show. Covered by core tests of the phase transitions, a web unit test of the texts and a cli output test."
+acceptance = [
+  "The window and tok ls say whether a card in the Check turn is queued, syncing with main or running the check command, with its name and elapsed time",
+  "A project without a check command gets a round that says so, not 'the check passed'",
+  "The daemon's own comments read as Toknila, never as the agent",
+]
+
+[[ticket]]
+id = "empty-thread"
+title = "An empty thread never blocks a hand-in"
+prompt = "In run 6 the agent of TOKNILA-48 opened a second design thread by mistake; `finished` is refused while any Open thread exists (crates/app/src/agent.rs around lines 131-142 through `require_none_open` in crates/core/src/thread.rs), Approve is person-only, so the agent had to ask a person to approve an empty duplicate. Build four things. (1) `open_thread` of a kind the card already has an open or approved thread of (crates/app/src/planner/mod.rs around lines 153-163, crates/app/src/threads.rs, crates/core/src/thread.rs) answers 409 with a hint that names thread N and says to post a version on it, for the planner and the card agent alike; the MCP tool text says the same. (2) An agent may withdraw its own thread while it has no version and no person message: a new thread state Withdrawn in crates/core/src/model/thread.rs, a tool and route withdraw_thread, journaled. (3) The finished guard ignores threads with no version: a thread without a version is not a design. (4) The window shows a thread with no version as a draft (muted, no version yet) in the thread list and never counts it as waiting for approval. Covered by core tests of the withdraw rules and the guard, daemon tests of the hint and the route through the fake agent, and a web unit test of the draft look."
+acceptance = [
+  "A second open_thread of the same kind on a card answers with a hint to post a version on the existing thread",
+  "An agent withdraws its own empty thread; an empty thread never blocks finished",
+  "The window shows an empty thread as a draft",
+]
+
+[[ticket]]
+id = "inbox-carries-hand-in"
+title = "The inbox row carries the hand-in"
+after = ["handed-in-only"]
+prompt = "The review row of the inbox shows the hand-in blocks only when the card's details were loaded somewhere else: apps/web/src/views/InboxRow.tsx reads state.details, and InboxItem in crates/core/src/inbox/mod.rs has no gist, what or checks. Build: the inbox item of a review carries the hand-in summary (gist, what changed, the checks with their PASS, FAIL and NOT_RUN lines, what is left, and the Since the Return block when there is one) so the row shows it without another request; a question item carries its text and a pin item the design name the same way; `tok inbox` prints the gist and the checks line of a review item. Covered by a core test of the item, a web unit test of the row fed the item alone, and a cli output test."
+acceptance = [
+  "A review row in the inbox shows the hand-in's gist, what changed and checks straight from the inbox payload",
+  "tok inbox prints the gist and the checks of a review item",
+]
+
+[[ticket]]
+id = "atomic-moves"
+title = "A move on the diagram is one request"
+prompt = "Moving a dependency edge is a POST then a DELETE with a compensating DELETE (apps/web/src/store/edgeEffects.ts around lines 35-50; the daemon has only POST and DELETE /chains/{chain}/edges, crates/app/src/chains.rs add_edge and remove_edge), and moving a design reference between cards on the board patches the target card then the source (apps/web/src/views/DesignBoard.tsx around lines 68-81, moveRef in apps/web/src/store/designBoard.ts), so a failure halfway leaves the reference on both cards. Build `POST /chains/{chain}/edges/move` with the old and the new edge, and `POST /tickets/{ticket}/designs/{index}/move` with the target card, each applied in one store transaction (the cycle check and dependency satisfaction for edges, the region kept for designs) and journaled as one event; the web uses them and drops the compensating code; the CLI dependency command learns a move. Covered by daemon route tests (success; a refused cycle and a missing target leave everything as it was), web unit tests, and the existing e2e specs for edges and the board updated to the new routes."
+acceptance = [
+  "An edge move and a design-reference move are each one request that either lands whole or changes nothing",
+  "The web uses the move routes; the compensating code is gone",
+]
+
+[[ticket]]
+id = "allow-always-says"
+title = "Allow always says what it allows"
+prompt = "A Bash command whose leading cd or export prefix is not plain (it contains $ or backticks) is not stripped, and `rule_for` in crates/core/src/model/command_policy.rs (around lines 146-170) yields Bash(cd *) or Bash(export *), which `rule_covers` never matches; `remember_command` returning None (crates/app/src/projects.rs around lines 246-260) ends as a 204 with no word to the person (crates/daemon/src/http/routes/questions.rs); the web offers Allow always on every Bash prompt (apps/web/src/store/commands.ts). Build: a non-plain prefix falls back to the exact command as the rule, or to no rule, never a prefix rule on cd or export; the permission question carries the rule that Allow always would add, or none with the reason (a command built with $ cannot become a rule); the web shows it under the button, for example Allow always: Bash(cargo test *), and hides the button when there is none; `tok` prints it with the question; after Allow always the answer says what was added. Trust mode allows every tool the deny list does not name (today only Bash, WebFetch and WebSearch are allowed, so other MCP tools still prompt), and the project settings page says what trust means. Covered by core tests of rule_for on the non-plain cases, a daemon test of the question payload, web unit tests and a cli output test."
+acceptance = [
+  "A permission question says which rule Allow always would add, or that none can be made and why; the button is hidden then",
+  "No rule on cd or export is ever made; a non-plain prefix falls back to the exact command",
+  "Trust mode allows every tool the deny list does not name",
+]
+
+[[ticket]]
+id = "design-library-consistent"
+title = "The design library stays consistent"
+after = ["inbox-carries-hand-in"]
+prompt = "Deleting a design from the library (crates/daemon/src/http/routes/designs.rs, crates/daemon/src/designs/mod.rs remove) leaves the cards' references and the pins dangling, and the web says this design is no longer in the library. A pdf design has no node thumbnail (apps/web/src/views/NodeThumb.tsx). A pin without a card shows only on the mockup (crates/core/src/inbox/pins.rs), not in the inbox. Build: DELETE of a referenced design answers 409 naming the cards and pins that use it unless force is asked; forced, it removes the references and the open pins in the same transaction and a system comment on each card says which design went; the window asks (Used by TOKNILA-12, TOKNILA-14 and 2 pins. Remove anyway?) and then forces. A pdf design gets a thumbnail of its first page made the same way the library thumbnail is; the node and the board tile show it. A pin without a card is an inbox item of kind pin (The assistant asks about <design>) answered in place like the others, and the answer reaches show_plan. Covered by daemon tests (409, force, the pdf thumbnail), a core inbox test, web unit tests, and a new e2e spec in its own file that deletes a referenced design with force and sees the node lose its thumbnail cleanly."
+acceptance = [
+  "Deleting a referenced design is refused with the users named; forced, it removes the references and pins and comments on the cards",
+  "A pdf design shows its first page on the node and the board",
+  "A pin without a card is an inbox item answered in place",
+]
+
+[[ticket]]
+id = "release-persists"
+title = "A release survives a restart"
+after = ["named-migrations"]
+prompt = "The release run's steps (check, bump, tag, push) live in a process-global in-memory map (crates/daemon/src/releaser.rs) and are lost on a daemon restart; only the milestone's state and tag are saved (crates/app/src/releases.rs). There is no browser e2e of the Release dialog (apps/web/src/views/ReleaseDialog.tsx with the test ids release-dialog and release-version; apps/web/e2e/epic.mjs checks only the Finish text). Build: every step is a journaled event (started, passed or failed with the output tail) read back from the store, so the dialog and the CLI show the steps after a restart; a daemon that restarts in the middle of a release marks the run interrupted at the step it was in, and the Finish node offers to run it again from that step (a step that completed, like the tag, is not redone); a chain released once offers Release again when a new card merges after the release, with the next version suggested from the newest tag, and a core test covers it. A new e2e spec release.mjs in its own file opens the Release dialog on a finished chain in a temp repository with a check command, runs the release and sees the Finish node read released with the tag; its screenshot goes to docs/runs. Covered by daemon tests of the persistence and of the interrupted run, the e2e and the core test."
+acceptance = [
+  "The release steps are in the journal and shown after a daemon restart; an interrupted release can be run again from its step",
+  "A chain released once can be released again after a new merged card, with the next version suggested",
+  "A browser e2e runs a release through the dialog",
+]
+
+[[ticket]]
+id = "cards-size-honest"
+title = "Cards keep their size honest"
+prompt = "Leftovers of the card-size work: the daemon stores any `size` as given (TicketPatch::apply in crates/core/src/model/ticket.rs; the 196 to 480 by at most 320 limits live only in apps/web/src/views/cardSize.ts), a tall card shows no description (apps/web/src/views/CanvasNodes.tsx), and the corner buttons (.canvas-corner in apps/web/src/chain.css, z-index 4) cover the grip of the lowest lane (z-index 3; PAD in apps/web/src/views/canvasGeometry.ts), which apps/web/e2e/card-size.mjs works around by resizing the top card. Build: the size limits move to the shared api-types and the daemon clamps on PATCH (a size out of range is clamped and the answer says so); a card taller than its title shows the first line of its description under the title; the canvas reserves room for the corner buttons (bottom padding, or the buttons in the top bar) so no grip is ever under them; card-size.mjs drops its workaround and resizes the lowest card. Covered by a core clamp test, a web unit test of the description line and the e2e."
+acceptance = [
+  "The daemon clamps a card's size to the limits the window uses; both read the limits from one place",
+  "A tall card shows the first line of its description; no grip sits under the corner buttons",
+]
+
+[[ticket]]
+id = "assistant-reads-only"
+title = "The assistant reads the repository and its designs, nothing else"
+after = ["allow-always-says"]
+prompt = "The planner profile has a plain Read allow rule (crates/core/src/model/profile.rs), so may read the design files and nothing else outside the repository rests on the deny list alone (TOKNILA-41's hand-in said so); the worker profile may be the same. Build: the planner's and the worker's Read, Grep and Glob (where the rules allow them) are scoped to the repository (the ship or the project root) plus the explicit design files, as rooted allow rules in the form toknila_core::private::read_allow_rule makes, and nothing else; the deny list stays as the second wall. A wiring test shows that with the deny list emptied a Read outside those roots is still not allowed by the allow rules; the live probe of TOKNILA-27 is repeated as a cli test with the fake agent reading inside and outside. The reviewer profile is checked the same way and narrowed if it is plain. Covered by wiring tests per profile."
+acceptance = [
+  "The planner, worker and reviewer profiles allow Read only inside the repository and on the explicit design files; the deny list is no longer the only wall",
+  "Covered by wiring tests with the deny list emptied",
+]
+
+[[ticket]]
+id = "merged-leaves-nothing"
+title = "A merged card leaves nothing behind"
+after = ["review-turn-phase"]
+prompt = "After a local-mode merge the ship's worktree goes (`merged()` in crates/core/src/machine/review.rs queues RemoveShip) but the branch stays, and Settings, Leftover ships never lists it because crates/app/src/strays.rs counts every non-cancelled card as owning its branch. Build: in local merge mode the merged card's branch is deleted with the worktree (it is fully merged; a branch that by some race is not is kept and explained on the card like a cancelled card's); in pull-request mode the branch is left to the forge; the Leftover ships page lists branches of merged and cancelled cards alike, with the card's key and the merge commit, and deletes them; `tok ship prune` does the same from the CLI. Covered by daemon tests of the retire path for merged cards (deleted; kept with a comment), a strays test and a cli test."
+acceptance = [
+  "A card merged locally leaves no worktree and no branch; a kept branch is explained on the card",
+  "Leftover ships lists and removes branches of merged cards; tok ship prune does the same",
+]
+
+[[ticket]]
+id = "test-daemon-dies"
+title = "A test daemon dies with its test"
+prompt = "Test daemons leak when a test binary ends without unwinding (panic=abort, process::exit, a killed cargo): the guard in crates/cli/tests/common/mod.rs (Tok's Drop calls reap, DaemonGuard, a ctrlc handler) runs only on Drop or a signal; twenty orphans were found once, three more after TOKNILA-19, and two `tok watch` processes from a cli test lived four days. Build: the daemon learns to die with its parent through a flag `tok daemon run --exit-with-parent` (or an environment variable) given an inherited pipe (a handle on Windows) that the daemon reads: when the parent dies the pipe closes and the daemon stops its agents and exits within a second; the test helpers start every daemon and every `tok watch` that way; `cargo xtask verify` ends by listing `tok daemon run` processes whose home is under a temp directory and that are older than the run, and fails naming them, so a leak is seen at once. Covered by a cli test that kills the parent with SIGKILL and sees the daemon gone, and the xtask check."
+acceptance = [
+  "A daemon started by a test exits by itself when the test process dies, even with SIGKILL",
+  "cargo xtask verify fails when a test daemon of this run is still alive",
+]
+
+[[ticket]]
+id = "unknown-field-refused"
+title = "An unknown field is refused"
+after = ["cards-size-honest"]
+prompt = "PATCH /projects/{project} with an unknown field answers 200 and changes nothing (PatchProject in crates/app/src/projects.rs has no deny_unknown_fields; NewProject is the same), which cost the orchestrator two silent misses on the review mode field. Build: every request body the daemon deserialises (project new and patch, ticket patch, chain patch, thread and discussion bodies, settings) rejects an unknown field with 400 naming the field and listing the accepted ones, and a wrong enum value does the same; `tok` prints the daemon's message; the openapi document is regenerated and a test asserts every body schema has additionalProperties false. Covered by a daemon test per body kind (one unknown field gives 400 with its name) and the openapi test."
+acceptance = [
+  "Any request body with an unknown field answers 400 naming it and the accepted fields",
+  "The openapi document says additionalProperties false for every body; tok prints the daemon's message",
+]
+
+[[ticket]]
+id = "discussion-never-hangs"
+title = "Talking to the assistant never hangs"
+prompt = "The Send box of the card discussion (apps/web/src/views/Discuss.tsx, awaitingAnswer in apps/web/src/store/discussion.ts) says The assistant is answering and keeps Send disabled until a reply arrives or the planner stops; there is no timer. Build: after 90 seconds without an answer the box says The assistant has not answered yet, Send is enabled again and a Nudge button re-delivers the message to the planner through the daemon's existing instruction path; when the planner is not running the box says so with Start (exists); the daemon logs a discussion message that got no answer within the time as a warning. Covered by a web unit test with a fake clock and a daemon test of the nudge."
+acceptance = [
+  "A discussion message without an answer for 90 seconds frees the Send box and offers a Nudge",
+  "Covered by a web unit test with a fake clock and a daemon test",
+]
+
+[[ticket]]
+id = "instructions-lessons"
+title = "The instructions carry the lessons of runs 5 and 6"
+after = ["named-migrations", "empty-thread", "assistant-reads-only"]
+prompt = "Runs 5 and 6 left six rules that the texts in crates/core/src/instructions/ (protocol.rs, the kickoff in mod.rs) and AGENTS.md do not carry yet. (1) Before proposing a fix or a wildcard card for a failing test, run it alone once; a test that passes alone is a load problem to report in the hand-in, not to fix. (2) Share the machine says a few workers under nice: make it one build or test loop under nice, never more, stopped by a trap. (3) When the check failure is about the environment (command not found, exit 127, a tool refused), say so in the hand-in and stop: do not fix the environment, do not add an empty commit. (4) Before the hand-in, merge the project's work branch into the ship and resolve the conflicts, keeping every existing entry of a shared list. (5) A Checks line quotes the gate's own result line word for word, and the daemon refuses a PASS whose evidence is under 20 characters. (6) The kickoff's Checks section points at AGENTS.md's Adding a migration bullet. Also protocol.rs says shell edits stop for a permission answer every time while AGENTS.md says they are refused; the daemon refuses them, so both say refused. Update the snapshot tests one at a time; keep the texts short, an agent reads them at every start."
+acceptance = [
+  "The six rules are in the protocol, the kickoff or AGENTS.md, each where an agent meets the situation",
+  "A PASS line whose evidence is under 20 characters is refused by the daemon with the rule named",
+  "protocol.rs and AGENTS.md agree that shell edits are refused",
+]
