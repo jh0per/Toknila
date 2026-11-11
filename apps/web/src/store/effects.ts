@@ -16,6 +16,7 @@ import { runSettingsEffect } from "./settingsEffects";
 import { saveTheme } from "./themeEffects";
 import { runUpdateEffect } from "./updatesEffects";
 import { runUsageEffect } from "./usageEffects";
+import { OPENED_MS } from "./follow";
 
 type Dispatch = (msg: Msg) => void;
 
@@ -254,6 +255,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "pushUrl":
         window.history.pushState(null, "", `${e.path}${window.location.search}`);
+        return;
+      case "expireOpened":
+        later(`opened:${e.seq}`, () => dispatch({ type: "openedExpired", seq: e.seq }), OPENED_MS);
         return;
     }
   };

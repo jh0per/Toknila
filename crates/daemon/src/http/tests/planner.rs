@@ -59,7 +59,7 @@ fn is_planner_route(method: &str, uri: &str) -> bool {
 }
 
 #[tokio::test]
-async fn a_planner_token_is_refused_with_403_on_every_route_but_its_own_ten() {
+async fn a_planner_token_is_refused_with_403_on_every_route_but_its_own_eleven() {
     let api = Api::new();
     api.two_projects().await;
     let token = api.planner_token("DEMO").await;
@@ -245,6 +245,55 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "the control: its own card");
+}
+
+#[tokio::test]
+async fn show_card_journals_one_window_event_for_a_card_of_its_own_project_only() {
+    let api = Api::new();
+    api.two_projects().await;
+    api.post("/v1/chains/plan/tickets", json!({ "title": "A" }))
+        .await;
+    let token = api.planner_token("DEMO").await;
+    let window_events = |events: Value| -> Vec<Value> {
+        events
+            .as_array()
+            .expect("events")
+            .iter()
+            .filter(|e| e["entity"] == "window")
+            .cloned()
+            .collect()
+    };
+    let project_id = api.get("/v1/projects/DEMO").await["id"].clone();
+
+    // Another project's card: refused, and nothing is journaled.
+    let (s, e) = api
+        .call_with(&token, Method::POST, "/v1/planner/cards/OTHER-1/show", None)
+        .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{e}");
+    assert!(window_events(api.get("/v1/events?since=0").await).is_empty());
+    let (s, e) = api
+        .call_with(&token, Method::POST, "/v1/planner/cards/DEMO-9/show", None)
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{e}");
+
+    // Its own card: answered with the card, and one event in the stream.
+    let (s, card) = api
+        .call_with(&token, Method::POST, "/v1/planner/cards/DEMO-1/show", None)
+        .await;
+    assert_eq!(s, StatusCode::OK, "{card}");
+    assert_eq!(card["ticket"]["key"], "DEMO-1");
+    let events = window_events(api.get("/v1/events?since=0").await);
+    assert_eq!(events.len(), 1, "{events:?}");
+    let e = &events[0];
+    assert_eq!(
+        (&e["kind"], &e["actor"]),
+        (&json!("show_card"), &json!("agent"))
+    );
+    assert_eq!(e["entity_id"], project_id);
+    assert_eq!(
+        e["payload"],
+        json!({ "project": project_id, "project_key": "DEMO", "chain": "plan", "ticket": "DEMO-1" })
+    );
 }
 
 #[tokio::test]

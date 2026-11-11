@@ -77,7 +77,8 @@ impl Repo<'_> {
     /// they are not read again.
     pub fn delete_project(&self, project: ProjectId) -> Result<(), StoreError> {
         let scope = Scope::new("SELECT id FROM chains WHERE project_id = ?1");
-        let mut sql = scope.statements(Some("(entity = 'project' AND entity_id = ?1)"));
+        let mut sql =
+            scope.statements(Some("(entity IN ('project', 'window') AND entity_id = ?1)"));
         sql.push("DELETE FROM projects WHERE id = ?1".to_owned());
         self.run(&sql, &project.to_string())
     }

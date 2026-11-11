@@ -240,6 +240,39 @@ fn a_planner_stays_in_its_own_project() {
 }
 
 #[test]
+fn showing_a_card_emits_one_window_event_and_changes_nothing_else() {
+    let mut mem = manual_demo();
+    let p = project(&mem);
+    let before = mem.events.len();
+    let t = planner::show_card(&mut mem, p, "DEMO-2").expect("show");
+    assert_eq!(t.key.to_string(), "DEMO-2");
+    assert_eq!(mem.events.len(), before + 1);
+    match mem.events.last() {
+        Some(toknila_core::events::DomainEvent::WindowShowCard {
+            project,
+            project_key,
+            chain,
+            ticket,
+        }) => assert_eq!(
+            (
+                *project,
+                project_key.to_string(),
+                chain.as_str(),
+                ticket.to_string()
+            ),
+            (p, "DEMO".to_owned(), "demo", "DEMO-2".to_owned())
+        ),
+        other => panic!("{other:?}"),
+    }
+    // Another project's planner is refused and nothing is emitted; a missing card is not found.
+    let e = planner::show_card(&mut mem, ProjectId::new(), "DEMO-1").expect_err("other");
+    assert_eq!(e.kind, ErrorKind::Forbidden);
+    let e = planner::show_card(&mut mem, p, "DEMO-99").expect_err("missing");
+    assert_eq!(e.kind, ErrorKind::NotFound);
+    assert_eq!(mem.events.len(), before + 1);
+}
+
+#[test]
 fn the_planner_talks_in_threads_and_only_the_owner_approves() {
     let mut mem = manual_demo();
     let p = project(&mem);
