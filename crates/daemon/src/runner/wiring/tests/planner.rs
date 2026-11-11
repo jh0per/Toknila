@@ -106,8 +106,15 @@ fn the_planner_settings_allow_reading_and_its_tools_and_name_no_hooks() {
         .iter()
         .filter_map(Value::as_str)
         .collect();
-    for want in ["Read", "Grep", "Glob", "Bash(git status *)", "mcp__toknila"] {
+    for want in [
+        "Read(//w/ships/demo-1/**)",
+        "Bash(git status *)",
+        "mcp__toknila",
+    ] {
         assert!(allow.contains(&want), "{want}: {allow:?}");
+    }
+    for bare in ["Read", "Grep", "Glob"] {
+        assert!(!allow.contains(&bare), "{bare} is scoped: {allow:?}");
     }
     for never in [
         "Edit",
@@ -172,7 +179,11 @@ fn the_planner_may_read_each_design_file_and_nothing_else_outside_the_repository
         .collect();
     assert_eq!(read_rules, want.iter().collect::<Vec<_>>(), "{allow:?}");
     assert!(want[0].starts_with("Read(//"), "{}", want[0]);
-    assert!(!allow.iter().any(|r| r.contains("**") || r.ends_with("p1)")));
+    assert!(
+        !allow
+            .iter()
+            .any(|r| r.contains("designs") && r.contains("**"))
+    );
     // Everything else of the data home stays denied, and so does the rest of the designs folder;
     // the design files are not denied.
     let deny = strings(&s["permissions"]["deny"]);
@@ -220,6 +231,7 @@ fn a_planner_run_without_the_projects_facts_is_refused() {
         token: TOKEN,
         url: None,
         bin: &rig.bin,
+        repo: &rig.repo,
         brief: &rig.brief,
     };
     let e = super::prepare(&AgentProfile::claude_code_planner(), &cx).expect_err("no facts");
