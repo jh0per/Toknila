@@ -101,6 +101,20 @@ fn both_roles_are_told_to_run_the_check_once_not_in_a_loop() {
 }
 
 #[test]
+fn the_checks_section_points_at_the_migration_bullet_and_the_npm_ci_line() {
+    let brief = RunBrief {
+        check_command: Some("cargo xtask verify"),
+        ..pinned_brief(&[])
+    };
+    let text = generate(&brief);
+    assert!(
+        text.contains("AGENTS.md's Adding a migration bullet"),
+        "{text}"
+    );
+    assert!(text.contains("npm ci --no-audit --no-fund"), "{text}");
+}
+
+#[test]
 fn both_roles_are_told_to_work_alone_and_to_quote_paths() {
     for text in [protocol(), review_protocol()] {
         assert!(text.contains("Do not start subagents or background agents"));

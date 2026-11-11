@@ -437,7 +437,7 @@ fn finished_moves_to_review_and_keeps_the_report() {
     recover(&mut mem).expect("settle");
     let a = mem.ticket_by_title("A");
     let summary = AgentEvent::Finished {
-        summary: "**What changed:** done\nall green\n**Checks:**\n- PASS verify: 12 tests\n**Left:** nothing".to_owned(),
+        summary: "**What changed:** done\nall green\n**Checks:**\n- PASS verify: test result: ok. 12 passed\n**Left:** nothing".to_owned(),
     };
     agent::ticket_event(&mut mem, &a, summary).expect("finished");
     assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Review);
@@ -449,7 +449,7 @@ fn finished_moves_to_review_and_keeps_the_report() {
     assert_eq!(report.body.what.as_deref(), Some("all green"));
     assert_eq!(
         report.body.how_to_verify.as_deref(),
-        Some("- PASS verify: 12 tests")
+        Some("- PASS verify: test result: ok. 12 passed")
     );
     assert_eq!(report.body.consequences.as_deref(), Some("nothing"));
 }
