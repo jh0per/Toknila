@@ -383,6 +383,65 @@
         }
       }
     },
+    "/chains/{chain}/edges/move": {
+      "post": {
+        "tags": [
+          "chains"
+        ],
+        "summary": "Replaces a dependency by another in one transaction: a refusal changes nothing.",
+        "operationId": "move_edge",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdgeMoveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain}/export": {
       "get": {
         "tags": [
@@ -3925,6 +3984,84 @@
         }
       }
     },
+    "/tickets/{ticket}/designs/{index}/move": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Gives a design reference, region kept, to another card of the chain in one transaction.",
+        "operationId": "move_design",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key that holds the reference",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "description": "Position of the reference in the card's list",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignMoveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/discussion": {
       "post": {
         "tags": [
@@ -6749,6 +6886,20 @@
           }
         }
       },
+      "DesignMoveInput": {
+        "type": "object",
+        "description": "`POST /v1/tickets/{ticket}/designs/{index}/move`: give a design reference to another card.",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Key of the card of the same chain that receives the reference."
+          }
+        },
+        "additionalProperties": false
+      },
       "DesignPick": {
         "type": "object",
         "description": "A design the planner names: its file name (or id) in the project's library, and the part of\nthe image that matters. The host finds the design and gives the use case a [`DesignRef`].",
@@ -6919,6 +7070,25 @@
           "normal",
           "after_release"
         ]
+      },
+      "EdgeMoveInput": {
+        "type": "object",
+        "description": "`POST /v1/chains/{chain}/edges/move`: replace a dependency by another, all or nothing.",
+        "required": [
+          "old",
+          "new"
+        ],
+        "properties": {
+          "new": {
+            "$ref": "#/components/schemas/EdgeInput",
+            "description": "The dependency that takes its place."
+          },
+          "old": {
+            "$ref": "#/components/schemas/EdgeInput",
+            "description": "The dependency that is dropped (its `kind` is ignored)."
+          }
+        },
+        "additionalProperties": false
       },
       "ErrorBody": {
         "type": "object",

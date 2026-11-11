@@ -51,12 +51,15 @@ describe("edge editing in the store", () => {
 describe("edge requests", () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  const bodies: string[] = [];
   /// Answers each request in turn with the status given (200 by default): a chain, or an error body.
   function daemon(answers: number[]) {
     const calls: string[] = [];
+    bodies.length = 0;
     vi.stubGlobal("window", { location: { search: "?token=t" } });
     vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
       calls.push(`${init.method} ${url}`);
+      bodies.push(typeof init.body === "string" ? init.body : "");
       const status = answers[calls.length - 1] ?? 200;
       const body = status === 200 ? chain(calls.length) : { error: `refused ${calls.length}`, code: "conflict" };
       return new Response(JSON.stringify(body), { status });
@@ -70,33 +73,28 @@ describe("edge requests", () => {
     type: "moveEdge", chain: "c1", from: "ticket:A", to: "ticket:B", kind: "normal", end: "to", target: "ticket:C",
   } as const;
 
-  it("adds at the new place, then removes the old one, and selects the new line", async () => {
+  it("moves a line in one request with the old and the new line, and selects the new one", async () => {
     const calls = daemon([]);
     const msg = await answer(move);
-    expect(calls).toEqual(["POST /v1/chains/c1/edges", "DELETE /v1/chains/c1/edges?from=A&to=B"]);
+    expect(calls).toEqual(["POST /v1/chains/c1/edges/move"]);
+    expect(JSON.parse(bodies[0])).toEqual({
+      old: { from: "A", to: "B" },
+      new: { from: "A", to: "C", kind: "normal" },
+    });
     expect(msg).toMatchObject({ type: "edgesChanged", selected: { chain: "c1", from: "ticket:A", to: "ticket:C" } });
   });
 
-  it("changes nothing when the new place is refused", async () => {
+  it("is one request even when the daemon refuses it: nothing else is sent to undo", async () => {
     const calls = daemon([409]);
     expect(await answer(move)).toEqual({ type: "edgeRefused", message: "refused 1" });
-    expect(calls).toHaveLength(1);
-  });
-
-  it("takes the new line back when the old one cannot be removed", async () => {
-    const calls = daemon([200, 409, 200]);
-    expect(await answer(move)).toEqual({ type: "edgeRefused", message: "refused 2" });
-    expect(calls).toEqual([
-      "POST /v1/chains/c1/edges",
-      "DELETE /v1/chains/c1/edges?from=A&to=B",
-      "DELETE /v1/chains/c1/edges?from=A&to=C",
-    ]);
+    expect(calls).toEqual(["POST /v1/chains/c1/edges/move"]);
   });
 
   it("moves the start of a line by replacing its from", async () => {
     const calls = daemon([]);
     const msg = await answer({ ...move, end: "from", target: "ticket:D" });
-    expect(calls[1]).toBe("DELETE /v1/chains/c1/edges?from=A&to=B");
+    expect(calls).toEqual(["POST /v1/chains/c1/edges/move"]);
+    expect(JSON.parse(bodies[0]).new).toEqual({ from: "D", to: "B", kind: "normal" });
     expect(msg).toMatchObject({ selected: { from: "ticket:D", to: "ticket:B" } });
   });
 

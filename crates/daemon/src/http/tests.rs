@@ -22,6 +22,7 @@ mod designs;
 mod discussion;
 mod inbox;
 mod merges;
+mod moves;
 mod parallel;
 mod pins;
 mod planner;
@@ -938,6 +939,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}",
             "/chains/{chain}/arrange",
             "/chains/{chain}/edges",
+            "/chains/{chain}/edges/move",
             "/chains/{chain}/export",
             "/chains/{chain}/release",
             "/chains/{chain}/releases",
@@ -1000,6 +1002,7 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/actions/{action}",
             "/tickets/{ticket}/activity",
             "/tickets/{ticket}/comments",
+            "/tickets/{ticket}/designs/{index}/move",
             "/tickets/{ticket}/discussion",
             "/tickets/{ticket}/events",
             "/tickets/{ticket}/instructions/claim",

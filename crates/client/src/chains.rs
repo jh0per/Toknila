@@ -3,7 +3,8 @@
 
 use crate::{Client, ClientResult, NO_BODY, enc};
 use toknila_api_types::{
-    ChainDeletion, ChainDetail, ChainFile, ChainItem, ChainSettings, EdgeInput, MoveInput, NewChain,
+    ChainDeletion, ChainDetail, ChainFile, ChainItem, ChainSettings, EdgeInput, EdgeMoveInput,
+    MoveInput, NewChain,
 };
 
 impl Client {
@@ -52,6 +53,15 @@ impl Client {
             enc(to)
         );
         self.call("DELETE", &path, NO_BODY)
+    }
+
+    /// `POST /chains/{chain}/edges/move`.
+    pub fn move_edge(&self, chain: &str, m: &EdgeMoveInput) -> ClientResult<ChainDetail> {
+        self.call(
+            "POST",
+            &format!("/chains/{}/edges/move", enc(chain)),
+            Some(m),
+        )
     }
 
     /// `PATCH /chains/{chain}`: review settings and autostart; `project` narrows the name.
