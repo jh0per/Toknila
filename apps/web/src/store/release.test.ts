@@ -54,3 +54,34 @@ describe("releasing a finished chain", () => {
     expect(s.release).toMatchObject({ busy: false, error: "the chain still has open cards" });
   });
 });
+
+describe("a release that a restart cut off", () => {
+  const interrupted: ReleaseRun = {
+    release: "r1", version: "1.4.3", tag: "v1.4.3", state: "interrupted", resume_from: "bump",
+    steps: [
+      { step: "check", label: "Check", state: "done", output: "ok" },
+      { step: "bump", label: "Bump the version", state: "interrupted", output: "" },
+      { step: "tag", label: "Tag", state: "pending", output: "" },
+    ],
+  };
+
+  it("shows the journaled steps from the offer and does not poll a run that stands still", () => {
+    const [open] = reduce(initialState({ name: "chains" }), { type: "openRelease", chain: "c1" });
+    const [s, fx] = reduce(open, { type: "releaseOffered", offer: { ...offer, run: interrupted } });
+    expect(s.release.run?.resume_from).toBe("bump");
+    expect(s.release.version).toBe("1.4.3");
+    expect(fx).toEqual([]);
+  });
+
+  it("follows a run that is still going when the dialog opens", () => {
+    const [open] = reduce(initialState({ name: "chains" }), { type: "openRelease", chain: "c1" });
+    const [, fx] = reduce(open, { type: "releaseOffered", offer: { ...offer, run: { ...interrupted, state: "running", resume_from: undefined } } });
+    expect(fx).toEqual([{ type: "pollRelease", release: "r1" }]);
+  });
+
+  it("sends the click to run it again with resume", () => {
+    const [s, fx] = reduce(initialState({ name: "chains" }), { type: "startRelease", chain: "c1", version: "1.4.3", resume: true });
+    expect(s.release.busy).toBe(true);
+    expect(fx).toEqual([{ type: "startRelease", chain: "c1", version: "1.4.3", resume: true }]);
+  });
+});

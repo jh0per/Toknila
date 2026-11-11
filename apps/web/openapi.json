@@ -7224,7 +7224,8 @@
         "enum": [
           "planned",
           "ready",
-          "released"
+          "released",
+          "again"
         ]
       },
       "FolderFate": {
@@ -9819,6 +9820,17 @@
             "type": "boolean",
             "description": "Every card is merged: the end node offers Release."
           },
+          "run": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseRun",
+                "description": "The last run of the chain's own release, read from the journal; `None` before the first."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "steps": {
             "type": "array",
             "items": {
@@ -9852,6 +9864,17 @@
           },
           "release": {
             "type": "string"
+          },
+          "resume_from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseStep",
+                "description": "The step an interrupted run was in; only when it is interrupted."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "state": {
             "$ref": "#/components/schemas/RunState"
@@ -10349,7 +10372,8 @@
         "enum": [
           "running",
           "failed",
-          "done"
+          "done",
+          "interrupted"
         ]
       },
       "RunStep": {
@@ -10531,6 +10555,10 @@
           "version"
         ],
         "properties": {
+          "resume": {
+            "type": "boolean",
+            "description": "Run an interrupted release again from the step it stopped at; what passed is not redone."
+          },
           "version": {
             "type": "string",
             "description": "The version, such as `1.4.0`; it becomes the tag `v1.4.0`."
@@ -10637,7 +10665,8 @@
           "pending",
           "running",
           "done",
-          "failed"
+          "failed",
+          "interrupted"
         ]
       },
       "StoppedAt": {

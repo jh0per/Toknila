@@ -64,12 +64,12 @@ export function storeFinishedOpen(project: string, open: boolean): void {
 /// and one line under it: how many cards are left, or the date and tag once it is released.
 export interface FinishView {
   title: string;
-  state: "planned" | "ready" | "released";
+  state: "planned" | "ready" | "released" | "again";
   stateText: string;
   text: string;
 }
 
-const STATE_TEXT = { planned: "planned", ready: "ready to release", released: "released" } as const;
+const STATE_TEXT = { planned: "planned", ready: "ready to release", released: "released", again: "release again" } as const;
 
 /// The Finish node's words from the summary's `finish`; `undefined` for a chain without a version.
 export function finishView(s: Pick<ChainSummary, "finish" | "total" | "done">): FinishView | undefined {
@@ -80,6 +80,7 @@ export function finishView(s: Pick<ChainSummary, "finish" | "total" | "done">): 
   const text =
     f.state === "released" ? `${f.released_at == null ? "" : dayText(f.released_at)}${tag}`.replace(/^ · /, "")
     : f.state === "ready" ? "every card is merged"
+    : f.state === "again" ? `new cards merged since${tag}`
     : `${left} left`;
   return { title: `Release v${f.version}`, state: f.state, stateText: STATE_TEXT[f.state], text };
 }

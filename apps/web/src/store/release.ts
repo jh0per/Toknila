@@ -26,7 +26,8 @@ export const initialRelease: ReleaseUi = { offer: undefined, version: "", busy: 
 export type ReleaseIntent =
   | { type: "openRelease"; chain: string }
   | { type: "setReleaseVersion"; version: string }
-  | { type: "startRelease"; chain: string; version: string };
+  /// `resume`: run an interrupted release again from its step; what passed is not redone.
+  | { type: "startRelease"; chain: string; version: string; resume?: boolean };
 
 /// What the daemon answered.
 export type ReleaseResult =
@@ -55,7 +56,11 @@ export function reduceRelease(s: State, msg: ReleaseMsg): [State, Effect[]] {
         [{ type: "loadReleaseOffer", chain: msg.chain }],
       ];
     case "releaseOffered":
-      return [set({ offer: msg.offer, version: s.release.version || msg.offer.version }), []];
+      // The steps come from the journal: a run that is going, or one a restart cut off, shows.
+      return [
+        set({ offer: msg.offer, version: s.release.version || msg.offer.version, run: msg.offer.run ?? undefined }),
+        msg.offer.run?.state === "running" ? [{ type: "pollRelease", release: msg.offer.run.release }] : [],
+      ];
     case "setReleaseVersion":
       return [set({ version: msg.version }), []];
     case "startRelease":

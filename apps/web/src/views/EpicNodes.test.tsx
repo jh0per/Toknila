@@ -38,8 +38,8 @@ describe("the Start node is the epic", () => {
 });
 
 describe("the Finish node is the release", () => {
-  const f = (state: "planned" | "ready" | "released", extra = {}) =>
-    summary({ finish: { version: "0.3.0", state, ...extra }, version: "0.3.0", releasable: state === "ready" });
+  const f = (state: "planned" | "ready" | "released" | "again", extra = {}) =>
+    summary({ finish: { version: "0.3.0", state, ...extra }, version: "0.3.0", releasable: state === "ready" || state === "again" });
 
   it("reads Release v0.3.0 planned while cards are open, with the cards left", () => {
     const html = finish(f("planned"));
@@ -59,6 +59,13 @@ describe("the Finish node is the release", () => {
     const html = finish(f("released", { tag: "v0.3.0", released_at: Date.UTC(2026, 10, 12, 12) }));
     expect(html).toContain(">released<");
     expect(html).toContain("12 Nov · v0.3.0");
+  });
+  it("offers Release again once a card merged after the release", () => {
+    const html = finish(f("again", { tag: "v0.3.0" }), () => {});
+    expect(html).toContain('data-state="again"');
+    expect(html).toContain(">release again<");
+    expect(html).toContain("new cards merged since · v0.3.0");
+    expect(html).toContain('data-testid="release-button"');
   });
   it("keeps the phase's words for a chain without a version", () => {
     const html = finish(summary({ phase: "active" }));

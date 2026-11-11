@@ -15,6 +15,8 @@ use crate::http::dto::{
 use crate::http::error::ErrorBody;
 use crate::releaser;
 use crate::server::{AppState, now};
+use crate::store::release_runs::Entry;
+use toknila_api_types::{RunState, StepState};
 
 #[utoipa::path(post, path = "/chains/{chain}/releases", tag = "releases", request_body = NewRelease,
     params(("chain" = String, Path, description = "Chain id or name")),
@@ -71,7 +73,7 @@ pub async fn release_offer(
     State(state): State<AppState>,
     Path(chain): Path<String>,
 ) -> ApiResult<Json<ReleaseOffer>> {
-    let (releasable, own, project) = read(&state, move |repo| {
+    let (releasable, own, project, run) = read(&state, move |repo| {
         let c = resolve::chain(repo, &chain)?;
         let view = repo
             .chain_view(c.id)?
@@ -79,8 +81,13 @@ pub async fn release_offer(
         let project = repo
             .project(c.project_id)?
             .ok_or_else(|| AppError::not_found("project"))?;
-        let own = view.end_release().map(|r| r.version.clone());
-        Ok((view.releasable(), own, project))
+        let end = view.end_release();
+        let own = end.map(|r| r.version.clone());
+        let run = match end {
+            Some(r) => repo.release_run(r.id)?,
+            None => None,
+        };
+        Ok((view.releasable(), own, project, run))
     })
     .await?;
     let tags = match project.repo_path.clone().filter(|r| !r.trim().is_empty()) {
@@ -95,6 +102,7 @@ pub async fn release_offer(
         last_tag: tags.first().cloned(),
         steps: project_steps(&project),
         base: project.work_branch.clone(),
+        run,
     }))
 }
 
@@ -115,6 +123,34 @@ pub async fn start_release(
         let (r, project) = releases::begin(tx, &chain, &input.version)?;
         let repo = repo_of(&project)?;
         let version = r.version.clone();
+        let steps = project_steps(&project);
+        let last = tx.repo().release_run(r.id)?;
+        if last.as_ref().is_some_and(|l| l.state == RunState::Running) {
+            return Err(AppError::conflict("a release of this chain is already running").into());
+        }
+        let (todo, entry) = if input.resume {
+            let run = last
+                .filter(|l| matches!(l.state, RunState::Interrupted | RunState::Failed))
+                .ok_or_else(|| AppError::conflict("there is no release to run again"))?;
+            let passed: Vec<_> = run
+                .steps
+                .iter()
+                .filter(|s| s.state == StepState::Done)
+                .map(|s| s.step)
+                .collect();
+            (
+                release_run::resume_steps(&steps, &passed),
+                Entry::RunResumed,
+            )
+        } else {
+            let entry = Entry::RunStarted {
+                version: version.clone(),
+                tag: release_run::tag_name(&version),
+                steps: steps.clone(),
+            };
+            (steps.clone(), entry)
+        };
+        tx.journal_release_run(r.id, &entry)?;
         let plan = releaser::Plan {
             release: r.id,
             repo,
@@ -124,7 +160,9 @@ pub async fn start_release(
             check: project.check_command.clone(),
             bump: project.bump_command.clone(),
             push: project.merge.mode == toknila_core::MergeMode::Github,
-            steps: project_steps(&project),
+            steps,
+            todo,
+            resuming: input.resume,
             scratch: PathBuf::new(),
         };
         let chain_id = r.chain_id;
@@ -140,37 +178,65 @@ pub async fn start_release(
         .take();
     if let Some(mut plan) = plan {
         plan.scratch = state.ships.join(".releases");
-        if !releaser::begin(&plan) {
-            return Err(AppError::conflict("a release of this chain is already running").into());
-        }
         tokio::spawn(run_release(state, plan));
     }
     Ok(Json(detail))
 }
 
-/// The run itself: the steps on a blocking thread, then the milestone is saved as released.
+/// Journals `entry` of the run of `id`; blocking, for the run's thread.
+fn journal(
+    store: &crate::store::Store,
+    handle: &tokio::runtime::Handle,
+    id: toknila_core::ReleaseId,
+    entry: Entry,
+) -> Result<(), String> {
+    handle
+        .block_on(store.write(Actor::System, now(), move |tx| {
+            tx.journal_release_run(id, &entry)
+        }))
+        .map(|_: ((), _)| ())
+        .map_err(|e: crate::store::StoreError| e.to_string())
+}
+
+/// The run itself: the steps on a blocking thread, then the milestone is saved as released and
+/// the run ends in the same transaction.
 async fn run_release(state: AppState, plan: releaser::Plan) {
     let (id, tag) = (plan.release, plan.tag.clone());
     let ran = {
         let plan = plan.clone();
-        tokio::task::spawn_blocking(move || releaser::execute(&plan)).await
+        let store = state.store.clone();
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            releaser::execute(&plan, &|e| journal(&store, &handle, id, e))
+        })
+        .await
     };
-    match ran {
+    let failure = match ran {
         Ok(Ok(())) => {
             let saved = state
                 .store
                 .write(Actor::Human, now(), move |tx| -> ApiResult<()> {
-                    Ok(releases::finish(tx, id, &tag)?)
+                    releases::finish(tx, id, &tag)?;
+                    Ok(tx.journal_release_run(id, &Entry::RunDone)?)
                 })
                 .await;
             match saved {
-                Ok(_) => releaser::done(id),
-                Err(e) => releaser::failed(id, format!("the release could not be saved: {e:?}")),
+                Ok(_) => return,
+                Err(e) => format!("the release could not be saved: {e:?}"),
             }
         }
-        Ok(Err(_)) => {}
-        Err(e) => releaser::failed(id, format!("the release run crashed: {e}")),
-    }
+        Ok(Err(_)) => return,
+        Err(e) => format!("the release run crashed: {e}"),
+    };
+    let entry = Entry::RunFailed { error: failure };
+    let _ = state
+        .store
+        .write(Actor::System, now(), move |tx| {
+            tx.journal_release_run(id, &entry)
+        })
+        .await
+        .map(|_: ((), _)| ())
+        .map_err(|e: crate::store::StoreError| e);
 }
 
 #[utoipa::path(get, path = "/releases/{release}/run", tag = "releases",
@@ -180,9 +246,12 @@ pub async fn release_run(
     State(state): State<AppState>,
     Path(release): Path<String>,
 ) -> ApiResult<Json<ReleaseRun>> {
-    let r = read(&state, move |repo| Ok(resolve::release(repo, &release)?)).await?;
-    let run = releaser::run_of(r.id)
-        .ok_or_else(|| AppError::not_found(format!("a release run of {}", r.version)))?;
+    let run = read(&state, move |repo| {
+        let r = resolve::release(repo, &release)?;
+        repo.release_run(r.id)?
+            .ok_or_else(|| AppError::not_found(format!("a release run of {}", r.version)).into())
+    })
+    .await?;
     Ok(Json(run))
 }
 
