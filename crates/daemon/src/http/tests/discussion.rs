@@ -257,3 +257,68 @@ async fn without_a_discussion_the_planners_edit_lands_at_once_as_before() {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(talk.card().await["prompt"], "direct");
 }
+
+/// The newest message of the card's discussion, as the watcher sees it.
+async fn newest_human(api: &Api) -> (toknila_core::TicketId, toknila_core::ThreadMessageId) {
+    let ticket = api.get("/v1/tickets/DEMO-1").await["ticket"]["id"]
+        .as_str()
+        .expect("id")
+        .parse()
+        .expect("ticket id");
+    let all = api.get("/v1/tickets/DEMO-1/threads").await;
+    let id = all["threads"][0]["messages"]
+        .as_array()
+        .expect("messages")
+        .last()
+        .expect("message")["id"]
+        .as_str()
+        .expect("id")
+        .parse()
+        .expect("message id");
+    (ticket, id)
+}
+
+#[tokio::test]
+async fn a_message_nobody_answers_in_time_is_logged_as_a_warning_and_an_answered_one_is_not() {
+    let api = Api::new();
+    let talk = setup(&api).await;
+    api.post(
+        "/v1/tickets/DEMO-1/discussion",
+        json!({ "text": "is this right?" }),
+    )
+    .await;
+    let (ticket, asked) = newest_human(&api).await;
+    let wait = std::time::Duration::from_millis(20);
+    // Control: unanswered for the whole wait, the watcher warns.
+    assert!(
+        crate::discussion_watch::warn_if_unanswered(&api.store, ticket, "DEMO-1", asked, wait)
+            .await
+    );
+    // The assistant answers: the same watch finds nothing to warn about.
+    talk.planner(
+        Method::POST,
+        "/v1/planner/cards/DEMO-1/threads/1/messages",
+        json!({ "text": "yes" }),
+    )
+    .await;
+    assert!(
+        !crate::discussion_watch::warn_if_unanswered(&api.store, ticket, "DEMO-1", asked, wait)
+            .await
+    );
+}
+
+#[tokio::test]
+async fn a_nudge_goes_the_planners_input_route_and_is_refused_when_the_planner_is_not_running() {
+    let api = Api::new();
+    let _talk = setup(&api).await;
+    api.post("/v1/tickets/DEMO-1/discussion", json!({ "text": "hello?" }))
+        .await;
+    let (status, body) = api
+        .call(
+            Method::POST,
+            "/v1/projects/DEMO/planner/input",
+            Some(json!("Discussion on card DEMO-1 (thread 1): hello?")),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+}

@@ -50,8 +50,34 @@ export function entries(d: ThreadDetail | undefined): Entry[] {
 
 /// The person has spoken last and the assistant has not answered yet: the box waits.
 export function awaitingAnswer(d: ThreadDetail | undefined): boolean {
+  return unansweredMessage(d) !== undefined;
+}
+
+/// How long the box waits for an answer before it says so and offers a nudge.
+export const ANSWER_WAIT_MS = 90_000;
+
+/// The person's message nobody has answered, if the person has spoken last.
+export function unansweredMessage(d: ThreadDetail | undefined): ThreadMessage | undefined {
   const last = [...(d?.messages ?? [])].reverse().find((m) => m.kind === "message" || m.kind === "edit_proposal");
-  return last !== undefined && last.author === "human";
+  return last !== undefined && last.author === "human" ? last : undefined;
+}
+
+/// Milliseconds left until the unanswered message is overdue (0 when it is); undefined when
+/// nothing waits for an answer.
+export function msUntilOverdue(d: ThreadDetail | undefined, now: number): number | undefined {
+  const m = unansweredMessage(d);
+  return m === undefined ? undefined : Math.max(0, m.created_at + ANSWER_WAIT_MS - now);
+}
+
+/// A message has gone without an answer for the whole wait: Send is free again and a nudge is offered.
+export const overdue = (d: ThreadDetail | undefined, now: number): boolean => msUntilOverdue(d, now) === 0;
+
+/// Calls `wake` when the unanswered message becomes overdue; returns what stops the timer.
+export function wakeWhenOverdue(d: ThreadDetail | undefined, now: number, wake: () => void): () => void {
+  const left = msUntilOverdue(d, now);
+  if (left === undefined || left === 0) return () => {};
+  const id = setTimeout(wake, left);
+  return () => clearTimeout(id);
 }
 
 /// The place a card's draft is kept in the store's drafts.
