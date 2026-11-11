@@ -24,7 +24,7 @@ pub use chain::{Chain, Edge, EdgeKind, NodeRef};
 pub use command_policy::CommandPolicy;
 pub use comment::{Actor, Comment, CommentBody, CommentKind};
 pub use ids::{
-    ChainId, CommentId, DesignId, ProjectId, ReleaseId, RunId, SubtaskId, ThreadId,
+    ChainId, CommentId, DesignId, PinId, ProjectId, ReleaseId, RunId, SubtaskId, ThreadId,
     ThreadMessageId, ThreadVersionId, TicketId,
 };
 pub use keys::{KeyError, ProjectKey, TicketKey};

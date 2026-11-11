@@ -54,6 +54,10 @@ id_type!(
     DesignId
 );
 id_type!(
+    /// Identifies a pin of the assistant on a design.
+    PinId
+);
+id_type!(
     /// Identifies a [`crate::Chain`].
     ChainId
 );
