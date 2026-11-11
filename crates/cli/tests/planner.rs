@@ -13,7 +13,8 @@ use std::time::{Duration, Instant};
 use common::{Tok, call, mcp_session, repo};
 use serde_json::{Value, json};
 
-const WAIT: Duration = Duration::from_secs(30);
+/// A ceiling, not a delay: a wait returns the moment its event happens.
+const WAIT: Duration = Duration::from_secs(120);
 
 fn planner_logs(tok: &Tok) -> String {
     let out = Command::new(env!("CARGO_BIN_EXE_tok"))

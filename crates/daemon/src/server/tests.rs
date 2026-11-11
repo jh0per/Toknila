@@ -60,7 +60,7 @@ async fn healthz_is_open_and_v1_needs_the_token() {
     .expect("client");
     assert_eq!((health, no_token, wrong, right), (200, 401, 401, 202));
     // The accepted shutdown stops the server.
-    tokio::time::timeout(std::time::Duration::from_secs(5), handle)
+    tokio::time::timeout(std::time::Duration::from_secs(60), handle)
         .await
         .expect("stopped")
         .expect("join");

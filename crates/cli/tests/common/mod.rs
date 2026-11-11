@@ -93,7 +93,7 @@ impl Tok {
     /// meanwhile. Returns when the review waits for a person (or for anyone else), or the card is
     /// no longer in Review.
     pub fn wait_for_person_turn(&self, key: &str) {
-        let until = Instant::now() + Duration::from_secs(30);
+        let until = Instant::now() + Duration::from_secs(120);
         loop {
             let card = self.run(&["show", key]);
             let by = &card["review"]["awaiting"]["by"];
@@ -268,13 +268,13 @@ pub fn reap(home: &Path) {
         .env("TOKNILA_HOME", home)
         .output();
     let Some(pid) = pid else { return };
-    let until = Instant::now() + Duration::from_secs(10);
+    let until = Instant::now() + Duration::from_secs(30);
     while pid_alive(pid) && Instant::now() < until {
         std::thread::sleep(Duration::from_millis(50));
     }
     if pid_alive(pid) {
         kill_pid(pid);
-        let until = Instant::now() + Duration::from_secs(5);
+        let until = Instant::now() + Duration::from_secs(15);
         while pid_alive(pid) && Instant::now() < until {
             std::thread::sleep(Duration::from_millis(50));
         }

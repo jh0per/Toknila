@@ -423,6 +423,8 @@ impl Rig {
         })
     }
 
+    /// The project's no-checks timeout is one second of wall clock, and passing is the thing under
+    /// test: there is no event to await. A sleep never ends early, so load can only lengthen it.
     async fn wait_out_the_timeout(&self) {
         tokio::time::sleep(std::time::Duration::from_millis(1300)).await;
     }

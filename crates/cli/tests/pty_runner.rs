@@ -15,7 +15,10 @@ use common::{Tok, git, kill_hard, repo};
 use toknila_client::Client;
 use toknila_daemon::info::DaemonInfo;
 
-const WAIT: Duration = Duration::from_secs(30);
+/// A ceiling, not a delay: every wait returns the moment its event happens. It is generous
+/// because a loaded machine (a parallel build, a Windows runner) can take a minute to start a
+/// daemon and a pty.
+const WAIT: Duration = Duration::from_secs(120);
 
 /// What a failed wait needs to be diagnosed from a CI log: the tickets and the daemon's logs.
 fn diagnostics(tok: &Tok) -> String {

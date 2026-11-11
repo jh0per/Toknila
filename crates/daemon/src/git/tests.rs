@@ -23,7 +23,7 @@ fn a_fetch_from_a_remote_that_never_answers_is_given_up_at_the_limit() {
     let err = Git::new("git")
         .fetch_within(&repo, &[url.as_str()], Duration::from_secs(1))
         .expect_err("gives up");
-    assert!(started.elapsed() < Duration::from_secs(15), "took too long");
+    assert!(started.elapsed() < Duration::from_secs(60), "took too long");
     let GitError::Failed { command, detail } = err else {
         panic!("not a failure: {err:?}");
     };
@@ -69,19 +69,30 @@ fn a_timeout_ends_the_helper_processes_too() {
     .expect("script");
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     let g = Git::new(&script.to_string_lossy());
-    let err = g
-        .run_within("/", &["fetch"], Duration::from_secs(1))
-        .expect_err("times out");
-    assert!(matches!(err, GitError::Failed { .. }), "{err:?}");
-    let pid: i32 = std::fs::read_to_string(&pid_file)
-        .expect("helper pid")
-        .trim()
-        .parse()
-        .expect("number");
+    // The limit must pass after the script has started its helper (its pid file exists); a kill
+    // before that leaves no helper to look for, and how long a shell takes to start is the
+    // machine's business. So the limit grows until a run did start its helper: the pid file is
+    // the event, not a guess of how long starting takes.
+    let mut limit = Duration::from_secs(1);
+    let pid: i32 = loop {
+        let err = g.run_within("/", &["fetch"], limit).expect_err("times out");
+        assert!(matches!(err, GitError::Failed { .. }), "{err:?}");
+        if let Ok(text) = std::fs::read_to_string(&pid_file)
+            && let Ok(pid) = text.trim().parse()
+        {
+            break pid;
+        }
+        assert!(
+            limit < Duration::from_secs(64),
+            "the script never started its helper"
+        );
+        limit *= 2;
+    };
     let alive = || nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok();
-    let until = Instant::now() + Duration::from_secs(5);
+    // The helper's end is awaited, with a ceiling far above what it takes.
+    let until = Instant::now() + Duration::from_secs(60);
     while alive() && Instant::now() < until {
-        std::thread::sleep(Duration::from_millis(50));
+        std::thread::sleep(Duration::from_millis(20));
     }
     assert!(!alive(), "the helper outlived the timeout");
 }

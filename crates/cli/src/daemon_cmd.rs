@@ -126,8 +126,17 @@ pub fn running(paths: &Paths) -> Result<Option<DaemonInfo>> {
 
 /// Starts the daemon if needed and waits until it answers.
 pub fn start(paths: &Paths) -> Result<DaemonInfo> {
-    if let Some(info) = running(paths)? {
-        return Ok(info);
+    // A daemon that is up but busy (a loaded machine) can miss one health probe; a refused
+    // connection answers at once, so a dead daemon's stale file costs only the pauses.
+    for attempt in 0..3 {
+        if let Some(info) = running(paths)? {
+            return Ok(info);
+        }
+        if attempt < 2 && DaemonInfo::read(&paths.daemon_json())?.is_some() {
+            std::thread::sleep(Duration::from_millis(200));
+        } else {
+            break;
+        }
     }
     std::fs::create_dir_all(&paths.home)?;
     let exe = std::env::current_exe().context("cannot find own executable")?;
@@ -151,6 +160,10 @@ pub fn start(paths: &Paths) -> Result<DaemonInfo> {
             return Ok(info);
         }
         if let Some(status) = child.try_wait()? {
+            // Ours lost the race to a daemon that is up: that one is the answer.
+            if let Some(info) = running(paths)? {
+                return Ok(info);
+            }
             bail!(
                 "daemon exited during startup ({status}); see logs in {}",
                 paths.logs().display()
