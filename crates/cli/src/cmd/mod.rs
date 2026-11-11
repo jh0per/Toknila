@@ -15,6 +15,7 @@ mod profile;
 mod project;
 mod release;
 mod review;
+mod ship;
 mod sim;
 mod spec;
 mod statusline;
@@ -34,6 +35,7 @@ pub use planner::PlannerCmd;
 pub use profile::ProfileCmd;
 pub use project::ProjectCmd;
 pub use release::ReleaseCmd;
+pub use ship::ShipCmd;
 pub use sim::SimCmd;
 pub use thread::ThreadCmd;
 pub use ticket::{SubtaskCmd, TicketCmd};
@@ -59,6 +61,9 @@ pub enum Command {
     /// Chains of tickets.
     #[command(subcommand)]
     Chain(ChainCmd),
+    /// Ships: the workspaces and branches of cards.
+    #[command(subcommand)]
+    Ship(ShipCmd),
     /// Create or show tickets.
     #[command(subcommand)]
     Ticket(TicketCmd),
@@ -257,6 +262,7 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
         Command::Profile(p) => profile::run(&c, p, json_out),
         Command::Planner(p) => planner::run(&c, p, json_out),
         Command::Chain(ch) => chain::run(&c, ch, json_out),
+        Command::Ship(s) => ship::run(&c, s, json_out),
         Command::Dep(d) => chain::dep(&c, d, json_out),
         Command::Ticket(t) => ticket::run(&c, t, json_out),
         Command::Subtask(s) => ticket::subtask(&c, s, json_out),
