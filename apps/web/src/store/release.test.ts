@@ -8,7 +8,7 @@ const chain = (releasable: boolean): ChainDetail =>
   ({
     chain: { id: "c1", name: "work", goal: "", autostart: true, project_id: "p1" },
     tickets: [], releases: [{ id: "r1", chain_id: "c1", version: "1.4.3", state: "cut" }], edges: [], release_tickets: [], order: [],
-    summary: { status: "idle", total: 1, done: 1, released: 0, releasable },
+    summary: { status: "idle", phase: "idle", finished_at: null, total: 1, done: 1, released: 0, releasable },
   }) as unknown as ChainDetail;
 
 const offer: ReleaseOffer = { releasable: true, version: "1.4.3", last_tag: "v1.4.2", steps: ["check", "tag"], base: "develop" };

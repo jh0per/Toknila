@@ -5093,6 +5093,7 @@
         "description": "What a product person sees at a glance.",
         "required": [
           "status",
+          "phase",
           "total",
           "done",
           "released",
@@ -5104,6 +5105,17 @@
             "description": "Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`.",
             "minimum": 0
           },
+          "finished_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the last card of a finished chain was merged; none while the chain is not finished."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "next_release": {
             "oneOf": [
               {
@@ -5113,6 +5125,10 @@
                 "type": "null"
               }
             ]
+          },
+          "phase": {
+            "$ref": "#/components/schemas/PhaseState",
+            "description": "Finished, active, waiting, idle or empty."
           },
           "releasable": {
             "type": "boolean",
@@ -6966,6 +6982,17 @@
         "enum": [
           "design",
           "implement"
+        ]
+      },
+      "PhaseState": {
+        "type": "string",
+        "description": "Where a phase (chain) stands at a glance (never stored): finished, active, waiting, idle or\nempty. It answers \"where is the phase\"; `ChainStatus` answers \"who must act\".",
+        "enum": [
+          "empty",
+          "finished",
+          "active",
+          "waiting",
+          "idle"
         ]
       },
       "Place": {

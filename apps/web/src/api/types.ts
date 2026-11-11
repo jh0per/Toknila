@@ -6,6 +6,7 @@ import type { components } from "../gen/api";
 type Schemas = components["schemas"];
 
 export type ChainDetail = Schemas["ChainDetail"];
+export type ChainSummary = Schemas["ChainSummary"];
 export type ChainItem = Schemas["ChainItem"];
 export type ChainStatus = Schemas["ChainStatus"];
 export type NodeRef = Schemas["NodeRef"];

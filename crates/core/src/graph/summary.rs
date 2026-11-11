@@ -69,8 +69,33 @@ impl ChainView {
         } else {
             ChainStatus::Idle
         };
+        let phase = if status == ChainStatus::Empty {
+            PhaseState::Empty
+        } else if status == ChainStatus::Done {
+            PhaseState::Finished
+        } else if any(&|s| matches!(s, S::Running | S::Waiting | S::Review)) {
+            PhaseState::Active
+        } else if self
+            .tickets
+            .iter()
+            .any(|t| t.status == S::Ready || (t.queued && !t.status.is_done()))
+        {
+            PhaseState::Waiting
+        } else {
+            PhaseState::Idle
+        };
+        let finished_at = (phase == PhaseState::Finished)
+            .then(|| {
+                planned()
+                    .filter(|t| matches!(t.status, S::Merged | S::Released))
+                    .map(|t| t.status_since)
+                    .max()
+            })
+            .flatten();
         ChainSummary {
             status,
+            phase,
+            finished_at,
             total,
             done,
             released,
