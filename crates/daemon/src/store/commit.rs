@@ -10,7 +10,10 @@ use super::{EventRecord, Store, StoreError, WriteTx, panic_message};
 
 /// A test seam: what runs on the writer thread right after a commit.
 #[derive(Clone, Default)]
-pub(super) struct Hook(Arc<Mutex<Option<Arc<dyn Fn() + Send + Sync>>>>);
+pub(super) struct Hook(Arc<Mutex<Option<Action>>>);
+
+/// What a hook runs.
+pub type Action = Arc<dyn Fn() + Send + Sync>;
 
 impl std::fmt::Debug for Hook {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -117,7 +120,7 @@ impl Store {
     /// Test seam: `hook` runs on the writer thread right after every commit, before the
     /// command's answer is sent. Lets a test drop the request at the earliest moment.
     #[doc(hidden)]
-    pub fn on_committed(&self, hook: Option<Arc<dyn Fn() + Send + Sync>>) {
+    pub fn on_committed(&self, hook: Option<Action>) {
         if let Ok(mut h) = self.hook.0.lock() {
             *h = hook;
         }
