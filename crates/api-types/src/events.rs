@@ -86,4 +86,8 @@ pub struct ErrorBody {
     /// is about one field; a form shows the message next to that field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
+    /// Who uses the design a refused delete names (`DELETE .../designs/{design}`, 409); a window
+    /// builds its question from it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub used_by: Option<toknila_app::design_use::DesignUse>,
 }

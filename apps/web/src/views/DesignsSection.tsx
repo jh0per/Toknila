@@ -1,8 +1,8 @@
 import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
-import { get, patch, post, token } from "../api/http";
-import { sendEmpty, uploadDesign } from "../api/designs";
+import { Refusal, get, patch, post, token } from "../api/http";
+import { removeDesign, uploadDesign } from "../api/designs";
 import type { Design, DesignList, Project } from "../api/types";
-import { dayText, fileUrl, kindLabel, placeholder, refusedFiles, sizeText } from "../store/designs";
+import { dayText, kindLabel, placeholder, refusedFiles, sizeText, thumbUrl, usedText } from "../store/designs";
 import { DesignViewer } from "./DesignViewer";
 import { usePins } from "./usePins";
 import { FigmaTokenBox } from "./FigmaTokenBox";
@@ -25,6 +25,7 @@ export function DesignsSection({ project, pinSeq = 0 }: {
   const [over, setOver] = useState(false);
   const [link, setLink] = useState("");
   const [open, setOpen] = useState<Design | undefined>();
+  const [used, setUsed] = useState<{ design: Design; text: string } | undefined>();
   const picker = useRef<HTMLInputElement>(null);
   const load = useCallback(async () => {
     try {
@@ -48,6 +49,17 @@ export function DesignsSection({ project, pinSeq = 0 }: {
       setBusy(false);
     }
   };
+  // A design that cards or pins use is not removed at once: the window asks, then forces.
+  const remove = (d: Design, force: boolean) =>
+    run(async () => {
+      try {
+        await removeDesign(project.key, d.id, force);
+        setUsed(undefined);
+      } catch (e) {
+        if (!force && e instanceof Refusal && e.usedBy) return setUsed({ design: d, text: usedText(e.usedBy) });
+        throw e;
+      }
+    });
   const addFiles = (files: File[]) => {
     const refused = refusedFiles(files);
     const ok = files.filter((f) => !refusedFiles([f]));
@@ -96,6 +108,17 @@ export function DesignsSection({ project, pinSeq = 0 }: {
         </div>
         {error && <p className="field-error" role="alert" data-testid="designs-error">{error}</p>}
       </section>
+      {used && (
+        <section className="card-block" role="alertdialog" aria-label={`Remove ${used.design.name}`} data-testid="design-used">
+          <p data-testid="design-used-text">{used.text}</p>
+          <span className="design-actions">
+            <button type="button" className="btn danger" disabled={busy} data-testid="design-force" onClick={() => void remove(used.design, true)}>
+              Remove anyway
+            </button>
+            <button type="button" className="btn" disabled={busy} data-testid="design-used-cancel" onClick={() => setUsed(undefined)}>Cancel</button>
+          </span>
+        </section>
+      )}
       {list && list.designs.length === 0 && <p className="muted" data-testid="designs-none">No designs yet.</p>}
       {list && list.designs.length > 0 && (
         <ul className="design-grid" data-testid="designs-list">
@@ -103,7 +126,7 @@ export function DesignsSection({ project, pinSeq = 0 }: {
             <DesignCard
               key={d.id} design={d} project={project.key} busy={busy} onOpen={() => setOpen(d)}
               onRename={(name) => run(() => patch(`${base}/${d.id}`, { name }))}
-              onRemove={() => run(() => sendEmpty("DELETE", `${base}/${d.id}`))}
+              onRemove={() => remove(d, false)}
               onFetch={list.figma_token && d.kind === "figma" && !d.has_file ? () => run(() => post(`${base}/${d.id}/fetch`, {})) : undefined}
             />
           ))}
@@ -135,7 +158,7 @@ function DesignCard({ design: d, project, busy, onOpen, onRename, onRemove, onFe
   return (
     <li className="design-card" data-testid="design-card" data-name={d.name}>
       <button type="button" className="design-thumb" data-testid="design-open" aria-label={`Open ${d.name}`} onClick={onOpen}>
-        {d.thumb ? <img src={fileUrl(project, d, token())} alt={d.name} loading="lazy" data-testid="design-thumb" /> : <span className="design-note">{note}</span>}
+        {d.thumb ? <img src={thumbUrl(project, d, token())} alt={d.name} loading="lazy" data-testid="design-thumb" /> : <span className="design-note">{note}</span>}
       </button>
       {name === undefined ? (
         <strong className="design-name" data-testid="design-name">{d.name}</strong>

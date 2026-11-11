@@ -95,6 +95,7 @@ const TABLE: Record<string, Words> = {
   "thread.reopened": (p) => `Thread reopened: ${str(p.thread?.title)}`,
   "thread.withdrawn": (p) => `Thread withdrawn: ${str(p.thread?.title)}`,
   "design_pin.asked": (p) => `The assistant pinned a question on ${str(p.pin?.design_name)}: ${str(p.pin?.text)}`,
+  "design_pin.removed": (p) => `The question on ${str(p.pin?.design_name)} went with the design: ${str(p.pin?.text)}`,
   "design_pin.answered": (p) => `Answered a question on ${str(p.pin?.design_name)}: ${str(p.pin?.answer)}`,
   "window.show_card": (p) => `The assistant opened ${str(p.ticket) || "a card"}`,
   "window.suggest": (p) => `The assistant says the next step: ${str(p.suggestion?.text)}`,

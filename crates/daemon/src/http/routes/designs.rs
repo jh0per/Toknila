@@ -7,9 +7,10 @@ use axum::body::{Body, to_bytes};
 use axum::extract::{Path, Query, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use toknila_app::design_use::{self, DesignUse};
 use toknila_app::{AppError, resolve};
-use toknila_core::DesignId;
-use toknila_core::design::{self, MAX_DESIGN_BYTES};
+use toknila_core::design::{self, DesignKind, MAX_DESIGN_BYTES};
+use toknila_core::{Actor, DesignId};
 
 use super::{ApiResult, read};
 use crate::designs::{DesignError, Designs, figma};
@@ -84,7 +85,16 @@ pub async fn upload_design(
     })?;
     let name = q.get("name").cloned().unwrap_or_default();
     let at = now();
-    let made = blocking(move || d.add_file(&name, &bytes, at)).await?;
+    let renderer = state.pdf_renderer.clone();
+    // A pdf's first page is drawn here, on the blocking thread; no renderer: no thumbnail.
+    let made = blocking(move || {
+        let made = d.add_file(&name, &bytes, at)?;
+        match made.kind {
+            DesignKind::Pdf => d.make_thumb(made.id, &*renderer),
+            _ => Ok(made),
+        }
+    })
+    .await?;
     Ok((StatusCode::CREATED, Json(made)))
 }
 
@@ -160,8 +170,7 @@ pub async fn fetch_design(
     params(("project" = String, Path, description = "Project id or key"),
         ("design" = String, Path, description = "Design id")),
     responses((status = 200, content_type = "application/octet-stream", body = Vec<u8>), (status = 404, body = ErrorBody)))]
-/// The kept file as it was stored, with its media type. It serves as the thumbnail too: the page
-/// scales it.
+/// The kept file as it was stored, with its media type.
 pub async fn design_file(
     State(state): State<AppState>,
     Path((project, design)): Path<(String, String)>,
@@ -169,15 +178,7 @@ pub async fn design_file(
     let d = designs_of(&state, project).await?;
     let id = design_id(&design)?;
     let (bytes, mime) = blocking(move || d.read_file(id)).await?;
-    Ok((
-        [
-            (header::CONTENT_TYPE, mime),
-            (header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_owned()),
-            (header::CACHE_CONTROL, "private, no-cache".to_owned()),
-        ],
-        bytes,
-    )
-        .into_response())
+    Ok(file_response(bytes, mime))
 }
 
 #[utoipa::path(patch, path = "/projects/{project}/designs/{design}", tag = "designs",
@@ -199,16 +200,79 @@ pub async fn rename_design(
 #[utoipa::path(delete, path = "/projects/{project}/designs/{design}", tag = "designs",
     params(("project" = String, Path, description = "Project id or key"),
         ("design" = String, Path, description = "Design id")),
-    responses((status = 204), (status = 404, body = ErrorBody)))]
-/// Removes a design and its file.
+    responses((status = 204), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Removes a design and its file. A design that cards or open pins still use is refused with 409
+/// (`used_by` names them) unless `force=true`: then the references and the open pins go in the
+/// same transaction and each card gets a system comment saying which design went.
 pub async fn delete_design(
     State(state): State<AppState>,
     Path((project, design)): Path<(String, String)>,
-) -> ApiResult<StatusCode> {
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Response> {
+    let force = matches!(q.get("force").map(String::as_str), Some("true" | "1"));
+    let p = read(&state, move |repo| Ok(resolve::project(repo, &project)?)).await?;
+    let d = Designs::new(&state.home, p.id);
+    let id = design_id(&design)?;
+    let (pid, lib) = (p.id, d.clone());
+    let name = blocking(move || lib.get(id)).await?.name;
+    let sentence = name.clone();
+    let (refused, _) = state
+        .store
+        .write(
+            Actor::Human,
+            now(),
+            move |tx| -> ApiResult<Option<DesignUse>> {
+                let used = design_use::of_design(&*tx, pid, id)?;
+                if used.is_free() {
+                    return Ok(None);
+                }
+                if !force {
+                    return Ok(Some(used));
+                }
+                design_use::release(tx, pid, id, &name)?;
+                Ok(None)
+            },
+        )
+        .await?;
+    if let Some(used) = refused {
+        let body = ErrorBody {
+            code: "conflict".to_owned(),
+            error: used.sentence(&sentence),
+            field: None,
+            used_by: Some(used),
+        };
+        return Ok((StatusCode::CONFLICT, Json(body)).into_response());
+    }
+    blocking(move || d.remove(id)).await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[utoipa::path(get, path = "/projects/{project}/designs/{design}/thumb", tag = "designs",
+    params(("project" = String, Path, description = "Project id or key"),
+        ("design" = String, Path, description = "Design id")),
+    responses((status = 200, content_type = "application/octet-stream", body = Vec<u8>), (status = 404, body = ErrorBody)))]
+/// The picture of a design: the image itself, or the first page of a pdf when one was made;
+/// 404 for a design without a picture.
+pub async fn design_thumb(
+    State(state): State<AppState>,
+    Path((project, design)): Path<(String, String)>,
+) -> ApiResult<Response> {
     let d = designs_of(&state, project).await?;
     let id = design_id(&design)?;
-    blocking(move || d.remove(id)).await?;
-    Ok(StatusCode::NO_CONTENT)
+    let (bytes, mime) = blocking(move || d.read_thumb(id)).await?;
+    Ok(file_response(bytes, mime))
+}
+
+fn file_response(bytes: Vec<u8>, mime: String) -> Response {
+    (
+        [
+            (header::CONTENT_TYPE, mime),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_owned()),
+            (header::CACHE_CONTROL, "private, no-cache".to_owned()),
+        ],
+        bytes,
+    )
+        .into_response()
 }
 
 #[utoipa::path(put, path = "/projects/{project}/figma-token", tag = "designs",

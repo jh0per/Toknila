@@ -34,9 +34,9 @@ beforeEach(() => {
 });
 
 describe("a design on the board", () => {
-  it("draws the picture from the project's file and outlines every card's region in its status colour", () => {
+  it("draws the project's picture (a pdf's first page too) and outlines every card's region in its status colour", () => {
     const html = tile();
-    expect(html).toContain("/v1/projects/DEMO/designs/D1/file?token=t0k");
+    expect(html).toContain("/v1/projects/DEMO/designs/D1/thumb?token=t0k");
     expect(html).toMatch(/class="board-region s-running[^"]*"[^>]*data-card="T-1"[^>]*style="left:20%;top:10%;width:40%;height:30%"/);
     // A card without a region has the whole picture.
     expect(html).toMatch(/class="board-region s-merged[^"]*"[^>]*data-card="T-2"[^>]*style="left:0%;top:0%;width:100%;height:100%"/);

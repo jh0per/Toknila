@@ -40,4 +40,20 @@ describe("InboxRow", () => {
     const pin = render(item({ kind: "design_question", text: "home.png: Is the logo fixed?", design: "home.png", pin: "p1", allowed_actions: [] }));
     expect(pin).toContain("home.png: Is the logo fixed?");
   });
+
+  it("shows a pin no card owns by its design, answered in place, with no card to open", () => {
+    const html = render(
+      item({
+        kind: "pin", ticket: undefined, chain: undefined, project: "p1", title: "home.png", text: "Which logo?",
+        design: "home.png", pin: "pin1", allowed_actions: [],
+      }),
+    );
+    expect(html).toContain('data-kind="pin"');
+    expect(html).toContain("The assistant asks about home.png");
+    expect(html).toContain("Which logo?");
+    expect(html).toContain('data-testid="inbox-pin-input"');
+    expect(html).toContain('data-testid="inbox-pin-send"');
+    expect(html).not.toContain("inbox-open-card");
+    expect(html).not.toContain("DEMO-1");
+  });
 });

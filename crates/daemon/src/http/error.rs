@@ -42,6 +42,7 @@ impl IntoResponse for ApiError {
             code: self.0.kind.code().to_owned(),
             error: self.0.message,
             field: None,
+            used_by: None,
         };
         (status, Json(body)).into_response()
     }
@@ -139,6 +140,7 @@ impl IntoResponse for FormError {
                     code,
                     error: message,
                     field: Some(field),
+                    used_by: None,
                 };
                 (StatusCode::BAD_REQUEST, Json(body)).into_response()
             }

@@ -23,7 +23,11 @@ pub(super) fn run(c: &Client, project: Option<String>, json_out: bool) -> Result
 
 /// One item as text: its kind, card and title, then what it carries (a review's gist and checks).
 fn lines(i: &InboxItem) -> String {
-    let mut out = format!("{}  {}  {}\n", w(&i.kind), i.ticket, i.title);
+    let card = i
+        .ticket
+        .as_ref()
+        .map_or_else(|| "-".to_owned(), ToString::to_string);
+    let mut out = format!("{}  {}  {}\n", w(&i.kind), card, i.title);
     if let Some(h) = &i.hand_in {
         out.push_str(&format!("  gist: {}\n", h.gist));
         let checks = h.checks_line();

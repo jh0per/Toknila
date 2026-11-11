@@ -1,7 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { token } from "../api/http";
 import { type Item, type Tile, type Use, isPicture, labelSlots, regionOf } from "../store/designBoard";
-import { fileUrl, kindLabel, placeholder, regionStyle } from "../store/designs";
+import { kindLabel, placeholder, regionStyle, thumbUrl } from "../store/designs";
 import type { Pin } from "../store/pins";
 import { PinMarkers } from "./PinOverlay";
 import type { RefDrag } from "./useRefDrag";
@@ -46,7 +46,7 @@ export function BoardTile({ project, item, tile, pins, activePin, onPin, onAspec
       {d && isPicture(d) ? (
         <div className="board-stage" data-testid="board-stage" style={{ height: tile.h }}>
           <img
-            src={fileUrl(project, d, token())} alt={item.name} draggable={false} data-testid="board-image"
+            src={thumbUrl(project, d, token())} alt={item.name} draggable={false} data-testid="board-image"
             onLoad={(e) => {
               const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
               if (w > 0 && h > 0) onAspect(item.id, w / h);
@@ -73,7 +73,7 @@ export function BoardTile({ project, item, tile, pins, activePin, onPin, onAspec
       ) : (
         <div className="board-note" data-testid="board-note" style={{ height: tile.h }}>
           <p className="muted">
-            {d ? (d.kind === "pdf" ? "A PDF is not drawn on the board. Open a card to read it." : placeholder(d)) : "This design is no longer in the project's library."}
+            {d ? (d.kind === "pdf" ? "This PDF has no first page picture on this machine. Open a card to read it." : placeholder(d)) : "This design is no longer in the project's library."}
           </p>
           <span className="board-note-cards">
             {item.uses.map((u, i) => (

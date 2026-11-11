@@ -90,6 +90,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         home: paths.home.clone(),
         ships: paths.ships(),
         trash: crate::trash::trasher_for(std::env::var_os(crate::trash::TRASH_DIR_ENV)),
+        pdf_renderer: Arc::new(crate::designs::thumb::SystemRenderer),
     };
 
     let listener = match reuse.as_ref().map(|i| i.port).filter(|p| *p != 0) {

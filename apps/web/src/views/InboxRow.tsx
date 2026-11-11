@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { post } from "../api/http";
-import type { InboxItem, InboxKind, TicketDetail } from "../api/types";
+import { type CardItem, type InboxItem, type InboxKind, type TicketDetail, isCardItem } from "../api/types";
 import { MAX_ANSWER, answerProblem } from "../store/pins";
 import { finishReport } from "../store/permissionReports";
 import { HandIn, InboxHandInBlocks } from "./HandIn";
@@ -23,6 +23,7 @@ const KIND_LINE: Record<InboxKind, string> = {
   thread: "A design thread has a new version",
   leftovers: "Subtasks were left open behind a finished card",
   design_question: "The assistant asks about a design",
+  pin: "The assistant asks about a design",
 };
 
 type Dispatch = (i: Intent) => void;
@@ -30,6 +31,18 @@ type Dispatch = (i: Intent) => void;
 /// One thing that waits on a person: the card's title first, what is asked as a muted second
 /// line, the actions that settle it, and Open card.
 export function InboxRow({ state, item, dispatch }: { state: State; item: InboxItem; dispatch: Dispatch }) {
+  // A pin no card owns: the design is the title, nothing to open, answered in place.
+  if (!isCardItem(item)) {
+    return (
+      <li data-kind={item.kind} data-key={item.pin ?? ""}>
+        <div className="row-head">
+          <span className="t">{item.title}</span>
+        </div>
+        <div className="row-kind muted" data-testid="inbox-kind">The assistant asks about {item.design ?? item.title}</div>
+        <DesignQuestion item={item} project={item.project ?? undefined} open={undefined} />
+      </li>
+    );
+  }
   const route = itemRoute(state, item);
   const open = route && (
     <NavLink route={route} dispatch={dispatch} className="btn" testId="inbox-open-card">Open card</NavLink>
@@ -46,7 +59,7 @@ export function InboxRow({ state, item, dispatch }: { state: State; item: InboxI
   );
 }
 
-type BodyProps = { item: InboxItem; open: React.ReactNode; dispatch: Dispatch };
+type BodyProps = { item: CardItem; open: React.ReactNode; dispatch: Dispatch };
 
 function Body({ item, route, open, dispatch, detail }: BodyProps & { route: Route | undefined; detail: TicketDetail | undefined }) {
   switch (item.kind) {
@@ -87,13 +100,14 @@ function Body({ item, route, open, dispatch, detail }: BodyProps & { route: Rout
         </div>
       );
     case "leftovers": return <Leftovers item={item} open={open} dispatch={dispatch} />;
-    case "design_question": return <DesignQuestion item={item} project={route?.name === "card" ? route.project : undefined} open={open} />;
+    case "design_question": return <DesignQuestion item={item} project={item.project ?? (route?.name === "card" ? route.project : undefined)} open={open} />;
+    case "pin": return null;
   }
 }
 
 /// A pin of the assistant on a design: its question, the box that answers it in place, and Open
 /// card (the mockup with the pin). The row goes when the inbox is read again after the answer.
-function DesignQuestion({ item, project, open }: { item: InboxItem; project: string | undefined; open: React.ReactNode }) {
+function DesignQuestion({ item, project, open }: { item: InboxItem; project: string | undefined; open: React.ReactNode | undefined }) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | undefined>();
   const send = async () => {

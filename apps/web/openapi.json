@@ -2340,7 +2340,7 @@
         "tags": [
           "designs"
         ],
-        "summary": "Removes a design and its file.",
+        "summary": "Removes a design and its file. A design that cards or open pins still use is refused with 409\n(`used_by` names them) unless `force=true`: then the references and the open pins go in the\nsame transaction and each card gets a system comment saying which design went.",
         "operationId": "delete_design",
         "parameters": [
           {
@@ -2365,6 +2365,15 @@
         "responses": {
           "204": {},
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -2505,8 +2514,62 @@
         "tags": [
           "designs"
         ],
-        "summary": "The kept file as it was stored, with its media type. It serves as the thumbnail too: the page\nscales it.",
+        "summary": "The kept file as it was stored, with its media type.",
         "operationId": "design_file",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "design",
+            "in": "path",
+            "description": "Design id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/designs/{design}/thumb": {
+      "get": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "The picture of a design: the image itself, or the first page of a pdf when one was made;\n404 for a design without a picture.",
+        "operationId": "design_thumb",
         "parameters": [
           {
             "name": "project",
@@ -6848,7 +6911,7 @@
           },
           "thumb": {
             "type": "boolean",
-            "description": "Whether the file can be shown as a picture (everything kept but a pdf)."
+            "description": "Whether a picture of the design is served at `.../designs/{id}/thumb`: the image itself,\nor the first page of a pdf when the machine could draw it."
           }
         }
       },
@@ -7019,6 +7082,29 @@
           }
         }
       },
+      "DesignUse": {
+        "type": "object",
+        "description": "What still uses a design.",
+        "required": [
+          "cards",
+          "pins"
+        ],
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketKey"
+            },
+            "description": "The cards that reference the design, in chain order."
+          },
+          "pins": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many open pins are on the design.",
+            "minimum": 0
+          }
+        }
+      },
       "Edge": {
         "type": "object",
         "description": "Dependency edge: `to` cannot start before `from` is done.",
@@ -7112,6 +7198,17 @@
               "null"
             ],
             "description": "The input the error belongs to (`repo_path`, `work_branch`, `default_profile`), when it\nis about one field; a form shows the message next to that field."
+          },
+          "used_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DesignUse",
+                "description": "Who uses the design a refused delete names (`DELETE .../designs/{design}`, 409); a window\nbuilds its question from it."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -7496,8 +7593,6 @@
         "description": "One entry of the inbox.",
         "required": [
           "kind",
-          "ticket",
-          "chain",
           "title",
           "since",
           "text",
@@ -7535,7 +7630,15 @@
             "description": "How the question can be answered, as core allows it (`question` items; empty for an\n`ask_human` question, which a comment answers)."
           },
           "chain": {
-            "$ref": "#/components/schemas/ChainId"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ChainId",
+                "description": "The card's chain; absent for a `pin`."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "design": {
             "type": [
@@ -7593,6 +7696,17 @@
             ],
             "description": "The pin to answer (`design_question` items)."
           },
+          "project": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId",
+                "description": "The project of the pin to answer (`design_question` and `pin` items)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "role": {
             "oneOf": [
               {
@@ -7629,12 +7743,19 @@
             "minimum": 0
           },
           "ticket": {
-            "$ref": "#/components/schemas/TicketKey",
-            "description": "The card to open and act on; for `leftovers` the earlier card that holds the subtasks."
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TicketKey",
+                "description": "The card to open and act on; for `leftovers` the earlier card that holds the subtasks;\nabsent for a `pin`, which no card owns."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "title": {
             "type": "string",
-            "description": "The card's title."
+            "description": "The card's title; the design's name for a `pin`."
           }
         }
       },
@@ -7648,7 +7769,8 @@
           "review",
           "thread",
           "leftovers",
-          "design_question"
+          "design_question",
+          "pin"
         ]
       },
       "InstructionClaim": {

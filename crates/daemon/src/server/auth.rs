@@ -110,6 +110,7 @@ fn refuse(status: StatusCode, error: &str, code: &str) -> Response {
         error: error.to_owned(),
         code: code.to_owned(),
         field: None,
+        used_by: None,
     };
     (status, Json(body)).into_response()
 }

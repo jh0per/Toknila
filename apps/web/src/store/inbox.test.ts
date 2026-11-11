@@ -30,6 +30,17 @@ describe("groupInbox", () => {
   });
 });
 
+describe("a pin no card owns", () => {
+  const pin = (id: string) => item("pin", undefined as never, 5, { chain: undefined, pin: id, project: "p1" });
+
+  it("is its own group after the questions of the cards, keyed by the pin, with no route", () => {
+    const groups = groupInbox([pin("a"), item("design_question", "DEMO-1", 6, { pin: "b" })]);
+    expect(groups.map((g) => g.kind)).toEqual(["design_question", "pin"]);
+    expect(itemKey(pin("a"))).not.toBe(itemKey(pin("b")));
+    expect(itemRoute(initialState({ name: "chains" }), pin("a"))).toBeUndefined();
+  });
+});
+
 describe("itemKey", () => {
   it("tells two threads of one card apart", () => {
     expect(itemKey(item("thread", "DEMO-1", 1, { thread: 1 }))).not.toBe(itemKey(item("thread", "DEMO-1", 1, { thread: 2 })));

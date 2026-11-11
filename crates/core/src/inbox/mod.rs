@@ -11,6 +11,7 @@
 //! | `thread` | a thread is open and its newest version came after the person's last request |
 //! | `leftovers` | a card was done out of order and an earlier card still has open subtasks that nobody dismissed |
 //! | `design_question` | a pin of the assistant on a design is about the card and the person has not answered it |
+//! | `pin` | an open pin of the assistant has no card (or its card is not in the project); it is answered in place |
 //!
 //! Items come newest first. The person's actions on them are the ordinary ones (approve,
 //! reject, unblock, a comment, approve a thread) plus the three leftover actions in
@@ -27,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use crate::design::pin::DesignPin;
 use crate::question::{self, AnswerKind, PendingPermission, QuestionKind, RunFacts};
 use crate::{
-    AgentRole, ChainId, Comment, ReviewNote, ReviewTurn, StatusReason, Subtask, Thread,
+    AgentRole, ChainId, Comment, ProjectId, ReviewNote, ReviewTurn, StatusReason, Subtask, Thread,
     ThreadMessage, ThreadVersion, Ticket, TicketKey, TicketStatus, Timestamp, WaitingReason,
     machine::TicketAction, thread,
 };
@@ -51,6 +52,8 @@ pub enum InboxKind {
     Leftovers,
     /// The assistant pinned a question on a design and waits for the answer.
     DesignQuestion,
+    /// The assistant pinned a question on a design and no card owns it; answered in place.
+    Pin,
 }
 
 /// One entry of the inbox.
@@ -58,10 +61,17 @@ pub enum InboxKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InboxItem {
     pub kind: InboxKind,
-    /// The card to open and act on; for `leftovers` the earlier card that holds the subtasks.
-    pub ticket: TicketKey,
-    pub chain: ChainId,
-    /// The card's title.
+    /// The card to open and act on; for `leftovers` the earlier card that holds the subtasks;
+    /// absent for a `pin`, which no card owns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ticket: Option<TicketKey>,
+    /// The card's chain; absent for a `pin`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chain: Option<ChainId>,
+    /// The project of the pin to answer (`design_question` and `pin` items).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<ProjectId>,
+    /// The card's title; the design's name for a `pin`.
     pub title: String,
     /// Since when it waits; items are sorted by this, newest first.
     pub since: Timestamp,
@@ -189,7 +199,11 @@ pub fn compute(data: &InboxData) -> Vec<InboxItem> {
     items.extend(question_items(data));
     items.extend(pins::pin_items(data));
     for i in items.iter_mut().filter(|i| i.kind == InboxKind::Review) {
-        if let Some(t) = data.tickets.iter().find(|t| t.key == i.ticket) {
+        if let Some(t) = data
+            .tickets
+            .iter()
+            .find(|t| Some(&t.key) == i.ticket.as_ref())
+        {
             i.hand_in = hand_in::of_card(t, &data.comments);
         }
     }
@@ -200,8 +214,9 @@ pub fn compute(data: &InboxData) -> Vec<InboxItem> {
 fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxItem {
     InboxItem {
         kind,
-        ticket: t.key.clone(),
-        chain: t.chain_id,
+        ticket: Some(t.key.clone()),
+        chain: Some(t.chain_id),
+        project: None,
         title: t.title.clone(),
         since,
         text,

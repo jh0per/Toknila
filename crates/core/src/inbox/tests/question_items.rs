@@ -184,7 +184,13 @@ fn no_screen_item_for_a_card_that_is_not_working_or_already_asks() {
     });
     let shown: Vec<_> = compute(&d)
         .iter()
-        .map(|i| (i.ticket.to_string(), i.kind, i.text.clone()))
+        .map(|i| {
+            (
+                i.ticket.clone().expect("card").to_string(),
+                i.kind,
+                i.text.clone(),
+            )
+        })
         .collect();
     assert_eq!(
         shown,

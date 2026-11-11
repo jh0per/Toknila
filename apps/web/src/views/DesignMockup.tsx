@@ -3,7 +3,7 @@ import { token } from "../api/http";
 import type { Design } from "../api/types";
 import type { Pin } from "../store/pins";
 import { PinList, PinMarkers } from "./PinOverlay";
-import { type Region, fileUrl, kindLabel, placeholder, regionStyle, regionText, stepZoom } from "../store/designs";
+import { type Region, fileUrl, isImage, kindLabel, placeholder, regionStyle, regionText, stepZoom } from "../store/designs";
 
 const refuse = () => Promise.reject(new Error("This page cannot answer pins."));
 
@@ -34,7 +34,7 @@ export function DesignMockup({ project, design: d, name, region, pins = [], onAn
       <figcaption className="mockup-head">
         <strong data-testid="mockup-name">{d.name}</strong>
         <span className="muted">{kindLabel(d)}</span>
-        {d.thumb && (
+        {isImage(d) && (
           <span className="mockup-zoom" role="group" aria-label="Zoom">
             <button type="button" className="btn small" data-testid="mockup-zoom-out" aria-label="Zoom out" onClick={() => setZoom(stepZoom(zoom, -1))}>−</button>
             <span data-testid="mockup-zoom-level" aria-live="polite">{zoom}%</span>
@@ -43,7 +43,7 @@ export function DesignMockup({ project, design: d, name, region, pins = [], onAn
           </span>
         )}
       </figcaption>
-      {d.thumb && (
+      {isImage(d) && (
         <div className="mockup-frame" data-testid="mockup-frame">
           <div className="mockup-stage" data-testid="mockup-stage" style={{ width: `${zoom}%` }}>
             <img src={url} alt={d.name} data-testid="mockup-image" draggable={false} />

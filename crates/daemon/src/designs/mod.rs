@@ -5,6 +5,7 @@
 
 pub mod figma;
 mod locate;
+pub mod thumb;
 
 pub use locate::Located;
 
@@ -282,6 +283,7 @@ impl Designs {
         if let Some(path) = self.file_of(&d) {
             let _ = fs::remove_file(path);
         }
+        self.remove_thumb(id);
         self.save(&all)
     }
 
