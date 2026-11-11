@@ -21,7 +21,7 @@ pub(super) fn wait_for_person(
     next.review.nudged = false;
     next.review.note = Some(ReviewNote::NoVerdict { lines });
     effects.push(Effect::StopReviewer);
-    effects.push(Effect::RecordReport {
+    effects.push(Effect::RecordNotice {
         summary: "The reviewer could not run what it needed, so its request for changes is not a finding against the code; it is for a person to decide.".to_owned(),
     });
     Ok((TicketStatus::Review, None))

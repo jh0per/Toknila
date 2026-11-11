@@ -430,7 +430,11 @@ fn a_reviewer_that_exits_without_a_verdict_hands_the_card_to_a_person() {
         .iter()
         .find(|c| c.kind == CommentKind::Report && c.body.gist.contains("exited without a verdict"))
         .expect("the card says why");
-    assert_eq!(report.author, Actor::Agent);
+    assert_eq!(
+        report.author,
+        Actor::System,
+        "the daemon's words are Toknila's"
+    );
 }
 
 #[test]

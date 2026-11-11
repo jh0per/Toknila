@@ -3,6 +3,7 @@
 
 import type { Ticket, TicketDetail } from "../api/types";
 import { reasonText } from "../format";
+import { checkText } from "./checkPhase";
 
 /// How the sentence is coloured: a person is needed (`needs`), things go on by themselves
 /// (`going`), or nothing is asked (`quiet`, `done`).
@@ -24,6 +25,8 @@ export interface Pace {
   queue: number | undefined;
   /// The chain starts its ready cards by itself.
   autostart: boolean;
+  /// The clock the elapsed time of a running check is read against; the current time when absent.
+  now?: number;
 }
 
 /// The status sentence and the next step of a card.
@@ -66,14 +69,7 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
       if (turn?.by === "agent") {
         return { tone: "going", text: "In review: the reviewer agent is checking the work", next: "You can read the agent's report below meanwhile." };
       }
-      if (turn?.by === "check") {
-        const place = detail?.review.check_queue ?? 0;
-        if (place > 0) {
-          const where = place === 1 ? "next in line" : `#${place} in line`;
-          return { tone: "going", text: `In review: waits for another check to end (${where})` };
-        }
-        return { tone: "going", text: "In review: bringing the ship up to main" };
-      }
+      if (turn?.by === "check" && detail) return { tone: "going", text: checkText(detail.review, pace.now ?? Date.now()) };
       if (turn?.by === "merging") return { tone: "going", text: "Approved: merging into the main branch" };
       return { tone: "needs", text: "In review: read the agent's report below, then Accept or Return" };
     }
