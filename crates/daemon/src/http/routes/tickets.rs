@@ -218,17 +218,26 @@ pub async fn ticket_action(
                     } else {
                         None
                     };
-                    Ok(look)
+                    Ok(look.map(|l| (l, t.review.clone())))
                 }))
             })
             .await??;
-        if let Some(look) = target {
+        if let Some((look, review)) = target {
             // Only changes beyond the hand-in commit are refused here; an empty branch or a
             // ship git cannot look at is the merge's to block with its own reason.
             if let Err(e @ GuardError::Problem(ShipProblem::Uncommitted { .. })) =
                 state.store.guard_ship(look.clone()).await
             {
                 return Err(ships::refuse_accept(e, &look).into());
+            }
+            // Nothing lands that was not handed in: commits beyond the hand-in, other than the
+            // daemon's own base-sync merges, are refused. A ship git cannot look at is the
+            // merge's to block.
+            if let Some(handed_in) = review.handed_in.clone()
+                && let Ok(extra) = state.store.extra_commits(look.clone(), review).await
+                && !extra.is_empty()
+            {
+                return Err(toknila_app::hand_in::refuse_extra(&extra, &handed_in).into());
             }
         }
     }

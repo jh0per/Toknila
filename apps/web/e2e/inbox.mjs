@@ -200,12 +200,23 @@ try {
   await row("review", "GIT-1").waitFor({ timeout: 10_000 });
   git(ship, "add", "late.txt");
   git(ship, "commit", "--quiet", "-m", "late");
+  let extra = "";
+  try {
+    tok("accept", "GIT-1");
+  } catch (e) {
+    extra = `${e.stdout ?? ""}${e.stderr ?? ""}${e.message}`;
+  }
+  if (!extra.includes("beyond the hand-in") || !extra.includes("late")) {
+    throw new Error(`accept was not refused naming the extra commit: ${extra}`);
+  }
+  console.log("PASS accept with a commit beyond the hand-in is refused and names it");
+  git(ship, "reset", "--quiet", "--hard", "HEAD~1");
   tok("accept", "GIT-1");
   for (const until = Date.now() + 20_000; !tok("show", "GIT-1").includes("merged"); ) {
-    if (Date.now() > until) throw new Error("the card did not merge after the file was committed");
+    if (Date.now() > until) throw new Error("the card did not merge after the extra commit was dropped");
     await new Promise((r) => setTimeout(r, 200));
   }
-  console.log("PASS once the file is committed, the accept merges the card");
+  console.log("PASS once the extra commit is dropped, the accept merges the card");
   // A card in review: the row has Accept and Return; Details show the report above them.
   const revChain = join(home, "reviewed.toml");
   writeFileSync(revChain, chainFile("reviewed", true, [{ id: "rev" }, { id: "back" }]));

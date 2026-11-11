@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 142a1f9bcb75daf45bc10d957b5944fe8429f8389bf30de5b9820931f4f19190 # shrinks to start = Proposed, events = [Approve { by: Human }, DepsSatisfied, Request, Start]
+cc a7ea5b28f2648a3ffcf26df705fa486aebea581b10bc358b062bfbc90d3d516a # shrinks to start = Backlog, events = [DepsSatisfied, Start, Finished { summary: "s", open_threads: [], mode: Human, check: true, max_rounds: 3 }, CheckSyncing, Cancel { reason: "r" }]
