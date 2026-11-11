@@ -85,7 +85,7 @@ try {
   const refsOf = async (key) => (await call("GET", `/tickets/${key}`)).ticket.designs ?? [];
 
   browser = await launch();
-  const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
+  const page = await browser.newPage({ viewport: { width: 1400, height: 1100 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const { expectPath } = checks(page);
@@ -195,6 +195,13 @@ try {
   await t("designs-empty").waitFor({ timeout: 10_000 });
   if (!(await t("designs-empty").textContent()).includes("No designs yet")) throw new Error("the empty hint is missing");
   console.log("PASS a chain without designs shows the hint");
+
+  // The three addresses of the view open it when typed (the daemon serves the page for each).
+  for (const path of ["/chains/work/designs", "/projects/BRD/chains/work/cards/BRD-2/designs"]) {
+    await page.goto(at(path));
+    await t("design-board").waitFor({ timeout: 10_000 });
+  }
+  console.log("PASS the addresses of the view open it directly");
 
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
   console.log("web design board: PASS");
