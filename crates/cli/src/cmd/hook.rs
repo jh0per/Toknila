@@ -27,7 +27,7 @@ fn signals(name: &str, stdin: &str) -> NewActivity {
         signal: format!("hook:{name}"),
         session_id: input.session_id.clone(),
         transcript_path: input.transcript_path.clone(),
-        tool: (name == "pre_tool_use")
+        tool: matches!(name, "pre_tool_use" | "post_tool_use")
             .then(|| hook::tool_text(&input))
             .flatten(),
         prompt: hook::permission_prompt(name, &input),

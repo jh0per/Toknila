@@ -2,8 +2,8 @@
 
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::graph::ChainView;
+use toknila_core::hook::{self, Reaction, Sign};
 use toknila_core::machine::TicketEvent;
-use toknila_core::nudge;
 use toknila_core::{
     Actor, BlockedReason, CommentBody, CommentKind, Release, StatusReason, Ticket, TicketId,
     TicketStatus, WaitingReason,
@@ -44,15 +44,17 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
     event: AgentEvent,
     head: Option<String>,
 ) -> AppResult<TicketId> {
-    // A report of work shows the agent is working again. A question, a crash, and talk with the
-    // owner (a proposal, a thread) do not: the card may well be waiting on the answer.
-    let resumed = match event {
-        AgentEvent::Started
-        | AgentEvent::SubtaskDone { .. }
-        | AgentEvent::Note { .. }
-        | AgentEvent::Finished { .. } => resume(uow, t)?,
-        _ => false,
-    };
+    // A report of work leaves a card that waits on a question or a permission where it is: only
+    // the answer closes those. The hand-in goes on, and an open question is overtaken by it.
+    match event {
+        AgentEvent::Started | AgentEvent::SubtaskDone { .. } | AgentEvent::Note { .. } => {
+            react(uow, t, &Sign::of(hook::SIGNAL_MCP))?;
+        }
+        AgentEvent::Finished { .. } => {
+            react(uow, t, &Sign::of(hook::SIGNAL_HAND_IN))?;
+        }
+        _ => {}
+    }
     match event {
         AgentEvent::Propose(card) => {
             let (chain, from) = (t.chain_id.to_string(), t.key.to_string());
@@ -82,7 +84,7 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
         AgentEvent::Started => with_chain(uow, t.chain_id, |ctx| {
             if t.status == TicketStatus::Ready {
                 ctx.ticket_event(t.id, TicketEvent::Start)?;
-            } else if t.status != TicketStatus::Running && !resumed {
+            } else if !matches!(t.status, TicketStatus::Running | TicketStatus::Waiting) {
                 return Err(AppError::conflict(format!(
                     "cannot start a ticket in {:?}",
                     t.status
@@ -219,36 +221,46 @@ fn report<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, body: CommentBody) ->
     add_comment(uow, &view, t.id, Actor::Agent, CommentKind::Report, body).map(|_| ())
 }
 
-/// A sign of life from the agent (a hook fired). A card that waits goes back to Running when the
-/// signal shows work (`toknila_core::nudge::resumes`); otherwise nothing about the ticket changes.
-/// An open `ask_human` question is never cleared by a hook (a nudge typed into the agent fires
-/// them): only the person's answer or instruction clears it.
-pub fn activity<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, signal: &str) -> AppResult<()> {
-    if !nudge::resumes(signal) {
-        return Ok(());
-    }
-    let asking = uow.ticket(t.id)?.is_some_and(|t| {
-        matches!(
-            t.status_reason,
-            Some(StatusReason::Waiting(WaitingReason::Question { .. }))
-        )
-    });
-    if !asking {
-        resume(uow, t)?;
-    }
-    Ok(())
+/// A sign of life from the agent (a hook fired). What it does to the card is `hook::react`'s: a
+/// question is closed by its answer alone, a permission by its answer or the hook of the prompted
+/// call, and only a silent card goes back to Running on any sign of work.
+pub fn activity<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, sign: &Sign<'_>) -> AppResult<()> {
+    react(uow, t, sign).map(|_| ())
 }
 
-/// A Waiting ticket whose agent is active again goes back to Running, through the machine.
-/// Returns whether it was Waiting.
-fn resume<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket) -> AppResult<bool> {
-    let waiting = uow
-        .ticket(t.id)?
-        .is_some_and(|t| t.status == TicketStatus::Waiting);
-    if waiting {
-        with_chain(uow, t.chain_id, |ctx| {
-            Ok::<_, AppError>(ctx.ticket_event(t.id, TicketEvent::AgentActive)?)
-        })?;
+/// Applies what `hook::react` decides for `t` and the sign: the card goes back to Running through
+/// the machine, and a question the hand-in overtook is closed with a system comment.
+fn react<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, sign: &Sign<'_>) -> AppResult<Reaction> {
+    let Some(now) = uow.ticket(t.id)? else {
+        return Ok(Reaction::Stay);
+    };
+    let waiting = match &now.status_reason {
+        Some(StatusReason::Waiting(w)) => Some(w),
+        _ => None,
+    };
+    let reaction = hook::react(now.status, waiting, sign);
+    if reaction == Reaction::Stay {
+        return Ok(reaction);
     }
-    Ok(waiting)
+    if reaction == Reaction::Overtake
+        && let Some(WaitingReason::Question { text }) = waiting
+    {
+        let gist = "The question was overtaken by the hand-in".to_owned();
+        let body = CommentBody {
+            gist,
+            what: Some(format!(
+                "The agent handed in while this question was open: {text}"
+            )),
+            ..Default::default()
+        };
+        let view = uow
+            .chain_view(t.chain_id)?
+            .ok_or_else(|| AppError::not_found("chain"))?;
+        let kind = CommentKind::Report;
+        add_comment(uow, &view, t.id, Actor::System, kind, body)?;
+    }
+    with_chain(uow, t.chain_id, |ctx| {
+        Ok::<_, AppError>(ctx.ticket_event(t.id, TicketEvent::AgentActive)?)
+    })?;
+    Ok(reaction)
 }

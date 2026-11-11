@@ -5,7 +5,8 @@ use axum::http::StatusCode;
 use axum::{Extension, Json};
 use toknila_app::{AppError, agent, instructions, questions, resolve, reviews, ships};
 use toknila_core::agent::{AgentEvent, ReleaseEvent};
-use toknila_core::{Actor, AgentRole, TicketStatus, hook, nudge};
+use toknila_core::hook::{self, Reaction, Sign};
+use toknila_core::{Actor, AgentRole, StatusReason, TicketStatus};
 
 use super::questions::ask_person;
 use super::{ApiResult, chain_write, load_ticket_detail, stamp};
@@ -125,11 +126,34 @@ pub async fn ticket_activity(
     let at = now();
     let (tokens, prompts) = (state.runners.tokens(), state.runners.prompts());
     tokens.mark_active(t.id, role, at);
-    if let Some(tool) = &input.tool {
+    // A `PreToolUse` names the call about to run; a `PostToolUse` names the call that is done.
+    let before = input.signal == "hook:pre_tool_use";
+    if let (true, Some(tool)) = (before, &input.tool) {
         prompts.remember_tool(t.id, role, tool.clone());
     }
+    // Only the worker's signs of life count for the nudge and bring a waiting card back: a
+    // reviewer beside it is not the worker working. What a sign does to the card is core's.
+    let worker = role == AgentRole::Worker;
+    let prompted = prompts.dialog_tool(t.id, role);
+    let reason = match &t.status_reason {
+        Some(StatusReason::Waiting(w)) => Some(w),
+        _ => None,
+    };
+    let done = (!before).then_some(input.tool.as_deref()).flatten();
+    let sign = Sign {
+        signal: &input.signal,
+        tool: done,
+        prompted: prompted.as_deref(),
+    };
+    let reaction = if worker {
+        hook::react(t.status, reason, &sign)
+    } else {
+        Reaction::Stay
+    };
     let screen_gone = prompts.unflag_screen(t.id, role);
-    let dialog_gone = hook::clears_prompt(&input.signal) && prompts.clear(t.id, role);
+    // A worker's dialog stays open while its card waits and the hook is not the prompted call's.
+    let held = worker && t.status == TicketStatus::Waiting && reaction == Reaction::Stay;
+    let dialog_gone = hook::clears_prompt(&input.signal) && !held && prompts.clear(t.id, role);
     // A prompt that the permission hook already holds is the same dialog.
     let asked = input.prompt.as_deref().map(|message| {
         let (summary, detail) = prompts.last_tool(t.id, role).map_or((None, None), |full| {
@@ -143,13 +167,11 @@ pub async fn ticket_activity(
         }
         (fresh, (text, detail))
     });
-    // Only the worker's signs of life count for the nudge and bring a waiting card back: a
-    // reviewer beside it is not the worker working.
-    let worker = role == AgentRole::Worker;
     if worker {
         tokens.touch(t.id, at, &input.signal);
     }
-    let resume = worker && t.status == TicketStatus::Waiting && nudge::resumes(&input.signal);
+    let resume = reaction != Reaction::Stay;
+    let (signal, done, prompted) = (input.signal.clone(), done.map(str::to_owned), prompted);
     let raised = asked.filter(|(fresh, _)| *fresh).map(|(_, asked)| asked);
     let reviewer_gone = (screen_gone || dialog_gone) && !worker;
     // A reviewer's turn ended: if its verdict is still missing, core nudges it or hands the card
@@ -164,12 +186,16 @@ pub async fn ticket_activity(
             .await?;
     }
     if resume || raised.is_some() || screen_gone || reviewer_gone {
-        let signal = input.signal;
         state
             .store
             .write(Actor::Agent, at, move |tx| -> ApiResult<()> {
                 if resume {
-                    agent::activity(tx, &t, &signal)?;
+                    let sign = Sign {
+                        signal: &signal,
+                        tool: done.as_deref(),
+                        prompted: prompted.as_deref(),
+                    };
+                    agent::activity(tx, &t, &sign)?;
                 }
                 if let Some((text, detail)) = raised {
                     ask_person(tx, &t, role, text, detail)?;

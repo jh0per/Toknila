@@ -1,6 +1,7 @@
 //! A card that waits goes back to Running when the agent shows life again.
 
 use toknila_core::agent::AgentEvent;
+use toknila_core::hook::Sign;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{CommentBody, StatusReason, TicketStatus, WaitingReason};
 
@@ -35,14 +36,85 @@ fn note(mem: &mut Mem) {
     agent::ticket_event(mem, &t, AgentEvent::Note { body }).expect("note");
 }
 
+fn sign(signal: &str) -> Sign<'_> {
+    Sign::of(signal)
+}
+
 #[test]
-fn an_mcp_event_after_ask_human_returns_the_card_to_running() {
+fn an_mcp_event_leaves_a_card_waiting_on_a_question_or_a_permission() {
+    for permission in [true, false] {
+        let mut mem = running();
+        ask(&mut mem, "may I run rm?", permission);
+        let waiting = a(&mem);
+        assert_eq!(waiting.status, TicketStatus::Waiting);
+        note(&mut mem);
+        let t = a(&mem);
+        agent::ticket_event(&mut mem, &t, AgentEvent::Started).expect("started");
+        let t = a(&mem);
+        assert_eq!(
+            (t.status, t.status_reason),
+            (TicketStatus::Waiting, waiting.status_reason),
+            "permission: {permission}"
+        );
+    }
+}
+
+#[test]
+fn a_hook_of_work_never_answers_a_question() {
     let mut mem = running();
-    ask(&mut mem, "may I run rm?", true);
+    ask(&mut mem, "which db?", false);
+    let t = a(&mem);
+    for signal in ["hook:post_tool_use", "hook:user_prompt_submit", "api"] {
+        agent::activity(&mut mem, &t, &sign(signal)).expect("activity");
+        assert_eq!(a(&mem).status, TicketStatus::Waiting, "{signal}");
+    }
+}
+
+#[test]
+fn a_permission_answered_at_the_terminal_resumes_on_the_hook_of_its_call_only() {
+    let mut mem = running();
+    ask(&mut mem, "may I run ls?", true);
+    let t = a(&mem);
+    let unrelated = Sign {
+        signal: "hook:post_tool_use",
+        tool: Some("Bash: pwd"),
+        prompted: Some("Bash: ls"),
+    };
+    agent::activity(&mut mem, &t, &unrelated).expect("activity");
     assert_eq!(a(&mem).status, TicketStatus::Waiting);
-    note(&mut mem);
+    agent::activity(&mut mem, &t, &sign("hook:user_prompt_submit")).expect("activity");
+    assert_eq!(a(&mem).status, TicketStatus::Waiting);
+    let prompted = Sign {
+        tool: Some("Bash: ls"),
+        ..unrelated
+    };
+    agent::activity(&mut mem, &t, &prompted).expect("activity");
     let t = a(&mem);
     assert_eq!((t.status, t.status_reason), (TicketStatus::Running, None));
+}
+
+#[test]
+fn a_hand_in_overtakes_an_open_question_and_goes_on() {
+    let mut mem = running();
+    ask(&mut mem, "which db?", false);
+    let t = a(&mem);
+    let summary = toknila_core::handin::from_plain("done");
+    agent::ticket_event(&mut mem, &t, AgentEvent::Finished { summary }).expect("finished");
+    assert_eq!(a(&mem).status, TicketStatus::Review);
+    let overtaken: Vec<_> = mem
+        .comments
+        .iter()
+        .filter(|c| c.author == toknila_core::Actor::System)
+        .filter(|c| c.body.gist.contains("overtaken"))
+        .collect();
+    assert_eq!(overtaken.len(), 1, "{:?}", mem.comments);
+    assert!(
+        overtaken[0]
+            .body
+            .what
+            .as_deref()
+            .is_some_and(|w| w.contains("which db?"))
+    );
 }
 
 #[test]
@@ -66,10 +138,10 @@ fn a_hook_that_means_work_resumes_and_one_that_means_waiting_does_not() {
     ask(&mut mem, "may I run rm?", true);
     let t = a(&mem);
     for quiet in ["hook:stop", "hook:notification", "start"] {
-        agent::activity(&mut mem, &t, quiet).expect("activity");
+        agent::activity(&mut mem, &t, &sign(quiet)).expect("activity");
         assert_eq!(a(&mem).status, TicketStatus::Waiting, "{quiet}");
     }
-    agent::activity(&mut mem, &t, "hook:post_tool_use").expect("activity");
+    agent::activity(&mut mem, &t, &sign("hook:post_tool_use")).expect("activity");
     assert_eq!(a(&mem).status, TicketStatus::Running);
 }
 
@@ -83,7 +155,7 @@ fn a_silent_card_returns_to_running_on_activity() {
         a(&mem).status_reason,
         Some(StatusReason::Waiting(WaitingReason::Silent))
     );
-    agent::activity(&mut mem, &t, "hook:user_prompt_submit").expect("activity");
+    agent::activity(&mut mem, &t, &sign("hook:user_prompt_submit")).expect("activity");
     assert_eq!(a(&mem).status, TicketStatus::Running);
 }
 
@@ -117,7 +189,7 @@ fn a_silent_give_up_never_clears_an_open_question() {
 fn activity_of_a_running_card_changes_nothing() {
     let mut mem = running();
     let t = a(&mem);
-    agent::activity(&mut mem, &t, "hook:post_tool_use").expect("activity");
+    agent::activity(&mut mem, &t, &sign("hook:post_tool_use")).expect("activity");
     assert_eq!(a(&mem).status, TicketStatus::Running);
 }
 
