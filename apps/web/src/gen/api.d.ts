@@ -1675,6 +1675,10 @@ export interface components {
             event: "thread_version";
             format: components["schemas"]["ArtifactFormat"];
             thread: string;
+        } | {
+            /** @enum {string} */
+            event: "withdraw_thread";
+            thread: string;
         };
         /**
          * @description How to launch an agent and in which role. A new agent is a new profile file, not new code.
@@ -3542,7 +3546,7 @@ export interface components {
          * @description Whether the thread still needs a decision.
          * @enum {string}
          */
-        ThreadState: "open" | "approved";
+        ThreadState: "open" | "approved" | "withdrawn";
         /** @description An immutable, numbered version of the thread's artifact. */
         ThreadVersion: {
             author: components["schemas"]["Actor"];

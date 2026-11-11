@@ -122,7 +122,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
         ),
         tool(
             "open_thread",
-            "Open a thread on a card to settle a design, a flow or an architecture with the owner before the card is built. Only the owner approves it.",
+            "Open a thread on a card to settle a design, a flow or an architecture with the owner before the card is built. Only the owner approves it. A card gets one thread of each kind: a second open_thread of the same kind is refused with the number of the existing thread; post a version on it with thread_version instead.",
             json!({
                 "card": card,
                 "kind": { "type": "string", "enum": ["design", "flow", "architecture", "other"] },

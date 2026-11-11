@@ -203,7 +203,7 @@ mod tests {
             toknila_core::instructions::protocol()
         );
         let tools = answers[1]["result"]["tools"].as_array().expect("tools");
-        assert_eq!(tools.len(), 10);
+        assert_eq!(tools.len(), 11);
         assert_eq!(answers[2]["result"], json!({}));
     }
 

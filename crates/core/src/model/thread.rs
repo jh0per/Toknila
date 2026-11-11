@@ -26,6 +26,8 @@ pub enum ThreadKind {
 pub enum ThreadState {
     Open,
     Approved,
+    /// The agent took back its own thread before it had a version or a person wrote in it.
+    Withdrawn,
 }
 
 /// How an artifact body is to be read.
