@@ -3,7 +3,8 @@
 
 use toknila_api_types::{
     CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain, NewThread,
-    NewVersion, PlanView, PlannerState, StartPlanner, TerminalSize, ThreadDetail, TicketDetail,
+    NewVersion, PlannerDesign, PlannerPlan, PlannerState, StartPlanner, TerminalSize, ThreadDetail,
+    TicketDetail,
 };
 use toknila_core::RunId;
 
@@ -82,8 +83,13 @@ impl Client {
     // ---- the planner plans, with its run token ----
 
     /// `GET /planner/plan`.
-    pub fn planner_plan(&self) -> ClientResult<PlanView> {
+    pub fn planner_plan(&self) -> ClientResult<PlannerPlan> {
         self.call("GET", "/planner/plan", NO_BODY)
+    }
+
+    /// `GET /planner/designs/{design}`.
+    pub fn planner_design(&self, design: &str) -> ClientResult<PlannerDesign> {
+        self.call("GET", &format!("/planner/designs/{}", enc(design)), NO_BODY)
     }
 
     /// `POST /planner/chains`.

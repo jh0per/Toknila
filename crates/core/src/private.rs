@@ -53,6 +53,11 @@ pub fn deny_rules_for(abs: &str, home: &str) -> Vec<String> {
     out
 }
 
+/// The allow rule that lets an agent `Read` exactly one absolute file (nothing below or beside it).
+pub fn read_allow_rule(abs: &str) -> String {
+    format!("Read(/{})", rooted(abs))
+}
+
 /// The absolute private paths below `home`.
 pub fn private_paths(home: &str) -> Vec<String> {
     let home = home.trim_end_matches(['/', '\\']);

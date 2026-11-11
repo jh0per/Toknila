@@ -59,6 +59,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 web_domains: Vec::new(),
                 repo_tools: Vec::new(),
                 project: None,
+                designs: Vec::new(),
             },
         });
     }

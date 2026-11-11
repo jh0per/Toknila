@@ -28,6 +28,7 @@ fn brief(acceptance: &[String]) -> RunBrief<'_> {
         waiting: &[],
         returned: None,
         design_first: false,
+        has_designs: false,
     }
 }
 
