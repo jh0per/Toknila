@@ -5,12 +5,16 @@
 // (196 to 480 px wide, up to 320 px tall); the size is then the card's own and still never
 // smaller than what its content needs.
 
+import api from "../../openapi.json";
 import type { Size } from "../api/types";
 
-export const MIN_W = 196;
+/// The limits of a card's size are the daemon's: it clamps to them, and the API document states
+/// them as the defaults of `SizeLimits` (crates/api-types/src/card_size.rs).
+const limits = api.components.schemas.SizeLimits.properties;
+export const MIN_W: number = limits.min_w.default;
 export const AUTO_MAX_W = 320;
-export const RESIZE_MAX_W = 480;
-export const RESIZE_MAX_H = 320;
+export const RESIZE_MAX_W: number = limits.max_w.default;
+export const RESIZE_MAX_H: number = limits.max_h.default;
 const GRID = 8;
 
 /// The three faces a card prints in; the measurer knows their fonts.
@@ -27,11 +31,15 @@ export interface CardContent {
   pill: string;
   key: string;
   foot: Foot;
+  /// The card's description (its prompt, Markdown); its first line shows on a tall card.
+  description?: string;
 }
 
 export interface CardLayout {
   w: number;
   h: number;
+  /// The first line of the description, when the card is tall enough to show it under the title.
+  desc?: string;
   /// The title, as drawn: one string per line, the last one cut with an ellipsis if it did not fit.
   lines: string[];
 }
@@ -42,6 +50,7 @@ const SIDE = 22;
 const CHROME_Y = 21;
 const GAP = 3;
 const LINE_H = 16;
+const DESC_H = 16;
 const PILL_H = 16;
 /// The pill's padding and dot, the gap before the key, in pixels.
 const PILL_EXTRA = 8 * 2 + 7 + 5;
@@ -99,8 +108,25 @@ export function autoWidth(c: CardContent, m: Measure): number {
 }
 
 /// The height a card needs for `lines` title lines.
-export const contentHeight = (lines: number, foot: Foot): number =>
-  up(CHROME_Y + lines * LINE_H + GAP + PILL_H + (foot === "none" ? 0 : GAP + FOOT_H[foot]));
+export const contentHeight = (lines: number, foot: Foot, desc = false): number =>
+  up(CHROME_Y + lines * LINE_H + (desc ? GAP + DESC_H : 0) + GAP + PILL_H + (foot === "none" ? 0 : GAP + FOOT_H[foot]));
+
+/// The first line of a description worth showing: the first non-empty line, without the Markdown
+/// marks that begin it (heading, list, quote, fence); `undefined` when there is none.
+export function descriptionLine(text: string | undefined): string | undefined {
+  for (const raw of (text ?? "").split(/\r?\n/)) {
+    const line = raw.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s*)+/, "").trim();
+    if (line && !/^(```|~~~|---+$|\*\*\*+$)/.test(line)) return line;
+  }
+  return undefined;
+}
+
+/// The description line a card of height `h` shows: only when it has room beyond what its title
+/// and rows need.
+const descFor = (c: CardContent, lines: number, h: number): string | undefined => {
+  const d = descriptionLine(c.description);
+  return d && h >= contentHeight(lines, c.foot, true) ? d : undefined;
+};
 
 /// The card as its content makes it.
 export function autoCard(c: CardContent, m: Measure): CardLayout {
@@ -130,5 +156,5 @@ export function sizedCard(c: CardContent, s: Size, m: Measure): CardLayout {
   const w = clamp(Math.round(s.w), MIN_W, RESIZE_MAX_W);
   const lines = wrapTitle(c.title, w - SIDE, maxLines(w), m);
   const h = clamp(Math.round(s.h), Math.min(contentHeight(lines.length, c.foot), RESIZE_MAX_H), RESIZE_MAX_H);
-  return { w, h, lines };
+  return { w, h, lines, desc: descFor(c, lines.length, h) };
 }

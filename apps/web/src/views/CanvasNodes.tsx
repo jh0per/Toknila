@@ -79,6 +79,7 @@ export function TicketNode({ ticket: t, projectKey, layout, href, style, selecte
       <span className="title" title={t.title} data-testid="title">
         {layout.lines.map((line, i) => <span className="tl" key={i}>{line}</span>)}
       </span>
+      {layout.desc && <span className="desc" data-testid="desc">{layout.desc}</span>}
       <span className="row">
         <span className="st" data-testid="status">
           <span className={`dot${t.status === "running" ? " pulse" : ""}`} data-testid={t.status === "running" ? "live" : undefined} />
