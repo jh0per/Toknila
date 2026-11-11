@@ -95,8 +95,17 @@ impl ChainTx {
     }
 
     /// Marks a cut milestone released; its tickets move to Released.
-    pub fn complete_release(&mut self, release: ReleaseId) -> Result<(), GraphError> {
-        let applied = self.step(|v, now| v.complete_release(release, now))?;
+    pub fn complete_release(
+        &mut self,
+        release: ReleaseId,
+        tag: Option<String>,
+    ) -> Result<(), GraphError> {
+        let applied = self.step(|v, now| {
+            if let Some(tag) = tag {
+                v.tag_release(release, tag)?;
+            }
+            v.complete_release(release, now)
+        })?;
         self.keep_effects(applied);
         Ok(())
     }

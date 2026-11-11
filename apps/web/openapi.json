@@ -422,6 +422,111 @@
         }
       }
     },
+    "/chains/{chain}/release": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "operationId": "release_offer",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseOffer"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "The person's click on Release: cuts the chain's release milestone and starts the run in the\nbackground. The answer is the chain with the milestone cut; the steps are read from\n`GET /releases/{release}/run`, and the milestone reads released when the last one passes.",
+        "operationId": "start_release",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRelease"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain}/releases": {
       "post": {
         "tags": [
@@ -2462,6 +2567,45 @@
             }
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/releases/{release}/run": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "operationId": "release_run",
+        "parameters": [
+          {
+            "name": "release",
+            "in": "path",
+            "description": "Release id or version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRun"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/json": {
                 "schema": {
@@ -4951,7 +5095,8 @@
           "status",
           "total",
           "done",
-          "released"
+          "released",
+          "releasable"
         ],
         "properties": {
           "done": {
@@ -4968,6 +5113,10 @@
                 "type": "null"
               }
             ]
+          },
+          "releasable": {
+            "type": "boolean",
+            "description": "Every card of the plan is in the work branch and one of them is not released yet: the\nchain's end node offers Release."
           },
           "released": {
             "type": "integer",
@@ -6508,6 +6657,13 @@
             },
             "description": "The commands remembered with \"Allow always\" (`Bash(cargo test *)`); the list replaces the\nremembered ones, so a rule is removed by sending the list without it."
           },
+          "bump_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command a release runs to bump the version (`npm version {version}\n--no-git-tag-version`; `{version}` is the version). An empty text clears it."
+          },
           "check_command": {
             "type": [
               "string",
@@ -7147,6 +7303,13 @@
             "type": "boolean",
             "description": "Hidden from the sidebar; its data is kept and it can be brought back."
           },
+          "bump_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command a release runs to put its version into the project's files (`npm version\n{version} --no-git-tag-version`; `{version}` is the version). `None`: no bump step."
+          },
           "check_command": {
             "type": [
               "string",
@@ -7566,6 +7729,13 @@
           "state": {
             "$ref": "#/components/schemas/ReleaseState"
           },
+          "tag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The git tag of the release (`v1.4.0`), set when a release run made it."
+          },
           "version": {
             "type": "string"
           }
@@ -7621,6 +7791,82 @@
           }
         }
       },
+      "ReleaseOffer": {
+        "type": "object",
+        "description": "Answer of `GET /v1/chains/{chain}/release`: what the Release dialog shows.",
+        "required": [
+          "releasable",
+          "version",
+          "steps",
+          "base"
+        ],
+        "properties": {
+          "base": {
+            "type": "string",
+            "description": "The branch the release is made on."
+          },
+          "last_tag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The last tag of the repository, if it has one."
+          },
+          "releasable": {
+            "type": "boolean",
+            "description": "Every card is merged: the end node offers Release."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseStep"
+            },
+            "description": "The steps the run will take, in order."
+          },
+          "version": {
+            "type": "string",
+            "description": "The version to suggest: the chain's own release when it has one, else the next patch of\nthe last tag."
+          }
+        }
+      },
+      "ReleaseRun": {
+        "type": "object",
+        "description": "Answer of `GET /v1/releases/{release}/run`: the last release run of a milestone.",
+        "required": [
+          "release",
+          "version",
+          "tag",
+          "state",
+          "steps"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the run stopped, naming the step; only when it failed."
+          },
+          "release": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RunState"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunStep"
+            }
+          },
+          "tag": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
       "ReleaseState": {
         "type": "string",
         "description": "Milestone lifecycle (gitflow): planned, then `release/<version>` is cut, then shipped.",
@@ -7628,6 +7874,16 @@
           "planned",
           "cut",
           "released"
+        ]
+      },
+      "ReleaseStep": {
+        "type": "string",
+        "description": "One step of a release run, in the order it runs.",
+        "enum": [
+          "check",
+          "bump",
+          "tag",
+          "push"
         ]
       },
       "RepoCheck": {
@@ -8013,6 +8269,40 @@
         "type": "string",
         "description": "Identifies a [`crate::Run`] of a runner process."
       },
+      "RunState": {
+        "type": "string",
+        "description": "Where a release run is as a whole.",
+        "enum": [
+          "running",
+          "failed",
+          "done"
+        ]
+      },
+      "RunStep": {
+        "type": "object",
+        "description": "One step of a release run with what it printed.",
+        "required": [
+          "step",
+          "label",
+          "state",
+          "output"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string",
+            "description": "What the step printed (the end of it when it is long)."
+          },
+          "state": {
+            "$ref": "#/components/schemas/StepState"
+          },
+          "step": {
+            "$ref": "#/components/schemas/ReleaseStep"
+          }
+        }
+      },
       "Ship": {
         "type": "object",
         "description": "The worktree and branch a ticket works in, once the shipyard has made them.",
@@ -8075,6 +8365,19 @@
               "null"
             ],
             "description": "A planner profile from `GET /v1/profiles`; unset: `claude-code-planner`."
+          }
+        }
+      },
+      "StartRelease": {
+        "type": "object",
+        "description": "Body of `POST /v1/chains/{chain}/release`: the person's click on Release.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "The version, such as `1.4.0`; it becomes the tag `v1.4.0`."
           }
         }
       },
@@ -8170,6 +8473,16 @@
           }
         ],
         "description": "The reason attached to the current status, if that status carries one."
+      },
+      "StepState": {
+        "type": "string",
+        "description": "Where one step of a release run is.",
+        "enum": [
+          "pending",
+          "running",
+          "done",
+          "failed"
+        ]
       },
       "StoppedAt": {
         "type": "object",

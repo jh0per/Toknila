@@ -101,6 +101,7 @@ impl Builder {
             branch: None,
             cut_at: None,
             released_at: None,
+            tag: None,
         };
         let id = r.id;
         self.view.releases.push(r);
@@ -578,4 +579,45 @@ fn settle_journals_every_intermediate_transition() {
     );
     assert_eq!(settled.applied.len(), 2);
     assert_eq!(v.settle(T).expect("settle again").events, []);
+}
+
+#[test]
+fn a_chain_is_releasable_when_every_card_is_merged_and_not_before() {
+    let mut b = Builder::new(true);
+    let (a, c) = (b.ticket(), b.ticket());
+    b.edge(a, c);
+    let mut v = b.view;
+    assert!(!v.releasable(), "cards that have not started");
+    settle(&mut v);
+    finish_and_accept(&mut v, a);
+    assert!(!v.releasable(), "one card is still open");
+    settle(&mut v);
+    finish_and_accept(&mut v, c);
+    assert!(v.releasable());
+    assert!(v.summary(T).releasable);
+    assert_eq!(
+        v.leaf_tickets(),
+        vec![tid(c)],
+        "a milestone waits for the last card"
+    );
+}
+
+#[test]
+fn a_released_chain_is_not_releasable_again_and_an_empty_one_never_is() {
+    let mut b = Builder::new(true);
+    let a = b.ticket();
+    let r = b.release("1.0.0", StartMode::Manual);
+    b.edge(a, r);
+    let mut v = b.view;
+    assert!(!v.releasable());
+    settle(&mut v);
+    finish_and_accept(&mut v, a);
+    assert!(v.releasable());
+    assert_eq!(v.end_release().map(|r| r.version.as_str()), Some("1.0.0"));
+    v.cut_release(rid(r), T).expect("cut");
+    v.tag_release(rid(r), "v1.0.0".to_owned()).expect("tag");
+    v.complete_release(rid(r), T).expect("release");
+    assert!(!v.releasable(), "everything is released");
+    assert_eq!(v.end_release(), None);
+    assert_eq!(v.releases[0].tag.as_deref(), Some("v1.0.0"));
 }

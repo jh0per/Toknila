@@ -27,6 +27,7 @@ fn project() -> Project {
         max_review_rounds: 3,
         merge: Default::default(),
         check_command: None,
+        bump_command: None,
         worker_model: None,
         reviewer_model: None,
         planner_model: None,
@@ -532,6 +533,7 @@ async fn chain_view_saves_and_loads_without_loss() {
         branch: None,
         cut_at: Some(Timestamp(7)),
         released_at: None,
+        tag: None,
     };
     let view = ChainView {
         chain: c.clone(),

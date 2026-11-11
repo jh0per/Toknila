@@ -128,19 +128,35 @@ export function TicketNode({ ticket: t, layout, href, style, selected, moving, o
 
 /// A release milestone: a dashed node at the end of its cards. The chain's last release is the
 /// end of the diagram (`end`).
-export function ReleaseNode({ release: r, nodeKey, style, over, end = false }: {
+export function ReleaseNode({ release: r, nodeKey, style, over, end = false, onRelease }: {
   release: Release;
   nodeKey: string;
   style: CSSProperties;
   over: boolean;
   end?: boolean;
+  /// Set when every card of the chain is merged: the node offers Release.
+  onRelease?: () => void;
 }) {
   return (
     <div className={`node release${over ? " over" : ""}`} data-node={nodeKey} data-version={r.version} data-end={end || undefined} style={style}>
       <b className="key">◆ {r.version}</b>
       <span className="muted">{r.channel} · {r.start_mode}</span>
-      <small className="muted" data-testid="release-state">{r.state}</small>
+      <small className="muted" data-testid="release-state">{r.state}{r.tag ? ` · ${r.tag}` : ""}</small>
+      {onRelease && <ReleaseButton onClick={onRelease} />}
     </div>
+  );
+}
+
+/// The Release button of an end node; a press on it is not a drag of the diagram.
+function ReleaseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button" className="btn primary small" data-testid="release-button"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+    >
+      Release
+    </button>
   );
 }
 
@@ -155,11 +171,12 @@ export function StartNode({ goal, style }: { goal: string; style: CSSProperties 
 }
 
 /// Where the diagram ends when the chain has no release: a dashed node at its right edge.
-export function FinishNode({ style }: { style: CSSProperties }) {
+export function FinishNode({ style, onRelease }: { style: CSSProperties; onRelease?: () => void }) {
   return (
     <div className="node bookend" data-testid="end-node" data-end style={style}>
       <b className="key">Finish</b>
       <span className="muted">Everything above is done</span>
+      {onRelease && <ReleaseButton onClick={onRelease} />}
     </div>
   );
 }

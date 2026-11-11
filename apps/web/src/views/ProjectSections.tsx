@@ -71,6 +71,9 @@ export function AgentsSection({ state, form, set }: FormProps) {
       <Field label="Test command (optional)" name="check_command" error={fieldError(s, "check_command")} hint="Agents run it before they hand in.">
         <input data-testid="check-command" value={form.check_command} spellCheck={false} onChange={(e) => set("check_command", e.target.value)} />
       </Field>
+      <Field label="Version bump command (optional)" name="bump_command" error={fieldError(s, "bump_command")} hint="A release runs it to put the new version into your files; {version} is the version. What it changes is committed.">
+        <input data-testid="bump-command" value={form.bump_command} spellCheck={false} onChange={(e) => set("bump_command", e.target.value)} />
+      </Field>
       <CommandsFields form={form} set={set} />
     </div>
   );

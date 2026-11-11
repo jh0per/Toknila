@@ -16,6 +16,7 @@ pub mod plan_files;
 pub mod pr_watch;
 pub mod profiles;
 pub mod recovery;
+pub mod releaser;
 pub mod runner;
 pub mod server;
 pub mod shipyard;

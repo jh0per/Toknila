@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use toknila_core::{
-    ChainId, Edge, EdgeKind, NodeRef, Release, ReleaseChannel, ReleaseId, StartMode,
+    ChainId, Edge, EdgeKind, NodeRef, Release, ReleaseChannel, ReleaseId, ReleaseState, StartMode,
 };
 
 use crate::chains::change;
@@ -102,8 +102,95 @@ pub fn act<U: UnitOfWork + ?Sized>(
     with_chain(uow, r.chain_id, |ctx| -> AppResult<()> {
         match action {
             ReleaseAction::Start => ctx.cut_release(r.id)?,
-            ReleaseAction::Complete => ctx.complete_release(r.id)?,
+            ReleaseAction::Complete => ctx.complete_release(r.id, None)?,
         }
+        Ok(())
+    })
+}
+
+/// Begins a release of the whole chain at `version`: every card must be in the work branch. The
+/// chain's end milestone is used and cut when it is only planned; a chain without one gets a
+/// milestone that waits for its last cards. Returns the cut milestone and its project. Nothing
+/// is tagged or pushed here: that is the release run's work.
+pub fn begin<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: &str,
+    version: &str,
+) -> AppResult<(Release, toknila_core::Project)> {
+    let version =
+        toknila_core::release_run::clean_version(version).map_err(AppError::bad_request)?;
+    let c = crate::resolve::chain(uow, chain)?;
+    let project = uow
+        .project(c.project_id)?
+        .ok_or_else(|| AppError::not_found("project"))?;
+    let release = with_chain(uow, c.id, |ctx| -> AppResult<Release> {
+        if !ctx.view.releasable() {
+            return Err(AppError::conflict(
+                "the chain still has open cards: release it when every card is merged",
+            ));
+        }
+        let existing = ctx.view.end_release().cloned();
+        let id = match existing {
+            Some(r) if r.version != version => {
+                return Err(AppError::bad_request(format!(
+                    "the chain's release is {}, not {version}",
+                    r.version
+                )));
+            }
+            Some(r) => r.id,
+            None => {
+                if ctx.view.releases.iter().any(|r| r.version == version) {
+                    return Err(AppError::conflict(format!(
+                        "release {version} already exists"
+                    )));
+                }
+                let chain_id = ctx.view.chain.id;
+                let r = Release::planned(
+                    ReleaseId::new(),
+                    chain_id,
+                    version.clone(),
+                    ReleaseChannel::TagOnly,
+                    StartMode::Manual,
+                );
+                let id = r.id;
+                let leaves = ctx.view.leaf_tickets();
+                ctx.add_release(r);
+                for t in leaves {
+                    ctx.add_edge(Edge {
+                        chain_id,
+                        from: NodeRef::Ticket(t),
+                        to: NodeRef::Release(id),
+                        kind: EdgeKind::Normal,
+                    })?;
+                }
+                id
+            }
+        };
+        if ctx
+            .view
+            .releases
+            .iter()
+            .any(|r| r.id == id && r.state == ReleaseState::Planned)
+        {
+            ctx.cut_release(id)?;
+        }
+        ctx.view
+            .releases
+            .iter()
+            .find(|r| r.id == id)
+            .cloned()
+            .ok_or_else(|| AppError::not_found("release"))
+    })?;
+    Ok((release, project))
+}
+
+/// Marks a cut milestone released with the tag its release run made.
+pub fn finish<U: UnitOfWork + ?Sized>(uow: &mut U, release: ReleaseId, tag: &str) -> AppResult<()> {
+    let r = uow
+        .release(release)?
+        .ok_or_else(|| AppError::not_found("release"))?;
+    with_chain(uow, r.chain_id, |ctx| -> AppResult<()> {
+        ctx.complete_release(release, Some(tag.to_owned()))?;
         Ok(())
     })
 }

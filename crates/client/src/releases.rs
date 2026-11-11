@@ -24,3 +24,35 @@ impl Client {
         )
     }
 }
+
+impl Client {
+    /// `GET /chains/{chain}/release`: what the Release dialog offers.
+    pub fn release_offer(&self, chain: &str) -> ClientResult<toknila_api_types::ReleaseOffer> {
+        self.call(
+            "GET",
+            &format!("/chains/{}/release", enc(chain)),
+            crate::NO_BODY,
+        )
+    }
+
+    /// `POST /chains/{chain}/release`: the click on Release; the run goes on in the daemon.
+    pub fn start_release(&self, chain: &str, version: &str) -> ClientResult<ChainDetail> {
+        let body = toknila_api_types::StartRelease {
+            version: version.to_owned(),
+        };
+        self.call(
+            "POST",
+            &format!("/chains/{}/release", enc(chain)),
+            Some(&body),
+        )
+    }
+
+    /// `GET /releases/{release}/run`: the steps of the last release run.
+    pub fn release_run(&self, release: &str) -> ClientResult<toknila_api_types::ReleaseRun> {
+        self.call(
+            "GET",
+            &format!("/releases/{}/run", enc(release)),
+            crate::NO_BODY,
+        )
+    }
+}

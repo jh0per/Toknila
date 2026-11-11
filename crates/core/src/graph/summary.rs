@@ -76,6 +76,27 @@ impl ChainView {
             released,
             stopped_at,
             next_release,
+            releasable: self.releasable(),
         }
+    }
+
+    /// Whether the chain can be released: it has cards, none waits for a person's approval, every
+    /// card of the plan is done, and at least one is Merged (in the work branch, not released).
+    pub fn releasable(&self) -> bool {
+        let mut planned = self.tickets.iter().filter(|t| t.in_plan()).peekable();
+        planned.peek().is_some()
+            && !self
+                .tickets
+                .iter()
+                .any(|t| t.status == TicketStatus::Proposed)
+            && self
+                .tickets
+                .iter()
+                .filter(|t| t.in_plan())
+                .all(|t| t.status.is_done())
+            && self
+                .tickets
+                .iter()
+                .any(|t| t.in_plan() && t.status == TicketStatus::Merged)
     }
 }

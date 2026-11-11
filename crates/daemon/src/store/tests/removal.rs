@@ -47,6 +47,7 @@ fn fill(tx: &mut WriteTx<'_>, key: &str) -> Result<(), StoreError> {
         branch: None,
         cut_at: None,
         released_at: None,
+        tag: None,
     };
     let view = ChainView {
         chain: c.clone(),

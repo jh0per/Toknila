@@ -66,6 +66,7 @@ fn project_roundtrips() {
         max_review_rounds: 3,
         merge: Default::default(),
         check_command: None,
+        bump_command: None,
         worker_model: None,
         reviewer_model: None,
         planner_model: None,
@@ -279,6 +280,7 @@ fn releases_roundtrip() {
                 branch: Some("release/1.0.0".to_owned()),
                 cut_at: Some(Timestamp(10)),
                 released_at: None,
+                tag: None,
             });
         }
     }
