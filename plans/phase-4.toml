@@ -1,0 +1,101 @@
+# Phase 4: visual planning. The designs come first, as images or Figma frames; the assistant
+# (the project's planner) reads them, cuts the work into cards, leads the person through the
+# process, shows the mockups on the cards and says what is unclear in them.
+# The owner's words (2026-11-11): designs in pictures or Figma, the main assistant helps create
+# the extra tasks and leads the whole process, tasks are discussed with it, it can say what is
+# unclear in the design and show the mockups in the card, opening the card itself; the main goal
+# is visual planning.
+# Import: in the window, Import on the TOKNILA project; or
+#         tok chain import plans/phase-4.toml --project TOKNILA
+#
+# The order is the priority. Cards that do not depend on each other can run in parallel.
+
+[chain]
+name = "phase-4"
+goal = "A person drops designs into a project, starts the assistant, and the assistant reads them, proposes the cards, shows each card its mockups, points at what is unclear on the design, opens a card to talk about it, and tells the person the next step; the plan is made from pictures, not from text"
+autostart = false
+
+[[ticket]]
+id = "design-library"
+title = "Designs attach to a project"
+design_first = true
+prompt = "A project gets a design library: the person drops image files (png, jpg, webp, pdf as one image per page) or pastes Figma frame links. Files are kept under the project's folder in the data home and served by the daemon (POST and GET under /v1/projects/{project}/designs, a list with name, size, kind and a thumbnail); a Figma link is kept as a design of kind figma with its file key and node id, and when the project has a Figma personal access token (a project setting, stored like the other secrets, never in the repository or the logs) the daemon fetches the frame as a png through Figma's images API and keeps it next to the uploads; without a token the link is shown with a hint to export the frame. A Designs section on the project page shows thumbnails with name, kind and date, lets the person add, rename and remove, and opens a design large. Covered by daemon tests of the routes and the store, web unit tests, and an e2e that uploads a png and sees it in the list."
+acceptance = [
+  "A png dropped on the project page appears in the Designs section with a thumbnail, is served by the daemon, and survives a daemon restart",
+  "A Figma frame link is kept as a design; with a token the frame is fetched as an image, without one the link shows an export hint",
+  "The token lives in the project settings, is never written to the repository or a log, and the TOML export names designs by file name only",
+]
+
+[[ticket]]
+id = "assistant-reads-designs"
+title = "The assistant reads the designs first"
+prompt = "The planner (crates/core/src/instructions/planner.rs, the planner run wiring, show_plan) learns the design library: show_plan lists the project's designs with their file paths, a new tool show_design (design) answers the path and the metadata of one design, and the planner's per-run settings allow Read on the design files (they sit outside the repository). The planner kickoff changes: when the project has designs, look at every design first, say in a few lines what screens and flows you see, then propose the cards; every card you add names the designs it comes from. Covered by a wiring test on the allow rules, a test of show_plan and show_design through the fake planner, and a snapshot of the kickoff text updated one test at a time."
+acceptance = [
+  "show_plan lists the designs with paths and show_design answers one design; the planner may Read those files and nothing else outside the repository",
+  "The planner kickoff tells it to look at the designs first and to name them on every card it adds",
+  "Covered by wiring, route and instruction tests",
+]
+
+[[ticket]]
+id = "card-designs"
+title = "A card shows its mockups"
+design_first = true
+prompt = "A card references designs: a list of design references (the design and an optional region as percentages of the image) set by the planner through add_card and edit_card (a new designs argument) or by the person from the card page (pick from the library, draw a region). The card page shows the mockups large with the region outlined and zoom; the card's node on the diagram shows a small thumbnail of its first design; the card agent's instructions name the design files (paths) and the regions, and its per-run settings allow Read on them. Chain TOML export and import carry the references by design name. Covered by core tests of the reference model, daemon tests of the routes and the instructions, a web unit test of the card page, and an e2e that sets a design on a card and sees the thumbnail on the node."
+acceptance = [
+  "A card with a design shows the mockup large on its page with the region outlined, and a thumbnail on its node",
+  "The planner can set and change a card's designs through add_card and edit_card; the person can from the card page",
+  "The card agent is told the design files and may read them; export and import keep the references",
+]
+
+[[ticket]]
+id = "unclear-on-design"
+title = "The assistant pins what is unclear on the design"
+design_first = true
+prompt = "The planner gets a tool design_question (design, region, text, card optional): a pin on the design with the question. Pins show on the mockup on the project page and on the card page, with the text; the person answers a pin in place (a short text), and an answered pin's question and answer are added to the card's prompt under a heading From the design; the inbox lists open pins as questions of the assistant. The planner sees the pins and the answers in show_plan. Covered by core tests of the pin model, daemon tests of the tool and the answer route, web unit tests of the pin overlay, and an e2e: the fake planner pins, the person answers, the card prompt carries it."
+acceptance = [
+  "A pin from the planner shows on the mockup with its text, on the project page and on the card page",
+  "The person answers a pin in place; the answer reaches the card's prompt and show_plan",
+  "Open pins are in the inbox as questions of the assistant",
+]
+
+[[ticket]]
+id = "assistant-opens-card"
+title = "The assistant opens a card for you"
+prompt = "The planner gets a tool show_card (card): the window shows that card (its page with the mockups) when the person has the assistant's screen or the chain open; a small toast says the assistant opened it and offers Back. Technically a window event over the event stream (kind window.show_card) that the web app follows once per event and that is ignored by a window that is not looking at that project; tok show prints it as an event. Covered by a daemon test of the tool and the event, a web unit test of the follow logic, and an e2e where the fake planner calls show_card and the card page appears."
+acceptance = [
+  "show_card from the planner makes the window show the card, with a toast and Back",
+  "A window looking at another project ignores the event; the event is in the stream and in tok show",
+  "Covered by daemon, web unit and e2e tests",
+]
+
+[[ticket]]
+id = "discuss-card"
+title = "A card is discussed with the assistant"
+design_first = true
+prompt = "On the card page, a Talk to the assistant box sends the person's text to the planner with the card as context (the planner reads the card, its designs, its threads and the message); the planner answers in the same place and may change the card through edit_card; a changed prompt or acceptance is shown to the person as a diff to accept or reject before it lands. The exchange is kept as a thread of kind discussion on the card, so the card agent reads it too. The assistant's answer can also open the card's designs or pin a question (the tools of the earlier cards). Covered by daemon tests with the fake planner (message in, answer and an edit proposal out, accept and reject), a web unit test of the diff view, and an e2e of one round."
+acceptance = [
+  "A message from the card page reaches the planner with the card as context and its answer shows on the card",
+  "An edit the planner proposes is shown as a diff and lands only when the person accepts it",
+  "The discussion is a thread on the card that the card agent reads",
+]
+
+[[ticket]]
+id = "assistant-next-step"
+title = "The assistant says the next step"
+prompt = "The planner keeps one standing suggestion per project: a tool suggest (text, card optional, action optional: start, answer, accept, release) that replaces the previous one. It shows at the top of the assistant's screen and as the first row of the inbox, with the one button that does the action (the person clicks; the planner never does). The planner kickoff and protocol say: after planning, and whenever the plan changes, say the next step; when nothing waits for the person, say so. The suggestion is cleared when its action is done or the card moves on. Covered by daemon tests of the tool and the clearing, a web unit test of the row, an e2e with the fake planner."
+acceptance = [
+  "The planner's suggestion shows on the assistant's screen and first in the inbox with a button for its action",
+  "The suggestion is replaced by the next one and cleared when its action is done",
+  "The planner's instructions tell it to keep the next step current",
+]
+
+[[ticket]]
+id = "design-board"
+title = "The plan as a board of designs"
+design_first = true
+prompt = "A chain gets a Designs view next to the diagram: the mockups of the chain's cards laid out as a board, each card's region outlined on its design with the card's key and status colour, pins shown, and a card's node reachable from its region (click opens the card page; drag a region's handle to another card to move the reference). Zoom and pan as on the diagram; Fit shows every design. The view is empty with a hint when the chain has no designs. Covered by web unit tests of the layout, an e2e that opens the board for a chain with two designed cards and clicks through to a card."
+acceptance = [
+  "The Designs view shows the chain's mockups with every card's region outlined in its status colour and the pins",
+  "A region opens its card; a region can be moved to another card by drag",
+  "Zoom, pan and Fit work as on the diagram; an empty chain shows a hint",
+]
