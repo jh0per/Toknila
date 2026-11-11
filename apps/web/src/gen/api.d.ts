@@ -1700,7 +1700,10 @@ export interface components {
         ChainSummary: {
             /** @description Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`. */
             done: number;
+            finished_at?: components["schemas"]["Timestamp"] | null;
             next_release?: components["schemas"]["NextRelease"] | null;
+            /** @description Finished, active, waiting, idle or empty. */
+            phase: components["schemas"]["PhaseState"];
             /**
              * @description Every card of the plan is in the work branch and one of them is not released yet: the
              *     chain's end node offers Release.
@@ -2482,6 +2485,12 @@ export interface components {
          * @enum {string}
          */
         Phase: "design" | "implement";
+        /**
+         * @description Where a phase (chain) stands at a glance (never stored): finished, active, waiting, idle or
+         *     empty. It answers "where is the phase"; `ChainStatus` answers "who must act".
+         * @enum {string}
+         */
+        PhaseState: "empty" | "finished" | "active" | "waiting" | "idle";
         /**
          * @description Where a card goes relative to another one.
          * @enum {string}

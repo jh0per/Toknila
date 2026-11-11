@@ -16,7 +16,7 @@ function chain(id: string, name: string, key: string, ticketIds: string[]): Chai
     chain: { id, name, goal: "", autostart: true, project_id: "p1" },
     tickets: ticketIds.map((t, i) => ({ id: t, key: `${key}-${i + 1}`, chain_id: id, title: t, status: "backlog" })),
     releases: [], edges: [], release_tickets: [], order: [],
-    summary: { status: "running", total: ticketIds.length, done: 0, released: 0 },
+    summary: { status: "running", phase: "idle", finished_at: null, total: ticketIds.length, done: 0, released: 0 },
   } as unknown as ChainDetail;
 }
 

@@ -112,3 +112,11 @@ a.node.moving { z-index: 6; cursor: grabbing; box-shadow: 0 6px 18px color-mix(i
 .quick-card input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-s); padding: 3px var(--s2); }
 .quick-card p { margin: 0; font-size: var(--fs-s); }
 .quick-card .link-btn { align-self: flex-end; }
+
+/* Phase: the dot, the word, the dimmed finished rows and their fold. */
+.phase-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sc); flex: none; display: inline-block; }
+.phase-dot[data-empty] { background: transparent; border: 1px solid var(--line); }
+.item .phase-word { font-size: 11px; color: var(--sc, var(--muted)); font-family: var(--mono); }
+.item.dim { opacity: 0.6; }
+.finished-group > .group-toggle { width: 100%; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.finished-group ul { list-style: none; margin: 0; padding: 0; }

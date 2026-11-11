@@ -621,3 +621,66 @@ fn a_released_chain_is_not_releasable_again_and_an_empty_one_never_is() {
     assert_eq!(v.end_release(), None);
     assert_eq!(v.releases[0].tag.as_deref(), Some("v1.0.0"));
 }
+
+fn phase_of(statuses: &[TicketStatus]) -> ChainSummary {
+    let mut b = Builder::new(false);
+    for (i, s) in statuses.iter().enumerate() {
+        b.ticket();
+        b.view.tickets[i].status = *s;
+        b.view.tickets[i].status_since = Timestamp(100 + i as i64);
+    }
+    b.view.summary(T)
+}
+
+#[test]
+fn phase_state_follows_the_cards() {
+    use TicketStatus as S;
+    assert_eq!(phase_of(&[]).phase, PhaseState::Empty);
+    assert_eq!(
+        phase_of(&[S::Merged, S::Released]).phase,
+        PhaseState::Finished
+    );
+    for s in [S::Running, S::Waiting, S::Review] {
+        assert_eq!(
+            phase_of(&[S::Merged, s, S::Backlog]).phase,
+            PhaseState::Active
+        );
+    }
+    assert_eq!(phase_of(&[S::Merged, S::Ready]).phase, PhaseState::Waiting);
+    assert_eq!(phase_of(&[S::Backlog, S::Backlog]).phase, PhaseState::Idle);
+    // A running card wins over a ready one.
+    assert_eq!(phase_of(&[S::Running, S::Ready]).phase, PhaseState::Active);
+    assert_eq!(PhaseState::Finished.word(), "finished");
+}
+
+#[test]
+fn a_chain_is_finished_only_with_its_end_release_released() {
+    let mut b = Builder::new(false);
+    let a = b.ticket();
+    let r = b.release("1.0", StartMode::Manual);
+    b.edge(a, r);
+    b.view.tickets[0].status = TicketStatus::Merged;
+    b.view.tickets[0].status_since = Timestamp(42);
+    assert_eq!(b.view.summary(T).phase, PhaseState::Idle);
+    assert_eq!(b.view.summary(T).finished_at, None);
+    b.view.tickets[0].status = TicketStatus::Released;
+    b.view.releases[0].state = ReleaseState::Released;
+    let s = b.view.summary(T);
+    assert_eq!(
+        (s.phase, s.finished_at),
+        (PhaseState::Finished, Some(Timestamp(42)))
+    );
+}
+
+#[test]
+fn finished_at_is_the_last_merge() {
+    let s = phase_of(&[
+        TicketStatus::Merged,
+        TicketStatus::Merged,
+        TicketStatus::Cancelled,
+    ]);
+    assert_eq!(
+        (s.phase, s.finished_at),
+        (PhaseState::Finished, Some(Timestamp(101)))
+    );
+}

@@ -13,7 +13,7 @@ function chain(order: NodeRef[], edges: [NodeRef, NodeRef][]): ChainDetail {
     edges: edges.map(([from, to]) => ({ chain_id: "c", from, to })),
     release_tickets: [],
     order,
-    summary: { status: "running", total: 0, done: 0, released: 0 },
+    summary: { status: "running", phase: "idle", finished_at: null, total: 0, done: 0, released: 0 },
   } as unknown as ChainDetail;
 }
 

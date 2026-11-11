@@ -1,9 +1,10 @@
 import type { CSSProperties, MouseEvent, PointerEvent } from "react";
-import type { Release, Ticket, TicketDetail, UsageFigures } from "../api/types";
+import type { ChainSummary, Release, Ticket, TicketDetail, UsageFigures } from "../api/types";
 import { outOfOrderText } from "../format";
 import { nodeKey } from "../layout";
 import { allows, subtaskProgress } from "../store/cardDetails";
 import { statusClass, statusGroup } from "../store/groups";
+import { finishText } from "../store/phase";
 import { showAgentName } from "../store/profiles";
 import type { CardLayout } from "./cardSize";
 import { PrChip } from "./PrChip";
@@ -171,11 +172,12 @@ export function StartNode({ goal, style }: { goal: string; style: CSSProperties 
 }
 
 /// Where the diagram ends when the chain has no release: a dashed node at its right edge.
-export function FinishNode({ style, onRelease }: { style: CSSProperties; onRelease?: () => void }) {
+export function FinishNode({ style, summary, onRelease }: { style: CSSProperties; summary: ChainSummary; onRelease?: () => void }) {
+  const text = finishText(summary);
   return (
-    <div className="node bookend" data-testid="end-node" data-end style={style}>
-      <b className="key">Finish</b>
-      <span className="muted">Everything above is done</span>
+    <div className="node bookend" data-testid="end-node" data-end data-phase={summary.phase} style={style}>
+      <b className="key">{summary.phase === "finished" ? "Finished" : "Finish"}</b>
+      <span className="muted" data-testid="end-node-text">{text}</span>
       {onRelease && <ReleaseButton onClick={onRelease} />}
     </div>
   );

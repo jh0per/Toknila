@@ -160,6 +160,7 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
                         let s = &it.summary;
                         vec![
                             it.chain.name.clone(),
+                            s.phase.word().to_owned(),
                             w(&s.status),
                             format!("{}/{}", s.done, s.total),
                             s.stopped_at
@@ -169,7 +170,7 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
                         ]
                     })
                     .collect();
-                output::table(&["CHAIN", "STATUS", "DONE", "STOPPED AT"], &rows);
+                output::table(&["CHAIN", "PHASE", "STATUS", "DONE", "STOPPED AT"], &rows);
             });
         }
     }
