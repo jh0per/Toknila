@@ -5,7 +5,7 @@
 //! outcome into an event for the ticket: `CheckDone`, or `CheckLost` when it could not run.
 
 use toknila_core::machine::TicketEvent;
-use toknila_core::{ReviewTurn, ShipSpec, Ticket, TicketId, TicketKey, TicketStatus};
+use toknila_core::{ReviewTurn, ShipSpec, Ticket, TicketId, TicketKey, TicketStatus, toolpath};
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
@@ -194,6 +194,20 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
             mode: reviews::mode_of(uow, &t)?,
             max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
         },
+        // The program was not found: the machine's problem, not a round of the loop.
+        Ok(r)
+            if !r.success
+                && !r.timed_out
+                && command.is_some()
+                && toolpath::command_not_found(
+                    r.code,
+                    &tail(r.output.trim_end(), OUTPUT_LIMIT),
+                ) =>
+        {
+            TicketEvent::CheckCannotRun {
+                command: command.unwrap_or_default().to_owned(),
+            }
+        }
         Ok(r) => TicketEvent::CheckDone {
             passed: r.success,
             output: report(command.unwrap_or_default(), &r),

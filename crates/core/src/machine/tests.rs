@@ -893,6 +893,9 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
             mode: crate::ReviewMode::Both,
             max_rounds: 1,
         }),
+        Just(TicketEvent::CheckCannotRun {
+            command: "cargo test".to_owned()
+        }),
         Just(TicketEvent::CheckLost {
             detail: "d".to_owned()
         }),

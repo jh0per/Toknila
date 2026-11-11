@@ -1,6 +1,7 @@
 //! Toknila daemon: SQLite store, HTTP API on 127.0.0.1 and (next tickets) the event stream.
 
 mod agent_path;
+pub use agent_path::{adopt_agent_path, log_adopted_path};
 pub mod check_line;
 pub mod checker;
 pub mod cleanup;

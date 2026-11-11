@@ -279,6 +279,31 @@ fn a_check_that_cannot_run_leaves_the_card_to_the_person() {
 }
 
 #[test]
+fn a_check_whose_program_is_not_found_is_no_round_and_leaves_the_card_to_the_person() {
+    let mut mem = running(ReviewMode::Both, 3);
+    mem.project.check_command = Some("cargo test".to_owned());
+    answer(
+        &mem,
+        [Ok(CheckResult {
+            success: false,
+            code: Some(127),
+            timed_out: false,
+            output: "sh: cargo: command not found".to_owned(),
+        })],
+    );
+    finish(&mut mem, "done".to_owned());
+    settle(&mut mem);
+    let t = a(&mem);
+    assert_eq!(
+        (t.status, t.review.turn),
+        (TicketStatus::Review, Some(ReviewTurn::Person))
+    );
+    assert!(t.review.rounds.is_empty(), "{:?}", t.review.rounds);
+    assert_eq!(t.review.auto_returns(), 0);
+    assert!(instructions(&mem).is_empty(), "{:?}", instructions(&mem));
+}
+
+#[test]
 fn a_card_whose_check_the_restart_cut_short_is_queued_again_and_checked() {
     let mut mem = running(ReviewMode::Both, 3);
     finish(&mut mem, "done".to_owned());

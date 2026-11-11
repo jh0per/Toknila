@@ -59,6 +59,37 @@ fn usual_folder(program: &str) -> Option<&'static str> {
     }
 }
 
+/// Whether a check that failed with `code` and the output `tail` never ran its command: the
+/// shell could not find the program (exit 127 on unix, 9009 on Windows, or the shell's own
+/// message). That is a problem of the machine, not of the worker's change.
+pub fn command_not_found(code: Option<i32>, tail: &str) -> bool {
+    if matches!(code, Some(127 | 9009)) {
+        return true;
+    }
+    // The shell's own message is the last thing printed, because the command never ran. Test
+    // output that happens to quote the words, followed by more lines, is not it.
+    tail.lines()
+        .filter(|l| !l.trim().is_empty())
+        .rev()
+        .take(2)
+        .any(|l| {
+            l.contains("command not found")
+                || l.contains("is not recognized as an internal or external command")
+        })
+}
+
+/// What a person reads when the check command `command` could not run: the program, the hint of
+/// [`check_command`], and that the worker's change is untouched.
+pub fn cannot_run_text(command: &str) -> String {
+    let program = program_of(command).unwrap_or(command);
+    let hint = check_command(command, None).hint;
+    format!(
+        "The check command `{command}` could not run on this machine: its first word `{program}` \
+         was not found. {hint} The agent's work is untouched and was not judged: you can Accept \
+         it or Return it."
+    )
+}
+
 /// The verdict on the project's check command: `found` is the folder that holds its program on the
 /// agents' `PATH`, if any.
 pub fn check_command(command: &str, found: Option<&Path>) -> Check {
