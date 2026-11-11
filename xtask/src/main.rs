@@ -17,10 +17,12 @@
 //!   clippy on it (needs the platform web view; CI runs it on macOS).
 
 use std::process::{Command, ExitCode};
+use std::time::Duration;
 
 mod app;
 mod bump;
 mod guards;
+mod leaks;
 mod updates;
 mod versions;
 
@@ -29,6 +31,8 @@ fn main() -> ExitCode {
     let result = match task.as_str() {
         "verify" => verify(),
         "guards" => guards(),
+        // The leak check alone, over daemons of any age (to see it fail on a daemon you left).
+        "leaks" => leaks::check(Duration::from_secs(u32::MAX.into())),
         "web" => web(),
         "e2e-web" => e2e_web(),
         "dist" => dist(std::env::args().nth(2)),
@@ -58,6 +62,7 @@ fn main() -> ExitCode {
 }
 
 fn verify() -> Result<(), String> {
+    let began = std::time::Instant::now();
     cargo(&["fmt", "--all", "--check"])?;
     cargo(&[
         "clippy",
@@ -70,6 +75,7 @@ fn verify() -> Result<(), String> {
     ])?;
     cargo(&["test", "--workspace", "--locked"])?;
     guards()?;
+    leaks::check(began.elapsed())?;
     eprintln!("xtask verify: PASS");
     Ok(())
 }

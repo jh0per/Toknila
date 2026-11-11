@@ -20,7 +20,11 @@ fn tok_cmd(home: &Path, args: &[&str]) -> Command {
 }
 
 fn tok_ok(home: &Path, args: &[&str]) -> Output {
-    let out = tok_cmd(home, args).output().expect("run tok");
+    let out = if args == ["daemon", "start"] {
+        common::start_daemon(home)
+    } else {
+        tok_cmd(home, args).output().expect("run tok")
+    };
     assert!(
         out.status.success(),
         "tok {args:?}: {}\n{}",

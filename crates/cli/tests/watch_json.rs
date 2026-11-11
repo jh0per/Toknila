@@ -3,11 +3,10 @@
 mod common;
 
 use std::io::{BufRead, BufReader};
-use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use common::{Tok, snapshot};
+use common::{Tok, snapshot, spawn_watch};
 
 #[test]
 fn watch_json_prints_each_journal_entry_as_one_json_line() {
@@ -15,12 +14,7 @@ fn watch_json_prints_each_journal_entry_as_one_json_line() {
     let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO"]);
 
-    let mut child = Command::new(env!("CARGO_BIN_EXE_tok"))
-        .args(["watch", "--json", "--since", "0"])
-        .env("TOKNILA_HOME", &tok.home)
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("spawn tok watch");
+    let mut child = spawn_watch(&tok.home, &["--json", "--since", "0"]);
     let out = child.stdout.take().expect("stdout");
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
@@ -52,12 +46,7 @@ fn watch_plain_line_starts_with_the_local_time() {
     let tok = Tok::in_dir(dir.path());
     tok.run(&["project", "new", "DEMO"]);
 
-    let mut child = Command::new(env!("CARGO_BIN_EXE_tok"))
-        .args(["watch", "--since", "0"])
-        .env("TOKNILA_HOME", &tok.home)
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("spawn tok watch");
+    let mut child = spawn_watch(&tok.home, &["--since", "0"]);
     let out = child.stdout.take().expect("stdout");
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
