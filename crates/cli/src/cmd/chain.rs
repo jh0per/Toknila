@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Subcommand};
-use toknila_api_types::{ChainSettings, EdgeInput, NewChain};
+use toknila_api_types::{ChainSettings, EdgeInput, EdgeMoveInput, NewChain};
 use toknila_client::Client;
 use toknila_core::EdgeKind;
 
@@ -98,6 +98,21 @@ pub enum DepCmd {
     Rm {
         #[command(flatten)]
         args: DepArgs,
+    },
+    /// Move a dependency to another end in one step: `from`/`to` name it, `--new-from` and
+    /// `--new-to` say what changes. A refusal (a cycle, a card that started) changes nothing.
+    Mv {
+        #[command(flatten)]
+        args: DepArgs,
+        /// The new dependency (defaults to `from`).
+        #[arg(long)]
+        new_from: Option<String>,
+        /// The new node that waits (defaults to `to`).
+        #[arg(long)]
+        new_to: Option<String>,
+        /// Wait until the release is released, not just cut.
+        #[arg(long)]
+        after_release: bool,
     },
 }
 
@@ -212,6 +227,35 @@ pub(super) fn dep(c: &Client, cmd: DepCmd, json_out: bool) -> Result<()> {
         DepCmd::Rm { args } => {
             let chain = chain_of(c, &[&args.to, &args.from], args.chain)?;
             c.remove_edge(&chain, &args.from, &args.to)?
+        }
+        DepCmd::Mv {
+            args,
+            new_from,
+            new_to,
+            after_release,
+        } => {
+            if new_from.is_none() && new_to.is_none() {
+                bail!("say where it goes: --new-from and/or --new-to");
+            }
+            let chain = chain_of(c, &[&args.to, &args.from], args.chain)?;
+            let kind = if after_release {
+                EdgeKind::AfterRelease
+            } else {
+                EdgeKind::Normal
+            };
+            let m = EdgeMoveInput {
+                new: EdgeInput {
+                    from: new_from.unwrap_or_else(|| args.from.clone()),
+                    to: new_to.unwrap_or_else(|| args.to.clone()),
+                    kind,
+                },
+                old: EdgeInput {
+                    from: args.from,
+                    to: args.to,
+                    kind: EdgeKind::Normal,
+                },
+            };
+            c.move_edge(&chain, &m)?
         }
     };
     emit(json_out, &detail, output::chain);

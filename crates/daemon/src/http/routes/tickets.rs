@@ -7,15 +7,15 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_app::ships::GuardError;
 use toknila_app::tickets::{self, TicketAction};
-use toknila_app::{notes, resolve, schedule, ships, wildcards};
+use toknila_app::{moves, notes, resolve, schedule, ships, wildcards};
 use toknila_core::guard::ShipProblem;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{Actor, ChainId, ReviewTurn, TicketStatus};
 
 use super::{ApiResult, load_ticket_detail, read, stamp, ticket_write};
 use crate::http::dto::{
-    ActionInput, NewComment, NewSubtask, NewTicket, NewWildcard, PatchSubtask, PatchTicket,
-    TicketDetail, TicketItem, TicketQuery, clamp_size,
+    ActionInput, DesignMoveInput, NewComment, NewSubtask, NewTicket, NewWildcard, PatchSubtask,
+    PatchTicket, TicketDetail, TicketItem, TicketQuery, clamp_size,
 };
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -181,6 +181,24 @@ pub async fn patch_ticket(
     .await?;
     detail.size_clamped = clamped;
     Ok(Json(detail))
+}
+
+#[utoipa::path(post, path = "/tickets/{ticket}/designs/{index}/move", tag = "tickets", request_body = DesignMoveInput,
+    params(
+        ("ticket" = String, Path, description = "Ticket id or key that holds the reference"),
+        ("index" = usize, Path, description = "Position of the reference in the card's list"),
+    ),
+    responses((status = 200, body = TicketDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Gives a design reference, region kept, to another card of the chain in one transaction.
+pub async fn move_design(
+    State(state): State<AppState>,
+    Path((ticket, index)): Path<(String, usize)>,
+    Json(m): Json<DesignMoveInput>,
+) -> ApiResult<Json<TicketDetail>> {
+    ticket_write(&state, ticket, Actor::Human, move |tx, t| {
+        Ok(moves::move_design(tx, &t, index, &m.target)?)
+    })
+    .await
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/actions/{action}", tag = "tickets", request_body = ActionInput,

@@ -135,12 +135,10 @@ const sameRegion = (a: Region | null | undefined, b: Region | null | undefined):
 
 const sameRef = (a: Ref, b: Ref): boolean => a.design === b.design && sameRegion(a.region, b.region);
 
-/// The two cards' lists after `ref` moves from the first to the second: the first loses it, the
-/// second gets it at the end (unless it has exactly that reference already). `undefined` when the
-/// first card does not hold the reference.
-export function moveRef(from: Ref[], to: Ref[], ref: Ref): { from: Ref[]; to: Ref[] } | undefined {
-  const at = from.findIndex((r) => sameRef(r, ref));
-  if (at < 0) return undefined;
-  const kept = to.some((r) => sameRef(r, ref)) ? to : [...to, { design: ref.design, region: ref.region ?? null }];
-  return { from: from.filter((_, i) => i !== at), to: kept };
+/// Where `ref` stands in a card's list, the index the daemon's move route takes; `undefined` when
+/// the card does not hold it. The daemon does the move (the other card gets it at the end unless it
+/// has exactly that reference already).
+export function refIndex(refs: Ref[], ref: Ref): number | undefined {
+  const at = refs.findIndex((r) => sameRef(r, ref));
+  return at < 0 ? undefined : at;
 }

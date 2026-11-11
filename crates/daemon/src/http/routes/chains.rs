@@ -6,12 +6,13 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_app::removal::{self, Removed};
-use toknila_app::{chains, resolve};
+use toknila_app::{chains, moves, resolve};
 use toknila_core::Actor;
 
 use super::{ApiResult, chain_write, load_chain_detail, read, stamp};
 use crate::http::dto::{
-    ChainDeletion, ChainDetail, ChainFile, ChainItem, ChainSettings, EdgeInput, MoveInput, NewChain,
+    ChainDeletion, ChainDetail, ChainFile, ChainItem, ChainSettings, EdgeInput, EdgeMoveInput,
+    MoveInput, NewChain,
 };
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -186,6 +187,28 @@ pub async fn add_edge(
 ) -> ApiResult<Json<ChainDetail>> {
     let detail = chain_write(&state, Actor::Human, move |tx| {
         Ok(chains::add_edge(tx, &chain, &e.from, &e.to, e.kind)?)
+    })
+    .await?;
+    Ok(Json(detail))
+}
+
+#[utoipa::path(post, path = "/chains/{chain}/edges/move", tag = "chains", request_body = EdgeMoveInput,
+    params(("chain" = String, Path, description = "Chain id or name")),
+    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Replaces a dependency by another in one transaction: a refusal changes nothing.
+pub async fn move_edge(
+    State(state): State<AppState>,
+    Path(chain): Path<String>,
+    Json(m): Json<EdgeMoveInput>,
+) -> ApiResult<Json<ChainDetail>> {
+    let detail = chain_write(&state, Actor::Human, move |tx| {
+        Ok(moves::move_edge(
+            tx,
+            &chain,
+            (&m.old.from, &m.old.to),
+            (&m.new.from, &m.new.to),
+            m.new.kind,
+        )?)
     })
     .await?;
     Ok(Json(detail))

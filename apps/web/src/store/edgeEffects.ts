@@ -34,17 +34,12 @@ export function runEdgeEffect(e: EdgeEffect, dispatch: Dispatch): void {
       return;
     case "moveEdge": {
       const [from, to] = e.end === "from" ? [e.target, e.to] : [e.from, e.target];
-      // The new place first: if the daemon refuses it, nothing changed. If it then refuses to
-      // drop the old one, the new one is taken back, so a failed move leaves the chain as it was.
-      add(from, to, e.kind)
-        .then(async () => {
-          try {
-            return await remove(e.from, e.to);
-          } catch (err) {
-            await remove(from, to).catch(() => undefined);
-            throw err;
-          }
-        })
+      // One request: the daemon drops the old line and adds the new one in one transaction, so a
+      // refusal leaves the chain as it was.
+      post<ChainDetail>(`${base}/move`, {
+        old: { from: idOf(e.from), to: idOf(e.to) },
+        new: { from: idOf(from), to: idOf(to), kind: e.kind },
+      })
         .then((chain) => changed(chain, from, to))
         .catch(refused);
       return;
