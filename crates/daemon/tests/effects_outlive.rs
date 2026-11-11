@@ -235,6 +235,43 @@ async fn a_hand_in_whose_client_is_gone_still_has_its_check_recorded() {
     );
 }
 
+/// The request is dropped on the writer thread right after the commit, before its answer is
+/// sent: the earliest moment there is, with no polling in between.
+#[tokio::test]
+async fn a_request_dropped_the_moment_its_hand_in_commits_still_has_its_check_recorded() {
+    let checker = SlowChecker::holding(Duration::from_millis(200));
+    let rig = Rig::new(checker.clone(), 1).await;
+    let slot: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
+    let seen = slot.clone();
+    rig.store.on_committed(Some(Arc::new(move || {
+        let until = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(h) = seen.lock().expect("lock").take() {
+                h.abort();
+                return;
+            }
+            if Instant::now() > until {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    })));
+    *slot.lock().expect("lock") = Some(rig.hand_in(1));
+    let until = Instant::now() + Duration::from_secs(10);
+    while slot.lock().expect("lock").is_some() {
+        assert!(Instant::now() < until, "the hand-in never committed");
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    rig.store.on_committed(None);
+    rig.store.settled().await;
+    assert_eq!(checker.runs.load(Ordering::SeqCst), 1);
+    let card = rig.card(1).await;
+    assert_eq!(
+        card["review"]["rounds"][0]["verdict"], "approve",
+        "the check was recorded as a round: {card}"
+    );
+}
+
 #[tokio::test]
 async fn the_hand_in_is_answered_at_once_and_the_card_is_being_checked_meanwhile() {
     let checker = SlowChecker::holding(Duration::from_secs(1));

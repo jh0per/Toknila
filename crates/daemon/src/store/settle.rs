@@ -97,8 +97,13 @@ impl super::Store {
         abandoned
     }
 
-    /// Runs what a command queued in a task the caller does not own.
-    pub(super) fn detach_effects(&self, queued: Vec<ExternalEffect>) {
+    /// Runs what a command queued in a task the caller does not own. Called on the writer
+    /// thread right after the commit, so it spawns through `runtime`, not from the request.
+    pub(super) fn spawn_effects(
+        &self,
+        runtime: &tokio::runtime::Handle,
+        queued: Vec<ExternalEffect>,
+    ) {
         if queued.is_empty() {
             return;
         }
@@ -115,7 +120,7 @@ impl super::Store {
             .join(", ");
         let guard = self.tasks.start(label);
         let store = self.clone();
-        tokio::spawn(async move {
+        runtime.spawn(async move {
             store.after_commit(queued).await;
             drop(guard);
         });

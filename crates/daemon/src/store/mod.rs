@@ -7,6 +7,7 @@
 mod backup;
 mod chains;
 mod codec;
+mod commit;
 mod error;
 mod external;
 mod notes;
@@ -139,6 +140,8 @@ pub struct Store {
     line: Arc<crate::check_line::CheckLine>,
     runner: Agents,
     tasks: Arc<settle::Tasks>,
+    /// Test seam: runs on the writer thread right after a commit; see `Store::on_committed`.
+    hook: commit::Hook,
 }
 
 impl Store {
@@ -177,6 +180,7 @@ impl Store {
             line: Arc::default(),
             runner: Arc::new(NoRunner),
             tasks: settle::Tasks::new(),
+            hook: commit::Hook::default(),
         }
     }
 
@@ -217,90 +221,6 @@ impl Store {
     /// Live committed events. Pair with [`Store::events_since`] to catch up first.
     pub fn subscribe(&self) -> broadcast::Receiver<EventRecord> {
         self.events.subscribe()
-    }
-
-    /// Runs `f` as one transaction. On `Ok` the state and the emitted events commit together and
-    /// the events are published; on `Err` or panic nothing is written. Work the command queued
-    /// for the host runs after the commit (see [`Store::after_commit`]).
-    pub async fn write<T, E, F>(
-        &self,
-        actor: Actor,
-        now: Timestamp,
-        f: F,
-    ) -> Result<(T, Vec<EventRecord>), E>
-    where
-        T: Send + 'static,
-        E: From<StoreError> + Send + 'static,
-        F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
-    {
-        let (value, emitted, queued) = self.commit_with_effects(actor, now, f).await?;
-        // The effects run in a task of their own: a caller that is dropped (a request whose
-        // client left) still gets them run and their outcomes recorded. Wait with `settled`.
-        self.detach_effects(queued);
-        Ok((value, emitted))
-    }
-
-    pub(super) async fn commit_with_effects<T, E, F>(
-        &self,
-        actor: Actor,
-        now: Timestamp,
-        f: F,
-    ) -> Result<(T, Vec<EventRecord>, Vec<ExternalEffect>), E>
-    where
-        T: Send + 'static,
-        E: From<StoreError> + Send + 'static,
-        F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
-    {
-        let events = self.events.clone();
-        let live = self.runner.live_runners();
-        let line = self.line.clone();
-        let outcome = self
-            .run(move |conn| {
-                let tx = match conn.transaction() {
-                    Ok(tx) => tx,
-                    Err(e) => return Ok(Err(E::from(e.into()))),
-                };
-                let mut w = WriteTx {
-                    tx,
-                    actor,
-                    now,
-                    events: Vec::new(),
-                    deferred: Vec::new(),
-                    live,
-                };
-                let value = match catch_unwind(AssertUnwindSafe(|| f(&mut w))) {
-                    Ok(Ok(v)) => v,
-                    Ok(Err(e)) => return Ok(Err(e)),
-                    Err(p) => return Ok(Err(E::from(StoreError::Panicked(panic_message(&p))))),
-                };
-                let WriteTx {
-                    tx,
-                    events: emitted,
-                    deferred,
-                    ..
-                } = w;
-                if let Err(e) = tx.commit() {
-                    return Ok(Err(E::from(e.into())));
-                }
-                // The checks take their places in the line here, on the writer thread right
-                // after the commit: the line holds the hand-ins in the order they committed,
-                // whichever effect task reaches the host first.
-                for effect in &deferred {
-                    if let ExternalEffect::RunCheck { ticket, .. } = effect {
-                        line.join(*ticket);
-                    }
-                }
-                for e in &emitted {
-                    // No subscribers is fine.
-                    let _ = events.send(e.clone());
-                }
-                Ok(Ok((value, emitted, deferred)))
-            })
-            .await;
-        match outcome {
-            Ok(inner) => inner,
-            Err(e) => Err(E::from(e)),
-        }
     }
 
     /// Runs a read-only query on the writer's connection (so it sees every committed write).
