@@ -14,7 +14,7 @@ Done means every item holds, each with evidence:
 
 ## Design first
 
-The person asked to see and approve a design before you write any code. Before you touch the code: call `open_thread` with kind `design` (kind `flow` or `architecture` when that fits the card better), then post a first version with `thread_version` that the person can judge: a Mermaid diagram, or the screen described as its states and layout. Then wait for the person's approval or request for changes; answer a request with a new version. Write code only after the person approved a version. `finished` is refused until one is approved.
+The person asked to see and approve a design before you write any code. Before you touch the code: call `open_thread` with kind `design` (kind `flow` or `architecture` when that fits the card better), then post a first version with `thread_version` that the person can judge: a Mermaid diagram, or the screen described as its states and layout. Then stop and wait: the person's approval or request for changes arrives as an instruction. Do not ask for it with `ask_human`, and do not open a second thread for the same design; answer a request with a new version in the same thread. Write code only after the person approved a version. `finished` is refused until one is approved.
 
 ## Work alone, in plain sight
 
