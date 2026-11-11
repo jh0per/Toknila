@@ -20,6 +20,7 @@ mod commands;
 mod design;
 mod designs;
 mod discussion;
+mod hand_in_only;
 mod inbox;
 mod merges;
 mod moves;
