@@ -27,6 +27,42 @@ pub enum ItemOutcome {
     Fail,
 }
 
+/// How the reviewer came to its judgement of an item.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ItemBasis {
+    /// The reviewer ran the check or test that shows it and quoted the result.
+    Ran,
+    /// The reviewer judged it by reading the diff and the files.
+    #[default]
+    Read,
+    /// The check or test the item names could not be run.
+    NotRun,
+}
+
+impl ItemBasis {
+    /// The word the verdict text and the Review card show.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Ran => "ran",
+            Self::Read => "read",
+            Self::NotRun => "NOT_RUN",
+        }
+    }
+
+    /// The basis a verdict line ends with (`... - evidence [ran]`), if it ends with one.
+    pub fn of_line(line: &str) -> Option<(Self, &str)> {
+        let line = line.trim_end();
+        [Self::Ran, Self::Read, Self::NotRun]
+            .into_iter()
+            .find_map(|b| {
+                let tail = format!(" [{}]", b.word());
+                line.strip_suffix(tail.as_str()).map(|rest| (b, rest))
+            })
+    }
+}
+
 /// The reviewer's judgement of one acceptance item.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,6 +70,9 @@ pub struct ItemVerdict {
     /// The item's 1-based position in the ticket's acceptance list.
     pub item: u32,
     pub outcome: ItemOutcome,
+    /// Whether the reviewer ran what shows the item or only read; `read` when it says nothing.
+    #[serde(default)]
+    pub basis: ItemBasis,
     /// One line of evidence.
     #[serde(default)]
     pub note: String,
@@ -95,7 +134,7 @@ pub fn render_items(acceptance: &[String], items: &[ItemVerdict], comment: &str)
         if !i.note.trim().is_empty() {
             out.push_str(&format!(" - {}", i.note.trim()));
         }
-        out.push('\n');
+        out.push_str(&format!(" [{}]\n", i.basis.word()));
     }
     out.push_str(comment.trim());
     out.trim().to_owned()
@@ -260,6 +299,45 @@ pub fn resolve_reviewer(ticket: &Ticket, chain: &Chain, project: &Project) -> St
 mod tests {
     use super::*;
     use crate::{ChainId, ProjectId, TicketDraft, TicketId};
+
+    #[test]
+    fn each_item_line_ends_with_how_the_reviewer_came_to_it_and_reads_back() {
+        let acceptance = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
+        let item = |n, basis, note: &str| ItemVerdict {
+            item: n,
+            outcome: ItemOutcome::Pass,
+            basis,
+            note: note.to_owned(),
+        };
+        let text = render_items(
+            &acceptance,
+            &[
+                item(1, ItemBasis::Ran, "test result: ok. 3 passed"),
+                item(2, ItemBasis::Read, ""),
+                item(3, ItemBasis::NotRun, "no cargo"),
+            ],
+            "ok",
+        );
+        assert_eq!(
+            text,
+            "PASS 1. a - test result: ok. 3 passed [ran]\nPASS 2. b [read]\nPASS 3. c - no cargo [NOT_RUN]\nok"
+        );
+        let basis: Vec<_> = text
+            .lines()
+            .map(|l| ItemBasis::of_line(l).map(|(b, _)| b))
+            .collect();
+        assert_eq!(
+            basis,
+            [
+                Some(ItemBasis::Ran),
+                Some(ItemBasis::Read),
+                Some(ItemBasis::NotRun),
+                None
+            ]
+        );
+        let v: ItemVerdict = serde_json::from_str(r#"{"item":1,"outcome":"pass"}"#).expect("json");
+        assert_eq!(v.basis, ItemBasis::Read, "an item without a basis was read");
+    }
 
     fn setup() -> (Ticket, Chain, Project) {
         let project = Project {

@@ -1817,12 +1817,19 @@ export interface components {
             reason: string;
         };
         /**
+         * @description How the reviewer came to its judgement of an item.
+         * @enum {string}
+         */
+        ItemBasis: "ran" | "read" | "not_run";
+        /**
          * @description How one acceptance item stands, in the reviewer's eyes.
          * @enum {string}
          */
         ItemOutcome: "pass" | "fail";
         /** @description The reviewer's judgement of one acceptance item. */
         ItemVerdict: {
+            /** @description Whether the reviewer ran what shows the item or only read; `read` when it says nothing. */
+            basis?: components["schemas"]["ItemBasis"];
             /**
              * Format: int32
              * @description The item's 1-based position in the ticket's acceptance list.

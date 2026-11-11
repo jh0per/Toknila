@@ -10,6 +10,7 @@ mod profile_brief;
 mod project;
 mod release;
 mod review;
+mod reviewer_rules;
 mod run;
 mod ship;
 mod stale;
@@ -33,10 +34,11 @@ pub use profile::{
 pub use project::{MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use review::{
-    ItemOutcome, ItemVerdict, ItemsError, Review, ReviewNote, ReviewRound, ReviewTurn, Verdict,
-    check_items, render_items, resolve_mode as resolve_review_mode, resolve_reviewer,
+    ItemBasis, ItemOutcome, ItemVerdict, ItemsError, Review, ReviewNote, ReviewRound, ReviewTurn,
+    Verdict, check_items, render_items, resolve_mode as resolve_review_mode, resolve_reviewer,
     reviewer_profile,
 };
+pub use reviewer_rules::reviewer_check_rules;
 pub use run::{ProcessExit, Run};
 pub use ship::{MergeSpec, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec, slugify};
 pub use stale::{BaseBehind, BaseCourse, StalePolicy, describe as describe_base_behind};

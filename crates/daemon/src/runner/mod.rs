@@ -253,6 +253,10 @@ impl Runners {
     ) -> Result<Arc<Active>, RunnerError> {
         let dir = self.root.join(req.ticket.to_string());
         let bin = self.agent_bin();
+        let mut brief = req.brief.clone();
+        if req.role == AgentRole::Reviewer {
+            brief.repo_tools = wiring::repo_tools(Path::new(&req.dir));
+        }
         let cx = wiring::Context {
             dir: &dir,
             key: &req.key,
@@ -261,7 +265,7 @@ impl Runners {
             token,
             url: self.url.get().map(String::as_str),
             bin: &bin,
-            brief: &req.brief,
+            brief: &brief,
         };
         let wiring = wiring::prepare(profile, &cx)?;
         let process = pty::spawn(profile, Path::new(&req.dir), &wiring)?;
