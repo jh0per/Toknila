@@ -258,3 +258,22 @@ fn the_phase_1_plan_is_a_valid_chain() {
 }
 
 mod order;
+
+#[test]
+fn export_names_designs_by_file_name_and_import_reads_it_back() {
+    let plan = parse(DEMO).expect("demo parses");
+    let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
+    let names = vec!["home.png".to_owned(), "flow \"v2\".pdf".to_owned()];
+    let text = export_with_designs(&view, &HashMap::new(), &names);
+    let read: toml::Value = toml::from_str(&text).expect("toml");
+    let listed: Vec<&str> = read["chain"]["designs"]
+        .as_array()
+        .expect("a list")
+        .iter()
+        .filter_map(toml::Value::as_str)
+        .collect();
+    assert_eq!(listed, ["home.png", "flow \"v2\".pdf"], "{text}");
+    assert!(parse(&text).is_ok());
+    // No designs: no key, the file is the one an export wrote before.
+    assert!(!export(&view, &HashMap::new()).contains("designs"));
+}

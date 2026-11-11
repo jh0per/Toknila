@@ -13,8 +13,18 @@ use crate::{EdgeKind, NodeRef, Release, Ticket, TicketId};
 /// Wildcard cards that are not in the plan (proposed or rejected) are left out; no edge touches
 /// them, so the file stays whole.
 pub fn export(view: &ChainView, subtasks: &HashMap<TicketId, Vec<(String, bool)>>) -> String {
+    export_with_designs(view, subtasks, &[])
+}
+
+/// [`export`], with the project's designs named in the `[chain]` table as `designs = [...]`:
+/// file names only, never a path, a link or a token. An import reads the list and ignores it.
+pub fn export_with_designs(
+    view: &ChainView,
+    subtasks: &HashMap<TicketId, Vec<(String, bool)>>,
+    designs: &[String],
+) -> String {
     let mut out = Lines::default();
-    chain_section(view, &mut out);
+    chain_section(view, designs, &mut out);
     for node in view.topo_order() {
         match node {
             NodeRef::Ticket(id) => {
@@ -57,13 +67,14 @@ fn quote(s: &str) -> String {
     toml::Value::String(s.to_owned()).to_string()
 }
 
-fn chain_section(view: &ChainView, out: &mut Lines) {
+fn chain_section(view: &ChainView, designs: &[String], out: &mut Lines) {
     let c = &view.chain;
     out.raw("[chain]");
     out.str("name", &c.name);
     if !c.goal.is_empty() {
         out.str("goal", &c.goal);
     }
+    out.list("designs", designs);
     if !c.autostart {
         out.raw("autostart = false");
     }

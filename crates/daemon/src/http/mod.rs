@@ -34,14 +34,20 @@ impl Modify for BearerAuth {
 /// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
-        agents::*, chains::*, events::*, inbox::*, planner::*, planner_run::*, plans::*,
-        profiles::*, projects::*, questions::*, releases::*, runner::*, strays::*, system::*,
-        threads::*, tickets::*, usage::*,
+        agents::*, chains::*, designs::*, events::*, inbox::*, planner::*, planner_run::*,
+        plans::*, profiles::*, projects::*, questions::*, releases::*, runner::*, strays::*,
+        system::*, threads::*, tickets::*, usage::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
         .routes(routes!(list_projects, create_project))
         .routes(routes!(get_project, patch_project))
+        .routes(routes!(list_designs, upload_design))
+        .routes(routes!(add_figma_design))
+        .routes(routes!(fetch_design))
+        .routes(routes!(design_file))
+        .routes(routes!(rename_design, delete_design))
+        .routes(routes!(put_figma_token, delete_figma_token))
         .routes(routes!(system_checks))
         .routes(routes!(system_places))
         .routes(routes!(cli_status))
