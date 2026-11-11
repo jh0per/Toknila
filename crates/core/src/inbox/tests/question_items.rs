@@ -225,6 +225,28 @@ fn a_reviewer_without_a_verdict_is_a_review_item_with_its_screen_and_run_again()
 }
 
 #[test]
+fn a_check_that_cannot_run_is_a_review_item_that_says_what_to_fix() {
+    let mut t = ticket(1, TicketStatus::Review, 5);
+    t.review.turn = Some(crate::ReviewTurn::Person);
+    t.review.note = Some(crate::ReviewNote::CheckCannotRun {
+        command: "cargo test".into(),
+    });
+    let got = compute(&data(vec![t], 9));
+    assert_eq!(got.len(), 1);
+    let i = &got[0];
+    assert_eq!(i.kind, InboxKind::Review);
+    assert!(i.text.contains("`cargo test` could not run"), "{}", i.text);
+    assert!(
+        i.text.contains("Add ~/.cargo/bin to the PATH"),
+        "{}",
+        i.text
+    );
+    assert!(!i.allowed_actions.contains(&TicketAction::RunReviewer));
+    assert!(i.allowed_actions.contains(&TicketAction::Accept));
+    assert!(i.allowed_actions.contains(&TicketAction::Return));
+}
+
+#[test]
 fn a_screen_answered_by_keys_stays_quiet_while_it_is_unchanged() {
     let t = ticket(1, TicketStatus::Running, 5);
     let mut r = run(&t, AgentRole::Worker, "Trust this folder?\n> Yes\n");

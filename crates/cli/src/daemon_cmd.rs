@@ -103,7 +103,10 @@ fn print_status(paths: &Paths, info: Option<&DaemonInfo>, json: bool) {
 fn run_foreground(paths: Paths) -> Result<()> {
     std::fs::create_dir_all(&paths.home)
         .with_context(|| format!("create {}", paths.home.display()))?;
+    // First, while this is the only thread: logging and the runtime start threads.
+    let appended = toknila_daemon::adopt_agent_path();
     let _guard = toknila_daemon::server::init_logging(&paths).map_err(anyhow::Error::msg)?;
+    toknila_daemon::log_adopted_path(&appended);
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;

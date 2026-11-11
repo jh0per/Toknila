@@ -149,6 +149,30 @@ pub(super) fn check_lost(
     Ok((TicketStatus::Review, None))
 }
 
+/// The check command's program was not found on this machine: the worker's work was never
+/// judged, so no round is recorded and nothing is sent back. The card waits for a person, with a
+/// note and a report that say what to fix on the machine.
+pub(super) fn check_cannot_run(
+    next: &mut Ticket,
+    command: &str,
+    effects: &mut Vec<Effect>,
+) -> Result<Outcome, TransitionError> {
+    if next.review.turn != Some(ReviewTurn::Check) {
+        return Err(TransitionError::NotAllowed {
+            event: "check_cannot_run",
+            from: next.status,
+        });
+    }
+    next.review.turn = Some(ReviewTurn::Person);
+    next.review.note = Some(ReviewNote::CheckCannotRun {
+        command: command.to_owned(),
+    });
+    effects.push(Effect::RecordReport {
+        summary: crate::toolpath::cannot_run_text(command),
+    });
+    Ok((TicketStatus::Review, None))
+}
+
 /// What the reviewer agent said, as the machine takes it.
 pub(super) struct AgentVerdict<'a> {
     pub verdict: Verdict,
@@ -260,7 +284,9 @@ pub(super) fn rerun(
     next: &mut Ticket,
     effects: &mut Vec<Effect>,
 ) -> Result<Outcome, TransitionError> {
-    if next.review.turn != Some(ReviewTurn::Person) || next.review.note.is_none() {
+    if next.review.turn != Some(ReviewTurn::Person)
+        || !matches!(next.review.note, Some(ReviewNote::NoVerdict { .. }))
+    {
         return Err(TransitionError::NotAllowed {
             event: "run_reviewer",
             from: next.status,

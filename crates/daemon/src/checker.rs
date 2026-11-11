@@ -174,6 +174,63 @@ mod tests {
         assert!(r.output.contains("to-stderr"), "both streams: {}", r.output);
     }
 
+    const PROBE: &str = "TOKNILA_PATH_PROBE";
+
+    /// Runs only inside the child of the test below: a daemon-like process that adopts the
+    /// agents' `PATH` and then runs a check whose program lives in `$HOME/.cargo/bin`.
+    #[test]
+    fn path_probe_child() {
+        if std::env::var_os(PROBE).is_none() {
+            return;
+        }
+        crate::adopt_agent_path();
+        let dir = tempfile::tempdir().expect("dir");
+        let r = ShellChecker::default()
+            .run(&spec("fake-tool-for-the-probe", dir.path()))
+            .expect("runs");
+        assert!(r.success, "{}", r.output);
+        assert_eq!(r.output.trim(), "found");
+    }
+
+    #[test]
+    fn a_check_finds_a_program_in_a_tool_folder_the_daemons_own_path_lacks() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = tempfile::tempdir().expect("home");
+        let bin = home.path().join(".cargo").join("bin");
+        std::fs::create_dir_all(&bin).expect("bin");
+        let tool = bin.join("fake-tool-for-the-probe");
+        std::fs::write(&tool, "#!/bin/sh\necho found\n").expect("tool");
+        std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let out = Command::new(std::env::current_exe().expect("exe"))
+            .args(["--exact", "checker::tests::path_probe_child", "--nocapture"])
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("HOME", home.path())
+            .env(PROBE, "1")
+            .output()
+            .expect("child");
+        assert!(
+            out.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        // Control: the same child without the tool folder on disk cannot find the program.
+        std::fs::remove_file(&tool).expect("remove");
+        let out = Command::new(std::env::current_exe().expect("exe"))
+            .args(["--exact", "checker::tests::path_probe_child"])
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("HOME", home.path())
+            .env(PROBE, "1")
+            .output()
+            .expect("child");
+        assert!(
+            !out.status.success(),
+            "the probe must fail without the tool"
+        );
+    }
+
     #[test]
     fn a_failing_command_has_its_exit_code_and_output() {
         let dir = tempfile::tempdir().expect("dir");

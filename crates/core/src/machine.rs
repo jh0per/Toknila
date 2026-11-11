@@ -12,6 +12,7 @@
 //! | Running | Review | `Finished` (with a check command: Review with the check running) |
 //! | Review (checking) | Review / Running | `CheckDone`: a pass goes on to the reviewer or the person; a failure returns the card to the worker, a round, until the round limit |
 //! | Review (checking) | Review | `CheckLost` (the check could not run: a person decides) |
+//! | Review (checking) | Review | `CheckCannotRun` (its program was not found: a person decides, no round) |
 //! | Running, Waiting | Blocked | `Block` (Review too, for a merge conflict) |
 //! | Blocked | previous status | `Unblock` |
 //! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
@@ -135,6 +136,9 @@ pub fn apply(
             now,
             &mut effects,
         )?,
+        (S::Review, TicketEvent::CheckCannotRun { command }) => {
+            review::check_cannot_run(&mut next, command, &mut effects)?
+        }
         (S::Review, TicketEvent::CheckLost { detail }) => {
             review::check_lost(&mut next, detail, &mut effects)?
         }

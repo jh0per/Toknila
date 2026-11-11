@@ -482,6 +482,73 @@ fn a_failing_check_returns_the_card_to_the_worker_with_the_output_as_a_round() {
 }
 
 #[test]
+fn a_check_whose_program_is_not_found_is_no_round_and_waits_for_the_person() {
+    let mut t = after_hand_in_with_check(ReviewMode::Both);
+    t.review.handed_in = Some("abc123".to_owned());
+    let tr = step(
+        &t,
+        &TicketEvent::CheckCannotRun {
+            command: "cargo test".to_owned(),
+        },
+    );
+    let r = &tr.ticket.review;
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(r.turn, Some(ReviewTurn::Person));
+    assert!(r.rounds.is_empty());
+    assert_eq!(r.auto_returns(), 0);
+    assert_eq!(r.handed_in.as_deref(), Some("abc123"));
+    assert_eq!(
+        r.note,
+        Some(ReviewNote::CheckCannotRun {
+            command: "cargo test".to_owned()
+        })
+    );
+    assert!(!tr.effects.contains(&Effect::EnsureRunner));
+    assert!(
+        !tr.effects
+            .iter()
+            .any(|e| matches!(e, Effect::RecordCheckOutput { .. }))
+    );
+    let said = tr.effects.iter().find_map(|e| match e {
+        Effect::RecordReport { summary } => Some(summary.clone()),
+        _ => None,
+    });
+    let said = said.expect("a report");
+    assert!(said.contains("`cargo test` could not run"), "{said}");
+    assert!(said.contains("`cargo` was not found"), "{said}");
+    assert!(said.contains("Add ~/.cargo/bin to the PATH"), "{said}");
+    assert!(said.contains("Accept") && said.contains("Return"), "{said}");
+    // The reviewer cannot be asked for here: there is no verdict missing.
+    assert!(apply(&tr.ticket, &TicketEvent::RunReviewer, NOW).is_err());
+}
+
+#[test]
+fn a_failing_check_with_test_output_is_still_a_round() {
+    use crate::toolpath::command_not_found;
+    assert!(command_not_found(Some(127), ""));
+    assert!(command_not_found(Some(9009), ""));
+    assert!(command_not_found(Some(1), "sh: x: command not found"));
+    assert!(command_not_found(
+        Some(1),
+        "'x' is not recognized as an internal or external command,\n\
+         operable program or batch file.\n"
+    ));
+    assert!(!command_not_found(
+        Some(101),
+        "test result: FAILED. 1 passed; 2 failed"
+    ));
+    // The words quoted by a failing test, with the test output after them, are not the shell's
+    // message: the command ran.
+    assert!(!command_not_found(
+        Some(101),
+        "---- a_check_that_says_command_not_found stdout ----\n\
+         assertion failed: said.contains(\"sh: cargo: command not found\")\n\
+         failures:\n    a_check_that_says_command_not_found\n\
+         test result: FAILED. 3 passed; 1 failed"
+    ));
+}
+
+#[test]
 fn a_passing_check_goes_on_to_whoever_the_mode_says() {
     for (mode, turn) in [
         (ReviewMode::Human, ReviewTurn::Person),
