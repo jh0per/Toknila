@@ -6,6 +6,16 @@ use toknila_api_types::{ChainDetail, EventRecord, TicketDetail, TicketItem};
 use toknila_core::wire::wire_name;
 use toknila_core::{Actor, CommentKind, NodeRef, StatusReason, WaitingReason};
 
+use crate::check_words::check_words_now;
+
+/// Who wrote a comment, in words: the daemon's own comments are Toknila's, never the agent's.
+fn author_word(a: Actor) -> String {
+    match a {
+        Actor::System => "Toknila".to_owned(),
+        other => w(&other),
+    }
+}
+
 /// `90_000` ms -> `1m30s`.
 pub fn duration(ms: u64) -> String {
     let s = ms / 1000;
@@ -93,6 +103,10 @@ pub fn tickets(items: &[TicketItem]) {
                 status.push_str(" (paused)");
             }
             status.push_str(&queued(it.queue_position));
+            if t.review.turn == Some(toknila_core::ReviewTurn::Check) {
+                let words = check_words_now(it.check.as_ref());
+                status.push_str(&format!(" ({words})"));
+            }
             vec![
                 t.key.to_string(),
                 status,
@@ -214,10 +228,9 @@ fn review(d: &TicketDetail) {
         Some(toknila_core::ReviewTurn::Person) => ", waiting for a person".to_owned(),
         Some(toknila_core::ReviewTurn::Agent { .. }) => ", waiting for the reviewer".to_owned(),
         Some(toknila_core::ReviewTurn::Merging) => ", merging".to_owned(),
-        Some(toknila_core::ReviewTurn::Check) => match r.check_queue {
-            Some(n) if n > 0 => format!(", waits for another check to end (place {n} in line)"),
-            _ => ", being checked".to_owned(),
-        },
+        Some(toknila_core::ReviewTurn::Check) => {
+            format!(", {}", check_words_now(r.check.as_ref()))
+        }
         None => String::new(),
     };
     println!(
@@ -234,7 +247,7 @@ fn review(d: &TicketDetail) {
         };
         let who = match round.reviewer {
             Actor::Human => "person",
-            Actor::System => "check",
+            Actor::System => "Toknila",
             Actor::Agent => "reviewer agent",
         };
         let said = if round.comment.is_empty() {
@@ -329,7 +342,7 @@ pub fn ticket(d: &TicketDetail) {
                 "  [{}] {} by {}{delivered}",
                 w(&c.kind),
                 c.body.gist,
-                w(&c.author)
+                author_word(c.author)
             );
         }
     }
@@ -398,6 +411,13 @@ mod tests {
         assert_eq!(duration(90_000), "1m30s");
         assert_eq!(duration(3_600_000 * 2 + 60_000), "2h01m");
         assert_eq!(duration(86_400_000 + 3_600_000), "1d01h");
+    }
+
+    #[test]
+    fn the_daemons_own_comments_are_by_toknila() {
+        assert_eq!(author_word(Actor::System), "Toknila");
+        assert_eq!(author_word(Actor::Agent), "agent");
+        assert_eq!(author_word(Actor::Human), "human");
     }
 
     #[test]

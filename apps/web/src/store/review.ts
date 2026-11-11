@@ -2,6 +2,7 @@
 // (`TicketDetail.review`); nothing here decides what is allowed.
 
 import type { ReviewRound, ReviewView } from "../api/types";
+import { checkText, systemRoundText } from "./checkPhase";
 
 /// Who gave a round, in words: a person, the daemon's check or the reviewer agent.
 export function whoText(r: ReviewRound): string {
@@ -23,6 +24,8 @@ export function gistText(comment: string, max = 120): string {
 
 /// "Round 2: you asked for changes — handle the error case".
 export function roundText(r: ReviewRound): string {
+  const skipped = r.reviewer === "system" ? systemRoundText(r.verdict, r.comment) : undefined;
+  if (skipped) return `Round ${r.number}: ${skipped}`;
   const gist = gistText(r.comment);
   return `Round ${r.number}: ${whoText(r)} ${verdictText(r)}${gist ? ` — ${gist}` : ""}`;
 }
@@ -38,15 +41,12 @@ export function loopText(review: ReviewView): string {
 }
 
 /// Who the card waits for in review, in words; empty outside review.
-export function awaitingText(review: ReviewView): string {
+export function awaitingText(review: ReviewView, now: number = Date.now()): string {
   const turn = review.awaiting;
   if (!turn) return "";
   if (turn.by === "person") return "waiting for you";
   if (turn.by === "merging") return "merging into the main branch";
-  if (turn.by === "check") {
-    const place = review.check_queue ?? 0;
-    return place > 0 ? `the check waits for another check to end (${place === 1 ? "next in line" : `#${place} in line`})` : "the check is running";
-  }
+  if (turn.by === "check") return checkText(review, now).replace(/^Being checked/, "being checked");
   return turn.decides ? "waiting for the reviewer agent" : "waiting for the reviewer agent, then you";
 }
 

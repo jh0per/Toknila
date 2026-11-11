@@ -38,7 +38,8 @@
 //! (dependents becoming Ready, Blocked or Backlog) come back as [`Effect`]s for the chain graph.
 
 use crate::{
-    OutOfOrder, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp, Verdict, WaitingReason,
+    CheckPhase, OutOfOrder, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp, Verdict,
+    WaitingReason,
 };
 
 mod action;
@@ -115,7 +116,7 @@ pub fn apply(
             // The hand-in ends the worker's run: a Return starts a replacement run.
             effects.push(Effect::StopWorker);
             if *check {
-                review::enter_check(&mut next, &mut effects);
+                check_phase::enter_check(&mut next, &mut effects);
             } else {
                 review::enter(&mut next, *mode, &mut effects);
             }
@@ -137,11 +138,22 @@ pub fn apply(
             &mut effects,
         )?,
         (S::Review, TicketEvent::CheckCannotRun { command }) => {
-            review::check_cannot_run(&mut next, command, &mut effects)?
+            check_phase::check_cannot_run(&mut next, command, &mut effects)?
         }
         (S::Review, TicketEvent::CheckLost { detail }) => {
-            review::check_lost(&mut next, detail, &mut effects)?
+            check_phase::check_lost(&mut next, detail, &mut effects)?
         }
+        (S::Review, TicketEvent::CheckSkipped { mode }) => {
+            check_phase::skipped(&mut next, *mode, now, &mut effects)?
+        }
+        (S::Review, TicketEvent::CheckSyncing) => {
+            check_phase::progress(&mut next, "check_syncing", CheckPhase::Syncing)?
+        }
+        (S::Review, TicketEvent::CheckRunning { command }) => check_phase::progress(
+            &mut next,
+            "check_running",
+            check_phase::running(command, now),
+        )?,
         (S::Running | S::Waiting, TicketEvent::Block { reason }) => {
             block(reason, ticket, &mut effects)?
         }
@@ -362,6 +374,7 @@ pub fn apply(
     })
 }
 
+mod check_phase;
 mod checks;
 mod review;
 mod unfounded;

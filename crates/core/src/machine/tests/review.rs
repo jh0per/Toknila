@@ -1,6 +1,6 @@
 use super::*;
 use crate::machine::review;
-use crate::{ReviewMode, ReviewNote, ReviewTurn, Verdict, machine::TicketAction};
+use crate::{CheckPhase, ReviewMode, ReviewNote, ReviewTurn, Verdict, machine::TicketAction};
 
 fn finished(mode: ReviewMode) -> TicketEvent {
     TicketEvent::Finished {
@@ -162,7 +162,7 @@ fn in_both_mode_requested_changes_return_the_card_until_the_round_limit() {
     assert_eq!(tr.ticket.review.rounds.len(), 1);
     assert!(matches!(
         tr.effects[..],
-        [Effect::StopReviewer, Effect::RecordReport { .. }]
+        [Effect::StopReviewer, Effect::RecordNotice { .. }]
     ));
 }
 
@@ -510,10 +510,10 @@ fn a_check_whose_program_is_not_found_is_no_round_and_waits_for_the_person() {
             .any(|e| matches!(e, Effect::RecordCheckOutput { .. }))
     );
     let said = tr.effects.iter().find_map(|e| match e {
-        Effect::RecordReport { summary } => Some(summary.clone()),
+        Effect::RecordNotice { summary } => Some(summary.clone()),
         _ => None,
     });
-    let said = said.expect("a report");
+    let said = said.expect("a notice from the daemon");
     assert!(said.contains("`cargo test` could not run"), "{said}");
     assert!(said.contains("`cargo` was not found"), "{said}");
     assert!(said.contains("Add ~/.cargo/bin to the PATH"), "{said}");
@@ -586,7 +586,7 @@ fn after_the_round_limit_a_failing_check_leaves_the_card_to_the_person_with_the_
     assert!(
         tr.effects
             .iter()
-            .any(|e| matches!(e, Effect::RecordReport { summary } if summary.contains("2 rounds")))
+            .any(|e| matches!(e, Effect::RecordNotice { summary } if summary.contains("2 rounds")))
     );
     assert!(
         !tr.effects.contains(&Effect::EnsureRunner),
@@ -634,6 +634,78 @@ fn the_check_result_is_heard_only_while_the_card_is_being_checked() {
     ] {
         assert!(apply(&t, &event, NOW).is_err(), "{event:?}");
     }
+}
+
+#[test]
+fn the_checker_reports_syncing_then_running_and_the_phase_ends_with_the_check() {
+    let t = after_hand_in_with_check(ReviewMode::Both);
+    assert_eq!(t.review.check, None, "nothing reported yet");
+    let t = step(&t, &TicketEvent::CheckSyncing).ticket;
+    assert_eq!(t.review.check, Some(CheckPhase::Syncing));
+    let running = TicketEvent::CheckRunning {
+        command: "cargo xtask verify".to_owned(),
+    };
+    let t = step(&t, &running).ticket;
+    assert_eq!(
+        t.review.check,
+        Some(CheckPhase::Running {
+            command: "cargo xtask verify".to_owned(),
+            since: NOW
+        })
+    );
+    assert_eq!(t.review.turn, Some(ReviewTurn::Check));
+    let passed = step(&t, &check_done(true, ReviewMode::Both, 3)).ticket;
+    assert_eq!(passed.review.check, None, "a pass ends the phase");
+    let failed = step(&t, &check_done(false, ReviewMode::Both, 3)).ticket;
+    assert_eq!(failed.review.check, None, "a failure ends the phase");
+    let lost = TicketEvent::CheckLost {
+        detail: "x".to_owned(),
+    };
+    assert_eq!(step(&t, &lost).ticket.review.check, None);
+}
+
+#[test]
+fn a_phase_is_heard_only_while_the_card_is_being_checked() {
+    for t in [
+        in_review(ReviewTurn::Person),
+        ticket_in(TicketStatus::Running),
+    ] {
+        assert!(apply(&t, &TicketEvent::CheckSyncing, NOW).is_err());
+    }
+}
+
+#[test]
+fn a_project_without_a_check_command_gets_a_round_that_says_so() {
+    let t = after_hand_in_with_check(ReviewMode::Human);
+    let tr = step(
+        &t,
+        &TicketEvent::CheckSkipped {
+            mode: ReviewMode::Human,
+        },
+    );
+    let round = &tr.ticket.review.rounds[0];
+    assert_eq!(
+        (round.reviewer, round.verdict, round.comment.as_str()),
+        (
+            Actor::System,
+            Verdict::Approve,
+            "Brought up to main; the project has no check command."
+        )
+    );
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+}
+
+#[test]
+fn the_daemons_own_comments_are_notices_not_the_agents_reports() {
+    let t = after_hand_in_with_check(ReviewMode::Both);
+    let lost = TicketEvent::CheckLost {
+        detail: "no shell".to_owned(),
+    };
+    let tr = step(&t, &lost);
+    assert!(matches!(
+        &tr.effects[..],
+        [Effect::RecordNotice { summary }] if summary.contains("The check could not run")
+    ));
 }
 
 #[test]

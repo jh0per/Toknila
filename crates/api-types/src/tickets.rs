@@ -51,6 +51,10 @@ pub struct TicketItem {
     pub needs_human: bool,
     /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
     pub queue_position: Option<u32>,
+    /// While the card's check runs: queued (place in the line), syncing with main, or running the
+    /// check command since a time. Absent otherwise, and before the checker reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<toknila_core::CheckPhase>,
 }
 
 /// Filters for `GET /v1/tickets`.
