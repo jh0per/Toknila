@@ -19,6 +19,9 @@
 //! - `pid`: print `pid=<own process id>`, so a test can end the agent from outside.
 //! - `flagfile <flag>`: read the file named by the argument after `<flag>` in this process's
 //!   whole command line, last occurrence (the instructions file a runner appends) and print each line as `file:<line>`.
+//! - `readcheck <flag> <path>`: judge a `Read` of `path` (`{cwd}` is the working directory) by
+//!   the settings file named after `<flag>` in the command line, and print
+//!   `read allow=<yes|no> deny=<yes|no> <path>`.
 //! - `sleep <ms>`: wait.
 //! - `hold`: wait until killed.
 //! - `child`: start a child process that holds until killed and print `child=<pid>`.
@@ -86,6 +89,54 @@ fn send(method: &str, path: &str, json: &str) -> String {
     format!("post={status} {}", body.trim())
 }
 
+/// Whether one permission rule of the settings file lets a `Read` of `path` through: a bare tool
+/// name allows any path, `Read(//dir/**)` a folder, `Read(//file)` one file.
+fn read_rule_matches(rule: &str, path: &str) -> bool {
+    if matches!(rule, "Read" | "Grep" | "Glob") {
+        return true;
+    }
+    let Some(body) = rule
+        .strip_prefix("Read(/")
+        .and_then(|r| r.strip_suffix(')'))
+    else {
+        return false;
+    };
+    match body.strip_suffix("/**") {
+        Some(dir) => path.starts_with(&format!("{dir}/")),
+        None => body == path,
+    }
+}
+
+/// `read allow=<yes|no> deny=<yes|no> <path>`: what the settings file named by `flag` in this
+/// process's command line says about reading `path`, the allow and the deny rules apart. `{cwd}` in
+/// the path is the working directory.
+fn readcheck(flag: &str, target: &str) -> String {
+    let cwd = std::env::current_dir()
+        .map(|d| d.display().to_string())
+        .unwrap_or_default();
+    let path = target.replace("{cwd}", &cwd);
+    let all: Vec<String> = std::env::args().collect();
+    let file = all.windows(2).rfind(|w| w[0] == flag).map(|w| w[1].clone());
+    let json: serde_json::Value = file
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    let hit = |list: &str| {
+        json["permissions"][list]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|r| r.as_str())
+            .any(|r| read_rule_matches(r, &path))
+    };
+    let yes = |b: bool| if b { "yes" } else { "no" };
+    format!(
+        "read allow={} deny={} {path}",
+        yes(hit("allow")),
+        yes(hit("deny"))
+    )
+}
+
 fn main() {
     let mut args = std::env::args().skip(1);
     while let Some(step) = args.next() {
@@ -138,6 +189,11 @@ fn main() {
                 for line in text.unwrap_or_default().lines() {
                     say(&format!("file:{line}"));
                 }
+            }
+            "readcheck" => {
+                let flag = args.next().unwrap_or_default();
+                let target = args.next().unwrap_or_default();
+                say(&readcheck(&flag, &target));
             }
             "trust" => {
                 for line in [
