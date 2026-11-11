@@ -14,6 +14,7 @@ import "./menu.css";
 import "./updates.css";
 import "./inbox.css";
 import "./details.css";
+import "./mockups.css";
 import "./assistant.css";
 
 // The viewer's theme goes on before the first paint, so a forced dark or light does not flash.

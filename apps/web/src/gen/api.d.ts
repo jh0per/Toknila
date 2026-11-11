@@ -412,6 +412,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keeps the planner's next step for its project, replacing the previous one (a
+         *     `window.suggest` event). The owner's window shows it with the button of its action; the
+         *     planner starts, answers and accepts nothing itself.
+         */
+        post: operations["planner_suggest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles": {
         parameters: {
             query?: never;
@@ -879,6 +900,23 @@ export interface paths {
          *     is named in `warnings` and that leftover stays.
          */
         post: operations["clean_strays"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The planner's standing suggestion for the project (the next step), or `null` when it has none. */
+        get: operations["get_suggestion"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1645,6 +1683,8 @@ export interface components {
             add_subtasks?: string[];
             /** @description Whether the agent shows a design for approval before any code. */
             design_first?: boolean | null;
+            /** @description The card's designs, replacing the list (`[]` clears it); left out keeps them. */
+            designs?: components["schemas"]["DesignPick"][] | null;
             /** @description Checklist items to rename. */
             edit_subtasks?: components["schemas"]["SubtaskEdit"][];
             prompt?: string | null;
@@ -1705,6 +1745,8 @@ export interface components {
             usage?: {
                 [key: string]: components["schemas"]["UsageFigures"];
             };
+            /** @description What an import left out (a design the project does not have); only an import answers it. */
+            warnings?: string[];
         };
         /**
          * @description A chain file: body of `POST /v1/projects/{project}/import`, answer of
@@ -1894,6 +1936,19 @@ export interface components {
             designs: components["schemas"]["Design"][];
             /** @description Whether the project has a Figma token; the token itself is never sent. */
             figma_token: boolean;
+        };
+        /**
+         * @description A design the planner names: its file name (or id) in the project's library, and the part of
+         *     the image that matters. The host finds the design and gives the use case a [`DesignRef`].
+         */
+        DesignPick: {
+            design: string;
+            region?: components["schemas"]["Region"] | null;
+        };
+        /** @description A card's reference to a design of its project, with the part of the image that matters. */
+        DesignRef: {
+            design: components["schemas"]["DesignId"];
+            region?: components["schemas"]["Region"] | null;
         };
         /** @description Dependency edge: `to` cannot start before `from` is done. */
         Edge: {
@@ -2237,6 +2292,8 @@ export interface components {
              *     code.
              */
             design_first?: boolean;
+            /** @description Designs of the project the card is about, by file name or id. */
+            designs?: components["schemas"]["DesignPick"][];
             prompt?: string;
             /** @description Checklist items. */
             subtasks?: string[];
@@ -2320,6 +2377,14 @@ export interface components {
         NewSubtask: {
             text: string;
         };
+        /** @description What the planner says as its next step. */
+        NewSuggestion: {
+            action?: components["schemas"]["SuggestionAction"] | null;
+            /** @description The card it is about (key, id or title). */
+            card?: string | null;
+            /** @description The step in a line or two; with no card and no action it says nothing waits for the owner. */
+            text: string;
+        };
         /** @description `POST /v1/tickets/{ticket}/threads`. */
         NewThread: {
             kind: components["schemas"]["ThreadKind"];
@@ -2342,6 +2407,8 @@ export interface components {
             before?: string[];
             /** @description Show the person a design to approve before any code. */
             design_first?: boolean;
+            /** @description Designs of the project the card is about (by id), with an optional region of each. */
+            designs?: components["schemas"]["DesignRef"][];
             needs_secrets?: boolean;
             paused?: boolean;
             profile?: string | null;
@@ -2506,6 +2573,11 @@ export interface components {
         PatchTicket: {
             acceptance?: string[] | null;
             design_first?: boolean | null;
+            /**
+             * @description The card's designs, replacing the whole list (an empty list clears it); left out to keep
+             *     them.
+             */
+            designs?: components["schemas"]["DesignRef"][] | null;
             needs_secrets?: boolean | null;
             pos?: components["schemas"]["Pos"] | null;
             profile?: string | null;
@@ -2854,6 +2926,17 @@ export interface components {
              */
             used_percentage: number;
         };
+        /** @description A rectangle of a design image, in whole percent of the image's width and height. */
+        Region: {
+            /** Format: int32 */
+            h: number;
+            /** Format: int32 */
+            w: number;
+            /** Format: int32 */
+            x: number;
+            /** Format: int32 */
+            y: number;
+        };
         /** @description A release milestone between tickets on the chain graph. */
         Release: {
             /** @description The release's branch (`release/<version>`); `null` while no branch was made. */
@@ -3199,6 +3282,24 @@ export interface components {
         };
         /** @description Identifies a [`crate::Subtask`]. */
         SubtaskId: string;
+        /** @description A project's standing suggestion. */
+        Suggestion: {
+            action?: components["schemas"]["SuggestionAction"] | null;
+            at: components["schemas"]["Timestamp"];
+            card?: components["schemas"]["TicketKey"] | null;
+            chain?: components["schemas"]["ChainId"] | null;
+            project: components["schemas"]["ProjectKey"];
+            /**
+             * @description What the planner says, in a line or two. With no card and no action it says that nothing
+             *     waits for the person.
+             */
+            text: string;
+        };
+        /**
+         * @description What the button of a suggestion does.
+         * @enum {string}
+         */
+        SuggestionAction: "start" | "answer" | "accept" | "release";
         /** @description All checks, and whether every one passed. */
         SystemChecks: {
             checks: components["schemas"]["Check"][];
@@ -3293,6 +3394,11 @@ export interface components {
              *     is told to open a design thread first, and `finished` is refused until one is approved.
              */
             design_first?: boolean;
+            /**
+             * @description The designs of the project this card is about, with the part of each that matters; the
+             *     first one is the card's thumbnail on the diagram.
+             */
+            designs?: components["schemas"]["DesignRef"][];
             done_out_of_order?: components["schemas"]["OutOfOrder"] | null;
             id: components["schemas"]["TicketId"];
             key: components["schemas"]["TicketKey"];
@@ -4638,6 +4744,53 @@ export interface operations {
             };
         };
     };
+    planner_suggest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSuggestion"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suggestion"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_profiles: {
         parameters: {
             query?: never;
@@ -5739,6 +5892,36 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_suggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suggestion"] | null;
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

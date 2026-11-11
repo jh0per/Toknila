@@ -8,6 +8,7 @@ import { finishText, finishView } from "../store/phase";
 import { showAgentName } from "../store/profiles";
 import type { CardLayout } from "./cardSize";
 import { Markdown } from "./Markdown";
+import { NodeThumb } from "./NodeThumb";
 import { PrChip } from "./PrChip";
 import { UsageChip } from "./UsageChip";
 
@@ -15,8 +16,10 @@ import { UsageChip } from "./UsageChip";
 /// subtasks are when it has any, and a proposed card carries its own Approve and Reject, the same
 /// actions the Inbox offers, when the daemon allows them. The agent's runner shows only when it is
 /// not the project's default; the usage figures show here and nowhere else on the page.
-export function TicketNode({ ticket: t, layout, href, style, selected, moving, over, linking, detail, usage, queued, defaultProfile, onHover, handlers }: {
+export function TicketNode({ ticket: t, projectKey, layout, href, style, selected, moving, over, linking, detail, usage, queued, defaultProfile, onHover, handlers }: {
   ticket: Ticket;
+  /// The key of the card's project: its designs are served under it.
+  projectKey: string;
   /// The title as wrapped for the card's width (`cardSize.ts`).
   layout: CardLayout;
   href: string;
@@ -56,7 +59,7 @@ export function TicketNode({ ticket: t, layout, href, style, selected, moving, o
     selected ? "sel" : "", moving ? "moving" : "", over ? "over" : "", linking ? "linkable" : "",
   ].filter(Boolean).join(" ");
   const proposal = t.status === "proposed" && (allows(detail, "approve") || allows(detail, "reject"));
-  const extras = Boolean(progress || queued !== undefined || t.pr || t.done_out_of_order || usage);
+  const extras = Boolean(progress || queued !== undefined || t.pr || t.done_out_of_order || usage || t.designs?.length);
   const act = (f: () => void) => (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -104,6 +107,7 @@ export function TicketNode({ ticket: t, layout, href, style, selected, moving, o
         </span>
       ) : extras && (
         <span className="foot">
+          {t.designs && t.designs.length > 0 && <NodeThumb project={projectKey} designs={t.designs} />}
           {progress && (
             <span className="sub" data-testid="subtasks" title={`${progress.done} of ${progress.total} subtasks done`}>
               <span className="sub-bar"><i style={{ width: `${(100 * progress.done) / progress.total}%` }} /></span>

@@ -20,6 +20,16 @@ use crate::http::dto::{
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
 
+/// Refuses design references to a design the project does not have.
+async fn check_design_ids(
+    state: &AppState,
+    project: toknila_core::ProjectId,
+    refs: Vec<toknila_core::design::DesignRef>,
+) -> ApiResult<()> {
+    let designs = crate::designs::Designs::new(&state.home, project);
+    Ok(tokio::task::spawn_blocking(move || designs.check_refs(&refs)).await??)
+}
+
 #[utoipa::path(post, path = "/chains/{chain}/tickets", tag = "tickets", request_body = NewTicket,
     params(("chain" = String, Path, description = "Chain id or name")),
     responses((status = 201, body = TicketDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
@@ -28,6 +38,14 @@ pub async fn create_ticket(
     Path(chain): Path<String>,
     Json(input): Json<NewTicket>,
 ) -> ApiResult<(StatusCode, Json<TicketDetail>)> {
+    if !input.designs.is_empty() {
+        let (name, refs) = (chain.clone(), input.designs.clone());
+        let project = read(&state, move |repo| {
+            Ok(resolve::chain(repo, &name)?.project_id)
+        })
+        .await?;
+        check_design_ids(&state, project, refs).await?;
+    }
     let (at, prices) = stamp(&state);
     let (detail, _) = state
         .store
@@ -120,6 +138,15 @@ pub async fn patch_ticket(
     Path(ticket): Path<String>,
     Json(patch): Json<PatchTicket>,
 ) -> ApiResult<Json<TicketDetail>> {
+    if let Some(refs) = patch.designs.clone() {
+        let key = ticket.clone();
+        let project = read(&state, move |repo| {
+            let t = resolve::ticket(repo, &key)?;
+            Ok(resolve::chain(repo, &t.chain_id.to_string())?.project_id)
+        })
+        .await?;
+        check_design_ids(&state, project, refs).await?;
+    }
     ticket_write(&state, ticket, Actor::Human, move |tx, t| {
         Ok(tickets::edit(tx, &t, patch)?)
     })

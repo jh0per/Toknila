@@ -6,7 +6,9 @@
 //!
 //! The planner's own run (start, stop, input, size) is here too: a project has at most one.
 
+mod cards;
 mod plan;
+mod suggest;
 mod window;
 mod with_designs;
 
@@ -16,17 +18,20 @@ use toknila_core::machine::person_only;
 use toknila_core::planner::{self, Refusal};
 use toknila_core::{
     Actor, AgentProfile, AgentRole, BaseBehind, Chain, ChainId, EdgeKind, PlannerSite, Project,
-    ProjectId, Thread, ThreadKind, Ticket, TicketId, TicketKey, TicketPatch,
+    ProjectId, Thread, ThreadKind, Ticket, TicketKey,
 };
 
+pub use cards::{
+    CardEdit, DesignPick, NewCard, SubtaskEdit, add_card, add_card_with_designs, edit_card,
+    edit_card_with_designs,
+};
 pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, plan};
+pub use suggest::{NewSuggestion, suggest};
 pub use window::show_card;
 pub use with_designs::{request_with, start_with};
 
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError, Started};
-use crate::tickets;
-use crate::tickets::NewTicket;
-use crate::{AppError, AppResult, ErrorKind, Reader, UnitOfWork, chains, notes, resolve, threads};
+use crate::{AppError, AppResult, ErrorKind, Reader, UnitOfWork, chains, resolve, threads};
 
 impl From<Refusal> for AppError {
     fn from(r: Refusal) -> Self {
@@ -102,104 +107,6 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
         version: None,
     };
     chains::create(uow, &project.to_string(), input)
-}
-
-/// What the planner gives for a new card.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct NewCard {
-    pub title: String,
-    #[serde(default)]
-    pub prompt: String,
-    #[serde(default)]
-    pub acceptance: Vec<String>,
-    /// Cards (keys) or release versions of the chain it waits for. Empty: the end of the chain.
-    #[serde(default)]
-    pub after: Vec<String>,
-    /// Checklist items.
-    #[serde(default)]
-    pub subtasks: Vec<String>,
-    /// The card changes what the person sees: the agent shows a design for approval before any
-    /// code.
-    #[serde(default)]
-    pub design_first: bool,
-}
-
-/// Adds a card to a chain of the planner's project.
-pub fn add_card<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    project: ProjectId,
-    chain_ref: &str,
-    input: NewCard,
-) -> AppResult<TicketId> {
-    let c = chain(uow, project, chain_ref)?;
-    planner::ensure_graph_change(&c)?;
-    let at_end = input.after.is_empty();
-    let input = NewTicket {
-        title: input.title,
-        prompt: input.prompt,
-        acceptance: input.acceptance,
-        after: input.after,
-        subtasks: input.subtasks,
-        design_first: input.design_first,
-        at_end,
-        ..NewTicket::default()
-    };
-    tickets::create(uow, &c.id.to_string(), input)
-}
-
-/// A rename of a checklist item.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SubtaskEdit {
-    /// 1-based position.
-    pub position: u32,
-    pub text: String,
-}
-
-/// What the planner may change on a card that has not started.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct CardEdit {
-    pub title: Option<String>,
-    pub prompt: Option<String>,
-    pub acceptance: Option<Vec<String>>,
-    /// Whether the agent shows a design for approval before any code.
-    pub design_first: Option<bool>,
-    /// Checklist items to append.
-    #[serde(default)]
-    pub add_subtasks: Vec<String>,
-    /// Checklist items to rename.
-    #[serde(default)]
-    pub edit_subtasks: Vec<SubtaskEdit>,
-}
-
-/// Edits a card of the planner's project that has not started.
-pub fn edit_card<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    project: ProjectId,
-    card_ref: &str,
-    edit: CardEdit,
-) -> AppResult<TicketId> {
-    let t = card(uow, project, card_ref)?;
-    planner::ensure_card_editable(&t)?;
-    let patch = TicketPatch {
-        title: edit.title,
-        prompt: edit.prompt,
-        acceptance: edit.acceptance,
-        design_first: edit.design_first,
-        ..TicketPatch::default()
-    };
-    if patch != TicketPatch::default() {
-        tickets::edit(uow, &t, patch)?;
-    }
-    for item in &edit.edit_subtasks {
-        notes::update_subtask(uow, &t, item.position, None, Some(item.text.clone()))?;
-    }
-    for text in &edit.add_subtasks {
-        notes::add_subtask(uow, &t, text)?;
-    }
-    Ok(t.id)
 }
 
 /// Makes `to` wait for `from` in a chain of the planner's project.

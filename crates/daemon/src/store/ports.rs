@@ -7,7 +7,7 @@ use toknila_core::graph::ChainView;
 use toknila_core::{
     Actor, AgentRole, Chain, ChainId, Comment, Project, ProjectId, Release, ReleaseId, Ship,
     Subtask, Thread, ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey,
-    Timestamp,
+    Timestamp, suggestion::Suggestion,
 };
 
 use super::{Repo, StoreError, WriteTx};
@@ -64,6 +64,7 @@ reader! {
     thread_messages(thread: ThreadId) -> Vec<ThreadMessage>;
     thread_versions(thread: ThreadId) -> Vec<ThreadVersion>;
     ship(ticket: TicketId) -> Option<Ship>;
+    suggestion(project: ProjectId) -> Option<Suggestion>;
     last_event_payload(entity: &str, entity_id: &str) -> Option<Value>;
     live_runners() -> Vec<(TicketId, AgentRole)>;
 }
@@ -127,6 +128,10 @@ impl UnitOfWork for WriteTx<'_> {
 
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()> {
         Ok(self.repo().save_ship(ship)?)
+    }
+
+    fn save_suggestion(&mut self, project: ProjectId, s: &Suggestion) -> AppResult<()> {
+        Ok(self.repo().save_suggestion(project, s)?)
     }
 
     fn delete_ship(&mut self, ticket: TicketId) -> AppResult<()> {

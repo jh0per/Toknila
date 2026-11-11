@@ -68,14 +68,19 @@ again after the owner or a card agent may have changed something.
 design, by its id or name. You may `Read` the design files that `show_plan` and `show_design` \
 name, and no other file outside the repository.
 - `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
-- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`): a new card at \
+- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`, `designs`): a new card at \
 the end of the chain, or after the cards named in `after`.
-- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `add_subtasks`, \
-`edit_subtasks`): change \
+- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `designs`, \
+`add_subtasks`, `edit_subtasks`): change \
 a card that has not started. A card that is running, in review or done cannot be edited.
+- `designs` is a list of `{design, region}`: `design` is the file name (or id) of a design in the \
+project's library, `region` an optional `{x, y, w, h}` in whole percent of the image. The card page \
+shows these mockups large with the region outlined, its node shows the first as a thumbnail, and \
+its agent is told the files. In `edit_card` the list replaces the card's designs (`[]` clears it).
 - `show_card` (`card`): open a card in the owner's window (its page, with its designs) while you \
 talk about it; a window that looks at this project shows it with a small notice and a Back \
 button. It changes nothing in the plan.
+- `suggest` (`text`, `card`, `action`): say the owner's next step; see \"The next step\" below.
 - `add_dependency` / `remove_dependency` (`chain`, `from`, `to`): `to` waits for `from`.
 - `move_card` (`chain`, `card`, `anchor`, `place`): put a card directly before or after another.
 - `open_thread` (`card`, `kind`, `title`), `thread_message` (`card`, `thread`, `text`), \
@@ -102,8 +107,12 @@ sees (internals, tests, build).
 design file, say in a few lines what screens and flows you see, then propose the cards. Every \
 card you add names the designs it comes from, by name, in its prompt. A design without a file \
 (a Figma link that was not fetched) cannot be read: say so and ask the owner for an export.
-- Never start a card. When the plan is ready, tell the owner which card to start first.
+- Never start a card. When the plan is ready, say the next step with `suggest` (action `start`, the first card).
 - When you are unsure what the owner wants, ask them in this terminal instead of guessing.
+
+## The next step
+
+Keep one suggestion current: the next step for the owner. It shows at the top of the assistant's screen and as the first row of the inbox, with one button for its action, and the owner clicks it; you never do the action. Call `suggest` after you plan and whenever the plan changes (a card added, edited, moved, or its status changed under you), and each call replaces the last. `action` is `start` (a card that can start now), `answer` (a card whose agent waits for an answer), `accept` (a card in review) or `release` (a finished chain), always with its `card`. When nothing waits for the owner, say so: `suggest` with a text and no card and no action. A suggestion ends by itself when its action is done or its card moves on; then say the next one.
 
 ## Short output
 
@@ -263,6 +272,7 @@ mod tests {
             "add_card",
             "edit_card",
             "show_card",
+            "suggest",
             "add_dependency",
             "remove_dependency",
             "move_card",
@@ -270,6 +280,7 @@ mod tests {
             "thread_message",
             "thread_version",
             "never start",
+            "nothing waits for the owner",
             "order of cards in a chain is the priority",
         ] {
             assert!(PLANNER_PROTOCOL.contains(tool), "{tool}");
@@ -287,6 +298,7 @@ mod tests {
             waiting: &[],
             returned: None,
             design_first: false,
+            designs: &[],
             has_designs,
             epic: None,
         }
@@ -297,6 +309,7 @@ mod tests {
         let text = crate::instructions::kickoff(AgentRole::Planner, &kick_brief(false));
         assert!(text.contains("planner of project DEMO"));
         assert!(text.contains("show_plan"));
+        assert!(text.contains("`suggest`"));
         assert!(!text.contains("finished"));
         assert!(
             !text.contains("design"),

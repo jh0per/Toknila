@@ -13,6 +13,7 @@ use crate::server::{AppState, router};
 use crate::store::Store;
 
 mod agent_tokens;
+mod card_designs;
 mod chain_settings;
 mod chain_version;
 mod commands;
@@ -953,6 +954,7 @@ async fn openapi_describes_every_route() {
             "/planner/chains/{chain}/edges",
             "/planner/designs/{design}",
             "/planner/plan",
+            "/planner/suggestion",
             "/profiles",
             "/projects",
             "/projects/{project}",
@@ -978,6 +980,7 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/plans",
             "/projects/{project}/strays",
             "/projects/{project}/strays/clean",
+            "/projects/{project}/suggestion",
             "/projects/{project}/unarchive",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",

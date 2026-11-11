@@ -7,7 +7,7 @@ use std::ops::Range;
 use toml::Spanned;
 
 use super::raw::RawFile;
-use super::{Plan, PlanChain, PlanEdge, PlanError, PlanNode, PlanRelease, PlanTicket};
+use super::{Plan, PlanChain, PlanDesign, PlanEdge, PlanError, PlanNode, PlanRelease, PlanTicket};
 use crate::dag::{self, EdgeCheck, EdgeProblem};
 use crate::{Chain, EdgeKind};
 
@@ -20,6 +20,7 @@ pub fn parse(text: &str) -> Result<Plan, PlanError> {
     let file = Source { text, raw: &raw };
     let ids = file.ids()?;
     file.check_done_subtasks()?;
+    file.check_design_regions()?;
     let edges = file.edges(&ids)?;
     file.check_edges(&edges)?;
     let version = file.version()?;
@@ -96,6 +97,19 @@ impl Source<'_> {
             if let Some(bad) = bad {
                 let message = format!("done_subtasks {bad} is not one of {len} subtasks");
                 return Err(self.error(t.id.span(), message));
+            }
+        }
+        Ok(())
+    }
+
+    /// Every region of a design reference lies inside the image.
+    fn check_design_regions(&self) -> Result<(), PlanError> {
+        for t in &self.raw.ticket {
+            for d in &t.designs {
+                if let Some(Err(why)) = d.region.as_ref().map(crate::design::Region::check) {
+                    let message = format!("design {:?}: {why}", d.design);
+                    return Err(self.error(t.id.span(), message));
+                }
             }
         }
         Ok(())
@@ -209,6 +223,14 @@ fn build(raw: RawFile, edges: Vec<PlanEdge>, version: Option<String>) -> Plan {
         review_mode: t.review_mode,
         needs_secrets: t.needs_secrets,
         design_first: t.design_first,
+        designs: t
+            .designs
+            .into_iter()
+            .map(|d| PlanDesign {
+                design: d.design,
+                region: d.region,
+            })
+            .collect(),
         paused: t.paused,
         done: t.done,
         done_subtasks: t.done_subtasks,

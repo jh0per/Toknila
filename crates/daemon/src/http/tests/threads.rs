@@ -192,3 +192,46 @@ async fn bad_input_is_refused_with_a_typed_error_and_stores_nothing() {
     assert_eq!(list["threads"][0]["versions"], json!([]));
     assert_eq!(kinds(&api, "thread").await, ["opened"]);
 }
+
+#[tokio::test]
+async fn approving_a_thread_answers_the_question_the_worker_waits_on() {
+    let api = Api::new();
+    api.demo().await;
+    api.post(
+        "/v1/chains/demo/tickets",
+        json!({ "title": "A", "profile": "sim" }),
+    )
+    .await;
+    let ev = |v: Value| api.post("/v1/tickets/DEMO-1/events", v);
+    ev(json!({ "event": "open_thread", "kind": "design", "title": "List screen" })).await;
+    ev(json!({ "event": "thread_version", "thread": "1", "format": "mermaid", "body": "graph TD; A-->B" }))
+        .await;
+    ev(json!({ "event": "ask_human", "text": "Design v1 is in thread 1. Do you approve it?" }))
+        .await;
+    assert_eq!(api.status("DEMO-1").await, "waiting");
+    let inbox = api.get("/v1/projects/DEMO/inbox").await;
+    let kinds: Vec<&Value> = inbox
+        .as_array()
+        .expect("list")
+        .iter()
+        .map(|i| &i["kind"])
+        .collect();
+    assert_eq!(kinds, ["question", "thread"], "{inbox}");
+
+    api.post(
+        "/v1/tickets/DEMO-1/threads/1/messages",
+        json!({ "text": "Looks right" }),
+    )
+    .await;
+    api.post("/v1/tickets/DEMO-1/threads/1/approve", json!({}))
+        .await;
+
+    assert_eq!(api.status("DEMO-1").await, "running");
+    assert_eq!(api.get("/v1/projects/DEMO/inbox").await, json!([]));
+    let card = api.get("/v1/tickets/DEMO-1").await;
+    let text = card.to_string();
+    assert!(
+        text.contains(r#"Thread 1 \"List screen\" version 1 is approved. Looks right. Continue."#),
+        "{text}"
+    );
+}

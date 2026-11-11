@@ -24,6 +24,9 @@ pub struct ChainDetail {
     /// Estimated token usage per card, by ticket key; cards that used none are absent.
     #[serde(default)]
     pub usage: BTreeMap<String, UsageFigures>,
+    /// What an import left out (a design the project does not have); only an import answers it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 impl ChainDetail {
@@ -45,6 +48,7 @@ impl ChainDetail {
             summary,
             order,
             usage: BTreeMap::new(),
+            warnings: Vec::new(),
         }
     }
 }

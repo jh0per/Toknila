@@ -14,11 +14,13 @@ const TAIL_BYTES: usize = 16 * 1024;
 impl Runners {
     /// What the host knows of the live runs for the inbox at `now`.
     pub fn facts(&self, now: Timestamp) -> toknila_app::inbox::Live {
-        // A run whose process is known to be over asks nothing any more.
+        // A run whose process is known to be over asks nothing any more, and neither does one that
+        // was told to end (a hand-in kills the worker; its dialog or quiet screen is no question
+        // while the process is still on its way out).
         let over: HashSet<(TicketId, AgentRole)> = self
             .active()
             .iter()
-            .filter(|(_, a)| a.is_over())
+            .filter(|(_, a)| a.is_over() || a.stopping())
             .map(|(key, _)| *key)
             .collect();
         let permissions = self

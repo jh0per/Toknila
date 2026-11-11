@@ -378,6 +378,8 @@ pub fn event(e: &EventRecord, offset: chrono::FixedOffset) -> String {
             s(&p["comment"]["body"]["gist"])
         ),
         ("window", "show_card") => format!("window show_card {}", s(&p["ticket"])),
+        ("window", "suggest") => format!("window suggest {}", s(&p["suggestion"]["text"])),
+        ("window", "suggestion_cleared") => "window suggestion_cleared".to_owned(),
         (entity, kind) => format!("{entity} {kind}"),
     };
     format!("{} #{} {} {what}", clock(e, offset), e.seq, w(&e.actor))
@@ -464,5 +466,29 @@ mod tests {
         };
         let utc = chrono::FixedOffset::east_opt(0).expect("valid");
         assert_eq!(event(&e, utc), "00:00:00 #9 agent window show_card DEMO-2");
+    }
+
+    #[test]
+    fn suggestion_events_say_the_step_and_its_end() {
+        let at = |kind: &str, payload| EventRecord {
+            seq: 3,
+            at: Timestamp(0),
+            actor: Actor::Agent,
+            entity: "window".to_owned(),
+            entity_id: "01JBQ7ZJ0000000000000000P1".to_owned(),
+            kind: kind.to_owned(),
+            payload,
+        };
+        let utc = chrono::FixedOffset::east_opt(0).expect("valid");
+        let set = at("suggest", json!({"suggestion": {"text": "Start DEMO-2"}}));
+        assert_eq!(
+            event(&set, utc),
+            "00:00:00 #3 agent window suggest Start DEMO-2"
+        );
+        let cleared = at("suggestion_cleared", json!({"project_key": "DEMO"}));
+        assert_eq!(
+            event(&cleared, utc),
+            "00:00:00 #3 agent window suggestion_cleared"
+        );
     }
 }

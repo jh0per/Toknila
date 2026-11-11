@@ -160,8 +160,35 @@ fn write_json(path: &Path, value: &Value) -> Result<(), RunnerError> {
         .map_err(|e| RunnerError::Spawn(format!("cannot write {}: {e}", path.display())))
 }
 
-fn brief_of_key<'a>(cx: &'a Context<'_>, key: &'a str) -> instructions::RunBrief<'a> {
+/// The designs of a worker's card that are still in the project's library, with their files: what
+/// the instructions name and what the run may read, and nothing else of the library.
+fn worker_designs(cx: &Context<'_>) -> (Vec<instructions::BriefDesign>, Vec<PathBuf>) {
+    let (Some(project), true) = (cx.brief.design_project, cx.role == AgentRole::Worker) else {
+        return (Vec::new(), Vec::new());
+    };
+    let Some(home) = cx.dir.parent().and_then(Path::parent) else {
+        return (Vec::new(), Vec::new());
+    };
+    let found = crate::designs::Designs::new(home, project).locate(&cx.brief.card_designs);
+    let files = found.iter().filter_map(|d| d.path.clone()).collect();
+    let briefs = found
+        .into_iter()
+        .map(|d| instructions::BriefDesign {
+            name: d.name,
+            path: d.path.map(|p| p.display().to_string()),
+            region: d.region,
+        })
+        .collect();
+    (briefs, files)
+}
+
+fn brief_of_key<'a>(
+    cx: &'a Context<'_>,
+    key: &'a str,
+    designs: &'a [instructions::BriefDesign],
+) -> instructions::RunBrief<'a> {
     instructions::RunBrief {
+        designs,
         key,
         title: &cx.brief.title,
         prompt: &cx.brief.prompt,
@@ -229,7 +256,8 @@ pub(super) fn prepare_with(
         AgentRole::Planner => cx.key.project().to_string(),
         _ => cx.key.to_string(),
     };
-    let brief = brief_of_key(cx, &key);
+    let (design_briefs, worker_files) = worker_designs(cx);
+    let brief = brief_of_key(cx, &key, &design_briefs);
     let mut wiring = Wiring {
         command: profile.argv(&instructions::kickoff(cx.role, &brief)),
         env_remove: profile.inherited_to_drop(inherited),
@@ -237,11 +265,11 @@ pub(super) fn prepare_with(
     };
     let dir = cx.dir.join(role_dir(cx.role));
     let mut rules = profile.permissions.rules(cx.brief.check_command.as_deref());
-    // A planner reads the project's design files, which sit outside the repository: one explicit
-    // rule per file, nothing wider.
+    // A planner reads the project's design files and a card's agent those of its card, which sit
+    // outside the repository: one explicit rule per file, nothing wider.
     let design_files: &[PathBuf] = match cx.role {
         AgentRole::Planner => &cx.brief.designs,
-        _ => &[],
+        _ => &worker_files,
     };
     rules.extend(
         design_files

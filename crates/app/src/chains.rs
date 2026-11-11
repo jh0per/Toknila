@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    Chain, ChainId, Edge, EdgeKind, Release, ReleaseChannel, ReleaseId, ReviewMode, ReviewTurn,
-    StartMode, TicketId, TicketKey, TicketStatus,
+    Chain, ChainId, DesignId, Edge, EdgeKind, Release, ReleaseChannel, ReleaseId, ReviewMode,
+    ReviewTurn, StartMode, TicketId, TicketKey, TicketStatus,
 };
 
 use crate::notes::{add_subtask, update_subtask};
@@ -89,6 +89,18 @@ pub fn import<U: UnitOfWork + ?Sized>(
     toml: &str,
     source: Option<String>,
 ) -> AppResult<ChainId> {
+    import_with_designs(uow, project, toml, source, &[]).map(|(id, _)| id)
+}
+
+/// [`import`] with the project's designs (id, file name): a ticket's design references are found
+/// by name. A name the project lacks is dropped, the card stays, and a warning says so.
+pub fn import_with_designs<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    project: &str,
+    toml: &str,
+    source: Option<String>,
+    library: &[(DesignId, String)],
+) -> AppResult<(ChainId, Vec<String>)> {
     let plan = toknila_core::plan::parse(toml).map_err(|e| AppError::bad_request(e.to_string()))?;
     let p = resolve::project(uow, project)?;
     if uow.chain_by_name(p.id, &plan.chain.name)?.is_some() {
@@ -105,9 +117,25 @@ pub fn import<U: UnitOfWork + ?Sized>(
         );
     }
     let mut keys = keys.into_iter();
-    let (mut view, subtasks) = plan.instantiate(p.id, uow.now(), || {
-        keys.next().expect("one key was taken per ticket")
-    });
+    let (mut view, subtasks) = plan.instantiate_with_designs(
+        p.id,
+        uow.now(),
+        || keys.next().expect("one key was taken per ticket"),
+        library,
+    );
+    let warnings: Vec<String> = view
+        .tickets
+        .iter()
+        .zip(&subtasks)
+        .flat_map(|(t, l)| {
+            l.dropped_designs.iter().map(move |name| {
+                format!(
+                    "{}: the project has no design named {name:?}; the card has no reference to it",
+                    t.key
+                )
+            })
+        })
+        .collect();
     view.chain.source = source;
     let (chain_id, chain) = (view.chain.id, view.chain.clone());
     uow.insert_chain(&chain)?;
@@ -144,7 +172,7 @@ pub fn import<U: UnitOfWork + ?Sized>(
     }
     merge_late(uow, chain_id, late)?;
     merge_done(uow, chain_id, &done)?;
-    Ok(chain_id)
+    Ok((chain_id, warnings))
 }
 
 /// Takes the tickets a file marked done behind open tickets to Merged with the state machine's
@@ -218,7 +246,7 @@ pub fn export<R: Reader + ?Sized>(repo: &R, chain: &str) -> AppResult<String> {
 pub fn export_with_designs<R: Reader + ?Sized>(
     repo: &R,
     chain: &str,
-    designs: &[String],
+    designs: &[(DesignId, String)],
 ) -> AppResult<String> {
     let c = resolve::chain(repo, chain)?;
     let view = repo

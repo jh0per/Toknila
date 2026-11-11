@@ -376,6 +376,30 @@ fn a_run_told_to_end_is_never_reused_by_the_next_start() {
 }
 
 #[test]
+fn a_run_told_to_end_asks_nothing_in_the_inbox_while_it_is_still_ending() {
+    let mut rig = Rig::new();
+    rig.profile("fake", &["print", "up", "hold"], "");
+    rig.start("fake");
+    rig.wait_for("up");
+    let now = toknila_core::Timestamp(1_900_000_000_000);
+    let facts = rig.runners.facts(now);
+    assert!(
+        facts.runs.iter().any(|r| r.ticket == rig.ticket),
+        "a live run is known to the inbox"
+    );
+    rig.runners.stop_role(rig.ticket, AgentRole::Worker);
+    // The process may still be on its way out: its screen and its dialogs are no question.
+    let facts = rig.runners.facts(now);
+    assert!(
+        facts.runs.iter().all(|r| r.ticket != rig.ticket),
+        "a run told to end is no run for the inbox"
+    );
+    assert!(facts.permissions.iter().all(|p| p.ticket != rig.ticket));
+    let end = rig.wait_end();
+    assert!(end.stopped);
+}
+
+#[test]
 fn the_scrollback_keeps_the_last_lines_the_profile_allows_and_the_log_keeps_all() {
     let mut rig = Rig::new();
     let steps: Vec<String> = (1..=30)

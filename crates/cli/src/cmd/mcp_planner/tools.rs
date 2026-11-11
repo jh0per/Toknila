@@ -39,6 +39,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "after": list_of_text("Cards (keys) the new card waits for; empty: the end of the chain"),
                 "subtasks": list_of_text("Checklist items"),
                 "design_first": { "type": "boolean", "description": "True for a card that changes what the person sees (screens, flows): its agent then shows a design for approval before any code" },
+                "designs": designs_param("The project's designs the card is about; the first is the card's thumbnail"),
             }),
             &["chain", "title"],
         ),
@@ -51,6 +52,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "prompt": text("New prompt"),
                 "acceptance": list_of_text("The new acceptance list; it replaces the old one"),
                 "design_first": { "type": "boolean", "description": "Whether the agent shows a design for approval before any code" },
+                "designs": designs_param("The card's designs; the list replaces the old one, [] clears it, left out keeps it"),
                 "add_subtasks": list_of_text("Checklist items to append"),
                 "edit_subtasks": { "type": "array", "description": "Checklist items to rename",
                     "items": { "type": "object", "properties": {
@@ -65,6 +67,17 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             "Open a card in the owner's window (its page, with the designs on it), when they have this project's assistant or chain open. They get a small notice with a Back button. Use it to point at a card you are talking about; it changes nothing in the plan.",
             json!({ "card": card }),
             &["card"],
+        ),
+        tool(
+            "suggest",
+            "Say the owner's next step. It shows at the top of the assistant's screen and as the first row of the inbox, with one button for its action; it replaces your previous suggestion, and it ends by itself when the action is done or the card moves on. `action` is one of start, answer, accept, release and goes with the `card` it is about (for release, any card of the chain). With neither, it says that nothing waits for the owner. You never do the action: the owner clicks.",
+            json!({
+                "text": text("The step in a line or two"),
+                "card": { "type": "string", "description": "The card the step is about (id, key or title)" },
+                "action": { "type": "string", "enum": ["start", "answer", "accept", "release"],
+                    "description": "What the button does; needs `card`" },
+            }),
+            &["text"],
         ),
         tool(
             "add_dependency",
@@ -117,4 +130,23 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             &["card", "thread", "format", "body"],
         ),
     ]
+}
+
+/// The `designs` argument: references to designs of the project's library.
+fn designs_param(description: &str) -> Value {
+    json!({
+        "type": "array",
+        "description": description,
+        "items": { "type": "object", "properties": {
+            "design": text("The design's file name in the project's library (or its id)"),
+            "region": { "type": "object",
+                "description": "The part of the image that matters, in whole percent of its width and height; left out: the whole image",
+                "properties": {
+                    "x": { "type": "integer", "minimum": 0, "maximum": 100 },
+                    "y": { "type": "integer", "minimum": 0, "maximum": 100 },
+                    "w": { "type": "integer", "minimum": 1, "maximum": 100 },
+                    "h": { "type": "integer", "minimum": 1, "maximum": 100 },
+                }, "required": ["x", "y", "w", "h"] },
+        }, "required": ["design"] },
+    })
 }

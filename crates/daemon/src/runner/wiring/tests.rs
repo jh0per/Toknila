@@ -819,3 +819,77 @@ fn every_hook_command_runs_under_the_hook_shell_with_a_path_that_has_a_space() {
         "{got:?}"
     );
 }
+
+#[test]
+fn a_worker_may_read_exactly_the_design_files_of_its_card_and_is_told_them() {
+    use toknila_core::design::{DesignRef, Region};
+    let mut rig = Rig::new();
+    let project = toknila_core::ProjectId::new();
+    let lib = crate::designs::Designs::new(rig.dir.path(), project);
+    let png = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0];
+    let login = lib
+        .add_file("login.png", &png, toknila_core::Timestamp(1))
+        .expect("kept");
+    let other = lib
+        .add_file("other.png", &png, toknila_core::Timestamp(2))
+        .expect("kept");
+    let region = Region {
+        x: 20,
+        y: 10,
+        w: 40,
+        h: 30,
+    };
+    rig.brief.design_project = Some(project);
+    rig.brief.card_designs = vec![DesignRef {
+        design: login.id,
+        region: Some(region),
+    }];
+    std::fs::create_dir_all(rig.dir.path().join("runs").join("t1")).expect("run dir");
+    rig.prepare(&AgentProfile::claude_code());
+    let file = rig
+        .dir
+        .path()
+        .join("designs")
+        .join(project.to_string())
+        .join(format!("{}.png", login.id));
+    let rule = toknila_core::private::read_allow_rule(&file.display().to_string());
+    let (_, text) = rig.file("settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    let allow: Vec<&str> = v["permissions"]["allow"]
+        .as_array()
+        .expect("allow")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert!(allow.contains(&rule.as_str()), "{allow:?}");
+    let reads: Vec<&&str> = allow
+        .iter()
+        .filter(|r| r.starts_with("Read(") && r.contains("designs"))
+        .collect();
+    assert_eq!(reads.len(), 1, "one Read rule, nothing wider: {allow:?}");
+    // The design file is not denied; the card's other library files still are.
+    let deny: Vec<&str> = v["permissions"]["deny"]
+        .as_array()
+        .expect("deny")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert!(
+        !deny.iter().any(|r| r.contains(&login.id.to_string())),
+        "{deny:?}"
+    );
+    assert!(
+        deny.iter().any(|r| r.contains(&other.id.to_string())),
+        "{deny:?}"
+    );
+    assert!(deny.iter().any(|r| r.contains("index.json")), "{deny:?}");
+    let (_, text) = rig.file("instructions.md");
+    assert!(text.contains("## Designs"), "{text}");
+    assert!(
+        text.contains(&format!(
+            "- login.png: `{}`; region: x 20%, y 10%, width 40%, height 30%",
+            file.display()
+        )),
+        "{text}"
+    );
+}

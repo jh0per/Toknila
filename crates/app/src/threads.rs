@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 use toknila_core::events::DomainEvent;
 use toknila_core::thread::{self, ThreadChange, ThreadEvent};
 use toknila_core::{
-    ArtifactFormat, MessageKind, Thread, ThreadId, ThreadKind, ThreadMessage, ThreadMessageId,
-    ThreadVersion, ThreadVersionId, Ticket,
+    ArtifactFormat, CommentBody, CommentKind, MessageKind, StatusReason, Thread, ThreadId,
+    ThreadKind, ThreadMessage, ThreadMessageId, ThreadVersion, ThreadVersionId, Ticket,
+    TicketStatus, WaitingReason,
 };
 
 use crate::{AppError, AppResult, UnitOfWork};
@@ -100,6 +101,8 @@ pub fn request_changes<U: UnitOfWork + ?Sized>(
     let (next, change) = thread::apply(th, event, uow.now())?;
     let m = message(uow, t, th, MessageKind::ChangesRequested, text)?;
     save(uow, t, &next, change)?;
+    let head = format!("Thread {} \"{}\": changes requested.", th.number, th.title);
+    tell_worker(uow, t, head, Some(m.text.clone()))?;
     Ok(m)
 }
 
@@ -164,7 +167,61 @@ pub fn approve<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, th: &Thread) -> 
     };
     let (next, change) = thread::apply(th, event, uow.now())?;
     save(uow, t, &next, change)?;
+    let said = last_person_message(uow, th)?;
+    let version = next
+        .approved_version
+        .map(|v| format!(" version {v}"))
+        .unwrap_or_default();
+    let head = format!(
+        "Thread {} \"{}\"{version} is approved.",
+        th.number, th.title
+    );
+    tell_worker(uow, t, head, said)?;
     Ok(next)
+}
+
+/// The person's last message in the thread, if any.
+fn last_person_message<R: crate::Reader + ?Sized>(r: &R, th: &Thread) -> AppResult<Option<String>> {
+    Ok(r.thread_messages(th.id)?
+        .into_iter()
+        .rfind(|m| m.author == toknila_core::Actor::Human)
+        .map(|m| m.text))
+}
+
+/// A decision on a thread reaches the card's worker as an instruction comment, through the same
+/// path as `tok comment`: typed into the live agent or kept for its next hook. A worker that
+/// waits on its own `ask_human` question is answered by it; a permission prompt is not a
+/// question about the thread and stays open, and a card in any other status is left alone.
+fn tell_worker<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    t: &Ticket,
+    head: String,
+    said: Option<String>,
+) -> AppResult<()> {
+    let Some(now) = uow.ticket(t.id)? else {
+        return Ok(());
+    };
+    let wanted = matches!(
+        (now.status, &now.status_reason),
+        (TicketStatus::Running, _)
+            | (
+                TicketStatus::Waiting,
+                Some(StatusReason::Waiting(WaitingReason::Question { .. }))
+            )
+    );
+    if !wanted {
+        return Ok(());
+    }
+    let said = said.map(|s| s.split_whitespace().collect::<Vec<_>>().join(" "));
+    let gist = match said.as_deref().map(|s| s.trim_end_matches('.')) {
+        Some(s) if !s.is_empty() => format!("{head} {s}. Continue."),
+        _ => format!("{head} Continue."),
+    };
+    let body = CommentBody {
+        gist,
+        ..Default::default()
+    };
+    crate::tickets::comment(uow, t, CommentKind::Instruction, body)
 }
 
 /// The ticket's open threads, for the hand-in event; the state machine refuses the hand-in

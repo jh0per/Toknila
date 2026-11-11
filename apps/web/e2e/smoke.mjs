@@ -177,6 +177,11 @@ try {
   console.log("PASS actions are disabled after approval, notice is gone");
   await page.getByRole("tab", { name: "Details" }).click();
 
+  // The thread decisions answered the open question (the card runs again); ask once more.
+  await expectText(status("DEMO-1"), "running", "a thread decision answers the question");
+  tok("sim", "DEMO-1", "ask", "still there?");
+  await expectText(status("DEMO-1"), "waiting", "asked after the thread");
+
   // Navigation lives in the URL: deep links open the card and the inbox, the title leads back.
   await page.goto(at("/projects/DEMO/chains/demo/cards/DEMO-2"));
   await expectText(page.locator("[data-testid=details]"), "DEMO-2", "card deep link loads");

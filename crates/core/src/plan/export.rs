@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 
 use crate::graph::ChainView;
 use crate::wire::wire_name;
-use crate::{EdgeKind, NodeRef, Release, Ticket, TicketId};
+use crate::{DesignId, EdgeKind, NodeRef, Release, Ticket, TicketId};
 
 /// Writes a chain as a file that [`super::parse`] reads back into the same graph. Ticket keys
 /// and release versions become the local ids. `subtasks` maps ticket ids to checklist items
@@ -21,15 +21,16 @@ pub fn export(view: &ChainView, subtasks: &HashMap<TicketId, Vec<(String, bool)>
 pub fn export_with_designs(
     view: &ChainView,
     subtasks: &HashMap<TicketId, Vec<(String, bool)>>,
-    designs: &[String],
+    designs: &[(DesignId, String)],
 ) -> String {
     let mut out = Lines::default();
-    chain_section(view, designs, &mut out);
+    let names: Vec<String> = designs.iter().map(|(_, n)| n.clone()).collect();
+    chain_section(view, &names, &mut out);
     for node in view.topo_order() {
         match node {
             NodeRef::Ticket(id) => {
                 if let Some(t) = view.tickets.iter().find(|t| t.id == id && t.in_plan()) {
-                    ticket_section(view, t, subtasks.get(&t.id), &mut out);
+                    ticket_section(view, t, subtasks.get(&t.id), designs, &mut out);
                 }
             }
             NodeRef::Release(id) => {
@@ -90,6 +91,7 @@ fn ticket_section(
     view: &ChainView,
     t: &Ticket,
     subtasks: Option<&Vec<(String, bool)>>,
+    library: &[(DesignId, String)],
     out: &mut Lines,
 ) {
     let node = NodeRef::Ticket(t.id);
@@ -127,6 +129,28 @@ fn ticket_section(
     }
     if t.design_first {
         out.raw("design_first = true");
+    }
+    // By name: an id means nothing in another project. A design the library lost is left out.
+    let refs: Vec<String> = t
+        .designs
+        .iter()
+        .filter_map(|r| {
+            let (_, name) = library.iter().find(|(id, _)| *id == r.design)?;
+            Some(match r.region {
+                Some(g) => format!(
+                    "{{ design = {}, region = {{ x = {}, y = {}, w = {}, h = {} }} }}",
+                    quote(name),
+                    g.x,
+                    g.y,
+                    g.w,
+                    g.h
+                ),
+                None => format!("{{ design = {} }}", quote(name)),
+            })
+        })
+        .collect();
+    if !refs.is_empty() {
+        out.raw(&format!("designs = [{}]", refs.join(", ")));
     }
     if t.paused {
         out.raw("paused = true");

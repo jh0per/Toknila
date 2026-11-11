@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Design } from "../api/types";
-import { dayText, fileUrl, kindLabel, looksLikeDesign, placeholder, refusedFiles, sizeText } from "./designs";
+import {
+  dayText, designOf, dragRegion, fileUrl, kindLabel, looksLikeDesign, placeholder, refusedFiles, regionStyle, regionText,
+  sizeText, stepZoom, withRef,
+} from "./designs";
 
 const design = (over: Partial<Design>): Design => ({
   id: "01M748YXDZ78RYHNWGEQFCX3MQ", name: "home.png", kind: "image", mime: "image/png", size: 10,
@@ -42,5 +45,46 @@ describe("designs", () => {
     expect(placeholder(design({ kind: "figma", hint: null }))).toContain("Export the frame");
     expect(placeholder(design({ kind: "pdf" }))).toBe("PDF");
     expect(placeholder(design({}))).toBe("");
+  });
+});
+
+describe("card design references", () => {
+  it("draws a region from two corners as whole percent inside the picture", () => {
+    expect(dragRegion({ x: 0.2, y: 0.1 }, { x: 0.6, y: 0.4 })).toEqual({ x: 20, y: 10, w: 40, h: 30 });
+    // Dragged the other way round, and past the edges: the same box, clamped.
+    expect(dragRegion({ x: 0.6, y: 0.4 }, { x: 0.2, y: 0.1 })).toEqual({ x: 20, y: 10, w: 40, h: 30 });
+    expect(dragRegion({ x: -0.5, y: 0.5 }, { x: 2, y: 0.9 })).toEqual({ x: 0, y: 50, w: 100, h: 40 });
+    // Control: a click that did not move is no region.
+    expect(dragRegion({ x: 0.3, y: 0.3 }, { x: 0.3, y: 0.3 })).toBeUndefined();
+  });
+
+  it("outlines a region in percent of the picture and says it in words", () => {
+    const r = { x: 20, y: 10, w: 40, h: 30 };
+    expect(regionStyle(r)).toEqual({ left: "20%", top: "10%", width: "40%", height: "30%" });
+    expect(regionText(r)).toBe("x 20%, y 10%, 40% wide, 30% tall");
+  });
+
+  it("steps the zoom up and down and stops at the ends", () => {
+    expect(stepZoom(100, 1)).toBe(150);
+    expect(stepZoom(100, -1)).toBe(75);
+    expect(stepZoom(400, 1)).toBe(400);
+    expect(stepZoom(50, -1)).toBe(50);
+  });
+
+  it("adds, replaces and removes a reference without touching the others", () => {
+    const a = { design: "a" };
+    const b = { design: "b", region: { x: 1, y: 2, w: 3, h: 4 } };
+    expect(withRef([a], 1, b)).toEqual([a, b]);
+    expect(withRef([a, b], 0, { design: "c" })).toEqual([{ design: "c" }, b]);
+    expect(withRef([a, b], 0, undefined)).toEqual([b]);
+    const list = [a];
+    withRef(list, 0, undefined);
+    expect(list).toEqual([a]);
+  });
+
+  it("finds the design of a reference, and none when the library lost it", () => {
+    const d = design({});
+    expect(designOf([d], { design: d.id })).toBe(d);
+    expect(designOf([d], { design: "gone" })).toBeUndefined();
   });
 });
