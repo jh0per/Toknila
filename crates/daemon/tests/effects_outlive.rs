@@ -276,17 +276,17 @@ async fn a_request_dropped_the_moment_its_hand_in_commits_still_has_its_check_re
 
 #[tokio::test]
 async fn the_hand_in_is_answered_at_once_and_the_card_is_being_checked_meanwhile() {
-    let checker = SlowChecker::holding(Duration::from_secs(1));
-    let rig = Rig::new(checker, 1).await;
-    let started = Instant::now();
-    rig.hand_in(1).await.expect("answered");
-    assert!(
-        started.elapsed() < Duration::from_millis(800),
-        "the request did not wait for the check: {:?}",
-        started.elapsed()
-    );
+    // Proof without a clock: the check is held until released, so a request that
+    // returned while it is still held cannot have waited for it.
+    let (checker, release) = SlowChecker::stuck();
+    let rig = Rig::new(checker.clone(), 1).await;
+    rig.hand_in(1)
+        .await
+        .expect("answered while the check is held");
     assert_eq!(rig.awaiting(1).await, json!({ "by": "check" }));
+    release.send(()).expect("release");
     rig.store.settled().await;
+    assert_eq!(checker.runs.load(Ordering::SeqCst), 1);
     assert_ne!(rig.awaiting(1).await["by"], "check");
 }
 
