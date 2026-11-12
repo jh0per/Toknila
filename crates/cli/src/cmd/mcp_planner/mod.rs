@@ -5,7 +5,7 @@
 //! There is no tool that starts, pauses, resumes, cancels, accepts, returns, reopens or merges.
 
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use toknila_api_types::{
     CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewDesignPin, NewMessage, NewPlanChain,
     NewSuggestion, NewThread, NewVersion, TicketDetail,
@@ -18,10 +18,12 @@ use super::mcp_tools::ToolError;
 
 mod answer;
 mod scope;
+mod strict;
 mod tools;
 
 pub(super) use answer::Answer;
 use scope::{PlanScope, plan_scope};
+use strict::{args, refuse_unknown_keys};
 
 pub(in crate::cmd) use tools::list;
 
@@ -140,38 +142,6 @@ struct ThreadVersion {
     thread: String,
     format: ArtifactFormat,
     body: String,
-}
-
-fn args<T: serde::de::DeserializeOwned>(arguments: &Value) -> Result<T, ToolError> {
-    let value = match arguments {
-        Value::Null => json!({}),
-        other => other.clone(),
-    };
-    serde_json::from_value(value).map_err(|e| ToolError::BadArguments(e.to_string()))
-}
-
-/// A key the tool's schema does not name is refused, listing the keys it takes; serde would drop
-/// it silently, and a misspelled `modle` would then look like a success.
-fn refuse_unknown_keys(name: &str, tool: &Value, arguments: &Value) -> Result<(), ToolError> {
-    let (Value::Object(given), Some(known)) =
-        (arguments, tool["inputSchema"]["properties"].as_object())
-    else {
-        return Ok(());
-    };
-    let unknown: Vec<&str> = given
-        .keys()
-        .map(String::as_str)
-        .filter(|k| !known.contains_key(*k))
-        .collect();
-    if unknown.is_empty() {
-        return Ok(());
-    }
-    let accepted: Vec<&str> = known.keys().map(String::as_str).collect();
-    Err(ToolError::BadArguments(format!(
-        "{name} takes no {}; its arguments are {}",
-        unknown.join(", "),
-        accepted.join(", ")
-    )))
 }
 
 /// The call a tool name and its arguments mean.
@@ -421,6 +391,8 @@ fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     fn names() -> Vec<String> {
