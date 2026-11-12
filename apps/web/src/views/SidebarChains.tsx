@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
-import { dayText, readFinishedOpen, splitChains, storeFinishedOpen, versionText } from "../store/phase";
+import { readFinishedOpen, splitChains, storeFinishedOpen, versionText } from "../store/phase";
 import { PhaseDot } from "./PhaseChip";
 import { NavLink } from "./Link";
 import { Chev, type Level, indent } from "./TreeRow";
@@ -13,6 +13,9 @@ type Props = {
   dispatch: (i: Intent) => void;
   onMenu: (c: ChainDetail) => (e: React.MouseEvent) => void;
 };
+
+/// The phases whose word the dot does not make plain; a finished or empty chain shows no word.
+const WORDED = new Set<string>(["active", "waiting", "idle"]);
 
 /// The chain rows of a project, as tree items one level under its Chains row: the unfinished ones
 /// with a dot, the phase word and the count, then one collapsible Finished (n) group, closed by
@@ -41,10 +44,9 @@ export function SidebarChains({ chains, project, selected, dispatch, onMenu }: P
             className={`item${c.chain.id === selected ? " sel" : ""}${dim ? " dim" : ""}`}
           >
             <PhaseDot phase={s.phase} />
-            <span className="t key">{c.chain.name}</span>
+            <span className="t chain-name">{c.chain.name}</span>
             {s.version && <span className="ver" data-testid="chain-version-row">{versionText(s)}</span>}
-            <span className="phase-word">{s.phase}</span>
-            {dim && s.finished_at != null && <span className="n">{dayText(s.finished_at)}</span>}
+            {WORDED.has(s.phase) && <span className="phase-word">{s.phase}</span>}
             <span className="n">{s.done}/{s.total}</span>
           </NavLink>
         </div>
