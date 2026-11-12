@@ -477,7 +477,10 @@ mod tests {
     fn a_fixable_problem_says_what_is_true_and_what_can_be_done() {
         let say = |f: &RepoFacts| judge(ABS, "main", f).problems[0].message.clone();
         let missing = say(&facts(PathKind::Missing, GitState::NotARepo));
-        assert_eq!(missing, format!("{ABS} does not exist. Toknila can create it."));
+        assert_eq!(
+            missing,
+            format!("{ABS} does not exist. Toknila can create it.")
+        );
         let plain = say(&facts(PathKind::Dir, GitState::NotARepo));
         assert_eq!(
             plain,
