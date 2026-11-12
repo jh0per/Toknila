@@ -181,6 +181,28 @@ fn a_planner_plans_with_its_token_and_is_refused_everything_that_starts_or_accep
     assert!(planner_logs(&tok).contains("post="), "history stays");
 }
 
+/// Ten start/stop cycles of a fake planner: `tok planner stop` is one short call each time, and
+/// none of them may fail on the transport, however loaded the machine is.
+#[test]
+fn ten_start_stop_cycles_of_a_fake_planner_never_fail_a_stop() {
+    let (_dir, tok, _repo) = setup(&["hold"]);
+    for cycle in 0..10 {
+        assert_eq!(
+            tok.run(&["planner", "start", "DEMO"])["running"],
+            true,
+            "start {cycle}"
+        );
+        assert_eq!(
+            tok.text(&["planner", "stop", "DEMO"]),
+            "planner of DEMO stopped\n",
+            "stop {cycle}"
+        );
+        wait_for(&tok, "the planner to stop", || {
+            !tok.client().planner("DEMO").expect("state").running
+        });
+    }
+}
+
 #[test]
 fn only_a_planner_profile_in_a_project_with_a_repository_starts_a_planner() {
     let (_dir, tok, _) = setup(&["hold"]);

@@ -36,10 +36,11 @@ impl Client {
         self.call("POST", &path, Some(&body))
     }
 
-    /// `POST /projects/{project}/planner/stop`.
+    /// `POST /projects/{project}/planner/stop`; stopping a stopped planner is fine, so a lost
+    /// connection is retried.
     pub fn stop_planner(&self, project: &str) -> ClientResult<PlannerState> {
         let path = format!("/projects/{}/planner/stop", enc(project));
-        self.call("POST", &path, Some(&serde_json::json!({})))
+        self.call_idempotent("POST", &path, Some(&serde_json::json!({})))
     }
 
     /// `GET /projects/{project}/planner/scrollback`.

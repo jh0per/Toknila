@@ -2,8 +2,6 @@
 //! so these calls bypass the typed-JSON helper; the frame format of the live stream is in
 //! `toknila_api_types::runner`.
 
-use std::io::Read;
-
 use toknila_api_types::TerminalSize;
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
 use toknila_core::{AgentRole, RunId};
@@ -57,10 +55,7 @@ impl Client {
             .parse()
             .map_err(|e| ClientError::Decode(format!("{HEADER_RUN}: {e}")))?;
         let (offset, end) = (number(HEADER_OFFSET)?, number(HEADER_END)?);
-        let mut bytes = Vec::new();
-        resp.into_reader()
-            .read_to_end(&mut bytes)
-            .map_err(|e| ClientError::Decode(e.to_string()))?;
+        let bytes = crate::body::bytes(resp).map_err(|e| ClientError::Decode(e.to_string()))?;
         Ok(Scrollback {
             run,
             offset,
