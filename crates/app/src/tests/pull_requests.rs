@@ -218,10 +218,17 @@ fn a_closed_pull_request_and_a_github_conflict_block_with_the_link() {
     );
     unblock(&mut mem);
     settle(&mut mem);
-    let BlockedReason::MergeConflict { detail } = blocked_reason(&mem.ticket_by_title("A")) else {
-        panic!("a merge conflict");
-    };
-    assert!(detail.contains(URL), "{detail}");
+    let a = mem.ticket_by_title("A");
+    assert_eq!(a.status, TicketStatus::Running, "back to the agent");
+    let c = mem
+        .comments
+        .iter()
+        .rfind(|c| c.kind == toknila_core::CommentKind::Instruction)
+        .expect("instruction");
+    assert!(
+        format!("{} {:?}", c.body.gist, c.body.what).contains(URL),
+        "{c:?}"
+    );
 }
 
 #[test]

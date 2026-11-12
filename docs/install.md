@@ -167,6 +167,45 @@ anything signed with the new key, so every installed copy needs one manual reins
 `.dmg`; after that updates work again. Until then, a leaked key lets its holder sign updates the
 old apps accept, so replace the secrets first.
 
+### Signing the Mac app
+
+macOS keeps every privacy permission under the app's code-signing requirement. Every entry in
+System Settings, Privacy & Security that works that way (Accessibility, Files and Folders, Full
+Disk Access, Screen Recording, Microphone, Automation) is lost when the identity changes. An
+ad-hoc signature (`codesign -dv` shows `Signature=adhoc`, `TeamIdentifier=not set`) is a new
+identity for every build, so after each update the app is a new app and the grants are gone. The
+fix is one stable identity for every build.
+
+Make the certificate once, either way:
+
+- **Developer ID** (paid Apple Developer account): create a "Developer ID Application" certificate in
+  the Apple developer portal, install it in Keychain Access. Notarization is a later card
+  (`APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`, hardened runtime).
+- **Self-signed** (free): Keychain Access, Certificate Assistant, Create a Certificate, type Code
+  Signing. Gatekeeper's quarantine stays as it is today; the permissions still survive updates.
+
+Then export it from Keychain Access as a `.p12` with a password, encode it and set the secrets:
+
+```sh
+base64 -i cert.p12 | pbcopy
+gh secret set APPLE_CERTIFICATE            # paste
+gh secret set APPLE_CERTIFICATE_PASSWORD   # the .p12 password
+gh secret set APPLE_SIGNING_IDENTITY       # the certificate's name, e.g. "Developer ID Application: Name (TEAMID)"
+```
+
+The Release workflow imports the certificate into a temporary keychain, lets Tauri sign the app
+with `APPLE_SIGNING_IDENTITY`, deletes the keychain, and the step "Check the app signature" runs
+`codesign -dv --verbose=2` on the app: it prints the identity, and fails the release when the
+secrets were given and the app is still ad hoc. Without the secrets the app is signed ad hoc and
+the step says so (`bundle.macOS.signingIdentity` stays unset in `tauri.conf.json`).
+
+What to expect: the first update to a build with the new identity resets the permissions once;
+every later update keeps them. The updater changes nothing, but the new bundle must carry the same
+identity as the installed one, so keep the certificate (the `.p12`) and never switch it casually.
+
+The Open Anyway button in the Security section (Gatekeeper, an un-notarised build) is a different
+mechanism that a signing identity alone does not change; notarization is a later card.
+
 ### Testing the updater
 
 `scripts/smoke-update.sh` builds version 9.0.0 and 9.0.1 from temporary copies of the working
