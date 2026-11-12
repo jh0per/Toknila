@@ -20,6 +20,15 @@ export function costText(usd: number): string {
   return `$${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/// How old a moment is: "just now", "5 min ago", "2 h ago", "3 d ago".
+export function agoText(thenMs: number, nowMs: number): string {
+  const min = Math.max(0, Math.round((nowMs - thenMs) / 60_000));
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  if (min < 48 * 60) return `${Math.round(min / 60)} h ago`;
+  return `${Math.round(min / 1440)} d ago`;
+}
+
 /// A share from 0 to 1 as a whole percentage.
 export const shareText = (share: number): string => `${Math.round(share * 100)}%`;
 
