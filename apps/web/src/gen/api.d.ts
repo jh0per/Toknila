@@ -1963,6 +1963,8 @@ export interface components {
             designs?: components["schemas"]["DesignPick"][] | null;
             /** @description Checklist items to rename. */
             edit_subtasks?: components["schemas"]["SubtaskEdit"][];
+            /** @description The card's own model, an alias or a full name; empty text clears it. */
+            model?: string | null;
             prompt?: string | null;
             title?: string | null;
         };
@@ -2677,6 +2679,8 @@ export interface components {
             design_first?: boolean;
             /** @description Designs of the project the card is about, by file name or id. */
             designs?: components["schemas"]["DesignPick"][];
+            /** @description The card's own model: an alias or a full name; left out, the project's runs it. */
+            model?: string | null;
             prompt?: string;
             /** @description Checklist items. */
             subtasks?: string[];
@@ -2805,6 +2809,8 @@ export interface components {
             design_first?: boolean;
             /** @description Designs of the project the card is about (by id), with an optional region of each. */
             designs?: components["schemas"]["DesignRef"][];
+            /** @description The card's own model (an alias or a full name); left out, the project's worker model runs. */
+            model?: string | null;
             needs_secrets?: boolean;
             paused?: boolean;
             profile?: string | null;
@@ -2914,6 +2920,8 @@ export interface components {
             /** @description Names of the designs the card is about. */
             designs?: string[];
             key: components["schemas"]["TicketKey"];
+            /** @description The card's own model; absent when the project's runs it. */
+            model?: string | null;
             status: components["schemas"]["TicketStatus"];
             /** Format: int32 */
             subtasks?: number;
@@ -3027,6 +3035,8 @@ export interface components {
              *     them.
              */
             designs?: components["schemas"]["DesignRef"][] | null;
+            /** @description The card's own model; an empty text clears it (the project's applies again). */
+            model?: string | null;
             needs_secrets?: boolean | null;
             pos?: components["schemas"]["Pos"] | null;
             profile?: string | null;
@@ -3990,6 +4000,11 @@ export interface components {
             done_out_of_order?: components["schemas"]["OutOfOrder"] | null;
             id: components["schemas"]["TicketId"];
             key: components["schemas"]["TicketKey"];
+            /**
+             * @description The model of the card's own agent (an alias or a full name); `None` means the project's
+             *     `worker_model`.
+             */
+            model?: string | null;
             /** @description Copy depot secrets onto the ship at start. */
             needs_secrets: boolean;
             /** @description Paused tickets stay in Backlog and are skipped by autostart. */

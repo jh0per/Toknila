@@ -124,6 +124,9 @@ fn ticket_section(
     if let Some(m) = t.review_mode {
         out.str("review_mode", &wire_name(&m).unwrap_or_default());
     }
+    if let Some(m) = &t.model {
+        out.str("model", m);
+    }
     if t.needs_secrets {
         out.raw("needs_secrets = true");
     }

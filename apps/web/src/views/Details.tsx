@@ -3,6 +3,7 @@ import type { Intent } from "../store/msg";
 import { type State, currentChain, currentProject } from "../store/state";
 import { ActionBar } from "./ActionBar";
 import { CardDesigns } from "./CardDesigns";
+import { CardModel } from "./CardModel";
 import { CardPlan } from "./CardPlan";
 import { Comments } from "./Comments";
 import { DependsOn } from "./DependsOn";
@@ -34,6 +35,12 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
         </ReviewBlock>
       )}
       <DetailsMeta card={card} />
+      {detail && (
+        <CardModel
+          key={`${card.key}:${card.model ?? ""}`} state={state} card={card} canEdit={detail.can_edit}
+          projectModel={currentProject(state)?.worker_model ?? undefined} dispatch={dispatch}
+        />
+      )}
       <CardPlan state={state} card={card} detail={detail} chain={chain} dispatch={dispatch} />
       <CardDesigns state={state} card={card} detail={detail} dispatch={dispatch} />
       <div className="cols">

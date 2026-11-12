@@ -76,6 +76,7 @@ impl Builder {
             profile: Some("sim".to_owned()),
             review_mode: None,
             reviewer: None,
+            model: None,
             branch: None,
             needs_secrets: false,
             design_first: false,

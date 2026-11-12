@@ -34,6 +34,8 @@ pub struct NewTicket {
     pub review_mode: Option<ReviewMode>,
     /// Reviewer agent profile for this ticket.
     pub reviewer: Option<String>,
+    /// The card's own model (an alias or a full name); left out, the project's worker model runs.
+    pub model: Option<String>,
     #[serde(default)]
     pub needs_secrets: bool,
     /// Show the person a design to approve before any code.
@@ -74,6 +76,10 @@ pub fn create<U: UnitOfWork + ?Sized>(
         return Err(AppError::bad_request("ticket title is empty"));
     }
     toknila_core::design::check_refs(&input.designs).map_err(AppError::bad_request)?;
+    let model = match input.model.as_deref() {
+        Some(m) => toknila_core::Project::clean_model(m).map_err(AppError::bad_request)?,
+        None => None,
+    };
     let c = resolve::chain(uow, chain)?;
     let key = next_key(uow, c.project_id)?;
     let draft = TicketDraft {
@@ -84,6 +90,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         profile: input.profile,
         review_mode: input.review_mode,
         reviewer: input.reviewer.filter(|r| !r.trim().is_empty()),
+        model,
         needs_secrets: input.needs_secrets,
         design_first: input.design_first,
         designs: input.designs,
@@ -154,6 +161,9 @@ pub fn edit<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, patch: TicketPatch)
     }
     if let Some(designs) = &patch.designs {
         toknila_core::design::check_refs(designs).map_err(AppError::bad_request)?;
+    }
+    if let Some(m) = &patch.model {
+        toknila_core::Project::clean_model(m).map_err(AppError::bad_request)?;
     }
     with_chain(uow, t.chain_id, |ctx| {
         Ok(ctx.edit_ticket(t.id, |t| patch.apply(t))?)

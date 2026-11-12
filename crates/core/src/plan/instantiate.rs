@@ -146,6 +146,7 @@ impl PlanTicket {
             profile: self.profile.clone(),
             review_mode: self.review_mode,
             reviewer: None,
+            model: self.model.clone(),
             needs_secrets: self.needs_secrets,
             design_first: self.design_first,
         }

@@ -174,6 +174,28 @@ fn design_first_is_read_instantiated_and_exported_only_when_set() {
 }
 
 #[test]
+fn a_cards_model_is_read_instantiated_exported_and_refused_when_it_is_not_one_word() {
+    let plan = parse(DEMO).expect("demo parses");
+    assert!(plan.tickets.iter().all(|t| t.model.is_none()));
+    let typed = parse("[chain]\nname = \"c\"\n\n[[ticket]]\nid = \"a\"\nmodel = \"opus\"\n")
+        .expect("parses");
+    assert_eq!(typed.tickets[0].model.as_deref(), Some("opus"));
+    let (view, _) = typed.instantiate(ProjectId::new(), Timestamp(0), keys());
+    assert_eq!(view.tickets[0].model.as_deref(), Some("opus"));
+    let text = export(&view, &HashMap::new());
+    assert_eq!(text.matches("model = \"opus\"").count(), 1, "{text}");
+    assert_eq!(
+        parse(&text).expect("reparses").tickets[0].model.as_deref(),
+        Some("opus")
+    );
+    let (view, _) = plan.instantiate(ProjectId::new(), Timestamp(0), keys());
+    assert!(!export(&view, &HashMap::new()).contains("model ="));
+    let bad = parse("[chain]\nname = \"c\"\n\n[[ticket]]\nid = \"a\"\nmodel = \"two words\"\n")
+        .expect_err("refused");
+    assert!(bad.message.contains("one word"), "{}", bad.message);
+}
+
+#[test]
 fn export_escapes_strings() {
     let mut plan = parse(DEMO).expect("demo parses");
     plan.tickets[0].title = "quote \" and\nnewline".into();

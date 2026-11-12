@@ -31,6 +31,10 @@ pub enum TicketCmd {
         /// The agent shows a design for your approval before it writes any code.
         #[arg(long)]
         design_first: bool,
+        /// The model of the card's agent (an alias such as opus, or a full name); left out, the
+        /// project's worker model runs.
+        #[arg(long)]
+        model: Option<String>,
     },
     /// Show a ticket.
     Show { ticket: String },
@@ -55,6 +59,7 @@ pub(super) fn run(c: &Client, cmd: TicketCmd, json_out: bool) -> Result<()> {
             accept,
             subtask,
             design_first,
+            model,
         } => {
             let input = NewTicket {
                 title,
@@ -64,6 +69,7 @@ pub(super) fn run(c: &Client, cmd: TicketCmd, json_out: bool) -> Result<()> {
                 acceptance: accept,
                 subtasks: subtask,
                 design_first,
+                model,
                 ..NewTicket::default()
             };
             emit(

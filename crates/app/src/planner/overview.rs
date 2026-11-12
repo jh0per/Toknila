@@ -23,6 +23,9 @@ pub struct OverviewCard {
     pub after: Vec<String>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub design_first: bool,
+    /// The card's own model; absent when the project's runs it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     /// Names of the designs the card is about.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub designs: Vec<String>,
@@ -118,6 +121,7 @@ fn cards<R: Reader + ?Sized>(
             status: t.status,
             after,
             design_first: t.design_first,
+            model: t.model,
             designs,
             waits_for_owner: owner,
         });

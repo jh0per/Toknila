@@ -55,6 +55,8 @@ pub(super) struct RawTicket {
     pub(super) after_release: Vec<Spanned<String>>,
     pub(super) profile: Option<String>,
     pub(super) review_mode: Option<ReviewMode>,
+    /// The card's own model (an alias or a full name).
+    pub(super) model: Option<String>,
     #[serde(default)]
     pub(super) needs_secrets: bool,
     #[serde(default)]

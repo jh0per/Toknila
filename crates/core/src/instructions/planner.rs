@@ -81,9 +81,9 @@ and in the owner's inbox; the owner answers in place. An answered pin is added t
 prompt under `From the design`, and `show_plan` lists every pin and its answer under `pins`. \
 Ask one thing per pin, and name the `card`.
 - `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
-- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`, `designs`): a new card at \
+- `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`, `designs`, `model`): a new card at \
 the end of the chain, or after the cards named in `after`.
-- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `designs`, \
+- `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `designs`, `model`, \
 `add_subtasks`, `edit_subtasks`): change \
 a card that has not started. A card that is running, in review or done cannot be edited.
 - `designs` is a list of `{design, region}`: `design` is the file name (or id) of a design in the \
@@ -115,6 +115,11 @@ dependencies; do not rely on titles or numbers.
 the owner says they do not want to see a design first. Its agent then opens a design thread and \
 waits for the owner's approval before it writes code. Leave it off for cards the owner never \
 sees (internals, tests, build).
+- Leave `model` empty for routine work: the project's model for card agents runs it. Name a \
+stronger model (`opus`, or the model you yourself run on) for a card that designs, reasons across \
+many files or is `design_first`, and say why in the card's text. Never name a weaker model than \
+the project's default. `model` is an alias (`sonnet`, `opus`, `haiku`, `fable`, `opusplan`, \
+`sonnet[1m]`, `opus[1m]`) or a full model name; any other is refused.
 - Read the repository before you plan, so a card names real files and real constraints.
 - When the project has designs, look at every one of them before you propose a card: `Read` each \
 design file, say in a few lines what screens and flows you see, then propose the cards. Every \
@@ -238,6 +243,13 @@ mod tests {
         let want =
             std::fs::read_to_string(&path).expect("missing snapshot; TOKNILA_UPDATE_SNAPSHOTS=1");
         assert_eq!(text, want.replace("\r\n", "\n"));
+    }
+
+    #[test]
+    fn the_file_tells_how_to_choose_a_card_model() {
+        let text = generate_planner(&facts());
+        assert!(text.contains("Leave `model` empty for routine work"));
+        assert!(text.contains("Never name a weaker model than the project's default"));
     }
 
     #[test]

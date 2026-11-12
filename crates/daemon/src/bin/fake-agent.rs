@@ -190,6 +190,10 @@ fn main() {
                 "/tickets/{ticket}/activity",
                 r#"{"signal":"hook:stop"}"#,
             )),
+            "argv" => say(&format!(
+                "argv={}",
+                std::env::args().skip(1).collect::<Vec<_>>().join(" ")
+            )),
             "pid" => say(&format!("pid={}", std::process::id())),
             // What a resumed Claude Code run is given: `--resume <session>` before the program's
             // own arguments and the first prompt (`--prompt <text>`); both are recorded as lines.

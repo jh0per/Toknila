@@ -21,6 +21,7 @@ pub fn parse(text: &str) -> Result<Plan, PlanError> {
     let ids = file.ids()?;
     file.check_done_subtasks()?;
     file.check_design_regions()?;
+    file.check_models()?;
     let edges = file.edges(&ids)?;
     file.check_edges(&edges)?;
     let version = file.version()?;
@@ -97,6 +98,16 @@ impl Source<'_> {
             if let Some(bad) = bad {
                 let message = format!("done_subtasks {bad} is not one of {len} subtasks");
                 return Err(self.error(t.id.span(), message));
+            }
+        }
+        Ok(())
+    }
+
+    /// A card's model is one word, as the project's models are.
+    fn check_models(&self) -> Result<(), PlanError> {
+        for t in &self.raw.ticket {
+            if let Some(Err(why)) = t.model.as_deref().map(crate::Project::clean_model) {
+                return Err(self.error(t.id.span(), format!("model: {why}")));
             }
         }
         Ok(())
@@ -221,6 +232,9 @@ fn build(raw: RawFile, edges: Vec<PlanEdge>, version: Option<String>) -> Plan {
         subtasks: t.subtasks,
         profile: t.profile,
         review_mode: t.review_mode,
+        model: t
+            .model
+            .and_then(|m| crate::Project::clean_model(&m).ok().flatten()),
         needs_secrets: t.needs_secrets,
         design_first: t.design_first,
         designs: t
