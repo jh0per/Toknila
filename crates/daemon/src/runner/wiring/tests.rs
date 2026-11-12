@@ -293,7 +293,7 @@ fn the_first_prompt_fills_the_kickoff_placeholder_per_role() {
     );
     assert!(r.command[3].contains("`review_verdict`"));
     for must in [
-        "run the check command",
+        "Do not run the whole gate again",
         "quote their result lines",
         "NOT_RUN",
     ] {

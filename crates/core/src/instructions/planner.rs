@@ -312,6 +312,7 @@ mod tests {
             has_designs,
             discussion: &[],
             epic: None,
+            check: None,
         }
     }
 

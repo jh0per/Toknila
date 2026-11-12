@@ -248,6 +248,10 @@ pub struct Review {
     /// What changed since the Return, for a hand-in that answers one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub since_return: Option<super::SinceReturn>,
+    /// What the check command said about the current hand-in; `None` before it ran, when the
+    /// project has no check command, or after a new hand-in until it ran again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_check: Option<super::CheckOutcome>,
 }
 
 impl Review {
@@ -261,6 +265,7 @@ impl Review {
             && self.handed_in.is_none()
             && self.synced.is_empty()
             && self.since_return.is_none()
+            && self.last_check.is_none()
     }
 
     /// How many times the loop (the check or the reviewer agent) has sent the card back since a

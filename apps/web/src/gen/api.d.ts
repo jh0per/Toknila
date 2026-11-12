@@ -2006,6 +2006,16 @@ export interface components {
             /** @description The version the tool reported, when it did. */
             version?: string | null;
         };
+        /** @description The result of the project's check command on one hand-in. */
+        CheckOutcome: {
+            /** @description When the check finished. */
+            at: components["schemas"]["Timestamp"];
+            /** @description The command that ran; empty when the checker never said which. */
+            command?: string;
+            /** @description The command and the end of its output, as the worker reads it. */
+            output: string;
+            passed: boolean;
+        };
         /**
          * @description Where a card's check stands while its turn is `Check`. The checker reports `Syncing` and
          *     `Running`; `Queued` is the daemon's line, added when the card is shown.
@@ -3374,6 +3384,7 @@ export interface components {
              *     first hand-in, or when the host could not look.
              */
             handed_in?: string | null;
+            last_check?: components["schemas"]["CheckOutcome"] | null;
             note?: components["schemas"]["ReviewNote"] | null;
             /** @description The reviewer was already nudged for a verdict in this round of review. */
             nudged?: boolean;

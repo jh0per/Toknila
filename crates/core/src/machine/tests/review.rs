@@ -62,6 +62,42 @@ fn step(t: &Ticket, event: &TicketEvent) -> Transition {
 }
 
 #[test]
+fn the_check_result_stays_on_the_review_until_the_next_hand_in() {
+    let t = step(
+        &ticket_in(TicketStatus::Running),
+        &finished_with_check(ReviewMode::Both),
+    )
+    .ticket;
+    assert_eq!(t.review.last_check, None);
+    let t = step(
+        &t,
+        &TicketEvent::CheckRunning {
+            command: "cargo xtask verify".to_owned(),
+        },
+    )
+    .ticket;
+    let t = step(&t, &check_done(true, ReviewMode::Both, 3)).ticket;
+    let kept = t.review.last_check.clone().expect("the result is kept");
+    assert_eq!(
+        (
+            kept.command.as_str(),
+            kept.passed,
+            kept.output.as_str(),
+            kept.at
+        ),
+        ("cargo xtask verify", true, "error: the thing failed", NOW)
+    );
+    // A new hand-in forgets it; one without a check does too.
+    let mut back = t.clone();
+    back.status = TicketStatus::Running;
+    back.review.turn = None;
+    let again = step(&back, &finished(ReviewMode::Both)).ticket;
+    assert_eq!(again.review.last_check, None);
+    let again = step(&back, &finished_with_check(ReviewMode::Both)).ticket;
+    assert_eq!(again.review.last_check, None);
+}
+
+#[test]
 fn a_finished_card_waits_for_whoever_the_mode_says() {
     let cases = [
         (ReviewMode::Human, ReviewTurn::Person, false),
