@@ -169,7 +169,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
             newCard: () => newCardAt(m.at),
             newChain: () => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: projectKey } }),
             importPlan: () => dispatch({ type: "openDialog", dialog: { kind: "import", project: projectKey } }),
-            askPlanner: () => dispatch({ type: "navigate", route: { name: "planner", project: projectKey } }),
+            askPlanner: () => dispatch({ type: "openAssistant" }),
           }),
         };
       case "card": {

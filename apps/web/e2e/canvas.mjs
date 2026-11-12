@@ -154,7 +154,10 @@ try {
   await page.locator("[data-testid=import-dialog]").waitFor({ state: "detached" });
   await page.mouse.click(q.x, q.y, { button: "right" });
   await page.locator("[data-testid=menu-canvas-planner]").click();
-  await expectPath("/projects/CAN/planner", "Plan with the assistant opens the project's planner");
+  await page.locator("[data-testid=assistant-panel]").waitFor({ timeout: 10_000 });
+  await expectText(page.locator("[data-testid=context-chip]"), "the card CAN-4", "Plan with the assistant opens the panel where the person is, on the open card");
+  await page.locator("[data-testid=assistant-close]").click();
+  await page.locator("[data-testid=assistant-panel]").waitFor({ state: "detached" });
 
   // 4. Right-click on a card: the actions that apply to its state.
   await open("CAN", "work");

@@ -1,7 +1,7 @@
 // The page's state machine: reduce(state, msg) -> [state, effects]. Pure: no DOM, no network.
 
 import type { EventRecord } from "../api/types";
-import { beside, chipBack, reduceAssistant } from "./assistant";
+import { chipBack, reduceAssistant, showChat, withPanelOpen } from "./assistant";
 import { conversationEvent, reloadTalks } from "./conversation";
 import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
@@ -115,7 +115,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       const { [ONBOARDING_DRAFT]: described = "", ...rest } = added.planner.drafts;
       const kept = { ...added, planner: { ...added.planner, drafts: { ...rest, [key]: described } } };
       const [asked, ask] = reducePlanner(kept, { type: "askPlanner", project: key });
-      return then(withDialog(asked, undefined), [...fx, ...(ask.length ? ask : [scan])], { name: "planner", project: key });
+      const [shown, save] = withPanelOpen(withDialog(asked, undefined));
+      return then(shown, [...fx, ...(ask.length ? ask : [scan]), ...save], { name: "project", project: key });
     }
     case "chainImported":
     case "recheck":
@@ -284,11 +285,9 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "updateFailed":
       return reduceUpdates(s, msg);
     case "askPlanner": {
-      const [next, fx] = reducePlanner(s, msg);
-      // The conversation is on the assistant's screen or in the panel beside the work: a message
-      // sent from elsewhere goes to the screen.
-      const there = (s.route.name === "planner" && s.route.project === msg.project) || (s.assistant.open && beside(s.route));
-      return fx.length && !there ? then(next, fx, { name: "planner", project: msg.project }) : [next, fx];
+      // A message sent from a box with the panel shut opens the panel (on the roadmap if need be).
+      const [shown, more, to] = showChat(s, ...reducePlanner(s, msg), msg.project);
+      return to ? then(shown, more, to) : [shown, more];
     }
     case "nudgeCard":
     case "nudgeChat":
