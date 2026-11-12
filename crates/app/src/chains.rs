@@ -17,7 +17,11 @@ use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork, resolve, with_chai
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NewChain {
+    /// The identifier of folders and branches.
     pub name: String,
+    /// The words a person reads; none: the name made readable.
+    #[serde(default)]
+    pub title: Option<String>,
     pub goal: Option<String>,
     /// Defaults to true.
     pub autostart: Option<bool>,
@@ -64,6 +68,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         id: ChainId::new(),
         project_id: p.id,
         name: name.to_owned(),
+        title: crate::epic::clean_title(input.title.as_deref()),
         goal: input.goal.unwrap_or_default(),
         autostart: input.autostart.unwrap_or(Chain::DEFAULT_AUTOSTART),
         review_mode: input.review_mode,

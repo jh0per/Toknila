@@ -4,6 +4,7 @@ import type { EpicKind } from "../store/epic";
 import type { Intent } from "../store/msg";
 import { dayText, finishView } from "../store/phase";
 import type { State } from "../store/state";
+import { epicTitle } from "../store/title";
 import { Field } from "./Field";
 import { Markdown } from "./Markdown";
 
@@ -21,7 +22,7 @@ export function EpicPanel({ chain, kind, project, state, dispatch }: {
   return (
     <section className="panel epic-panel" data-testid="epic-panel" data-kind={kind}>
       <div className="panel-head">
-        <div className="tabs"><span className="who"><span className="key">{head}</span> {chain.chain.name}</span></div>
+        <div className="tabs"><span className="who"><span className="key">{head}</span> {epicTitle(chain)}</span></div>
         <button type="button" className="btn small" data-testid="epic-close" onClick={() => dispatch({ type: "closeEpic" })}>Close</button>
       </div>
       <div className="tabpanel">
@@ -36,20 +37,24 @@ export function EpicPanel({ chain, kind, project, state, dispatch }: {
 type FormProps = { chain: ChainDetail; project: string; state: State; dispatch: (i: Intent) => void };
 
 function EpicForm({ chain, project, state, dispatch }: FormProps) {
-  const [name, setName] = useState(chain.chain.name);
+  const own = epicTitle(chain);
+  const [title, setTitle] = useState(own);
   const [goal, setGoal] = useState(chain.chain.goal);
   const [preview, setPreview] = useState(false);
-  const changed = name.trim() !== chain.chain.name || goal.trim() !== chain.chain.goal.trim();
+  const changed = title.trim() !== own || goal.trim() !== chain.chain.goal.trim();
   const save = () => {
-    const patch: { name?: string; goal?: string } = {};
-    if (name.trim() !== chain.chain.name) patch.name = name.trim();
+    const patch: { title?: string; goal?: string } = {};
+    if (title.trim() !== own) patch.title = title.trim();
     if (goal.trim() !== chain.chain.goal.trim()) patch.goal = goal;
     dispatch({ type: "saveEpic", chain: chain.chain.id, project, from: chain.chain.name, patch });
   };
   return (
     <form className="form epic-form" noValidate onSubmit={(e) => { e.preventDefault(); if (changed) save(); }}>
-      <Field label="Name" name="epic-name" error={undefined}>
-        <input data-testid="epic-name" value={name} spellCheck={false} onChange={(e) => setName(e.target.value)} />
+      <Field
+        label="Title" name="epic-title" error={undefined}
+        hint={<>What the epic is called where you read it. Its slug <code className="mono" data-testid="epic-slug">{chain.chain.name}</code> names its folders and branches.</>}
+      >
+        <input data-testid="epic-name" value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
       <Field label="Goal" name="epic-goal" error={undefined} hint="What the epic is for. The planner and every story's agent read it as the epic's purpose. Markdown.">
         {preview

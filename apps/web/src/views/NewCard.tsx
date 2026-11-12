@@ -4,6 +4,7 @@ import { acceptanceFrom, cardTitle, titleFromTask } from "../store/cardForm";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import { type State, ticketsInOrder } from "../store/state";
+import { epicTitle } from "../store/title";
 import { DesignFirst } from "./DesignFirst";
 import { Field } from "./Field";
 import { ModelPicker } from "./ModelPicker";
@@ -38,7 +39,7 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
         });
       }}
     >
-      <h2>New story in {chain.chain.name}</h2>
+      <h2>New story in {epicTitle(chain)}</h2>
       <Field label="What should the agent do?" name="card-prompt" error={undefined} hint="Say it the way you would to a colleague. Several lines are fine.">
         <textarea data-testid="card-prompt" rows={5} value={task} autoFocus onChange={(e) => setTask(e.target.value)} />
       </Field>

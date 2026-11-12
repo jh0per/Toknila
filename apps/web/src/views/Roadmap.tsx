@@ -4,6 +4,7 @@ import type { Intent } from "../store/msg";
 import { readFinishedOpen, storeFinishedOpen, versionText } from "../store/phase";
 import { dropMove, moveStep, roadmapPhase, splitRoadmap } from "../store/roadmap";
 import { type State, chainsOf } from "../store/state";
+import { epicTitle } from "../store/title";
 import { AssistantButton } from "./AssistantButton";
 import { NavLink } from "./Link";
 import { SwitcherButton } from "./ProjectSwitcher";
@@ -74,7 +75,7 @@ export function Roadmap({ project, state, dispatch }: { project: Project; state:
       >
         <NavLink route={{ name: "projectChain", project: project.key, chain: c.chain.name }} dispatch={dispatch} className="rm-body" testId="roadmap-open">
           <span className="rm-top">
-            <span className="rm-name" data-testid="roadmap-name">{c.chain.name}</span>
+            <span className="rm-name" data-testid="roadmap-name">{epicTitle(c)}</span>
             {s.version && <span className="ver" data-testid="roadmap-version">{versionText(s)}</span>}
           </span>
           <span className="rm-phase" data-testid="roadmap-phase">{phase}</span>
@@ -82,7 +83,7 @@ export function Roadmap({ project, state, dispatch }: { project: Project; state:
           <span className="rm-bar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
         </NavLink>
         <button
-          type="button" className="rm-kebab" aria-label={`Menu of ${c.chain.name}`} aria-haspopup="menu" aria-expanded={menu === id}
+          type="button" className="rm-kebab" aria-label={`Menu of ${epicTitle(c)}`} aria-haspopup="menu" aria-expanded={menu === id}
           data-testid="roadmap-menu-button"
           onClick={(e) => {
             e.stopPropagation();

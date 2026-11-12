@@ -8,6 +8,7 @@ import type { Intent } from "../store/msg";
 import type { Route } from "../store/route";
 import type { State } from "../store/state";
 import { itemRoute } from "../store/inbox";
+import { epicTitle } from "../store/title";
 import { Answer } from "./Answer";
 import { NavLink } from "./Link";
 
@@ -54,6 +55,7 @@ export function InboxRow({ state, item, dispatch }: { state: State; item: InboxI
         {route ? <NavLink route={route} dispatch={dispatch} className="key">{item.ticket}</NavLink> : <span className="key">{item.ticket}</span>}
       </div>
       <div className="row-kind muted" data-testid="inbox-kind">{KIND_LINE[item.kind]}</div>
+      {state.chains[item.chain] && <div className="row-epic muted" data-testid="inbox-epic">{epicTitle(state.chains[item.chain])}</div>}
       <Body item={item} route={route} open={open} dispatch={dispatch} detail={state.details[item.ticket]} />
     </li>
   );

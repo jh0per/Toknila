@@ -1,4 +1,5 @@
 import type { ImportPathResult, ImportedChain } from "../api/types";
+import { epicTitle } from "../store/title";
 
 const counts = (c: ImportedChain): string =>
   [
@@ -13,7 +14,7 @@ export function ImportSummary({ result }: { result: ImportPathResult }) {
     <div className="import-result" data-testid="import-result">
       {result.chains.map((c) => (
         <div key={c.chain.chain.id} data-chain={c.chain.chain.name}>
-          <p>Imported <b>{c.chain.chain.name}</b> from {c.folder}: {counts(c)}.</p>
+          <p>Imported <b>{epicTitle(c.chain)}</b> from {c.folder}: {counts(c)}.</p>
           {c.out_of_order.map((line) => <p key={line} className="muted">{line}</p>)}
         </div>
       ))}

@@ -384,6 +384,7 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
         id: "01JBQ7ZJ0000000000000000C1".parse().expect("id"),
         project_id: project.id,
         name: "auth".to_owned(),
+        title: None,
         goal: String::new(),
         autostart: true,
         review_mode: None,

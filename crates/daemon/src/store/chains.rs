@@ -18,10 +18,10 @@ type ChainRow = (
     Option<String>,
     Option<String>,
     u32,
+    Option<String>,
 );
 
-const CHAIN_COLS: &str =
-    "id, project_id, name, goal, autostart, review_mode, reviewer, source, version, position";
+const CHAIN_COLS: &str = "id, project_id, name, goal, autostart, review_mode, reviewer, source, version, position, title";
 
 impl Repo<'_> {
     /// Reserves the next ticket number of a project.
@@ -39,7 +39,7 @@ impl Repo<'_> {
     pub fn insert_chain(&self, c: &Chain) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
+                "INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
             ),
             params![
                 c.id.to_string(),
@@ -51,7 +51,8 @@ impl Repo<'_> {
                 c.reviewer,
                 c.source,
                 c.version,
-                c.position
+                c.position,
+                c.title
             ],
         )?;
         Ok(())
@@ -59,7 +60,7 @@ impl Repo<'_> {
 
     pub fn update_chain(&self, c: &Chain) -> Result<(), StoreError> {
         self.conn.execute(
-            "UPDATE chains SET name = ?2, goal = ?3, autostart = ?4, review_mode = ?5, reviewer = ?6, version = ?7, position = ?8 WHERE id = ?1",
+            "UPDATE chains SET name = ?2, goal = ?3, autostart = ?4, review_mode = ?5, reviewer = ?6, version = ?7, position = ?8, title = ?9 WHERE id = ?1",
             params![
                 c.id.to_string(),
                 c.name,
@@ -68,7 +69,8 @@ impl Repo<'_> {
                 opt_enum(&c.review_mode)?,
                 c.reviewer,
                 c.version,
-                c.position
+                c.position,
+                c.title
             ],
         )?;
         Ok(())
@@ -86,6 +88,7 @@ impl Repo<'_> {
             r.get(7)?,
             r.get(8)?,
             r.get(9)?,
+            r.get(10)?,
         ))
     }
 
@@ -101,6 +104,7 @@ impl Repo<'_> {
             source: t.7,
             version: t.8,
             position: t.9,
+            title: t.10,
         })
     }
 

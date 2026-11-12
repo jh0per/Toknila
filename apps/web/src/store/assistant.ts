@@ -85,9 +85,10 @@ export const panelChip = (s: State): Context | undefined => (s.assistant.open ? 
 /// The same context as one comparable string.
 export const contextKey = (c: Context): string => (c.kind === "roadmap" ? "roadmap" : c.kind === "chain" ? `chain:${c.name}` : `card:${c.key}`);
 
-/// What the chip says.
-export const contextLabel = (c: Context): string =>
-  c.kind === "roadmap" ? "Roadmap" : c.kind === "chain" ? `the epic ${c.name}` : `the story ${c.key}`;
+/// What the chip says. A chain shows `title`, the words the store has for its name (the slug when
+/// not given).
+export const contextLabel = (c: Context, title?: string): string =>
+  c.kind === "roadmap" ? "Roadmap" : c.kind === "chain" ? `the epic ${title ?? c.name}` : `the story ${c.key}`;
 
 /// The slice after the route changed: whatever opens next brings its chip back.
 export const chipBack = (a: AssistantSlice): AssistantSlice => (a.chipOff ? { ...a, chipOff: false } : a);

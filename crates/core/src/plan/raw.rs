@@ -19,6 +19,8 @@ pub(super) struct RawFile {
 #[serde(deny_unknown_fields)]
 pub(super) struct RawChain {
     pub(super) name: String,
+    /// The words a person reads for the epic.
+    pub(super) title: Option<String>,
     #[serde(default)]
     pub(super) goal: String,
     pub(super) autostart: Option<bool>,

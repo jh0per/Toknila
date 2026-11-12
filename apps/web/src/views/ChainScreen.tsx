@@ -3,6 +3,7 @@ import { chainTone } from "../store/groups";
 import { versionText } from "../store/phase";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, slotsOf } from "../store/state";
+import { epicTitle } from "../store/title";
 import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
 import { AskBox } from "./AskBox";
 import { AssistantButton } from "./AssistantButton";
@@ -39,7 +40,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
               </NavLink>
             </>
           ) : <b />}
-          <i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
+          <i>/</i><b data-testid="chain-name-top">{epicTitle(chain)}</b>
           {chain.summary.version && <span className="ver" data-testid="chain-version-top">{versionText(chain.summary)}</span>}
         </div>
         <SpendLine state={state} dispatch={dispatch} />
@@ -95,13 +96,13 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
         chain={chain} state={state} dispatch={dispatch}
         onEmpty={project && (
           <div className="empty-state">
-            <h2>What should {chain.chain.name} do?</h2>
+            <h2>What should {epicTitle(chain)} do?</h2>
             <p className="muted">
               This epic has no stories yet. Tell the assistant what it is for and it drafts the stories, or add the first story yourself.
             </p>
             <AskBox
               project={project.key} state={state} dispatch={dispatch} testId="chain-ask" label="What should this epic do?"
-              placeholder={`For example: the stories for ${chain.chain.name}`} button="Plan it with the assistant"
+              placeholder={`For example: the stories for ${epicTitle(chain)}`} button="Plan it with the assistant"
             />
             <p className="secondary-links">
               Or{" "}

@@ -89,9 +89,11 @@ when the design does not say what you need. It shows on the mockup (project page
 and in the owner's inbox; the owner answers in place. An answered pin is added to its story's \
 prompt under `From the design`, and `show_plan` lists every pin and its answer under `pins`. \
 Ask one thing per pin, and name the `card`.
-- `new_chain` (`name`, `goal`, `version`): a new epic at the end of the roadmap, with the version \
-it releases. Its stories wait for the owner to start them.
-- `edit_chain` (`chain`, `name`, `goal`, `version`): change an epic whose release is not cut.
+- `new_chain` (`title`, `goal`, `version`, optional `name`): a new epic at the end of the roadmap, \
+with the version it releases. Name an epic as the owner would say it, in their language (\"MIDI \
+controllers\", \"Android release\"), as the `title`, and leave the `name` (the slug of folders and \
+branches) to the daemon. Its stories wait for the owner to start them.
+- `edit_chain` (`chain`, `title`, `goal`, `version`): change an epic whose release is not cut.
 - `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`, `designs`, `model`): a new story at \
 the end of the epic, or after the stories named in `after`.
 - `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `designs`, `model`, \
@@ -126,10 +128,10 @@ epics already planned. Plan the stories of an epic when the owner asks for that 
 them ahead. The owner reorders the epics in the window; you do not.
 
 On the roadmap you plan epics, not stories. When the owner describes what to build, propose a \
-split into releases: two to five epics, each with a name, a one-paragraph goal and a version, \
+split into releases: two to five epics, each with a title, a one-paragraph goal and a version, \
 the versions in order after the suggested next version. Say the split in one `say` (about the \
 roadmap) and wait. On the owner's yes, create the epics with `new_chain` in that order; each \
-one is appended at the end of the roadmap and shows in the chat as `added epic NAME vVERSION`. \
+one is appended at the end of the roadmap and shows in the chat as `added epic TITLE vVERSION`. \
 Plan the stories of an epic only when the owner opens that epic or asks for it. Never start \
 anything.
 
@@ -339,7 +341,9 @@ mod tests {
         assert!(text.contains("you plan epics, not stories"));
         assert!(text.contains("When the owner describes what to build, propose a split"));
         assert!(text.contains("two to five epics"));
-        assert!(text.contains("`added epic NAME vVERSION`"));
+        assert!(text.contains("`added epic TITLE vVERSION`"));
+        assert!(text.contains("as the owner would say it, in their language"));
+        assert!(text.contains("leave the `name` (the slug of folders and branches) to the daemon"));
         assert!(text.contains("Never start anything."));
         assert!(text.contains("`About epic NAME:`"));
         assert!(text.contains("`Discussion on story KEY (thread N):`"));

@@ -27,6 +27,7 @@ export const initialEpic: EpicUi = { panel: undefined, suggested: undefined, bus
 /// What a save changes; a field left out is kept.
 export interface EpicPatch {
   name?: string;
+  title?: string;
   goal?: string;
   version?: string;
 }

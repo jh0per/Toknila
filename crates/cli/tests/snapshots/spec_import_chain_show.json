@@ -7,7 +7,8 @@
     "position": 0,
     "project_id": "<id>",
     "review_mode": null,
-    "source": "<path>"
+    "source": "<path>",
+    "title": "Spec: Sample Feature"
   },
   "edges": [
     {
@@ -124,6 +125,7 @@
   "release_tickets": [],
   "releases": [],
   "summary": {
+    "display_title": "Spec: Sample Feature",
     "done": 2,
     "finished_at": null,
     "next_release": null,

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
 import { readFinishedOpen, splitChains, storeFinishedOpen, versionText } from "../store/phase";
+import { epicTitle } from "../store/title";
 import { PhaseDot } from "./PhaseChip";
 import { NavLink } from "./Link";
 import { Chev, type Level, indent } from "./TreeRow";
@@ -40,11 +41,11 @@ export function SidebarChains({ chains, project, selected, dispatch, onMenu }: P
           <Chev />
           <NavLink
             route={{ name: "projectChain", project, chain: c.chain.name }}
-            dispatch={dispatch} row title={c.chain.name}
+            dispatch={dispatch} row title={epicTitle(c)}
             className={`item${c.chain.id === selected ? " sel" : ""}${dim ? " dim" : ""}`}
           >
             <PhaseDot phase={s.phase} />
-            <span className="t chain-name">{c.chain.name}</span>
+            <span className="t chain-name">{epicTitle(c)}</span>
             {s.version && <span className="ver" data-testid="chain-version-row">{versionText(s)}</span>}
             {WORDED.has(s.phase) && <span className="phase-word">{s.phase}</span>}
             <span className="n">{s.done}/{s.total}</span>

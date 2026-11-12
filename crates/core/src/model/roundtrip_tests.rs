@@ -88,6 +88,7 @@ fn chain_and_edges_roundtrip() {
         id: ChainId::new(),
         project_id: ProjectId::new(),
         name: "phase-0".to_owned(),
+        title: None,
         goal: "Skeleton".to_owned(),
         autostart: true,
         review_mode: None,
