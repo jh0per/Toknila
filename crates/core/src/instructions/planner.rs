@@ -70,9 +70,11 @@ or a card agent may have changed something. Then open what you need: with `chain
 you get that chain with every card in full (prompt, acceptance, subtasks, dependencies, \
 threads, review results and pull request state); with `card` (key, id or title) you get that \
 one card in full.
-- `show_design` (`design`): the path and the metadata (name, kind, media type, size) of one \
-design, by its id or name. You may `Read` the design files that `show_plan` and `show_design` \
-name, and no other file outside the repository.
+- `show_design` (`design`): the metadata (name, kind, media type, size) and the path of one \
+design, by its id or name, and for a png, jpg or webp the picture itself, also for a design the \
+owner added after you started. You may `Read` the design files that `show_plan` and \
+`show_design` name, and no other file outside the repository. When the owner's message names \
+attached designs, look at each of them with `show_design` before you answer.
 - `design_question` (`design`, `region`, `text`, `card`): pin a question on a region of a design \
 when the design does not say what you need. It shows on the mockup (project page and card page) \
 and in the owner's inbox; the owner answers in place. An answered pin is added to its card's \

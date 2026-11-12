@@ -131,7 +131,7 @@ fn run_foreground(paths: Paths, exit_with_parent: bool) -> Result<()> {
 
 /// The running daemon's info, or `None` if no daemon answers `/healthz`.
 pub fn running(paths: &Paths) -> Result<Option<DaemonInfo>> {
-    let Some(info) = DaemonInfo::read(&paths.daemon_json())? else {
+    let Some(info) = DaemonInfo::read_settled(&paths.daemon_json())? else {
         return Ok(None);
     };
     let healthy = Client::healthy(&info.base_url());
@@ -151,7 +151,7 @@ pub fn start_with(paths: &Paths, lifeline: bool) -> Result<DaemonInfo> {
         if let Some(info) = running(paths)? {
             return Ok(info);
         }
-        if attempt < 2 && DaemonInfo::read(&paths.daemon_json())?.is_some() {
+        if attempt < 2 && DaemonInfo::read_settled(&paths.daemon_json())?.is_some() {
             std::thread::sleep(Duration::from_millis(200));
         } else {
             break;
