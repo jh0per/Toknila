@@ -49,7 +49,7 @@ fn chunk_raw_values(chunk: &str) -> usize {
     let size_decl = chunk
         .strip_prefix("font-size")
         .or_else(|| chunk.strip_prefix("font:"))
-        .is_some_and(|value| has_px(value));
+        .is_some_and(has_px);
     if size_decl {
         n += 1;
     }
