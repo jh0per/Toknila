@@ -16,13 +16,13 @@ pub enum Place {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum MoveError {
     /// The chain is not in the project's roadmap.
-    #[error("the chain is not in this project's roadmap")]
+    #[error("the epic is not in this project's roadmap")]
     UnknownChain,
     /// The chain it should go next to is not in the roadmap.
-    #[error("the chain to move next to is not in this project's roadmap")]
+    #[error("the epic to move next to is not in this project's roadmap")]
     UnknownAnchor,
     /// A chain cannot go next to itself.
-    #[error("a chain cannot be moved next to itself")]
+    #[error("an epic cannot be moved next to itself")]
     SameChain,
 }
 

@@ -14,13 +14,13 @@ export interface Shortcut {
 
 /// Every key the window answers to. A key that is added to the window is added here, in the same change.
 export const SHORTCUTS: Shortcut[] = [
-  { keys: ["N"], what: "New card on the diagram" },
-  { keys: ["S"], what: "Start the card you are on" },
-  { keys: ["Enter"], what: "Open the card you are on" },
+  { keys: ["N"], what: "New story on the diagram" },
+  { keys: ["S"], what: "Start the story you are on" },
+  { keys: ["Enter"], what: "Open the story you are on" },
   { keys: ["Delete"], what: "Remove the dependency line you picked" },
   { keys: ["Esc"], what: "Close a menu or a dialog, or let go of what you picked" },
   { keys: ["Cmd/Ctrl", ","], what: "Open Settings" },
-  { keys: ["Cmd/Ctrl", "."], what: "Show or hide the assistant beside the roadmap, a chain or a card" },
+  { keys: ["Cmd/Ctrl", "."], what: "Show or hide the assistant beside the roadmap, an epic or a story" },
   { keys: ["?"], what: "Show this list" },
 ];
 

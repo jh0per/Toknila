@@ -129,7 +129,7 @@ try {
   // 3. The person edits and sends.
   await t("planner-ask-input").fill("build an export to csv please");
   await t("planner-ask-send").click();
-  await toldAbout("About chain work: build an export to csv please");
+  await toldAbout("About epic work: build an export to csv please");
 
   // 4. Typing while listening stops listening and keeps the typed words (after the box is free again).
   await page.waitForFunction(() => document.querySelector("[data-testid=planner-ask-input]")?.disabled === false);
@@ -162,7 +162,7 @@ try {
   await page.evaluate(() => window.__rec.say([["go go", true]]));
   await page.waitForTimeout(1000);
   check((await t("planner-ask-input").inputValue()) === "go go", "before the pause the words wait in the field");
-  await toldAbout("About chain work: go go");
+  await toldAbout("About epic work: go go");
   check((await mic.getAttribute("data-mic")) === "idle", "after an automatic send the microphone is off");
   await t("planner-ask-mic-auto").uncheck();
   await page.context().close();

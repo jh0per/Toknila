@@ -40,7 +40,7 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
         ? { tone: "quiet", text: "Paused: it will not start until you resume it", next: can("resume") ? "Resume it when you want it to go on." : undefined }
         : {
             tone: "quiet",
-            text: "Not started: it waits for the cards before it",
+            text: "Not started: it waits for the stories before it",
             next: can("start") || can("start_anyway") ? "You can also start it now." : undefined,
           };
     case "ready":
@@ -49,7 +49,7 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
       }
       return pace.autostart
         ? { tone: "going", text: "Ready: starts when a slot is free" }
-        : { tone: "needs", text: "Ready: start it when you want", next: "This chain does not start cards automatically; press Start." };
+        : { tone: "needs", text: "Ready: start it when you want", next: "This epic does not start stories automatically; press Start." };
     case "running":
       return designLine(detail) ?? {
         tone: "going",
@@ -127,7 +127,7 @@ function waitingText(card: Ticket): string | undefined {
   const r = card.status_reason;
   if (r?.status !== "waiting") return undefined;
   if (r.kind === "silent") return "The agent went silent. Look at its Terminal, or write to it below.";
-  if (r.kind === "screen") return "Claude Code asks on its screen. Answer it in the Inbox or in the card's Terminal tab.";
+  if (r.kind === "screen") return "Claude Code asks on its screen. Answer it in the Inbox or in the story's Terminal tab.";
   return r.text;
 }
 

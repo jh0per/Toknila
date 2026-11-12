@@ -758,7 +758,7 @@ fn a_return_while_the_card_is_being_checked_says_so() {
     .to_string();
     assert_eq!(
         err,
-        "cannot return yet: the card is still being checked (brought up to main \
+        "cannot return yet: the story is still being checked (brought up to main \
          and the check command run); Return or Accept once it waits for a person"
     );
 }

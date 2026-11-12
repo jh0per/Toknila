@@ -9,8 +9,8 @@ export function ImportChain({ project, state, dispatch }: { project: Project; st
   const s = state.settings;
   return (
     <section className="card-block" data-testid="import-chain">
-      <h2>Import a chain file</h2>
-      <p className="muted">Optional. A chain file plans the project's cards; it is read once and then lives in the database.</p>
+      <h2>Import an epic file</h2>
+      <p className="muted">Optional. An epic file plans the project's stories; it is read once and then lives in the database.</p>
       <input
         type="file" accept=".toml,text/plain" data-testid="chain-file" disabled={s.busy}
         onChange={(e) => {
@@ -19,7 +19,7 @@ export function ImportChain({ project, state, dispatch }: { project: Project; st
           e.target.value = "";
         }}
       />
-      {s.imported && <p className="saved" data-testid="imported">Imported chain {s.imported}.</p>}
+      {s.imported && <p className="saved" data-testid="imported">Imported epic {s.imported}.</p>}
       {formError(s) && <p className="error" role="alert">{formError(s)}</p>}
     </section>
   );

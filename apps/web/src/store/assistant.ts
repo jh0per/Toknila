@@ -87,17 +87,17 @@ export const contextKey = (c: Context): string => (c.kind === "roadmap" ? "roadm
 
 /// What the chip says.
 export const contextLabel = (c: Context): string =>
-  c.kind === "roadmap" ? "Roadmap" : c.kind === "chain" ? `the epic ${c.name}` : `the card ${c.key}`;
+  c.kind === "roadmap" ? "Roadmap" : c.kind === "chain" ? `the epic ${c.name}` : `the story ${c.key}`;
 
 /// The slice after the route changed: whatever opens next brings its chip back.
 export const chipBack = (a: AssistantSlice): AssistantSlice => (a.chipOff ? { ...a, chipOff: false } : a);
 
 /// The line the planner's terminal takes for a message about a context, on one line. A card's
-/// line is `Discussion on card KEY (thread N): …` (`askLine` in discussion.ts), as the card's
+/// line is `Discussion on story KEY (thread N): …` (`askLine` in discussion.ts), as the card's
 /// thread is the daemon's to number.
 export function lineFor(c: Context, text: string): string {
   const one = text.trim().replace(/\s*\n\s*/g, " ");
-  return c.kind === "chain" ? `About chain ${c.name}: ${one}` : `About the roadmap: ${one}`;
+  return c.kind === "chain" ? `About epic ${c.name}: ${one}` : `About the roadmap: ${one}`;
 }
 
 /// The messages "only about this" keeps: those about the card, the chain or the roadmap.

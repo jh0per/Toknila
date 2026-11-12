@@ -11,7 +11,7 @@ import { CardProposals } from "./CardProposals";
 import { ChatEntry } from "./ChatMessage";
 
 const placeholderFor = (c: Context | undefined): string =>
-  c?.kind === "card" ? "Ask about this card or say what to change; Enter sends"
+  c?.kind === "card" ? "Ask about this story or say what to change; Enter sends"
   : c?.kind === "chain" ? "Ask, or say what to change in this epic; Enter sends"
   : c?.kind === "roadmap" ? "Ask, or say what to build; Enter sends"
   : "Tell the assistant what to change; Enter sends";
@@ -80,7 +80,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
   const starter = talk !== undefined && messages.length === 0 && context?.kind === "roadmap";
   return (
     <div className="chat-pane" data-testid="chat-pane">
-      <label className="only-about muted" title={context ? undefined : "Open a roadmap, a chain or a card to filter by it"}>
+      <label className="only-about muted" title={context ? undefined : "Open a roadmap, an epic or a story to filter by it"}>
         <input
           type="checkbox" data-testid="only-about" checked={only} disabled={!context}
           onChange={(e) => dispatch({ type: "setOnlyAboutThis", only: e.target.checked })}
@@ -97,7 +97,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
           <p className="muted chat-note" data-testid="placeholder">
             {starter
               ? ROADMAP_STARTER
-              : "Tell the assistant what you want to build or change. It reads your project and writes the plan as cards; you start the cards and accept the work."}
+              : "Tell the assistant what you want to build or change. It reads your project and writes the plan as stories; you start the stories and accept the work."}
           </p>
         )}
         <ol className="chat-items" data-testid="chat-items">

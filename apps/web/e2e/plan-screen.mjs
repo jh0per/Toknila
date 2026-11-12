@@ -149,7 +149,7 @@ try {
   must((await t("chain-status").getAttribute("class")).includes("tone-attn"), "the pill of a chain that needs a person has the amber tone");
   must((await css(t("chain-status"), "color")) === attn, "the chain pill is amber");
   must((await t("run-chain").getAttribute("class")).includes("primary"), "Run chain is the primary button");
-  await expectText(t("canvas-hint"), "Lines run from Start to the end. Drag a card to place it.", "the hint is on the canvas");
+  await expectText(t("canvas-hint"), "Lines run from Start to the end. Drag a story to place it.", "the hint is on the canvas");
   for (const word of ["todo", "in progress", "needs you", "done"]) await expectText(t("canvas-legend"), word, "the legend has a word");
 
   // 5. Theme: System, Light, Dark; remembered for this viewer.
@@ -229,7 +229,7 @@ try {
   await t("menu-card-start").waitFor();
   const ready = await menuShape();
   must(
-    ready === "Open,Edit,Open terminal,|Start,Pause,Ask for a design,|Add card before,Add card after,Add dependency…,|Cancel",
+    ready === "Open,Edit,Open terminal,|Start,Pause,Ask for a design,|Add story before,Add story after,Add dependency…,|Cancel",
     `a ready card's menu is grouped (${ready})`,
   );
   must((await t("menu-card-open").locator("kbd").textContent()) === "Enter", "Open shows its key");
@@ -258,7 +258,7 @@ try {
   await node("PLN-2").click({ button: "right" });
   await t("menu-card-cancel").waitFor();
   const busy = await menuShape();
-  must(busy.endsWith("|Cancel") && !busy.includes("Start") && !busy.includes("Add card before"), `a running card's menu follows the daemon (${busy})`);
+  must(busy.endsWith("|Cancel") && !busy.includes("Start") && !busy.includes("Add story before"), `a running card's menu follows the daemon (${busy})`);
   await page.keyboard.press("Escape");
 
   // The menu of a line: titled with its two cards; Delete is its key.
@@ -291,14 +291,14 @@ try {
   await page.mouse.click(1330, freeY, { button: "right" });
   await t("menu-canvas-new-card").waitFor();
   const canvasMenu = await menuShape();
-  must(canvasMenu === "New card,|New chain,Import a plan,|Plan with the assistant", `the canvas menu has three groups (${canvasMenu})`);
-  must((await t("menu-canvas-new-card").locator("kbd").textContent()) === "N", "New card shows N");
+  must(canvasMenu === "New story,|New epic,Import a plan,|Plan with the assistant", `the canvas menu has three groups (${canvasMenu})`);
+  must((await t("menu-canvas-new-card").locator("kbd").textContent()) === "N", "New story shows N");
   await page.keyboard.press("Escape");
 
   // Add dependency: pick the card to wait for.
   await node("PLN-6").click({ button: "right" });
   await t("menu-card-add-dependency").click();
-  await expectText(t("linking-hint"), "Click the card PLN-6 should wait for", "Add dependency says what to click");
+  await expectText(t("linking-hint"), "Click the story PLN-6 should wait for", "Add dependency says what to click");
   await node("PLN-4").click();
   await page.locator("g.edge[data-edge='PLN-4>PLN-6']").waitFor({ state: "attached" });
   console.log("PASS clicking a card made PLN-6 wait for PLN-4");

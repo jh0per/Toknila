@@ -16,7 +16,7 @@ pub fn show_card<U: UnitOfWork + ?Sized>(
     let t = card(&*uow, project, reference)?;
     let chain = uow
         .chain(t.chain_id)?
-        .ok_or_else(|| AppError::not_found(format!("chain of {}", t.key)))?;
+        .ok_or_else(|| AppError::not_found(format!("epic of {}", t.key)))?;
     let p = uow
         .project(project)?
         .ok_or_else(|| AppError::not_found(format!("project {project}")))?;

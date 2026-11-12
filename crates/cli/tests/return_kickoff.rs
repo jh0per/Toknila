@@ -86,20 +86,20 @@ fn a_return_is_in_the_new_runs_kickoff_and_a_hand_in_at_the_same_commit_is_refus
     tok.run(&["sim", "DEMO-1", "finish", "done"]);
     assert_eq!(tok.status("DEMO-1"), "review");
     let log_before = tok.logs("DEMO-1").len();
-    assert!(!screen(&tok).contains("This card was returned"));
+    assert!(!screen(&tok).contains("This story was returned"));
 
     tok.wait_for_person_turn("DEMO-1");
     tok.run(&["return", "DEMO-1", "Rename the flag"]);
     wait_until("the new run to print the Return", || {
         let log = tok.logs("DEMO-1");
-        log.len() > log_before && log.contains("file:## This card was returned")
+        log.len() > log_before && log.contains("file:## This story was returned")
     });
     let seen = screen(&tok);
     let short = &first[..7];
     // Round 1 is the hand-in's own check (every card with a ship is brought up to its base and
     // checked); the Return is round 2.
     assert!(
-        seen.contains("This card was returned: round 2, by the person"),
+        seen.contains("This story was returned: round 2, by the person"),
         "{seen}"
     );
     assert!(

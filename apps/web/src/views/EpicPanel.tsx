@@ -51,7 +51,7 @@ function EpicForm({ chain, project, state, dispatch }: FormProps) {
       <Field label="Name" name="epic-name" error={undefined}>
         <input data-testid="epic-name" value={name} spellCheck={false} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <Field label="Goal" name="epic-goal" error={undefined} hint="What the chain is for. The planner and every card's agent read it as the chain's purpose. Markdown.">
+      <Field label="Goal" name="epic-goal" error={undefined} hint="What the epic is for. The planner and every story's agent read it as the epic's purpose. Markdown.">
         {preview
           ? <div className="epic-preview" data-testid="epic-preview"><Markdown text={goal} /></div>
           : <textarea data-testid="epic-goal-input" rows={6} value={goal} onChange={(e) => setGoal(e.target.value)} />}
@@ -82,7 +82,7 @@ function ReleaseForm({ chain, project, state, dispatch }: FormProps) {
       }}
     >
       <p data-testid="release-panel-state">
-        {view ? <><b>{view.title}</b> · {view.stateText}{f?.released_at != null && ` on ${dayText(f.released_at)}`}{f?.tag && ` · tag ${f.tag}`}</> : "This chain has no version yet."}
+        {view ? <><b>{view.title}</b> · {view.stateText}{f?.released_at != null && ` on ${dayText(f.released_at)}`}{f?.tag && ` · tag ${f.tag}`}</> : "This epic has no version yet."}
       </p>
       <Field
         label="Version" name="epic-version" error={undefined}

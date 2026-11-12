@@ -75,8 +75,8 @@ describe("Run chain", () => {
   it("uses the autostart switch and says both what Run and Stop do", () => {
     const [, fx] = reduce(start(), { type: "setAutostart", chain: "c1", autostart: true });
     expect(fx).toEqual([{ type: "setAutostart", chain: "c1", autostart: true }]);
-    expect(RUN_CHAIN_HINT).toMatch(/starts the ready cards up to the free agent slots/);
-    expect(RUN_CHAIN_HINT).toMatch(/Stop chain stops starting cards automatically; cards already running keep running/);
+    expect(RUN_CHAIN_HINT).toMatch(/starts the ready stories up to the free agent slots/);
+    expect(RUN_CHAIN_HINT).toMatch(/Stop epic stops starting stories automatically; stories already running keep running/);
   });
 });
 

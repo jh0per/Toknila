@@ -22,7 +22,7 @@ use crate::{
 /// Why the graph or a graph operation was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GraphError {
-    #[error("edge refers to a node that is not in this chain: {0:?}")]
+    #[error("edge refers to a node that is not in this epic: {0:?}")]
     UnknownNode(NodeRef),
     #[error("a node cannot depend on itself: {0:?}")]
     SelfLoop(NodeRef),
@@ -51,13 +51,13 @@ pub enum GraphError {
     Transition(#[from] TransitionError),
     #[error("graph did not settle after {0} steps")]
     NoFixpoint(usize),
-    #[error("{0} is a proposed card; approve or reject it first")]
+    #[error("{0} is a proposed story; approve or reject it first")]
     StillProposed(String),
-    #[error("{node} is already {state}; a card can only go before work that has not started")]
+    #[error("{node} is already {state}; a story can only go before work that has not started")]
     BeforeStarted { node: String, state: String },
     #[error("{node} is already {state}; what it waits for can no longer change")]
     DependencyLocked { node: String, state: String },
-    #[error("{0} is not a proposed card")]
+    #[error("{0} is not a proposed story")]
     NotProposed(String),
 }
 

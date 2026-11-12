@@ -42,7 +42,7 @@ describe("a card without threads", () => {
 
   it("offers nothing on a card that can no longer take it", () => {
     const html = renderToStaticMarkup(<NoThreads card={card()} canAsk={false} dispatch={none} />);
-    expect(html).toContain("No threads on this card.");
+    expect(html).toContain("No threads on this story.");
     expect(html).not.toContain("<button");
   });
 });

@@ -79,8 +79,8 @@ export function finishView(s: Pick<ChainSummary, "finish" | "total" | "done">): 
   const tag = f.tag ? ` · ${f.tag}` : "";
   const text =
     f.state === "released" ? `${f.released_at == null ? "" : dayText(f.released_at)}${tag}`.replace(/^ · /, "")
-    : f.state === "ready" ? "every card is merged"
-    : f.state === "again" ? `new cards merged since${tag}`
+    : f.state === "ready" ? "every story is merged"
+    : f.state === "again" ? `new stories merged since${tag}`
     : `${left} left`;
   return { title: `Release v${f.version}`, state: f.state, stateText: STATE_TEXT[f.state], text };
 }

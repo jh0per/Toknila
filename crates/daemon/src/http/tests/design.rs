@@ -120,7 +120,7 @@ async fn ask_design_on_a_running_card_sends_an_instruction_and_review_refuses_it
         comments[0]["body"]["gist"]
             .as_str()
             .expect("gist")
-            .starts_with("Before you go further, open a design thread for this card"),
+            .starts_with("Before you go further, open a design thread for this story"),
         "{}",
         comments[0]
     );

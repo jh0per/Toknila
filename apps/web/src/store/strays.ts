@@ -4,7 +4,7 @@ import type { Stray } from "../api/types";
 /// work that deleting it would lose.
 export function strayText(s: Stray): string {
   if (s.kind === "worktree") return s.branch ? `${s.name} (branch ${s.branch})` : s.name;
-  const owner = [s.card ? `card ${s.card}` : "", s.merge_commit ? `merged in ${s.merge_commit}` : ""]
+  const owner = [s.card ? `story ${s.card}` : "", s.merge_commit ? `merged in ${s.merge_commit}` : ""]
     .filter(Boolean)
     .join(", ");
   const tail = owner ? ` [${owner}]` : "";

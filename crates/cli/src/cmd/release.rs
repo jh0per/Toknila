@@ -12,7 +12,7 @@ use crate::output;
 
 #[derive(Debug, Subcommand)]
 pub enum ReleaseCmd {
-    /// Add a milestone to a chain.
+    /// Add a milestone to an epic.
     New {
         chain: String,
         version: String,
@@ -30,7 +30,7 @@ pub enum ReleaseCmd {
     },
     /// Cut a manual milestone (release/<version> leaves develop).
     Start { release: String },
-    /// Release a finished chain: runs the check, the bump, the tag and the push.
+    /// Release a finished epic: runs the check, the bump, the tag and the push.
     Run {
         chain: String,
         version: String,
@@ -60,7 +60,7 @@ fn steps(run: &ReleaseRun) {
     }
     if let Some(step) = run.resume_from {
         println!(
-            "Interrupted at {}: tok release run <chain> {} --resume",
+            "Interrupted at {}: tok release run <epic> {} --resume",
             step.label(),
             run.version
         );

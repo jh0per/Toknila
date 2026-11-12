@@ -187,12 +187,12 @@ fn order(detail: &ChainDetail) -> String {
             NodeRef::Release(_) => None,
         })
         .collect();
-    format!("chain {}: {}", detail.chain.name, labels.join(" < "))
+    format!("epic {}: {}", detail.chain.name, labels.join(" < "))
 }
 
 fn card_line(verb: &str, d: &TicketDetail) -> String {
     format!(
-        "{} {verb} in chain {}: {} ({})",
+        "{} {verb} in epic {}: {} ({})",
         d.ticket.key,
         d.chain,
         d.ticket.title,
@@ -234,7 +234,7 @@ fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
         PlannerCall::NewChain(c) => {
             let d = client.planner_new_chain(c).map_err(e)?;
             Ok(format!(
-                "chain {} created; its cards wait for the owner to start them",
+                "epic {} created; its stories wait for the owner to start them",
                 d.chain.name
             ))
         }
@@ -242,7 +242,7 @@ fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
             .planner_edit_chain(chain, edit)
             .map(|d| {
                 format!(
-                    "chain {} updated (version {})",
+                    "epic {} updated (version {})",
                     d.chain.name,
                     d.chain.version.as_deref().unwrap_or("none")
                 )

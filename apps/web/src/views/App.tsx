@@ -69,7 +69,7 @@ export function App() {
           <EmptyChains project={project} state={state} dispatch={dispatch} />
         ) : (
           <p className="muted empty">
-            Pick a chain in the sidebar.
+            Pick an epic in the sidebar.
           </p>
         )}
         {/* Last in main, after the top bar the divider measures from, so it reads the panel's height. */}

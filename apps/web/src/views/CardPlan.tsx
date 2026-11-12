@@ -86,7 +86,7 @@ function CardMover({ state, card, chain, dispatch }: { state: State; card: Ticke
           <option value="before">before</option>
           <option value="after">after</option>
         </select>
-        <select aria-label="Card" data-testid="move-anchor" value={anchor} onChange={(e) => setAnchor(e.target.value)}>
+        <select aria-label="Story" data-testid="move-anchor" value={anchor} onChange={(e) => setAnchor(e.target.value)}>
           {others.map((t) => <option key={t.id} value={t.key}>{t.key} · {t.title}</option>)}
         </select>
       </div>

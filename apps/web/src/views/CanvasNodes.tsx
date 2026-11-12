@@ -110,7 +110,7 @@ export function TicketNode({ ticket: t, projectKey, layout, href, style, selecte
         <span className="foot">
           {t.designs && t.designs.length > 0 && <NodeThumb project={projectKey} designs={t.designs} />}
           {progress && (
-            <span className="sub" data-testid="subtasks" title={`${progress.done} of ${progress.total} subtasks done`}>
+            <span className="sub" data-testid="subtasks" title={`${progress.done} of ${progress.total} tasks done`}>
               <span className="sub-bar"><i style={{ width: `${(100 * progress.done) / progress.total}%` }} /></span>
               <b>{progress.done}/{progress.total}</b>
             </span>

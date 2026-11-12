@@ -401,7 +401,7 @@ async fn nothing_a_planner_does_starts_a_card_even_in_a_project_with_agents() {
         e["error"]
             .as_str()
             .unwrap_or_default()
-            .contains("only the owner starts cards")
+            .contains("only the owner starts stories")
     );
     assert_eq!(
         api.get("/v1/tickets").await.as_array().map(Vec::len),

@@ -150,7 +150,7 @@ pub(crate) fn spec_of<U: Reader + ?Sized>(
 ) -> AppResult<Option<ShipSpec>> {
     let project = uow
         .project(chain.project_id)?
-        .ok_or_else(|| AppError::not_found(format!("project of chain {}", chain.name)))?;
+        .ok_or_else(|| AppError::not_found(format!("project of epic {}", chain.name)))?;
     Ok(ShipSpec::for_ticket(&project, chain, ticket))
 }
 

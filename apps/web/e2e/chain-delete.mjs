@@ -55,7 +55,7 @@ try {
   await page.locator("[data-testid=menu-delete-chain]").click();
   const what = page.locator("[data-testid=delete-chain-what]");
   await expectText(what, "phase-1", "the dialog names the chain");
-  await expectText(what, "2 cards", "the dialog says how many cards go");
+  await expectText(what, "2 stories", "the dialog says how many stories go");
   await shot("delete-chain-dialog");
   await page.locator("[data-testid=delete-chain-cancel]").click();
   await page.locator("[data-testid=delete-chain-dialog]").waitFor({ state: "detached" });
@@ -65,11 +65,11 @@ try {
   // A chain with a running card is refused, naming the card.
   await item("live").click({ button: "right" });
   await page.locator("[data-testid=menu-delete-chain]").click();
-  await expectText(page.locator("[data-testid=delete-chain-what]"), "1 card", "the dialog says one card");
+  await expectText(page.locator("[data-testid=delete-chain-what]"), "1 story", "the dialog says one story");
   await page.locator("[data-testid=delete-chain-confirm]").click();
   await expectText(
     page.locator("[data-testid=delete-chain-error]"),
-    "chain live has agents working on CHD-3; stop them before deleting the chain",
+    "epic live has agents working on CHD-3; stop them before deleting the epic",
     "the refusal names the running card",
   );
   await shot("delete-chain-refused");
@@ -81,7 +81,7 @@ try {
   await page.locator("[data-testid=menu-delete-chain]").click();
   await page.locator("[data-testid=delete-chain-confirm]").click();
   await expectText(page.locator("[data-testid=delete-chain-result]"), "phase-1 was deleted", "the result says the chain was deleted");
-  await expectText(page.locator("[data-testid=delete-chain-result]"), "2 cards deleted", "the result counts the cards");
+  await expectText(page.locator("[data-testid=delete-chain-result]"), "2 stories deleted", "the result counts the stories");
   await shot("delete-chain-done");
   await page.locator("[data-testid=delete-chain-done]").click();
   await item("phase-1").waitFor({ state: "detached" });

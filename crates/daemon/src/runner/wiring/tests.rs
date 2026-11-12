@@ -126,7 +126,7 @@ fn a_card_agent_reads_the_goal_of_its_chain_in_its_instructions() {
     rig.prepare(&AgentProfile::claude_code());
     let (_, text) = rig.file("instructions.md");
     assert!(
-        text.contains("## Epic: checkout\n\nThis card is a task of the chain checkout."),
+        text.contains("## Epic: checkout\n\nThis story belongs to the epic checkout."),
         "{text}"
     );
     assert!(text.contains("Pay with saved cards."));

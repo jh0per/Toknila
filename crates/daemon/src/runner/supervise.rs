@@ -23,7 +23,7 @@ pub fn supervise(store: Store, mut ended: UnboundedReceiver<RunEnded>) -> JoinHa
             match result {
                 Ok((true, _)) => tracing::info!(
                     ticket = %key,
-                    "a worker ended with its card still running and no agent; starting a new run"
+                    "a worker ended with its story still running and no agent; starting a new run"
                 ),
                 Ok((false, _)) => {}
                 Err(error) => {

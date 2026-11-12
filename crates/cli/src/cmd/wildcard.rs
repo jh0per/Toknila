@@ -18,10 +18,10 @@ pub struct CardArgs {
     /// Acceptance criterion; repeatable.
     #[arg(long)]
     accept: Vec<String>,
-    /// What the card waits for (ticket keys, titles or release versions); repeatable.
+    /// What the story waits for (ticket keys, titles or release versions); repeatable.
     #[arg(long)]
     after: Vec<String>,
-    /// What waits for the card; none of it may have started when the card is approved.
+    /// What waits for the story; none of it may have started when the story is approved.
     /// Repeatable.
     #[arg(long)]
     before: Vec<String>,

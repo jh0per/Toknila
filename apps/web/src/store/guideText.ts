@@ -1,6 +1,6 @@
 // The words of the Guide page. This is the one place the text lives: the page draws it, so a
-// section changes here without touching the layout. Words follow docs/glossary.md (card, chain,
-// main branch, test command, assistant, hand-in). Every sentence is checked against the screens it
+// section changes here without touching the layout. Words follow docs/glossary.md (epic, story,
+// task, main branch, test command, assistant, hand-in). Every sentence is checked against the screens it
 // describes; a screen that changes changes its section in the same change.
 
 /// Where a section's "Show me" leads, resolved against the person's own window in `guide.ts`.
@@ -38,36 +38,36 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     alt: "A project's Designs page: the library and where to drop a file or paste a Figma link",
     text:
       "Each project has a library of designs under Designs in the sidebar: png, jpg, webp or pdf files, or the link of a Figma frame. " +
-      "Drop a screenshot on a card, or attach one to a message to the assistant, and the agent gets it with its work. " +
-      "Cards can also ask for a design first: the agent shows one and writes code only after you approve it.",
+      "Drop a screenshot on a story, or attach one to a message to the assistant, and the agent gets it with its work. " +
+      "Stories can also ask for a design first: the agent shows one and writes code only after you approve it.",
   },
   {
     id: "plan", title: "Plan with the assistant", show: "assistant", showLabel: "Open the assistant",
     alt: "The roadmap with the assistant panel beside it and its chip, the roadmap",
     text:
-      "The assistant is a smart helper for the process: it creates epics and their cards, steers the process, answers your questions, and turns a screenshot into a design card. " +
-      "There is one assistant, at two levels: open Assistant under your project and the roadmap opens with it beside, where it plans epics (an epic holds cards and ends in a release); inside an epic the same panel (Cmd/Ctrl+.) talks about that epic's cards, and its chip says what is open, which you can take off. " +
+      "The assistant is a smart helper for the process: it creates epics and their stories, steers the process, answers your questions, and turns a screenshot into a design story. " +
+      "There is one assistant, at two levels: open Assistant under your project and the roadmap opens with it beside, where it plans epics (an epic holds stories and ends in a release); inside an epic the same panel (Cmd/Ctrl+.) talks about that epic's stories, and its chip says what is open, which you can take off. " +
       "The expand button of the panel opens the chat at full width, with the assistant's terminal.",
   },
   {
-    id: "start", title: "Start a card", show: "chain", showLabel: "Open a chain",
-    alt: "A chain's diagram with cards, the agents count and the Start cards automatically switch",
+    id: "start", title: "Start a story", show: "chain", showLabel: "Open an epic",
+    alt: "An epic's diagram with stories, the agents count and the Start stories automatically switch",
     text:
-      "Press Start on a card, or S on the diagram. An agent then works on it in its own workspace, a separate copy of the repository, so your folder stays as it is. " +
-      "Only as many agents run at once as the project allows (\"Agents at once\", shown as 1/2 agents on a chain); other ready cards wait for a free slot. " +
-      "Turn on \"Start cards automatically\" (or press Run chain) and a chain starts its ready cards by itself.",
+      "Press Start on a story, or S on the diagram. An agent then works on it in its own workspace, a separate copy of the repository, so your folder stays as it is. " +
+      "Only as many agents run at once as the project allows (\"Agents at once\", shown as 1/2 agents on an epic); other ready stories wait for a free slot. " +
+      "Turn on \"Start stories automatically\" (or press Run epic) and an epic starts its ready stories by itself.",
   },
   {
     id: "inbox", title: "Answer what waits", show: "inbox", showLabel: "Open the inbox",
-    alt: "The inbox with an agent's question and a card awaiting approval",
+    alt: "The inbox with an agent's question and a story awaiting approval",
     text:
-      "The Inbox gathers what needs a person: cards awaiting approval, questions of an agent, blocked cards, cards waiting for review, designs to approve and questions of the assistant. " +
-      "Answer in the row, or open the card. " +
+      "The Inbox gathers what needs a person: stories awaiting approval, questions of an agent, blocked stories, stories waiting for review, designs to approve and questions of the assistant. " +
+      "Answer in the row, or open the story. " +
       "When an agent wants to run a command, Allow lets it once, Allow always remembers it for the project, and Deny refuses.",
   },
   {
-    id: "review", title: "Review and accept", show: "review", showLabel: "Open a card in review",
-    alt: "A card in review: the agent's hand-in, the review rounds, Accept and Return",
+    id: "review", title: "Review and accept", show: "review", showLabel: "Open a story in review",
+    alt: "A story in review: the agent's hand-in, the review rounds, Accept and Return",
     text:
       "When an agent is done it hands in: what changed, each check as PASS, FAIL, NOT_RUN or BLOCKED, and what is left. " +
       "The test command runs, then a reviewer agent reads the work, in rounds up to the project's limit; each round is listed under Review. " +
@@ -78,7 +78,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "release", title: "Release a finished epic", show: "release", showLabel: "Open a finished epic",
     alt: "A finished epic's diagram: its version and the Release button at the end",
     text:
-      "The roadmap is the epics, each with its cards and ending in a release. When all an epic's cards are done, a Release button appears at the end of its diagram. " +
+      "The roadmap is the epics, each with its stories and ending in a release. When all an epic's stories are done, a Release button appears at the end of its diagram. " +
       "Check the version (it becomes the tag, like v0.3.0) and press Release: Toknila checks, bumps the version and tags; in local mode you push main and the tag yourself, a GitHub project pushes as its steps say. " +
       "Nothing is tagged or pushed before you press it; a failed step stops the run and says which, and steps that passed are not done again.",
   },
@@ -86,8 +86,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "where", title: "Where things are", show: "tree", showLabel: "Show the project's tree",
     alt: "The sidebar: one tree per project, and Usage, Settings and Keyboard shortcuts at its foot",
     text:
-      "The sidebar is one tree per project: Roadmap, Assistant (it plans epics on the roadmap, cards inside an epic), Inbox, Agents, Epics, Designs and Settings. " +
-      "Its foot holds Usage (tokens and estimated cost by model, workspace, project, chain and card), Settings (Cmd/Ctrl+,) and Keyboard shortcuts (?). " +
+      "The sidebar is one tree per project: Roadmap, Assistant (it plans epics on the roadmap, stories inside an epic), Inbox, Agents, Epics, Designs and Settings. " +
+      "Its foot holds Usage (tokens and estimated cost by model, workspace, project, epic and story), Settings (Cmd/Ctrl+,) and Keyboard shortcuts (?). " +
       "A project's settings hold its test command, agents and review.",
   },
 ];

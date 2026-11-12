@@ -125,8 +125,8 @@ pub fn transcript(messages: &[ThreadMessage]) -> Vec<String> {
                 let Some(p) = proposal_of(m) else { continue };
                 let state = match decision(messages, m) {
                     Decision::Pending => "waiting for the person",
-                    Decision::Accepted => "accepted: the card above has it",
-                    Decision::Rejected => "rejected: the card is unchanged",
+                    Decision::Accepted => "accepted: the story above has it",
+                    Decision::Rejected => "rejected: the story is unchanged",
                 };
                 let mut line = format!("assistant proposed an edit ({state})");
                 if let Some(c) = &p.prompt {

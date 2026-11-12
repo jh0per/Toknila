@@ -63,7 +63,7 @@ pub fn chain<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> 
     // A name that only another project has is that project's chain.
     match r.chains_named(reference)?.into_iter().next() {
         Some(c) => in_project(r, project, c),
-        None => Err(AppError::not_found(format!("chain {reference}"))),
+        None => Err(AppError::not_found(format!("epic {reference}"))),
     }
 }
 
@@ -71,7 +71,7 @@ fn in_project<R: Reader + ?Sized>(r: &R, project: ProjectId, c: Chain) -> AppRes
     let owner = r
         .project(c.project_id)?
         .map_or_else(String::new, |p| p.key.to_string());
-    planner::ensure_in_project(project, c.project_id, format!("chain {}", c.name), &owner)?;
+    planner::ensure_in_project(project, c.project_id, format!("epic {}", c.name), &owner)?;
     Ok(c)
 }
 
@@ -80,11 +80,16 @@ pub fn card<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> A
     let t = resolve::ticket(r, reference)?;
     let chain = r
         .chain(t.chain_id)?
-        .ok_or_else(|| AppError::not_found(format!("chain of {}", t.key)))?;
+        .ok_or_else(|| AppError::not_found(format!("epic of {}", t.key)))?;
     let owner = r
         .project(chain.project_id)?
         .map_or_else(String::new, |p| p.key.to_string());
-    planner::ensure_in_project(project, chain.project_id, format!("card {}", t.key), &owner)?;
+    planner::ensure_in_project(
+        project,
+        chain.project_id,
+        format!("story {}", t.key),
+        &owner,
+    )?;
     Ok(t)
 }
 
@@ -144,12 +149,12 @@ pub fn edit_chain<U: UnitOfWork + ?Sized>(
     let c = chain(uow, project, chain_ref)?;
     let view = uow
         .chain_view(c.id)?
-        .ok_or_else(|| AppError::not_found(format!("chain {chain_ref}")))?;
+        .ok_or_else(|| AppError::not_found(format!("epic {chain_ref}")))?;
     if let Some(r) = view.finish_release()
         && r.state != toknila_core::ReleaseState::Planned
     {
         return Err(AppError::conflict(format!(
-            "release {} of chain {} is cut or released: the epic can no longer change",
+            "release {} of epic {} is cut or released: the epic can no longer change",
             r.version, c.name
         )));
     }

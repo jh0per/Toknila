@@ -87,7 +87,7 @@ fn load_chain_detail(
 ) -> ApiResult<ChainDetail> {
     let view = repo
         .chain_view(chain)?
-        .ok_or_else(|| AppError::not_found(format!("chain {chain}")))?;
+        .ok_or_else(|| AppError::not_found(format!("epic {chain}")))?;
     let rows = repo.usage_rows(RowFilter {
         chain: Some(chain),
         ..RowFilter::default()

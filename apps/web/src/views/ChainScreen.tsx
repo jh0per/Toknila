@@ -67,7 +67,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
             type="checkbox" data-testid="chain-autostart-toggle" checked={on}
             onChange={(e) => dispatch({ type: "setAutostart", chain: chain.chain.id, autostart: e.target.checked })}
           />{" "}
-          Start cards automatically
+          Start stories automatically
         </label>
         <ThemeButton theme={state.theme} dispatch={dispatch} />
         <AssistantButton state={state} dispatch={dispatch} />
@@ -75,13 +75,13 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
           type="button" className="btn" data-testid="new-card"
           onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newCard", chain: chain.chain.id } })}
         >
-          New card
+          New story
         </button>
         <button
           type="button" className={`btn${on ? " on" : " primary"}`} data-testid="run-chain" title={RUN_CHAIN_HINT}
           onClick={() => dispatch({ type: "setAutostart", chain: chain.chain.id, autostart: !on })}
         >
-          {on ? "Stop chain" : "Run chain"}
+          {on ? "Stop epic" : "Run epic"}
         </button>
         <SimulatedBanner project={project} />
       </header>
@@ -91,11 +91,11 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
           <div className="empty-state">
             <h2>What should {chain.chain.name} do?</h2>
             <p className="muted">
-              This chain has no cards yet. Tell the assistant what it is for and it drafts the cards, or add the first card yourself.
+              This epic has no stories yet. Tell the assistant what it is for and it drafts the stories, or add the first story yourself.
             </p>
             <AskBox
-              project={project.key} state={state} dispatch={dispatch} testId="chain-ask" label="What should this chain do?"
-              placeholder={`For example: the cards for ${chain.chain.name}`} button="Plan it with the assistant"
+              project={project.key} state={state} dispatch={dispatch} testId="chain-ask" label="What should this epic do?"
+              placeholder={`For example: the stories for ${chain.chain.name}`} button="Plan it with the assistant"
             />
             <p className="secondary-links">
               Or{" "}
@@ -103,7 +103,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
                 type="button" className="inline-link" data-testid="chain-empty-new-card"
                 onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newCard", chain: chain.chain.id } })}
               >
-                add a card
+                add a story
               </button>{" "}
               by hand.
             </p>

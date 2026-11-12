@@ -11,29 +11,29 @@ use crate::output::{self, w};
 
 #[derive(Debug, Subcommand)]
 pub enum ChainCmd {
-    /// Create an empty chain.
+    /// Create an empty epic.
     New {
         name: String,
         #[arg(long)]
         goal: Option<String>,
-        /// The version the chain releases, such as `0.3.0`: its end release is made with it.
+        /// The version the epic releases, such as `0.3.0`: its end release is made with it.
         #[arg(long)]
         version: Option<String>,
-        /// Do not start cards automatically (a person starts each one).
+        /// Do not start stories automatically (a person starts each one).
         #[arg(long)]
         no_autostart: bool,
         #[arg(long)]
         project: Option<String>,
     },
-    /// Create a chain from a TOML file, or from a spec folder (with tasks.md); a folder of spec
-    /// folders imports each one as its own chain.
+    /// Create an epic from a TOML file, or from a spec folder (with tasks.md); a folder of spec
+    /// folders imports each one as its own epic.
     Import {
         file: std::path::PathBuf,
         #[arg(long)]
         project: Option<String>,
     },
-    /// Write a chain as TOML (to stdout, or a file), or patch a spec folder's tasks.md with
-    /// `--spec`: checkboxes follow the subtasks, new cards are appended, nothing is deleted.
+    /// Write an epic as TOML (to stdout, or a file), or patch a spec folder's tasks.md with
+    /// `--spec`: checkboxes follow the tasks, new stories are appended, nothing is deleted.
     Export {
         chain: String,
         file: Option<std::path::PathBuf>,
@@ -41,43 +41,43 @@ pub enum ChainCmd {
         #[arg(long, conflicts_with = "file")]
         spec: Option<std::path::PathBuf>,
     },
-    /// Change a chain's settings after it is made. `--autostart on` starts cards automatically:
+    /// Change an epic's settings after it is made. `--autostart on` starts stories automatically:
     /// the ready ones now (as far as slots allow) and later ones as they become ready; `off` stops
-    /// that and opens the chain's graph to the planner.
+    /// that and opens the epic's graph to the planner.
     Set {
         chain: String,
-        /// The project, when two projects have a chain of this name.
+        /// The project, when two projects have an epic of this name.
         #[arg(long)]
         project: Option<String>,
-        /// Whether the chain starts its cards automatically.
+        /// Whether the epic starts its stories automatically.
         #[arg(long, value_parser = ["on", "off"])]
         autostart: Option<String>,
-        /// The version the chain releases; refused once its release was cut.
+        /// The version the epic releases; refused once its release was cut.
         #[arg(long)]
         version: Option<String>,
     },
-    /// Move a chain in its project's roadmap: right before or right after another chain.
+    /// Move an epic in its project's roadmap: right before or right after another epic.
     Mv {
         chain: String,
-        /// Put it right before this chain.
+        /// Put it right before this epic.
         #[arg(long, conflicts_with = "after", required_unless_present = "after")]
         before: Option<String>,
-        /// Put it right after this chain.
+        /// Put it right after this epic.
         #[arg(long)]
         after: Option<String>,
-        /// The project, when two projects have a chain of this name.
+        /// The project, when two projects have an epic of this name.
         #[arg(long)]
         project: Option<String>,
     },
-    /// Show a chain as a graph in dependency order with its status.
+    /// Show an epic as a graph in dependency order with its status.
     Show { chain: String },
-    /// List chains with their status.
+    /// List epics with their status.
     Ls,
-    /// Delete a chain with its cards, threads and workspaces (the project folder and the branches
-    /// made for the cards stay). Refused while an agent works on one of its cards.
+    /// Delete an epic with its stories, threads and workspaces (the project folder and the branches
+    /// made for the stories stay). Refused while an agent works on one of its stories.
     Rm {
         chain: String,
-        /// The project, when two projects have a chain of this name.
+        /// The project, when two projects have an epic of this name.
         #[arg(long)]
         project: Option<String>,
         /// Do not ask for confirmation.
@@ -92,7 +92,7 @@ pub struct DepArgs {
     from: String,
     /// The node that waits.
     to: String,
-    /// Chain, when neither side is a ticket.
+    /// Epic, when neither side is a ticket.
     #[arg(long)]
     chain: Option<String>,
 }
@@ -113,7 +113,7 @@ pub enum DepCmd {
         args: DepArgs,
     },
     /// Move a dependency to another end in one step: `from`/`to` name it, `--new-from` and
-    /// `--new-to` say what changes. A refusal (a cycle, a card that started) changes nothing.
+    /// `--new-to` say what changes. A refusal (a cycle, a story that started) changes nothing.
     Mv {
         #[command(flatten)]
         args: DepArgs,
@@ -296,7 +296,7 @@ fn chain_of(c: &Client, refs: &[&str], given: Option<String>) -> Result<String> 
         }
     }
     bail!(
-        "cannot tell the chain from {}; pass --chain",
+        "cannot tell the epic from {}; pass --chain",
         refs.join(" and ")
     )
 }

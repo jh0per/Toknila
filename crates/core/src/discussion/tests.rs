@@ -106,7 +106,7 @@ fn the_transcript_says_who_spoke_and_what_became_of_each_proposal() {
         vec![
             "person: stricter errors".to_owned(),
             "assistant: I would add 4xx".to_owned(),
-            "assistant proposed an edit (accepted: the card above has it); prompt to: new; \
+            "assistant proposed an edit (accepted: the story above has it); prompt to: new; \
              acceptance to: \"a\"; \"b\""
                 .to_owned(),
         ]

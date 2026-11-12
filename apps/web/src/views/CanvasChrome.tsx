@@ -20,19 +20,19 @@ export function CanvasChrome({ zoom, fitted, cut, onFit, onZoomIn, onZoomOut, ar
 }) {
   return (
     <>
-      <p className="canvas-hint" data-testid="canvas-hint">Lines run from Start to the end. Drag a card to place it.</p>
+      <p className="canvas-hint" data-testid="canvas-hint">Lines run from Start to the end. Drag a story to place it.</p>
       <div className="canvas-corner">
-        {cut && !fitted && <span className="canvas-cut" data-testid="cut-hint">Some cards are out of view.</span>}
+        {cut && !fitted && <span className="canvas-cut" data-testid="cut-hint">Some stories are out of view.</span>}
         {arrangeable && (
           <button
-            type="button" className="btn" data-testid="arrange" title="Put every card back where the layout puts it"
+            type="button" className="btn" data-testid="arrange" title="Put every story back where the layout puts it"
             onClick={onArrange}
           >
             Arrange
           </button>
         )}
-        <ZoomControls zoom={zoom} fitted={fitted} cut={cut} onFit={onFit} onZoomIn={onZoomIn} onZoomOut={onZoomOut} what="every card" />
-        <p className="canvas-legend" data-testid="canvas-legend" title="The colour of a card's status">
+        <ZoomControls zoom={zoom} fitted={fitted} cut={cut} onFit={onFit} onZoomIn={onZoomIn} onZoomOut={onZoomOut} what="every story" />
+        <p className="canvas-legend" data-testid="canvas-legend" title="The colour of a story's status">
           <span className="tone-todo">todo</span>
           <span className="tone-prog">in progress</span>
           <span className="tone-attn" title="Waiting, in review, blocked or proposed: a person is needed">needs you</span>
@@ -41,7 +41,7 @@ export function CanvasChrome({ zoom, fitted, cut, onFit, onZoomIn, onZoomOut, ar
       </div>
       {linking && (
         <p className="canvas-linking" role="status" data-testid="linking-hint">
-          Click the card {linking} should wait for.
+          Click the story {linking} should wait for.
           <button type="button" className="link-btn" data-testid="linking-cancel" onClick={onCancelLinking}>Cancel</button>
         </p>
       )}

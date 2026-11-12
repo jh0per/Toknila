@@ -70,7 +70,7 @@ fn deleting_a_chain_is_refused_while_an_agent_works_and_names_the_cards() {
     assert_eq!(e.kind, ErrorKind::Conflict);
     assert_eq!(
         e.message,
-        "chain demo has agents working on DEMO-1, DEMO-2; stop them before deleting the chain"
+        "epic demo has agents working on DEMO-1, DEMO-2; stop them before deleting the epic"
     );
     assert_eq!(mem.view.tickets.len(), 2, "nothing was deleted");
     assert!(mem.events.is_empty());

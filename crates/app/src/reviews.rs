@@ -51,10 +51,10 @@ pub struct ReviewView {
 fn context<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<(Chain, Project)> {
     let chain = r
         .chain(t.chain_id)?
-        .ok_or_else(|| AppError::not_found("chain of the ticket"))?;
+        .ok_or_else(|| AppError::not_found("epic of the ticket"))?;
     let project = r
         .project(chain.project_id)?
-        .ok_or_else(|| AppError::not_found("project of the chain"))?;
+        .ok_or_else(|| AppError::not_found("project of the epic"))?;
     Ok((chain, project))
 }
 
@@ -91,7 +91,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
     };
     let project = uow
         .project(ctx.view.chain.project_id)?
-        .ok_or_else(|| AppError::not_found("project of the chain"))?;
+        .ok_or_else(|| AppError::not_found("project of the epic"))?;
     let profile = resolve_reviewer(t, &ctx.view.chain, &project);
     if profile == AgentProfile::SIM_REVIEWER {
         return Ok(());

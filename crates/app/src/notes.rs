@@ -63,7 +63,7 @@ pub fn add_subtask<U: UnitOfWork + ?Sized>(
 ) -> AppResult<Subtask> {
     let text = text.trim();
     if text.is_empty() {
-        return Err(AppError::bad_request("subtask text is empty"));
+        return Err(AppError::bad_request("task text is empty"));
     }
     let position = u32::try_from(uow.subtasks(ticket.id)?.len())
         .unwrap_or(u32::MAX)
@@ -96,7 +96,7 @@ pub fn update_subtask<U: UnitOfWork + ?Sized>(
         .subtasks(ticket.id)?
         .into_iter()
         .find(|s| s.position == position)
-        .ok_or_else(|| AppError::not_found(format!("subtask {position} of {}", ticket.key)))?;
+        .ok_or_else(|| AppError::not_found(format!("task {position} of {}", ticket.key)))?;
     if let Some(done) = done {
         s.done = done;
         s.done_by = done.then_some(uow.actor());

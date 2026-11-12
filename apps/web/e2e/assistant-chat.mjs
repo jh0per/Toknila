@@ -123,7 +123,7 @@ try {
   const words = lines.map((l) => l.split("\n")[0].replace(/\s+/g, " ").trim());
   // A line that does not name its card gets the card's link after the words.
   words[0] = words[0].replace(/ v\d+\.\d+\.\d+$/, "");
-  const want = ["added epic roadmap", "added card WEB-1", "edited WEB-1", "opened thread 1 on WEB-1", "suggested: Start the design card · WEB-1"];
+  const want = ["added epic roadmap", "added story WEB-1", "edited WEB-1", "opened thread 1 on WEB-1", "suggested: Start the design card · WEB-1"];
   if (JSON.stringify(words) !== JSON.stringify(want)) throw new Error(`Toknila's lines: expected ${JSON.stringify(want)}, got ${JSON.stringify(words)}`);
   console.log("PASS what the assistant did is Toknila's lines: added chain, added card, edited, opened thread, suggested");
   // Oldest first, newest at the bottom: the lines of its work around its words, in the order they happened.

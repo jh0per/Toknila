@@ -35,7 +35,7 @@ pub enum SpecErrorKind {
     #[error("no phase with tasks")]
     NoTasks,
     /// The folder name cannot name a chain.
-    #[error("empty chain name")]
+    #[error("empty epic name")]
     EmptyName,
 }
 

@@ -243,7 +243,7 @@ async fn deleting_a_chain_is_refused_while_a_card_runs_and_names_it() {
     assert_eq!(s, StatusCode::CONFLICT, "{e}");
     assert_eq!(
         e["error"],
-        "chain demo has agents working on DEMO-1; stop them before deleting the chain"
+        "epic demo has agents working on DEMO-1; stop them before deleting the epic"
     );
     assert_eq!(api.status("DEMO-1").await, "running");
 }
@@ -257,7 +257,7 @@ async fn a_chain_name_may_be_narrowed_to_a_project_and_an_unknown_one_is_not_fou
         .await;
     let (s, e) = delete_chain(&api, "/v1/chains/demo").await;
     assert_eq!(s, StatusCode::CONFLICT, "{e}");
-    assert_eq!(e["error"], "2 chains are named demo; use the chain id");
+    assert_eq!(e["error"], "2 epics are named demo; use the epic id");
     let (s, out) = delete_chain(&api, "/v1/chains/demo?project=TWO").await;
     assert_eq!(s, StatusCode::OK, "{out}");
     assert_eq!(out["project"], "TWO");

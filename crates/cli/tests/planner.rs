@@ -395,9 +395,9 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         by_id(31)
     );
     assert_eq!(by_id(32)["result"]["isError"], true, "no card DEMO-99");
-    assert!(text_of(by_id(3)).contains("chain mcp created"));
+    assert!(text_of(by_id(3)).contains("epic mcp created"));
     assert!(
-        text_of(by_id(4)).contains("DEMO-1 added in chain mcp"),
+        text_of(by_id(4)).contains("DEMO-1 added in epic mcp"),
         "{}",
         text_of(by_id(4))
     );
@@ -409,7 +409,7 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         text_of(by_id(7))
     );
     assert!(
-        text_of(by_id(9)).starts_with("chain mcp:"),
+        text_of(by_id(9)).starts_with("epic mcp:"),
         "{}",
         text_of(by_id(9))
     );
@@ -447,7 +447,7 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
     );
     assert_eq!(by_id(14)["result"]["isError"], true);
     assert!(
-        text_of(by_id(14)).contains("only the owner starts cards"),
+        text_of(by_id(14)).contains("only the owner starts stories"),
         "{}",
         text_of(by_id(14))
     );

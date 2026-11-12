@@ -64,7 +64,7 @@ try {
   await expectText(status("DEMO-1"), "simulated", "DEMO-1 autostarted, and reads simulated (no real agent)");
   await expectText(
     page.locator("[data-testid=simulated-banner]"),
-    "This project runs a simulated agent: cards run without a real agent. Change it in Settings, Agents.",
+    "This project runs a simulated agent: stories run without a real agent. Change it in Settings, Agents.",
     "the chain screen of a simulated project shows the banner",
   );
   await expectText(status("DEMO-2"), "backlog", "DEMO-2 waits for DEMO-1");

@@ -48,7 +48,7 @@ pub fn move_design<U: UnitOfWork + ?Sized>(
     let target = resolve::ticket(uow, target)?;
     if target.chain_id != ticket.chain_id {
         return Err(AppError::bad_request(format!(
-            "{} is not on the chain of {}",
+            "{} is not in the epic of {}",
             target.key, ticket.key
         )));
     }

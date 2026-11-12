@@ -97,7 +97,7 @@ pub(super) fn kickoff_part(waiting: &[String], returned: Option<&Returned>) -> S
             None => "your hand-in".to_owned(),
         };
         out.push_str(&format!(
-            " This card was returned: round {n}, by {by}, sent back {what}. The Return comes \
+            " This story was returned: round {n}, by {by}, sent back {what}. The Return comes \
              first, before anything else: \"{text}\". Make that change, commit it, then call \
              `finished` naming the new commit; a hand-in with the same commit is refused.",
             n = r.round,
@@ -123,7 +123,7 @@ pub(super) fn sections(waiting: &[String], returned: Option<&Returned>) -> Strin
     if let Some(r) = returned {
         let by = r.by.map_or("a reviewer", returned_by);
         out.push_str(&format!(
-            "\n## This card was returned\n\nRound {n} was returned by {by}",
+            "\n## This story was returned\n\nRound {n} was returned by {by}",
             n = r.round
         ));
         if let Some(c) = &r.commit {
@@ -147,7 +147,7 @@ pub(super) fn sections(waiting: &[String], returned: Option<&Returned>) -> Strin
     if !waiting.is_empty() {
         out.push_str(
             "\n## Instructions waiting for you\n\n\
-             These were given to this card and no agent has acted on them yet. They come before \
+             These were given to this story and no agent has acted on them yet. They come before \
              the task above: read them first and do what they ask. Oldest first:\n",
         );
         for text in waiting {

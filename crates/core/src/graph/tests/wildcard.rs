@@ -211,12 +211,12 @@ fn approval_before_started_work_fails_and_names_it() {
     );
     assert_eq!(
         err.to_string(),
-        "DEMO-1 is already running; a card can only go before work that has not started"
+        "DEMO-1 is already running; a story can only go before work that has not started"
     );
     let err = approve(&mut v, q).expect_err("R1 is cut");
     assert_eq!(
         err.to_string(),
-        "release R1 is already cut; a card can only go before work that has not started"
+        "release R1 is already cut; a story can only go before work that has not started"
     );
     assert_eq!(v, before);
 }
@@ -238,7 +238,7 @@ fn nothing_links_to_a_card_until_a_person_decides() {
     assert_eq!(v.add_edge(edge), Err(still.clone()));
     assert_eq!(
         still.to_string(),
-        "DEMO-3 is a proposed card; approve or reject it first"
+        "DEMO-3 is a proposed story; approve or reject it first"
     );
     let into = Edge {
         from: a,

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 const WORDS = {
-  reject: { ask: "Why is {key} turned down?", send: "Reject card" },
-  return: { ask: "What should the agent change in {key}?", send: "Return card" },
+  reject: { ask: "Why is {key} turned down?", send: "Reject story" },
+  return: { ask: "What should the agent change in {key}?", send: "Return story" },
 } as const;
 
 /// The question before a card is rejected or sent back from the diagram: the daemon wants the

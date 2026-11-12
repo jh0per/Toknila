@@ -18,7 +18,7 @@ export function Shortcuts({ state, dispatch }: { state: State; dispatch: (i: Int
             </div>
           ))}
         </dl>
-        <p className="muted">The arrow keys move between the tabs of a card, and between the entries of a menu.</p>
+        <p className="muted">The arrow keys move between the tabs of a story, and between the entries of a menu.</p>
       </div>
     </Modal>
   );

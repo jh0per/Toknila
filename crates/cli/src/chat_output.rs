@@ -18,7 +18,7 @@ fn when(m: &Message, offset: FixedOffset) -> String {
 fn about(m: &Message) -> String {
     match &m.about {
         Some(About::Card { key }) => format!(" [{key}]"),
-        Some(About::Chain { name }) => format!(" [chain {name}]"),
+        Some(About::Chain { name }) => format!(" [epic {name}]"),
         Some(About::Roadmap) => " [roadmap]".to_owned(),
         None => String::new(),
     }
@@ -75,9 +75,9 @@ mod tests {
             })
         };
         assert_eq!(
-            message_lines(&msg(Author::Person, "Add a card\nafter DEMO-1", None), utc),
+            message_lines(&msg(Author::Person, "Add a story\nafter DEMO-1", None), utc),
             [
-                "2023-11-14 22:13  You: Add a card",
+                "2023-11-14 22:13  You: Add a story",
                 "                  after DEMO-1"
             ]
         );
@@ -86,8 +86,8 @@ mod tests {
             ["2023-11-14 22:13  Assistant [DEMO-2]: Done"]
         );
         assert_eq!(
-            message_lines(&msg(Author::Toknila, "added card DEMO-2", card()), utc),
-            ["2023-11-14 22:13  · added card DEMO-2 [DEMO-2]"]
+            message_lines(&msg(Author::Toknila, "added story DEMO-2", card()), utc),
+            ["2023-11-14 22:13  · added story DEMO-2 [DEMO-2]"]
         );
     }
 }

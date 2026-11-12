@@ -29,7 +29,7 @@ export const runsSimulated = (cardProfile: string | null | undefined, projectDef
 /// The banner of a project whose default agent is `sim`, or nothing.
 export function simulatedBanner(project: { default_profile: string } | undefined): string | undefined {
   return project?.default_profile === SIM
-    ? "This project runs a simulated agent: cards run without a real agent. Change it in Settings, Agents."
+    ? "This project runs a simulated agent: stories run without a real agent. Change it in Settings, Agents."
     : undefined;
 }
 

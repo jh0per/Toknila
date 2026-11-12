@@ -11,7 +11,7 @@ use crate::output;
 
 #[derive(Debug, Subcommand)]
 pub enum TicketCmd {
-    /// Add a ticket to a chain.
+    /// Add a story to an epic.
     New {
         chain: String,
         title: String,
@@ -31,7 +31,7 @@ pub enum TicketCmd {
         /// The agent shows a design for your approval before it writes any code.
         #[arg(long)]
         design_first: bool,
-        /// The model of the card's agent (an alias such as opus, or a full name); left out, the
+        /// The model of the story's agent (an alias such as opus, or a full name); left out, the
         /// project's worker model runs.
         #[arg(long)]
         model: Option<String>,

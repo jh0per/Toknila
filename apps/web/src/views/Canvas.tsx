@@ -109,8 +109,8 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
     dispatch({ type: "openQuickCard", chain: chainId, x: at.x, y: at.y, ...rel });
   const quick = state.quick.card?.chain === chainId ? state.quick.card : undefined;
   const quickLabel = quick?.after
-    ? `New card that waits for ${quick.after}`
-    : quick?.before ? `New card that ${quick.before} waits for` : "New card";
+    ? `New story that waits for ${quick.after}`
+    : quick?.before ? `New story that ${quick.before} waits for` : "New story";
   const sel = state.route.name === "card" ? state.route.key : "";
   const focusTicket = chain.tickets.find((t) => t.key === sel);
   const focusNode = focusTicket ? nodeKey({ kind: "ticket", id: focusTicket.id }) : undefined;
@@ -293,7 +293,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
             {scene.nodes.filter((n) => n.kind === "ticket" || n.kind === "release").map((n) => (
               <span
                 key={`h-${n.key}`} className={`handle${handleShown(n.key) ? " show" : ""}`} data-node={n.key}
-                data-testid={`handle-${label(n.key)}`} title="Drag onto another card to make it wait for this one"
+                data-testid={`handle-${label(n.key)}`} title="Drag onto another story to make it wait for this one"
                 style={{ left: outPoint(n.box).x - 6, top: outPoint(n.box).y - 6 }}
                 onPointerEnter={() => setHover(n.key)}
                 onPointerLeave={() => setHover(undefined)}
