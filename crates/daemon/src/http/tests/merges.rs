@@ -144,7 +144,7 @@ async fn a_conflict_met_at_the_hand_in_returns_the_card_to_the_worker_and_the_fi
 }
 
 #[tokio::test]
-async fn a_conflict_met_at_accept_blocks_with_the_file_names_and_unblock_after_the_fix_merges() {
+async fn a_conflict_met_at_accept_returns_the_card_and_the_agents_next_hand_in_merges_it() {
     let e = env().await;
     add(&e.api, json!({ "title": "Edit readme" })).await;
     let ship = ship_path(&card(&e.api, "DEMO-1").await);
@@ -163,14 +163,18 @@ async fn a_conflict_met_at_accept_blocks_with_the_file_names_and_unblock_after_t
         .await;
 
     let d = card(&e.api, "DEMO-1").await;
-    assert_eq!(status(&d), "blocked");
-    assert_eq!(reason(&d)["kind"], "merge_conflict");
+    assert_eq!(status(&d), "running", "back with its agent: {d}");
+    let last = d["comments"]
+        .as_array()
+        .expect("comments")
+        .last()
+        .expect("the Return text was sent")
+        .to_string();
+    assert!(last.contains("instruction"), "{last}");
+    assert!(last.contains("Conflicting files: README.md."), "{last}");
     assert!(
-        reason(&d)["detail"]
-            .as_str()
-            .expect("detail")
-            .contains("README.md"),
-        "{d}"
+        last.contains("git merge develop") && last.contains("run the gates"),
+        "{last}"
     );
     assert_eq!(git(&e.repo, &["rev-parse", "develop"]), base, "untouched");
     assert!(
@@ -178,13 +182,25 @@ async fn a_conflict_met_at_accept_blocks_with_the_file_names_and_unblock_after_t
         "the ship stays so the conflict can be fixed there"
     );
 
-    // The person (or the agent) resolves it on the ship, then unblocks.
+    // The agent merges the base, resolves it on the ship and finishes again: no second Accept.
     git(&ship, &["merge", "--no-edit", "-s", "ours", "develop"]);
     e.api
-        .post("/v1/tickets/DEMO-1/actions/unblock", json!({}))
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "finished", "summary": toknila_core::handin::from_plain("merged") }),
+        )
         .await;
     let d = card(&e.api, "DEMO-1").await;
-    assert_eq!(status(&d), "merged");
+    assert_eq!(status(&d), "review", "the reviewer is still to judge it");
+    assert_eq!(d["review"]["awaiting"]["by"], "agent", "{}", d["review"]);
+    e.api
+        .post(
+            "/v1/tickets/DEMO-1/events",
+            json!({ "event": "review_verdict", "verdict": "approve", "comment": "fine", "items": [] }),
+        )
+        .await;
+    let d = card(&e.api, "DEMO-1").await;
+    assert_eq!(status(&d), "merged", "{}", d["review"]);
     assert_eq!(git(&e.repo, &["show", "develop:README.md"]), "ship says hi");
     assert_eq!(git(&e.repo, &["status", "--porcelain"]), "");
 }

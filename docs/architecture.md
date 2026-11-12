@@ -216,7 +216,13 @@ Accept does not move a card straight to Merged: the work has to land in the proj
   `Block` from Review with a typed reason. A card without a ship (no repository) has nothing to
   merge and the host answers at once. The accept's HTTP answer is the committed state (merging);
   the outcome follows on the stream.
-- **Reasons.** `merge_conflict` (details name the conflicting files), `base_checkout_dirty`
+- **A conflict at Accept** (the base sync, or the merge itself) of a card with a ship is not a
+  block: `MergeConflicted` returns the card to its agent as a round, with the text of the
+  hand-in-time conflict (the files, `git merge <base>`, resolve, run the gates, finish again),
+  and the person's Accept is remembered (`review.accepted`). The next hand-in that passes the
+  check and the reviewer merges without a second Accept; a person's Return forgets it. A card
+  without a ship (the sim profile) is still blocked with `merge_conflict`.
+- **Reasons.** `merge_conflict` (sim profile only; details name the conflicting files), `base_checkout_dirty`
   (names the path of the checkout and what to do), `ship_uncommitted` and `ship_empty` (see
   [The uncommitted-ship guard](#the-uncommitted-ship-guard)) and `merge_failed` (git missing or
   older than 2.38, a branch missing, the base kept moving). **Unblock retries the merge**; the person or the
