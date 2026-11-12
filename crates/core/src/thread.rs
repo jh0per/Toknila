@@ -53,7 +53,7 @@ pub enum ThreadError {
     #[error("thread is already approved")]
     AlreadyApproved,
     #[error(
-        "this card already has {kind:?} thread {number}; post a version on thread {number} with thread_version instead of opening another"
+        "this story already has {kind:?} thread {number}; post a version on thread {number} with thread_version instead of opening another"
     )]
     DuplicateKind { kind: ThreadKind, number: u32 },
     #[error("only the agent that opened a thread can withdraw it")]
@@ -307,7 +307,7 @@ pub fn require_none_open(ticket: &TicketKey, open: &[OpenThread]) -> Result<(), 
 }
 
 /// The instruction a person's "ask for a design" sends to a card that already runs.
-pub const ASK_DESIGN_TEXT: &str = "Before you go further, open a design thread for this card and wait for approval. Use `open_thread` (kind design), post a first version the person can judge with `thread_version`, and write code only after the person approved a version.";
+pub const ASK_DESIGN_TEXT: &str = "Before you go further, open a design thread for this story and wait for approval. Use `open_thread` (kind design), post a first version the person can judge with `thread_version`, and write code only after the person approved a version.";
 
 /// The design gate of the hand-in: a card that must show a design first is refused until one of
 /// its threads is approved with a version pinned.

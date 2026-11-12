@@ -137,7 +137,7 @@ export function CardDesignsView({
       {refused && <p className="field-error" role="alert" data-testid="card-designs-refused">{refused}</p>}
       {refs.length === 0 && drops && (
         <div className="card-designs-drop" data-testid="card-designs-drop">
-          {over ? "Drop to add to this card and the project's library" : "Drop a screenshot or pdf here, paste an image, or upload files."}
+          {over ? "Drop to add to this story and the project's library" : "Drop a screenshot or pdf here, paste an image, or upload files."}
           <div className="muted">png, jpg, webp or pdf, up to 25 MB each.</div>
         </div>
       )}

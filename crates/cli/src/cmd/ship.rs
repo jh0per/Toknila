@@ -9,8 +9,8 @@ use super::{default_project, emit};
 /// `tok ship` subcommands.
 #[derive(Debug, Subcommand)]
 pub enum ShipCmd {
-    /// Delete the leftover workspaces and `ship/*` branches that no live card owns: those of
-    /// merged, cancelled and deleted cards. Same as Clean up in Settings, Leftover ships.
+    /// Delete the leftover workspaces and `ship/*` branches that no live story owns: those of
+    /// merged, cancelled and deleted stories. Same as Clean up in Settings, Leftover ships.
     Prune {
         /// A project (key); the only one when none is named.
         #[arg(long)]

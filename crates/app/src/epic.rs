@@ -36,7 +36,7 @@ pub(crate) fn set_version(ctx: &mut ChainTx, text: &str) -> AppResult<()> {
     }
     if clash {
         return Err(AppError::conflict(format!(
-            "the chain already has a release {version}"
+            "the epic already has a release {version}"
         )));
     }
     match end {
@@ -90,10 +90,10 @@ pub fn set_settings<U: UnitOfWork + ?Sized>(
 ) -> AppResult<ChainId> {
     let c = resolve::chain_in(uow, project, chain)?;
     let name = match settings.name.as_deref().map(str::trim) {
-        Some("") => return Err(AppError::bad_request("chain name is empty")),
+        Some("") => return Err(AppError::bad_request("epic name is empty")),
         Some(n) if n != c.name => {
             if uow.chain_by_name(c.project_id, n)?.is_some() {
-                return Err(AppError::conflict(format!("chain {n} already exists")));
+                return Err(AppError::conflict(format!("epic {n} already exists")));
             }
             Some(n.to_owned())
         }

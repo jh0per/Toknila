@@ -51,7 +51,7 @@ impl Outcome {
             (Some(e), r) => format!("{}: {r}: {e}", self.folder),
             (None, _) => {
                 let head = format!(
-                    "{}: imported, {} cards ({} done), {} tasks",
+                    "{}: imported, {} stories ({} done), {} tasks",
                     self.folder, self.cards, self.done_cards, self.tasks
                 );
                 self.out_of_order
@@ -74,7 +74,7 @@ pub(super) fn import_file(c: &Client, file: &Path, project: Option<String>) -> R
     let result = c.import_path(&project, &absolute(file)?)?;
     match result.chains.into_iter().next() {
         Some(imported) => Ok(imported.chain),
-        None => bail!("{} made no chain", file.display()),
+        None => bail!("{} made no epic", file.display()),
     }
 }
 

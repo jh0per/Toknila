@@ -134,7 +134,7 @@ async fn import_by_path_refuses_clearly_and_names_the_path() {
     assert_eq!(s, StatusCode::CONFLICT, "{e}");
     assert_eq!(
         e["error"],
-        format!("{path}: chain 001-login already exists in DEMO")
+        format!("{path}: epic 001-login already exists in DEMO")
     );
 }
 

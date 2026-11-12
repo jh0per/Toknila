@@ -112,7 +112,7 @@ impl AgentEvent {
     }
 
     /// What a card's agent is told when its note was turned into a question.
-    pub const NOTE_ASKED: &'static str = "Your note asked a question, so Toknila put it in the inbox as a question and the card now waits. A note is a report and is never answered: to ask a person something, use ask_human.";
+    pub const NOTE_ASKED: &'static str = "Your note asked a question, so Toknila put it in the inbox as a question and the story now waits. A note is a report and is never answered: to ask a person something, use ask_human.";
 
     /// The question as a Waiting reason, for `AskHuman`.
     pub fn waiting_reason(text: &str, permission: bool, detail: Option<String>) -> WaitingReason {

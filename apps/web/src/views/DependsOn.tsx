@@ -52,7 +52,7 @@ export function DependsOn({ state, card, detail, chain, dispatch }: {
       {detail.can_move ? (
         <AddDependency choices={choices.map((k) => [k, name(k)])} busy={state.edges.busy} onAdd={(from) => dispatch({ type: "addEdge", ...edge(from) })} />
       ) : (
-        <p className="muted">What this card waits for can no longer change.</p>
+        <p className="muted">What this story waits for can no longer change.</p>
       )}
       {state.edges.error && <p className="error" role="alert" data-testid="dep-error">{state.edges.error}</p>}
     </div>

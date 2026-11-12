@@ -97,7 +97,7 @@ fn a_run_after_a_return_starts_with_the_round_who_the_commit_and_the_text() {
         assert!(first.contains(want), "{want}: {first}");
     }
     let text = generate(&with);
-    assert!(text.contains("## This card was returned"), "{text}");
+    assert!(text.contains("## This story was returned"), "{text}");
     assert!(
         text.contains("> Rename the flag\n> and update the docs"),
         "{text}"
@@ -108,7 +108,7 @@ fn a_run_after_a_return_starts_with_the_round_who_the_commit_and_the_text() {
         Some(Actor::Agent),
         "a reviewer's request is a Return too"
     );
-    assert!(!generate(&brief(&acceptance)).contains("This card was returned"));
+    assert!(!generate(&brief(&acceptance)).contains("This story was returned"));
 }
 
 #[test]

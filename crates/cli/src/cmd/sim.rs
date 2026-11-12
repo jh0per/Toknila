@@ -21,7 +21,7 @@ pub enum SimCmd {
         #[arg(long)]
         permission: bool,
     },
-    /// The agent ticks subtask N: `tok sim A subtask 1 done`.
+    /// The agent ticks task N: `tok sim A subtask 1 done`.
     Subtask {
         position: u32,
         #[arg(value_parser = ["done"], default_value = "done")]
@@ -33,7 +33,7 @@ pub enum SimCmd {
     Finish { summary: Option<String> },
     /// The agent crashed (-> Blocked).
     Crash { detail: String },
-    /// The simulated reviewer gives its verdict on a card in Review.
+    /// The simulated reviewer gives its verdict on a story in Review.
     Review {
         #[arg(value_parser = ["approve", "request-changes"])]
         verdict: String,
@@ -43,12 +43,12 @@ pub enum SimCmd {
         #[arg(long = "item")]
         items: Vec<String>,
     },
-    /// The agent found work nobody planned: a wildcard card that waits for your approval.
+    /// The agent found work nobody planned: a wildcard story that waits for your approval.
     Propose {
         #[command(flatten)]
         card: CardArgs,
     },
-    /// The agent works in threads on its card.
+    /// The agent works in threads on its story.
     #[command(subcommand)]
     Thread(SimThreadCmd),
 }

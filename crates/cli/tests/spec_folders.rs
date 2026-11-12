@@ -86,7 +86,7 @@ fn spec_folder_round_trip() {
     let message = String::from_utf8_lossy(&again.stdout).into_owned()
         + &String::from_utf8_lossy(&again.stderr);
     assert!(
-        message.contains("chain 001-sample-feature already exists in SPEC"),
+        message.contains("epic 001-sample-feature already exists in SPEC"),
         "{message}"
     );
 
@@ -190,7 +190,7 @@ fn a_gap_and_early_tasks_import_and_export_unchanged() {
     assert!(text.status.success());
     let out = String::from_utf8_lossy(&text.stdout).into_owned();
     assert!(
-        out.contains("\n  phase-2 done out of order: phase-1 has 1 open subtask (T004)\n"),
+        out.contains("\n  phase-2 done out of order: phase-1 has 1 open task (T004)\n"),
         "{out}"
     );
     // The early tasks are one card named after the spec, first, with no phase number.

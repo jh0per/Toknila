@@ -135,7 +135,7 @@ fn approval_before_a_started_ticket_is_refused() {
         (e.kind, e.message.as_str()),
         (
             ErrorKind::Conflict,
-            "DEMO-1 is already running; a card can only go before work that has not started"
+            "DEMO-1 is already running; a story can only go before work that has not started"
         )
     );
     assert_eq!(mem.ticket_by_id(id).status, TicketStatus::Proposed);
@@ -178,7 +178,7 @@ fn only_a_person_approves_or_rejects() {
         (e.kind, e.message.as_str()),
         (
             ErrorKind::Conflict,
-            "only a person can approve a card; this came from Agent"
+            "only a person can approve a story; this came from Agent"
         )
     );
     let e = decide(&mut mem, id, TicketAction::Reject, Some("no")).expect_err("agent");
@@ -195,7 +195,7 @@ fn proposals_are_checked_before_anything_changes() {
     let blank = wildcards::propose(&mut mem, "demo", proposal(" ", &[], &[]), None);
     assert_eq!(
         blank.map_err(|e| (e.kind, e.message)),
-        Err((ErrorKind::BadRequest, "card title is empty".to_owned()))
+        Err((ErrorKind::BadRequest, "story title is empty".to_owned()))
     );
     let unknown = wildcards::propose(&mut mem, "demo", proposal("x", &["NOPE-9"], &[]), None);
     assert_eq!(unknown.map_err(|e| e.kind), Err(ErrorKind::NotFound));

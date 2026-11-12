@@ -64,7 +64,7 @@ describe("the Finish node is the release", () => {
     const html = finish(f("again", { tag: "v0.3.0" }), () => {});
     expect(html).toContain('data-state="again"');
     expect(html).toContain(">release again<");
-    expect(html).toContain("new cards merged since · v0.3.0");
+    expect(html).toContain("new stories merged since · v0.3.0");
     expect(html).toContain('data-testid="release-button"');
   });
   it("keeps the phase's words for a chain without a version", () => {

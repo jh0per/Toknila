@@ -2,7 +2,7 @@ import type { ChainDeletion } from "../api/types";
 import type { Intent } from "../store/msg";
 import { type State } from "../store/state";
 
-const cards = (n: number) => `${n} card${n === 1 ? "" : "s"}`;
+const cards = (n: number) => `${n} ${n === 1 ? "story" : "stories"}`;
 
 /// Deleting a chain: what goes is named (the chain and its cards), what stays is said, and the
 /// daemon's refusal (an agent works on a card of it) is shown as it came. Afterwards: what
@@ -15,20 +15,20 @@ export function DeleteChain({ chain: id, state, dispatch }: { chain: string; sta
   const n = chain.tickets.length;
   return (
     <div className="card-block form" data-testid="delete-chain">
-      <h2>Delete chain {chain.chain.name}</h2>
+      <h2>Delete epic {chain.chain.name}</h2>
       <p data-testid="delete-chain-what">
-        Deletes the chain <b>{chain.chain.name}</b> and its <b>{cards(n)}</b> from Toknila, with their threads, journal
-        entries, run files and workspaces. The project folder and the branches Toknila made for the cards stay untouched.
+        Deletes the epic <b>{chain.chain.name}</b> and its <b>{cards(n)}</b> from Toknila, with their threads, journal
+        entries, run files and workspaces. The project folder and the branches Toknila made for the stories stay untouched.
       </p>
       {r.error && (
         <div className="error" role="alert" data-testid="delete-chain-error">
           <p>{r.error.message}</p>
-          {r.error.agentsWorking && <p>Stop those agents first, then delete the chain again.</p>}
+          {r.error.agentsWorking && <p>Stop those agents first, then delete the epic again.</p>}
         </div>
       )}
       <div className="row">
         <button type="button" className="btn danger" disabled={r.busy} data-testid="delete-chain-confirm" onClick={() => dispatch({ type: "deleteChain", chain: id })}>
-          Delete chain
+          Delete epic
         </button>
         <button type="button" className="btn" data-testid="delete-chain-cancel" onClick={() => dispatch({ type: "closeDialog" })}>
           Cancel

@@ -82,7 +82,7 @@ impl Source<'_> {
                     .map_or(1, |i| i + 1);
                 PlanError {
                     line: at,
-                    message: format!("chain version {text:?}: {message}"),
+                    message: format!("epic version {text:?}: {message}"),
                 }
             })
     }
@@ -96,7 +96,7 @@ impl Source<'_> {
                 .iter()
                 .find(|n| **n == 0 || **n as usize > len);
             if let Some(bad) = bad {
-                let message = format!("done_subtasks {bad} is not one of {len} subtasks");
+                let message = format!("done_subtasks {bad} is not one of {len} tasks");
                 return Err(self.error(t.id.span(), message));
             }
         }

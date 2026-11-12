@@ -195,7 +195,7 @@ async fn what_the_assistant_did_is_a_line_of_toknilas_that_links_to_it() {
     assert_eq!(
         lines,
         [
-            ("toknila: added card DEMO-2".to_owned(), card("DEMO-2")),
+            ("toknila: added story DEMO-2".to_owned(), card("DEMO-2")),
             ("toknila: edited DEMO-2".to_owned(), card("DEMO-2")),
             (
                 "toknila: opened thread 1 on DEMO-2".to_owned(),

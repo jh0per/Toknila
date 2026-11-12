@@ -48,6 +48,6 @@ describe("the discussion read from its thread", () => {
   });
 
   it("types the planner one line that names the card, the thread and the words", () => {
-    expect(askLine("DEMO-1", 2, "  make it\nstricter ")).toBe("Discussion on card DEMO-1 (thread 2): make it stricter");
+    expect(askLine("DEMO-1", 2, "  make it\nstricter ")).toBe("Discussion on story DEMO-1 (thread 2): make it stricter");
   });
 });

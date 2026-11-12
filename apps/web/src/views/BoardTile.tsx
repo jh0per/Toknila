@@ -41,7 +41,7 @@ export function BoardTile({ project, item, tile, pins, activePin, onPin, onAspec
       <figcaption className="board-caption">
         <strong data-testid="board-tile-name">{item.name}</strong>
         {d && <span className="muted">{kindLabel(d)}</span>}
-        <span className="muted">{item.uses.length} {item.uses.length === 1 ? "card" : "cards"}</span>
+        <span className="muted">{item.uses.length} {item.uses.length === 1 ? "story" : "stories"}</span>
       </figcaption>
       {d && isPicture(d) ? (
         <div className="board-stage" data-testid="board-stage" style={{ height: tile.h }}>
@@ -62,8 +62,8 @@ export function BoardTile({ project, item, tile, pins, activePin, onPin, onAspec
                   {u.card}
                 </button>
                 <span
-                  className="board-handle" data-testid="board-handle" role="button" aria-label={`Move ${u.card}'s reference to another card`}
-                  title="Drag onto another card to move this reference there" onPointerDown={(e) => actions.grab(e, u.card, u, item.id)}
+                  className="board-handle" data-testid="board-handle" role="button" aria-label={`Move ${u.card}'s reference to another story`}
+                  title="Drag onto another story to move this reference there" onPointerDown={(e) => actions.grab(e, u.card, u, item.id)}
                 />
               </span>
             </span>
@@ -73,7 +73,7 @@ export function BoardTile({ project, item, tile, pins, activePin, onPin, onAspec
       ) : (
         <div className="board-note" data-testid="board-note" style={{ height: tile.h }}>
           <p className="muted">
-            {d ? (d.kind === "pdf" ? "This PDF has no first page picture on this machine. Open a card to read it." : placeholder(d)) : "This design is no longer in the project's library."}
+            {d ? (d.kind === "pdf" ? "This PDF has no first page picture on this machine. Open a story to read it." : placeholder(d)) : "This design is no longer in the project's library."}
           </p>
           <span className="board-note-cards">
             {item.uses.map((u, i) => (

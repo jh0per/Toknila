@@ -10,7 +10,7 @@ describe("the simulated agent", () => {
 
   it("shows the banner for a project whose default agent is sim, and for no other", () => {
     expect(simulatedBanner({ default_profile: "sim" })).toBe(
-      "This project runs a simulated agent: cards run without a real agent. Change it in Settings, Agents.",
+      "This project runs a simulated agent: stories run without a real agent. Change it in Settings, Agents.",
     );
     expect(simulatedBanner({ default_profile: "claude-code" })).toBeUndefined();
     expect(simulatedBanner(undefined)).toBeUndefined();

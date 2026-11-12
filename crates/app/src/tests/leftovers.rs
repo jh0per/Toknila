@@ -114,7 +114,7 @@ fn closing_marks_the_subtasks_done_and_leaves_a_note_in_the_journal() {
         .iter()
         .find(|c| c.kind == CommentKind::Decision)
         .expect("a note");
-    assert_eq!(note.body.gist, "Closed 2 leftover subtasks of DEMO-3");
+    assert_eq!(note.body.gist, "Closed 2 leftover tasks of DEMO-3");
     assert!(
         mem.kinds().contains(&"comment.added".to_owned()),
         "{:?}",

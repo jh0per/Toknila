@@ -52,16 +52,16 @@ pub enum Command {
     /// Projects: one product, one repository.
     #[command(subcommand)]
     Project(ProjectCmd),
-    /// A project's planner: its main agent, which plans chains and cards and starts nothing.
+    /// A project's planner: its main agent, which plans epics and stories and starts nothing.
     #[command(subcommand)]
     Planner(PlannerCmd),
     /// Agent profiles: how each agent is launched.
     #[command(subcommand)]
     Profile(ProfileCmd),
-    /// Chains of tickets.
+    /// Epics of stories.
     #[command(subcommand)]
     Chain(ChainCmd),
-    /// Ships: the workspaces and branches of cards.
+    /// Ships: the workspaces and branches of stories.
     #[command(subcommand)]
     Ship(ShipCmd),
     /// Create or show tickets.
@@ -73,7 +73,7 @@ pub enum Command {
     /// Checklist items of a ticket.
     #[command(subcommand)]
     Subtask(SubtaskCmd),
-    /// Threads on a card: settle a design, a flow or an architecture before implementation.
+    /// Threads on a story: settle a design, a flow or an architecture before implementation.
     #[command(subcommand)]
     Thread(ThreadCmd),
     /// Write to a ticket: an instruction for its agent, or a report or decision.
@@ -91,7 +91,7 @@ pub enum Command {
     Resume { ticket: String },
     /// Block a ticket, with a reason.
     Block { ticket: String, reason: String },
-    /// Unblock a ticket; it returns to where it was. A card whose main branch is behind its
+    /// Unblock a ticket; it returns to where it was. A story whose main branch is behind its
     /// upstream can instead start after a fast-forward (`--fast-forward`) or as it is (`--anyway`).
     Unblock {
         ticket: String,
@@ -112,9 +112,9 @@ pub enum Command {
         ticket: String,
         comment: Option<String>,
     },
-    /// Choose who reviews finished cards: a person, a reviewer agent, or the agent first and
-    /// then a person. Set on a project, a chain or one ticket; the ticket's wins, then the
-    /// chain's, then the project's.
+    /// Choose who reviews finished stories: a person, a reviewer agent, or the agent first and
+    /// then a person. Set on a project, an epic or one ticket; the ticket's wins, then the
+    /// epic's, then the project's.
     ReviewMode {
         /// human, agent or both.
         #[arg(value_parser = ["human", "agent", "both"])]
@@ -122,7 +122,7 @@ pub enum Command {
         /// A ticket (key or title).
         #[arg(long, conflicts_with_all = ["chain", "project"])]
         ticket: Option<String>,
-        /// A chain (name).
+        /// An epic (name).
         #[arg(long, conflicts_with = "project")]
         chain: Option<String>,
         /// A project (key); the only one when none is named.
@@ -142,7 +142,7 @@ pub enum Command {
     Design { ticket: String },
     /// Cancel a ticket (won't do), with a reason.
     Cancel { ticket: String, reason: String },
-    /// Propose a wildcard card: work nobody planned. It waits for a person's approval.
+    /// Propose a wildcard story: work nobody planned. It waits for a person's approval.
     Propose {
         chain: String,
         #[command(flatten)]
@@ -151,9 +151,9 @@ pub enum Command {
         #[arg(long)]
         from: Option<String>,
     },
-    /// Approve a wildcard card: it joins the plan and its dependencies take effect.
+    /// Approve a wildcard story: it joins the plan and its dependencies take effect.
     Approve { ticket: String },
-    /// Reject a wildcard card, with a reason: it is cancelled.
+    /// Reject a wildcard story, with a reason: it is cancelled.
     Reject { ticket: String, reason: String },
     /// Release milestones.
     #[command(subcommand)]
@@ -173,7 +173,7 @@ pub enum Command {
         #[arg(long)]
         chain: Option<String>,
     },
-    /// Show one ticket with its subtasks and comments.
+    /// Show one ticket with its tasks and comments.
     Show { ticket: String },
     /// What waits on a person: a review shows the hand-in's gist and its checks.
     Inbox {

@@ -16,12 +16,12 @@ const NO_VERDICT = "The reviewer gave no verdict";
 
 /// The second line of a row: what is asked of the person, in words.
 const KIND_LINE: Record<InboxKind, string> = {
-  proposal: "A card the planner proposes: approve it or turn it down",
+  proposal: "A story the planner proposes: approve it or turn it down",
   question: "The agent is waiting for your answer",
   blocked: "Blocked: it cannot go on by itself",
   review: "Ready for your review",
   thread: "A design thread has a new version",
-  leftovers: "Subtasks were left open behind a finished card",
+  leftovers: "Tasks were left open behind a finished story",
   design_question: "The assistant asks about a design",
   pin: "The assistant asks about a design",
 };
@@ -45,7 +45,7 @@ export function InboxRow({ state, item, dispatch }: { state: State; item: InboxI
   }
   const route = itemRoute(state, item);
   const open = route && (
-    <NavLink route={route} dispatch={dispatch} className="btn" testId="inbox-open-card">Open card</NavLink>
+    <NavLink route={route} dispatch={dispatch} className="btn" testId="inbox-open-card">Open story</NavLink>
   );
   return (
     <li data-kind={item.kind} data-key={item.ticket}>
@@ -247,11 +247,11 @@ function Leftovers({ item, open, dispatch }: BodyProps) {
   return (
     <div className="row-body">
       <p className="muted">
-        {item.done_cards.join(", ")} {item.done_cards.length === 1 ? "was" : "were"} done before this card; these subtasks are still open:
+        {item.done_cards.join(", ")} {item.done_cards.length === 1 ? "was" : "were"} done before this story; these tasks are still open:
       </p>
       <ul className="ck">{item.subtasks.map((s, i) => <li key={i}>{s}</li>)}</ul>
       <div className="btns">
-        <button className="btn primary" onClick={() => decide("move")}>Move to a new card</button>
+        <button className="btn primary" onClick={() => decide("move")}>Move to a new story</button>
         <button className="btn" onClick={() => decide("close")}>Close them</button>
         <button className="btn" onClick={() => decide("leave")}>Leave as is</button>
         {open}

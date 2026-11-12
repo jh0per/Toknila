@@ -58,8 +58,8 @@ export function cardEntries(detail: TicketDetail | undefined, h: CardMenuHandler
   }
 
   const around: MenuEntry[] = [];
-  if (detail?.can_move) around.push({ label: "Add card before", testId: "menu-card-add-before", run: h.addBefore });
-  around.push({ label: "Add card after", testId: "menu-card-add-after", run: h.addAfter });
+  if (detail?.can_move) around.push({ label: "Add story before", testId: "menu-card-add-before", run: h.addBefore });
+  around.push({ label: "Add story after", testId: "menu-card-add-after", run: h.addAfter });
   if (detail?.can_move) around.push({ label: "Add dependency…", testId: "menu-card-add-dependency", run: h.addDependency });
 
   const cancel = specs.find((s) => s.action === "cancel");
@@ -77,9 +77,9 @@ export interface CanvasMenuHandlers {
 /// The menu of empty canvas: New card | New chain, Import a plan | Plan with the assistant.
 export function canvasEntries(h: CanvasMenuHandlers): MenuEntry[] {
   return menuGroups(
-    [{ label: "New card", testId: "menu-canvas-new-card", keys: "N", run: h.newCard }],
+    [{ label: "New story", testId: "menu-canvas-new-card", keys: "N", run: h.newCard }],
     [
-      { label: "New chain", testId: "menu-canvas-new-chain", run: h.newChain },
+      { label: "New epic", testId: "menu-canvas-new-chain", run: h.newChain },
       { label: "Import a plan", testId: "menu-canvas-import", run: h.importPlan },
     ],
     [{ label: "Plan with the assistant", testId: "menu-canvas-planner", run: h.askPlanner }],

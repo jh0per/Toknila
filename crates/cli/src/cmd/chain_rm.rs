@@ -33,11 +33,11 @@ pub(super) fn run(
 fn confirm(input: &mut impl BufRead, terminal: bool, name: &str) -> Result<()> {
     if !terminal {
         bail!(
-            "not deleting chain {name}: it needs a confirmation and stdin is not a terminal; pass --yes"
+            "not deleting epic {name}: it needs a confirmation and stdin is not a terminal; pass --yes"
         );
     }
-    eprintln!("This deletes chain {name} with its cards, threads and workspaces.");
-    eprint!("Type the chain name ({name}) to go on: ");
+    eprintln!("This deletes epic {name} with its stories, threads and workspaces.");
+    eprint!("Type the epic name ({name}) to go on: ");
     let mut line = String::new();
     input.read_line(&mut line)?;
     if line.trim() != name {
@@ -49,8 +49,11 @@ fn confirm(input: &mut impl BufRead, terminal: bool, name: &str) -> Result<()> {
 /// What a deletion did, for a person.
 fn deleted(d: &ChainDeletion) {
     println!(
-        "chain {} of {} deleted: {} card(s)",
-        d.chain.name, d.project, d.tickets
+        "epic {} of {} deleted: {} {}",
+        d.chain.name,
+        d.project,
+        d.tickets,
+        if d.tickets == 1 { "story" } else { "stories" }
     );
     for w in &d.worktrees_removed {
         println!("removed workspace {w}");

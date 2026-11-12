@@ -19,11 +19,11 @@ export type AutostartEffect = AutostartIntent;
 
 /// The hint on the toggle: what turning it on does.
 export const AUTOSTART_HINT =
-  "On: ready cards start by themselves, and turning it on starts the ready ones now. The planner cannot change the cards' order or dependencies in a chain that starts cards automatically.";
+  "On: ready stories start by themselves, and turning it on starts the ready ones now. The planner cannot change the stories' order or dependencies in an epic that starts stories automatically.";
 
 /// The hint on the chain header's Run chain / Stop chain button: what each does.
 export const RUN_CHAIN_HINT =
-  "Run chain starts cards automatically and starts the ready cards up to the free agent slots. Stop chain stops starting cards automatically; cards already running keep running.";
+  "Run epic starts stories automatically and starts the ready stories up to the free agent slots. Stop epic stops starting stories automatically; stories already running keep running.";
 
 /// The reducer of the autostart toggle.
 export function reduceAutostart(s: State, msg: AutostartIntent | AutostartResult): [State, Effect[]] {

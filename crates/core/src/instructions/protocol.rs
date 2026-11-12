@@ -1,9 +1,15 @@
 //! The ticket-independent text of the generated instructions.
 
 pub(super) const PROTOCOL: &str = "\
+## Words
+
+People say epic, story and task; the tools and routes keep their old names. A chain is an epic, \
+a card is a story and a subtask is a task: `subtask_done` ticks a task, `propose` proposes a \
+story. Say epic, story and task in what you write; use the tool names only when you call them.
+
 ## Work alone, in plain sight
 
-Do the work yourself, in this terminal. Do not start subagents or background agents: a card is \
+Do the work yourself, in this terminal. Do not start subagents or background agents: a story is \
 done by one agent, and a person follows it here. Quote every path in a shell command with double \
 quotes; never backslash-escape a space. Change files with the Edit and Write tools and read them \
 with Read and Grep: those are approved without asking in this session, while shell edits \
@@ -20,7 +26,7 @@ folder of your own.
 Use the tools of the MCP server `toknila`; never change the ticket any other way.
 
 - `started`: you begin working.
-- `subtask_done` (`position`): a checklist item is done.
+- `subtask_done` (`position`): a task of the checklist is done.
 - `note` (comment template fields): progress, a decision you made, a finding. Nobody answers a \
 note: a question in it is never seen.
 - `ask_human` (`text`): the one way to get an answer. Use it for every decision you cannot make \
@@ -32,7 +38,7 @@ merges or pushes only what is committed. After `finished`, stop: do not edit, ru
 anything more; the next thing you do is act on a person's Return or instruction.
 - `crashed` (`detail`): you cannot continue.
 - `propose` (`title`, `prompt`, `acceptance`): work you found that nobody planned. It becomes a \
-card a person approves; do not do it yourself.
+story a person approves; do not do it yourself.
 - `open_thread`, `thread_message`, `thread_version`: settle a design with the person before you \
 build it; `finished` is refused while a thread is open.
 
@@ -52,7 +58,7 @@ Other agents and the person work on this machine at the same time.
 unless the task asks for it; then one loop, under `nice`, never more, stopped by a trap.
 - Run a long gate as `cargo xtask verify 2>&1 | tail -n 30` so the result line is on the screen; \
 never redirect output to a file (a large output spills to a file you may not read back).
-- Before you propose a fix or a wildcard card for a failing test, run it alone once. A test that \
+- Before you propose a fix or a wildcard story for a failing test, run it alone once. A test that \
 passes alone is a load problem: report it in the hand-in, do not fix it.
 - Never edit a generated file by hand (`apps/web/src/gen/api.d.ts`, `openapi.json`): run \
 `npm run gen` and let `gen:check` prove it.
@@ -92,12 +98,12 @@ Before the hand-in, merge the project's work branch into the ship and resolve th
 keeping every existing entry of a shared list. A Checks line quotes the gate's own result line \
 word for word; the daemon refuses a PASS whose evidence is under 20 characters.
 
-A person sees the three blocks apart on the Review card, above Accept and Return. Do not run the \
+A person sees the three blocks apart on the Review story, above Accept and Return. Do not run the \
 checks again after handing in.
 
 ## After a Return
 
-When the card was returned, the Return text is the first thing you read in your instructions and \
+When the story was returned, the Return text is the first thing you read in your instructions and \
 in your first message. Do what it asks, commit the change, then hand in naming the new commit. A \
 hand-in at the same commit as before is refused: a Return needs new commits.
 
@@ -126,7 +132,7 @@ Reports, notes and decisions use this shape; leave out empty fields:
 pub(super) const REVIEW_PROTOCOL: &str = "\
 ## Work alone, in plain sight
 
-Do the work yourself, in this terminal. Do not start subagents or background agents: a card is \
+Do the work yourself, in this terminal. Do not start subagents or background agents: a story is \
 done by one agent, and a person follows it here. Quote every path in a shell command with double \
 quotes; never backslash-escape a space.
 
@@ -170,8 +176,8 @@ verdict that leaves one out is refused.
 - `outcome: person` (shown as PERSON) is for an item only a person can judge: a picture, a look, \
 a feeling, an approval the record does not hold. It is neither PASS nor FAIL and does not count \
 against the hand-in. Say in the `note` what the person should look at. Never ask for files the \
-card did not ask for: pictures live in the worker's scratchpad by rule, not in the repository. \
-The card's threads and the whole hand-in are in your instructions: judge \"the thread shows ... \
+story did not ask for: pictures live in the worker's scratchpad by rule, not in the repository. \
+The story's threads and the whole hand-in are in your instructions: judge \"the thread shows ... \
 and the owner approved it before code\" and \"the hand-in says ...\" from them (basis `ran`), and \
 use `person` only for what they do not hold.
 - `verdict: approve`: the work does what the task asks and every item passes or is for a person. \

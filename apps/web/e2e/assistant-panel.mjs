@@ -116,7 +116,7 @@ try {
   // 3. A message with the chain chip is typed `About chain work: ...` and stored with the chain.
   await t("planner-ask-input").fill("reorder the cards");
   await t("planner-ask-send").click();
-  await toldAbout("About chain work: reorder the cards");
+  await toldAbout("About epic work: reorder the cards");
   const sent = (await conversation()).find((m) => m.text === "reorder the cards");
   if (sent?.about?.kind !== "chain" || sent.about.name !== "work") throw new Error(`stored without the chain: ${JSON.stringify(sent)}`);
   console.log("PASS the message is stored with the chain as its context");
@@ -160,7 +160,7 @@ try {
 
   // 7. On a card the chip names the card; the top bar's button closes the panel.
   await page.goto(at("/projects/PN/chains/work/cards/PN-1"));
-  await expectText(t("context-chip"), "the card PN-1", "a card has its chip");
+  await expectText(t("context-chip"), "the story PN-1", "a story has its chip");
   await t("assistant-toggle").click();
   await shown("the button closes the panel on a card", false);
   await t("assistant-toggle").click();

@@ -112,7 +112,7 @@ pub fn chain_in_full<R: Reader + ?Sized>(
     let chain = super::chain(r, project, reference)?;
     let view = r
         .chain_view(chain.id)?
-        .ok_or_else(|| AppError::not_found(format!("chain {reference}")))?;
+        .ok_or_else(|| AppError::not_found(format!("epic {reference}")))?;
     chain_plan(r, view, at)
 }
 
@@ -126,7 +126,7 @@ pub fn card_in_full<R: Reader + ?Sized>(
     let ticket = super::card(r, project, reference)?;
     let view = r
         .chain_view(ticket.chain_id)?
-        .ok_or_else(|| AppError::not_found(format!("chain of {}", ticket.key)))?;
+        .ok_or_else(|| AppError::not_found(format!("epic of {}", ticket.key)))?;
     let after = ordered(&view)
         .into_iter()
         .find(|(t, _)| t.id == ticket.id)

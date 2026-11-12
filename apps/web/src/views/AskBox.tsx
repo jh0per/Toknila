@@ -4,6 +4,8 @@ import { canSend } from "../store/askAttach";
 import { draftOf } from "../store/planner";
 import type { State } from "../store/state";
 import { AskChips, AttachButton, DropFrame, useAskAttach } from "./AskAttach";
+import { MicButton, SpeechNote } from "./MicButton";
+import { useSpeech } from "./useSpeech";
 
 /// The most rows the chat's composer grows to.
 const MAX_ROWS = 8;
@@ -76,18 +78,20 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
   const sending = state.planner.sending === project || waiting;
   const send = () => dispatch({ type: "askPlanner", project });
   const a = useAskAttach(state, dispatch, { project, where: project, prefix: project });
+  const setText = (t: string) => dispatch({ type: "editPlannerDraft", where: project, text: t });
+  const speech = useSpeech(text, setText, send);
   return (
     <DropFrame a={a} className={`ask${compact ? " compact" : ""}`} testId={testId}>
       <PromptField
         value={text} label={label} testId={`${testId}-input`} rows={rows ?? 3} grow={compact ? MAX_ROWS : undefined} disabled={sending} focus={focus}
         placeholder={placeholder} onSubmit={send}
-        onChange={(t) => dispatch({ type: "editPlannerDraft", where: project, text: t })}
+        onChange={(t) => { speech.stop(); setText(t); }}
       />
       <AskChips a={a} project={project} testId={testId} />
       <div className="ask-actions">
         <AttachButton busy={sending || a.place.busy} onFiles={a.add} testId={testId} />
-        {/* The end group: the microphone button of TOKNILA-100 goes here, left of Send, the same size as the attach button. */}
         <div className="ask-actions-end">
+          <MicButton s={speech} testId={testId} disabled={sending} />
           <button
             type="button" className={`btn send ${compact ? "tonal" : "primary"}`} data-testid={`${testId}-send`} onClick={send}
             disabled={sending || !canSend(state, project, text)}
@@ -96,6 +100,7 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
           </button>
         </div>
       </div>
+      <SpeechNote s={speech} testId={testId} />
       <p className="ask-hint">Enter sends, Shift+Enter for a new line</p>
     </DropFrame>
   );

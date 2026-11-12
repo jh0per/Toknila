@@ -24,7 +24,7 @@ export function NoThreads({ card, canAsk, dispatch }: { card: Ticket; canAsk: bo
     <p className="muted" data-testid="no-threads">
       {card.design_first
         ? "A design is asked for. The agent will show it here and wait for your approval before it writes any code."
-        : "No threads on this card."}
+        : "No threads on this story."}
     </p>
   );
 }

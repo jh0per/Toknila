@@ -2,7 +2,7 @@ import type { ImportPathResult, ImportedChain } from "../api/types";
 
 const counts = (c: ImportedChain): string =>
   [
-    `${c.cards} card${c.cards === 1 ? "" : "s"}`,
+    `${c.cards} ${c.cards === 1 ? "story" : "stories"}`,
     c.tasks ? `${c.tasks} task${c.tasks === 1 ? "" : "s"}` : "",
     c.done_cards ? `${c.done_cards} already done` : "",
   ].filter(Boolean).join(", ");

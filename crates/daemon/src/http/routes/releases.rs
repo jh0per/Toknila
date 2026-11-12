@@ -126,7 +126,7 @@ pub async fn start_release(
         let steps = project_steps(&project);
         let last = tx.repo().release_run(r.id)?;
         if last.as_ref().is_some_and(|l| l.state == RunState::Running) {
-            return Err(AppError::conflict("a release of this chain is already running").into());
+            return Err(AppError::conflict("a release of this epic is already running").into());
         }
         let (todo, entry) = if input.resume {
             let run = last

@@ -7,8 +7,8 @@ type ModelName = "planner_model" | "worker_model" | "reviewer_model";
 
 const MODELS: { name: ModelName; label: string; testId: string; hint: string }[] = [
   { name: "planner_model", label: "Assistant", testId: "planner-model", hint: "Plans the work and talks with you." },
-  { name: "worker_model", label: "Card agents", testId: "worker-model", hint: "Does the work of a card, unless the card names its own model." },
-  { name: "reviewer_model", label: "Reviewer", testId: "reviewer-model", hint: "Reads what a card agent handed in." },
+  { name: "worker_model", label: "Story agents", testId: "worker-model", hint: "Does the work of a story, unless the story names its own model." },
+  { name: "reviewer_model", label: "Reviewer", testId: "reviewer-model", hint: "Reads what a story agent handed in." },
 ];
 
 /// The Claude models of the project, named for the person who does the work: the assistant (the

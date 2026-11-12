@@ -210,7 +210,7 @@ fn a_chain_that_autostarts_refuses_graph_changes_but_not_text_or_threads() {
     for r in refusals {
         let e = r.expect_err("refused");
         assert_eq!(e.kind, ErrorKind::Forbidden, "{e}");
-        assert!(e.message.contains("only the owner starts cards"), "{e}");
+        assert!(e.message.contains("only the owner starts stories"), "{e}");
     }
     assert_eq!(mem.view.tickets.len(), 2, "nothing was added");
     let edit = CardEdit {

@@ -7,7 +7,7 @@ import { Field } from "./Field";
 
 const MODES: ReviewMode[] = ["human", "agent", "both"];
 const REVIEW_WORDS: Record<ReviewMode, string> = {
-  human: "I review every finished card", agent: "A reviewer agent reviews it", both: "A reviewer agent first, then me",
+  human: "I review every finished story", agent: "A reviewer agent reviews it", both: "A reviewer agent first, then me",
 };
 
 /// A new, empty chain in a project: its name, an optional goal, whether ready cards start by
@@ -36,7 +36,7 @@ export function NewChain({ project, state, dispatch }: { project: string; state:
         });
       }}
     >
-      <h2>New chain in {project}</h2>
+      <h2>New epic in {project}</h2>
       <Field label="Name" name="chain-name" error={planError(p, "chain", "name")}>
         <input data-testid="chain-name" value={name} placeholder="window-planning" spellCheck={false} autoFocus onChange={(e) => setName(e.target.value)} />
       </Field>
@@ -45,22 +45,22 @@ export function NewChain({ project, state, dispatch }: { project: string; state:
       </Field>
       <Field
         label="Version (optional)" name="chain-version" error={planError(p, "chain", "version")}
-        hint={state.epic.suggested ? `The chain ends in a release of this version; suggested: the next patch after the newest tag and the versions the roadmap plans.` : "The chain ends in a release of this version."}
+        hint={state.epic.suggested ? `The epic ends in a release of this version; suggested: the next patch after the newest tag and the versions the roadmap plans.` : "The epic ends in a release of this version."}
       >
         <input data-testid="chain-version" value={version} placeholder="0.3.0" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
       </Field>
       <label className="check">
         <input type="checkbox" data-testid="chain-autostart" checked={autostart} onChange={(e) => setAutostart(e.target.checked)} />
-        Start cards automatically
+        Start stories automatically
       </label>
-      <Field label="Who reviews finished cards" name="chain-review-mode" error={undefined}>
+      <Field label="Who reviews finished stories" name="chain-review-mode" error={undefined}>
         <select data-testid="chain-review-mode" value={mode} onChange={(e) => setMode(e.target.value as ReviewMode | "")}>
           <option value="">The project's setting</option>
           {MODES.map((m) => <option key={m} value={m}>{REVIEW_WORDS[m]}</option>)}
         </select>
       </Field>
       {refused && <p className="error" role="alert" data-testid="chain-error">{refused}</p>}
-      <button className="btn primary" type="submit" disabled={p.busy} data-testid="create-chain">Create chain</button>
+      <button className="btn primary" type="submit" disabled={p.busy} data-testid="create-chain">Create epic</button>
     </form>
   );
 }

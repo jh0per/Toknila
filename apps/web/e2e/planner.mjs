@@ -106,7 +106,7 @@ try {
   if ((await page.locator("[data-testid=planner-entry]").count()) !== 1) throw new Error("expected one planner entry");
 
   const hint = await page.locator("[data-testid=planner-link]").getAttribute("title");
-  if (hint !== "plans epics on the roadmap, cards inside an epic") throw new Error(`the Assistant row's hint is: ${hint}`);
+  if (hint !== "plans epics on the roadmap, stories inside an epic") throw new Error(`the Assistant row's hint is: ${hint}`);
   if ((await page.locator("[data-testid=planner-link]").getAttribute("href")).includes("/planner")) throw new Error("the Assistant row still links to the screen");
   await page.locator("[data-testid=planner-link]").click();
   await expectPath("/projects/WEB", "the Assistant row opens the roadmap");
@@ -137,7 +137,7 @@ try {
   await page.locator("[data-testid=projects] li[data-project=WEB] > .row a").click();
   await expectPath("/projects/WEB", "the project opens");
   await expectText(page.locator("[data-testid=no-chains]"), "What do you want to build?", "an empty project leads with the question");
-  await expectText(page.locator("[data-testid=empty-new-chain]"), "New chain", "New chain is a quieter link below");
+  await expectText(page.locator("[data-testid=empty-new-chain]"), "New epic", "New epic is a quieter link below");
   await expectText(page.locator("[data-testid=empty-import]"), "Import", "so is Import");
   await shot("empty-project");
   await page.locator("[data-testid=empty-ask-input]").fill("hello planner");

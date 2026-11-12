@@ -23,12 +23,12 @@ export function useChainMenu(dispatch: (i: Intent) => void): {
       x={at.x} y={at.y} onClose={close}
       title={at.chain.chain.name}
       entries={menuGroups([{
-        label: at.chain.chain.autostart ? "Stop starting cards automatically" : "Start cards automatically",
+        label: at.chain.chain.autostart ? "Stop starting stories automatically" : "Start stories automatically",
         testId: "menu-autostart",
         hint: AUTOSTART_HINT,
         run: () => dispatch({ type: "setAutostart", chain: at.chain.chain.id, autostart: !at.chain.chain.autostart }),
       }], [{
-        label: "Delete chain…",
+        label: "Delete epic…",
         testId: "menu-delete-chain",
         danger: true,
         run: () => dispatch({ type: "openDialog", dialog: { kind: "deleteChain", chain: at.chain.chain.id } }),

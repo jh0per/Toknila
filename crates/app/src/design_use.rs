@@ -76,7 +76,7 @@ pub fn release<U: UnitOfWork + ?Sized>(
     for key in &used.cards {
         let card = uow
             .ticket_by_key(key)?
-            .ok_or_else(|| AppError::not_found(format!("card {key}")))?;
+            .ok_or_else(|| AppError::not_found(format!("story {key}")))?;
         with_chain(uow, card.chain_id, |ctx| {
             ctx.edit_ticket(card.id, |t| t.designs.retain(|d| d.design != design))
                 .map_err(AppError::from)

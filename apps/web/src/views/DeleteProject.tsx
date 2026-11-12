@@ -18,8 +18,8 @@ export function DeleteProject({ project: key, state, dispatch }: { project: stri
     <div className="card-block form" data-testid="delete-project">
       <h2>Delete {project.key}</h2>
       <p>
-        Removes {project.key} from Toknila: its chains, cards, threads, journal and the links of its usage records, its
-        run files and its workspaces. The project folder and the branches Toknila made for its cards stay untouched.
+        Removes {project.key} from Toknila: its epics, stories, threads, journal and the links of its usage records, its
+        run files and its workspaces. The project folder and the branches Toknila made for its stories stay untouched.
       </p>
       <button type="button" className="btn danger" disabled={r.busy} data-testid="delete-remove" onClick={() => remove(false)}>
         Remove from Toknila
@@ -46,8 +46,8 @@ export function DeleteProject({ project: key, state, dispatch }: { project: stri
           <p>{r.error.message}</p>
           {r.error.agentsWorking && (
             <p>
-              Stop its agents first. The window has no button that stops an agent: let the running cards finish, or cancel
-              them from their card, then delete again.
+              Stop its agents first. The window has no button that stops an agent: let the running stories finish, or cancel
+              them from their story, then delete again.
             </p>
           )}
         </div>
@@ -61,7 +61,7 @@ function Deleted({ d, trashAsked, dispatch }: { d: ProjectDeletion; trashAsked: 
     <div className="card-block form" data-testid="delete-result">
       <h2>{d.project.key} was removed</h2>
       <p>
-        {d.chains.length} chain{d.chains.length === 1 ? "" : "s"} and {d.tickets} card{d.tickets === 1 ? "" : "s"} deleted
+        {d.chains.length} {d.chains.length === 1 ? "epic" : "epics"} and {d.tickets} {d.tickets === 1 ? "story" : "stories"} deleted
         {d.worktrees_removed.length > 0 ? `; workspaces removed: ${d.worktrees_removed.join(", ")}` : ""}.
       </p>
       <p className={d.folder === "kept" && trashAsked ? "error" : ""} data-testid="delete-folder-note">{folderText(d, trashAsked)}</p>

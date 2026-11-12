@@ -41,12 +41,12 @@ try {
   await expectText(status, "ready", "the card is ready and nothing starts it");
   if (await toggle.isChecked()) throw new Error("the toggle shows autostart on for a chain made without it");
   console.log("PASS the header toggle shows autostart off");
-  await expectText(page.locator(".autostart"), "Start cards automatically", "the header toggle is worded like the menu");
+  await expectText(page.locator(".autostart"), "Start stories automatically", "the header toggle is worded like the menu");
 
   // The sidebar menu: its entry offers to turn it on, and the hint says it may start cards.
   await row.click({ button: "right" });
   const entry = page.locator("[data-testid=menu-autostart]");
-  await expectText(entry, "Start cards automatically", "the chain menu offers autostart");
+  await expectText(entry, "Start stories automatically", "the epic menu offers autostart");
   const hint = await entry.getAttribute("title");
   if (!hint || !/start/.test(hint) || !/ready/.test(hint)) throw new Error(`the hint does not say it starts ready cards: ${hint}`);
   console.log(`PASS the hint says what it does: ${hint}`);
@@ -63,14 +63,14 @@ try {
   if (daemonSays() !== false) throw new Error("the daemon still has autostart on");
   console.log("PASS the header toggle turned autostart off in the daemon");
   await row.click({ button: "right" });
-  await expectText(page.locator("[data-testid=menu-autostart]"), "Start cards automatically", "after off the menu offers on again");
+  await expectText(page.locator("[data-testid=menu-autostart]"), "Start stories automatically", "after off the menu offers on again");
   await page.keyboard.press("Escape");
 
   // And the menu turns it off when it is on.
   await toggle.click();
   await page.waitForFunction(() => document.querySelector("[data-testid=chain-autostart-toggle]").checked, null, { timeout: 10_000 });
   await row.click({ button: "right" });
-  await expectText(page.locator("[data-testid=menu-autostart]"), "Stop starting cards automatically", "with autostart on the menu offers off");
+  await expectText(page.locator("[data-testid=menu-autostart]"), "Stop starting stories automatically", "with autostart on the menu offers off");
   await page.locator("[data-testid=menu-autostart]").click();
   await page.waitForFunction(() => !document.querySelector("[data-testid=chain-autostart-toggle]").checked, null, { timeout: 10_000 });
   if (daemonSays() !== false) throw new Error("the menu did not turn autostart off");

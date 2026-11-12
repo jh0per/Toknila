@@ -161,7 +161,7 @@ pub fn page_size(limit: Option<usize>) -> usize {
 
 /// What Toknila says when the assistant added a card.
 pub fn added_card(key: &TicketKey) -> String {
-    format!("added card {key}")
+    format!("added story {key}")
 }
 
 /// What Toknila says when the assistant edited a card.
@@ -189,7 +189,7 @@ pub fn added_chain(name: &str, version: Option<&str>) -> String {
 
 /// What Toknila says when the assistant edited a chain.
 pub fn edited_chain(name: &str) -> String {
-    format!("edited chain {name}")
+    format!("edited epic {name}")
 }
 
 /// What Toknila says when the assistant set its suggestion.
@@ -251,7 +251,7 @@ mod tests {
         let m = Message {
             id: "01JBQ7ZJ0000000000000000M1".into(),
             author: Author::Toknila,
-            text: "added card DEMO-2".into(),
+            text: "added story DEMO-2".into(),
             about: Some(About::Card {
                 key: "DEMO-2".parse().expect("key"),
             }),
@@ -263,7 +263,7 @@ mod tests {
             serde_json::to_value(&m).expect("json"),
             serde_json::json!({
                 "id": "01JBQ7ZJ0000000000000000M1", "author": "toknila",
-                "text": "added card DEMO-2",
+                "text": "added story DEMO-2",
                 "about": { "kind": "card", "key": "DEMO-2" }, "at": 5
             })
         );

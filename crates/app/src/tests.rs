@@ -593,6 +593,6 @@ fn export_then_import_conflicts_on_the_same_name() {
     let e = chains::import(&mut mem, "DEMO", &toml, None).expect_err("same name");
     assert_eq!(
         (e.kind, e.message.as_str()),
-        (ErrorKind::Conflict, "chain demo already exists in DEMO")
+        (ErrorKind::Conflict, "epic demo already exists in DEMO")
     );
 }

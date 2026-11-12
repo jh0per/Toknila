@@ -32,7 +32,7 @@ pub fn delete_chain<U: UnitOfWork + ?Sized>(
     let c = resolve::chain_in(uow, project, chain)?;
     let p = uow
         .project(c.project_id)?
-        .ok_or_else(|| AppError::not_found(format!("project of chain {}", c.name)))?;
+        .ok_or_else(|| AppError::not_found(format!("project of epic {}", c.name)))?;
     let tickets = uow.tickets(Some(c.id))?;
     if let Some(view) = uow.chain_view(c.id)? {
         let live = uow.live_runners()?;
@@ -44,7 +44,7 @@ pub fn delete_chain<U: UnitOfWork + ?Sized>(
                 .map(|t| t.key.to_string())
                 .collect();
             return Err(AppError::conflict(format!(
-                "chain {} has agents working on {}; stop them before deleting the chain",
+                "epic {} has agents working on {}; stop them before deleting the epic",
                 c.name,
                 keys.join(", ")
             )));

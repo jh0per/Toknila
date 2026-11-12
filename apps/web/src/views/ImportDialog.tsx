@@ -21,9 +21,9 @@ export function ImportDialog({ project, state, dispatch }: { project: string; st
       <section className="formats" data-testid="import-formats">
         <p className="muted">Toknila reads three kinds of plans:</p>
         <ul>
-          <li><b>A chain file</b> (TOML), one card per <code>[[ticket]]</code>: <code>{home}plans/login.toml</code></li>
+          <li><b>An epic file</b> (TOML), one story per <code>[[ticket]]</code>: <code>{home}plans/login.toml</code></li>
           <li><b>A spec folder</b> with a <code>tasks.md</code> in it: <code>{home}specs/001-login</code></li>
-          <li><b>A folder of spec folders</b>, one chain for each: <code>{home}specs</code></li>
+          <li><b>A folder of spec folders</b>, one epic for each: <code>{home}specs</code></li>
         </ul>
       </section>
       <form
@@ -33,7 +33,7 @@ export function ImportDialog({ project, state, dispatch }: { project: string; st
           if (path.trim()) dispatch({ type: "importPath", project, path: path.trim() });
         }}
       >
-        <Field label="Path of a chain file or folder" name="import-path" error={refused("path")} hint="The full path, as it is on this computer.">
+        <Field label="Path of an epic file or folder" name="import-path" error={refused("path")} hint="The full path, as it is on this computer.">
           <input data-testid="import-path" value={path} spellCheck={false} autoFocus onChange={(e) => setPath(e.target.value)} />
         </Field>
         <button className="btn primary" type="submit" disabled={i.busy || !path.trim()} data-testid="import-path-submit">
@@ -47,7 +47,7 @@ export function ImportDialog({ project, state, dispatch }: { project: string; st
           if (toml.trim()) dispatch({ type: "importText", project, toml });
         }}
       >
-        <Field label="Or paste a chain file" name="import-text" error={refused("paste")} hint={<>Starts with <code>[chain]</code> and a <code>name = "login"</code> line.</>}>
+        <Field label="Or paste an epic file" name="import-text" error={refused("paste")} hint={<>Starts with <code>[chain]</code> and a <code>name = "login"</code> line.</>}>
           <textarea data-testid="import-text" rows={4} spellCheck={false} value={toml} onChange={(e) => setToml(e.target.value)} />
         </Field>
         <button className="btn" type="submit" disabled={i.busy || !toml.trim()} data-testid="import-text-submit">

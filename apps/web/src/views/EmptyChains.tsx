@@ -15,8 +15,8 @@ export function EmptyChains({ project, state, dispatch }: { project: Project; st
       <h2>What do you want to build?</h2>
       <p data-testid="roadmap-starter"><b>{ROADMAP_STARTER}</b></p>
       <p className="muted">
-        Tell the assistant in a sentence or two. It reads {project.name || project.key}, drafts the plan as an epic of cards, and
-        you start the cards when you are happy with it.
+        Tell the assistant in a sentence or two. It reads {project.name || project.key}, drafts the plan as an epic of stories, and
+        you start the stories when you are happy with it.
       </p>
       <AskBox
         project={project.key} state={state} dispatch={dispatch} testId="empty-ask" label="What do you want to build?"
@@ -28,7 +28,7 @@ export function EmptyChains({ project, state, dispatch }: { project: Project; st
           type="button" className="inline-link" data-testid="empty-new-chain"
           onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: project.key } })}
         >
-          New chain
+          New epic
         </button>{" "}
         by hand, or{" "}
         <button

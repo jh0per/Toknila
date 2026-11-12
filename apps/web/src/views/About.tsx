@@ -8,7 +8,7 @@ export function About({ state, dispatch }: { state: State; dispatch: (i: Intent)
     <section className="card-block" data-testid="about">
       <p data-testid="version">Toknila {cli?.version ?? "…"}</p>
       <h3 className="sub">The <code>tok</code> command</h3>
-      <p className="muted">A command for the terminal that does what this window does: list cards, start them, answer them.</p>
+      <p className="muted">A command for the terminal that does what this window does: list stories, start them, answer them.</p>
       {cli && !cli.bundled && (
         <p className="muted">The <code>tok</code> command comes with the Toknila app; this daemon has none next to it.</p>
       )}

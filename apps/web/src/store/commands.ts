@@ -7,7 +7,7 @@ import type { CommandPolicy, InboxItem } from "../api/types";
 export const COMMAND_CHOICES: { value: CommandPolicy; label: string; hint: string }[] = [
   { value: "auto", label: "Let Claude decide", hint: "Claude Code decides and asks you only about risky actions." },
   { value: "ask", label: "Ask me each time", hint: "You answer a question for every command that is not already allowed." },
-  { value: "trust", label: "Never ask", hint: "The agent runs any command and uses any tool, including tools from other servers, without asking. Only what Toknila always refuses stays refused: starting other agents, scheduling work outside the card, leaving the workspace and reading your private folders. Use it only for a project you trust." },
+  { value: "trust", label: "Never ask", hint: "The agent runs any command and uses any tool, including tools from other servers, without asking. Only what Toknila always refuses stays refused: starting other agents, scheduling work outside the story, leaving the workspace and reading your private folders. Use it only for a project you trust." },
 ];
 
 /// The command inside a remembered rule: `Bash(cargo test *)` is `cargo test *`.

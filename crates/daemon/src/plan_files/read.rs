@@ -49,7 +49,7 @@ pub fn read(path: &str) -> Result<Found, AppError> {
     let given = path.trim();
     if given.is_empty() {
         return Err(AppError::bad_request(
-            "give the absolute path of a chain file, a spec folder or a folder of spec folders",
+            "give the absolute path of an epic file, a spec folder or a folder of spec folders",
         ));
     }
     let raw = Path::new(given);

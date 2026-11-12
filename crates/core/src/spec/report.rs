@@ -29,7 +29,7 @@ impl fmt::Display for OutOfOrderCard {
             let keys = b.open.join(", ");
             write!(
                 f,
-                "{sep}{} has {} open subtask{s} ({keys})",
+                "{sep}{} has {} open task{s} ({keys})",
                 b.card,
                 b.open.len()
             )?;

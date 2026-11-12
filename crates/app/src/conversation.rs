@@ -97,14 +97,14 @@ pub fn say_as_person<U: UnitOfWork + ?Sized>(
         None => None,
         Some(About::Chain { name }) => {
             let c = planner::chain(&*uow, project.id, &name)
-                .map_err(|_| AppError::not_found(format!("chain {name}")))?;
+                .map_err(|_| AppError::not_found(format!("epic {name}")))?;
             Some(About::Chain { name: c.name })
         }
         Some(About::Roadmap) => Some(About::Roadmap),
         Some(About::Card { .. }) => {
             return Err(AppError::new(
                 ErrorKind::BadRequest,
-                "a message about a card goes to the card's discussion",
+                "a message about a story goes to the story's discussion",
             ));
         }
     };
@@ -120,7 +120,7 @@ fn about_of<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> A
             Ok(c) => Ok(About::Chain { name: c.name }),
             // No card or chain of that name: "roadmap" names the roadmap.
             Err(_) if reference.eq_ignore_ascii_case("roadmap") => Ok(About::Roadmap),
-            Err(_) => Err(AppError::not_found(format!("card or chain {reference}"))),
+            Err(_) => Err(AppError::not_found(format!("story or epic {reference}"))),
         },
         Err(e) => Err(e),
     }

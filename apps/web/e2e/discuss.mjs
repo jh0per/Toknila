@@ -94,7 +94,7 @@ try {
   await t("assistant-toggle").click();
   await expectText(t("assistant-state"), "not running", "the panel says the assistant is not running");
   await expectText(t("planner-idle"), "Sending a message starts it", "and that sending a message starts it");
-  await expectText(t("context-chip"), "the card DS-1", "the panel's chip says which card is open");
+  await expectText(t("context-chip"), "the story DS-1", "the panel's chip says which card is open");
 
   // 2. Running (started with the fake planner profile), the panel says so.
   tok("planner", "start", "DS", "--profile", "fake-planner");
@@ -114,7 +114,7 @@ try {
     });
     return await out.text();
   })();
-  if (!terminalLine.includes("got:Discussion on card DS-1 (thread 1): make the acceptance stricter on errors")) {
+  if (!terminalLine.includes("got:Discussion on story DS-1 (thread 1): make the acceptance stricter on errors")) {
     throw new Error(`the planner was not told the card and the words: ${terminalLine.slice(-400)}`);
   }
   console.log("PASS the planner was told the card, the thread and the words");
@@ -152,8 +152,8 @@ try {
   for (const line of [
     "file:- person: make the acceptance stricter on errors",
     "file:- assistant: I would add the 4xx case",
-    "(accepted: the card above has it)",
-    "(rejected: the card is unchanged)",
+    "(accepted: the story above has it)",
+    "(rejected: the story is unchanged)",
   ]) {
     if (!out.includes(line)) throw new Error(`the agent's instructions lack "${line}":\n${out.slice(-800)}`);
   }

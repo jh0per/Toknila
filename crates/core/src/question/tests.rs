@@ -210,7 +210,7 @@ fn a_worker_that_handed_in_is_refused_without_asking_and_only_then() {
         panic!("a handed-in worker is refused");
     };
     assert_eq!(message, HANDED_IN_DENIAL);
-    assert!(message.contains("handed in") && message.contains("unless the card is returned"));
+    assert!(message.contains("handed in") && message.contains("unless the story is returned"));
     for status in S::ALL.into_iter().filter(|s| *s != S::Review) {
         assert_eq!(auto_decision(AgentRole::Worker, status), None, "{status:?}");
     }

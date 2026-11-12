@@ -20,7 +20,7 @@ function Places({ state }: { state: State }) {
         <dt>Agent files</dt>
         <dd data-testid="place-profiles"><code>{places?.profiles ?? "…"}</code></dd>
       </dl>
-      <p className="muted">The data folder holds the database and the run logs; a workspace is the copy of the project a card's agent works in.</p>
+      <p className="muted">The data folder holds the database and the run logs; a workspace is the copy of the project a story's agent works in.</p>
     </details>
   );
 }

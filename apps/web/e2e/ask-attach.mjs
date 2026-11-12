@@ -142,7 +142,7 @@ try {
   //    and the card's discussion names it with the message.
   await page.goto(at("/projects/AT/chains/work/cards/AT-1"));
   await t("assistant-toggle").click();
-  await expectText(t("context-chip"), "the card AT-1", "the panel's chip is the open card");
+  await expectText(t("context-chip"), "the story AT-1", "the panel's chip is the open card");
   await t("planner-ask-input").waitFor({ timeout: 10_000 });
   await paste("planner-ask-input", [{ name: "image.png", type: "image/png" }]);
   await t("planner-ask-chip").waitFor({ timeout: 10_000 });

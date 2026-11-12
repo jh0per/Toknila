@@ -67,7 +67,7 @@ fn start_with<U: UnitOfWork + ?Sized>(
     };
     let project = uow
         .project(ctx.view.chain.project_id)?
-        .ok_or_else(|| AppError::not_found("project of the chain"))?;
+        .ok_or_else(|| AppError::not_found("project of the epic"))?;
     if t.profile.is_none() && project.runs_simulated(t) && !project.simulated {
         // A card that only gets `sim` from its project's default starts no process: on a project
         // that did not ask for simulation it would read Running with no agent behind it. A card

@@ -26,8 +26,8 @@ pub fn chain<R: Reader + ?Sized>(repo: &R, r: &str) -> AppResult<Chain> {
     let found = repo.chains_named(r)?;
     unique(
         found,
-        || format!("chain {r}"),
-        |n| format!("{n} chains are named {r}; use the chain id"),
+        || format!("epic {r}"),
+        |n| format!("{n} epics are named {r}; use the epic id"),
     )
 }
 
@@ -42,8 +42,8 @@ pub fn chain_in<R: Reader + ?Sized>(repo: &R, project: Option<&str>, r: &str) ->
     found.retain(|c| c.id.to_string() == r || c.name == r);
     unique(
         found,
-        || format!("chain {r} in project {}", p.key),
-        |n| format!("{n} chains are named {r}; use the chain id"),
+        || format!("epic {r} in project {}", p.key),
+        |n| format!("{n} epics are named {r}; use the epic id"),
     )
 }
 
@@ -114,7 +114,7 @@ pub fn node(view: &ChainView, r: &str) -> AppResult<NodeRef> {
         return Ok(NodeRef::Release(rel.id));
     }
     Err(AppError::not_found(format!(
-        "{r} in chain {}",
+        "{r} in epic {}",
         view.chain.name
     )))
 }

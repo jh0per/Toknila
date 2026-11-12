@@ -42,10 +42,10 @@ describe("what is open is the context chip", () => {
 describe("what a message sent with a chip is", () => {
   const open = (route: Route) => apply(at(route), { type: "toggleAssistant" });
 
-  it("about a chain is typed `About chain NAME: …` and stored with the chain", () => {
+  it("about a chain is typed `About epic NAME: …` and stored with the chain", () => {
     const [, fx] = reduce(typed(open({ name: "projectChain", project: "DEMO", chain: "plan" }), "reorder\nthe cards"), { type: "askPlanner", project: "DEMO" });
     expect(fx[0]).toMatchObject({
-      call: "ask", text: "About chain plan: reorder the cards", raw: "reorder\nthe cards", about: { kind: "chain", name: "plan" },
+      call: "ask", text: "About epic plan: reorder the cards", raw: "reorder\nthe cards", about: { kind: "chain", name: "plan" },
     });
   });
 
@@ -57,7 +57,7 @@ describe("what a message sent with a chip is", () => {
 
   it("is plain without a chip", () => {
     const off = apply(open({ name: "project", project: "DEMO" }), { type: "removeChip" });
-    expect(lineFor({ kind: "chain", name: "x" }, " a  ")).toBe("About chain x: a");
+    expect(lineFor({ kind: "chain", name: "x" }, " a  ")).toBe("About epic x: a");
     const [, fx] = reduce(typed(off, "hi"), { type: "askPlanner", project: "DEMO" });
     expect(fx[0]).toMatchObject({ call: "ask", text: "hi" });
   });
@@ -78,7 +78,7 @@ describe("what a message sent with a chip is", () => {
   it("names the epic and the card in the chip", () => {
     expect(contextLabel({ kind: "roadmap" })).toBe("Roadmap");
     expect(contextLabel({ kind: "chain", name: "phase-7" })).toBe("the epic phase-7");
-    expect(contextLabel({ kind: "card", key: "DEMO-1" })).toBe("the card DEMO-1");
+    expect(contextLabel({ kind: "card", key: "DEMO-1" })).toBe("the story DEMO-1");
   });
 
   it("openAssistant opens the panel once and leaves an open one alone", () => {
