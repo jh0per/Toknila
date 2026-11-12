@@ -76,6 +76,54 @@ fn an_answer_to_a_running_worker_changes_no_status() {
 }
 
 #[test]
+fn a_workers_screen_question_moves_the_card_to_waiting_and_its_first_sign_of_life_back() {
+    let mut mem = running();
+    let t = a(&mem);
+    mem.events.clear();
+    let lines = vec!["Is this a project you trust?".to_owned()];
+    questions::screen_raised(&mut mem, &t, AgentRole::Worker, &lines).expect("raised");
+    let waiting = a(&mem);
+    assert_eq!(waiting.status, TicketStatus::Waiting);
+    assert_eq!(
+        waiting.status_reason,
+        Some(StatusReason::Waiting(WaitingReason::Screen))
+    );
+    assert_eq!(waiting.waiting_for(), "you: Claude Code asks on its screen");
+    let kinds = mem.kinds();
+    assert!(
+        kinds.contains(&"ticket.question_raised".to_owned()),
+        "{kinds:?}"
+    );
+    questions::screen_cleared(&mut mem, &t, AgentRole::Worker).expect("cleared");
+    let now = a(&mem);
+    assert_eq!(
+        (now.status, now.status_reason),
+        (TicketStatus::Running, None)
+    );
+}
+
+#[test]
+fn a_reviewers_screen_question_leaves_the_card_alone() {
+    let mut mem = running();
+    let t = a(&mem);
+    questions::screen_raised(&mut mem, &t, AgentRole::Reviewer, &[]).expect("raised");
+    assert_eq!(a(&mem).status, TicketStatus::Running);
+}
+
+#[test]
+fn an_answer_to_a_screen_question_puts_the_card_back_to_running() {
+    let mut mem = running();
+    let t = a(&mem);
+    questions::screen_raised(&mut mem, &t, AgentRole::Worker, &[]).expect("raised");
+    questions::answered(&mut mem, &t, AgentRole::Worker, AnswerKind::Yes).expect("answered");
+    let now = a(&mem);
+    assert_eq!(
+        (now.status, now.status_reason),
+        (TicketStatus::Running, None)
+    );
+}
+
+#[test]
 fn only_a_person_answers() {
     let mut mem = running();
     ask(&mut mem);
@@ -92,7 +140,14 @@ fn raising_and_clearing_are_journaled_for_the_role() {
     let mut mem = running();
     let t = a(&mem);
     mem.events.clear();
-    questions::raised(&mut mem, &t, AgentRole::Reviewer, QuestionKind::Screen).expect("raised");
+    questions::raised(
+        &mut mem,
+        &t,
+        AgentRole::Reviewer,
+        QuestionKind::Screen,
+        None,
+    )
+    .expect("raised");
     questions::cleared(&mut mem, &t, AgentRole::Reviewer).expect("cleared");
     assert_eq!(
         mem.kinds(),

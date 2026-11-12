@@ -20,13 +20,14 @@
 pub mod hand_in;
 pub mod leftovers;
 mod pins;
+mod screens;
 
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
 use crate::design::pin::DesignPin;
-use crate::question::{self, AnswerKind, PendingPermission, QuestionKind, RunFacts};
+use crate::question::{AnswerKind, PendingPermission, QuestionKind, RunFacts};
 use crate::{
     AgentRole, ChainId, Comment, ProjectId, ReviewNote, ReviewTurn, StatusReason, Subtask, Thread,
     ThreadMessage, ThreadVersion, Ticket, TicketKey, TicketStatus, Timestamp, WaitingReason,
@@ -333,28 +334,7 @@ fn question_items(data: &InboxData) -> Vec<InboxItem> {
         }
         items.push(i);
     }
-    for run in data.runs.iter().filter(|r| r.waits_on_screen(data.now)) {
-        let Some(t) = card(run.ticket) else { continue };
-        let working = matches!(t.status, TicketStatus::Running | TicketStatus::Review);
-        let asking = data
-            .permissions
-            .iter()
-            .any(|p| p.ticket == run.ticket && p.role == run.role);
-        if !working || asking {
-            continue;
-        }
-        let since = run.waiting_since();
-        let mut i = item(
-            InboxKind::Question,
-            t,
-            since,
-            question::SCREEN_TEXT.to_owned(),
-        );
-        i.role = Some(run.role);
-        i.answers = QuestionKind::Screen.answers();
-        i.lines = question::last_lines(&run.tail, question::SCREEN_LINES);
-        items.push(i);
-    }
+    items.extend(screens::items(data));
     items
 }
 

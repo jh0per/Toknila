@@ -159,11 +159,15 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
 fn a_question_asked_after_the_silent_nudge_reaches_the_inbox_and_the_answer_reaches_the_agent() {
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
-    // Quiet for a second and no nudges allowed: the first look of the ticker (every 5 s) gives up
-    // and the card waits as silent. The agent then asks, still alive, and reads the answer.
+    // A first hook (the agent has shown life), then quiet for a second and no nudges allowed: the
+    // first look of the ticker (every 5 s) gives up and the card waits as silent. The agent then
+    // asks, still alive, and reads the answer. (A run with no sign of life is never given up on.)
     tok.profile(
         "quiet",
         &[
+            "post",
+            "/tickets/{ticket}/activity",
+            r#"{"signal":"hook:stop"}"#,
             "sleep",
             "9000",
             "post",

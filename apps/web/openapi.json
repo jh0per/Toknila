@@ -6404,7 +6404,9 @@
           "two",
           "escape",
           "up",
-          "down"
+          "down",
+          "yes",
+          "no"
         ]
       },
       "AnswerOutcome": {
@@ -13183,6 +13185,20 @@
           },
           "label": {
             "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A workspace line only: the last folder name of `repo`."
+          },
+          "repo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A workspace line only: the folder of the main repository the folder belongs to."
           }
         }
       },
@@ -13382,6 +13398,21 @@
                 "type": "string",
                 "enum": [
                   "silent"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The agent's own screen asks something (a trust dialog, a login) before it has shown any\nsign of life; only a person answers it.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "screen"
                 ]
               }
             }

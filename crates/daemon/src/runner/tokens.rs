@@ -98,6 +98,7 @@ impl AgentTokens {
                         started: at,
                         mcp: None,
                         hook: None,
+                        screen_open: false,
                     },
                 },
             );

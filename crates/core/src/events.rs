@@ -115,6 +115,10 @@ pub enum DomainEvent {
         ticket: TicketId,
         role: AgentRole,
         kind: QuestionKind,
+        /// In words, what is asked ("the agent's screen asks: <first line>"); absent for older
+        /// entries.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
     },
     /// Such a question went away without an answer: the agent showed life again, or its run ended.
     QuestionCleared {

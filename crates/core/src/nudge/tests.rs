@@ -19,9 +19,11 @@ fn signals() -> Signals {
     Signals {
         started: at(0),
         mcp: None,
-        hook: None,
+        // The first hook came with the start, so the run has shown life.
+        hook: Some(at(0)),
         output: None,
         delivered: None,
+        screen_open: false,
     }
 }
 
@@ -33,19 +35,59 @@ fn a_run_that_is_quiet_for_the_threshold_is_nudged() {
 }
 
 #[test]
-fn output_is_the_fallback_only_when_no_mcp_or_hook_was_seen() {
+fn a_run_with_no_sign_of_life_is_never_nudged() {
+    // No hook, no MCP call: only output (a first-run screen prints too), however long it is quiet.
     let s = Signals {
+        hook: None,
         output: Some(at(100)),
         ..signals()
     };
-    assert_eq!(decide(&cfg(), &s, false, &[], at(219)), Decision::Wait);
-    assert_eq!(decide(&cfg(), &s, false, &[], at(220)), Decision::Nudge);
-    // A hook seen at 10 makes output (a spinner, say) irrelevant.
+    assert!(!s.alive());
+    let sent = [at(120), at(240), at(360)];
+    for now in [at(120), at(5000), at(100_000)] {
+        assert_eq!(decide(&cfg(), &s, false, &[], now), Decision::Wait);
+        assert_eq!(decide(&cfg(), &s, false, &sent, now), Decision::Wait);
+    }
+    // A delivered instruction is not a sign of life either.
     let s = Signals {
-        hook: Some(at(10)),
+        delivered: Some(at(50)),
         ..s
     };
-    assert_eq!(decide(&cfg(), &s, false, &[], at(130)), Decision::Nudge);
+    assert_eq!(decide(&cfg(), &s, false, &[], at(5000)), Decision::Wait);
+}
+
+#[test]
+fn the_silence_counts_from_the_first_sign_of_life_not_from_the_start() {
+    // Started at 0, the first hook at 1000: the nudge is due at 1120, not at 120.
+    let s = Signals {
+        hook: Some(at(1000)),
+        ..signals()
+    };
+    assert_eq!(decide(&cfg(), &s, false, &[], at(1119)), Decision::Wait);
+    assert_eq!(decide(&cfg(), &s, false, &[], at(1120)), Decision::Nudge);
+    // Output (a spinner, say) does not postpone it.
+    let s = Signals {
+        output: Some(at(1100)),
+        ..s
+    };
+    assert_eq!(decide(&cfg(), &s, false, &[], at(1120)), Decision::Nudge);
+}
+
+#[test]
+fn an_open_screen_question_is_never_nudged_or_given_up_on() {
+    let s = Signals {
+        screen_open: true,
+        ..signals()
+    };
+    let sent = [at(120), at(240), at(360)];
+    assert_eq!(decide(&cfg(), &s, false, &[], at(5000)), Decision::Wait);
+    assert_eq!(decide(&cfg(), &s, false, &sent, at(5000)), Decision::Wait);
+    // Control: the same run without the question is nudged.
+    let open = Signals {
+        screen_open: false,
+        ..s
+    };
+    assert_eq!(decide(&cfg(), &open, false, &[], at(5000)), Decision::Nudge);
 }
 
 #[test]
