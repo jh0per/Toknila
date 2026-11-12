@@ -233,6 +233,11 @@ fn replace_worker<U: UnitOfWork + ?Sized>(uow: &mut U, run: &Run) -> AppResult<b
         return Ok(false);
     }
     let started = i64::try_from(run.id.0.timestamp_ms()).unwrap_or(i64::MAX);
+    if t.status_since.0 > started {
+        // The card became Running after this run began: this is the agent that was paused while
+        // the card waited, and the run that resumed it is already queued.
+        return Ok(false);
+    }
     if (0..RESTART_GUARD_MS).contains(&(uow.now().0 - started)) {
         let detail = "the agent ends right after it starts".to_owned();
         let reason = BlockedReason::Crashed { detail };
