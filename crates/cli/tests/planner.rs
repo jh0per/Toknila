@@ -310,6 +310,10 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
                     "text": "Is the logo fixed?", "card": "DEMO-1" }),
         ),
         call(26, "show_plan", json!({})),
+        call(27, "show_plan", json!({ "chain": "mcp" })),
+        call(28, "show_plan", json!({ "card": "DEMO-1" })),
+        call(29, "show_plan", json!({ "card": "DEMO-99" })),
+        call(30, "show_plan", json!({ "chain": "mcp", "card": "DEMO-1" })),
         // The owner's calls are not tools.
         call(16, "start", json!({ "card": "DEMO-1" })),
         call(17, "accept", json!({ "card": "DEMO-1" })),
@@ -450,13 +454,19 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
     assert_eq!(pins[0]["card"], "DEMO-1");
     assert_eq!(pins[0]["region"]["w"], 30);
     assert_eq!(pins[0]["answer"], Value::Null);
-    let mcp_chain = plan["chains"]
+    // The overview names the chain the tools made and its three cards in short.
+    let short = plan["chains"]
         .as_array()
         .expect("chains")
         .iter()
-        .find(|c| c["chain"]["name"] == "mcp")
+        .find(|c| c["name"] == "mcp")
         .expect("the chain the tools made");
-    assert_eq!(mcp_chain["chain"]["autostart"], false);
+    assert_eq!(short["autostart"], false);
+    assert_eq!(short["cards"].as_array().map(Vec::len), Some(3), "{short}");
+    assert!(short["cards"][0].get("prompt").is_none(), "{short}");
+    // `chain` opens it in full, `card` opens one card in full.
+    let mcp_chain: Value = serde_json::from_str(&text_of(by_id(27))).expect("the chain is JSON");
+    assert_eq!(mcp_chain["chain"]["name"], "mcp");
     let keys: Vec<&str> = mcp_chain["cards"]
         .as_array()
         .expect("cards")
@@ -464,6 +474,11 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         .filter_map(|c| c["ticket"]["key"].as_str())
         .collect();
     assert_eq!(keys.len(), 3);
+    let one: Value = serde_json::from_str(&text_of(by_id(28))).expect("the card is JSON");
+    assert_eq!(one["ticket"]["key"], "DEMO-1");
+    assert_eq!(one["subtasks"].as_array().map(Vec::len), Some(2), "{one}");
+    assert_eq!(by_id(29)["result"]["isError"], true, "{}", by_id(29));
+    assert_eq!(by_id(30)["result"]["isError"], true, "{}", by_id(30));
     let first = mcp_chain["cards"]
         .as_array()
         .expect("cards")
@@ -485,5 +500,97 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         tok.statuses()
     );
     assert_eq!(tok.statuses().len(), 3);
+    tok.run(&["planner", "stop", "DEMO"]);
+}
+
+#[test]
+fn show_plan_without_arguments_stays_small_for_a_project_of_a_hundred_big_cards() {
+    let (_dir, tok, _) = setup(&["env", "TOKNILA_RUN_TOKEN", "hold"]);
+    tok.run(&["planner", "start", "DEMO", "--profile", "fake-planner"]);
+    wait_for(&tok, "the token line", || {
+        planner_logs(&tok).contains("TOKNILA_RUN_TOKEN=")
+    });
+    let token = planner_logs(&tok)
+        .lines()
+        .find_map(|l| {
+            l.trim()
+                .strip_prefix("TOKNILA_RUN_TOKEN=")
+                .map(str::to_owned)
+        })
+        .expect("token");
+
+    let mut lines = vec![
+        call(
+            1,
+            "new_chain",
+            json!({ "name": "mini", "goal": "two cards" }),
+        ),
+        call(
+            2,
+            "add_card",
+            json!({ "chain": "mini", "title": "One", "prompt": "p" }),
+        ),
+        call(
+            3,
+            "add_card",
+            json!({ "chain": "mini", "title": "Two", "prompt": "p", "after": ["DEMO-1"],
+                    "subtasks": ["a"], "design_first": true }),
+        ),
+        call(
+            4,
+            "new_chain",
+            json!({ "name": "big", "goal": "a hundred cards" }),
+        ),
+    ];
+    let prompt = "x".repeat(3_000);
+    for n in 1..=100u32 {
+        let mut card = json!({ "chain": "big", "title": format!("Card {n}"), "prompt": prompt,
+                               "acceptance": ["a".repeat(200)] });
+        if n > 1 {
+            card["after"] = json!([format!("DEMO-{}", n + 1)]);
+        }
+        lines.push(call(10 + n, "add_card", card));
+    }
+    lines.push(call(200, "show_plan", json!({})));
+    lines.push(call(201, "show_plan", json!({ "chain": "big" })));
+    let answers = mcp_session(
+        &tok.info().base_url(),
+        &token,
+        &[("TOKNILA_ROLE", "planner")],
+        &lines,
+    );
+    let by_id = |id: u64| {
+        answers
+            .iter()
+            .find(|a| a["id"] == id)
+            .unwrap_or_else(|| panic!("no answer {id}"))
+    };
+    let overview = text_of(by_id(200));
+    assert!(
+        overview.len() < 40_000,
+        "the overview of 100 cards with 3,000-character prompts is {} characters",
+        overview.len()
+    );
+    let parsed: Value = serde_json::from_str(&overview).expect("the overview is JSON");
+    let big = parsed["chains"]
+        .as_array()
+        .expect("chains")
+        .iter()
+        .find(|c| c["name"] == "big")
+        .expect("big");
+    assert_eq!(big["cards"].as_array().map(Vec::len), Some(100));
+    assert_eq!(big["cards"][99]["key"], "DEMO-102");
+    assert_eq!(big["cards"][99]["status"], "backlog");
+    assert_eq!(big["cards"][99]["after"][0], "DEMO-101");
+    // The control: the chain in full is the big answer, so the ceiling measures something.
+    assert!(text_of(by_id(201)).len() > 300_000);
+    let mini = parsed["chains"]
+        .as_array()
+        .expect("chains")
+        .iter()
+        .find(|c| c["name"] == "mini")
+        .expect("mini")
+        .clone();
+    common::snapshot("planner_overview_chain", mini);
     tok.run(&["planner", "stop", "DEMO"]);
 }

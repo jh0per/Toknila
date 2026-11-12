@@ -7,7 +7,7 @@ use crate::http::body::Json;
 use axum::Extension;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use toknila_api_types::{PlannerDesign, PlannerPlan};
+use toknila_api_types::{PlanCard, PlanChain, PlannerDesign, PlannerOverview, PlannerPlan};
 use toknila_app::planner::{self, CardEdit, DesignPick, NewCard, NewPlanChain, NewSuggestion};
 use toknila_app::threads::{self, NewMessage, NewThread, NewVersion};
 use toknila_core::design::DesignRef;
@@ -39,6 +39,62 @@ pub async fn planner_plan(
     let designs = Designs::new(&state.home, project);
     let designs = tokio::task::spawn_blocking(move || designs.for_planner()).await??;
     Ok(Json(PlannerPlan { plan, designs }))
+}
+
+#[utoipa::path(get, path = "/planner/overview", tag = "planner",
+    responses((status = 200, body = PlannerOverview), (status = 403, body = ErrorBody)))]
+/// The plan of the planner's project in short records (every chain, the cards of the chains that
+/// are not finished, the designs with their paths, the pins): small at any size of the plan.
+pub async fn planner_overview(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+) -> ApiResult<Json<PlannerOverview>> {
+    let project = principal.planner_project()?;
+    let at = now();
+    let designs = Designs::new(&state.home, project);
+    let designs = tokio::task::spawn_blocking(move || designs.for_planner()).await??;
+    let names: Vec<_> = designs.iter().map(|d| (d.id, d.name.clone())).collect();
+    let overview = read(&state, move |repo| {
+        Ok(planner::overview(repo, project, at, &names)?)
+    })
+    .await?;
+    Ok(Json(PlannerOverview { overview, designs }))
+}
+
+#[utoipa::path(get, path = "/planner/chains/{chain}", tag = "planner",
+    params(("chain" = String, Path, description = CHAIN)),
+    responses((status = 200, body = PlanChain), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// One chain of the planner's project with every card in full.
+pub async fn planner_chain(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Path(chain): Path<String>,
+) -> ApiResult<Json<PlanChain>> {
+    let project = principal.planner_project()?;
+    let at = now();
+    let found = read(&state, move |repo| {
+        Ok(planner::chain_in_full(repo, project, &chain, at)?)
+    })
+    .await?;
+    Ok(Json(found))
+}
+
+#[utoipa::path(get, path = "/planner/cards/{card}", tag = "planner",
+    params(("card" = String, Path, description = CARD)),
+    responses((status = 200, body = PlanCard), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// One card of the planner's project in full: prompt, acceptance, subtasks, threads with their
+/// messages, review results and pull request.
+pub async fn planner_card(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Path(card): Path<String>,
+) -> ApiResult<Json<PlanCard>> {
+    let project = principal.planner_project()?;
+    let found = read(&state, move |repo| {
+        Ok(planner::card_in_full(repo, project, &card)?)
+    })
+    .await?;
+    Ok(Json(found))
 }
 
 #[utoipa::path(get, path = "/planner/designs/{design}", tag = "planner",

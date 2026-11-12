@@ -27,8 +27,8 @@ pub use chains::{
     ChainDetail, ChainItem, DesignMoveInput, EdgeInput, EdgeMoveInput, MoveInput, ReleaseMember,
 };
 pub use designs::{
-    Design, DesignList, FigmaToken, NewDesignPin, NewFigmaDesign, PlannerDesign, PlannerPlan,
-    RenameDesign,
+    Design, DesignList, FigmaToken, NewDesignPin, NewFigmaDesign, PlannerDesign, PlannerOverview,
+    PlannerPlan, RenameDesign,
 };
 pub use events::{ErrorBody, EventQuery, EventRecord, InstructionClaim, NewActivity};
 pub use planner::{PlannerState, StartPlanner};
@@ -47,8 +47,8 @@ pub use tickets::{ActionInput, NewSubtask, PatchSubtask, TicketDetail, TicketIte
 pub use toknila_app::chains::{ChainSettings, NewChain};
 pub use toknila_app::pins::PinAnswer;
 pub use toknila_app::planner::{
-    CardEdit, NewCard, NewPlanChain, NewSuggestion, PlanCard, PlanChain, PlanThread, PlanView,
-    SubtaskEdit,
+    CardEdit, NewCard, NewPlanChain, NewSuggestion, OverviewCard, OverviewChain, OverviewSummary,
+    PlanCard, PlanChain, PlanOverview, PlanThread, PlanView, SubtaskEdit,
 };
 pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;

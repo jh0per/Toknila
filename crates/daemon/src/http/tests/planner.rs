@@ -260,6 +260,43 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
 }
 
 #[tokio::test]
+async fn the_overview_a_chain_and_a_card_are_read_in_the_planners_project_only() {
+    let api = Api::new();
+    api.two_projects().await;
+    let token = api.planner_token("DEMO").await;
+    api.post("/v1/chains/plan/tickets", json!({ "title": "Mine" }))
+        .await;
+    let get = |uri: &'static str| {
+        let (api, token) = (&api, token.clone());
+        async move { api.call_with(&token, Method::GET, uri, None).await }
+    };
+    let (s, _) = get("/v1/planner/overview").await;
+    assert_eq!(s, StatusCode::OK);
+    // Own chain and card: the control.
+    let (s, chain) = get("/v1/planner/chains/plan").await;
+    assert_eq!(s, StatusCode::OK, "{chain}");
+    assert_eq!(chain["cards"][0]["ticket"]["title"], "Mine");
+    let (s, card) = get("/v1/planner/cards/DEMO-1").await;
+    assert_eq!(s, StatusCode::OK, "{card}");
+    assert_eq!(card["ticket"]["key"], "DEMO-1");
+    // Another project's: refused. One that does not exist: not found.
+    for uri in ["/v1/planner/chains/theirs", "/v1/planner/cards/OTHER-1"] {
+        let (s, e) = get(uri).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{uri}: {e}");
+        assert!(
+            e["error"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("another project")
+        );
+    }
+    for uri in ["/v1/planner/chains/nope", "/v1/planner/cards/DEMO-99"] {
+        let (s, e) = get(uri).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{uri}: {e}");
+    }
+}
+
+#[tokio::test]
 async fn show_card_journals_one_window_event_for_a_card_of_its_own_project_only() {
     let api = Api::new();
     api.two_projects().await;
