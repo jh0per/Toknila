@@ -28,6 +28,8 @@ pub struct Reported {
     pub mcp: Option<Timestamp>,
     /// Its last hook.
     pub hook: Option<Timestamp>,
+    /// A `screen` question is open for the run (the host sets it; it is not a sign of life).
+    pub screen_open: bool,
 }
 
 /// Whether a comment is a nudge: an instruction the system wrote.
@@ -70,6 +72,7 @@ pub fn check<R: Reader + ?Sized>(
         hook: reported.hook,
         output: Some(Timestamp(now.0.saturating_sub(quiet))),
         delivered,
+        screen_open: reported.screen_open,
     };
     Ok(nudge::decide(cfg, &signals, state.busy, &nudges, now))
 }

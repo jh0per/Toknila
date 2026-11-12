@@ -215,6 +215,8 @@ pub fn react(status: TicketStatus, reason: Option<&WaitingReason>, sign: &Sign<'
                     _ => true,
                 }
         }
+        // The first sign of life ends a wait on the screen.
+        Some(WaitingReason::Screen) => true,
         Some(WaitingReason::Silent) | None => {
             sign.signal == SIGNAL_MCP || crate::nudge::resumes(sign.signal)
         }

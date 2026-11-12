@@ -12,6 +12,7 @@
 mod keys;
 mod screen;
 mod shell_edit;
+mod trust;
 
 use serde::{Deserialize, Serialize};
 
@@ -20,12 +21,24 @@ use crate::{AgentRole, TicketId, TicketStatus, Timestamp};
 pub use keys::{expand_keys, has_named_keys};
 pub use screen::{SCREEN_LINES, last_lines, screen_hash};
 pub use shell_edit::{SHELL_EDIT_DENIAL, shell_edit_denial};
+pub use trust::{TRUST_NO, TRUST_YES, is_trust_dialog, trust_keys};
 
 /// Seconds after spawn without a sign of life before an agent counts as waiting on its screen.
 pub const DEFAULT_STARTUP_SECS: u64 = 20;
 
 /// The text of the inbox item for an agent that waits on its screen.
 pub const SCREEN_TEXT: &str = "The agent waits on its screen";
+
+/// What the inbox row and `tok ls` say of a card that waits on its screen.
+pub const SCREEN_WAITING: &str = "Claude Code asks on its screen";
+
+/// The journal's words for a screen question: what its first line says.
+pub fn screen_words(lines: &[String]) -> String {
+    lines.first().map_or_else(
+        || "the agent's screen asks something".to_owned(),
+        |first| format!("the agent's screen asks: {}", first.trim()),
+    )
+}
 
 /// What kind of question is open.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -63,6 +76,10 @@ pub enum AnswerKind {
     Up,
     /// The Down arrow key.
     Down,
+    /// Choose "Yes, I trust this folder" on Claude Code's trust dialog.
+    Yes,
+    /// Choose "No, exit" on the trust dialog.
+    No,
 }
 
 impl QuestionKind {
@@ -83,9 +100,11 @@ impl QuestionKind {
         }
     }
 
-    /// Whether `answer` may be given to this kind of question.
+    /// Whether `answer` may be given to this kind of question. The two trust answers are for a
+    /// screen only; the keys they type depend on the screen ([`trust_keys`]).
     pub fn accepts(self, answer: AnswerKind) -> bool {
         self.answers().contains(&answer)
+            || (self == Self::Screen && matches!(answer, AnswerKind::Yes | AnswerKind::No))
     }
 }
 
@@ -160,6 +179,8 @@ pub fn deliver(
 ) -> Result<Delivery, AnswerError> {
     let text = text.map(str::trim).filter(|t| !t.is_empty());
     Ok(match (answer, hook_waiting) {
+        // Only a screen that is the trust dialog says which keys these are.
+        (AnswerKind::Yes | AnswerKind::No, _) => return Err(AnswerError::NotOffered(answer)),
         (AnswerKind::Allow, true) => Delivery::Hook(Decision::Allow),
         (AnswerKind::Deny, true) => Delivery::Hook(Decision::Deny {
             message: text.unwrap_or(DENIED).to_owned(),

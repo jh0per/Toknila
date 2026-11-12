@@ -6,23 +6,66 @@
 use toknila_core::events::DomainEvent;
 use toknila_core::machine::{TicketEvent, person_only};
 use toknila_core::question::{AnswerKind, QuestionKind};
-use toknila_core::{AgentRole, Ticket, TicketStatus};
+use toknila_core::{AgentRole, StatusReason, Ticket, TicketStatus, WaitingReason};
 
+use crate::chain::tell_ticket;
 use crate::{AppError, AppResult, UnitOfWork, with_chain};
 
-/// A run of `t` raised a question that no status shows (a reviewer's dialog, a screen wait).
+/// A run of `t` raised a question that no status shows (a reviewer's dialog); `text` says what is
+/// asked in words, for the journal.
 pub fn raised<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     t: &Ticket,
     role: AgentRole,
     kind: QuestionKind,
+    text: Option<String>,
 ) -> AppResult<()> {
     uow.emit(&DomainEvent::QuestionRaised {
         key: t.key.clone(),
         ticket: t.id,
         role,
         kind,
+        text,
     })
+}
+
+/// A run's own screen asks (`screen_lines` are what it shows): the journal says what the first
+/// line is, and a worker's Running card moves to Waiting (reason: its screen), so the window and
+/// `tok ls` say it waits for a person. Nothing but a person answers it.
+pub fn screen_raised<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    t: &Ticket,
+    role: AgentRole,
+    screen_lines: &[String],
+) -> AppResult<()> {
+    let words = toknila_core::question::screen_words(screen_lines);
+    raised(uow, t, role, QuestionKind::Screen, Some(words))?;
+    let running = uow
+        .ticket(t.id)?
+        .is_some_and(|t| t.status == TicketStatus::Running);
+    if role == AgentRole::Worker && running {
+        let reason = WaitingReason::Screen;
+        tell_ticket(uow, t.id, TicketEvent::AskHuman { reason })?;
+    }
+    Ok(())
+}
+
+/// The screen question went away without an answer (the run showed its first sign of life, or
+/// ended): a worker's card that waited on it goes on.
+pub fn screen_cleared<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    t: &Ticket,
+    role: AgentRole,
+) -> AppResult<()> {
+    cleared(uow, t, role)?;
+    let waiting = uow.ticket(t.id)?.is_some_and(|t| {
+        t.status == TicketStatus::Waiting
+            && t.status_reason == Some(StatusReason::Waiting(WaitingReason::Screen))
+    });
+    if role == AgentRole::Worker && waiting {
+        tell_ticket(uow, t.id, TicketEvent::AgentActive)?;
+    }
+    Ok(())
 }
 
 /// Such a question went away without an answer.

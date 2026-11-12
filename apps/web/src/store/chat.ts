@@ -55,6 +55,7 @@ function eventItem(e: EventRecord): ChatItem | undefined {
   if (e.kind === "status_changed" && p.reason?.status === "waiting") {
     const r = p.reason as Fields;
     if (r.kind === "silent") return agent("Agent", "note", "The agent stopped responding.");
+    if (r.kind === "screen") return agent("Agent", "question", "Claude Code asks on its screen.");
     return agent("Agent", "question", r.kind === "permission" ? `Asks for permission: ${r.text}` : String(r.text ?? ""));
   }
   if (e.kind === "question_raised" && p.kind !== "question") {
