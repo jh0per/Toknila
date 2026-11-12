@@ -1,5 +1,8 @@
 /* A card's designs: mockups large with the region outlined, the picker, the node thumbnail. */
 .card-designs { display: flex; flex-direction: column; gap: var(--s2); margin: var(--s3) 0; }
+.card-designs.drop-over { outline: 2px solid var(--accent); outline-offset: 2px; background: var(--accent-soft); border-radius: var(--r-m); }
+.card-designs-drop { border: 1px dashed var(--line); border-radius: var(--r-m); padding: var(--s4); text-align: center; font-size: var(--fs-m); }
+.card-designs.drop-over .card-designs-drop { border: 2px solid var(--accent); }
 .card-designs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
 /* Looks like the page's h4 headings; it is not an h4 element only so the columns below stay the first. */
 .card-designs-title { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }

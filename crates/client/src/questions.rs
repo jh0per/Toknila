@@ -28,9 +28,8 @@ impl Client {
             .post(&url)
             .set("Authorization", &format!("Bearer {}", self.token))
             .send_json(json)
-            .map_err(transport_error)?
-            .into_string()
-            .map_err(|e| ClientError::Decode(e.to_string()))?;
+            .map_err(transport_error)?;
+        let text = crate::body::text(text).map_err(|e| ClientError::Decode(e.to_string()))?;
         serde_json::from_str(&text).map_err(|e| ClientError::Decode(e.to_string()))
     }
 
@@ -44,15 +43,12 @@ impl Client {
     ) -> ClientResult<PermissionReply> {
         let url = format!("{}/v1/tickets/{}/pre-tool", self.base, enc(ticket));
         let json = serde_json::to_value(ask).map_err(|e| ClientError::Decode(e.to_string()))?;
-        let text = self
-            .agent
+        let text = crate::agent(wait)
             .post(&url)
-            .timeout(wait)
             .set("Authorization", &format!("Bearer {}", self.token))
             .send_json(json)
-            .map_err(transport_error)?
-            .into_string()
-            .map_err(|e| ClientError::Decode(e.to_string()))?;
+            .map_err(transport_error)?;
+        let text = crate::body::text(text).map_err(|e| ClientError::Decode(e.to_string()))?;
         serde_json::from_str(&text).map_err(|e| ClientError::Decode(e.to_string()))
     }
 }

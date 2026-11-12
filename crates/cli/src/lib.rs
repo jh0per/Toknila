@@ -8,6 +8,7 @@ mod client;
 mod cmd;
 mod daemon_cmd;
 mod output;
+mod paused_output;
 mod review_output;
 #[cfg(windows)]
 mod win;

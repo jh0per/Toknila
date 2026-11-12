@@ -36,6 +36,8 @@ struct Raw {
     #[serde(default)]
     nudge: RawNudge,
     startup_secs: Option<u64>,
+    #[serde(default)]
+    resume: Vec<String>,
 }
 
 /// The `[nudge]` table with the span of `idle_secs`, so a bad value is reported where it stands.
@@ -136,5 +138,6 @@ pub fn parse(name: &str, text: &str) -> Result<AgentProfile, ProfileError> {
         startup_secs: raw
             .startup_secs
             .unwrap_or(crate::question::DEFAULT_STARTUP_SECS),
+        resume: raw.resume,
     })
 }

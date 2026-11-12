@@ -234,14 +234,19 @@ pub(crate) fn tell_worker<U: UnitOfWork + ?Sized>(
     let Some(now) = uow.ticket(t.id)? else {
         return Ok(());
     };
-    let wanted = matches!(
-        (now.status, &now.status_reason),
-        (TicketStatus::Running, _)
-            | (
-                TicketStatus::Waiting,
-                Some(StatusReason::Waiting(WaitingReason::Question { .. }))
-            )
-    );
+    // A paused agent waits for a person whatever it asked or went silent on; the decision brings
+    // it back.
+    let wanted = match (now.status, &now.status_reason) {
+        (TicketStatus::Waiting, Some(StatusReason::Waiting(WaitingReason::Permission { .. }))) => {
+            false
+        }
+        (TicketStatus::Waiting, _) if now.agent_paused.is_some() => true,
+        (TicketStatus::Running, _) => true,
+        (TicketStatus::Waiting, Some(StatusReason::Waiting(WaitingReason::Question { .. }))) => {
+            true
+        }
+        _ => false,
+    };
     if !wanted {
         return Ok(());
     }

@@ -53,7 +53,7 @@ const LINE_H = 16;
 const DESC_H = 16;
 const PILL_H = 16;
 /// The pill's padding and dot, the gap before the key, in pixels.
-const PILL_EXTRA = 8 * 2 + 7 + 5;
+const PILL_EXTRA = 8 * 2 + 8 + 5;
 const KEY_GAP = 6;
 const FOOT_H: Record<Foot, number> = { none: 0, extras: 20, actions: 26 };
 const ELLIPSIS = "…";

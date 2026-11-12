@@ -97,6 +97,10 @@ pub fn apply(
         (S::Waiting, TicketEvent::AskHuman { reason }) => ask_again(ticket, reason, event)?,
         (
             S::Waiting,
+            TicketEvent::AgentPaused { .. } | TicketEvent::ResumeWanted | TicketEvent::ResumeStart,
+        ) => pause::step(ticket, event, &mut next, &mut effects, now).ok_or_else(refuse)?,
+        (
+            S::Waiting,
             TicketEvent::InstructionDelivered | TicketEvent::AgentActive | TicketEvent::Answered,
         ) => (S::Running, None),
         (
@@ -368,6 +372,9 @@ pub fn apply(
     if status != S::Ready {
         next.queued = false;
     }
+    if status != S::Waiting {
+        next.agent_paused = None;
+    }
     next.status = status;
     next.status_reason = reason;
     Ok(Transition {
@@ -378,6 +385,7 @@ pub fn apply(
 
 mod check_phase;
 mod checks;
+mod pause;
 mod review;
 mod unfounded;
 pub use checks::person_only;

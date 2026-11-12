@@ -14,7 +14,9 @@
 mod active;
 mod drain;
 mod facts;
+mod live;
 mod logs;
+mod pausing;
 mod private;
 mod prompts;
 mod pty;
@@ -78,6 +80,8 @@ pub struct Runners {
     prompts: Prompts,
     /// How long a permission hook is held for an answer, in milliseconds.
     permission_wait_ms: AtomicU64,
+    /// How long a card waits for a person before its agent's process is ended, in milliseconds.
+    pause_grace_ms: AtomicU64,
     /// The daemon's address, known once it listens; agents get it in their environment.
     url: OnceLock<String>,
 }
@@ -100,6 +104,7 @@ impl Runners {
             tokens: Arc::default(),
             prompts: Prompts::default(),
             permission_wait_ms: AtomicU64::new(toknila_core::hook::PERMISSION_WAIT_SECS * 1000),
+            pause_grace_ms: AtomicU64::new(pausing::GRACE.as_millis() as u64),
             url: OnceLock::new(),
         };
         (Arc::new(runners), rx)
@@ -143,28 +148,6 @@ impl Runners {
 
     fn active(&self) -> std::sync::MutexGuard<'_, HashMap<(TicketId, AgentRole), Arc<Active>>> {
         self.active.lock().unwrap_or_else(PoisonError::into_inner)
-    }
-
-    /// Tickets with a live worker process.
-    pub fn live(&self) -> Vec<TicketId> {
-        self.live_in(AgentRole::Worker)
-    }
-
-    /// Tickets with a live process of `role`.
-    pub fn live_in(&self, role: AgentRole) -> Vec<TicketId> {
-        self.active()
-            .iter()
-            .filter(|((_, r), a)| *r == role && !a.is_over() && !a.stopping())
-            .map(|((t, _), _)| *t)
-            .collect()
-    }
-
-    /// The run of `role` that is alive for `ticket` now, if any.
-    pub fn live_run(&self, ticket: TicketId, role: AgentRole) -> Option<Run> {
-        let active = self.active().get(&(ticket, role)).cloned();
-        active
-            .filter(|a| !a.is_over() && !a.stopping())
-            .map(|a| a.run().clone())
     }
 
     /// Kills every live process, for a daemon that is shutting down.
@@ -343,7 +326,7 @@ impl Runner for Runners {
         Ok(Started {
             run,
             reused: false,
-            briefed: profile.reads_brief(),
+            briefed: wiring::briefed(&profile, &req.brief),
         })
     }
 

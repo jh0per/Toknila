@@ -22,6 +22,13 @@ pub enum TicketEvent {
     Request,
     /// The schedule gave the card a slot: its runner starts.
     Start,
+    /// Host: a Waiting card's agent process was ended after the grace; the card holds no slot
+    /// and keeps the agent's `session` for the profile's resume form.
+    AgentPaused { session: Option<String> },
+    /// A person's answer arrived for a paused card: it starts again when a slot is free.
+    ResumeWanted,
+    /// The schedule gave a paused card with an answer a slot: its agent starts again.
+    ResumeStart,
     /// Agent: asked a question, wants permission, or went silent.
     AskHuman { reason: WaitingReason },
     /// A person's new comment reached the agent.
@@ -155,6 +162,9 @@ impl TicketEvent {
             Self::DepsUnsatisfied => "deps_unsatisfied",
             Self::Request => "start",
             Self::Start => "start",
+            Self::AgentPaused { .. } => "agent_paused",
+            Self::ResumeWanted => "resume_wanted",
+            Self::ResumeStart => "resume_start",
             Self::AskHuman { .. } => "ask_human",
             Self::InstructionDelivered => "instruction_delivered",
             Self::AgentActive => "agent_active",
@@ -201,6 +211,9 @@ impl TicketEvent {
 pub enum Effect {
     /// Make sure a runner is working on the ticket (start or restart it).
     EnsureRunner,
+    /// Start the paused card's agent again from its `session` (a fresh start when it is `None`
+    /// or the profile has no resume form), with the answer as its first input.
+    ResumeRunner { session: Option<String> },
     /// Make sure the ticket has its ship (worktree and branch); reuse it if it exists.
     PrepareShip,
     /// [`Effect::PrepareShip`] after a person decided what to do about a base branch that is
