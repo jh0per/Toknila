@@ -26,6 +26,9 @@ use super::tree;
 /// agent keeps its spinner and output moving.
 const IDLE_AFTER: Duration = Duration::from_secs(3);
 
+/// How much of a run's first output says whether the agent refused to resume its session.
+const HEAD_BYTES: u64 = 4096;
+
 /// How long the watcher waits for the last output after the process ended.
 const DRAIN: Duration = Duration::from_secs(2);
 
@@ -41,6 +44,8 @@ pub(super) struct Channels {
     pub wake: broadcast::Sender<TicketId>,
     pub ended: mpsc::UnboundedSender<RunEnded>,
     pub tokens: Arc<AgentTokens>,
+    /// The answer a resumed run carries as its first input; `None` for a run that starts fresh.
+    pub resumed: Option<String>,
 }
 
 /// A run, live or finished.
@@ -67,6 +72,8 @@ pub(super) struct Active {
     log_path: PathBuf,
     /// The last line of the log, written once the process is over (see [`Active::kill_with_note`]).
     farewell: Mutex<Option<String>>,
+    /// The first input of a resumed run, to carry into the fresh start if the resume is refused.
+    resumed: Option<String>,
 }
 
 impl std::fmt::Debug for Active {
@@ -108,6 +115,7 @@ impl Active {
             wake,
             ended,
             tokens,
+            resumed,
         } = channels;
         let Spawned {
             reader,
@@ -135,6 +143,7 @@ impl Active {
             helper,
             log_path: log.path().to_owned(),
             farewell: Mutex::new(None),
+            resumed,
         });
         let (done, drained) = channel();
         let pump = {
@@ -258,11 +267,23 @@ impl Active {
             run: self.run.clone(),
             exit,
             stopped: self.stopped.load(Ordering::SeqCst),
+            refused: self.refused_resume(),
         });
     }
 
     pub fn run(&self) -> &Run {
         &self.run
+    }
+
+    /// The input of this run when it was a resume whose first lines say the agent does not know
+    /// the session; `None` for any other run.
+    fn refused_resume(&self) -> Option<String> {
+        let input = self.resumed.as_ref()?;
+        let mut head = Vec::new();
+        let file = std::fs::File::open(&self.log_path).ok()?;
+        file.take(HEAD_BYTES).read_to_end(&mut head).ok()?;
+        let head = String::from_utf8_lossy(&head);
+        toknila_core::AgentProfile::resume_refused(&head).then(|| input.clone())
     }
 
     /// When the process started.
