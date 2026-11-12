@@ -49,9 +49,9 @@ function DidLine({ m, project, state, dispatch }: { m: ConversationMessage; proj
   return (
     <li className="did" data-testid="chat-did" data-id={m.id}>
       {at >= 0 ? (
-        <span>{m.text.slice(0, at)}{link(label)}{m.text.slice(at + label.length)}</span>
+        <span className="did-text">{m.text.slice(0, at)}{link(label)}{m.text.slice(at + label.length)}</span>
       ) : (
-        <span>{m.text}{route && <> · {link(label)}</>}</span>
+        <span className="did-text">{m.text}{route && <> · {link(label)}</>}</span>
       )}
       <time className="muted" dateTime={new Date(m.at).toISOString()}>{whenText(m.at)}</time>
     </li>
@@ -64,7 +64,7 @@ export function ChatEntry({ m, project, state, dispatch }: { m: ConversationMess
   if (m.author === "toknila") return <DidLine m={m} project={project} state={state} dispatch={dispatch} />;
   const mine = m.author === "person";
   return (
-    <li className={`bubble msg ${mine ? "you" : "agent"}`} data-testid="chat-message" data-author={m.author} data-id={m.id}>
+    <li className={`bubble msg chat-bubble ${mine ? "you" : "agent"}`} data-testid="chat-message" data-author={m.author} data-id={m.id}>
       <div className="bubble-head">
         <b>{mine ? "You" : "Assistant"}</b>
         <Chip m={m} project={project} state={state} dispatch={dispatch} />

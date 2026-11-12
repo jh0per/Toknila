@@ -5,6 +5,8 @@ import type { Intent } from "../store/msg";
 import { type State, ticketEvents } from "../store/state";
 import { Answer } from "./Answer";
 import { PromptField } from "./AskBox";
+import { MicButton, SpeechNote } from "./MicButton";
+import { useSpeech } from "./useSpeech";
 
 const KIND_LABEL: Record<ChatItem["kind"], string> = {
   instruction: "instruction", report: "report", decision: "decision", question: "question", answer: "answer", note: "",
@@ -43,6 +45,7 @@ export function ChatTab({ state, card, dispatch }: { state: State; card: Ticket;
     dispatch({ type: "addComment", key: card.key, kind: "instruction", text: text.trim() });
     setText("");
   };
+  const speech = useSpeech(text, setText, send);
   const started = card.status === "running" || card.status === "waiting" || card.status === "review";
   return (
     <div className="chat" data-testid="chat">
@@ -60,10 +63,12 @@ export function ChatTab({ state, card, dispatch }: { state: State; card: Ticket;
       {!asked && canTalk(card) && (
         <form className="chat-box" data-testid="chat-box" onSubmit={(e) => { e.preventDefault(); send(); }}>
           <PromptField
-            value={text} onChange={setText} onSubmit={send} rows={2} label="Message to the agent" testId="chat-input"
+            value={text} onChange={(t) => { speech.stop(); setText(t); }} onSubmit={send} rows={2} label="Message to the agent" testId="chat-input"
             placeholder={started ? "Tell the agent something; Enter sends" : "Leave a note for the agent; it gets it when it starts"}
           />
+          <MicButton s={speech} testId="chat" disabled={false} />
           <button type="submit" className="btn primary" data-testid="chat-send" disabled={!text.trim()}>Send to the agent</button>
+          <SpeechNote s={speech} testId="chat" />
         </form>
       )}
       {!asked && !canTalk(card) && <p className="muted" data-testid="chat-closed">This story is finished, so there is nobody to tell.</p>}

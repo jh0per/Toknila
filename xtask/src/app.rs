@@ -279,6 +279,8 @@ fn info_plist(version: &str) -> String {
   <key>CFBundleVersion</key><string>{version}</string>
   <key>LSMinimumSystemVersion</key><string>10.15</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Toknila listens when you press the microphone button, so you can speak to the assistant instead of typing.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Toknila turns what you say into text with the system's speech recognition, only while you press the microphone button.</string>
 </dict>
 </plist>
 "#
@@ -377,5 +379,12 @@ mod tests {
         let p = info_plist("9.8.7");
         assert!(p.contains("<key>CFBundleShortVersionString</key><string>9.8.7</string>"));
         assert!(p.contains("<key>CFBundleExecutable</key><string>toknila-desktop</string>"));
+    }
+
+    #[test]
+    fn plist_says_why_it_listens() {
+        let p = info_plist("1.0.0");
+        assert!(p.contains("<key>NSMicrophoneUsageDescription</key><string>Toknila listens"));
+        assert!(p.contains("<key>NSSpeechRecognitionUsageDescription</key><string>Toknila turns"));
     }
 }
