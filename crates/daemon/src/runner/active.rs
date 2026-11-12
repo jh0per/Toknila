@@ -63,6 +63,10 @@ pub(super) struct Active {
     pid: Option<u32>,
     /// The `toknila` binary the agent runs for its MCP server and hooks; not work of its own.
     helper: PathBuf,
+    /// Where the run's output is logged.
+    log_path: PathBuf,
+    /// The last line of the log, written once the process is over (see [`Active::kill_with_note`]).
+    farewell: Mutex<Option<String>>,
 }
 
 impl std::fmt::Debug for Active {
@@ -129,6 +133,8 @@ impl Active {
             hooks,
             pid: child.process_id(),
             helper,
+            log_path: log.path().to_owned(),
+            farewell: Mutex::new(None),
         });
         let (done, drained) = channel();
         let pump = {
@@ -235,6 +241,17 @@ impl Active {
         wake: &broadcast::Sender<TicketId>,
         ended: &mpsc::UnboundedSender<RunEnded>,
     ) {
+        if let Some(line) = lock(&self.farewell).take() {
+            // After the process: nothing it prints can overwrite the line.
+            let line = format!("\r\n[toknila] {line}\r\n");
+            let opened = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&self.log_path);
+            if let Err(e) = opened.and_then(|mut f| f.write_all(line.as_bytes())) {
+                tracing::warn!(run = %self.run.id, error = %e, "cannot write the pause to the run log");
+            }
+            lock(&self.state).scrollback.push(line.as_bytes());
+        }
         lock(&self.state).exit = Some(exit.clone());
         let _ = wake.send(self.run.ticket_id);
         let _ = ended.send(RunEnded {
@@ -321,6 +338,14 @@ impl Active {
                 pixel_height: 0,
             })
             .map_err(|e| RunnerError::Write(e.to_string()))
+    }
+
+    /// [`Active::kill`], and `note` becomes the last line of the run's log and scrollback.
+    pub fn kill_with_note(&self, note: String) {
+        if !self.is_over() {
+            *lock(&self.farewell) = Some(note);
+        }
+        self.kill();
     }
 
     /// Ends the process and everything it started, on purpose; its exit then is not a crash.

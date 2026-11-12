@@ -31,6 +31,7 @@ pub fn watch(store: Store, runners: Arc<Runners>) -> JoinHandle<()> {
 /// One round at time `at`: the runs that are quiet are nudged or given up on.
 pub async fn tick(store: &Store, runners: &Arc<Runners>, at: Timestamp) {
     super::screens::tick(store, runners, at).await;
+    super::pausing::tick(store, runners, at).await;
     for ticket in runners.idle_reviewers() {
         let screen = runners.reviewer_screen(ticket);
         let done = store

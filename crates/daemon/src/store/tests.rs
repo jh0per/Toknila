@@ -66,6 +66,7 @@ fn ticket(chain: ChainId, n: u32) -> Ticket {
         status_since: Timestamp(1),
         paused: false,
         queued: false,
+        agent_paused: None,
         profile: Some("sim".to_owned()),
         review_mode: None,
         reviewer: None,

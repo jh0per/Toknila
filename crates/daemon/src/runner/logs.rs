@@ -55,6 +55,11 @@ pub(super) struct RunLog {
 }
 
 impl RunLog {
+    /// The file the log is written to.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     /// Creates the log of a new run (and its folder) and drops the logs of the runs the ticket
     /// no longer keeps.
     pub fn create(

@@ -2,6 +2,8 @@
 //!
 //! **Slots.** A project has `max_parallel` slots (default [`DEFAULT_LIMIT`]). A card holds one
 //! while it is Running or Waiting (its agent is alive; a simulated agent counts the same).
+//! A Waiting card whose agent was paused (its process ended after a grace) holds none either; its
+//! answer makes it wanted like a ready card ("resumes when a slot is free").
 //! Review, Blocked, Merged, Released, Cancelled and Backlog hold none by their status alone: the
 //! agent is done, stopped or has not begun. A **live runner** holds one whatever the status: a
 //! worker kept alive through review, and the reviewer next to it, each take a slot. The host knows
@@ -48,9 +50,14 @@ pub fn check_limit(limit: u32) -> Result<u32, LimitError> {
     }
 }
 
-/// Does the card hold a slot: its agent is working or waiting for an answer.
+/// Does the card hold a slot: its agent is working or waiting for an answer. A Waiting card whose
+/// agent was paused (its process ended, `Ticket::agent_paused`) holds none until it resumes.
 pub fn holds_slot(ticket: &Ticket) -> bool {
-    matches!(ticket.status, TicketStatus::Running | TicketStatus::Waiting)
+    match ticket.status {
+        TicketStatus::Running => true,
+        TicketStatus::Waiting => ticket.agent_paused.is_none(),
+        _ => false,
+    }
 }
 
 /// The state of a project's slots and what to do about it.
