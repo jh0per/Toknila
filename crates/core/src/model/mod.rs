@@ -29,8 +29,8 @@ pub use check_outcome::CheckOutcome;
 pub use command_policy::CommandPolicy;
 pub use comment::{Actor, Comment, CommentBody, CommentKind};
 pub use ids::{
-    ChainId, CommentId, ConversationMessageId, DesignId, PinId, ProjectId, ReleaseId, RunId,
-    SubtaskId, ThreadId, ThreadMessageId, ThreadVersionId, TicketId,
+    ChainId, CommentId, DesignId, PinId, ProjectId, ReleaseId, RunId, SubtaskId, ThreadId,
+    ThreadMessageId, ThreadVersionId, TicketId,
 };
 pub use keys::{KeyError, ProjectKey, TicketKey};
 pub use paused::PausedAgent;

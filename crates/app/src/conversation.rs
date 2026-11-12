@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use toknila_core::conversation::{self, About, Author, Message};
 use toknila_core::events::DomainEvent;
-use toknila_core::{ConversationMessageId, Project, ProjectId, TicketKey};
+use toknila_core::{Project, ProjectId, TicketKey};
 
 use crate::{AppError, AppResult, ErrorKind, Reader, UnitOfWork, planner, resolve};
 
@@ -58,7 +58,7 @@ fn store<U: UnitOfWork + ?Sized>(
     attachments: Vec<String>,
 ) -> AppResult<Message> {
     let m = Message {
-        id: ConversationMessageId::new().to_string(),
+        id: conversation::next_id(),
         author,
         text,
         about,

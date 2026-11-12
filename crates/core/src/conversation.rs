@@ -20,6 +20,21 @@ pub const MAX_PAGE: usize = 200;
 /// The longest text of one message, in characters.
 pub const MAX_TEXT: usize = 20_000;
 
+static IDS: std::sync::Mutex<ulid::Generator> = std::sync::Mutex::new(ulid::Generator::new());
+
+/// A fresh id for a message the conversation stores. Ids grow with every call, also within one
+/// millisecond, so sorting by (time, id) lists messages in the order they were said.
+pub fn next_id() -> String {
+    let mut ids = IDS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match ids.generate() {
+        Ok(id) => id.to_string(),
+        // The random part ran out within one millisecond: a plain id is later by then.
+        Err(_) => ulid::Ulid::generate().to_string(),
+    }
+}
+
 /// Who wrote a message.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -215,6 +230,16 @@ mod tests {
         assert_eq!(clean_text(" \n "), Err(Refusal::Empty));
         assert_eq!(clean_text(&"x".repeat(MAX_TEXT + 1)), Err(Refusal::TooLong));
         assert!(clean_text(&"x".repeat(MAX_TEXT)).is_ok());
+    }
+
+    #[test]
+    fn ids_grow_with_every_call_so_they_order_messages_said_in_one_millisecond() {
+        let ids: Vec<String> = (0..2000).map(|_| next_id()).collect();
+        let mut sorted = ids.clone();
+        sorted.sort();
+        assert_eq!(ids, sorted);
+        sorted.dedup();
+        assert_eq!(sorted.len(), ids.len(), "no id twice");
     }
 
     #[test]
