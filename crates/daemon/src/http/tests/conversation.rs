@@ -218,6 +218,8 @@ async fn a_card_discussion_is_in_the_conversation_with_its_card_and_is_stored_on
     let planner = api.planner_token("DEMO").await;
     api.post(CONVERSATION, json!({ "text": "General question" }))
         .await;
+    // Two messages in one millisecond have no order of their own.
+    tokio::time::sleep(std::time::Duration::from_millis(3)).await;
     api.post(
         "/v1/tickets/DEMO-1/discussion",
         json!({ "text": "Why this card?" }),
