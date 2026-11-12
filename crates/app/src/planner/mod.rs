@@ -84,7 +84,12 @@ pub fn card<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> A
     let owner = r
         .project(chain.project_id)?
         .map_or_else(String::new, |p| p.key.to_string());
-    planner::ensure_in_project(project, chain.project_id, format!("story {}", t.key), &owner)?;
+    planner::ensure_in_project(
+        project,
+        chain.project_id,
+        format!("story {}", t.key),
+        &owner,
+    )?;
     Ok(t)
 }
 

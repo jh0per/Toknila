@@ -136,7 +136,11 @@ mod tests {
         assert!(ensure_graph_change(&chain(false)).is_ok());
         let refused = ensure_graph_change(&chain(true)).expect_err("refused");
         assert!(matches!(refused, Refusal::AutostartChain { .. }));
-        assert!(refused.to_string().contains("only the owner starts stories"));
+        assert!(
+            refused
+                .to_string()
+                .contains("only the owner starts stories")
+        );
     }
 
     #[test]
