@@ -20,6 +20,8 @@ fn brief_with<'a>(check: Option<&'a CheckOutcome>) -> RunBrief<'a> {
         discussion: &[],
         epic: None,
         check,
+        threads: &[],
+        hand_in: None,
     }
 }
 

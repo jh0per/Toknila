@@ -2669,7 +2669,7 @@ export interface components {
          * @description How one acceptance item stands, in the reviewer's eyes.
          * @enum {string}
          */
-        ItemOutcome: "pass" | "fail";
+        ItemOutcome: "pass" | "fail" | "person";
         /** @description The reviewer's judgement of one acceptance item. */
         ItemVerdict: {
             /** @description Whether the reviewer ran what shows the item or only read; `read` when it says nothing. */

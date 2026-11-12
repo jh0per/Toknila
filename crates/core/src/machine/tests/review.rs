@@ -832,6 +832,51 @@ fn a_failing_item_returns_the_card_with_the_item_lines_as_the_remarks() {
     }));
 }
 
+#[test]
+fn a_person_item_does_not_count_against_the_hand_in() {
+    use crate::ItemOutcome::{Fail, Pass, Person};
+    let t = with_acceptance(ReviewTurn::Agent { decides: true });
+    // Approved with a PERSON item: the merge starts, the line reads PERSON.
+    let tr = step(
+        &t,
+        &judged(Verdict::Approve, "", items(&[(1, Pass), (2, Person)])),
+    );
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Merging));
+    assert_eq!(
+        tr.ticket.review.rounds[0].comment,
+        "PASS 1. first holds - seen [ran]\nPERSON 2. second holds - seen [ran]"
+    );
+    // A request whose only non-PASS item is PERSON is read as an approval.
+    let tr = step(
+        &t,
+        &judged(
+            Verdict::RequestChanges,
+            "the picture is for a person",
+            items(&[(1, Pass), (2, Person)]),
+        ),
+    );
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Merging));
+    assert_eq!(tr.ticket.review.rounds[0].verdict, Verdict::Approve);
+    // A failing item next to a PERSON one is still a failure.
+    let tr = step(
+        &t,
+        &judged(
+            Verdict::RequestChanges,
+            "",
+            items(&[(1, Fail), (2, Person)]),
+        ),
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert!(matches!(
+        apply(
+            &t,
+            &judged(Verdict::Approve, "", items(&[(1, Fail), (2, Person)])),
+            NOW
+        ),
+        Err(TransitionError::Items(_))
+    ));
+}
+
 fn item_with(
     item: u32,
     outcome: crate::ItemOutcome,

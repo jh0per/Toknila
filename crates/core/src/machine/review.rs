@@ -9,7 +9,7 @@ use super::checks::{non_empty, run_on_ship};
 use super::{Effect, TransitionError};
 use crate::{
     Actor, ItemVerdict, ReviewMode, ReviewNote, ReviewTurn, StatusReason, Ticket, TicketStatus,
-    Timestamp, Verdict, check_items, render_items, request_is_unfounded,
+    Timestamp, Verdict, check_items, effective_verdict, render_items, request_is_unfounded,
 };
 
 /// What the reviewer is told when it ends its turn without a verdict.
@@ -163,18 +163,19 @@ pub(super) fn agent_decides(
             from: next.status,
         });
     };
-    check_items(&next.acceptance, said.items, said.verdict)?;
+    let verdict = effective_verdict(said.verdict, said.items);
+    check_items(&next.acceptance, said.items, verdict)?;
     let text = render_items(&next.acceptance, said.items, said.comment);
-    if said.verdict == Verdict::RequestChanges {
+    if verdict == Verdict::RequestChanges {
         non_empty(&text, "request_changes")?;
     }
-    if said.verdict == Verdict::RequestChanges && request_is_unfounded(said.items, said.comment) {
+    if verdict == Verdict::RequestChanges && request_is_unfounded(said.items, said.comment) {
         return super::unfounded::wait_for_person(next, &text, effects);
     }
-    next.review.record(Actor::Agent, said.verdict, &text, now);
+    next.review.record(Actor::Agent, verdict, &text, now);
     // The reviewer is done: its process ends and its slot is free. The worker's runner stays.
     effects.push(Effect::StopReviewer);
-    match said.verdict {
+    match verdict {
         Verdict::Approve if !decides && !next.review.accepted => {
             next.review.turn = Some(ReviewTurn::Person);
             Ok((TicketStatus::Review, None))
