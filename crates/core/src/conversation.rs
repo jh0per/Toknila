@@ -202,7 +202,10 @@ mod tests {
             (Actor::Agent, Author::Toknila),
             (Actor::System, Author::Toknila),
         ] {
-            assert!(check_writer(actor, author).is_err(), "{actor:?} as {author:?}");
+            assert!(
+                check_writer(actor, author).is_err(),
+                "{actor:?} as {author:?}"
+            );
         }
     }
 
@@ -242,7 +245,9 @@ mod tests {
                 "about": { "kind": "card", "key": "DEMO-2" }, "at": 5
             })
         );
-        let chain = About::Chain { name: "plan".into() };
+        let chain = About::Chain {
+            name: "plan".into(),
+        };
         assert_eq!(
             serde_json::to_value(&chain).expect("json"),
             serde_json::json!({ "kind": "chain", "name": "plan" })

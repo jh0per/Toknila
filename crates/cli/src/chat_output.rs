@@ -6,7 +6,11 @@ use toknila_core::conversation::{About, Author, Message};
 /// When a message was said, in `offset`; `--------------` if the timestamp is out of range.
 fn when(m: &Message, offset: FixedOffset) -> String {
     DateTime::from_timestamp_millis(m.at.0)
-        .map(|t| t.with_timezone(&offset).format("%Y-%m-%d %H:%M").to_string())
+        .map(|t| {
+            t.with_timezone(&offset)
+                .format("%Y-%m-%d %H:%M")
+                .to_string()
+        })
         .unwrap_or_else(|| "----------------".to_owned())
 }
 
@@ -36,7 +40,10 @@ pub fn message_lines(m: &Message, offset: FixedOffset) -> Vec<String> {
     let mut out = vec![format!("{time}  {who}{}: {first}", about(m))];
     out.extend(lines.map(|l| format!("                  {l}")));
     if !m.attachments.is_empty() {
-        out.push(format!("                  (attached: {})", m.attachments.join(", ")));
+        out.push(format!(
+            "                  (attached: {})",
+            m.attachments.join(", ")
+        ));
     }
     out
 }

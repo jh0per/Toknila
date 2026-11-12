@@ -2,10 +2,10 @@
 //! itself (a client with its run token) reads and edits the plan.
 
 use toknila_api_types::{
-    CardEdit, ChainDetail, ConversationPage, DesignPin, Say, EdgeInput, EditPlanChain, MoveInput, NewCard, NewMessage,
-    NewPlanChain, NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain, PlannerDesign,
-    PlannerOverview, PlannerPlan, PlannerState, StartPlanner, TerminalSize, ThreadDetail,
-    TicketDetail,
+    CardEdit, ChainDetail, ConversationPage, DesignPin, EdgeInput, EditPlanChain, MoveInput,
+    NewCard, NewMessage, NewPlanChain, NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain,
+    PlannerDesign, PlannerOverview, PlannerPlan, PlannerState, Say, StartPlanner, TerminalSize,
+    ThreadDetail, TicketDetail,
 };
 use toknila_core::RunId;
 use toknila_core::conversation::Message;

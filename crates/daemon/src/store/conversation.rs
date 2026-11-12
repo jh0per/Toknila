@@ -5,7 +5,7 @@
 use rusqlite::params;
 use toknila_core::ProjectId;
 use toknila_core::conversation::{About, Message};
-use toknila_core::{Timestamp, TicketKey};
+use toknila_core::{TicketKey, Timestamp};
 
 use super::StoreError;
 use super::codec::{Repo, enum_from, enum_str, from_json, json};
@@ -104,7 +104,11 @@ impl Repo<'_> {
         );
         let mut st = self.conn.prepare(&sql)?;
         let rows = st.query_map(
-            params![project.to_string(), before, i64::try_from(limit).unwrap_or(i64::MAX)],
+            params![
+                project.to_string(),
+                before,
+                i64::try_from(limit).unwrap_or(i64::MAX)
+            ],
             |r| {
                 Ok((
                     r.get(0)?,
@@ -118,9 +122,7 @@ impl Repo<'_> {
                 ))
             },
         )?;
-        let mut out = rows
-            .map(|r| message(r?))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut out = rows.map(|r| message(r?)).collect::<Result<Vec<_>, _>>()?;
         out.reverse();
         Ok(out)
     }

@@ -1,8 +1,8 @@
 //! The planner's cards: adding one and editing one that has not started, with the designs it
 //! references.
 
-use serde::{Deserialize, Serialize};
 use crate::conversation as conv;
+use serde::{Deserialize, Serialize};
 use toknila_core::conversation;
 use toknila_core::design::DesignRef;
 use toknila_core::planner;
@@ -188,7 +188,8 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
         notes::add_subtask(uow, &t, text)?;
     }
     // A change only proposed is not yet an edit: the card has it when the person accepts.
-    let only_proposed = proposed && !changed && edit.edit_subtasks.is_empty() && edit.add_subtasks.is_empty();
+    let only_proposed =
+        proposed && !changed && edit.edit_subtasks.is_empty() && edit.add_subtasks.is_empty();
     let text = if only_proposed {
         conversation::proposed_edit(&t.key)
     } else {

@@ -13,8 +13,8 @@ mod suggest;
 mod window;
 mod with_designs;
 
-use serde::{Deserialize, Serialize};
 use crate::conversation as conv;
+use serde::{Deserialize, Serialize};
 use toknila_core::conversation::{self, About};
 use toknila_core::instructions::ProjectFacts;
 use toknila_core::machine::person_only;

@@ -115,7 +115,12 @@ pub fn say_as_assistant<U: UnitOfWork + ?Sized>(
 ) -> AppResult<Message> {
     conversation::check_writer(uow.actor(), Author::Assistant)?;
     let text = conversation::clean_text(&input.text)?;
-    let about = match input.about.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
+    let about = match input
+        .about
+        .as_deref()
+        .map(str::trim)
+        .filter(|a| !a.is_empty())
+    {
         Some(r) => Some(about_of(&*uow, project, r)?),
         None => None,
     };
