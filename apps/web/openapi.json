@@ -877,6 +877,53 @@
       }
     },
     "/planner/cards/{card}": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "One card of the planner's project in full: prompt, acceptance, subtasks, threads with their\nmessages, review results and pull request.",
+        "operationId": "planner_card",
+        "parameters": [
+          {
+            "name": "card",
+            "in": "path",
+            "description": "Card id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCard"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "planner"
@@ -1236,6 +1283,55 @@
         }
       }
     },
+    "/planner/chains/{chain}": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "One chain of the planner's project with every card in full.",
+        "operationId": "planner_chain",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanChain"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/planner/chains/{chain}/cards": {
       "post": {
         "tags": [
@@ -1551,6 +1647,35 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/overview": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "The plan of the planner's project in short records (every chain, the cards of the chains that\nare not finished, the designs with their paths, the pins): small at any size of the plan.",
+        "operationId": "planner_overview",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerOverview"
+                }
+              }
+            }
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -8810,6 +8935,122 @@
         },
         "additionalProperties": false
       },
+      "OverviewCard": {
+        "type": "object",
+        "description": "One card of an unfinished chain as one short record.",
+        "required": [
+          "key",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What it waits for: card keys and `release <version>` labels."
+          },
+          "design_first": {
+            "type": "boolean"
+          },
+          "designs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the designs the card is about."
+          },
+          "key": {
+            "$ref": "#/components/schemas/TicketKey"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "subtasks": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "threads": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string"
+          },
+          "waits_for_owner": {
+            "type": "boolean",
+            "description": "The card waits for the owner: it is proposed, asks a question, is in review, or has a\nthread version the owner has not answered."
+          }
+        }
+      },
+      "OverviewChain": {
+        "type": "object",
+        "description": "A chain: its facts, and its cards unless it is finished.",
+        "required": [
+          "id",
+          "name",
+          "goal",
+          "autostart",
+          "summary"
+        ],
+        "properties": {
+          "autostart": {
+            "type": "boolean"
+          },
+          "cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewCard"
+            },
+            "description": "Empty for a finished chain: open it with `chain` to read its cards."
+          },
+          "goal": {
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ChainId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/OverviewSummary"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "OverviewSummary": {
+        "type": "object",
+        "description": "Where a chain stands.",
+        "required": [
+          "phase",
+          "done",
+          "total"
+        ],
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "phase": {
+            "$ref": "#/components/schemas/PhaseState"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "PatchProject": {
         "type": "object",
         "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
@@ -9274,6 +9515,31 @@
           "chain_file"
         ]
       },
+      "PlanOverview": {
+        "type": "object",
+        "description": "The project, every chain in short, and the pins with their answers.",
+        "required": [
+          "project",
+          "chains"
+        ],
+        "properties": {
+          "chains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewChain"
+            }
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignPin"
+            }
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          }
+        }
+      },
       "PlanScan": {
         "type": "object",
         "description": "`GET /v1/projects/{project}/plans`: the plans of the project's repository.",
@@ -9405,6 +9671,29 @@
             "minimum": 0
           }
         }
+      },
+      "PlannerOverview": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlanOverview"
+          },
+          {
+            "type": "object",
+            "required": [
+              "designs"
+            ],
+            "properties": {
+              "designs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PlannerDesign"
+                },
+                "description": "Oldest first, each with the path of its file."
+              }
+            }
+          }
+        ],
+        "description": "Answer of `GET /v1/planner/overview`: the plan in short records and the project's designs."
       },
       "PlannerPlan": {
         "allOf": [

@@ -245,7 +245,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * One card of the planner's project in full: prompt, acceptance, subtasks, threads with their
+         *     messages, review results and pull request.
+         */
+        get: operations["planner_card"];
         put?: never;
         post?: never;
         delete?: never;
@@ -340,6 +344,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/chains/{chain}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One chain of the planner's project with every card in full. */
+        get: operations["planner_chain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/chains/{chain}/cards": {
         parameters: {
             query?: never;
@@ -401,6 +422,26 @@ export interface paths {
         };
         /** One design of the planner's project: its metadata and the path of its file. */
         get: operations["planner_design"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The plan of the planner's project in short records (every chain, the cards of the chains that
+         *     are not finished, the designs with their paths, the pins): small at any size of the plan.
+         */
+        get: operations["planner_overview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2812,6 +2853,45 @@ export interface components {
              */
             strip_ansi: boolean;
         };
+        /** @description One card of an unfinished chain as one short record. */
+        OverviewCard: {
+            /** @description What it waits for: card keys and `release <version>` labels. */
+            after?: string[];
+            design_first?: boolean;
+            /** @description Names of the designs the card is about. */
+            designs?: string[];
+            key: components["schemas"]["TicketKey"];
+            status: components["schemas"]["TicketStatus"];
+            /** Format: int32 */
+            subtasks?: number;
+            /** Format: int32 */
+            threads?: number;
+            title: string;
+            /**
+             * @description The card waits for the owner: it is proposed, asks a question, is in review, or has a
+             *     thread version the owner has not answered.
+             */
+            waits_for_owner?: boolean;
+        };
+        /** @description A chain: its facts, and its cards unless it is finished. */
+        OverviewChain: {
+            autostart: boolean;
+            /** @description Empty for a finished chain: open it with `chain` to read its cards. */
+            cards?: components["schemas"]["OverviewCard"][];
+            goal: string;
+            id: components["schemas"]["ChainId"];
+            name: string;
+            summary: components["schemas"]["OverviewSummary"];
+            version?: string | null;
+        };
+        /** @description Where a chain stands. */
+        OverviewSummary: {
+            /** Format: int32 */
+            done: number;
+            phase: components["schemas"]["PhaseState"];
+            /** Format: int32 */
+            total: number;
+        };
         /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
         PatchProject: {
             /**
@@ -2985,6 +3065,12 @@ export interface components {
          * @enum {string}
          */
         PlanKind: "spec_folder" | "chain_file";
+        /** @description The project, every chain in short, and the pins with their answers. */
+        PlanOverview: {
+            chains: components["schemas"]["OverviewChain"][];
+            pins?: components["schemas"]["DesignPin"][];
+            project: components["schemas"]["Project"];
+        };
         /** @description `GET /v1/projects/{project}/plans`: the plans of the project's repository. */
         PlanScan: {
             behind?: components["schemas"]["WorkingCopyBehind"] | null;
@@ -3026,6 +3112,11 @@ export interface components {
              * @description Bytes of the kept file; zero without one.
              */
             size: number;
+        };
+        /** @description Answer of `GET /v1/planner/overview`: the plan in short records and the project's designs. */
+        PlannerOverview: components["schemas"]["PlanOverview"] & {
+            /** @description Oldest first, each with the path of its file. */
+            designs: components["schemas"]["PlannerDesign"][];
         };
         /** @description Answer of `GET /v1/planner/plan`: the plan and the project's designs. */
         PlannerPlan: components["schemas"]["PlanView"] & {
@@ -4664,6 +4755,44 @@ export interface operations {
             };
         };
     };
+    planner_card: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card id, key or title */
+                card: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanCard"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     planner_edit_card: {
         parameters: {
             query?: never;
@@ -4921,6 +5050,44 @@ export interface operations {
             };
         };
     };
+    planner_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChain"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     planner_add_card: {
         parameters: {
             query?: never;
@@ -5138,6 +5305,33 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannerOverview"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

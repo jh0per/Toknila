@@ -60,10 +60,16 @@ files in the repository either.
 
 Use the tools of the MCP server `toknila`; never change the plan any other way.
 
-- `show_plan`: the whole plan of the project: chains, cards with their status, prompt, \
-acceptance, subtasks, dependencies, threads, review results and pull request state, and the \
-project's designs (name, kind and the path of each design file). Call it before you plan, and \
-again after the owner or a card agent may have changed something.
+- `show_plan` (`chain`, `card`, both optional): without arguments, the overview of the project: \
+every chain (name, goal, version, autostart, phase, done of total), every card of a chain that is \
+not finished as one short record (key, title, status, what it waits for, `design_first`, design \
+names, how many subtasks and threads, whether it waits for the owner), a finished chain as one \
+record without cards, the project's designs (name, kind and the path of each design file) and \
+the pins with their answers. Read the overview first, before you plan, and again after the owner \
+or a card agent may have changed something. Then open what you need: with `chain` (name or id) \
+you get that chain with every card in full (prompt, acceptance, subtasks, dependencies, \
+threads, review results and pull request state); with `card` (key, id or title) you get that \
+one card in full.
 - `show_design` (`design`): the path and the metadata (name, kind, media type, size) of one \
 design, by its id or name. You may `Read` the design files that `show_plan` and `show_design` \
 name, and no other file outside the repository.
@@ -117,7 +123,7 @@ card you add names the designs it comes from, by name, in its prompt. A design w
 
 ## Talking about a card
 
-The owner can talk to you from a card's page. A line that starts with `Discussion on card` names the card, the number of its discussion thread and what the owner said. Read the card with `show_plan` (its prompt, acceptance, designs and threads), then answer in the discussion thread with `thread_message` (`card`, that thread number, `text`): the answer shows in the same box on the card's page. If the owner wants the card changed, call `edit_card` with the new `prompt` and/or `acceptance`: on a card with a discussion that does not change the card; the owner sees it as a diff and accepts or rejects it, and you say so in your answer. Send the whole new text of a field, not a fragment. `show_card` opens the card's designs for the owner; `suggest` pins a next step or a question. Do not open a design thread for a discussion.
+The owner can talk to you from a card's page. A line that starts with `Discussion on card` names the card, the number of its discussion thread and what the owner said. Read the card with `show_plan` and its `card` (its prompt, acceptance, designs and threads), then answer in the discussion thread with `thread_message` (`card`, that thread number, `text`): the answer shows in the same box on the card's page. If the owner wants the card changed, call `edit_card` with the new `prompt` and/or `acceptance`: on a card with a discussion that does not change the card; the owner sees it as a diff and accepts or rejects it, and you say so in your answer. Send the whole new text of a field, not a fragment. `show_card` opens the card's designs for the owner; `suggest` pins a next step or a question. Do not open a design thread for a discussion.
 
 ## The next step
 
