@@ -70,6 +70,7 @@ reader! {
     suggestion(project: ProjectId) -> Option<Suggestion>;
     last_event_payload(entity: &str, entity_id: &str) -> Option<Value>;
     live_runners() -> Vec<(TicketId, AgentRole)>;
+    live_runs() -> Vec<toknila_core::schedule::LiveRun>;
 }
 
 impl UnitOfWork for WriteTx<'_> {
