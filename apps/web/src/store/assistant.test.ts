@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConversationMessage } from "../api/types";
-import { aboutThis, chipOf, contextOf, lineFor, parseAssistant } from "./assistant";
+import { aboutThis, chipOf, contextLabel, contextOf, lineFor, parseAssistant } from "./assistant";
 import { ASSISTANT_KEY, readAssistant, saveAssistant } from "./assistantEffects";
 import type { Msg } from "./msg";
 import { reduce } from "./reduce";
@@ -62,9 +62,30 @@ describe("what a message sent with a chip is", () => {
     expect(fx[0]).toMatchObject({ call: "ask", text: "hi" });
   });
 
-  it("asked on the roadmap with the panel shut still goes to the assistant's screen", () => {
-    const [s] = reduce(typed(at({ name: "project", project: "DEMO" }), "hi"), { type: "askPlanner", project: "DEMO" });
-    expect(s.route).toEqual({ name: "planner", project: "DEMO" });
+  it("asked on the roadmap with the panel shut opens the panel there, and remembers it", () => {
+    const [s, fx] = reduce(typed(at({ name: "project", project: "DEMO" }), "hi"), { type: "askPlanner", project: "DEMO" });
+    expect(s.route).toEqual({ name: "project", project: "DEMO" });
+    expect(s.assistant.open).toBe(true);
+    expect(fx).toContainEqual({ type: "saveAssistant", open: true, width: 360, only: false });
+  });
+
+  it("asked from a screen the panel cannot sit beside opens the panel on the roadmap", () => {
+    const [s] = reduce(typed(at({ name: "inbox" } as Route), "hi"), { type: "askPlanner", project: "DEMO" });
+    expect(s.route).toEqual({ name: "project", project: "DEMO" });
+    expect(s.assistant.open).toBe(true);
+  });
+
+  it("names the epic and the card in the chip", () => {
+    expect(contextLabel({ kind: "roadmap" })).toBe("Roadmap");
+    expect(contextLabel({ kind: "chain", name: "phase-7" })).toBe("the epic phase-7");
+    expect(contextLabel({ kind: "card", key: "DEMO-1" })).toBe("the card DEMO-1");
+  });
+
+  it("openAssistant opens the panel once and leaves an open one alone", () => {
+    const [s, fx] = reduce(at({ name: "project", project: "DEMO" }), { type: "openAssistant" });
+    expect(s.assistant.open).toBe(true);
+    expect(fx).toHaveLength(1);
+    expect(reduce(s, { type: "openAssistant" })[1]).toEqual([]);
   });
 });
 

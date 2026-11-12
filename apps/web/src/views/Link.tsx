@@ -3,7 +3,7 @@ import type { Intent } from "../store/msg";
 import { type Route, routePath } from "../store/route";
 
 /// An anchor that keeps the URL honest (middle click works) but navigates through the store.
-export function NavLink({ route, dispatch, className, children, testId, title, row }: {
+export function NavLink({ route, dispatch, className, children, testId, title, row, also }: {
   route: Route;
   dispatch: (i: Intent) => void;
   className?: string;
@@ -12,6 +12,8 @@ export function NavLink({ route, dispatch, className, children, testId, title, r
   title?: string;
   /// The link is a row of the sidebar's tree: the keys of the tree move between such rows.
   row?: boolean;
+  /// Done first when the link is followed (the Assistant row opens the panel before it goes).
+  also?: Intent;
 }) {
   return (
     <a
@@ -23,6 +25,7 @@ export function NavLink({ route, dispatch, className, children, testId, title, r
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         e.preventDefault();
+        if (also) dispatch(also);
         dispatch({ type: "navigate", route });
       }}
     >

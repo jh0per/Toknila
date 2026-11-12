@@ -38,12 +38,15 @@ describe("the sidebar tree", () => {
     expect(h).not.toContain('data-chain-item="cb"');
     expect(h).toContain('data-chain-item="ca"');
   });
-  it("lists Roadmap, Assistant, Chains, Designs and Settings under an open project, in that order", () => {
+  it("lists Roadmap, Assistant, Epics, Designs and Settings under an open project, in that order", () => {
     const open = html(world()).split('data-project="AAA"')[1].split('data-project="BBB"')[0];
-    const order = ["Roadmap", "Assistant", "Chains", "Designs", "Settings"].map((w) => open.indexOf(`>${w}<`));
+    const order = ["Roadmap", "Assistant", "Epics", "Designs", "Settings"].map((w) => open.indexOf(`>${w}<`));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(open).toContain('data-testid="planner-link"');
+    // The Assistant row opens the roadmap (with the panel), says what it is, and no longer links to the screen.
+    expect(open).toContain('title="plans epics on the roadmap, cards inside an epic"');
+    expect(open).not.toContain("/projects/AAA/planner");
     expect(open).toContain('data-testid="new-chain-plus"');
     expect(open).toContain('data-testid="import-plus"');
     expect(open).toContain("/projects/AAA/settings/designs");
