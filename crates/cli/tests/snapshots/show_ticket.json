@@ -4,6 +4,7 @@
   ],
   "can_edit": false,
   "can_move": false,
+  "can_move_to_chain": false,
   "chain": "demo",
   "comments": [
     {

@@ -142,14 +142,15 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
         ),
         tool(
             "move_card",
-            "Put a card directly before or after another card of its chain; the dependencies around it are rewired. A card that has started cannot move.",
+            "Put a card directly before or after another card of its chain (give anchor and place); the dependencies around it are rewired. Or move it to another epic of the project (give to_chain; it goes to the end of that epic unless anchor and place say where). Only the owner's yes moves a card between epics. A card that has started cannot move; neither epic may start its cards by itself.",
             json!({
                 "chain": chain,
                 "card": card,
                 "anchor": text("The card it goes next to"),
                 "place": { "type": "string", "enum": ["before", "after"] },
+                "to_chain": text("The epic that receives the card, when it leaves its own"),
             }),
-            &["chain", "card", "anchor", "place"],
+            &["chain", "card"],
         ),
         tool(
             "open_thread",

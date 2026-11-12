@@ -14,8 +14,8 @@ use toknila_core::{Actor, ChainId, ReviewTurn, TicketStatus};
 
 use super::{ApiResult, load_ticket_detail, read, stamp, ticket_write};
 use crate::http::dto::{
-    ActionInput, DesignMoveInput, NewComment, NewSubtask, NewTicket, NewWildcard, PatchSubtask,
-    PatchTicket, TicketDetail, TicketItem, TicketQuery, clamp_size,
+    ActionInput, DesignMoveInput, MoveToChain, NewComment, NewSubtask, NewTicket, NewWildcard,
+    PatchSubtask, PatchTicket, TicketDetail, TicketItem, TicketQuery, clamp_size,
 };
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -208,6 +208,22 @@ pub async fn move_design(
 ) -> ApiResult<Json<TicketDetail>> {
     ticket_write(&state, ticket, Actor::Human, move |tx, t| {
         Ok(moves::move_design(tx, &t, index, &m.target)?)
+    })
+    .await
+}
+
+#[utoipa::path(post, path = "/tickets/{ticket}/move-to-chain", tag = "tickets", request_body = MoveToChain,
+    params(("ticket" = String, Path, description = "Ticket id or key")),
+    responses((status = 200, body = TicketDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Moves a card that has not started to another epic of its project, to the end or next to a card.
+pub async fn move_to_chain(
+    State(state): State<AppState>,
+    Path(ticket): Path<String>,
+    Json(m): Json<MoveToChain>,
+) -> ApiResult<Json<TicketDetail>> {
+    ticket_write(&state, ticket, Actor::Human, move |tx, t| {
+        let place = m.place.as_ref().map(|p| (p.anchor.as_str(), p.place));
+        Ok(moves::move_to_chain(tx, &t, &m.chain, place)?)
     })
     .await
 }

@@ -1,9 +1,11 @@
 // Where cards sit on the canvas and how big they are. A card dragged (or moved with the arrow keys)
 // or resized keeps its new place or size at once, as `pending` or `sizes`, while the daemon is
 // asked to save it; the daemon's answer makes it the card's own and the pending one goes.
-// "Arrange" hands every card back to the layout.
+// "Arrange" hands every card back to the layout. A card that has not started can also go to
+// another epic of its project (the card menu, or a drag onto an epic's row in the sidebar): the
+// daemon decides, and its refusal shows on the diagram like the others.
 
-import type { ChainDetail, Pos, Size, Ticket } from "../api/types";
+import type { ChainDetail, MoveInput, Pos, Size, Ticket, TicketDetail } from "../api/types";
 import type { Effect } from "./msg";
 import { withChain } from "./plan";
 import type { State } from "./state";
@@ -14,26 +16,33 @@ export interface PlacementState {
   pending: Record<string, Pos | null>;
   /// The same for sizes; `null` is a card that fits its text again.
   sizes: Record<string, Size | null>;
+  /// The epic (chain id) whose sidebar row a dragged card is over: the row shows as a drop target.
+  dropEpic: string | undefined;
 }
 
-export const initialPlacement: PlacementState = { pending: {}, sizes: {} };
+export const initialPlacement: PlacementState = { pending: {}, sizes: {}, dropEpic: undefined };
 
 /// What the person did.
 export type PlacementIntent =
   | { type: "placeCard"; chain: string; ticket: string; key: string; pos: Pos | null }
   | { type: "sizeCard"; chain: string; ticket: string; key: string; size: Size | null }
-  | { type: "arrangeChain"; chain: string };
+  | { type: "arrangeChain"; chain: string }
+  | { type: "overEpic"; chain: string | undefined }
+  /// The card `key`, now in the chain `from` (an id), goes to the epic `chain` (id or name): to the
+  /// end, or next to a card of it.
+  | { type: "moveToEpic"; key: string; from: string; chain: string; place?: MoveInput };
 
 /// What the daemon answered.
 export type PlacementResult =
   | { type: "cardPlaced"; chain: string; ticket: string; pos: Pos | null }
   | { type: "cardSized"; chain: string; ticket: string; size: Size | null }
   | { type: "cardPlaceRefused"; ticket: string; message: string }
-  | { type: "chainArranged"; chain: ChainDetail };
+  | { type: "chainArranged"; chain: ChainDetail }
+  | { type: "movedToEpic"; from: string; detail: TicketDetail };
 
 export type PlacementMsg = PlacementIntent | PlacementResult;
 
-export type PlacementEffect = PlacementIntent;
+export type PlacementEffect = Extract<PlacementIntent, { type: "placeCard" | "sizeCard" | "arrangeChain" | "moveToEpic" }>;
 
 const same = (a: Pos | null | undefined, b: Pos | null | undefined): boolean =>
   (a?.x ?? null) === (b?.x ?? null) && (a?.y ?? null) === (b?.y ?? null);
@@ -77,6 +86,16 @@ export function reducePlacement(s: State, msg: PlacementMsg): [State, Effect[]] 
       return [set({ sizes: { ...s.placement.sizes, [msg.ticket]: msg.size } }), [msg]];
     case "arrangeChain":
       return [s, [msg]];
+    case "overEpic":
+      return [set({ dropEpic: msg.chain }), []];
+    case "moveToEpic":
+      return [set({ dropEpic: undefined }), [msg]];
+    case "movedToEpic": {
+      // Both diagrams are read again: the old one loses the card, the new one shows it at the end.
+      const d = msg.detail;
+      const next = set({ pending: without(s.placement.pending, d.ticket.id) }, { ...s, details: { ...s.details, [d.ticket.key]: d } });
+      return [next, [{ type: "loadChain", id: msg.from }, { type: "loadChain", id: d.ticket.chain_id }]];
+    }
     case "cardPlaced": {
       const c = s.chains[msg.chain];
       // A newer move is still on its way: it decides what the card shows.

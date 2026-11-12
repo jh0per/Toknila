@@ -2,8 +2,8 @@
 
 use crate::{Client, ClientResult, NO_BODY, enc};
 use toknila_api_types::{
-    ActionInput, DesignMoveInput, NewComment, NewSubtask, NewTicket, NewWildcard, PatchSubtask,
-    PatchTicket, TicketDetail, TicketItem, TicketQuery,
+    ActionInput, DesignMoveInput, MoveToChain, NewComment, NewSubtask, NewTicket, NewWildcard,
+    PatchSubtask, PatchTicket, TicketDetail, TicketItem, TicketQuery,
 };
 
 impl Client {
@@ -46,6 +46,12 @@ impl Client {
         m: &DesignMoveInput,
     ) -> ClientResult<TicketDetail> {
         let path = format!("/tickets/{}/designs/{index}/move", enc(ticket));
+        self.call("POST", &path, Some(m))
+    }
+
+    /// `POST /tickets/{ticket}/move-to-chain`.
+    pub fn move_to_chain(&self, ticket: &str, m: &MoveToChain) -> ClientResult<TicketDetail> {
+        let path = format!("/tickets/{}/move-to-chain", enc(ticket));
         self.call("POST", &path, Some(m))
     }
 

@@ -48,7 +48,7 @@ impl Repo<'_> {
         self.conn.execute(
             &format!(
                 "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29) \
-                 ON CONFLICT(id) DO UPDATE SET title = excluded.title, prompt = excluded.prompt, \
+                 ON CONFLICT(id) DO UPDATE SET chain_id = excluded.chain_id, title = excluded.title, prompt = excluded.prompt, \
                  acceptance_json = excluded.acceptance_json, status = excluded.status, \
                  status_reason_json = excluded.status_reason_json, status_since = excluded.status_since, \
                  paused = excluded.paused, profile = excluded.profile, review_mode = excluded.review_mode, \

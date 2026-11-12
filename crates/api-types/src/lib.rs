@@ -25,7 +25,8 @@ mod usage;
 pub use agents::{ProjectAgents, QueuedCard};
 pub use card_size::{CARD_MAX_H, CARD_MAX_W, CARD_MIN_W, SizeLimits, clamp_size};
 pub use chains::{
-    ChainDetail, ChainItem, DesignMoveInput, EdgeInput, EdgeMoveInput, MoveInput, ReleaseMember,
+    ChainDetail, ChainItem, DesignMoveInput, EdgeInput, EdgeMoveInput, MoveInput, MoveToChain,
+    PlannerMove, ReleaseMember,
 };
 pub use conversation::ConversationQuery;
 pub use designs::{

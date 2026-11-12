@@ -6,7 +6,7 @@ import { type EdgeRef, idOf } from "../store/edges";
 import { epicPanel } from "../store/epic";
 import { canRelease } from "../store/release";
 import type { Intent } from "../store/msg";
-import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
+import { type State, chainsOf, currentProject, hrefOf, queuePosition } from "../store/state";
 import { epicTitle } from "../store/title";
 import { ContextMenu, type MenuEntry } from "./ContextMenu";
 import { EdgeLayer } from "./EdgeLayer";
@@ -20,7 +20,7 @@ import { CancelConfirm } from "./CancelConfirm";
 import { CanvasChrome } from "./CanvasChrome";
 import { FinishNode, ReleaseNode, StartNode, TicketNode } from "./CanvasNodes";
 import { ReasonAsk } from "./ReasonAsk";
-import { canvasEntries, cardEntries, edgeMenu } from "./canvasMenus";
+import { canvasEntries, cardEntries, edgeMenu, epicChoices } from "./canvasMenus";
 import { useCanvasKeys } from "./useCanvasKeys";
 import { useCardDrag } from "./useCardDrag";
 import { type Drag, useEdgeDrag } from "./useEdgeDrag";
@@ -30,6 +30,7 @@ type Menu =
   | { kind: "edge"; x: number; y: number; edge: LaidEdge }
   | { kind: "canvas"; x: number; y: number; at: Pt }
   | { kind: "card"; x: number; y: number; key: string; at: Pt }
+  | { kind: "epics"; x: number; y: number; key: string }
   | { kind: "cancel"; x: number; y: number; key: string }
   | { kind: "ask"; x: number; y: number; key: string; action: "reject" | "return" };
 
@@ -58,7 +59,14 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
   };
   // A card is drawn where it is being dragged, else where it was just put, else where it was saved.
   const zoomRef = useRef(1);
-  const { moving, press, wasDrag } = useCardDrag(zoomRef, place);
+  // Released over an epic's row of the sidebar, a card goes to that epic instead of a new place.
+  const { moving, press, wasDrag } = useCardDrag(zoomRef, place, {
+    project: projectKey, own: chainId, over: (to) => dispatch({ type: "overEpic", chain: to }),
+    drop: (id, to) => {
+      const t = tickets.get(id);
+      if (t) dispatch({ type: "moveToEpic", key: t.key, from: chainId, chain: to });
+    },
+  });
   const resize = (id: string, size: Size | null) => {
     const t = tickets.get(id);
     if (t) dispatch({ type: "sizeCard", chain: chainId, ticket: id, key: t.key, size });
@@ -194,10 +202,16 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
             addAfter: () => newCardAt(m.at, { after: m.key }),
             addBefore: () => newCardAt(m.at, { before: m.key }),
             addDependency: () => ticket && setLinking(nodeKey({ kind: "ticket", id: ticket.id })),
+            moveToEpic: () => setMenu({ kind: "epics", x: m.x, y: m.y, key: m.key }),
             askCancel: () => setMenu({ kind: "cancel", x: m.x, y: m.y, key: m.key }),
           }),
         };
       }
+      case "epics":
+        return {
+          title: `Move ${m.key} to…`,
+          entries: epicChoices(chainsOf(state, project), chainId, (to) => dispatch({ type: "moveToEpic", key: m.key, from: chainId, chain: to })),
+        };
       case "cancel":
       case "ask":
         return { entries: [] };

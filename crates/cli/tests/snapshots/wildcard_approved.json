@@ -6,6 +6,7 @@
   ],
   "can_edit": true,
   "can_move": true,
+  "can_move_to_chain": true,
   "chain": "demo",
   "comments": [],
   "design_waiting": false,

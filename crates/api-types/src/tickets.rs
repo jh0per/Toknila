@@ -33,6 +33,10 @@ pub struct TicketDetail {
     pub can_edit: bool,
     /// Can the card still be moved in the chain? Decided by core from the status.
     pub can_move: bool,
+    /// Can the card go to another epic of its project? Decided by core: it has not started (or is
+    /// cancelled) and has no ship.
+    #[serde(default)]
+    pub can_move_to_chain: bool,
     /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
     pub queue_position: Option<u32>,
     /// Tokens the card's agents used and their estimated cost at API list prices; all zero

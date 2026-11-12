@@ -22,6 +22,8 @@ code, pre, .key { font-family: var(--mono); }
 .item { display: flex; align-items: center; gap: var(--sp2); padding: var(--sp1) var(--sp2); border-radius: var(--shape-xs); min-width: 0; }
 .item:hover { background: var(--surface-container-high); }
 .item.sel { background: var(--primary-container); color: var(--on-primary-container); font-weight: var(--fw-medium); }
+/* An epic row a card dragged from the diagram would land on. */
+[data-drop] > .row { background: var(--primary-container); outline: 2px dashed var(--primary); outline-offset: -2px; border-radius: var(--shape-xs); }
 .item .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .item .key, .item .n { font-size: var(--fs-label-m); color: var(--on-surface-variant); }
 .badge { font-family: var(--mono); font-size: var(--fs-label-m); line-height: var(--lh-label-m); min-width: var(--sp4); padding: 0 var(--sp1); text-align: center; background: var(--error); color: var(--on-error); border-radius: var(--shape-full); font-weight: var(--fw-semibold); }

@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TicketAction, TicketDetail } from "../api/types";
-import { canvasEntries, cardEntries, edgeMenu } from "./canvasMenus";
+import type { ChainDetail } from "../api/types";
+import { canvasEntries, cardEntries, edgeMenu, epicChoices } from "./canvasMenus";
 
-const detail = (allowed: TicketAction[], can_move: boolean, can_edit = false): TicketDetail =>
-  ({ allowed_actions: allowed, can_move, can_edit }) as unknown as TicketDetail;
+const detail = (allowed: TicketAction[], can_move: boolean, can_edit = false, can_move_to_chain = false): TicketDetail =>
+  ({ allowed_actions: allowed, can_move, can_edit, can_move_to_chain }) as unknown as TicketDetail;
 const handlers = () => ({
   open: vi.fn(), openTerminal: vi.fn(), edit: vi.fn(), act: vi.fn(), ask: vi.fn(), addAfter: vi.fn(),
-  addBefore: vi.fn(), addDependency: vi.fn(), askCancel: vi.fn(),
+  addBefore: vi.fn(), addDependency: vi.fn(), moveToEpic: vi.fn(), askCancel: vi.fn(),
 });
 /// Labels with `|` where a separator is drawn.
 const shape = (d: TicketDetail | undefined) =>
@@ -79,6 +80,40 @@ describe("the card menu", () => {
   it("does not offer Block: it needs a reason the menu has no field for", () => {
     expect(shape(detail(["block", "cancel"], false))).not.toContain("|Block");
     expect(shape(detail(["block"], false)).join()).not.toContain("Block");
+  });
+});
+
+describe("Move to epic", () => {
+  const epic = (id: string, name: string, title?: string) =>
+    ({ chain: { id, name }, summary: { display_title: title } }) as unknown as ChainDetail;
+
+  it("is offered when core says the card can leave its epic, after the entries around the card", () => {
+    expect(shape(detail(["start"], true, true, true))).toEqual([
+      "Open", "Edit", "Open terminal", "|Start", "|Add story before", "Add story after", "Add dependency…", "Move to epic…",
+    ]);
+    // A cancelled card cannot be reordered but can move to another epic.
+    expect(shape(detail([], false, false, true))).toEqual(["Open", "Open terminal", "|Add story after", "Move to epic…"]);
+  });
+
+  it("is not offered for a card core keeps in its epic, nor before the card is known", () => {
+    expect(shape(detail(["pause"], false, false, false)).join()).not.toContain("Move to epic");
+    expect(shape(undefined).join()).not.toContain("Move to epic");
+  });
+
+  it("opens the chooser when picked", () => {
+    const h = handlers();
+    cardEntries(detail([], false, false, true), h).find((x) => x.testId === "menu-card-move-epic")?.run();
+    expect(h.moveToEpic).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists the project's epics with the card's own greyed, and runs the others with their id", () => {
+    const move = vi.fn();
+    const e = epicChoices([epic("a", "soundpacks", "Sound packs"), epic("b", "android")], "a", move);
+    expect(e.map((x) => [x.label, x.disabled ?? false])).toEqual([["Sound packs", true], ["android", false]]);
+    e[0].run();
+    expect(move).not.toHaveBeenCalled();
+    e[1].run();
+    expect(move.mock.calls).toEqual([["b"]]);
   });
 });
 

@@ -13,6 +13,8 @@ use crate::{
     AppError, AppResult, ErrorKind, UnitOfWork, checks, merges, reviews, runs, schedule, ships,
 };
 
+mod cross;
+
 /// A chain being changed by one command. Every step is journaled by the graph
 /// ([`ChainView::record`]) so each transition, including intermediate ones
 /// (Backlog -> Ready -> Running), becomes its own event.

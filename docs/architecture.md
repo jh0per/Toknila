@@ -584,7 +584,13 @@ The web shows what the daemon says and keeps no rule of its own.
   chains shows "No chains yet" with New chain and Import; a project with chains and none picked
   shows its most recently active chain (`defaultChain`: the chain of the newest journal entry, else
   the first). The card's Details offer Edit and Move only when `TicketDetail.can_edit` and
-  `can_move` say so; a move is `POST /v1/chains/{c}/tickets/{t}/move`. Archived projects
+  `can_move` say so; a move is `POST /v1/chains/{c}/tickets/{t}/move`. A card that has not
+  started (or is cancelled) goes to another epic of its project with
+  `POST /v1/tickets/{t}/move-to-chain {chain, place?}` (`tok card mv`; core's `card_move` holds
+  the refusals: started or shipped, other project, an autostart target, a dependency on a card of
+  its epic), to the end of the epic or next to a card; the key stays and the journal says
+  `ticket.moved`. The window offers it as the card menu's "Move to epic…" (`can_move_to_chain`)
+  and as a drag onto an epic's row of the sidebar. Archived projects
   (`Project.archived`) leave the sidebar and come back through "Show archived"; archiving is
   refused while the project's agents work, and the refusal shows inline.
 - **Plans and deletion from the window** (`store/imports.ts`, `store/removal.ts`,

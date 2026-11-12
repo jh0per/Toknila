@@ -6,6 +6,8 @@
 .ctx-menu [role^=menuitem] { display: flex; align-items: center; gap: var(--sp3); width: 100%; min-height: var(--row-h); border: 0; background: none; text-align: left; padding: 0 var(--sp3); border-radius: var(--shape-xs); }
 .ctx-menu [role^=menuitem]:hover, .ctx-menu [role^=menuitem]:focus-visible { background: var(--primary-container); outline: none; }
 .ctx-menu [role^=menuitem].danger { color: var(--error); }
+.ctx-menu [role^=menuitem][aria-disabled=true] { color: var(--on-surface-variant); opacity: .5; cursor: default; }
+.ctx-menu [role^=menuitem][aria-disabled=true]:hover { background: none; }
 .ctx-label { flex: 1; white-space: nowrap; }
 .ctx-check { width: var(--sp3); flex: none; color: var(--primary); }
 .ctx-menu kbd { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); padding: 0 var(--sp1); }

@@ -2,6 +2,7 @@
   "allowed_actions": [],
   "can_edit": false,
   "can_move": false,
+  "can_move_to_chain": true,
   "chain": "demo",
   "comments": [],
   "design_waiting": false,

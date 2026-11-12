@@ -194,7 +194,9 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
              `show_plan` to know the plan, say nothing about it yet, and wait for the owner's \
-             message: answer what they ask, and plan only when they ask you to. Do not start any story.",
+             message: answer what they ask, and plan only when they ask you to. Only if a story \
+             sits in the wrong epic, as \"A story in the wrong epic\" says, point it out in one \
+             `say` now, once; never move it without the owner's yes. Do not start any story.",
             key = brief.key
         ),
         crate::AgentRole::Reviewer => format!(

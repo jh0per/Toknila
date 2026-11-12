@@ -13,6 +13,8 @@ type Props = {
   selected: string | undefined;
   dispatch: (i: Intent) => void;
   onMenu: (c: ChainDetail) => (e: React.MouseEvent) => void;
+  /// The epic (chain id) a card dragged from the diagram is over: its row shows as a drop target.
+  drop?: string;
 };
 
 /// The phases whose word the dot does not make plain; a finished or empty chain shows no word.
@@ -22,7 +24,7 @@ const WORDED = new Set<string>(["active", "waiting", "idle"]);
 /// with a dot, the phase word and the count, then one collapsible Finished (n) group, closed by
 /// default and remembered per project. The selected chain stays visible: the group opens for a
 /// finished one.
-export function SidebarChains({ chains, project, selected, dispatch, onMenu }: Props) {
+export function SidebarChains({ chains, project, selected, dispatch, onMenu, drop }: Props) {
   const { open, finished } = splitChains(chains);
   const [stored, setStored] = useState(() => readFinishedOpen(project));
   useEffect(() => setStored(readFinishedOpen(project)), [project]);
@@ -36,7 +38,10 @@ export function SidebarChains({ chains, project, selected, dispatch, onMenu }: P
   const row = (c: ChainDetail, dim: boolean, level: Level) => {
     const s = c.summary;
     return (
-      <li key={c.chain.id} role="treeitem" aria-selected={c.chain.id === selected} data-chain-item={c.chain.name} data-phase={s.phase} onContextMenu={onMenu(c)}>
+      <li
+        key={c.chain.id} role="treeitem" aria-selected={c.chain.id === selected} data-chain-item={c.chain.name} data-phase={s.phase} onContextMenu={onMenu(c)}
+        data-chain-id={c.chain.id} data-chain-project={project} data-drop={c.chain.id === drop || undefined}
+      >
         <div className="row" style={indent(level)}>
           <Chev />
           <NavLink

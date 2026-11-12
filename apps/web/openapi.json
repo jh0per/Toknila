@@ -1539,7 +1539,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Puts a card directly before or after another; the dependencies around it are rewired.",
+        "summary": "Puts a card directly before or after another (the dependencies around it are rewired), or\nmoves it to another epic of the project (`to_chain`).",
         "operationId": "planner_move_card",
         "parameters": [
           {
@@ -1565,7 +1565,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MoveInput"
+                "$ref": "#/components/schemas/PlannerMove"
               }
             }
           },
@@ -1577,6 +1577,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -4890,6 +4899,74 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/move-to-chain": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Moves a card that has not started to another epic of its project, to the end or next to a card.",
+        "operationId": "move_to_chain",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveToChain"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -8891,6 +8968,31 @@
         },
         "additionalProperties": false
       },
+      "MoveToChain": {
+        "type": "object",
+        "description": "`POST /v1/tickets/{ticket}/move-to-chain`: a card that has not started goes to another epic\nof its project: to the end, or next to a card of that epic.",
+        "required": [
+          "chain"
+        ],
+        "properties": {
+          "chain": {
+            "type": "string",
+            "description": "The epic (id or name) that receives the card."
+          },
+          "place": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MoveInput",
+                "description": "Where it goes in that epic; left out, at the end."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "NewActivity": {
         "type": "object",
         "description": "Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook.",
@@ -10571,6 +10673,37 @@
             "minimum": 0
           }
         }
+      },
+      "PlannerMove": {
+        "type": "object",
+        "description": "`POST /v1/planner/chains/{chain}/cards/{card}/move`: the planner puts a card next to another\nof its epic, or moves it to another epic (`to_chain`: at the end unless `anchor` and `place`\nsay where).",
+        "properties": {
+          "anchor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ticket key of the card the moved card goes next to."
+          },
+          "place": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Place"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to_chain": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The epic the card moves to, when it leaves its own."
+          }
+        },
+        "additionalProperties": false
       },
       "PlannerOverview": {
         "allOf": [
@@ -13105,6 +13238,10 @@
           "can_move": {
             "type": "boolean",
             "description": "Can the card still be moved in the chain? Decided by core from the status."
+          },
+          "can_move_to_chain": {
+            "type": "boolean",
+            "description": "Can the card go to another epic of its project? Decided by core: it has not started (or is\ncancelled) and has no ship."
           },
           "chain": {
             "type": "string"
