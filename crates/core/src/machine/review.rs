@@ -74,7 +74,17 @@ pub(super) fn check_done(
             from: next.status,
         });
     }
+    let command = match &next.review.check {
+        Some(crate::CheckPhase::Running { command, .. }) => command.clone(),
+        _ => String::new(),
+    };
     next.review.check = None;
+    next.review.last_check = Some(crate::CheckOutcome {
+        command,
+        passed,
+        output: output.to_owned(),
+        at: now,
+    });
     if passed {
         next.review
             .record(Actor::System, Verdict::Approve, "The check passed.", now);

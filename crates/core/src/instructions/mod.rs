@@ -10,11 +10,14 @@
 //! - [`typed`] and [`for_hook`]: the text of that delivery.
 //! - [`terminal`]: the bounds of a terminal size.
 
+mod gate;
 mod planner;
 mod protocol;
 pub mod terminal;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_gate;
 #[cfg(test)]
 mod tests_return;
 mod waiting;
@@ -58,6 +61,9 @@ pub struct RunBrief<'a> {
     /// The chain the card belongs to, as its epic: the chain's name and its goal, which is what
     /// every card of the chain works toward. `None` or an empty goal says nothing.
     pub epic: Option<(&'a str, &'a str)>,
+    /// What the daemon's check command said about the hand-in under review (a reviewer only);
+    /// `None` when it did not run, e.g. the project has no check command.
+    pub check: Option<&'a crate::CheckOutcome>,
 }
 
 /// The section that carries the discussion of the card with the assistant; empty when there is
@@ -233,11 +239,14 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         ),
         crate::AgentRole::Reviewer => format!(
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
-             branch, run the check command and the tests the hand-in names and quote their \
-             result lines (each command plain, one per call, no `cd` or `&&`), mark NOT_RUN what \
-             you could not run (never FAIL it), then call `review_verdict` once. You do not change the code.{since}",
+             branch, run the single tests the hand-in names and whatever the diff makes you doubt \
+             and quote their result lines (each command plain, one per call, no `cd` or `&&`), \
+             mark NOT_RUN what you could not run (never FAIL it), then call `review_verdict` \
+             once. You do not change the code. Do not run the whole gate again.{since}\n\n\
+             {gate}",
             key = brief.key,
             since = waiting::reviewer_part(brief.returned),
+            gate = gate::text(brief.check),
         ),
         _ => format!(
             "Start ticket {key} now. Read your Toknila instructions, work the card, commit your \
@@ -330,9 +339,9 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
             s.text()
         ));
     }
-    out.push_str(&checks_section(
-        brief,
-        "Run it to see the result for yourself, quote its result line, and report it as a check in your verdict.",
+    out.push_str(&format!(
+        "\n## The gate's result\n\n{}\n",
+        gate::text(brief.check)
     ));
     out.push('\n');
     out.push_str(protocol::REVIEW_PROTOCOL);

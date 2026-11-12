@@ -208,6 +208,7 @@ fn brief_of_key<'a>(
             .epic
             .as_ref()
             .map(|(name, goal)| (name.as_str(), goal.as_str())),
+        check: cx.brief.check.as_ref(),
     }
 }
 

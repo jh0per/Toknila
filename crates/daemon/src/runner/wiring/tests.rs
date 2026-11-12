@@ -293,7 +293,7 @@ fn the_first_prompt_fills_the_kickoff_placeholder_per_role() {
     );
     assert!(r.command[3].contains("`review_verdict`"));
     for must in [
-        "run the check command",
+        "Do not run the whole gate again",
         "quote their result lines",
         "NOT_RUN",
     ] {
@@ -321,7 +321,15 @@ fn the_check_command_reaches_the_instructions_the_kickoff_and_both_allow_lists()
     rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
     for role in ["worker", "reviewer"] {
         let (_, instructions) = rig.file_of(role, "instructions.md");
-        assert!(instructions.contains("`cargo xtask verify`"), "{role}");
+        if role == "worker" {
+            assert!(instructions.contains("`cargo xtask verify`"), "{role}");
+        } else {
+            // The reviewer is given the gate's result, not told to run the gate.
+            assert!(
+                !instructions.contains("`cargo xtask verify`"),
+                "{role}: {instructions}"
+            );
+        }
         let (_, settings) = rig.file_of(role, "settings.json");
         assert!(
             rules(&settings).contains(&"Bash(cargo xtask verify *)".to_owned()),

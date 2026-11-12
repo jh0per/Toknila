@@ -53,6 +53,9 @@ struct Rig {
     ship: PathBuf,
     /// The person's checkout, on the base branch `develop`.
     repo: PathBuf,
+    runners: Arc<toknila_daemon::runner::Runners>,
+    _ended: tokio::sync::mpsc::UnboundedReceiver<toknila_app::runner::RunEnded>,
+    ticket_id: Option<toknila_core::TicketId>,
 }
 
 impl Rig {
@@ -61,6 +64,34 @@ impl Rig {
     }
 
     async fn with_check(rounds: u32, check: Option<&str>) -> Rig {
+        Rig::build(rounds, check, false).await
+    }
+
+    /// A rig whose reviewer is the fake agent: it prints the kickoff it was started with and
+    /// holds. Stop it with [`Rig::stop_reviewer`].
+    async fn with_fake_reviewer() -> Rig {
+        Rig::build(3, Some(CHECK), true).await
+    }
+
+    fn stop_reviewer(&self) {
+        use toknila_app::runner::Runner;
+        self.runners
+            .stop_role(self.ticket(), toknila_core::AgentRole::Reviewer);
+    }
+
+    fn ticket(&self) -> toknila_core::TicketId {
+        self.ticket_id.expect("the fake reviewer rig has a card")
+    }
+
+    /// What the fake reviewer printed so far.
+    fn reviewer_output(&self) -> String {
+        self.runners
+            .read(self.ticket(), toknila_core::AgentRole::Reviewer, None)
+            .map(|c| String::from_utf8_lossy(&c.bytes).into_owned())
+            .unwrap_or_default()
+    }
+
+    async fn build(rounds: u32, check: Option<&str>, fake_reviewer: bool) -> Rig {
         let tmp = tempfile::tempdir().expect("tmp");
         let repo = tmp.path().join("repo");
         std::fs::create_dir_all(&repo).expect("mkdir");
@@ -68,18 +99,28 @@ impl Rig {
         git(&repo, &["symbolic-ref", "HEAD", "refs/heads/develop"]);
         commit_file(&repo, "README.md", "hi\n");
 
-        let store = Store::open(&tmp.path().join("t.db"))
+        let (runners, ended) =
+            toknila_daemon::runner::Runners::new(tmp.path().join("runs"), tmp.path().join("p"));
+        let mut store = Store::open(&tmp.path().join("t.db"))
             .expect("store")
             .with_shipyard(Arc::new(GitShipyard::new(tmp.path().join("ships"))))
             .with_merger(Arc::new(toknila_daemon::github::Mergers::new()));
-        let (runners, _) =
-            toknila_daemon::runner::Runners::new(tmp.path().join("runs"), tmp.path().join("p"));
+        if fake_reviewer {
+            store = store.with_runner(runners.clone());
+            std::fs::create_dir_all(tmp.path().join("p")).expect("profiles");
+            let agent = env!("CARGO_BIN_EXE_fake-agent");
+            std::fs::write(
+                tmp.path().join("p").join("fake-reviewer.toml"),
+                format!("command = ['{agent}', 'print', '{{kickoff}}', 'hold']\n"),
+            )
+            .expect("profile");
+        }
         let app = router(AppState {
             store: store.clone(),
             token: TOKEN.into(),
             shutdown: Arc::new(Notify::new()),
             profiles: tmp.path().join("p"),
-            runners,
+            runners: runners.clone(),
             tools: Arc::new(toknila_daemon::tools::SystemTools),
             usage: Arc::new(toknila_daemon::usage::Usage::disabled()),
             home: tmp.path().to_owned(),
@@ -93,6 +134,9 @@ impl Rig {
             store,
             ship: PathBuf::new(),
             repo: repo.clone(),
+            runners,
+            _ended: ended,
+            ticket_id: None,
         };
         let project = rig
             .post(
@@ -115,6 +159,14 @@ impl Rig {
             )
             .await;
         assert_eq!(patched["max_review_rounds"], rounds);
+        if fake_reviewer {
+            rig.call(
+                Method::PATCH,
+                "/v1/projects/DEMO",
+                json!({ "reviewer": "fake-reviewer" }),
+            )
+            .await;
+        }
         rig.post("/v1/projects/DEMO/chains", json!({ "name": "auth" }))
             .await;
         rig.post(
@@ -123,11 +175,9 @@ impl Rig {
                     "acceptance": ["It logs in", "It is tidy"] }),
         )
         .await;
-        rig.ship = PathBuf::from(
-            rig.card().await["ship"]["path"]
-                .as_str()
-                .expect("the card has a ship"),
-        );
+        let card = rig.card().await;
+        rig.ship = PathBuf::from(card["ship"]["path"].as_str().expect("the card has a ship"));
+        rig.ticket_id = card["ticket"]["id"].as_str().and_then(|id| id.parse().ok());
         rig
     }
 
@@ -336,6 +386,36 @@ async fn a_card_that_passes_the_check_and_the_reviewer_reaches_the_person_with_t
             ("agent".into(), "approve".into())
         ]
     );
+}
+
+#[tokio::test]
+async fn the_reviewer_started_after_a_passed_check_is_given_that_check_in_its_kickoff() {
+    let rig = Rig::with_fake_reviewer().await;
+    rig.finish("ok.txt").await;
+    let until = Instant::now() + Duration::from_secs(30);
+    let out = loop {
+        let out = rig.reviewer_output();
+        if out.contains("```") && out.matches("```").count() >= 2 {
+            break out;
+        }
+        assert!(
+            Instant::now() < until,
+            "the reviewer got no kickoff: {out:?}"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    };
+    rig.stop_reviewer();
+    for want in [
+        "Review ticket DEMO-1 now",
+        "Toknila ran the gate",
+        CHECK,
+        "with PASS",
+        "exited with code 0",
+        "do not run the whole gate again",
+    ] {
+        assert!(out.contains(want), "{want:?} in the kickoff: {out}");
+    }
+    assert!(!out.contains("did not run the gate"), "{out}");
 }
 
 #[tokio::test]

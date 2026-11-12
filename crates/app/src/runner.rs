@@ -93,6 +93,8 @@ pub struct RunBrief {
     pub designs: Vec<std::path::PathBuf>,
     /// The card's chain as its epic: the chain's name and goal (a card's agent only).
     pub epic: Option<(String, String)>,
+    /// What the check command said about the hand-in under review (a reviewer only).
+    pub check: Option<toknila_core::CheckOutcome>,
 }
 
 /// A runner now works for the ticket.

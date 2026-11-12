@@ -118,6 +118,7 @@ pub fn apply(
             if *check {
                 check_phase::enter_check(&mut next, &mut effects);
             } else {
+                next.review.last_check = None;
                 review::enter(&mut next, *mode, &mut effects);
             }
             (S::Review, None)
