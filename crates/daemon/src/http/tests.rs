@@ -30,6 +30,7 @@ mod pins;
 mod planner;
 mod planning;
 mod plans;
+mod prepare;
 mod profiles;
 mod questions;
 mod releases;
@@ -1024,6 +1025,7 @@ async fn openapi_describes_every_route() {
             "/releases/{release}/events",
             "/releases/{release}/run",
             "/repos/check",
+            "/repos/prepare",
             "/system/checks",
             "/system/cli",
             "/system/cli/install",

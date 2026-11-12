@@ -11,6 +11,14 @@ pub struct RepoCheckRequest {
     pub work_branch: Option<String>,
 }
 
+/// `POST /v1/repos/prepare`: the one fix to make to a folder (one its check offers).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoPrepareRequest {
+    pub repo_path: String,
+    pub fix: toknila_core::repo::RepoFix,
+}
+
 /// `GET /v1/system/places`: where Toknila keeps what it makes on this machine.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
