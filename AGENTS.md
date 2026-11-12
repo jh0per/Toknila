@@ -152,6 +152,10 @@ evidence as such. Decisions and reports use the ticket comment template:
 
 Omit empty fields.
 
+Pictures (screenshots, before/after) go to your run's scratchpad, never into the repository unless
+the card names a path for them; give the folder's path in the hand-in. A design thread is the record
+of an approval: name it in the hand-in and do not expect the reviewer to see it.
+
 ## Checklist before saying done
 
 - [ ] `cargo xtask verify` passes locally on the committed tree; `cargo xtask web` and
