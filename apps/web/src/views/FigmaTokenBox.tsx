@@ -31,7 +31,7 @@ export function FigmaTokenBox({ project, saved, onChange }: { project: string; s
           data-testid="figma-token-input" aria-label="Figma personal access token" onChange={(e) => setText(e.target.value)}
         />
         <button
-          type="button" className="btn" disabled={!text.trim()} data-testid="figma-token-save"
+          type="button" className="btn primary" disabled={!text.trim()} data-testid="figma-token-save"
           onClick={() => void act(() => sendEmpty("PUT", path, { token: text }))}
         >
           Save token

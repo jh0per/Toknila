@@ -127,3 +127,15 @@ export async function cleanup(tok, home) {
     console.warn(`warning: cannot remove ${home}: ${e.message}`);
   }
 }
+
+/// With `SCREENSHOT_DIR` set: a screenshot of the page (or of `target`, a locator) in light and
+/// dark, as `<name>-light.png` and `<name>-dark.png`. Without it nothing happens.
+export async function shoot(page, name, target = page) {
+  const dir = process.env.SCREENSHOT_DIR;
+  if (!dir) return;
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await target.screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+  }
+  await page.emulateMedia({ colorScheme: null });
+}
