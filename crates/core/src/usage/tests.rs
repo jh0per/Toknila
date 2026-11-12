@@ -424,3 +424,30 @@ mod quota {
         assert!(!gone.available);
     }
 }
+
+#[test]
+fn a_workspace_line_carries_its_repository_only_when_it_has_one() {
+    let figures = UsageFigures::default();
+    let with = UsageItem {
+        label: "/Users/x/.paradev/worktrees/app/a".into(),
+        figures: figures.clone(),
+        repo: Some("/Users/x/Work/app".into()),
+        name: Some("app".into()),
+    };
+    let without = UsageItem {
+        label: "/work/loose".into(),
+        figures,
+        repo: None,
+        name: None,
+    };
+    let json = |i: &UsageItem| {
+        let mut v = serde_json::to_value(i).expect("json");
+        v.as_object_mut().expect("object").remove("figures");
+        v.to_string()
+    };
+    assert_eq!(
+        json(&with),
+        r#"{"label":"/Users/x/.paradev/worktrees/app/a","name":"app","repo":"/Users/x/Work/app"}"#
+    );
+    assert_eq!(json(&without), r#"{"label":"/work/loose"}"#);
+}

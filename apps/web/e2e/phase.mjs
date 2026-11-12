@@ -28,7 +28,7 @@ const chainFile = (name, cards) =>
 
 let browser;
 try {
-  tok("project", "new", "PHA");
+  tok("project", "new", "PHA", "--sim");
   tok("review-mode", "human", "--project", "PHA");
   writeFileSync(join(home, "old.toml"), chainFile("old", [{ id: "O1", done: true }, { id: "O2", done: true }]));
   writeFileSync(join(home, "now.toml"), chainFile("now", [{ id: "N1" }, { id: "N2" }]));

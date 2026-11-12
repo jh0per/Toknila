@@ -4,6 +4,7 @@
     "in_status_ms": 0,
     "needs_human": true,
     "queue_position": null,
+    "simulated": true,
     "ticket": {
       "acceptance": [
         "an expired token is refreshed"

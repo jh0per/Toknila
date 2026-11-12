@@ -11,6 +11,7 @@ import { PlansSection } from "./PlansSection";
 import { AdvancedSection } from "./ProjectAdvanced";
 import { AgentsSection, GeneralSection, ReviewSection } from "./ProjectSections";
 import { SaveBar } from "./SaveBar";
+import { SimulatedBanner } from "./SimulatedBanner";
 
 type Props = { state: State; dispatch: (i: Intent) => void; project: Project | undefined; section: ProjectSection };
 
@@ -42,6 +43,7 @@ export function ProjectSettings({ state, dispatch, project, section }: Props) {
           Add a project…
         </button>
       </div>
+      <SimulatedBanner project={project} />
       {project && <Body key={formKey(project, state)} project={project} state={state} dispatch={dispatch} section={section} />}
     </>
   );

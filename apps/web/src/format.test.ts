@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StatusReason } from "./api/types";
-import { ESTIMATE_NOTE, chipText, costText, outOfOrderText, reasonText, shareText, tokensText } from "./format";
+import { ESTIMATE_NOTE, agoText, chipText, costText, outOfOrderText, reasonText, shareText, tokensText } from "./format";
 
 describe("outOfOrderText", () => {
   it("names the earlier cards that were still open", () => {
@@ -58,6 +58,14 @@ describe("usage text", () => {
     expect(costText(0.004)).toBe("<$0.01");
     expect(costText(3.4)).toBe("$3.40");
     expect(costText(1234.5)).toBe("$1,234.50");
+  });
+  it("says how old a figure is", () => {
+    const now = 1_000_000_000_000;
+    expect(agoText(now - 20_000, now)).toBe("just now");
+    expect(agoText(now - 5 * 60_000, now)).toBe("5 min ago");
+    expect(agoText(now - 2 * 3_600_000, now)).toBe("2 h ago");
+    expect(agoText(now - 72 * 3_600_000, now)).toBe("3 d ago");
+    expect(agoText(now + 60_000, now)).toBe("just now");
   });
   it("shows a share as a percentage", () => {
     expect(shareText(0.931)).toBe("93%");

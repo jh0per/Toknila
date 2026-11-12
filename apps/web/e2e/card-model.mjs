@@ -31,7 +31,7 @@ git(repo, "commit", "--quiet", "--allow-empty", "-m", "init");
 
 let browser;
 try {
-  tok("project", "new", "DEMO", "--repo", repo);
+  tok("project", "new", "DEMO", "--repo", repo, "--sim");
   const { url } = JSON.parse(tok("open", "--json"));
   const at = (path) => url.replace("/?", `${path}?`);
   browser = await launch();

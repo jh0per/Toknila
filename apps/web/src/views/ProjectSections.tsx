@@ -1,6 +1,6 @@
 import type { MergeMethod, MergeMode, Project, ReviewMode } from "../api/types";
 import { type ProjectForm } from "../store/projectForm";
-import { listProfile } from "../store/profiles";
+import { SIM, listProfile, profileLabel, simLast } from "../store/profiles";
 import { fieldError } from "../store/settings";
 import type { State } from "../store/state";
 import { Field } from "./Field";
@@ -21,6 +21,13 @@ export function profileOptions(state: State, role: string, current: string): str
     .filter((l) => l.profile.role === role && listProfile(l.profile.name, current, import.meta.env.DEV))
     .map((l) => l.profile.name);
   return current && !all.includes(current) ? [current, ...all] : all;
+}
+
+/// The Default agent choices: the real agents, then `sim` last (it is always offered, by name).
+function defaultAgentOptions(state: State, current: string): string[] {
+  const names = profileOptions(state, "worker", current);
+  const hasSim = state.settings.profiles.some((l) => l.profile.name === SIM);
+  return simLast(hasSim && !names.includes(SIM) ? [...names, SIM] : names);
 }
 
 const REVIEW_MODES: { value: ReviewMode; label: string }[] = [
@@ -64,7 +71,7 @@ export function AgentsSection({ state, form, set }: FormProps) {
     <div className="page-section" data-testid="project-agents">
       <Field label="Default agent" name="default_profile" error={fieldError(s, "default_profile")} hint="Runs every card that does not name another one.">
         <select data-testid="default-profile" value={form.default_profile} onChange={(e) => set("default_profile", e.target.value)}>
-          {profileOptions(state, "worker", form.default_profile).map((n) => <option key={n}>{n}</option>)}
+          {defaultAgentOptions(state, form.default_profile).map((n) => <option key={n} value={n}>{profileLabel(n)}</option>)}
         </select>
       </Field>
       <ModelsFields state={state} form={form} set={set} />

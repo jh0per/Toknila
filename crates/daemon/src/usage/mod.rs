@@ -7,6 +7,7 @@
 //! now; Codex (`~/.codex/sessions`) would be one more source.
 
 mod refresh;
+mod repo;
 mod scan;
 mod watch;
 
@@ -53,6 +54,8 @@ pub struct Usage {
     gate: tokio::sync::Mutex<()>,
     /// Sessions already tied to their run, so a hook does not write the same row again.
     known: Mutex<HashSet<String>>,
+    /// The repository of each workspace path, asked of git once.
+    repos: Arc<repo::RepoCache>,
 }
 
 impl std::fmt::Debug for Usage {
@@ -102,6 +105,7 @@ impl Usage {
             sources,
             gate: tokio::sync::Mutex::new(()),
             known: Mutex::new(HashSet::new()),
+            repos: Arc::default(),
         }
     }
 
@@ -201,8 +205,16 @@ impl Usage {
             })
             .await?;
         let snapshot: Option<QuotaSnapshot> = snapshot.and_then(|s| serde_json::from_str(&s).ok());
+        let mut summary = summarize(&rows, &prices, at, days);
+        let repos = self.repos.clone();
+        summary = tokio::task::spawn_blocking(move || {
+            repos.annotate(&mut summary.by_workspace);
+            summary
+        })
+        .await
+        .map_err(|e| StoreError::Panicked(e.to_string()))?;
         Ok(UsageView {
-            summary: summarize(&rows, &prices, at, days),
+            summary,
             machine_scan: machine,
             prices: info,
             quota: quota::view(snapshot.as_ref(), at),

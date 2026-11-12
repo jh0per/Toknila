@@ -94,6 +94,7 @@ impl Mem {
             allowed_commands: Vec::new(),
             reviewer_web_domains: Vec::new(),
             archived: false,
+            simulated: true,
         };
         let chain = Chain {
             id: ChainId::new(),

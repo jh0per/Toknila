@@ -1,9 +1,10 @@
 /* The notice that the assistant opened a card: top right, small, with Back. */
-.opened-notice { position: fixed; top: var(--sp4); right: var(--sp4); z-index: 20; display: flex; align-items: center; gap: var(--sp2); background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-s); padding: var(--sp2) var(--sp3); box-shadow: var(--e2); font-size: var(--fs-body-l); }
+.opened-notice { position: fixed; top: var(--sp4); right: var(--sp4); z-index: 20; display: flex; align-items: center; gap: var(--sp2); background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-s); padding: var(--sp2) var(--sp3); box-shadow: var(--e2); font-size: var(--fs-body-l); line-height: var(--lh-body-l); }
 /* The update note in the corner of the window. */
-.update-banner { position: fixed; right: var(--sp4); bottom: var(--sp4); z-index: 20; max-width: var(--w-note); display: flex; flex-direction: column; gap: var(--sp2); background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-s); padding: var(--sp3) var(--sp4); box-shadow: var(--e2); font-size: var(--fs-body-l); }
+.update-banner { position: fixed; right: var(--sp4); bottom: var(--sp4); z-index: 20; max-width: var(--w-note); display: flex; flex-direction: column; gap: var(--sp2); background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-s); padding: var(--sp3) var(--sp4); box-shadow: var(--e2); font-size: var(--fs-body-l); line-height: var(--lh-body-l); }
+.update-banner > b { font-size: var(--fs-title-m); line-height: var(--lh-title-m); font-weight: var(--fw-medium); }
 /* Over a chain the note sits above the panel divider (and the diagram's legend), so it does not cover the card's columns. */
 .has-panel .update-banner { bottom: calc(var(--panel-h, max(45%, 240px)) + var(--sp2) + var(--sp8) + var(--sp2)); }
 .update-banner .notes { margin: 0; white-space: pre-line; }
-.update-banner .hint { margin: 0; color: var(--warn); font-size: var(--fs-body-m); }
+.update-banner .hint { margin: 0; color: var(--warn); font-size: var(--fs-body-m); line-height: var(--lh-body-m); }
 .update-banner .btns { display: flex; gap: var(--sp2); justify-content: flex-end; }

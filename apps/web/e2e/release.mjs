@@ -41,7 +41,7 @@ try {
   writeFileSync(join(repo, "README.md"), "hi\n");
   git(repo, "add", "README.md");
   git(repo, "commit", "--quiet", "-m", "init");
-  tok("project", "new", "REL", "--repo", repo, "--base", "develop", "--check-command", "echo release-checked", "--merge", "local");
+  tok("project", "new", "REL", "--repo", repo, "--base", "develop", "--check-command", "echo release-checked", "--merge", "local", "--sim");
   tok("review-mode", "human", "--project", "REL");
   const chain = join(home, "chain.toml");
   writeFileSync(chain, `[chain]\nname = "shipped"\nautostart = true\n\n[[ticket]]\nid = "work"\ntitle = "work"\nprofile = "sim"\n`);

@@ -33,7 +33,7 @@ fn the_hand_in_waits_for_the_owner_to_approve_the_design() {
     std::fs::write(&v1, V1).expect("write v1");
     std::fs::write(&v2, V2).expect("write v2");
     let (v1, v2) = (v1.to_str().expect("utf-8"), v2.to_str().expect("utf-8"));
-    tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
+    tok.run(&["project", "new", "DEMO", "--name", "Demo", "--sim"]);
     tok.run(&[
         "chain",
         "import",
@@ -174,7 +174,7 @@ fn a_person_opens_a_thread_and_approves_it_in_words() {
     let tok = Tok::in_dir(dir.path());
     let chain = dir.path().join("demo.toml");
     std::fs::write(&chain, CHAIN).expect("write chain");
-    tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
+    tok.run(&["project", "new", "DEMO", "--name", "Demo", "--sim"]);
     tok.run(&[
         "chain",
         "import",

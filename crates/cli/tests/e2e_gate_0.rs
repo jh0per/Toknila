@@ -17,7 +17,7 @@ fn gate_0() {
     let file = file.to_str().expect("utf-8 path");
 
     // 1. Plan: a project and the chain from a file; autostart picks up the first ticket.
-    tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
+    tok.run(&["project", "new", "DEMO", "--name", "Demo", "--sim"]);
     tok.run(&["chain", "import", file, "--project", "DEMO"]);
     assert_eq!(
         tok.statuses(),
@@ -121,7 +121,7 @@ fn gate_0() {
     let out = dir.path().join("out.toml");
     tok.run(&["chain", "export", "demo", out.to_str().expect("utf-8 path")]);
     let exported = std::fs::read_to_string(&out).expect("exported file");
-    tok.run(&["project", "new", "COPY"]);
+    tok.run(&["project", "new", "COPY", "--sim"]);
     tok.run(&[
         "chain",
         "import",

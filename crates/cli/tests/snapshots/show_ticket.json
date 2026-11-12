@@ -63,6 +63,7 @@
     "used_rounds": 0
   },
   "ship": null,
+  "simulated": true,
   "subtasks": [],
   "ticket": {
     "acceptance": [],

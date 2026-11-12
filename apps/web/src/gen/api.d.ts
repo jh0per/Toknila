@@ -2810,6 +2810,11 @@ export interface components {
             repo_path?: string | null;
             /** @description The command run once in every new ship before the agent starts; an empty text names none. */
             setup_command?: string | null;
+            /**
+             * @description Marks the project for simulation (`tok project new --sim`): its cards may run under the
+             *     `sim` profile. Unset or false: a card under `sim` is refused. The window never sets it.
+             */
+            simulated?: boolean | null;
             work_branch?: string | null;
         };
         /** @description `POST /v1/chains/{chain}/releases`. */
@@ -3357,6 +3362,12 @@ export interface components {
              *     (`npm ci --prefix apps/web`). `None`: no setup.
              */
             setup_command?: string | null;
+            /**
+             * @description Marked for simulation: its cards may run under the `sim` profile, which starts no process.
+             *     Only `tok project new --sim` and tests set it; a project without it refuses to start a card
+             *     under `sim`.
+             */
+            simulated?: boolean;
             /** @description Branch ships start from and merge into (`develop`). */
             work_branch: string;
             /**
@@ -4121,6 +4132,11 @@ export interface components {
             /** @description How the card is reviewed (mode, reviewer, whose turn) and the rounds so far. */
             review: components["schemas"]["ReviewView"];
             ship?: components["schemas"]["Ship"] | null;
+            /**
+             * @description The card's agent is the simulated one (`sim`): no process runs, and a status of Running
+             *     means nothing is working on it.
+             */
+            simulated?: boolean;
             size_clamped?: components["schemas"]["Size"] | null;
             subtasks: components["schemas"]["Subtask"][];
             ticket: components["schemas"]["Ticket"];
@@ -4144,6 +4160,8 @@ export interface components {
              * @description Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
              */
             queue_position?: number | null;
+            /** @description The card's agent is the simulated one (`sim`): no process runs. */
+            simulated?: boolean;
             ticket: components["schemas"]["Ticket"];
         };
         /** @example DEMO-3 */
@@ -4228,6 +4246,10 @@ export interface components {
         UsageItem: {
             figures: components["schemas"]["UsageFigures"];
             label: string;
+            /** @description A workspace line only: the last folder name of `repo`. */
+            name?: string | null;
+            /** @description A workspace line only: the folder of the main repository the folder belongs to. */
+            repo?: string | null;
         };
         /** @description Body of `PUT /v1/usage/settings`. */
         UsageSettings: {

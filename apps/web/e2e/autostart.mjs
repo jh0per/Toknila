@@ -23,7 +23,7 @@ const daemonSays = () => JSON.parse(tok("chain", "show", "work", "--json")).chai
 
 let browser;
 try {
-  tok("project", "new", "AUT");
+  tok("project", "new", "AUT", "--sim");
   tok("chain", "new", "work", "--project", "AUT", "--no-autostart");
   tok("ticket", "new", "work", "Alpha");
   const { url } = JSON.parse(tok("open", "--json"));
@@ -51,7 +51,7 @@ try {
   if (!hint || !/start/.test(hint) || !/ready/.test(hint)) throw new Error(`the hint does not say it starts ready cards: ${hint}`);
   console.log(`PASS the hint says what it does: ${hint}`);
   await entry.click();
-  await expectText(status, "running", "turning autostart on started the ready card");
+  await expectText(status, "simulated", "turning autostart on started the ready card");
   await page.waitForFunction(() => document.querySelector("[data-testid=chain-autostart-toggle]").checked, null, { timeout: 10_000 });
   console.log("PASS the header toggle follows: on");
   if (daemonSays() !== true) throw new Error("the daemon does not have autostart on");

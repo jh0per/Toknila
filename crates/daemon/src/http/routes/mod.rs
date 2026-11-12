@@ -127,7 +127,14 @@ fn load_ticket_detail(
         let (versions, messages) = (repo.thread_versions(th.id)?, repo.thread_messages(th.id)?);
         design_waiting |= toknila_core::thread::awaiting_person(th, &versions, &messages).is_some();
     }
+    let simulated = match repo.chain(t.chain_id)? {
+        Some(c) => repo
+            .project(c.project_id)?
+            .is_some_and(|p| p.runs_simulated(&t)),
+        None => false,
+    };
     Ok(TicketDetail {
+        simulated,
         design_waiting,
         usage: figures(&rows, prices),
         review,

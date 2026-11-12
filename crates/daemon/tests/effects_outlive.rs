@@ -140,7 +140,8 @@ impl Rig {
         rig.send(
             Method::POST,
             "/v1/projects",
-            json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(), "check_command": "true" }),
+            json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(), "check_command": "true",
+                "default_profile": "sim", "simulated": true }),
         )
         .await;
         rig.send(

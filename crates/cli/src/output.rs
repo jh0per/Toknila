@@ -75,6 +75,16 @@ pub fn table(header: &[&str], rows: &[Vec<String>]) {
     }
 }
 
+/// The status as a person reads it: a card Running under the simulated agent has no process
+/// behind it, so it never reads plain `running`.
+pub fn status_word(status: &toknila_core::TicketStatus, simulated: bool) -> String {
+    if simulated && *status == toknila_core::TicketStatus::Running {
+        "simulated".to_owned()
+    } else {
+        w(status)
+    }
+}
+
 /// ` (queued #2)` for a card waiting for an agent slot, else nothing.
 fn queued(position: Option<u32>) -> String {
     position.map_or_else(String::new, |n| format!(" (queued #{n})"))
@@ -86,7 +96,7 @@ pub fn ticket_line(d: &TicketDetail) {
     println!(
         "{} {}{}{}",
         t.key,
-        w(&t.status),
+        status_word(&t.status, d.simulated),
         queued(d.queue_position),
         in_parens(t.status_reason.as_ref())
     );
@@ -98,7 +108,7 @@ pub fn tickets(items: &[TicketItem]) {
         .iter()
         .map(|it| {
             let t = &it.ticket;
-            let mut status = w(&t.status);
+            let mut status = status_word(&t.status, it.simulated);
             if t.paused {
                 status.push_str(" (paused)");
             }
@@ -227,7 +237,7 @@ pub fn ticket(d: &TicketDetail) {
         "{}  {}  [{}{}] for {}",
         t.key,
         t.title,
-        w(&t.status),
+        status_word(&t.status, d.simulated),
         queued(d.queue_position),
         duration(d.in_status_ms)
     );
