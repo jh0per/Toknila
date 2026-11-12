@@ -103,9 +103,15 @@ pub async fn runner_answer(
         })
         .flatten();
     let hook_waiting = runners.prompts().hook_waiting(t.id, role);
-    match question::deliver(body.answer, body.text.as_deref(), hook_waiting)
-        .map_err(AppError::from)?
-    {
+    let delivery = if matches!(body.answer, AnswerKind::Yes | AnswerKind::No) {
+        let yes = body.answer == AnswerKind::Yes;
+        crate::runner::screens::trust_keys(&runners, t.id, role, yes, at)
+            .map(Delivery::Keys)
+            .ok_or(question::AnswerError::NotOffered(body.answer))
+    } else {
+        question::deliver(body.answer, body.text.as_deref(), hook_waiting)
+    };
+    match delivery.map_err(AppError::from)? {
         Delivery::Hook(decision) => {
             if !runners.prompts().resolve(t.id, role, decision) {
                 return Err(AppError::conflict("the agent no longer waits for a decision").into());
@@ -365,7 +371,7 @@ pub(super) fn ask_person(
             agent::ticket_event(tx, t, event)?;
         }
     } else {
-        questions::raised(tx, t, role, QuestionKind::Permission)?;
+        questions::raised(tx, t, role, QuestionKind::Permission, None)?;
     }
     Ok(())
 }

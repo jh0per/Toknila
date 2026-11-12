@@ -185,6 +185,11 @@ impl Prompts {
         self.inner().screens.remove(&(ticket, role))
     }
 
+    /// Whether the run is flagged as waiting on its screen.
+    pub fn screen_flagged(&self, ticket: TicketId, role: AgentRole) -> bool {
+        self.inner().screens.contains(&(ticket, role))
+    }
+
     /// The runs flagged as waiting on their screen.
     pub fn flagged(&self) -> Vec<(TicketId, AgentRole)> {
         self.inner().screens.iter().copied().collect()

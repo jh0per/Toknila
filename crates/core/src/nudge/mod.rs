@@ -1,8 +1,9 @@
 //! The silence rule: when a quiet agent is nudged, and when it is given up on. Pure; the daemon
 //! gathers the facts and runs what is decided.
 //!
-//! Where "quiet" is measured, in order of trust: the agent's own MCP calls, then its hooks, and
-//! only when neither has ever been seen (beyond the run's start) the terminal's output. A person's
+//! Quiet counts from the first sign of life, never from the start: a run with no hook and no MCP
+//! call yet, or with an open `screen` question, is never nudged. Where "quiet" is measured, in
+//! order of trust: the agent's own MCP calls, then its hooks. A person's
 //! instruction delivered to the agent and a nudge both count as a sign of life, so neither is
 //! followed at once by another. A live child process (a build, tests) means the agent is waiting
 //! on work, not silent.
@@ -48,9 +49,17 @@ pub struct Signals {
     pub output: Option<Timestamp>,
     /// When a person's instruction (or a nudge) last reached it.
     pub delivered: Option<Timestamp>,
+    /// A `screen` question is open for the run: the agent's own screen asks a person.
+    pub screen_open: bool,
 }
 
 impl Signals {
+    /// Whether the agent has shown any sign of life (a hook or an MCP call). Output alone is
+    /// none: a first-run screen prints too.
+    pub fn alive(&self) -> bool {
+        self.mcp.is_some() || self.hook.is_some()
+    }
+
     /// The last moment the agent showed life, by the order of trust above.
     pub fn last(&self) -> Timestamp {
         let reported = self.mcp.max(self.hook);
@@ -78,7 +87,9 @@ pub fn decide(
     nudges: &[Timestamp],
     now: Timestamp,
 ) -> Decision {
-    if child_alive {
+    // A nudge types into the terminal: it must never answer a first-run screen, so a run that has
+    // shown no sign of life, or has a screen question open, is a person's to look at.
+    if child_alive || signals.screen_open || !signals.alive() {
         return Decision::Wait;
     }
     let since = nudges

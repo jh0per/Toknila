@@ -21,8 +21,14 @@ pub(super) fn ask_again(
     event: &TicketEvent,
 ) -> Result<(TicketStatus, Option<StatusReason>), TransitionError> {
     let reason = match &ticket.status_reason {
-        Some(StatusReason::Waiting(WaitingReason::Silent)) => StatusReason::Waiting(asked.clone()),
-        Some(open @ StatusReason::Waiting(_)) if *asked == WaitingReason::Silent => open.clone(),
+        Some(StatusReason::Waiting(WaitingReason::Silent | WaitingReason::Screen)) => {
+            StatusReason::Waiting(asked.clone())
+        }
+        Some(open @ StatusReason::Waiting(_))
+            if matches!(asked, WaitingReason::Silent | WaitingReason::Screen) =>
+        {
+            open.clone()
+        }
         _ => {
             let (event, from) = (event.name(), ticket.status);
             return Err(TransitionError::NotAllowed { event, from });
