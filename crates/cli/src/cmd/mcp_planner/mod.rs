@@ -7,7 +7,7 @@
 use serde_json::Value;
 use toknila_api_types::{
     CardEdit, ChainDetail, EdgeInput, EditPlanChain, MoveInput, NewCard, NewDesignPin, NewMessage,
-    NewPlanChain, NewSuggestion, NewThread, NewVersion, TicketDetail,
+    NewPlanChain, NewSuggestion, NewThread, NewVersion, Say, TicketDetail,
 };
 use toknila_client::Client;
 use toknila_core::graph::Place;
@@ -53,6 +53,7 @@ pub(super) enum PlannerCall {
         edit: CardEdit,
     },
     Suggest(NewSuggestion),
+    Say(Say),
     DesignQuestion(NewDesignPin),
     ShowCard {
         card: String,
@@ -118,6 +119,7 @@ pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolErr
             PlannerCall::EditCard { card, edit }
         }
         "suggest" => PlannerCall::Suggest(args(arguments)?),
+        "say" => PlannerCall::Say(args(arguments)?),
         "design_question" => PlannerCall::DesignQuestion(args(arguments)?),
         "show_card" => {
             let ShowCard { card } = args(arguments)?;
@@ -264,6 +266,10 @@ fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
                 None => "next step kept".to_owned(),
             })
             .map_err(e),
+        PlannerCall::Say(s) => client
+            .planner_say(s)
+            .map(|_| "said: the owner reads it in the chat".to_owned())
+            .map_err(e),
         PlannerCall::ShowCard { card } => client
             .planner_show_card(card)
             .map(|d| {
@@ -364,9 +370,19 @@ mod tests {
     }
 
     #[test]
-    fn the_planner_has_its_fifteen_tools_and_none_that_starts_or_accepts_anything() {
+    fn the_planner_has_its_sixteen_tools_and_none_that_starts_or_accepts_anything() {
         let names = names();
-        assert_eq!(names.len(), 15, "{names:?}");
+        assert_eq!(names.len(), 16, "{names:?}");
+        assert!(names.iter().any(|n| n == "say"));
+        assert!(matches!(
+            call("say", &json!({ "text": "Hi", "about": "DEMO-2" })),
+            Ok(PlannerCall::Say(s)) if s.text == "Hi" && s.about.as_deref() == Some("DEMO-2")
+        ));
+        assert!(matches!(
+            call("say", &json!({})),
+            Err(ToolError::BadArguments(_))
+        ));
+        assert!(call("say", &json!({ "text": "x", "colour": "red" })).is_err());
         assert!(names.iter().any(|n| n == "edit_chain"));
         assert!(names.iter().any(|n| n == "design_question"));
         for forbidden in [

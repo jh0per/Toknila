@@ -8,6 +8,7 @@ mod backup;
 mod chains;
 mod codec;
 mod commit;
+mod conversation;
 mod error;
 mod external;
 mod migrations;

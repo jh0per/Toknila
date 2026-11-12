@@ -52,7 +52,9 @@ export type PlannerIntent =
   | { type: "discussCard"; project: string; key: string }
   /// Deliver the card's unanswered message to the planner again (`thread` is the discussion's
   /// number, `text` the message), through the planner's input; nothing is stored twice.
-  | { type: "nudgeCard"; project: string; key: string; thread: number; text: string };
+  | { type: "nudgeCard"; project: string; key: string; thread: number; text: string }
+  /// The same for a message of the chat that is about no card: its text is typed again.
+  | { type: "nudgeChat"; project: string; text: string };
 
 /// What the daemon answered.
 export type PlannerResult =
@@ -77,6 +79,8 @@ export type PlannerEffect = {
   draft?: string;
   /// `ask`: the message, on one line (the terminal submits a line).
   text?: string;
+  /// `ask`: the message as written, line breaks kept: it is stored in the conversation first.
+  raw?: string;
   /// `ask`: the planner has to start first, so wait for its screen to settle before typing.
   wait?: boolean;
 };
@@ -97,7 +101,7 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
       const running = plannerOf(s, msg.project)?.running ?? false;
       return [
         set({ error: "", sending: msg.project }),
-        [{ type: "plannerCall", project: msg.project, call: "ask", profile: s.planner.profile, text, wait: !running }],
+        [{ type: "plannerCall", project: msg.project, call: "ask", profile: s.planner.profile, text, raw: (s.planner.drafts[msg.project] ?? "").trim(), wait: !running }],
       ];
     }
     case "discussCard": {
@@ -114,6 +118,8 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
         set({ error: "" }),
         [{ type: "plannerCall", project: msg.project, call: "nudge", card: msg.key, thread: msg.thread, text: msg.text }],
       ];
+    case "nudgeChat":
+      return [set({ error: "" }), [{ type: "plannerCall", project: msg.project, call: "nudge", text: oneLine(msg.text) }]];
     case "plannerAsked":
       return [set({ sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } }), []];
     case "startPlanner":

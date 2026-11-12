@@ -2,6 +2,7 @@
 
 use serde_json::Value;
 use toknila_app::{AppError, AppResult, Reader, UnitOfWork};
+use toknila_core::conversation::Message;
 use toknila_core::design::pin::DesignPin;
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
@@ -68,6 +69,7 @@ reader! {
     design_pins(project: ProjectId) -> Vec<DesignPin>;
     design_pin(id: PinId) -> Option<DesignPin>;
     suggestion(project: ProjectId) -> Option<Suggestion>;
+    conversation_page(project: ProjectId, before: Option<&str>, limit: usize) -> Vec<Message>;
     last_snapshot_payload(entity: &str, entity_id: &str, field: &str) -> Option<Value>;
     live_runners() -> Vec<(TicketId, AgentRole)>;
     live_runs() -> Vec<toknila_core::schedule::LiveRun>;
@@ -140,6 +142,10 @@ impl UnitOfWork for WriteTx<'_> {
 
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()> {
         Ok(self.repo().save_ship(ship)?)
+    }
+
+    fn insert_conversation_message(&mut self, project: ProjectId, m: &Message) -> AppResult<()> {
+        Ok(self.repo().insert_conversation_message(project, m)?)
     }
 
     fn save_suggestion(&mut self, project: ProjectId, s: &Suggestion) -> AppResult<()> {

@@ -28,7 +28,9 @@ describe("talking to the assistant", () => {
     const typed = apply(start(), { type: "editPlannerDraft", where: "DEMO", text: "  a shop\nwith a cart  " });
     const [s, fx] = reduce(typed, { type: "askPlanner", project: "DEMO" });
     expect(fx).toContainEqual({
-      type: "plannerCall", project: "DEMO", call: "ask", profile: "claude-code-planner", text: "a shop with a cart", wait: true,
+      type: "plannerCall", project: "DEMO", call: "ask", profile: "claude-code-planner", text: "a shop with a cart",
+      // The conversation keeps the words as written, line break and all.
+      raw: "a shop\nwith a cart", wait: true,
     });
     expect(s.planner.sending).toBe("DEMO");
     // Asked from the project page: the conversation moves to the assistant's screen.
@@ -47,7 +49,7 @@ describe("talking to the assistant", () => {
     const typed = apply(live, { type: "editPlannerDraft", where: "DEMO", text: "add a login" });
     const [, fx] = reduce(typed, { type: "askPlanner", project: "DEMO" });
     expect(fx).toEqual([
-      { type: "plannerCall", project: "DEMO", call: "ask", profile: "claude-code-planner", text: "add a login", wait: false },
+      { type: "plannerCall", project: "DEMO", call: "ask", profile: "claude-code-planner", text: "add a login", raw: "add a login", wait: false },
     ]);
   });
 
@@ -106,7 +108,7 @@ describe("the first project leads into the assistant", () => {
     const [s, fx] = reduce(typed, { type: "projectAdded", project: added });
     expect(s.route).toEqual({ name: "planner", project: "NEW" });
     expect(fx).toContainEqual({
-      type: "plannerCall", project: "NEW", call: "ask", profile: "claude-code-planner", text: "a recipe app", wait: true,
+      type: "plannerCall", project: "NEW", call: "ask", profile: "claude-code-planner", text: "a recipe app", raw: "a recipe app", wait: true,
     });
     expect(s.planner.drafts[ONBOARDING_DRAFT]).toBeUndefined();
     expect(draftOf(s, "NEW")).toBe("a recipe app");

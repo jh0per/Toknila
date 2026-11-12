@@ -7,6 +7,7 @@ import type {
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { attachFiles } from "./attachEffects";
 import { runAutostartEffect } from "./autostartEffects";
+import { runConversationEffect } from "./conversationEffects";
 import { runEdgeEffect } from "./edgeEffects";
 import { runEpicEffect } from "./epicEffects";
 import { runRoadmapEffect } from "./roadmapEffects";
@@ -213,6 +214,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "plannerCall":
         runPlannerEffect(e, dispatch);
+        return;
+      case "fetchConversation":
+        runConversationEffect(e, dispatch);
         return;
       case "importText":
       case "importPath":

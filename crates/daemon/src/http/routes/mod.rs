@@ -3,6 +3,7 @@
 
 pub mod agents;
 pub mod chains;
+pub mod conversation;
 pub mod designs;
 pub mod events;
 pub mod inbox;

@@ -11,6 +11,7 @@ import { type PlacementState, initialPlacement } from "./placement";
 import { type ImportState, initialImports } from "./imports";
 import { type PlanState, initialPlan } from "./plan";
 import { type QuickState, initialQuick } from "./quick";
+import { type ConversationSlice, initialConversation } from "./conversation";
 import { type PlannerSlice, initialPlanner } from "./planner";
 import { type ReleaseUi, initialRelease } from "./release";
 import { type RemovalState, initialRemoval } from "./removal";
@@ -61,6 +62,8 @@ export interface State {
   plan: PlanState;
   /// Each project's planner: whether its process is alive.
   planner: PlannerSlice;
+  /// Each project's conversation with its assistant, for the chats that have been opened.
+  conversation: ConversationSlice;
   /// Imports from the window and the plans found in a repository.
   imports: ImportState;
   /// Deleting a project or a chain: the dialog's answer.
@@ -117,6 +120,7 @@ export function initialState(route: Route): State {
     settings: initialSettings,
     plan: initialPlan,
     planner: initialPlanner,
+    conversation: initialConversation,
     imports: initialImports,
     removal: initialRemoval,
     release: initialRelease,

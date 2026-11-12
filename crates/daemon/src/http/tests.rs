@@ -17,6 +17,7 @@ mod card_designs;
 mod chain_settings;
 mod chain_version;
 mod commands;
+mod conversation;
 mod design;
 mod design_delete;
 mod designs;
@@ -1002,12 +1003,14 @@ async fn openapi_describes_every_route() {
             "/planner/overview",
             "/planner/pins",
             "/planner/plan",
+            "/planner/say",
             "/planner/suggestion",
             "/profiles",
             "/projects",
             "/projects/{project}",
             "/projects/{project}/archive",
             "/projects/{project}/chains",
+            "/projects/{project}/conversation",
             "/projects/{project}/delete",
             "/projects/{project}/design-pins",
             "/projects/{project}/design-pins/{pin}/answer",
