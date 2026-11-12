@@ -102,7 +102,7 @@ export function DesignsSection({ project, pinSeq = 0 }: {
             className="design-link" placeholder="https://www.figma.com/design/…?node-id=…" spellCheck={false}
             value={link} data-testid="figma-url" aria-label="Figma frame link" onChange={(e) => setLink(e.target.value)}
           />
-          <button type="button" className="btn" disabled={busy || !link.trim()} data-testid="figma-add" onClick={() => void addLink(link)}>
+          <button type="button" className="btn primary" disabled={busy || !link.trim()} data-testid="figma-add" onClick={() => void addLink(link)}>
             Add link
           </button>
         </div>
@@ -176,12 +176,12 @@ function DesignCard({ design: d, project, busy, onOpen, onRename, onRemove, onFe
       </span>
       {d.kind === "figma" && !d.has_file && d.thumb === false && d.hint && <span className="muted design-hint" data-testid="design-hint">{d.hint}</span>}
       <span className="design-actions">
-        {onFetch && <button type="button" className="btn" disabled={busy} data-testid="design-fetch" onClick={() => void onFetch()}>Fetch image</button>}
-        <button type="button" className="btn" disabled={busy} data-testid="design-rename" onClick={() => setName(d.name)}>Rename</button>
+        {onFetch && <button type="button" className="btn text" disabled={busy} data-testid="design-fetch" onClick={() => void onFetch()}>Fetch image</button>}
+        <button type="button" className="btn text" disabled={busy} data-testid="design-rename" onClick={() => setName(d.name)}>Rename</button>
         {sure ? (
-          <button type="button" className="btn danger" disabled={busy} data-testid="design-remove-sure" onClick={() => void onRemove()}>Really remove</button>
+          <button type="button" className="btn text danger" disabled={busy} data-testid="design-remove-sure" onClick={() => void onRemove()}>Really remove</button>
         ) : (
-          <button type="button" className="btn" disabled={busy} data-testid="design-remove" onClick={() => setSure(true)}>Remove</button>
+          <button type="button" className="btn text danger" disabled={busy} data-testid="design-remove" onClick={() => setSure(true)}>Remove</button>
         )}
       </span>
     </li>

@@ -14,8 +14,8 @@ export function Field({ label, name, error, hint, action, children }: {
   return (
     <label className="field">
       <span className="field-label">{label}</span>
-      {hint && <span className="field-hint">{hint}</span>}
       {children}
+      {hint && <span className="field-hint">{hint}</span>}
       {error && (
         <span className="field-problem">
           <span className="field-error" role="alert" data-testid={`error-${name}`}>{error}</span>

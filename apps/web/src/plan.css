@@ -1,36 +1,48 @@
 /* Planning from the window: dialogs, the empty chain state, card editing. The shared parts here are
    .modal and .check; the right-click menu is in menu.css. Tokens only. */
 .modal-back { position: fixed; inset: 0; background: var(--scrim); display: flex; align-items: flex-start; justify-content: center; padding: 8vh var(--sp4) var(--sp4); z-index: 20; }
-.modal { position: relative; width: min(560px, 100%); max-height: 84vh; overflow: auto; background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-l); box-shadow: var(--e3); }
-.modal > .card-block { border: 0; padding-right: var(--sp8); }
+.modal { position: relative; width: min(var(--w-dialog), 100%); max-height: 84vh; overflow: auto; background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-l); box-shadow: var(--e3); }
+/* One dialog shell: 24 padding, title, body, then the actions at the bottom right with the one filled
+   button last (the markup lists it first, the row is reversed); a destructive one is filled red. */
+.modal > .card-block { border: 0; padding: var(--sp6); gap: var(--sp4); align-items: stretch; }
+.modal > .card-block > h2 { font-size: var(--fs-headline-m); line-height: var(--lh-headline-m); padding-right: var(--sp6); }
+.modal > .card-block > .btn { align-self: flex-end; }
+.modal .card-block > .row { flex-direction: row-reverse; justify-content: flex-start; width: 100%; flex-wrap: wrap; }
+.modal .row > .btn:not(.primary, .danger), .modal .btns > .btn:not(.primary, .danger) { border-color: transparent; }
+.modal .btn.danger { background: var(--error); border-color: transparent; color: var(--on-error); }
 .modal > .card-block > p.error, .plan-form p.error { margin: 0; }
 .modal-close { position: absolute; top: var(--sp2); right: var(--sp2); width: var(--ctl-h); height: var(--ctl-h); border: 0; border-radius: var(--shape-full); background: none; color: var(--on-surface-variant); font-size: var(--fs-headline-m); line-height: 1; }
 .modal-close:hover { background: var(--surface-container-high); color: var(--on-surface); }
 .check { display: flex; align-items: center; gap: var(--sp2); font-size: var(--fs-body-m); }
 .check.design-first { align-items: flex-start; }
 .check.design-first .muted { display: block; }
-.no-threads { display: flex; flex-direction: column; gap: var(--sp2); align-items: flex-start; max-width: 520px; }
+.no-threads { display: flex; flex-direction: column; gap: var(--sp2); align-items: flex-start; max-width: var(--w-narrow); }
 .no-threads p { margin: 0; }
 .btn.mini { height: auto; padding: 0 var(--sp2); font-size: var(--fs-label-m); }
 .link-btn { border: 0; background: none; color: var(--on-surface-variant); font-size: var(--fs-body-m); text-align: left; padding: var(--sp1) var(--sp2); }
 .link-btn:hover { color: var(--on-surface); text-decoration: underline; }
 .sec li.archived { display: flex; align-items: center; gap: var(--sp1); }
 .sec li.archived .item { flex: 1; opacity: var(--state-disabled); }
-.empty-state { max-width: 520px; margin: 10vh auto 0; display: flex; flex-direction: column; gap: var(--sp3); align-items: flex-start; }
+.empty-state { max-width: var(--w-narrow); margin: 10vh auto 0; display: flex; flex-direction: column; gap: var(--sp3); align-items: flex-start; }
 .empty-state h2 { margin: 0; font-size: var(--fs-headline-m); line-height: var(--lh-headline-m); font-weight: var(--fw-semibold); }
 .empty-state p { margin: 0; }
 .plan-btns { display: flex; gap: var(--sp2); margin: 0 0 var(--sp3); }
-.plan-form { display: flex; flex-direction: column; gap: var(--sp2); margin: 0 0 var(--sp3); padding: var(--sp3); max-width: 720px; background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: var(--shape-m); }
+.plan-form { display: flex; flex-direction: column; gap: var(--sp2); margin: 0 0 var(--sp3); padding: var(--sp3); max-width: var(--w-page); background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: var(--shape-m); }
 .top .btn { height: calc(var(--ctl-h) - var(--sp1)); padding: 0 var(--sp3); }
-.h-btns { display: inline-flex; gap: 2px; }
+.h-btns { display: inline-flex; gap: var(--sp-half); }
 .import-form { display: flex; flex-direction: column; gap: var(--sp2); align-items: flex-start; width: 100%; }
 .card-block .sub { margin: var(--sp2) 0 0; font-size: var(--fs-body-l); font-weight: var(--fw-semibold); }
 .import-result, .found { display: flex; flex-direction: column; gap: var(--sp1); width: 100%; }
 .import-result p, .found p { margin: 0; }
 .import-result { padding: var(--sp2) var(--sp3); background: var(--surface-container-high); border-radius: var(--shape-xs); }
-.found .plans { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp1); }
-.found .plans li { display: flex; flex-direction: column; gap: 2px; padding: var(--sp1) var(--sp2); background: var(--surface-container-high); border-radius: var(--shape-xs); }
-.found .plans .key { font-size: var(--fs-body-m); }
+/* Plans found: a Material two-line list. The whole row is the checkbox's label; the outcome trails. */
+.found .plans { list-style: none; margin: 0; padding: 0; width: 100%; border: 1px solid var(--outline-variant); border-radius: var(--shape-m); overflow: hidden; }
+.found .plans li + li { border-top: 1px solid var(--outline-variant); }
+.plan-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp3); min-height: var(--h-list-row); padding: var(--sp1) var(--sp3); cursor: pointer; }
+.plan-row:hover { background: color-mix(in srgb, var(--on-surface) calc(var(--state-hover) * 100%), transparent); }
+.plan-text { display: flex; flex-direction: column; min-width: 0; }
+.plan-path { white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-body-l); line-height: var(--lh-body-l); }
+.found .plans [data-testid="plan-outcome"] { font-size: var(--fs-body-m); text-align: right; max-width: var(--w-field); }
 .found .row { flex-wrap: wrap; gap: var(--sp2); }
 .empty-state .found { margin-top: var(--sp2); }
 .trash-zone { display: flex; flex-direction: column; gap: var(--sp2); align-items: flex-start; width: 100%; margin-top: var(--sp2); padding-top: var(--sp3); border-top: 1px solid var(--outline-variant); }
@@ -46,6 +58,6 @@
 .formats code { overflow-wrap: anywhere; }
 .add-project .fold .field { margin-bottom: var(--sp2); }
 .fold .found { font-weight: var(--fw-regular); margin-left: var(--sp2); }
-.cancel-pop button { border: 1px solid var(--outline); background: var(--surface-container); border-radius: var(--shape-full); padding: 2px var(--sp3); }
+.cancel-pop button { border: 1px solid var(--outline); background: var(--surface-container); border-radius: var(--shape-full); padding: var(--sp-half) var(--sp3); }
 .cancel-pop button:disabled { opacity: var(--state-disabled); cursor: default; }
 .cancel-pop button.danger { color: var(--error); }

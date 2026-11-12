@@ -65,6 +65,10 @@
   --shape-xs: 4px; --shape-s: 8px; --shape-m: 12px; --shape-l: 16px; --shape-full: 999px;
   /* Density: compact. */
   --ctl-h: 28px; --field-h: 32px; --row-h: 28px; --pad: var(--sp3); --gap: var(--sp2); --btn-px: var(--sp3);
+  /* Sizes of the settings pages and dialogs: the half step, the widths of a page, a form, a dialog,
+     a menu and a note, and the design thumbnails. */
+  --sp-half: 2px; --w-page: 720px; --w-form: 640px; --w-dialog: 560px; --w-narrow: 520px; --w-field: 260px;
+  --w-menu: 220px; --w-note: 320px; --w-design: 180px; --h-thumb: 120px; --h-list-row: 48px; --w-viewer: 900px;
   /* Type faces; no font is loaded from the network, the fallbacks are the system's. */
   --ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;

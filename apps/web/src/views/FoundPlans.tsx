@@ -23,15 +23,15 @@ export function FoundPlans({ project, state, dispatch }: { project: string; stat
   const i = state.imports;
   const f = i.found?.project === project ? i.found : undefined;
   const scanning = i.scanning === project;
-  const scan = (label: string) => (
-    <button type="button" className="btn" data-testid="scan-plans" disabled={scanning} onClick={() => dispatch({ type: "scanPlans", project })}>
+  const scan = (label: string, kind = "text") => (
+    <button type="button" className={`btn ${kind}`} data-testid="scan-plans" disabled={scanning} onClick={() => dispatch({ type: "scanPlans", project })}>
       {scanning ? "Scanning…" : label}
     </button>
   );
   if (!f) {
     return (
       <div className="found" data-testid="found-plans">
-        {scan("Scan the repository")}
+        {scan("Scan the repository", "")}
         {i.scanError && <p className="error" role="alert">{i.scanError}</p>}
       </div>
     );
@@ -56,20 +56,26 @@ export function FoundPlans({ project, state, dispatch }: { project: string; stat
         <ul className="plans">
           {f.plans.map((p) => (
             <li key={p.path} data-plan={p.relative}>
-              <label className="check">
+              <label className="plan-row">
                 <input
                   type="checkbox" checked={f.selected.includes(p.path)} disabled={busy}
                   onChange={(e) => dispatch({ type: "togglePlan", path: p.path, on: e.target.checked })}
                 />
-                <span className="key">{p.relative}</span>
-                <span className="muted">{what(p)}</span>
+                <span className="plan-text">
+                  <span className="key plan-path">{p.relative}</span>
+                  <span className="muted">{what(p)}</span>
+                </span>
+                <Outcome o={f.outcomes[p.path]} />
               </label>
-              <Outcome o={f.outcomes[p.path]} />
             </li>
           ))}
         </ul>
       )}
-      <div className="row">
+      <div className="row bar">
+        {scan("Scan again")}
+        <button type="button" className="btn text" data-testid="skip-plans" disabled={busy} onClick={() => dispatch({ type: "skipPlans" })}>
+          {finished || n === 0 ? "Close" : "Skip"}
+        </button>
         {n > 0 && (
           <button
             type="button" className="btn primary" data-testid="import-selected" disabled={busy || f.selected.length === 0}
@@ -78,10 +84,6 @@ export function FoundPlans({ project, state, dispatch }: { project: string; stat
             Import selected
           </button>
         )}
-        <button type="button" className="btn" data-testid="skip-plans" disabled={busy} onClick={() => dispatch({ type: "skipPlans" })}>
-          {finished || n === 0 ? "Close" : "Skip"}
-        </button>
-        {scan("Scan again")}
       </div>
     </div>
   );
