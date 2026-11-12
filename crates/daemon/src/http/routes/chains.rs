@@ -6,13 +6,13 @@ use crate::http::body::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_app::removal::{self, Removed};
-use toknila_app::{chains, moves, resolve};
+use toknila_app::{chains, moves, resolve, roadmap};
 use toknila_core::Actor;
 
 use super::{ApiResult, chain_write, load_chain_detail, read, stamp};
 use crate::http::dto::{
     ChainDeletion, ChainDetail, ChainFile, ChainItem, ChainSettings, EdgeInput, EdgeMoveInput,
-    MoveInput, NewChain,
+    MoveChain, MoveInput, NewChain,
 };
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, now};
@@ -146,6 +146,26 @@ pub async fn patch_chain(
             project.as_deref(),
             settings,
         )?)
+    })
+    .await?;
+    Ok(Json(detail))
+}
+
+#[utoipa::path(post, path = "/chains/{chain}/move", tag = "chains", request_body = MoveChain,
+    params(("chain" = String, Path, description = "Chain id or name"),
+        ("project" = Option<String>, Query, description = "Project id or key, when two projects have a chain of this name")),
+    responses((status = 200, body = ChainDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// Puts the chain right before or right after another chain of its project in the roadmap, a
+/// finished one too. The chains whose place changed are journaled as updated (`chain.updated`).
+pub async fn move_chain(
+    State(state): State<AppState>,
+    Path(chain): Path<String>,
+    Query(q): Query<HashMap<String, String>>,
+    Json(to): Json<MoveChain>,
+) -> ApiResult<Json<ChainDetail>> {
+    let project = q.get("project").cloned();
+    let detail = chain_write(&state, Actor::Human, move |tx| {
+        Ok(roadmap::move_chain(tx, &chain, project.as_deref(), to)?)
     })
     .await?;
     Ok(Json(detail))

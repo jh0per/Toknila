@@ -4,6 +4,7 @@
     "goal": "Walk a chain through a manual release with simulated agents",
     "id": "<id>",
     "name": "demo",
+    "position": 0,
     "project_id": "<id>",
     "review_mode": null,
     "source": "<path>"

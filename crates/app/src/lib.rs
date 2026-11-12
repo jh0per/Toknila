@@ -32,6 +32,7 @@ pub mod releases;
 pub mod removal;
 pub mod resolve;
 pub mod reviews;
+pub mod roadmap;
 pub mod runner;
 pub mod runs;
 pub mod schedule;

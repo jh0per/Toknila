@@ -8,6 +8,7 @@ type Schemas = components["schemas"];
 export type ChainDetail = Schemas["ChainDetail"];
 export type ChainSummary = Schemas["ChainSummary"];
 export type ChainItem = Schemas["ChainItem"];
+export type MoveChain = Schemas["MoveChain"];
 export type ChainStatus = Schemas["ChainStatus"];
 export type NodeRef = Schemas["NodeRef"];
 export type Edge = Schemas["Edge"];

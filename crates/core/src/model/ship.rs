@@ -212,6 +212,7 @@ mod tests {
             review_mode: None,
             reviewer: None,
             source: None,
+            position: 0,
             version: None,
         };
         let draft = TicketDraft {

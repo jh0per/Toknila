@@ -9,6 +9,7 @@ import { attachFiles } from "./attachEffects";
 import { runAutostartEffect } from "./autostartEffects";
 import { runEdgeEffect } from "./edgeEffects";
 import { runEpicEffect } from "./epicEffects";
+import { runRoadmapEffect } from "./roadmapEffects";
 import { runPlacementEffect } from "./placementEffects";
 import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
@@ -242,6 +243,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "saveEpic":
       case "loadNextVersion":
         runEpicEffect(e, dispatch);
+        return;
+      case "moveChain":
+        runRoadmapEffect(e, dispatch);
         return;
       case "saveTheme":
         saveTheme(e.theme);

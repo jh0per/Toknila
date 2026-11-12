@@ -2,9 +2,10 @@
 //! itself (a client with its run token) reads and edits the plan.
 
 use toknila_api_types::{
-    CardEdit, ChainDetail, DesignPin, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain,
-    NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain, PlannerDesign, PlannerOverview,
-    PlannerPlan, PlannerState, StartPlanner, TerminalSize, ThreadDetail, TicketDetail,
+    CardEdit, ChainDetail, DesignPin, EdgeInput, EditPlanChain, MoveInput, NewCard, NewMessage,
+    NewPlanChain, NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain, PlannerDesign,
+    PlannerOverview, PlannerPlan, PlannerState, StartPlanner, TerminalSize, ThreadDetail,
+    TicketDetail,
 };
 use toknila_core::RunId;
 use toknila_core::suggestion::Suggestion;
@@ -132,6 +133,11 @@ impl Client {
     /// `POST /planner/chains`.
     pub fn planner_new_chain(&self, c: &NewPlanChain) -> ClientResult<ChainDetail> {
         self.call("POST", "/planner/chains", Some(c))
+    }
+
+    /// `PATCH /planner/chains/{chain}`.
+    pub fn planner_edit_chain(&self, chain: &str, e: &EditPlanChain) -> ClientResult<ChainDetail> {
+        self.call("PATCH", &format!("/planner/chains/{}", enc(chain)), Some(e))
     }
 
     /// `POST /planner/chains/{chain}/cards`.
