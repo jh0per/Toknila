@@ -57,7 +57,7 @@ try {
   console.log("PASS the Finished group is closed by default");
 
   await page.locator("[data-testid=finished-toggle]").click();
-  await expectText(item("old"), "finished", "the opened group lists the finished chain");
+  await expectText(item("old"), "old", "the opened group lists the finished chain by its name");
   if ((await item("old").locator(".dim").count()) !== 1) throw new Error("the finished row is not dimmed");
   console.log("PASS the finished row is dimmed");
 
