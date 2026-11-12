@@ -2,6 +2,7 @@ import type { Intent } from "../store/msg";
 import { type State, currentProject } from "../store/state";
 import { updateReady } from "../store/updates";
 import { NavLink } from "./Link";
+import { NavIcon } from "./NavIcon";
 import { SidebarProjects } from "./SidebarProjects";
 
 export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
@@ -31,18 +32,22 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
 
       <div className="side-foot">
         <NavLink route={{ name: "usage" }} dispatch={dispatch} className={`item${state.route.name === "usage" ? " sel" : ""}`} testId="usage-link">
+          <NavIcon name="usage" />
           <span className="t">Usage</span>
         </NavLink>
         <NavLink route={{ name: "settings", project: project?.key }} dispatch={dispatch} className={`item${state.route.name === "settings" ? " sel" : ""}`} testId="settings-link">
+          <NavIcon name="settings" />
           <span className="t">Settings</span>
           {updateReady(state.updates) && (
             <span className="update-dot" data-testid="settings-dot" role="img" aria-label="An update is ready" title="An update is ready" />
           )}
         </NavLink>
         <NavLink route={{ name: "guide" }} dispatch={dispatch} className={`item${state.route.name === "guide" ? " sel" : ""}`} testId="guide-link">
+          <NavIcon name="guide" />
           <span className="t">Guide</span>
         </NavLink>
         <button type="button" className="item shortcuts-link" data-testid="shortcuts-link" onClick={() => dispatch({ type: "toggleShortcuts" })}>
+          <NavIcon name="shortcuts" />
           <span className="t">Keyboard shortcuts</span>
           <kbd>?</kbd>
         </button>
