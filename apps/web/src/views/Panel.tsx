@@ -18,7 +18,7 @@ const LABEL: Record<Tab, string> = {
   details: "Details", events: "Events", chat: "Chat", terminal: "Terminal", threads: "Threads", pr: "Pull request",
 };
 
-const PR_PLACEHOLDER = "The pull request of this card, with its checks and review state, will be shown here.";
+const PR_PLACEHOLDER = "The pull request of this story, with its checks and review state, will be shown here.";
 
 /// The bottom panel for the selected card: tabs, the card's actions once in the header, the tab.
 /// The arrow keys, Home and End move between the tabs; only the picked tab is in the Tab order.

@@ -127,7 +127,7 @@ function waitingText(card: Ticket): string | undefined {
   const r = card.status_reason;
   if (r?.status !== "waiting") return undefined;
   if (r.kind === "silent") return "The agent went silent. Look at its Terminal, or write to it below.";
-  if (r.kind === "screen") return "Claude Code asks on its screen. Answer it in the Inbox or in the card's Terminal tab.";
+  if (r.kind === "screen") return "Claude Code asks on its screen. Answer it in the Inbox or in the story's Terminal tab.";
   return r.text;
 }
 
