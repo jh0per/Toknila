@@ -130,6 +130,7 @@ describe("where a chip or a Toknila line leads", () => {
     expect(aboutRoute(s, "DEMO", { kind: "chain", name: "plan" })).toEqual({ name: "projectChain", project: "DEMO", chain: "plan" });
     expect(aboutRoute(s, "DEMO", null)).toBeUndefined();
     expect(aboutLabel({ kind: "card", key: "DEMO-1" })).toBe("DEMO-1");
-    expect(aboutLabel({ kind: "chain", name: "plan" })).toBe("chain plan");
+    expect(aboutLabel({ kind: "chain", name: "plan" })).toBe("epic plan");
+    expect(aboutLabel({ kind: "chain", name: "plan" }, "The plan")).toBe("epic The plan");
   });
 });

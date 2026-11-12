@@ -6,6 +6,7 @@ import { msUntilOverdue } from "../store/conversation";
 import type { Intent } from "../store/msg";
 import { plannerOf } from "../store/planner";
 import type { State } from "../store/state";
+import { titleByName } from "../store/title";
 import { AskBox } from "./AskBox";
 import { CardProposals } from "./CardProposals";
 import { ChatEntry } from "./ChatMessage";
@@ -38,6 +39,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
   const talk = talkOf(state, key);
   const messages = talk?.messages ?? [];
   const shown = state.assistant.only && context ? aboutThis(messages, context) : messages;
+  const label = context && contextLabel(context, context.kind === "chain" ? titleByName(state, context.name) : undefined);
   const running = plannerOf(state, key)?.running ?? false;
   const sending = state.planner.sending === key;
 
@@ -91,7 +93,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
         {talk?.older && <p className="muted chat-note" data-testid="chat-older">Loading older messages…</p>}
         {talk && !talk.more && messages.length > 0 && <p className="muted chat-note" data-testid="chat-start">This is the start of the conversation.</p>}
         {talk && only && shown.length === 0 && messages.length > 0 && (
-          <p className="muted chat-note" data-testid="chat-none-about">Nothing said about {contextLabel(context).toLowerCase()} yet.</p>
+          <p className="muted chat-note" data-testid="chat-none-about">Nothing said about {label?.toLowerCase()} yet.</p>
         )}
         {talk && messages.length === 0 && (
           <p className="muted chat-note" data-testid="placeholder">
@@ -120,8 +122,8 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
       {context && (
         <div className="context-chip-row">
           <span className="context-chip" data-testid="context-chip" data-context={contextKey(context)}>
-            {contextLabel(context)}
-            <button type="button" className="icon-btn" data-testid="context-chip-remove" aria-label={`Take off the context: ${contextLabel(context)}`} onClick={() => dispatch({ type: "removeChip" })}>
+            {label}
+            <button type="button" className="icon-btn" data-testid="context-chip-remove" aria-label={`Take off the context: ${label}`} onClick={() => dispatch({ type: "removeChip" })}>
               ×
             </button>
           </span>

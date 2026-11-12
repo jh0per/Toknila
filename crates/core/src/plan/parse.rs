@@ -219,6 +219,11 @@ impl Source<'_> {
 fn build(raw: RawFile, edges: Vec<PlanEdge>, version: Option<String>) -> Plan {
     let chain = PlanChain {
         name: raw.chain.name,
+        title: raw
+            .chain
+            .title
+            .map(|t| t.trim().to_owned())
+            .filter(|t| !t.is_empty()),
         goal: raw.chain.goal,
         autostart: raw.chain.autostart.unwrap_or(Chain::DEFAULT_AUTOSTART),
         review_mode: raw.chain.review_mode,

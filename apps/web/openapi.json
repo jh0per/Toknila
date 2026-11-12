@@ -5977,7 +5977,7 @@
           },
           {
             "type": "object",
-            "description": "A chain (epic), by name.",
+            "description": "A chain (epic), by name; the window shows the chain's title.",
             "required": [
               "name",
               "kind"
@@ -6879,7 +6879,8 @@
             "$ref": "#/components/schemas/ChainId"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "The identifier of folders and branches (`ship/<name>/...`); never shown as the epic's\nname where a person reads it, see [`Chain::display_title`]."
           },
           "position": {
             "type": "integer",
@@ -6915,6 +6916,13 @@
             ],
             "description": "The spec folder or chain file the chain was imported from, as an absolute path; `null`\nfor a chain made in Toknila or imported from pasted text."
           },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The words a person reads; none in a row older than titles."
+          },
           "version": {
             "type": [
               "string",
@@ -6938,6 +6946,10 @@
           "chain": {
             "$ref": "#/components/schemas/Chain",
             "description": "The chain as it was."
+          },
+          "display_title": {
+            "type": "string",
+            "description": "The words a person read for it: its title, or its name made readable."
           },
           "project": {
             "type": "string",
@@ -7108,6 +7120,13 @@
             ],
             "description": "Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`."
           },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The words a person reads for the epic; an empty text goes back to the name made readable."
+          },
           "version": {
             "type": [
               "string",
@@ -7143,6 +7162,10 @@
           "releasable"
         ],
         "properties": {
+          "display_title": {
+            "type": "string",
+            "description": "The words a person reads for the chain: its title, or its name made readable. The page\nshows this and never repeats the rule."
+          },
           "done": {
             "type": "integer",
             "description": "Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`.",
@@ -7918,6 +7941,13 @@
               "string",
               "null"
             ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The words a person reads for the epic."
           },
           "version": {
             "type": [
@@ -8928,7 +8958,8 @@
             ]
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "The identifier of folders and branches."
           },
           "review_mode": {
             "oneOf": [
@@ -8946,6 +8977,13 @@
               "null"
             ],
             "description": "Reviewer agent profile for the chain's tickets."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The words a person reads; none: the name made readable."
           },
           "version": {
             "type": [
@@ -9090,9 +9128,6 @@
       "NewPlanChain": {
         "type": "object",
         "description": "What the planner may give for a new chain; a chain it makes never starts cards by itself.",
-        "required": [
-          "name"
-        ],
         "properties": {
           "goal": {
             "type": [
@@ -9101,7 +9136,18 @@
             ]
           },
           "name": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The identifier of folders and branches; left out, the daemon derives it from the title."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the owner called the epic, in their words (\"MIDI controllers\")."
           },
           "version": {
             "type": [
@@ -9745,6 +9791,10 @@
           },
           "summary": {
             "$ref": "#/components/schemas/OverviewSummary"
+          },
+          "title": {
+            "type": "string",
+            "description": "What the owner reads for the epic: its title, or the name made readable."
           },
           "version": {
             "type": [

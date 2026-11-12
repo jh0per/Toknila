@@ -55,6 +55,9 @@ pub struct PlanError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PlanChain {
     pub name: String,
+    /// The words a person reads for the epic; none: the name made readable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     pub goal: String,
     pub autostart: bool,
     pub review_mode: Option<ReviewMode>,

@@ -9,7 +9,12 @@ use super::{ChainId, ProjectId, ReleaseId, ReviewMode, TicketId};
 pub struct Chain {
     pub id: ChainId,
     pub project_id: ProjectId,
+    /// The identifier of folders and branches (`ship/<name>/...`); never shown as the epic's
+    /// name where a person reads it, see [`Chain::display_title`].
     pub name: String,
+    /// The words a person reads; none in a row older than titles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     pub goal: String,
     /// Start Ready tickets automatically (on by default).
     pub autostart: bool,

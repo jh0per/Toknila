@@ -2065,6 +2065,10 @@ export interface components {
             autostart: boolean;
             goal: string;
             id: components["schemas"]["ChainId"];
+            /**
+             * @description The identifier of folders and branches (`ship/<name>/...`); never shown as the epic's
+             *     name where a person reads it, see [`Chain::display_title`].
+             */
             name: string;
             /**
              * Format: int32
@@ -2081,6 +2085,8 @@ export interface components {
              *     for a chain made in Toknila or imported from pasted text.
              */
             source?: string | null;
+            /** @description The words a person reads; none in a row older than titles. */
+            title?: string | null;
             /**
              * @description The version the chain releases, such as `0.3.0`: the epic's release. Its end release
              *     carries the same version; none for a chain that was made without one.
@@ -2094,6 +2100,8 @@ export interface components {
         ChainDeletion: {
             /** @description The chain as it was. */
             chain: components["schemas"]["Chain"];
+            /** @description The words a person read for it: its title, or its name made readable. */
+            display_title?: string;
             /** @description Key of the project it belonged to. */
             project: string;
             /** @description How many cards went with it. */
@@ -2152,6 +2160,8 @@ export interface components {
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile; an empty text goes back to `<worker profile>-reviewer`. */
             reviewer?: string | null;
+            /** @description The words a person reads for the epic; an empty text goes back to the name made readable. */
+            title?: string | null;
             /** @description The version the chain releases; refused once its release was cut. */
             version?: string | null;
         };
@@ -2163,6 +2173,11 @@ export interface components {
         ChainStatus: "empty" | "not_started" | "blocked" | "needs_human" | "running" | "idle" | "done";
         /** @description What a product person sees at a glance. */
         ChainSummary: {
+            /**
+             * @description The words a person reads for the chain: its title, or its name made readable. The page
+             *     shows this and never repeats the rule.
+             */
+            display_title?: string;
             /** @description Merged, Released or Cancelled (Definition of Done: in the work branch), of `total`. */
             done: number;
             finish?: components["schemas"]["Finish"] | null;
@@ -2426,6 +2441,8 @@ export interface components {
         EditPlanChain: {
             goal?: string | null;
             name?: string | null;
+            /** @description The words a person reads for the epic. */
+            title?: string | null;
             version?: string | null;
         };
         /** @description Error body of every failed request. */
@@ -2823,10 +2840,13 @@ export interface components {
             /** @description Defaults to true. */
             autostart?: boolean | null;
             goal?: string | null;
+            /** @description The identifier of folders and branches. */
             name: string;
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile for the chain's tickets. */
             reviewer?: string | null;
+            /** @description The words a person reads; none: the name made readable. */
+            title?: string | null;
             /** @description The version the chain releases (`0.3.0`); its end release is made with it. Optional. */
             version?: string | null;
         };
@@ -2871,7 +2891,10 @@ export interface components {
         /** @description What the planner may give for a new chain; a chain it makes never starts cards by itself. */
         NewPlanChain: {
             goal?: string | null;
-            name: string;
+            /** @description The identifier of folders and branches; left out, the daemon derives it from the title. */
+            name?: string | null;
+            /** @description What the owner called the epic, in their words ("MIDI controllers"). */
+            title?: string | null;
             /** @description The version the epic releases (`0.4.0`); the roadmap suggests the next one. */
             version?: string | null;
         };
@@ -3089,6 +3112,8 @@ export interface components {
             id: components["schemas"]["ChainId"];
             name: string;
             summary: components["schemas"]["OverviewSummary"];
+            /** @description What the owner reads for the epic: its title, or the name made readable. */
+            title?: string;
             version?: string | null;
         };
         /** @description Where a chain stands. */

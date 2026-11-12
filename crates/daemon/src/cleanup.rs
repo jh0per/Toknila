@@ -85,12 +85,14 @@ pub async fn after_chain_delete(state: &AppState, removed: Removed) -> ChainDele
 
 /// The chain answer before any cleanup.
 fn chain_report(removed: &Removed) -> ChainDeletion {
+    let chain = removed
+        .chains
+        .first()
+        .cloned()
+        .expect("one chain was deleted");
     ChainDeletion {
-        chain: removed
-            .chains
-            .first()
-            .cloned()
-            .expect("one chain was deleted"),
+        display_title: chain.display_title(),
+        chain,
         project: removed.project.key.to_string(),
         tickets: removed.tickets.len(),
         worktrees_removed: Vec::new(),

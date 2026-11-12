@@ -8,6 +8,7 @@ use toknila_core::{
 
 use super::*;
 
+mod chain_title;
 mod removal;
 mod roadmap;
 
@@ -46,6 +47,7 @@ fn chain(project: ProjectId) -> Chain {
         id: ChainId::new(),
         project_id: project,
         name: "demo".to_owned(),
+        title: None,
         goal: "gate".to_owned(),
         autostart: true,
         review_mode: Some(ReviewMode::Both),

@@ -201,6 +201,19 @@ fn dependency_rule() {
 }
 
 #[test]
+fn the_epic_title_is_the_spec_heading_or_else_the_folder_name_made_readable() {
+    let title = |spec: Option<&str>| {
+        let imp = import(SAMPLE, "010-midi-controllers", spec, &[]).expect("imports");
+        plan::parse(&imp.toml).expect("parses").chain.title
+    };
+    assert_eq!(
+        title(Some("Feature Specification: MIDI")).as_deref(),
+        Some("Feature Specification: MIDI")
+    );
+    assert_eq!(title(None).as_deref(), Some("Midi controllers"));
+}
+
+#[test]
 fn import_builds_a_chain_file_the_chain_parser_accepts() {
     let imp = import(SAMPLE, "001-sample-feature", None, &docs()).expect("imports");
     assert_eq!((imp.cards, imp.tasks, imp.done_cards), (6, 11, 2));

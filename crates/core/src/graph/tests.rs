@@ -42,6 +42,7 @@ impl Builder {
             id: ChainId::new(),
             project_id: ProjectId::new(),
             name: "demo".to_owned(),
+            title: None,
             goal: String::new(),
             autostart,
             review_mode: None,

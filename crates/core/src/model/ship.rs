@@ -208,6 +208,7 @@ mod tests {
             id: ChainId::new(),
             project_id: project.id,
             name: "Auth Flow!".into(),
+            title: None,
             goal: String::new(),
             autostart: true,
             review_mode: None,

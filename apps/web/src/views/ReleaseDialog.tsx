@@ -1,6 +1,7 @@
 import type { ReleaseStep } from "../api/types";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
+import { epicTitle } from "../store/title";
 
 const LABEL: Record<ReleaseStep, string> = {
   check: "Check",
@@ -25,7 +26,7 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
   const offer = r.offer;
   return (
     <div className="card-block form" data-testid="release-dialog">
-      <h2>Release {chain.chain.name}</h2>
+      <h2>Release {epicTitle(chain)}</h2>
       {!offer && !r.error && <p className="muted">Looking at the repository…</p>}
       {offer && (
         <>

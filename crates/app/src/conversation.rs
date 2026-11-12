@@ -95,10 +95,10 @@ pub fn say_as_person<U: UnitOfWork + ?Sized>(
         .collect();
     let about = match input.about {
         None => None,
-        Some(About::Chain { name }) => {
+        Some(About::Chain { name, .. }) => {
             let c = planner::chain(&*uow, project.id, &name)
                 .map_err(|_| AppError::not_found(format!("epic {name}")))?;
-            Some(About::Chain { name: c.name })
+            Some(About::chain_of(&c))
         }
         Some(About::Roadmap) => Some(About::Roadmap),
         Some(About::Card { .. }) => {
@@ -117,7 +117,7 @@ fn about_of<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> A
     match planner::card(r, project, reference) {
         Ok(t) => Ok(About::Card { key: t.key }),
         Err(e) if e.kind == ErrorKind::NotFound => match planner::chain(r, project, reference) {
-            Ok(c) => Ok(About::Chain { name: c.name }),
+            Ok(c) => Ok(About::chain_of(&c)),
             // No card or chain of that name: "roadmap" names the roadmap.
             Err(_) if reference.eq_ignore_ascii_case("roadmap") => Ok(About::Roadmap),
             Err(_) => Err(AppError::not_found(format!("story or epic {reference}"))),

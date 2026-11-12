@@ -13,7 +13,12 @@ use crate::output::{self, w};
 pub enum ChainCmd {
     /// Create an empty epic.
     New {
+        /// The identifier of folders and branches (`ship/<name>/...`).
         name: String,
+        /// The words a person reads, such as "MIDI controllers"; without one the window shows the
+        /// name made readable.
+        #[arg(long)]
+        title: Option<String>,
         #[arg(long)]
         goal: Option<String>,
         /// The version the epic releases, such as `0.3.0`: its end release is made with it.
@@ -55,6 +60,9 @@ pub enum ChainCmd {
         /// The version the epic releases; refused once its release was cut.
         #[arg(long)]
         version: Option<String>,
+        /// The words a person reads for the epic; an empty text goes back to the name.
+        #[arg(long)]
+        title: Option<String>,
     },
     /// Move an epic in its project's roadmap: right before or right after another epic.
     Mv {
@@ -133,6 +141,7 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
     match cmd {
         ChainCmd::New {
             name,
+            title,
             goal,
             version,
             no_autostart,
@@ -141,6 +150,7 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
             let p = default_project(c, project)?;
             let input = NewChain {
                 name,
+                title,
                 goal,
                 autostart: Some(!no_autostart),
                 review_mode: None,
@@ -180,13 +190,15 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
             project,
             autostart,
             version,
+            title,
         } => {
-            if autostart.is_none() && version.is_none() {
-                bail!("nothing to set: pass --autostart on|off or --version");
+            if autostart.is_none() && version.is_none() && title.is_none() {
+                bail!("nothing to set: pass --autostart on|off, --version or --title");
             }
             let settings = ChainSettings {
                 autostart: autostart.map(|a| a == "on"),
                 version,
+                title,
                 ..ChainSettings::default()
             };
             let detail = c.patch_chain(&chain, project.as_deref(), &settings)?;

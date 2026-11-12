@@ -93,6 +93,7 @@ impl ChainView {
             })
             .flatten();
         ChainSummary {
+            display_title: self.chain.display_title(),
             status,
             phase,
             finished_at,

@@ -145,6 +145,7 @@ export function aboutRoute(s: State, project: string, about: ConversationAbout |
   return undefined;
 }
 
-/// What a context chip says.
-export const aboutLabel = (about: ConversationAbout): string =>
-  about.kind === "roadmap" ? "roadmap" : about.kind === "chain" ? `chain ${about.name}` : about.key;
+/// What a context chip says. A chain shows its title; `title` is the one the store has for the
+/// chain's name (the slug when it has none).
+export const aboutLabel = (about: ConversationAbout, title?: string): string =>
+  about.kind === "roadmap" ? "roadmap" : about.kind === "chain" ? `epic ${title ?? about.name}` : about.key;

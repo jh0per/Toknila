@@ -97,7 +97,12 @@ pub fn card<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> A
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct NewPlanChain {
-    pub name: String,
+    /// What the owner called the epic, in their words ("MIDI controllers").
+    #[serde(default)]
+    pub title: Option<String>,
+    /// The identifier of folders and branches; left out, the daemon derives it from the title.
+    #[serde(default)]
+    pub name: Option<String>,
     pub goal: Option<String>,
     /// The version the epic releases (`0.4.0`); the roadmap suggests the next one.
     #[serde(default)]
@@ -110,8 +115,22 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
     project: ProjectId,
     input: NewPlanChain,
 ) -> AppResult<ChainId> {
+    let title = crate::epic::clean_title(input.title.as_deref());
+    let name = match input
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+    {
+        Some(n) => n.to_owned(),
+        None => match &title {
+            Some(t) => crate::epic::unique_name(uow, project, t)?,
+            None => return Err(AppError::bad_request("an epic needs a title")),
+        },
+    };
     let input = chains::NewChain {
-        name: input.name,
+        name,
+        title,
         goal: input.goal,
         autostart: Some(planner::NEW_CHAIN_AUTOSTART),
         review_mode: None,
@@ -123,8 +142,8 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
         let version = uow
             .chain_view(id)?
             .and_then(|v| v.finish_release().map(|r| r.version.clone()));
-        let text = conversation::added_chain(&c.name, version.as_deref());
-        conv::line(uow, project, text, Some(About::Chain { name: c.name }))?;
+        let text = conversation::added_chain(&c.display_title(), version.as_deref());
+        conv::line(uow, project, text, Some(About::chain_of(&c)))?;
     }
     Ok(id)
 }
@@ -134,6 +153,9 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct EditPlanChain {
     pub name: Option<String>,
+    /// The words a person reads for the epic.
+    #[serde(default)]
+    pub title: Option<String>,
     pub goal: Option<String>,
     pub version: Option<String>,
 }
@@ -160,15 +182,16 @@ pub fn edit_chain<U: UnitOfWork + ?Sized>(
     }
     let settings = crate::epic::ChainSettings {
         name: edit.name,
+        title: edit.title,
         goal: edit.goal,
         version: edit.version,
         ..Default::default()
     };
     let id = crate::epic::set_settings(uow, &c.id.to_string(), None, settings)?;
     // The chain as it is now: an edit may have renamed it.
-    let name = uow.chain(id)?.map_or(c.name, |now| now.name);
-    let text = conversation::edited_chain(&name);
-    conv::line(uow, project, text, Some(About::Chain { name }))?;
+    let now = uow.chain(id)?.unwrap_or(c);
+    let text = conversation::edited_chain(&now.display_title());
+    conv::line(uow, project, text, Some(About::chain_of(&now)))?;
     Ok(id)
 }
 

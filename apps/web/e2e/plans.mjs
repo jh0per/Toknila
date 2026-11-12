@@ -117,7 +117,8 @@ try {
   await expectText(t("error-import-path"), "nowhere", "a bad path is refused inline");
   await t("import-path").fill(join(planner, "specs", "002-b"));
   await t("import-path-submit").click();
-  await expectText(t("import-result"), "Imported 002-b", "a spec folder imports by path");
+  await expectText(t("import-result"), "Imported B from", "a spec folder imports by path, under the title of its spec.md");
+  await expectText(t("import-result"), "002-b", "the summary names the folder it came from");
   await t("import-path").fill(join(planner, "extra", "y.toml"));
   await t("import-path-submit").click();
   await expectText(t("import-result"), "Imported y", "a chain file imports by path");

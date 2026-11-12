@@ -7,6 +7,7 @@ import { epicPanel } from "../store/epic";
 import { canRelease } from "../store/release";
 import type { Intent } from "../store/msg";
 import { type State, currentProject, hrefOf, queuePosition } from "../store/state";
+import { epicTitle } from "../store/title";
 import { ContextMenu, type MenuEntry } from "./ContextMenu";
 import { EdgeLayer } from "./EdgeLayer";
 import { QuickCard } from "./QuickCard";
@@ -246,7 +247,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
               const panel = epicPanel(state);
               const open = (kind: "epic" | "release") => () => dispatch({ type: "openEpic", chain: chainId, kind });
               if (n.kind === "start") {
-                return <StartNode key={n.key} name={chain.chain.name} goal={chain.chain.goal} style={style} selected={panel?.kind === "epic"} onOpen={open("epic")} />;
+                return <StartNode key={n.key} name={epicTitle(chain)} goal={chain.chain.goal} style={style} selected={panel?.kind === "epic"} onOpen={open("epic")} />;
               }
               // Every card merged: the end node offers Release.
               const onRelease = canRelease(chain) ? () => dispatch({ type: "openRelease", chain: chainId }) : undefined;

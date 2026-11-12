@@ -48,13 +48,13 @@ try {
   const chains = () => JSON.parse(tok("chain", "ls", "--json")).map((c) => c.chain.name).sort();
 
   await page.goto(url.replace("/?", "/projects/CHD/chains/phase-1?"));
-  await expectText(page.locator("[data-testid=chain-name-top]"), "phase-1", "the mistaken chain is open");
+  await expectText(page.locator("[data-testid=chain-name-top]"), "Phase 1", "the mistaken chain is open under its name made readable");
 
   // The dialog names what goes; Cancel changes nothing.
   await item("phase-1").click({ button: "right" });
   await page.locator("[data-testid=menu-delete-chain]").click();
   const what = page.locator("[data-testid=delete-chain-what]");
-  await expectText(what, "phase-1", "the dialog names the chain");
+  await expectText(what, "Phase 1", "the dialog names the chain");
   await expectText(what, "2 stories", "the dialog says how many stories go");
   await shot("delete-chain-dialog");
   await page.locator("[data-testid=delete-chain-cancel]").click();
@@ -80,7 +80,7 @@ try {
   await item("phase-1").click({ button: "right" });
   await page.locator("[data-testid=menu-delete-chain]").click();
   await page.locator("[data-testid=delete-chain-confirm]").click();
-  await expectText(page.locator("[data-testid=delete-chain-result]"), "phase-1 was deleted", "the result says the chain was deleted");
+  await expectText(page.locator("[data-testid=delete-chain-result]"), "Phase 1 was deleted", "the result says the chain was deleted");
   await expectText(page.locator("[data-testid=delete-chain-result]"), "2 stories deleted", "the result counts the stories");
   await shot("delete-chain-done");
   await page.locator("[data-testid=delete-chain-done]").click();
