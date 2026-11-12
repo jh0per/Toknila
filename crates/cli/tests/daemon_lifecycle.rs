@@ -99,3 +99,42 @@ fn start_status_auth_stop() {
         .collect();
     assert!(!logs.is_empty(), "daemon wrote a log file");
 }
+
+#[test]
+fn a_cut_address_file_is_reported_as_incomplete_never_as_an_os_error() {
+    let home = common::tempdir();
+    let h = home.path();
+    for text in ["", "{\"pid\":1,\"po"] {
+        std::fs::write(h.join("daemon.json"), text).expect("cut file");
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_tok"));
+        cmd.args(["daemon", "status"]).env("TOKNILA_HOME", h);
+        common::isolate(&mut cmd, h);
+        let out = cmd.output().expect("run tok");
+        assert!(!out.status.success(), "status of a cut file succeeds");
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            err.contains("the address file is incomplete"),
+            "stderr: {err}"
+        );
+        assert!(!err.contains("os error"), "stderr: {err}");
+    }
+}
+
+#[test]
+fn an_address_file_still_being_written_is_waited_for() {
+    let home = common::tempdir();
+    let h = home.path().to_path_buf();
+    let _stop = common::DaemonGuard::new(&h);
+    let started = tok(&h, &["daemon", "start"]);
+    let full = std::fs::read_to_string(h.join("daemon.json")).expect("daemon.json");
+    std::fs::write(h.join("daemon.json"), "").expect("empty for a moment");
+    let (path, text) = (h.join("daemon.json"), full);
+    let writer = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        std::fs::write(path, text).expect("restore");
+    });
+    let status = tok(&h, &["daemon", "status"]);
+    writer.join().expect("writer");
+    assert_eq!(status["running"], true, "{status}");
+    assert_eq!(status["pid"], started["pid"]);
+}
