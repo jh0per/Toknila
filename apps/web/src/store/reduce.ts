@@ -11,6 +11,7 @@ import { reduceEpic, renamedRoute, reopen } from "./epic";
 import { followTarget, opened } from "./follow";
 import { reducePlacement } from "./placement";
 import { reduceQuick } from "./quick";
+import { reduceRoadmap } from "./roadmap";
 import { type Dialog, reducePlan, withChain } from "./plan";
 import { ONBOARDING_DRAFT, loadPlanner, reducePlanner } from "./planner";
 import { reduceShortcuts } from "./shortcuts";
@@ -223,6 +224,10 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       const [moved, more] = then(next, fx, renamedRoute(msg.project, name));
       return [reopen(moved), more];
     }
+    case "moveChain":
+    case "chainMoved":
+    case "chainMoveRefused":
+      return reduceRoadmap(s, msg);
     case "selectEdge":
     case "dismissEdgeError":
     case "addEdge":

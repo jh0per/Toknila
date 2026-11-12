@@ -372,6 +372,7 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
             "show_design",
             "design_question",
             "new_chain",
+            "edit_chain",
             "add_card",
             "edit_card",
             "show_card",

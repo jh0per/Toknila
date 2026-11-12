@@ -5,6 +5,7 @@ import type {
 } from "../api/types";
 import { type EdgesState, initialEdges } from "./edges";
 import { type EpicUi, initialEpic } from "./epic";
+import { type RoadmapUi, initialRoadmap } from "./roadmap";
 import type { OpenedCard } from "./follow";
 import { type PlacementState, initialPlacement } from "./placement";
 import { type ImportState, initialImports } from "./imports";
@@ -67,6 +68,8 @@ export interface State {
   release: ReleaseUi;
   /// The epic and release panels, and the version a new chain suggests.
   epic: EpicUi;
+  /// The roadmap screen: the daemon's refusal of the last move.
+  roadmap: RoadmapUi;
   /// Editing dependencies: the selected line and the daemon's last refusal.
   edges: EdgesState;
   placement: PlacementState;
@@ -115,6 +118,7 @@ export function initialState(route: Route): State {
     removal: initialRemoval,
     release: initialRelease,
     epic: initialEpic,
+    roadmap: initialRoadmap,
     edges: initialEdges,
     placement: initialPlacement,
     quick: initialQuick,

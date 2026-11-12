@@ -47,6 +47,7 @@ impl Builder {
             review_mode: None,
             reviewer: None,
             source: None,
+            position: 0,
             version: None,
         };
         let view = ChainView {

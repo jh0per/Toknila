@@ -47,12 +47,13 @@ pub use tickets::{ActionInput, NewSubtask, PatchSubtask, TicketDetail, TicketIte
 pub use toknila_app::chains::{ChainSettings, NewChain};
 pub use toknila_app::pins::PinAnswer;
 pub use toknila_app::planner::{
-    CardEdit, NewCard, NewPlanChain, NewSuggestion, OverviewCard, OverviewChain, OverviewSummary,
-    PlanCard, PlanChain, PlanOverview, PlanThread, PlanView, SubtaskEdit,
+    CardEdit, EditPlanChain, NewCard, NewPlanChain, NewSuggestion, OverviewCard, OverviewChain,
+    OverviewSummary, PlanCard, PlanChain, PlanOverview, PlanThread, PlanView, SubtaskEdit,
 };
 pub use toknila_app::projects::{NewProject, PatchProject};
 pub use toknila_app::releases::NewRelease;
 pub use toknila_app::reviews::ReviewView;
+pub use toknila_app::roadmap::MoveChain;
 pub use toknila_app::threads::{NewMessage, NewThread, NewVersion};
 pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;

@@ -45,9 +45,24 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
         ),
         tool(
             "new_chain",
-            "Create a chain. Its cards wait for the owner to start them: a chain you create never starts cards by itself.",
-            json!({ "name": text("Short unique name"), "goal": text("What the chain is for") }),
+            "Create a chain: an epic, one phase of the roadmap, added at the end of the roadmap. Give it the version it releases (the next one after the roadmap's greatest, such as 0.4.0). Its cards wait for the owner to start them: a chain you create never starts cards by itself.",
+            json!({
+                "name": text("Short unique name"),
+                "goal": text("What the chain is for"),
+                "version": text("The version the epic releases, such as 0.4.0; its release is made with it"),
+            }),
             &["name"],
+        ),
+        tool(
+            "edit_chain",
+            "Change the name, goal or version of an epic whose release is not cut yet; a field left out is kept. An epic being released or released is the owner's.",
+            json!({
+                "chain": chain,
+                "name": text("New name"),
+                "goal": text("New goal"),
+                "version": text("New version, such as 0.4.0"),
+            }),
+            &["chain"],
         ),
         tool(
             "add_card",

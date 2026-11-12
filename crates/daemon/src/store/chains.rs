@@ -17,10 +17,11 @@ type ChainRow = (
     Option<String>,
     Option<String>,
     Option<String>,
+    u32,
 );
 
 const CHAIN_COLS: &str =
-    "id, project_id, name, goal, autostart, review_mode, reviewer, source, version";
+    "id, project_id, name, goal, autostart, review_mode, reviewer, source, version, position";
 
 impl Repo<'_> {
     /// Reserves the next ticket number of a project.
@@ -38,7 +39,7 @@ impl Repo<'_> {
     pub fn insert_chain(&self, c: &Chain) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+                "INSERT INTO chains ({CHAIN_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
             ),
             params![
                 c.id.to_string(),
@@ -49,7 +50,8 @@ impl Repo<'_> {
                 opt_enum(&c.review_mode)?,
                 c.reviewer,
                 c.source,
-                c.version
+                c.version,
+                c.position
             ],
         )?;
         Ok(())
@@ -57,7 +59,7 @@ impl Repo<'_> {
 
     pub fn update_chain(&self, c: &Chain) -> Result<(), StoreError> {
         self.conn.execute(
-            "UPDATE chains SET name = ?2, goal = ?3, autostart = ?4, review_mode = ?5, reviewer = ?6, version = ?7 WHERE id = ?1",
+            "UPDATE chains SET name = ?2, goal = ?3, autostart = ?4, review_mode = ?5, reviewer = ?6, version = ?7, position = ?8 WHERE id = ?1",
             params![
                 c.id.to_string(),
                 c.name,
@@ -65,7 +67,8 @@ impl Repo<'_> {
                 c.autostart,
                 opt_enum(&c.review_mode)?,
                 c.reviewer,
-                c.version
+                c.version,
+                c.position
             ],
         )?;
         Ok(())
@@ -82,6 +85,7 @@ impl Repo<'_> {
             r.get(6)?,
             r.get(7)?,
             r.get(8)?,
+            r.get(9)?,
         ))
     }
 
@@ -96,6 +100,7 @@ impl Repo<'_> {
             reviewer: t.6,
             source: t.7,
             version: t.8,
+            position: t.9,
         })
     }
 
@@ -129,7 +134,7 @@ impl Repo<'_> {
 
     pub fn chains(&self, project: Option<ProjectId>) -> Result<Vec<Chain>, StoreError> {
         let mut st = self.conn.prepare(&format!(
-            "SELECT {CHAIN_COLS} FROM chains WHERE ?1 IS NULL OR project_id = ?1 ORDER BY rowid"
+            "SELECT {CHAIN_COLS} FROM chains WHERE ?1 IS NULL OR project_id = ?1 ORDER BY position, rowid"
         ))?;
         let rows = st.query_map([project.map(|p| p.to_string())], Self::chain_from)?;
         rows.map(|r| Self::chain_build(r?)).collect()
@@ -138,7 +143,7 @@ impl Repo<'_> {
     /// Chains with this name, across projects.
     pub fn chains_named(&self, name: &str) -> Result<Vec<Chain>, StoreError> {
         let mut st = self.conn.prepare(&format!(
-            "SELECT {CHAIN_COLS} FROM chains WHERE name = ?1 ORDER BY rowid"
+            "SELECT {CHAIN_COLS} FROM chains WHERE name = ?1 ORDER BY position, rowid"
         ))?;
         let rows = st.query_map([name], Self::chain_from)?;
         rows.map(|r| Self::chain_build(r?)).collect()

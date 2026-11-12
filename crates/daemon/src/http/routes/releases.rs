@@ -258,13 +258,23 @@ pub async fn release_run(
 #[utoipa::path(get, path = "/projects/{project}/next-version", tag = "releases",
     params(("project" = String, Path, description = "Project id or key")),
     responses((status = 200, body = VersionSuggestion), (status = 404, body = ErrorBody)))]
-/// The version a new chain of the project suggests: the next patch of the repository's newest
-/// tag, or `0.1.0` when it has none or the project has no repository.
+/// The version a new chain of the project suggests: the next patch after the greatest of the
+/// repository's newest version tag and the versions the project's chains plan, or `0.1.0` when
+/// there is none.
 pub async fn next_version(
     State(state): State<AppState>,
     Path(project): Path<String>,
 ) -> ApiResult<Json<VersionSuggestion>> {
-    let project = read(&state, move |repo| Ok(resolve::project(repo, &project)?)).await?;
+    let (project, planned) = read(&state, move |repo| {
+        let p = resolve::project(repo, &project)?;
+        let planned: Vec<String> = repo
+            .chains(Some(p.id))?
+            .into_iter()
+            .filter_map(|c| c.version)
+            .collect();
+        Ok((p, planned))
+    })
+    .await?;
     let tags = match project.repo_path.filter(|r| !r.trim().is_empty()) {
         Some(repo) => tokio::task::spawn_blocking(move || releaser::tags(&repo))
             .await
@@ -272,7 +282,7 @@ pub async fn next_version(
         None => Vec::new(),
     };
     Ok(Json(VersionSuggestion {
-        version: release_run::suggest_version(&tags),
+        version: toknila_core::roadmap::next_version(&tags, &planned),
         last_tag: tags.first().cloned(),
     }))
 }
