@@ -58,6 +58,14 @@ describe("itemRows", () => {
     expect(basisText("NOT_RUN")).toBe("NOT_RUN");
   });
 
+  it("shows an item only a person can judge as PERSON", () => {
+    const rows = itemRows("PASS 1. It logs in [ran]\nPERSON 2. It looks right - the picture is for a person [read]");
+    expect(rows).toEqual([
+      { outcome: "PASS", item: 1, text: "It logs in", basis: "ran" },
+      { outcome: "PERSON", item: 2, text: "It looks right - the picture is for a person", basis: "read" },
+    ]);
+  });
+
   it("leaves out a round without item lines", () => {
     expect(itemRows("The check passed.")).toEqual([]);
     expect(itemRows("PASS 1. old verdict without a basis")).toEqual([]);

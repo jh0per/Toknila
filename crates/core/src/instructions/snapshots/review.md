@@ -12,6 +12,12 @@ Check that every item holds, with evidence:
 
 - [ ] The review file is pinned by a snapshot test
 
+## The card's threads
+
+The record of the card's design threads. You cannot open them; judge "the thread shows ... and the owner approved it before code" from this list (basis `ran`). Times are UTC, to compare with the commit times.
+
+The card has no design threads.
+
 ## The gate's result
 
 Toknila did not run the gate on this hand-in (the project has no check command, or it did not run). There is no gate result to quote: say `NOT_RUN` and why for the check item.
@@ -34,8 +40,9 @@ The ship is your working directory, so run every command plain from it: no `cd`,
 
 You have one tool, `review_verdict`, of the MCP server `toknila`. Call it once, when you are done:
 
-- `items`: one entry per acceptance item of the ticket, by its position (1, 2, ...), each with `outcome: pass` or `outcome: fail`, a `basis` (`ran`, `read` or `not_run`) and a one-line `note` of evidence, with the quoted result line of what you ran. Judge every item; a verdict that leaves one out is refused.
-- `verdict: approve`: the work does what the task asks and every item passes. `comment` is optional. An approval with a failing item is refused.
+- `items`: one entry per acceptance item of the ticket, by its position (1, 2, ...), each with `outcome: pass`, `outcome: fail` or `outcome: person`, a `basis` (`ran`, `read` or `not_run`) and a one-line `note` of evidence, with the quoted result line of what you ran. Judge every item; a verdict that leaves one out is refused.
+- `outcome: person` (shown as PERSON) is for an item only a person can judge: a picture, a look, a feeling, an approval the record does not hold. It is neither PASS nor FAIL and does not count against the hand-in. Say in the `note` what the person should look at. Never ask for files the card did not ask for: pictures live in the worker's scratchpad by rule, not in the repository. The card's threads and the whole hand-in are in your instructions: judge "the thread shows ... and the owner approved it before code" and "the hand-in says ..." from them (basis `ran`), and use `person` only for what they do not hold.
+- `verdict: approve`: the work does what the task asks and every item passes or is for a person. `comment` is optional. An approval with a failing item is refused.
 - `verdict: request_changes`: something is missing or wrong. Say exactly what to change in `comment`, one point per line, so the worker can act on it without asking.
 
 A call that is refused comes back as an error text; read it and adapt. After the verdict you are done: stop.

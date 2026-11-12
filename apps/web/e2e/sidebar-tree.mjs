@@ -24,13 +24,16 @@ try {
     writeFileSync(join(home, `${chain}.toml`), `[chain]\nname = "${chain}"\n\n[[ticket]]\nid = "${key}1"\ntitle = "${key}1"\nprofile = "sim"\n`);
     tok("chain", "import", join(home, `${chain}.toml`), "--project", key);
   }
+  const longName = "a-finished-chain-with-a-really-long-name-for-the-sidebar";
+  writeFileSync(join(home, "long.toml"), `[chain]\nname = "${longName}"\n\n[[ticket]]\nid = "TRL1"\ntitle = "TRL1"\nprofile = "sim"\ndone = true\n`);
+  tok("chain", "import", join(home, "long.toml"), "--project", "TRA");
   const { url } = JSON.parse(tok("open", "--json"));
 
   browser = await launch();
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  const { expectPath } = checks(page);
+  const { expectPath, expectText } = checks(page);
   const node = (key) => page.locator(`[data-testid=projects] li[data-project=${key}]`);
   const rowOf = (key) => page.locator(`[data-testid=projects] li[data-project=${key}] > .row`);
   const chev = (key) => rowOf(key).locator("[data-toggle]");
@@ -61,10 +64,27 @@ try {
   must((await page.locator("[data-testid=projects] ul[role=tree]").count()) >= 1, "the projects are a tree");
   must((await page.locator("[data-testid=projects] [role=treeitem]").count()) > 4, "its rows are treeitems");
   const rows = (await node("TRA").locator("> ul > li").allTextContents()).map((t) => t.replace(/^[^A-Za-z]+/, "").match(/^[A-Za-z]+/)?.[0]);
-  must(rows.join(",").startsWith("Roadmap,Assistant,Inbox,Agents,Chains"), `the rows under an open project are Roadmap, Assistant, Inbox, Agents, Chains... (${rows})`);
+  must(rows.join(",").startsWith("Roadmap,Assistant,Inbox,Agents,Epics"), `the rows under an open project are Roadmap, Assistant, Inbox, Agents, Epics... (${rows})`);
   must(rows.at(-2) === "Designs" && rows.at(-1) === "Settings", "Designs and Settings close the list");
   await chain("alpha").waitFor();
   must((await chain("beta").count()) === 0, "a closed project shows none of its chains");
+
+  // A finished chain's row: its name (cut by an ellipsis, never missing), one line, no date, no repeated word.
+  await page.locator("[data-testid=finished-toggle]").click();
+  const fin = chain(longName);
+  await fin.waitFor();
+  const finText = (await fin.innerText()).replace(/\s+/g, " ");
+  must(finText.includes("a-finished-chain"), `a finished row shows its chain name (${finText})`);
+  must(!/\d+ [A-Z][a-z]{2}/.test(finText) && !/finished/.test(finText.replace(longName, "")), `a finished row has no date and no phase word (${finText})`);
+  const geo = await fin.locator("a.item").evaluate((a) => {
+    const t = a.querySelector(".chain-name");
+    const side = document.querySelector(".sidebar").getBoundingClientRect().right;
+    const lh = parseFloat(getComputedStyle(a).lineHeight) || 20;
+    return { h: a.getBoundingClientRect().height, right: a.getBoundingClientRect().right, side, lh, clipped: t.scrollWidth > t.clientWidth, face: getComputedStyle(t).fontFamily };
+  });
+  must(geo.h < geo.lh * 2, `a finished row is one line (${geo.h}px)`);
+  must(geo.right <= geo.side && geo.clipped, "a long name ends in an ellipsis inside the sidebar");
+  must(!/mono/i.test(geo.face), `a chain name is in the body face (${geo.face})`);
 
   // Each project opens its own rows; a chain of the second one is reachable without its page.
   await chev("TRB").click();
@@ -95,7 +115,9 @@ try {
   await expectPath("/projects/TRA", "the project's name opens its page");
   await page.locator("[data-testid=roadmap-link]").first().waitFor();
   await node("TRB").locator("[data-testid=planner-link]").click();
-  await expectPath("/projects/TRB/planner", "the Assistant row opens the project's assistant");
+  await expectPath("/projects/TRB", "the Assistant row opens the roadmap");
+  await page.locator("[data-testid=assistant-panel]").waitFor({ timeout: 10_000 });
+  await expectText(page.locator("[data-testid=context-chip]"), "Roadmap", "with the assistant beside it and the roadmap chip on");
   await node("TRB").locator("a", { hasText: "Designs" }).click();
   await expectPath("/projects/TRB/settings/designs", "the Designs row opens the project's designs");
   await page.goto(url.replace("/?", "/projects/TRA?"));

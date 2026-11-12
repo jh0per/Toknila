@@ -34,6 +34,7 @@ export const initialAssistant: AssistantSlice = { open: false, width: DEFAULT_WI
 /// What the person did.
 export type AssistantIntent =
   | { type: "toggleAssistant" }
+  | { type: "openAssistant" }
   | { type: "closeAssistant" }
   | { type: "setAssistantWidth"; width: number }
   | { type: "setOnlyAboutThis"; only: boolean }
@@ -82,7 +83,7 @@ export const contextKey = (c: Context): string => (c.kind === "roadmap" ? "roadm
 
 /// What the chip says.
 export const contextLabel = (c: Context): string =>
-  c.kind === "roadmap" ? "Roadmap" : c.kind === "chain" ? `Chain ${c.name}` : `Card ${c.key}`;
+  c.kind === "roadmap" ? "Roadmap" : c.kind === "chain" ? `the epic ${c.name}` : `the card ${c.key}`;
 
 /// The slice after the route changed: whatever opens next brings its chip back.
 export const chipBack = (a: AssistantSlice): AssistantSlice => (a.chipOff ? { ...a, chipOff: false } : a);
@@ -108,6 +109,21 @@ export function aboutThis(messages: ConversationMessage[], c: Context): Conversa
 /// Whether a route has a project screen the panel can sit beside.
 export const beside = (route: Route): boolean => contextOf(route) !== undefined;
 
+/// The state with the panel open, and the effect that remembers it.
+export const withPanelOpen = (s: State): [State, Effect[]] => {
+  const a = { ...s.assistant, open: true };
+  return [{ ...s, assistant: a }, [{ type: "saveAssistant", open: true, width: a.width, only: a.only }]];
+};
+
+/// Where a message sent from a box goes: the chat is in the panel beside the work or on the full
+/// screen; from anywhere else the panel opens (on the roadmap, if the screen cannot have it).
+export function showChat(before: State, next: State, fx: Effect[], project: string): [State, Effect[], Route | undefined] {
+  const there = (before.route.name === "planner" && before.route.project === project) || (before.assistant.open && beside(before.route));
+  if (!fx.length || there) return [next, fx, undefined];
+  const [shown, save] = withPanelOpen(next);
+  return [shown, [...fx, ...save], beside(before.route) ? undefined : { name: "project", project }];
+}
+
 export function reduceAssistant(s: State, msg: AssistantIntent | ConversationMsg): [State, Effect[]] {
   const set = (patch: Partial<AssistantSlice>): [State, Effect[]] => {
     const a = { ...s.assistant, ...patch };
@@ -115,6 +131,7 @@ export function reduceAssistant(s: State, msg: AssistantIntent | ConversationMsg
   };
   switch (msg.type) {
     case "toggleAssistant": return set({ open: !s.assistant.open });
+    case "openAssistant": return s.assistant.open ? [s, []] : set({ open: true });
     case "closeAssistant": return s.assistant.open ? set({ open: false }) : [s, []];
     case "setAssistantWidth": return set({ width: clampWidth(msg.width) });
     case "setOnlyAboutThis": return set({ only: msg.only });

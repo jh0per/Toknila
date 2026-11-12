@@ -13,7 +13,7 @@ export function EmptyChains({ project, state, dispatch }: { project: Project; st
     <div className="empty-state" data-testid="no-chains">
       <h2>What do you want to build?</h2>
       <p className="muted">
-        Tell the assistant in a sentence or two. It reads {project.name || project.key}, drafts the plan as a chain of cards, and
+        Tell the assistant in a sentence or two. It reads {project.name || project.key}, drafts the plan as an epic of cards, and
         you start the cards when you are happy with it.
       </p>
       <AskBox

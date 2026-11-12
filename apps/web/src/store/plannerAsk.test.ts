@@ -33,9 +33,9 @@ describe("talking to the assistant", () => {
       raw: "a shop\nwith a cart", wait: true,
     });
     expect(s.planner.sending).toBe("DEMO");
-    // Asked from the project page: the conversation moves to the assistant's screen.
-    expect(s.route).toEqual({ name: "planner", project: "DEMO" });
-    expect(fx).toContainEqual({ type: "pushUrl", path: "/projects/DEMO/planner" });
+    // Asked from the roadmap with the panel shut: the panel opens beside it.
+    expect(s.route).toEqual({ name: "project", project: "DEMO" });
+    expect(s.assistant.open).toBe(true);
     // The draft stays until the text has reached the planner, so a refusal does not lose it.
     expect(draftOf(s, "DEMO")).toBe("  a shop\nwith a cart  ");
     const [sent] = reduce(s, { type: "plannerAsked", project: "DEMO" });
@@ -106,7 +106,8 @@ describe("the first project leads into the assistant", () => {
   it("opens the assistant with what was described", () => {
     const typed = apply(onboarding(), { type: "editPlannerDraft", where: ONBOARDING_DRAFT, text: "a recipe app" });
     const [s, fx] = reduce(typed, { type: "projectAdded", project: added });
-    expect(s.route).toEqual({ name: "planner", project: "NEW" });
+    expect(s.route).toEqual({ name: "project", project: "NEW" });
+    expect(s.assistant.open).toBe(true);
     expect(fx).toContainEqual({
       type: "plannerCall", project: "NEW", call: "ask", profile: "claude-code-planner", text: "a recipe app", raw: "a recipe app", wait: true,
     });
@@ -114,9 +115,10 @@ describe("the first project leads into the assistant", () => {
     expect(draftOf(s, "NEW")).toBe("a recipe app");
   });
 
-  it("opens the assistant's screen even when nothing was described", () => {
+  it("opens the roadmap with the panel even when nothing was described", () => {
     const [s, fx] = reduce(onboarding(), { type: "projectAdded", project: added });
-    expect(s.route).toEqual({ name: "planner", project: "NEW" });
+    expect(s.route).toEqual({ name: "project", project: "NEW" });
+    expect(s.assistant.open).toBe(true);
     expect(fx.some((e) => e.type === "plannerCall" && e.call === "ask")).toBe(false);
     expect(fx).toContainEqual({ type: "loadPlans", project: "NEW", reason: "added" });
   });
