@@ -80,7 +80,11 @@ mod tests {
     #[test]
     fn worktrees_of_one_repository_share_it_and_other_folders_have_none() {
         let dir = tempfile::tempdir().expect("tmp");
-        let root = dir.path().canonicalize().expect("canonical");
+        // Resolved (macOS temp is a symlink) but without Windows' `\\?\` prefix, which `git
+        // worktree add` refuses ("could not create leading directories").
+        let resolved = dir.path().canonicalize().expect("canonical");
+        let text = resolved.to_string_lossy().into_owned();
+        let root = std::path::PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text));
         let main = root.join("imagegen-backend");
         init_repo(&main, "main");
         let (a, b) = (root.join("wt/a"), root.join("other-tool/b"));
