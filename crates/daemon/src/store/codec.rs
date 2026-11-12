@@ -318,16 +318,20 @@ impl<'c> Repo<'c> {
         .collect()
     }
 
-    /// Payload of the newest journal event about one entity, if any.
-    pub fn last_event_payload(
+    /// Payload of the newest journal event about one entity that carries a snapshot under
+    /// `field` (`ticket`, `release`); events without one (`ship_removed`, `runner_exited`) are
+    /// skipped.
+    pub fn last_snapshot_payload(
         &self,
         entity: &str,
         id: &str,
+        field: &str,
     ) -> Result<Option<serde_json::Value>, StoreError> {
         self.conn
             .query_row(
-                "SELECT payload_json FROM events WHERE entity = ?1 AND entity_id = ?2 ORDER BY seq DESC LIMIT 1",
-                params![entity, id],
+                "SELECT payload_json FROM events WHERE entity = ?1 AND entity_id = ?2 \
+                 AND json_extract(payload_json, '$.' || ?3) IS NOT NULL ORDER BY seq DESC LIMIT 1",
+                params![entity, id, field],
                 |r| r.get::<_, String>(0),
             )
             .optional()?

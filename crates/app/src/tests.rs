@@ -272,13 +272,20 @@ impl Reader for Mem {
     fn live_runners(&self) -> AppResult<Vec<(TicketId, toknila_core::AgentRole)>> {
         Ok(crate::Runner::live_runners(&self.runner))
     }
-    fn last_event_payload(&self, entity: &str, id: &str) -> AppResult<Option<Value>> {
-        let last = self
+    fn last_snapshot_payload(
+        &self,
+        entity: &str,
+        id: &str,
+        field: &str,
+    ) -> AppResult<Option<Value>> {
+        let found = self
             .events
             .iter()
             .rev()
-            .find(|e| e.entity() == entity && e.entity_id() == id);
-        Ok(last.map(|e| serde_json::to_value(e).expect("event json")))
+            .filter(|e| e.entity() == entity && e.entity_id() == id)
+            .map(|e| serde_json::to_value(e).expect("event json"))
+            .find(|v| v.get(field).is_some_and(|f| !f.is_null()));
+        Ok(found)
     }
 }
 
