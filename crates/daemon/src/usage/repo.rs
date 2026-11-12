@@ -53,7 +53,7 @@ fn repo_of(folder: &Path) -> Option<PathBuf> {
     }
     // Relative to the folder git was asked in (`.git` in a main checkout).
     let common = folder.join(printed);
-    let common = common.canonicalize().unwrap_or(common);
+    let common = plain(common.canonicalize().unwrap_or(common));
     // A normal repository keeps its data in `<repo>/.git`; a bare one is its own folder.
     if common.file_name().is_some_and(|n| n == ".git") {
         common.parent().map(Path::to_owned)
@@ -62,10 +62,23 @@ fn repo_of(folder: &Path) -> Option<PathBuf> {
     }
 }
 
+/// A canonical path as a person reads it: Windows's `canonicalize` adds the `\\?\` prefix,
+/// which neither git nor the Usage page wants, so it goes.
+fn plain(p: PathBuf) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let s = p.to_string_lossy();
+        if let Some(rest) = s.strip_prefix(r"\\?\") {
+            return PathBuf::from(rest);
+        }
+    }
+    p
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git::testing::{git, init_repo};
+    use crate::git::testing::{canonical, git, init_repo};
     use toknila_core::usage::UsageFigures;
 
     fn item(path: &Path) -> UsageItem {
@@ -80,7 +93,7 @@ mod tests {
     #[test]
     fn worktrees_of_one_repository_share_it_and_other_folders_have_none() {
         let dir = tempfile::tempdir().expect("tmp");
-        let root = dir.path().canonicalize().expect("canonical");
+        let root = canonical(dir.path());
         let main = root.join("imagegen-backend");
         init_repo(&main, "main");
         let (a, b) = (root.join("wt/a"), root.join("other-tool/b"));

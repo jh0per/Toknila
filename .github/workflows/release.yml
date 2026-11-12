@@ -75,8 +75,8 @@ jobs:
 
       # One signing identity for every Mac build, so macOS keeps the privacy permissions the
       # owner granted across updates. With the three secrets the certificate goes into a
-      # temporary keychain and Tauri signs with it (APPLE_SIGNING_IDENTITY); without them the
-      # app is signed ad hoc and the step says so. See docs/install.md, "Signing the Mac app".
+      # temporary keychain and `cargo xtask app` signs with it (APPLE_SIGNING_IDENTITY); without
+      # them the app is signed ad hoc and the step says so. See docs/install.md, "Signing the Mac app".
       - name: Import the signing certificate
         if: runner.os == 'macOS'
         shell: bash
@@ -101,7 +101,7 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
           echo "SIGNING_GIVEN=true" >> "$GITHUB_ENV"
-          # Set for the later steps only when given: Tauri reads it, an empty value would not be "unset".
+          # Set for the later steps only when given: `cargo xtask app` reads it.
           echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
           echo "Imported the signing certificate into a temporary keychain."
 
@@ -119,8 +119,9 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          app=$(find target apps/desktop/src-tauri/target -type d -name 'Toknila.app' -path '*bundle/macos*' 2>/dev/null | head -n 1)
-          test -n "$app" || { echo "Toknila.app not found"; exit 1; }
+          # `cargo xtask app` writes the bundle to dist/app.
+          app=dist/app/Toknila.app
+          test -d "$app" || { echo "$app not found"; exit 1; }
           info=$(codesign -dv --verbose=2 "$app" 2>&1)
           echo "$info"
           if echo "$info" | grep -q '^Signature=adhoc'; then

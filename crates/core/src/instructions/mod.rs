@@ -193,9 +193,8 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         ),
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
-             `show_plan`, then tell the owner in a line or two how the plan stands, say the next step \
-             with `suggest` (or that nothing waits for them), and wait for \
-             what they want planned. Do not start any card.",
+             `show_plan` to know the plan, say nothing about it yet, and wait for the owner's \
+             message: answer what they ask, and plan only when they ask you to. Do not start any card.",
             key = brief.key
         ),
         crate::AgentRole::Reviewer => format!(
