@@ -71,6 +71,12 @@ fn start_status_auth_stop() {
 
     assert_eq!(tok(h, &["daemon", "stop"])["stopped"], true);
     assert_eq!(tok(h, &["daemon", "status"])["running"], false);
+    // The daemon removes its file as it exits; `stop` may see the daemon gone a moment before the
+    // removal shows, so the claim is "it goes", awaited with a deadline.
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while h.join("daemon.json").exists() && std::time::Instant::now() < until {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
     assert!(
         !h.join("daemon.json").exists(),
         "clean stop removes daemon.json"
