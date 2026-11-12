@@ -51,9 +51,9 @@ pub struct PlanView {
     pub pins: Vec<DesignPin>,
 }
 
-fn chain_plan<R: Reader + ?Sized>(r: &R, view: ChainView, at: Timestamp) -> AppResult<PlanChain> {
-    let summary = view.summary(at);
-    let mut cards = Vec::new();
+/// The tickets of a chain in dependency order, each with what it waits for.
+pub(super) fn ordered(view: &ChainView) -> Vec<(Ticket, Vec<String>)> {
+    let mut out = Vec::new();
     for node in view.topo_order() {
         let NodeRef::Ticket(id) = node else { continue };
         let Some(ticket) = view.tickets.iter().find(|t| t.id == id).cloned() else {
@@ -65,26 +65,74 @@ fn chain_plan<R: Reader + ?Sized>(r: &R, view: ChainView, at: Timestamp) -> AppR
             .filter(|e| e.to == node)
             .map(|e| view.label(e.from))
             .collect();
-        let mut threads = Vec::new();
-        for thread in r.threads(id)? {
-            threads.push(PlanThread {
-                messages: r.thread_messages(thread.id)?,
-                versions: u32::try_from(r.thread_versions(thread.id)?.len()).unwrap_or(u32::MAX),
-                thread,
-            });
-        }
-        cards.push(PlanCard {
-            subtasks: r.subtasks(id)?,
-            ticket,
-            after,
-            threads,
+        out.push((ticket, after));
+    }
+    out
+}
+
+fn plan_card<R: Reader + ?Sized>(r: &R, ticket: Ticket, after: Vec<String>) -> AppResult<PlanCard> {
+    let id = ticket.id;
+    let mut threads = Vec::new();
+    for thread in r.threads(id)? {
+        threads.push(PlanThread {
+            messages: r.thread_messages(thread.id)?,
+            versions: u32::try_from(r.thread_versions(thread.id)?.len()).unwrap_or(u32::MAX),
+            thread,
         });
+    }
+    Ok(PlanCard {
+        subtasks: r.subtasks(id)?,
+        ticket,
+        after,
+        threads,
+    })
+}
+
+fn chain_plan<R: Reader + ?Sized>(r: &R, view: ChainView, at: Timestamp) -> AppResult<PlanChain> {
+    let summary = view.summary(at);
+    let mut cards = Vec::new();
+    for (ticket, after) in ordered(&view) {
+        cards.push(plan_card(r, ticket, after)?);
     }
     Ok(PlanChain {
         chain: view.chain,
         summary,
         cards,
     })
+}
+
+/// One chain of the planner's project with every card in full. A chain of another project is
+/// refused, one that does not exist is not found.
+pub fn chain_in_full<R: Reader + ?Sized>(
+    r: &R,
+    project: ProjectId,
+    reference: &str,
+    at: Timestamp,
+) -> AppResult<PlanChain> {
+    let chain = super::chain(r, project, reference)?;
+    let view = r
+        .chain_view(chain.id)?
+        .ok_or_else(|| AppError::not_found(format!("chain {reference}")))?;
+    chain_plan(r, view, at)
+}
+
+/// One card of the planner's project in full: prompt, acceptance, subtasks, threads with their
+/// messages, review results and pull request.
+pub fn card_in_full<R: Reader + ?Sized>(
+    r: &R,
+    project: ProjectId,
+    reference: &str,
+) -> AppResult<PlanCard> {
+    let ticket = super::card(r, project, reference)?;
+    let view = r
+        .chain_view(ticket.chain_id)?
+        .ok_or_else(|| AppError::not_found(format!("chain of {}", ticket.key)))?;
+    let after = ordered(&view)
+        .into_iter()
+        .find(|(t, _)| t.id == ticket.id)
+        .map(|(_, after)| after)
+        .unwrap_or_default();
+    plan_card(r, ticket, after)
 }
 
 /// The plan of `project` at `at`: every chain, every card in order.

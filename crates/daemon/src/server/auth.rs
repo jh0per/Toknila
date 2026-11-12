@@ -34,8 +34,11 @@ pub const AGENT_ROUTES: [&str; 5] = [
 /// The only routes a planner's token may call, as `(method, path)`. Each acts on the planner's own
 /// project, which the token names, so no path carries a project. Every route here runs a use case
 /// of `toknila_app::planner`, which checks the scope again.
-pub const PLANNER_ROUTES: [(&str, &str); 14] = [
+pub const PLANNER_ROUTES: [(&str, &str); 17] = [
     ("GET", "/v1/planner/plan"),
+    ("GET", "/v1/planner/overview"),
+    ("GET", "/v1/planner/chains/{chain}"),
+    ("GET", "/v1/planner/cards/{card}"),
     ("GET", "/v1/planner/designs/{design}"),
     ("POST", "/v1/planner/pins"),
     ("POST", "/v1/planner/chains"),

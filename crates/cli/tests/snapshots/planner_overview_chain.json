@@ -1,0 +1,28 @@
+{
+  "autostart": false,
+  "cards": [
+    {
+      "key": "DEMO-1",
+      "status": "ready",
+      "title": "One"
+    },
+    {
+      "after": [
+        "DEMO-1"
+      ],
+      "design_first": true,
+      "key": "DEMO-2",
+      "status": "backlog",
+      "subtasks": 1,
+      "title": "Two"
+    }
+  ],
+  "goal": "two cards",
+  "id": "<id>",
+  "name": "mini",
+  "summary": {
+    "done": 0,
+    "phase": "waiting",
+    "total": 2
+  }
+}
