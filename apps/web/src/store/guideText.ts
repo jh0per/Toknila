@@ -43,11 +43,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   },
   {
     id: "plan", title: "Plan with the assistant", show: "assistant", showLabel: "Open the assistant",
-    alt: "The assistant's screen: the plan so far above, the conversation below and a Next step row",
+    alt: "The roadmap with the assistant panel beside it and its chip, the roadmap",
     text:
-      "Open Assistant under your project and say what you want to build. It writes chains and cards, and they show as \"Plan so far\" above the conversation. " +
-      "The assistant panel (Cmd/Ctrl+.) also stays beside the roadmap, a chain or a card and knows what is open, so you can talk about one card. " +
-      "When there is something to do next, the Next step row offers it as a button: Start, Answer, Accept or Release.",
+      "There is one assistant, at two levels. Open Assistant under your project: the roadmap opens with the assistant beside it, and there it plans epics (an epic holds cards and ends in a release). " +
+      "Inside an epic the same panel (Cmd/Ctrl+.) plans and talks about that epic's cards; its chip says what is open, the roadmap, the epic or the card, and you can take it off. " +
+      "The expand button of the panel opens the chat at full width, with the assistant's terminal.",
   },
   {
     id: "start", title: "Start a card", show: "chain", showLabel: "Open a chain",
@@ -75,10 +75,10 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "Accept merges into the main branch, or opens a pull request when the project is set to.",
   },
   {
-    id: "release", title: "Release a finished chain", show: "release", showLabel: "Open a finished chain",
-    alt: "A finished chain's diagram: its version and the Release button at the end",
+    id: "release", title: "Release a finished epic", show: "release", showLabel: "Open a finished epic",
+    alt: "A finished epic's diagram: its version and the Release button at the end",
     text:
-      "A chain is a version on the roadmap; when all its cards are done, a Release button appears at the end of its diagram. " +
+      "The roadmap is the epics, each with its cards and ending in a release. When all an epic's cards are done, a Release button appears at the end of its diagram. " +
       "Check the version (it becomes the tag, like v0.3.0) and press Release: Toknila checks, bumps the version and tags; in local mode you push main and the tag yourself, a GitHub project pushes as its steps say. " +
       "Nothing is tagged or pushed before you press it; a failed step stops the run and says which, and steps that passed are not done again.",
   },
@@ -86,7 +86,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "where", title: "Where things are", show: "tree", showLabel: "Show the project's tree",
     alt: "The sidebar: one tree per project, and Usage, Settings and Keyboard shortcuts at its foot",
     text:
-      "The sidebar is one tree per project: Roadmap, Assistant, Inbox, Agents, Chains, Designs and Settings. " +
+      "The sidebar is one tree per project: Roadmap, Assistant (it plans epics on the roadmap, cards inside an epic), Inbox, Agents, Epics, Designs and Settings. " +
       "Its foot holds Usage (tokens and estimated cost by model, workspace, project, chain and card), Settings (Cmd/Ctrl+,) and Keyboard shortcuts (?). " +
       "A project's settings hold its test command, agents and review.",
   },

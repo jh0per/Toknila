@@ -355,7 +355,7 @@ try {
   await open("/projects/PLN/planner");
   await t("planner-idle").waitFor();
   must((await t("term-host").count()) === 0, "the planner's empty terminal is not drawn");
-  await expectText(t("planner-chain"), "Plan so far", "the diagram is labelled");
+  must((await t("planner-chain").count()) + (await t("canvas").count()) === 0, "the assistant's screen has no Plan-so-far diagram");
   await shot("plan-screen-planner");
 
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);

@@ -98,6 +98,10 @@ pub struct RunBrief {
     pub epic: Option<(String, String)>,
     /// What the check command said about the hand-in under review (a reviewer only).
     pub check: Option<toknila_core::CheckOutcome>,
+    /// The card's threads, which a reviewer cannot open (a reviewer only).
+    pub threads: Vec<toknila_core::instructions::BriefThread>,
+    /// The whole hand-in under review, as its three blocks (a reviewer only).
+    pub hand_in: Option<String>,
     /// The run continues a card's paused agent (a worker only): see [`Resume`].
     pub resume: Option<Resume>,
 }

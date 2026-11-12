@@ -14,8 +14,7 @@ use toknila_api_types::runner::agent_env;
 use toknila_app::RunnerError;
 use toknila_app::runner::RunBrief;
 use toknila_core::hook::HOOKS;
-use toknila_core::instructions;
-use toknila_core::{AgentProfile, AgentRole, RunId, TicketKey};
+use toknila_core::{AgentProfile, AgentRole, RunId, TicketKey, instructions};
 
 /// Name of the MCP server in the agent's config.
 const SERVER: &str = "toknila";
@@ -210,6 +209,8 @@ fn brief_of_key<'a>(
             .as_ref()
             .map(|(name, goal)| (name.as_str(), goal.as_str())),
         check: cx.brief.check.as_ref(),
+        threads: &cx.brief.threads,
+        hand_in: cx.brief.hand_in.as_deref(),
     }
 }
 

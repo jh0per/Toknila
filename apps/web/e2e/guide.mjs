@@ -59,7 +59,7 @@ try {
   ).then(() => true, () => false);
   if (!loaded) throw new Error("not every section has a picture that loaded");
   console.log("PASS every section has a picture that loaded");
-  await expectText(t("guide-toc"), "Release a finished chain", "the table of sections lists the last section");
+  await expectText(t("guide-toc"), "Release a finished epic", "the table of sections lists the last section");
 
   // A project: Show me opens its places; the empty state and the sidebar's foot link here.
   tok("project", "new", "GDE", "--sim");

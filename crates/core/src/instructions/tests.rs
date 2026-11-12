@@ -35,6 +35,8 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         discussion: &[],
         epic: None,
         check: None,
+        threads: &[],
+        hand_in: None,
     }
 }
 
@@ -138,6 +140,8 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         discussion: &[],
         epic: None,
         check: None,
+        threads: &[],
+        hand_in: None,
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -227,6 +231,8 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         discussion: &[],
         epic: None,
         check: None,
+        threads: &[],
+        hand_in: None,
     }
 }
 

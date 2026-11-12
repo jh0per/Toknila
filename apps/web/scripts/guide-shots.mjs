@@ -125,9 +125,10 @@ try {
   await page.waitForFunction(() => [...document.querySelectorAll("[data-testid=design-thumb]")].every((i) => i.complete && i.naturalWidth > 0));
   await shoot("designs");
 
-  // 3. The assistant's screen: the plan so far and the conversation.
-  await page.goto(at("/projects/APP/planner"));
-  await t("planner-title").waitFor({ timeout: 10_000 });
+  // 3. The roadmap with the assistant beside it, the roadmap chip on.
+  await page.goto(at("/projects/APP"));
+  await t("planner-link").click();
+  await t("assistant-panel").waitFor({ timeout: 10_000 });
   await sleep(500);
   await shoot("plan");
 
