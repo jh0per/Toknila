@@ -4551,6 +4551,65 @@
         }
       }
     },
+    "/tickets/{ticket}/pre-tool": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "The agent's `PreToolUse` hook: a tool call is about to run, in any permission mode. Answers with\nthe automatic decisions only (`deny` or `ask`, meaning no decision); never asks a person and\nnever waits.",
+        "operationId": "agent_pre_tool",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionReply"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/runner/answer": {
       "post": {
         "tags": [

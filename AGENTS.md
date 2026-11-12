@@ -42,6 +42,10 @@ before moving code between crates. Summary of what holds today:
   Nothing else is edited: a build step collects the files. Never edit a released migration, and
   never number one; start the file name with a letter so it sorts after the legacy `0001_`
   to `0024_` files (a test fails otherwise); a duplicate name stops the daemon at start, naming both files.
+- Agent and hook rules: a rule that must hold in every permission mode (the shell-edit refusal)
+  lives in the PreToolUse hook (`POST /tickets/{ticket}/pre-tool`, core's
+  `question::automatic_decision`); PermissionRequest fires only when Claude Code would ask, so under
+  `auto` and `trust` it never sees the call.
 - The database is the source of truth. TOML chain files are import/export only. Chain status,
   progress and "where it stopped" are computed, never stored.
 

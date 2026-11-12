@@ -125,6 +125,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(runner_input))
         .routes(routes!(runner_answer))
         .routes(routes!(agent_permission))
+        .routes(routes!(agent_pre_tool))
         .routes(routes!(runner_size))
         .routes(routes!(release_action))
         .routes(routes!(release_offer))

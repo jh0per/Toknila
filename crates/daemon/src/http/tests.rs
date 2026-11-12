@@ -1039,6 +1039,7 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/instructions/claim",
             "/tickets/{ticket}/leftovers/{action}",
             "/tickets/{ticket}/permission",
+            "/tickets/{ticket}/pre-tool",
             "/tickets/{ticket}/runner/answer",
             "/tickets/{ticket}/runner/input",
             "/tickets/{ticket}/runner/scrollback",
