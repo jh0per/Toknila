@@ -57,6 +57,7 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
         next: "Watch it in Terminal; it will ask here if it needs you.",
       };
     case "waiting":
+      if (card.agent_paused) return pausedLine(card, pace.queue);
       return (card.status_reason?.status === "waiting" && card.status_reason.kind === "silent" ? designLine(detail) : undefined) ?? {
         tone: "needs",
         text: "Waiting for your answer",
@@ -99,6 +100,26 @@ function designLine(detail: TicketDetail | undefined): StatusLine | undefined {
     return { tone: "going", text: "An agent is working on the design", next: "It will show it in Threads when it is ready for you to judge." };
   }
   return undefined;
+}
+
+/// The sentence of a card whose agent was paused to free its slot: what it waits for, that no
+/// agent is running, and how it comes back.
+function pausedLine(card: Ticket, queue: number | undefined): StatusLine {
+  const r = card.status_reason;
+  const asks = r?.status === "waiting" && r.kind !== "silent" ? `: ${r.text}` : "";
+  if (card.agent_paused?.resume) {
+    const place = queue === undefined ? "" : queue === 1 ? " (next in line)" : ` (#${queue} in line)`;
+    return {
+      tone: "going",
+      text: `Answered: the agent resumes when a slot is free${place}`,
+      next: "No agent is running now; the answer is waiting for it.",
+    };
+  }
+  return {
+    tone: "needs",
+    text: `Waiting for your answer${asks}`,
+    next: "Its agent is paused, not running, and holds no slot. Answer below and it resumes.",
+  };
 }
 
 /// What a waiting card asks, in a sentence.

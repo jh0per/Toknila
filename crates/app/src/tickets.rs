@@ -209,5 +209,13 @@ pub fn comment<U: UnitOfWork + ?Sized>(
         .chain_view(t.chain_id)?
         .ok_or_else(|| AppError::not_found("chain"))?;
     add_comment(uow, &view, t.id, Actor::Human, kind, body)?;
-    with_chain(uow, t.chain_id, |_| Ok::<_, AppError>(()))
+    // The answer to a card whose agent was paused wants it back: it starts when a slot is free.
+    let paused = kind == CommentKind::Instruction
+        && uow.ticket(t.id)?.is_some_and(|t| t.agent_paused.is_some());
+    with_chain(uow, t.chain_id, |ctx| {
+        if paused {
+            ctx.ticket_event(t.id, TicketEvent::ResumeWanted)?;
+        }
+        Ok::<_, AppError>(())
+    })
 }

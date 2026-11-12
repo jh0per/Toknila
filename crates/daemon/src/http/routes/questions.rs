@@ -74,6 +74,19 @@ pub async fn runner_answer(
     let role = body.role.unwrap_or(AgentRole::Worker);
     let at = now();
     let runners = state.runners.clone();
+    // A paused agent has no dialog or terminal: the answer starts it again.
+    if role == AgentRole::Worker && t.agent_paused.is_some() {
+        let (answer, text, card) = (body.answer, body.text.clone(), t.clone());
+        let (resumed, _) = state
+            .store
+            .write(Actor::Human, at, move |tx| {
+                toknila_app::paused::answer_permission(tx, &card, answer, text.as_deref())
+            })
+            .await?;
+        if resumed {
+            return Ok(StatusCode::NO_CONTENT.into_response());
+        }
+    }
     let Some(kind) = open_question(&runners, &t, role, at) else {
         return Err(AppError::conflict(format!("the {role:?} of {} asks nothing", t.key)).into());
     };

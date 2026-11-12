@@ -82,8 +82,18 @@ pub(crate) fn run<U: UnitOfWork + ?Sized>(uow: &mut U, project: ProjectId) -> Ap
         else {
             continue;
         };
+        // A paused agent whose answer arrived starts again; a ready card starts.
+        let paused = chains
+            .iter()
+            .flat_map(|c| &c.tickets)
+            .any(|t| t.id == id && t.agent_paused.is_some());
+        let event = if paused {
+            TicketEvent::ResumeStart
+        } else {
+            TicketEvent::Start
+        };
         run_chain(uow, chain, |tx| {
-            Ok::<_, AppError>(tx.ticket_event(id, TicketEvent::Start)?)
+            Ok::<_, AppError>(tx.ticket_event(id, event)?)
         })?;
     }
     Ok(())

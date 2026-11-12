@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 
 use toknila_core::events::DomainEvent;
-use toknila_core::machine::{TicketEvent, person_only};
+use toknila_core::machine::{Effect, TicketEvent, person_only};
 use toknila_core::{
     Actor, AgentProfile, AgentRole, BlockedReason, Project, Run, Ticket, TicketId, TicketKey,
     TicketStatus,
@@ -14,7 +14,7 @@ use toknila_core::{
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
-use crate::runner::{RunBrief, RunEnded, Runner, RunnerError};
+use crate::runner::{Resume, RunBrief, RunEnded, Runner, RunnerError};
 use crate::{AppError, AppResult, ChainTx, ErrorKind, UnitOfWork, reviews, with_chain};
 
 /// Whether the ticket's agent is a process. The simulated profile starts none.
@@ -29,6 +29,41 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
     ctx: &ChainTx,
     ticket: TicketId,
 ) -> AppResult<()> {
+    start_with(uow, ctx, ticket, None)
+}
+
+/// `ResumeRunner`: queue starting the agent of a card that waited for a person with no process,
+/// from the `session` it kept, with the answer as the run's first input.
+pub(crate) fn queue_resume<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ctx: &ChainTx,
+    ticket: TicketId,
+    session: Option<String>,
+) -> AppResult<()> {
+    start_with(uow, ctx, ticket, Some(session))
+}
+
+/// What the person answered, as it would have been typed to the live agent: the instruction
+/// comments no run has seen, one line each, oldest first.
+fn answer_input(comments: &[toknila_core::Comment]) -> String {
+    let typed: Vec<String> = comments
+        .iter()
+        .filter(|c| c.kind == toknila_core::CommentKind::Instruction && c.delivered_at.is_none())
+        .map(toknila_core::instructions::typed)
+        .collect();
+    if typed.is_empty() {
+        "The person answered; carry on.".to_owned()
+    } else {
+        typed.join(" ")
+    }
+}
+
+fn start_with<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ctx: &ChainTx,
+    ticket: TicketId,
+    resume: Option<Option<String>>,
+) -> AppResult<()> {
     let Some(t) = ctx.view.tickets.iter().find(|t| t.id == ticket) else {
         return Ok(());
     };
@@ -39,6 +74,10 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
         let comments = uow.comments(ticket)?;
         let returned = toknila_core::instructions::Returned::of(&t.review);
         let waiting = toknila_core::instructions::waiting(&comments, returned.as_ref());
+        let resume = resume.map(|session| Resume {
+            session,
+            input: answer_input(&comments),
+        });
         uow.defer(ExternalEffect::StartRunner {
             ticket,
             key: t.key.clone(),
@@ -66,10 +105,28 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 designs: Vec::new(),
                 epic: Some((ctx.view.chain.name.clone(), ctx.view.chain.goal.clone())),
                 check: None,
+                resume,
             },
         });
     }
     Ok(())
+}
+
+/// Queues what a runner effect asks for after the commit. Returns whether `effect` was one.
+pub(crate) fn queue_effect<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ctx: &ChainTx,
+    ticket: TicketId,
+    effect: &Effect,
+) -> AppResult<bool> {
+    match effect {
+        Effect::EnsureRunner => queue_start(uow, ctx, ticket)?,
+        Effect::ResumeRunner { session } => queue_resume(uow, ctx, ticket, session.clone())?,
+        Effect::StopRunner => queue_stop(uow, ticket),
+        Effect::StopWorker => queue_stop_worker(uow, ticket),
+        _ => return Ok(false),
+    }
+    Ok(true)
 }
 
 /// `StopRunner`: queue stopping the ticket's runner. Stopping a ticket without one is a no-op on
@@ -176,6 +233,11 @@ fn replace_worker<U: UnitOfWork + ?Sized>(uow: &mut U, run: &Run) -> AppResult<b
         return Ok(false);
     }
     let started = i64::try_from(run.id.0.timestamp_ms()).unwrap_or(i64::MAX);
+    if t.status_since.0 > started {
+        // The card became Running after this run began: this is the agent that was paused while
+        // the card waited, and the run that resumed it is already queued.
+        return Ok(false);
+    }
     if (0..RESTART_GUARD_MS).contains(&(uow.now().0 - started)) {
         let detail = "the agent ends right after it starts".to_owned();
         let reason = BlockedReason::Crashed { detail };
@@ -216,6 +278,8 @@ pub fn mark_lost<U: UnitOfWork + ?Sized>(
             .tickets(Some(chain.id))?
             .iter()
             .filter(|t| matches!(t.status, TicketStatus::Running | TicketStatus::Waiting))
+            // A paused agent has no process on purpose; its card waits for an answer.
+            .filter(|t| t.agent_paused.is_none())
             .filter(|t| runs_process(&project, t) && !live.contains(&t.id))
             .map(|t| (t.id, t.key.clone()))
             .collect();

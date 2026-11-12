@@ -28,6 +28,8 @@ struct Inner {
     tools: HashMap<Key, String>,
     pending: HashMap<Key, Pending>,
     screens: HashSet<Key>,
+    /// The agent's own session id, as its hooks reported it.
+    sessions: HashMap<Key, String>,
 }
 
 /// The in-memory questions of the live runs.
@@ -44,6 +46,16 @@ impl Prompts {
     /// Remembers the tool call the run is about to make, as the hook told it (the whole text).
     pub fn remember_tool(&self, ticket: TicketId, role: AgentRole, tool: String) {
         self.inner().tools.insert((ticket, role), tool);
+    }
+
+    /// Remembers the agent's own session id, which a resumed run continues.
+    pub fn remember_session(&self, ticket: TicketId, role: AgentRole, session: String) {
+        self.inner().sessions.insert((ticket, role), session);
+    }
+
+    /// The agent's session id of the run, when a hook told it.
+    pub fn session(&self, ticket: TicketId, role: AgentRole) -> Option<String> {
+        self.inner().sessions.get(&(ticket, role)).cloned()
     }
 
     /// The run's last tool call, as the hook told it.
@@ -185,6 +197,7 @@ impl Prompts {
         inner.tools.remove(&key);
         inner.pending.remove(&key);
         inner.screens.remove(&key);
+        inner.sessions.remove(&key);
     }
 }
 

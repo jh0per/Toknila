@@ -13,10 +13,14 @@ impl ChainView {
         for node in self.topo_order() {
             let NodeRef::Ticket(id) = node else { continue };
             let Some(t) = self.ticket(id) else { continue };
-            let wanted = t.status == TicketStatus::Ready
-                && !t.paused
-                && (t.queued || self.chain.autostart)
-                && self.unsatisfied_deps(node).is_empty();
+            // A paused agent whose answer arrived wants its slot back; its dependencies were
+            // satisfied when it started.
+            let resumes = t.agent_paused.as_ref().is_some_and(|p| p.resume);
+            let wanted = resumes
+                || (t.status == TicketStatus::Ready
+                    && !t.paused
+                    && (t.queued || self.chain.autostart)
+                    && self.unsatisfied_deps(node).is_empty());
             if wanted {
                 out.push(id);
             }

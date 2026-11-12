@@ -327,6 +327,9 @@ fn round<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Result<bool,
 
 fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Result<(), AppError> {
     for (ticket, effect) in std::mem::take(&mut ctx.effects) {
+        if runs::queue_effect(uow, ctx, ticket, &effect)? {
+            continue;
+        }
         let (author, kind, text) = match effect {
             Effect::PrepareShip => {
                 ships::queue_prepare(uow, ctx, ticket, Default::default())?;
@@ -353,18 +356,6 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
             Effect::RecordReport { summary } => (Actor::Agent, CommentKind::Report, summary),
             Effect::RecordNotice { summary } => (Actor::System, CommentKind::Report, summary),
             Effect::RecordInstruction { text } => (Actor::Human, CommentKind::Instruction, text),
-            Effect::EnsureRunner => {
-                runs::queue_start(uow, ctx, ticket)?;
-                continue;
-            }
-            Effect::StopRunner => {
-                runs::queue_stop(uow, ticket);
-                continue;
-            }
-            Effect::StopWorker => {
-                runs::queue_stop_worker(uow, ticket);
-                continue;
-            }
             Effect::StartReviewer => {
                 reviews::queue_start(uow, ctx, ticket)?;
                 continue;
