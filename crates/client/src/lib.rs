@@ -276,7 +276,11 @@ mod tests {
                 for n in 0..connections {
                     let (mut s, _) = listener.accept().expect("accept");
                     if n > 0 {
-                        let _ = s.read(&mut [0u8; 4096]);
+                        // The whole request (headers and body may arrive apart), so that the
+                        // close is a plain FIN and not a reset.
+                        s.set_read_timeout(Some(Duration::from_millis(300)))
+                            .expect("timeout");
+                        while s.read(&mut [0u8; 4096]).is_ok_and(|n| n > 0) {}
                     }
                     std::thread::sleep(Duration::from_millis(100));
                     let reply = "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n[]";
