@@ -57,7 +57,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 design_first: t.design_first,
                 card_designs: t.designs.clone(),
                 design_project: Some(project.id),
-                model: project.worker_model.clone(),
+                model: t.model.clone().or_else(|| project.worker_model.clone()),
                 command_policy: project.command_policy,
                 allowed_commands: project.allowed_commands.clone(),
                 web_domains: Vec::new(),

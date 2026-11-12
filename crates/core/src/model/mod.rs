@@ -34,7 +34,7 @@ pub use keys::{KeyError, ProjectKey, TicketKey};
 pub use profile::{
     AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules, Permissions,
 };
-pub use project::{MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
+pub use project::{MODEL_ALIASES, MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use review::{
     CheckPhase, ItemBasis, ItemOutcome, ItemVerdict, ItemsError, Review, ReviewNote, ReviewRound,

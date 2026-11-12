@@ -6,6 +6,7 @@ import { planError } from "../store/plan";
 import { type State, ticketsInOrder } from "../store/state";
 import { DesignFirst } from "./DesignFirst";
 import { Field } from "./Field";
+import { ModelPicker } from "./ModelPicker";
 
 /// A new card in a chain. It starts with what the agent should do (several lines; it is the
 /// agent's prompt), then what must hold when it is done (one item per line); the title follows
@@ -18,6 +19,7 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
   const [typed, setTyped] = useState<string | undefined>(undefined);
   const [after, setAfter] = useState("");
   const [designFirst, setDesignFirst] = useState(false);
+  const [model, setModel] = useState("");
   const p = state.plan;
   const refused = planError(p, "card");
   const title = typed ?? titleFromTask(task);
@@ -32,7 +34,7 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
         dispatch({
           type: "createCard",
           chain: chain.chain.id,
-          input: { title: cardTitle(typed, task), prompt: task.trim(), acceptance: acceptanceFrom(acceptance), ...(designFirst ? { design_first: true } : {}), ...place },
+          input: { title: cardTitle(typed, task), prompt: task.trim(), acceptance: acceptanceFrom(acceptance), ...(designFirst ? { design_first: true } : {}), ...(model.trim() ? { model: model.trim() } : {}), ...place },
         });
       }}
     >
@@ -51,6 +53,9 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
           <option value="">The end of the chain</option>
           {ticketsInOrder(chain).map((t) => <option key={t.id} value={t.key}>{t.key} · {t.title}</option>)}
         </select>
+      </Field>
+      <Field label="Model (optional)" name="card-model" error={planError(p, "card", "model")} hint="Leave it to the project's model for routine work; pick a stronger one for a card that needs careful thought.">
+        <ModelPicker value={model} onChange={setModel} testId="card-model" defaultLabel="The project's model" />
       </Field>
       <DesignFirst checked={designFirst} onChange={setDesignFirst} />
       {refused && <p className="error" role="alert" data-testid="card-error">{refused}</p>}

@@ -61,6 +61,8 @@ describe("the project form", () => {
     expect(sectionOfField("work_branch")).toBe("general");
     expect(sectionOfField("max_parallel")).toBe("agents");
     expect(sectionOfField("pr_title")).toBe("review");
-    expect(sectionOfField("planner_model")).toBe("advanced");
+    expect(sectionOfField("planner_model")).toBe("agents");
+    expect(sectionOfField("worker_model")).toBe("agents");
+    expect(sectionOfField("reviewer_model")).toBe("agents");
   });
 });

@@ -167,17 +167,23 @@ try {
   await t("max-parallel").fill("3");
   await t("savebar").waitFor();
   await expectText(t("savebar"), "unsaved changes", "the Save bar appears with the first change");
-  // The one Save bar covers every section: the models are in Advanced.
+  // The models are in Agents, named for a person: the assistant, the card agents, the reviewer.
+  for (const [id, label] of [["planner-model", "Assistant"], ["worker-model", "Card agents"], ["reviewer-model", "Reviewer"]]) {
+    if ((await t(id).inputValue()) !== "") throw new Error(`${id} should be empty (Claude Code's own default)`);
+    await expectText(page.locator("[data-testid=project-models] .field-label").filter({ hasText: label }), label, `the ${id} field is named ${label}`);
+  }
+  await expectText(t("model-note"), "applies to the next agent that starts", "the models say when a change applies");
+  const aliases = await t("worker-model").locator("option").evaluateAll((os) => os.map((o) => o.value));
+  if (!["", "sonnet", "opus", "haiku", "fable"].every((a) => aliases.includes(a))) throw new Error(`the aliases offered: ${aliases}`);
+  const first = await t("worker-model").locator("option").first().textContent();
+  if (first !== "Claude Code's default") throw new Error(`the empty choice is "${first}"`);
+  console.log("PASS the empty choice is Claude Code's default");
+  console.log("PASS the model aliases and Claude Code's default are offered");
+  // Advanced no longer has them.
   await t("settings-nav-advanced").click();
   await expectPath("/projects/DEMO/settings/advanced", "Advanced has its own address");
   await expectText(t("savebar"), "unsaved changes", "the Save bar follows to the other section");
-  for (const id of ["worker-model", "reviewer-model", "planner-model"]) {
-    if ((await t(id).inputValue()) !== "") throw new Error(`${id} should be empty (Claude Code's own default)`);
-  }
-  await expectText(t("model-aliases"), "Leave empty to use your Claude Code default", "the models say what empty means");
-  const aliases = await page.locator("#model-aliases option").evaluateAll((os) => os.map((o) => o.value));
-  if (!["sonnet", "opus", "haiku"].every((a) => aliases.includes(a))) throw new Error(`the aliases offered: ${aliases}`);
-  console.log("PASS the documented model aliases are offered");
+  await absent(t("worker-model"), "Advanced does not hold the models any more");
   await absent(page.getByText("Release branch"), "Advanced shows the release branch only when it differs from the main branch");
   // Where things live and the danger zone are folded.
   for (const id of ["places", "danger-zone"]) {
@@ -187,13 +193,14 @@ try {
   await t("places").locator("summary").click();
   await expectText(t("place-home"), "toknila-settings-", "Where things live says where the data lives");
   await expectText(t("place-ships"), "ships", "and where the workspaces are");
-  await t("worker-model").fill("sonnet");
-  await t("planner-model").fill("not a model");
+  await t("settings-nav-agents").click();
+  await t("worker-model").selectOption("sonnet");
+  await t("planner-model").selectOption("__another__");
+  await t("planner-model-custom").fill("not a model");
   await t("save-settings").click();
   await expectText(t("error-planner_model"), "one word", "a model with spaces is refused at its field");
   await expectText(t("savebar-error"), "one word", "and the Save bar says so");
-  await t("planner-model").fill("opus");
-  await t("settings-nav-agents").click();
+  await t("planner-model").selectOption("opus");
   await t("check-command").fill("cargo test");
   await t("save-settings").click();
   await expectText(t("saved"), "Saved", "settings saved");
@@ -270,7 +277,6 @@ try {
   const check = await t("check-command").inputValue();
   if (check !== "cargo xtask verify") throw new Error(`after the restart: test command ${check}`);
   console.log("PASS limit 3 and the test command survive a daemon restart");
-  await page.goto(at("/projects/DEMO/settings/advanced"));
   await t("worker-model").waitFor({ timeout: 20_000 });
   const models = [await t("worker-model").inputValue(), await t("reviewer-model").inputValue(), await t("planner-model").inputValue()];
   if (models.join("|") !== "sonnet||opus") throw new Error(`after the restart: models ${models}`);

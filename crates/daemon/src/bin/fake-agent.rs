@@ -180,6 +180,10 @@ fn main() {
                 "/tickets/{ticket}/activity",
                 r#"{"signal":"hook:stop"}"#,
             )),
+            "argv" => say(&format!(
+                "argv={}",
+                std::env::args().skip(1).collect::<Vec<_>>().join(" ")
+            )),
             "pid" => say(&format!("pid={}", std::process::id())),
             "flagfile" => {
                 let flag = args.next().unwrap_or_default();

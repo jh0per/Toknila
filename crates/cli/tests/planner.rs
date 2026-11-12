@@ -676,3 +676,77 @@ fn show_design_gives_the_picture_of_a_design_added_after_the_planner_started() {
     assert_eq!(by_id(3)["result"]["isError"], true, "{}", by_id(3));
     tok.run(&["planner", "stop", "DEMO"]);
 }
+
+#[test]
+fn a_card_takes_the_model_the_assistant_names_and_a_key_no_tool_takes_is_refused() {
+    let (_dir, tok, _) = setup(&["env", "TOKNILA_RUN_TOKEN", "hold"]);
+    tok.run(&["planner", "start", "DEMO", "--profile", "fake-planner"]);
+    wait_for(&tok, "the token line", || {
+        planner_logs(&tok).contains("TOKNILA_RUN_TOKEN=")
+    });
+    let token = planner_logs(&tok)
+        .lines()
+        .find_map(|l| {
+            l.trim()
+                .strip_prefix("TOKNILA_RUN_TOKEN=")
+                .map(str::to_owned)
+        })
+        .expect("token");
+    let info = tok.info();
+    let answers = mcp_session(
+        &info.base_url(),
+        &token,
+        &[("TOKNILA_ROLE", "planner")],
+        &[
+            call(1, "new_chain", json!({ "name": "m" })),
+            call(
+                2,
+                "add_card",
+                json!({ "chain": "m", "title": "Deep", "model": "fable" }),
+            ),
+            call(
+                3,
+                "add_card",
+                json!({ "chain": "m", "title": "Wrong", "model": "gpt" }),
+            ),
+            call(
+                4,
+                "add_card",
+                json!({ "chain": "m", "title": "Typo", "modle": "opus" }),
+            ),
+            call(5, "show_plan", json!({ "card": "DEMO-1" })),
+            call(6, "show_plan", json!({})),
+            call(7, "edit_card", json!({ "card": "DEMO-1", "model": "gpt" })),
+            call(8, "show_plan", json!({ "chain": "nope", "extra": 1 })),
+            call(9, "suggest", json!({ "text": "x", "colour": "red" })),
+        ],
+    );
+    let by_id = |id: u64| answers.iter().find(|a| a["id"] == id).expect("answer");
+    assert_eq!(by_id(2)["result"]["isError"], false, "{}", by_id(2));
+    let one: Value = serde_json::from_str(&text_of(by_id(5))).expect("the card is JSON");
+    assert_eq!(one["ticket"]["model"], "fable", "{one}");
+    let plan: Value = serde_json::from_str(&text_of(by_id(6))).expect("the plan is JSON");
+    let cards = &plan["chains"]
+        .as_array()
+        .and_then(|c| c.iter().find(|c| c["name"] == "m"))
+        .expect("the chain")["cards"];
+    assert_eq!(
+        cards.as_array().map(Vec::len),
+        Some(1),
+        "gpt added nothing: {plan}"
+    );
+    assert_eq!(cards[0]["model"], "fable", "{plan}");
+    for id in [3, 7] {
+        assert_eq!(by_id(id)["result"]["isError"], true, "{}", by_id(id));
+        assert!(
+            text_of(by_id(id)).contains("sonnet, opus, haiku, fable"),
+            "{}",
+            text_of(by_id(id))
+        );
+    }
+    for (id, key) in [(4, "modle"), (8, "extra"), (9, "colour")] {
+        assert_eq!(by_id(id)["result"]["isError"], true, "{}", by_id(id));
+        assert!(text_of(by_id(id)).contains(key), "{}", text_of(by_id(id)));
+    }
+    tok.run(&["planner", "stop", "DEMO"]);
+}
