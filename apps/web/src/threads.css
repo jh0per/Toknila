@@ -1,27 +1,31 @@
-/* Threads tab: same tokens as the rest of the window (tokens.css). */
-.phase-row { display: flex; gap: var(--s2); align-items: center; margin-bottom: var(--s2); }
-.phase { font-family: var(--mono); font-size: var(--fs-s); color: var(--muted); }
-.phase .on { color: var(--accent); font-weight: 600; }
-.note { color: var(--muted); font-size: var(--fs-s); margin: 0 0 var(--s2); }
-.thr { border: 1px solid var(--line); border-radius: var(--r-m); margin-bottom: var(--s3); }
-.thr > header { display: flex; gap: var(--s2); align-items: center; padding: 7px 10px; background: var(--surface2); border-radius: var(--r-m) var(--r-m) 0 0; flex-wrap: wrap; }
-.thr > header b { font-weight: 600; }
+/* Threads tab: same tokens as the rest of the window (tokens.css). A thread is an outlined card
+   with a tonal header; its state is a tonal chip by role. */
+.phase-row { display: flex; gap: var(--sp2); align-items: center; margin-bottom: var(--sp2); }
+.phase { font-family: var(--mono); font-size: var(--fs-body-m); color: var(--on-surface-variant); }
+.phase .on { color: var(--primary); font-weight: var(--fw-semibold); }
+.note { color: var(--on-surface-variant); font-size: var(--fs-body-m); margin: 0 0 var(--sp2); }
+.thr { border: 1px solid var(--outline-variant); border-radius: var(--shape-m); margin-bottom: var(--sp4); background: var(--surface-container); overflow: hidden; }
+.thr > header { display: flex; gap: var(--sp2); align-items: center; padding: var(--sp2) var(--sp3); background: var(--surface-container-high); flex-wrap: wrap; }
+.thr > header b { font-weight: var(--fw-semibold); }
 .thr .grow { flex: 1; }
-.kind { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; }
-.tag { font-size: 11px; border-radius: 9px; padding: 0 8px; font-weight: 500; }
-.tag.open { background: var(--block-soft); color: var(--block); }
-.tag.ok { background: var(--done-soft); color: var(--done); }
-.tag.chg { background: var(--todo-soft); color: var(--danger); }
-.tag.muted { background: var(--surface2); color: var(--muted, var(--fg)); }
+.kind { font-family: var(--mono); font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--status-todo); background: var(--status-todo-container); border-radius: var(--shape-full); padding: 0 var(--sp2); }
+.tag { font-size: var(--fs-label-m); line-height: var(--lh-label-m); border-radius: var(--shape-full); padding: 0 var(--sp2); font-weight: var(--fw-medium); }
+.tag.open { background: var(--status-block-container); color: var(--status-block); }
+.tag.ok { background: var(--status-done-container); color: var(--status-done); }
+.tag.chg { background: var(--error-container); color: var(--error); }
+.tag.muted { background: var(--surface-container-high); color: var(--on-surface-variant); }
 .thr.draft { opacity: 0.7; border-style: dashed; }
-.art { padding: var(--s3); overflow-x: auto; }
-.art-html { width: 100%; height: 360px; border: 1px solid var(--line); border-radius: var(--r-s); background: #fff; }
+.art { padding: var(--sp3); overflow-x: auto; }
+.art-html { width: 100%; height: 360px; border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); background: var(--paper); }
 .art-text { white-space: pre-wrap; margin: 0; }
 .art-mermaid svg { max-width: 100%; height: auto; }
-.versions { display: flex; gap: var(--s1); align-items: center; padding: 0 var(--s3) var(--s2); }
-.messages { list-style: none; margin: 0; padding: 0 var(--s3); }
-.msg { display: flex; gap: var(--s2); padding: var(--s1) 0; border-top: 1px solid var(--line); }
-.msg .who { font-family: var(--mono); font-size: var(--fs-s); color: var(--muted); min-width: 48px; }
+.versions { display: flex; gap: var(--sp1); align-items: center; padding: 0 var(--sp3) var(--sp2); }
+/* The conversation: the person's words on the right in a primary container, the agent's on the left. */
+.messages { list-style: none; margin: 0; padding: var(--sp2) var(--sp3); display: flex; flex-direction: column; gap: var(--sp2); }
+.msg { display: flex; flex-wrap: wrap; gap: var(--sp1) var(--sp2); align-items: baseline; align-self: flex-start; max-width: 85%; padding: var(--sp2) var(--sp3); border-radius: var(--shape-m) var(--shape-m) var(--shape-m) var(--shape-xs); background: var(--surface-container-high); font-size: var(--fs-body-l); line-height: var(--lh-body-l); }
+.msg.human { align-self: flex-end; border-radius: var(--shape-m) var(--shape-m) var(--shape-xs) var(--shape-m); background: var(--primary-container); color: var(--on-primary-container); }
+.msg .who { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); min-width: var(--sp8); }
 .msg .text { white-space: pre-wrap; overflow-wrap: anywhere; }
-.thr footer { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: flex-start; padding: var(--s2) 10px; border-top: 1px solid var(--line); }
-.thr footer textarea { flex: 1 1 100%; font: inherit; min-height: 48px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: var(--r-s); padding: var(--s1) var(--s2); }
+.thr footer { display: flex; gap: var(--sp2); flex-wrap: wrap; align-items: flex-start; padding: var(--sp2) var(--sp3) var(--sp3); border-top: 1px solid var(--outline-variant); }
+.thr footer textarea { flex: 1 1 100%; font: inherit; font-size: var(--fs-body-l); line-height: var(--lh-body-l); min-height: calc(var(--field-h) * 2); color: var(--on-surface); background: var(--surface-container); border: 1px solid var(--outline); border-radius: var(--shape-xs); padding: var(--sp2) var(--sp3); resize: vertical; }
+.thr footer textarea:focus { outline: none; border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }

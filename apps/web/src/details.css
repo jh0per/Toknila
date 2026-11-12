@@ -1,34 +1,33 @@
 /* A card's Details: the status sentence first, the report in review, the folded technical details. */
-.status-block { display: flex; flex-direction: column; gap: var(--s1); margin: 0 0 var(--s3); padding: var(--s2) var(--s3); border-left: 3px solid var(--todo); background: var(--surface2); border-radius: 0 var(--r-m) var(--r-m) 0; }
-.status-block.tone-needs { border-left-color: var(--block); background: var(--block-soft); }
-.status-block.tone-going { border-left-color: var(--prog); background: var(--prog-soft); }
-.status-block.tone-done { border-left-color: var(--done); background: var(--done-soft); }
-.status-sentence { margin: 0; font-weight: 600; font-size: var(--fs-l); max-width: none; }
+.status-block { display: flex; flex-direction: column; gap: var(--sp1); padding: var(--sp2) var(--sp3); border-left: 4px solid var(--status-todo); background: var(--surface-container-high); border-radius: 0 var(--shape-m) var(--shape-m) 0; }
+.status-block.tone-needs { border-left-color: var(--status-block); background: var(--status-block-container); }
+.status-block.tone-going { border-left-color: var(--status-prog); background: var(--status-prog-container); }
+.status-block.tone-done { border-left-color: var(--status-done); background: var(--status-done-container); }
+.status-sentence { margin: 0; font-weight: var(--fw-semibold); font-size: var(--fs-title-l); line-height: var(--lh-title-l); max-width: none; }
 .status-next { margin: 0; }
-.status-block .answer { margin-top: var(--s2); }
-.status-block > .btn { align-self: flex-start; margin-top: var(--s1); }
-.review-block { display: flex; flex-direction: column; gap: var(--s2); margin: 0 0 var(--s3); padding: var(--s3); border: 1px solid var(--line); border-radius: var(--r-m); }
+.status-block .answer { margin-top: var(--sp2); }
+.status-block > .btn { align-self: flex-start; margin-top: var(--sp1); }
+.review-block { display: flex; flex-direction: column; gap: var(--sp2); padding: var(--sp3); border: 1px solid var(--outline-variant); border-radius: var(--shape-m); }
 .review-block h4 { margin: 0; }
-.report { display: flex; flex-direction: column; gap: var(--s1); }
+.report { display: flex; flex-direction: column; gap: var(--sp1); }
 .report p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.report-gist { font-weight: 600; }
-.hand-in h5 { margin: 0 0 var(--s1); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted, inherit); }
-.hand-in .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); overflow-wrap: anywhere; }
-.hand-in .status { font-weight: 600; font-family: var(--mono, monospace); font-size: 0.8125rem; }
-.hand-in li[data-status="FAIL"] .status, .hand-in li[data-status="BLOCKED"] .status { color: var(--danger, inherit); }
-.review-block .actions { padding-top: var(--s1); }
-.technical { margin-top: var(--s3); }
+.report-gist { font-weight: var(--fw-semibold); }
+.hand-in h5 { margin: 0 0 var(--sp1); font-size: var(--fs-title-m); line-height: var(--lh-title-m); font-weight: var(--fw-semibold); color: var(--on-surface); }
+.hand-in .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp1); overflow-wrap: anywhere; }
+.hand-in .status { font-weight: var(--fw-semibold); font-family: var(--mono); font-size: var(--fs-body-m); }
+.hand-in li[data-status="FAIL"] .status, .hand-in li[data-status="BLOCKED"] .status { color: var(--error); }
+.review-block .actions { padding-top: var(--sp1); }
 .technical dl { margin: 0; }
 .details .facts code { overflow-wrap: anywhere; }
 
 /* Talk to the assistant: the discussion on a card, with the assistant's proposed edit as a diff. */
-.discuss { display: flex; flex-direction: column; gap: var(--s2); margin: 0 0 var(--s3); padding: var(--s3); border: 1px solid var(--line); border-radius: var(--r-m); }
+.discuss { display: flex; flex-direction: column; gap: var(--sp2); padding: var(--sp3); border: 1px solid var(--outline-variant); border-radius: var(--shape-m); }
 .discuss h4 { margin: 0; }
 .discuss .bubble.proposal { max-width: 100%; align-self: stretch; }
-.discuss .row { display: flex; gap: var(--s2); }
-.diff { display: flex; flex-direction: column; gap: var(--s2); }
-.diff h5 { margin: 0 0 var(--s1); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
-.diff-lines { margin: 0; padding: var(--s1) 0; font-family: var(--mono, monospace); font-size: 0.8125rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-.diff-line { display: block; padding: 0 var(--s2); }
-.diff-line.add { background: color-mix(in srgb, var(--done) 18%, transparent); }
-.diff-line.del { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+.discuss .row { display: flex; gap: var(--sp2); }
+.diff { display: flex; flex-direction: column; gap: var(--sp2); }
+.diff h5 { margin: 0 0 var(--sp1); font-size: var(--fs-title-m); line-height: var(--lh-title-m); font-weight: var(--fw-semibold); }
+.diff-lines { margin: 0; padding: var(--sp1) 0; font-family: var(--mono); font-size: var(--fs-body-m); white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-line { display: block; padding: 0 var(--sp2); }
+.diff-line.add { background: color-mix(in srgb, var(--status-done) 18%, transparent); }
+.diff-line.del { background: color-mix(in srgb, var(--error) 18%, transparent); }
