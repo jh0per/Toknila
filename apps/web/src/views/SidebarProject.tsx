@@ -7,7 +7,11 @@ import { agentsOf, projectOpen, readProjectOpen, storeProjectOpen, waitingIn } f
 import { NavLink } from "./Link";
 import { SidebarChains } from "./SidebarChains";
 import { AgentsNode, InboxNode } from "./SidebarNodes";
+import { type IconName, NavIcon } from "./NavIcon";
 import { Chev, indent } from "./TreeRow";
+
+/// The letters in a project's badge: the first two of its key.
+const initials = (p: Project) => p.key.slice(0, 2).toUpperCase();
 
 /// What the Assistant row says it is: one assistant, at the roadmap and inside an epic.
 export const ASSISTANT_HINT = "plans epics on the roadmap, cards inside an epic";
@@ -44,11 +48,12 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
   const selected = onScreen && chainRoute ? currentChain(state)?.chain.id : undefined;
   const running = agentsOf(state, project).runs.length;
   const waiting = waitingIn(state, project);
-  const leaf = (label: string, to: Route, sel: boolean, extra?: ReactNode, testId?: string, hint?: string, also?: Intent) => (
+  const leaf = (label: string, icon: IconName, to: Route, sel: boolean, extra?: ReactNode, testId?: string, hint?: string, also?: Intent) => (
     <li role="treeitem" aria-selected={sel} data-testid={testId?.replace("-link", "-entry")}>
       <div className="row" style={indent(1)}>
         <Chev />
         <NavLink route={to} dispatch={dispatch} row className={`item${sel ? " sel" : ""}`} testId={testId} title={hint} also={also}>
+          <NavIcon name={icon} />
           <span className="t">{label}</span>
           {extra}
         </NavLink>
@@ -67,6 +72,7 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
           <Chev open={open} />
         </button>
         <NavLink route={{ name: "project", project: key }} dispatch={dispatch} row title={project.name} className={`item${onScreen ? " cur" : ""}`}>
+          <span className="pbadge" aria-hidden="true" data-testid="project-badge" data-initials={initials(project)} />
           <span className="t">{project.name}</span>
           {!open && running > 0 && <span className="dot pulse" role="img" aria-label="An agent is running" title="An agent is running" />}
           {!open && waiting > 0 && <span className="badge" title={`${waiting} waiting for you`} data-testid="project-waiting">{waiting}</span>}
@@ -82,14 +88,15 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
       </div>
       {open && (
         <ul role="group">
-          {leaf("Roadmap", { name: "project", project: key }, onScreen && route.name === "project", undefined, "roadmap-link")}
-          {leaf("Assistant", { name: "project", project: key }, onScreen && route.name === "planner", <span className="n" aria-hidden="true">✦</span>, "planner-link", ASSISTANT_HINT, { type: "openAssistant" })}
+          {leaf("Roadmap", "roadmap", { name: "project", project: key }, onScreen && route.name === "project", undefined, "roadmap-link")}
+          {leaf("Assistant", "assistant", { name: "project", project: key }, onScreen && route.name === "planner", <span className="n" aria-hidden="true">✦</span>, "planner-link", ASSISTANT_HINT, { type: "openAssistant" })}
           <InboxNode project={project} state={state} dispatch={dispatch} onScreen={onScreen} />
           <AgentsNode project={project} state={state} dispatch={dispatch} onScreen={onScreen} />
           <li role="treeitem" aria-expanded={chainsOpen} data-testid="chains" data-project-chains={key}>
             <div className="row" style={indent(1)}>
               <Chev open={chainsOpen} />
               <button type="button" className="item group-toggle" data-row data-toggle onClick={() => setChainsOpen(!chainsOpen)}>
+                <NavIcon name="chains" />
                 <span className="t">Epics</span>
               </button>
               <span className="h-btns">
@@ -113,8 +120,8 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
               </ul>
             )}
           </li>
-          {leaf("Designs", { name: "settings", project: key, section: "designs" }, false)}
-          {leaf("Settings", { name: "settings", project: key }, false)}
+          {leaf("Designs", "designs", { name: "settings", project: key, section: "designs" }, false)}
+          {leaf("Settings", "settings", { name: "settings", project: key }, false)}
         </ul>
       )}
     </li>

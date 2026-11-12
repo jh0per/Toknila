@@ -134,6 +134,36 @@ async fn a_tampered_row_still_drifts_behind_snapshotless_events() {
 }
 
 #[tokio::test]
+async fn a_running_card_with_no_run_record_is_lost_on_a_real_project() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("t.db")).expect("store");
+    let app = router(AppState::for_test(store.clone(), "t", dir.path()));
+    post(
+        &app,
+        "/v1/projects",
+        json!({ "key": "REAL", "default_profile": "claude-code" }),
+    )
+    .await;
+    // The card names `sim` itself, as a chain file may: it starts no process and leaves no run.
+    let toml = "[chain]\nname = \"c\"\ngoal = \"g\"\n[[ticket]]\nid = \"A\"\ntitle = \"A\"\nprofile = \"sim\"\n";
+    post(&app, "/v1/projects/REAL/import", json!({ "toml": toml })).await;
+    store.settled().await;
+    let status = || {
+        let raw = rusqlite::Connection::open(dir.path().join("t.db")).expect("raw");
+        raw.query_row("SELECT status FROM tickets WHERE key = 'REAL-1'", [], |r| {
+            r.get::<_, String>(0)
+        })
+        .expect("status")
+    };
+    // Control: the card is Running, and the journal holds no run of it.
+    assert_eq!(status(), "running");
+    let r = recover(&store).await.expect("recover");
+    assert_eq!(r.lost, ["REAL-1"]);
+    assert_eq!(r.running, 0);
+    assert_eq!(status(), "blocked");
+}
+
+#[tokio::test]
 async fn a_release_whose_last_event_carries_no_snapshot_has_no_drift() {
     let (dir, store) = seeded().await;
     let id = one_id(&dir, "SELECT id FROM releases LIMIT 1");

@@ -264,17 +264,43 @@ mod tests {
     /// A daemon that answers completely and closes at once (a reset, as the unread request is
     /// still in its buffer) must not turn the finished answer into `os error 22`, nor an error
     /// answer into a bare "HTTP 400".
+    ///
+    /// macOS only: the `os error 22` of the pool handoff is macOS's answer to a reset socket.
+    /// Linux and Windows read the answer whole on the first connection and never open the second
+    /// one, so the fake server's `join` would wait forever there (it hung CI for the whole job).
+    /// On macOS the reset races the handoff too: when it comes late the answer is read whole and
+    /// nothing is repeated, so the test asserts what holds either way (a GET never fails with
+    /// the reset, a POST is sent once) and never that the reset was seen.
+    #[cfg(target_os = "macos")]
     #[test]
     fn an_answer_the_daemon_closed_right_after_is_read_whole() {
-        // The first connection is answered and reset (the request stays unread); the next ones
-        // are answered after their request was read. Returns the connections it accepted.
-        fn serve(connections: usize) -> (String, std::thread::JoinHandle<()>) {
+        // Accepts up to `connections`: the first is answered and reset (the request stays
+        // unread), the next ones after their request was read. A connection that does not come
+        // within two seconds ends the server, so a missing or a wrong retry fails an assertion
+        // instead of hanging. Returns how many connections it accepted.
+        fn serve(connections: usize) -> (String, std::thread::JoinHandle<usize>) {
             use std::io::{Read, Write};
             let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+            listener.set_nonblocking(true).expect("nonblocking");
             let base = format!("http://{}", listener.local_addr().expect("addr"));
             let server = std::thread::spawn(move || {
+                let mut accepted = 0;
                 for n in 0..connections {
-                    let (mut s, _) = listener.accept().expect("accept");
+                    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+                    let mut s = loop {
+                        match listener.accept() {
+                            Ok((s, _)) => break s,
+                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                if std::time::Instant::now() > deadline {
+                                    return accepted;
+                                }
+                                std::thread::sleep(Duration::from_millis(10));
+                            }
+                            Err(e) => panic!("accept: {e}"),
+                        }
+                    };
+                    accepted += 1;
+                    s.set_nonblocking(false).expect("blocking");
                     if n > 0 {
                         // The whole request (headers and body may arrive apart), so that the
                         // close is a plain FIN and not a reset.
@@ -286,32 +312,35 @@ mod tests {
                     let reply = "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n[]";
                     s.write_all(reply.as_bytes()).expect("write");
                 }
+                accepted
             });
             (base, server)
         }
 
-        // A GET whose connection was lost is repeated once on a new connection.
+        // A GET whose connection was lost is repeated once on a new connection: the answer is
+        // the list, never the reset.
         let (base, server) = serve(2);
         let got = Client::new(base, "t0k").projects();
-        server.join().expect("server");
-        assert!(got.expect("repeated").is_empty());
+        let accepted = server.join().expect("server");
+        assert!(got.expect("the list, repeated if lost").is_empty());
+        assert!((1..=2).contains(&accepted), "{accepted} connections");
 
         // A route that is harmless to repeat is too (its answer here is not a planner state, so
-        // it is a decode error, but it came from the second connection, not from `os error 22`).
+        // it is a decode error, but never `os error 22`).
         let (base, server) = serve(2);
         let got = Client::new(base, "t0k").stop_planner("DEMO");
         server.join().expect("server");
         let text = format!("{got:?}");
         assert!(!text.contains("os error 22"), "{text}");
 
-        // A POST is sent once: its failure is shown, and no second connection was opened (the
-        // server would otherwise wait for it, and `join` would never return).
-        let (base, server) = serve(1);
+        // A POST is sent once: its failure (the reset, or the answer that is no planner state)
+        // is shown, and no second connection is opened.
+        let (base, server) = serve(2);
         let err = Client::new(base, "t0k")
             .start_planner("DEMO", None)
-            .expect_err("a POST is never repeated");
-        server.join().expect("server");
-        assert!(err.to_string().contains("os error 22"), "{err}");
+            .expect_err("no planner state in `[]`");
+        let accepted = server.join().expect("server");
+        assert_eq!(accepted, 1, "a POST is never repeated: {err}");
     }
 
     #[test]

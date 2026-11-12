@@ -73,6 +73,38 @@ jobs:
       - name: cargo xtask dist
         run: cargo xtask dist ${{ matrix.target }}
 
+      # One signing identity for every Mac build, so macOS keeps the privacy permissions the
+      # owner granted across updates. With the three secrets the certificate goes into a
+      # temporary keychain and Tauri signs with it (APPLE_SIGNING_IDENTITY); without them the
+      # app is signed ad hoc and the step says so. See docs/install.md, "Signing the Mac app".
+      - name: Import the signing certificate
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_SIGNING_IDENTITY" ]; then
+            echo "No signing secrets (APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY): the app will be signed ad hoc."
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/toknila-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo "SIGNING_GIVEN=true" >> "$GITHUB_ENV"
+          # Set for the later steps only when given: Tauri reads it, an empty value would not be "unset".
+          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          echo "Imported the signing certificate into a temporary keychain."
+
       # The Mac app and its update archive. The archive is signed with the updater key on a
       # release only; on main there is no key in the build and the step says it skipped signing.
       - name: cargo xtask app
@@ -81,6 +113,31 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ env.RELEASE == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.RELEASE == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+
+      # Proves the signature. Fails when a signing secret was given and the app is still ad hoc.
+      - name: Check the app signature
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          app=$(find target apps/desktop/src-tauri/target -type d -name 'Toknila.app' -path '*bundle/macos*' 2>/dev/null | head -n 1)
+          test -n "$app" || { echo "Toknila.app not found"; exit 1; }
+          info=$(codesign -dv --verbose=2 "$app" 2>&1)
+          echo "$info"
+          if echo "$info" | grep -q '^Signature=adhoc'; then
+            if [ "$SIGNING_GIVEN" = "true" ]; then
+              echo "::error::A signing certificate was given but the app is signed ad hoc"
+              exit 1
+            fi
+            echo "The app is signed ad hoc (no signing secrets): macOS will treat every build as a new app."
+          else
+            echo "Signed with: $(echo "$info" | grep '^Authority=' | head -n 1)"
+          fi
+
+      - name: Remove the signing keychain
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -n "$KEYCHAIN" ]; then security delete-keychain "$KEYCHAIN" || true; fi
 
       - uses: actions/upload-artifact@v4
         with:
