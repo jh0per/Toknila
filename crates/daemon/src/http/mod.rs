@@ -60,6 +60,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(cli_status))
         .routes(routes!(cli_install))
         .routes(routes!(repos_check))
+        .routes(routes!(repos_prepare))
         .routes(routes!(list_agents))
         .routes(routes!(get_usage))
         .routes(routes!(put_usage_settings))

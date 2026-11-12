@@ -3774,6 +3774,45 @@
         }
       }
     },
+    "/repos/prepare": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Does the one fix the folder's check offers (make the folder, `git init`, the first commit)\nand answers the folder's new check. A fix the check does not offer is refused, nothing touched.",
+        "operationId": "repos_prepare",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoPrepareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoCheck"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/system/checks": {
       "get": {
         "tags": [
@@ -10662,6 +10701,32 @@
           "work_branch"
         ]
       },
+      "RepoFix": {
+        "type": "string",
+        "description": "How a problem can be fixed by the daemon (`POST /v1/repos/prepare`).",
+        "enum": [
+          "create_folder",
+          "init_repository",
+          "first_commit"
+        ]
+      },
+      "RepoPrepareRequest": {
+        "type": "object",
+        "description": "`POST /v1/repos/prepare`: the one fix to make to a folder (one its check offers).",
+        "required": [
+          "repo_path",
+          "fix"
+        ],
+        "properties": {
+          "fix": {
+            "$ref": "#/components/schemas/RepoFix"
+          },
+          "repo_path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "RepoProblem": {
         "type": "object",
         "description": "One thing that stops the folder from being used.",
@@ -10676,6 +10741,17 @@
           },
           "field": {
             "$ref": "#/components/schemas/RepoField"
+          },
+          "fix": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RepoFix",
+                "description": "What the daemon can do about it; `null` when only the person can."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "message": {
             "type": "string"
@@ -10692,7 +10768,8 @@
           "not_a_directory",
           "not_a_git_repo",
           "git_missing",
-          "branch_missing"
+          "branch_missing",
+          "no_commits"
         ]
       },
       "Review": {

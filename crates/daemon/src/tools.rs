@@ -233,7 +233,10 @@ pub fn system_checks_for(tools: &dyn Tools, commands: &[String], home: &Path) ->
     SystemChecks::new(checks)
 }
 
+mod prepare;
 mod traits;
+
+pub use prepare::{PrepareError, prepare_repo};
 
 #[cfg(test)]
 mod tests;
