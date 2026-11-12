@@ -264,17 +264,37 @@ mod tests {
     /// A daemon that answers completely and closes at once (a reset, as the unread request is
     /// still in its buffer) must not turn the finished answer into `os error 22`, nor an error
     /// answer into a bare "HTTP 400".
+    ///
+    /// macOS only: the `os error 22` of the pool handoff is macOS's answer to a reset socket.
+    /// Linux and Windows read the answer whole on the first connection and never open the second
+    /// one, so the fake server's `join` would wait forever there (it hung CI for the whole job).
+    #[cfg(target_os = "macos")]
     #[test]
     fn an_answer_the_daemon_closed_right_after_is_read_whole() {
         // The first connection is answered and reset (the request stays unread); the next ones
-        // are answered after their request was read. Returns the connections it accepted.
+        // are answered after their request was read. A connection that does not come within a
+        // few seconds ends the server, so a missing retry fails an assertion instead of hanging.
         fn serve(connections: usize) -> (String, std::thread::JoinHandle<()>) {
             use std::io::{Read, Write};
             let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+            listener.set_nonblocking(true).expect("nonblocking");
             let base = format!("http://{}", listener.local_addr().expect("addr"));
             let server = std::thread::spawn(move || {
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
                 for n in 0..connections {
-                    let (mut s, _) = listener.accept().expect("accept");
+                    let mut s = loop {
+                        match listener.accept() {
+                            Ok((s, _)) => break s,
+                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                if std::time::Instant::now() > deadline {
+                                    return;
+                                }
+                                std::thread::sleep(Duration::from_millis(10));
+                            }
+                            Err(e) => panic!("accept: {e}"),
+                        }
+                    };
+                    s.set_nonblocking(false).expect("blocking");
                     if n > 0 {
                         // The whole request (headers and body may arrive apart), so that the
                         // close is a plain FIN and not a reset.
