@@ -4,6 +4,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use toknila_core::graph::ChainView;
+use toknila_core::schedule::LiveRun;
 use toknila_core::wire::wire_name;
 use toknila_core::{AgentRole, ChainId, Edge, NodeRef, Release, ReleaseId, TicketId, Timestamp};
 
@@ -66,7 +67,7 @@ fn node_from(kind: &str, id: &str) -> Result<NodeRef, StoreError> {
 pub struct Repo<'c> {
     pub(crate) conn: &'c Connection,
     /// The runner processes alive when this repository was opened (see `Reader::live_runners`).
-    live: Vec<(TicketId, AgentRole)>,
+    live: Vec<LiveRun>,
 }
 
 const RELEASE_COLS: &str =
@@ -74,12 +75,17 @@ const RELEASE_COLS: &str =
 
 impl<'c> Repo<'c> {
     /// A repository that knows which runners are alive.
-    pub(crate) fn with_live(conn: &'c Connection, live: Vec<(TicketId, AgentRole)>) -> Self {
+    pub(crate) fn with_live(conn: &'c Connection, live: Vec<LiveRun>) -> Self {
         Self { conn, live }
     }
 
     /// The runner processes that were alive when this repository was opened.
     pub fn live_runners(&self) -> Result<Vec<(TicketId, AgentRole)>, StoreError> {
+        Ok(self.live.iter().map(|(t, r, _)| (*t, *r)).collect())
+    }
+
+    /// [`Repo::live_runners`] with the time each process started.
+    pub fn live_runs(&self) -> Result<Vec<LiveRun>, StoreError> {
         Ok(self.live.clone())
     }
 

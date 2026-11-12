@@ -14,9 +14,9 @@ use crate::server::AppState;
 /// them.
 pub async fn list_agents(State(state): State<AppState>) -> ApiResult<Json<Vec<ProjectAgents>>> {
     let agents = read(&state, |repo| {
-        Ok(schedule::plans(repo)?
-            .iter()
-            .map(|(project, plan)| ProjectAgents::new(project, plan))
+        Ok(schedule::agents(repo)?
+            .into_iter()
+            .map(|(project, plan, runs)| ProjectAgents::new(&project, &plan, runs))
             .collect())
     })
     .await?;

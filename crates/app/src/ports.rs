@@ -64,6 +64,15 @@ pub trait Reader {
     fn live_runners(&self) -> AppResult<Vec<(TicketId, AgentRole)>> {
         Ok(Vec::new())
     }
+    /// [`Reader::live_runners`] with the time each process started. A host that does not know
+    /// the times reports the epoch.
+    fn live_runs(&self) -> AppResult<Vec<toknila_core::schedule::LiveRun>> {
+        Ok(self
+            .live_runners()?
+            .into_iter()
+            .map(|(t, r)| (t, r, toknila_core::Timestamp(0)))
+            .collect())
+    }
     /// Payload of the newest journal event about one entity.
     fn last_event_payload(&self, entity: &str, entity_id: &str) -> AppResult<Option<Value>>;
 }

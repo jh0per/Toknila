@@ -179,8 +179,8 @@ describe("stream events", () => {
 
 describe("agent slots", () => {
   const agents = [
-    { project: "p1", limit: 2, used: 2, queued: [{ ticket: "t2", position: 1 }, { ticket: "t3", position: 2 }] },
-    { project: "p2", limit: 4, used: 0, queued: [] },
+    { project: "p1", limit: 2, used: 2, queued: [{ ticket: "t2", position: 1 }, { ticket: "t3", position: 2 }], runs: [] },
+    { project: "p2", limit: 4, used: 0, queued: [], runs: [] },
   ];
 
   it("show the slots of the project in focus and the place of each waiting card", () => {

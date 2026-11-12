@@ -354,11 +354,11 @@ impl Runner for Runners {
     }
 
     fn live_runners(&self) -> Vec<(TicketId, AgentRole)> {
-        self.active()
-            .iter()
-            .filter(|(_, a)| !a.is_over())
-            .map(|(key, _)| *key)
-            .collect()
+        active::live_pairs(&self.active())
+    }
+
+    fn live_runs(&self) -> Vec<toknila_core::schedule::LiveRun> {
+        active::live_runs(&self.active())
     }
 
     fn stop_role(&self, ticket: TicketId, role: AgentRole) {

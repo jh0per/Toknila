@@ -58,7 +58,7 @@ impl Store {
         F: FnOnce(&mut WriteTx<'_>) -> Result<T, E> + Send + 'static,
     {
         let events = self.events.clone();
-        let live = self.runner.live_runners();
+        let live = self.runner.live_runs();
         let line = self.line.clone();
         let store = self.clone();
         let runtime = tokio::runtime::Handle::current();

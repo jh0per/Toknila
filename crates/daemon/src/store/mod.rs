@@ -35,7 +35,7 @@ use toknila_app::external::ExternalEffect;
 use toknila_app::runner::{NoRunner, Runner};
 use toknila_app::{Merger, Shipyard};
 use toknila_core::events::DomainEvent;
-use toknila_core::{Actor, AgentRole, TicketId, Timestamp};
+use toknila_core::{Actor, Timestamp};
 
 pub use codec::Repo;
 pub use error::StoreError;
@@ -50,7 +50,7 @@ pub struct WriteTx<'c> {
     events: Vec<EventRecord>,
     deferred: Vec<ExternalEffect>,
     /// The runner processes alive when the command began.
-    live: Vec<(TicketId, AgentRole)>,
+    live: Vec<toknila_core::schedule::LiveRun>,
 }
 
 /// Where a command's ships are made; shared by every command of the store.
@@ -250,7 +250,7 @@ impl Store {
         T: Send + 'static,
         F: FnOnce(&Repo<'_>) -> Result<T, StoreError> + Send + 'static,
     {
-        let live = self.runner.live_runners();
+        let live = self.runner.live_runs();
         self.run(move |conn| {
             let tx = conn.transaction()?;
             let out = match catch_unwind(AssertUnwindSafe(|| f(&Repo::with_live(&tx, live)))) {

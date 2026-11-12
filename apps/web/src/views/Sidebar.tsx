@@ -1,6 +1,6 @@
 import { KIND_TITLE, itemKey, itemRoute } from "../store/inbox";
 import type { Intent } from "../store/msg";
-import { type State, cardRoute, chainsOf, currentChain, currentProject, runningAgents } from "../store/state";
+import { type State, chainsOf, currentChain, currentProject, runRoute, runsOf } from "../store/state";
 import { updateReady } from "../store/updates";
 import { useChainMenu } from "./ChainMenu";
 import { NavLink } from "./Link";
@@ -12,7 +12,7 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
   const project = currentProject(state);
   const chain = currentChain(state);
   const waiting = state.inbox;
-  const running = runningAgents(state);
+  const running = runsOf(state);
   const chainMenu = useChainMenu(dispatch);
   return (
     <nav className="sidebar" aria-label="Sidebar" data-link={state.link}>
@@ -100,15 +100,27 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
         {project && <SlotStepper project={project} state={state} dispatch={dispatch} />}
         {running.length === 0 && <p className="muted side-note">None running.</p>}
         <ul>
-          {running.map(({ ticket, chain: c }) => (
-            <li key={ticket.id}>
-              <NavLink route={cardRoute(state, c, ticket)} dispatch={dispatch} className="item">
+          {running.map((run) => {
+            const route = runRoute(state, run);
+            const body = run.card ? (
+              <>
                 <span className="dot pulse" />
-                <span className="key">{ticket.key}</span>
-                <span className="t">{ticket.title}</span>
-              </NavLink>
-            </li>
-          ))}
+                <span className="key">{run.card.key}</span>
+                <span className="t">{run.card.title}</span>
+                <span className="n" data-testid="run-role">{run.role}</span>
+              </>
+            ) : (
+              <>
+                <span className="dot pulse" />
+                <span className="t">Assistant</span>
+              </>
+            );
+            return (
+              <li key={run.card ? `${run.card.id}:${run.role}` : "assistant"} data-testid={run.card ? "run-card" : "run-assistant"}>
+                {route ? <NavLink route={route} dispatch={dispatch} className="item">{body}</NavLink> : <span className="item">{body}</span>}
+              </li>
+            );
+          })}
         </ul>
       </section>
 

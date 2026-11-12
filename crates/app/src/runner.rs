@@ -126,6 +126,13 @@ pub trait Runner: std::fmt::Debug {
     fn stop_role(&self, ticket: TicketId, role: AgentRole);
     /// Every runner process that is alive, by ticket and role.
     fn live_runners(&self) -> Vec<(TicketId, AgentRole)>;
+    /// [`Runner::live_runners`] with the time each process started; the epoch when unknown.
+    fn live_runs(&self) -> Vec<toknila_core::schedule::LiveRun> {
+        self.live_runners()
+            .into_iter()
+            .map(|(t, r)| (t, r, toknila_core::Timestamp(0)))
+            .collect()
+    }
     /// Writes bytes to the terminal of the ticket's runner of `role`.
     fn write(&self, ticket: TicketId, role: AgentRole, bytes: &[u8]) -> Result<(), RunnerError>;
     /// What a live run is like, for choosing how to reach it; `None` without a live process.
