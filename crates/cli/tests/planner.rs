@@ -188,7 +188,7 @@ fn ten_start_stop_cycles_of_a_fake_planner_never_fail_a_stop() {
     let (_dir, tok, _repo) = setup(&["hold"]);
     for cycle in 0..10 {
         assert_eq!(
-            tok.run(&["planner", "start", "DEMO"])["running"],
+            tok.run(&["planner", "start", "DEMO", "--profile", "fake-planner"])["running"],
             true,
             "start {cycle}"
         );
