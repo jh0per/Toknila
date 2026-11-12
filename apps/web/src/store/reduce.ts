@@ -5,7 +5,7 @@ import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
 import { reduceAttach } from "./attach";
 import { reduceAutostart } from "./autostart";
-import { detailsWanted, knownKey } from "./cardDetails";
+import { detailsWanted, knownKey, threadEventEffects } from "./cardDetails";
 import { reduceTheme } from "./theme";
 import { reduceEdges } from "./edges";
 import { reduceEpic, renamedRoute, reopen } from "./epic";
@@ -390,13 +390,4 @@ function applyWindow(s: State, e: EventRecord, gap: boolean): [State, Effect[]] 
   if (!target) return [s, fx];
   const [moved, more] = go(s, target);
   return [{ ...moved, opened: opened(s, target, e.seq) }, [...fx, ...more, { type: "expireOpened", seq: e.seq }]];
-}
-
-/// A thread event changes the card's threads and its phase; the hand-in gate may move its status.
-function threadEventEffects(s: State, key: string | undefined): Effect[] {
-  const fx: Effect[] = [{ type: "loadInbox" }, { type: "loadAgents" }];
-  if (key && s.route.name === "card" && s.route.key === key) {
-    fx.push({ type: "loadThreads", key }, { type: "loadDetail", key });
-  }
-  return fx;
 }

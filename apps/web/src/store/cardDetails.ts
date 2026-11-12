@@ -7,6 +7,15 @@ import type { ChainDetail, TicketAction, TicketDetail, TicketStatus } from "../a
 import type { Effect } from "./msg";
 import type { State } from "./state";
 
+/// A thread event changes the card's threads and its phase; the hand-in gate may move its status.
+export function threadEventEffects(s: State, key: string | undefined): Effect[] {
+  const fx: Effect[] = [{ type: "loadInbox" }, { type: "loadAgents" }];
+  if (key && s.route.name === "card" && s.route.key === key) {
+    fx.push({ type: "loadThreads", key }, { type: "loadDetail", key });
+  }
+  return fx;
+}
+
 /// Statuses of cards whose subtasks and allowed actions the diagram shows without being opened.
 const SHOWN: TicketStatus[] = ["proposed", "running", "waiting", "review"];
 
