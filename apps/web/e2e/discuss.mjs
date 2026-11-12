@@ -94,7 +94,7 @@ try {
   await t("assistant-toggle").click();
   await expectText(t("assistant-state"), "not running", "the panel says the assistant is not running");
   await expectText(t("planner-idle"), "Sending a message starts it", "and that sending a message starts it");
-  await expectText(t("context-chip"), "Card DS-1", "the panel's chip says which card is open");
+  await expectText(t("context-chip"), "the card DS-1", "the panel's chip says which card is open");
 
   // 2. Running (started with the fake planner profile), the panel says so.
   tok("planner", "start", "DS", "--profile", "fake-planner");

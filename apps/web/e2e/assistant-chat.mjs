@@ -5,7 +5,8 @@
 // Usage: node e2e/assistant-chat.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
 // needs: fake-agent
 //
-// The assistant's screen is a chat with a record: what the person sends shows as their bubble before
+// The assistant's own screen (/projects/KEY/planner, behind the panel's expand control) is the chat
+// at full width, with no diagram; it is a chat with a record: what the person sends shows as their bubble before
 // the planner has answered; the planner's `say` is an assistant bubble with the card as its chip;
 // what it did shows as Toknila's lines with links; every message has a Copy control that fills the
 // clipboard; a card discussion is in the same conversation once, with the card as its context; the
@@ -81,6 +82,13 @@ try {
   //    the box; Start, Stop and the profile are on the Terminal tab.
   await page.goto(at("/projects/WEB/planner"));
   await expectPath("/projects/WEB/planner", "the assistant's screen");
+  // It is the chat at full width: no "Plan so far" diagram, no panel beside it.
+  if ((await t("canvas").count()) + (await t("planner-chain").count()) + (await t("assistant-panel").count()) !== 0) {
+    throw new Error("the assistant's screen draws a diagram or a panel");
+  }
+  const wide = await t("chat-pane").boundingBox();
+  if (!wide || wide.width < 800) throw new Error(`the chat is not at full width: ${wide?.width}`);
+  console.log("PASS the assistant's screen is the chat at full width, without a diagram");
   if ((await t("planner-tab-chat").getAttribute("aria-selected")) !== "true") throw new Error("the chat is not the default tab");
   await expectText(t("planner-idle"), "Sending a message starts it", "the idle chat says sending starts the assistant");
   if ((await t("planner-stop").count()) + (await t("planner-start").count()) + (await t("planner-profile").count()) !== 0) {

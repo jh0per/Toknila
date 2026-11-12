@@ -4,12 +4,13 @@
 // Usage: node e2e/planner.mjs <tok binary> <fake-agent binary>   (cargo xtask e2e-web runs it)
 // needs: fake-agent
 //
-// The sidebar has a "Plan with the assistant" entry at the top of the project's section; it opens
-// the assistant's panel: not running, a centred box (no terminal yet). A project without chains
-// asks "What do you want to build?"; typing there and pressing Enter starts the planner in the
-// project's repository and the text reaches it. Its terminal is live, the diagram above shows the
-// chain and cards the planner makes as they happen, the box under the terminal and the terminal
-// itself both reach it. Stop ends it.
+// The sidebar's Assistant row opens the roadmap with the assistant's panel beside it and the
+// roadmap chip on (not running, no terminal yet); the panel's expand control opens the same chat at
+// full width at /projects/KEY/planner, with its Terminal tab and no "Plan so far" diagram. A
+// project without epics asks "What do you want to build?"; typing there and pressing Enter opens the
+// panel, starts the planner in the project's repository and the text reaches it. Its terminal is live,
+// the epic and cards it makes show in the sidebar and on the epic's page, the box of the chat and the
+// terminal both reach it. Stop ends it.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -104,11 +105,21 @@ try {
   if (!entryBefore) throw new Error("the assistant row should come before the chains");
   if ((await page.locator("[data-testid=planner-entry]").count()) !== 1) throw new Error("expected one planner entry");
 
+  const hint = await page.locator("[data-testid=planner-link]").getAttribute("title");
+  if (hint !== "plans epics on the roadmap, cards inside an epic") throw new Error(`the Assistant row's hint is: ${hint}`);
+  if ((await page.locator("[data-testid=planner-link]").getAttribute("href")).includes("/planner")) throw new Error("the Assistant row still links to the screen");
   await page.locator("[data-testid=planner-link]").click();
-  await expectPath("/projects/WEB/planner", "selecting it opens the assistant's address");
+  await expectPath("/projects/WEB", "the Assistant row opens the roadmap");
+  await expectText(page.locator("[data-testid=assistant-state]"), "not running", "the panel says the planner is not running");
+  if ((await page.locator("[data-testid=assistant-panel] [data-testid=context-chip][data-context=roadmap]").count()) !== 1) throw new Error("the roadmap chip is not on");
+  // The panel's expand control opens the chat at full width: no diagram, the chat tab first.
+  await page.locator("[data-testid=assistant-expand]").click();
+  await expectPath("/projects/WEB/planner", "the expand control opens the full-width chat");
   await expectText(page.locator("[data-testid=planner-state]"), "not running", "the planner is not running");
-  await expectText(page.locator("[data-testid=planner-empty]"), "Plan so far", "the diagram is labelled");
-  // The chat is the tab it opens on; not running, it says sending starts it and asks what to build.
+  for (const id of ["planner-chain", "planner-empty", "canvas"]) {
+    if ((await page.locator(`[data-testid=${id}]`).count()) !== 0) throw new Error(`the assistant's screen still draws ${id}`);
+  }
+  console.log("PASS the full-width chat has no Plan-so-far diagram");
   if ((await page.locator("[data-testid=planner-tab-chat][aria-selected=true]").count()) !== 1) throw new Error("the chat is not the default tab");
   await expectText(page.locator("[data-testid=planner-idle]"), "Sending a message starts it", "the idle chat says sending starts the assistant");
   await expectText(page.locator("[data-testid=placeholder]"), "Tell the assistant what you want to build or change", "an empty chat asks what to build");
@@ -131,16 +142,29 @@ try {
   await shot("empty-project");
   await page.locator("[data-testid=empty-ask-input]").fill("hello planner");
   await page.keyboard.press("Enter");
-  await expectPath("/projects/WEB/planner", "sending moves to the assistant's screen");
-  await expectText(page.locator("[data-testid=planner-state]"), "running", "the text started the planner");
-  // The words are in the chat as the person's bubble (stored before the planner saw them), and the
-  // chat is where the screen opens.
+  await page.locator("[data-testid=assistant-panel]").waitFor({ timeout: 10_000 });
+  await expectText(page.locator("[data-testid=assistant-state]"), "running", "the text opened the panel and started the planner");
+  // The words are in the chat as the person's bubble (stored before the planner saw them).
   await expectText(page.locator("[data-testid=chat-message][data-author=person]"), "hello planner", "the sent text is the person's bubble");
   await expectText(page.locator("[data-testid=chat-message][data-author=assistant]"), "Planned two cards", "the planner's say is its bubble");
+  // The terminal is on the full-width screen.
+  await page.locator("[data-testid=assistant-expand]").click();
+  await expectPath("/projects/WEB/planner", "expanding opens the full-width chat");
   await page.locator("[data-testid=planner-tab-terminal]").click();
   await expectText(page.locator("[data-testid=planner-stop]"), "Stop", "Stop replaces Start on the Terminal tab");
   await expectText(term, "planner ready", "the terminal shows the planner's live output");
-  await expectText(term, "got:hello planner", "the text typed in the empty project reached the planner");
+  // The terminal opened after the planner had answered, so the line may have scrolled off the small
+  // screen: the daemon's scrollback is the proof the text reached it.
+  const base = new URL(url);
+  for (const stop = Date.now() + 15_000; ; await new Promise((r) => setTimeout(r, 150))) {
+    const back = await (await fetch(`${base.origin}/v1/projects/WEB/planner/scrollback`, {
+      headers: { authorization: `Bearer ${base.searchParams.get("token")}` },
+    })).text();
+    // The panel was open on the roadmap, so the line carries its context.
+    if (back.includes("got:About the roadmap: hello planner")) break;
+    if (Date.now() > stop) throw new Error("the text typed in the empty project did not reach the planner");
+  }
+  console.log("PASS the text typed in the empty project reached the planner");
   await expectText(page.locator("[data-testid=term-status]"), "live", "the terminal is live");
   // The assistant's terminal has the copy controls too (the card's are checked in terminal-copy).
   for (const id of ["term-copy", "term-copy-more"]) {
@@ -149,13 +173,18 @@ try {
   console.log("PASS the assistant's terminal has the Copy controls");
   await shot("planner-running");
 
-  // What the planner makes shows in the diagram above, live, and in the sidebar.
-  await expectText(page.locator("[data-testid=planner-chain]"), "roadmap", "the diagram follows the chain the planner made");
+  // What the planner makes shows in the sidebar, and on the epic's page.
+  await expectText(page.locator("[data-testid=chains] li"), "roadmap", "the epic is in the sidebar");
+  await page.locator("[data-testid=chains] li a").first().click();
+  await expectPath("/projects/WEB/chains/roadmap", "the epic opens from the sidebar");
   await expectText(page.locator("a[data-key=WEB-1]"), "Design the list", "its first card is on the diagram");
   await expectText(page.locator("a[data-key=WEB-2]"), "Build the list", "its second card is on the diagram");
-  await expectText(page.locator("[data-testid=chains] li"), "roadmap", "the chain is in the sidebar");
   // The planner's attempt to start a card was refused: nothing runs.
   await expectText(page.locator("a[data-key=WEB-1] [data-testid=status]"), "ready", "the refused start left the card ready");
+  // Back to the full-width chat through the panel (the Assistant row opens it beside the roadmap).
+  await page.locator("[data-testid=planner-link]").click();
+  await page.locator("[data-testid=assistant-expand]").click();
+  await expectPath("/projects/WEB/planner", "the chat at full width again");
 
   // The planner's next step is on its screen with the button of its action, and the first row of
   // the inbox; the person clicks, the planner never does (its own start above was refused).
@@ -176,8 +205,11 @@ try {
   await shot("planner-next-step");
   // Doing its action ends it: the card starts (the simulated agent), the suggestion is cleared.
   await page.locator("[data-testid=suggestion-button]").click();
-  await expectText(page.locator("a[data-key=WEB-1] [data-testid=status]"), "running", "the button started the card");
   await next.waitFor({ state: "detached" });
+  await page.locator("[data-testid=chains] li a").first().click();
+  await expectText(page.locator("a[data-key=WEB-1] [data-testid=status]"), "running", "the button started the card");
+  await page.locator("[data-testid=planner-link]").click();
+  await page.locator("[data-testid=assistant-expand]").click();
   await inbox.locator("[data-testid=suggestion]").waitFor({ state: "detached" });
   console.log("PASS the suggestion is gone once its action is done, from the inbox too");
   const tokenOf = new URL(url);

@@ -34,12 +34,12 @@ export function App() {
   const r = state.route.name;
   const chain = currentChain(state);
   const project = currentProject(state);
-  // The planner's screen has the chain layout (a diagram above, a panel below), chain or not.
+  // The assistant's own screen is the chat at full width: no diagram, no chain.
   const planning = r === "planner" && Boolean(project) && state.loaded;
   // The project's own page is its roadmap, as long as it has epics; a project without any leads
   // with the question for the assistant.
   const roadmap = r === "project" && Boolean(project) && state.loaded && chainsOf(state, project).length > 0;
-  const showChain = !roadmap && (Boolean(chain) || planning) && state.loaded && r !== "inbox" && r !== "settings" && r !== "usage" && r !== "guide";
+  const showChain = !roadmap && !planning && Boolean(chain) && state.loaded && r !== "inbox" && r !== "settings" && r !== "usage" && r !== "guide";
   // No project to show yet: the main area is the onboarding, with the add-a-project form on it.
   const onboarding = state.loaded && r !== "settings" && r !== "guide" && activeProjects(state).length === 0 && !project;
   // The assistant panel sits beside the roadmap, a chain or a card, when it is open.
@@ -47,7 +47,7 @@ export function App() {
   return (
     <div className={`ide${aside ? " with-assistant" : ""}`} style={aside ? ({ "--assistant-w": `${state.assistant.width}px` } as CSSProperties) : undefined}>
       {r === "settings" ? <SettingsSidebar state={state} dispatch={dispatch} /> : <Sidebar state={state} dispatch={dispatch} />}
-      <main className={showChain ? "has-panel" : roadmap ? "roadmap-page" : "plain"}>
+      <main className={showChain ? "has-panel" : roadmap ? "roadmap-page" : planning ? "planner-page" : "plain"}>
         {state.error && !showChain && <p className="error">{state.error}</p>}
         {!state.loaded ? <p className="muted">Loading…</p> : r === "settings" ? (
           <Settings state={state} dispatch={dispatch} />

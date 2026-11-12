@@ -81,7 +81,7 @@ try {
   await shown("the panel is closed by default", false);
   await t("assistant-toggle").click();
   await shown("the top bar's button opens the panel", true);
-  await expectText(t("context-chip"), "Chain work", "the chip says which chain is open");
+  await expectText(t("context-chip"), "the epic work", "the chip says which epic is open");
   const grid = await t("assistant-panel").boundingBox();
   if (!grid || Math.abs(grid.width - 360) > 2) throw new Error(`the panel is not 360 px wide by default: ${grid?.width}`);
   console.log("PASS the panel is 360 px wide by default");
@@ -143,11 +143,27 @@ try {
 
   // 7. On a card the chip names the card; the top bar's button closes the panel.
   await page.goto(at("/projects/PN/chains/work/cards/PN-1"));
-  await expectText(t("context-chip"), "Card PN-1", "a card has its chip");
+  await expectText(t("context-chip"), "the card PN-1", "a card has its chip");
   await t("assistant-toggle").click();
   await shown("the button closes the panel on a card", false);
   await t("assistant-toggle").click();
   await shown("and opens it again", true);
+
+  // 7b. The sidebar's Assistant row opens the roadmap with the panel and the roadmap chip; the
+  //     panel's expand control opens the full-width chat, whose chip-less screen has no panel beside it.
+  await t("assistant-toggle").click();
+  await shown("closed again before the row is used", false);
+  await t("planner-link").click();
+  await t("roadmap").waitFor();
+  await shown("the Assistant row opens the panel on the roadmap", true);
+  await expectText(t("context-chip"), "Roadmap", "with the roadmap chip on");
+  await t("assistant-expand").click();
+  await t("planner-tab-chat").waitFor();
+  await shown("the full-width chat has no panel beside it", false);
+  if (new URL(page.url()).pathname !== "/projects/PN/planner") throw new Error(`expand went to ${page.url()}`);
+  console.log("PASS the expand control opens the chat at /projects/PN/planner");
+  await page.goto(at("/projects/PN/chains/work/cards/PN-1"));
+  await shown("the panel is open on the card again", true);
 
   // 8. Under 1100 px the panel overlays the screen with a scrim; Escape closes it.
   await page.setViewportSize({ width: 1000, height: 800 });
