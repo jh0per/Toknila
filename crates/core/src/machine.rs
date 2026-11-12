@@ -18,6 +18,7 @@
 //! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
 //! | Review | Review (merging) | `Accept`; an approving `ReviewVerdict` that decides does the same |
 //! | Review (merging) | Merged | `MergeDone` (removes the ship's worktree, keeps its branch) |
+//! | Review (merging) | Running | `MergeConflicted` (the base conflicts with the ship: back to the worker as a round; the Accept is remembered) |
 //! | Review (merging) | Blocked | `Block` with a merge reason (`merge_conflict`, `ci_failed`, `pr_closed`, ...); `Unblock` merges again |
 //! | Review (merging) | same | `PrUpdated` (pull-request mode: the card's pull request and its checks) |
 //! | Review | Running / same | `ReviewVerdict` (the reviewer agent; see [`review`]) |
@@ -45,6 +46,7 @@ use crate::{
 mod action;
 mod error;
 mod event;
+mod merge;
 pub use action::{TicketAction, UnknownAction};
 pub use error::TransitionError;
 pub use event::{Effect, TicketEvent};
@@ -227,13 +229,10 @@ pub fn apply(
             (S::Review, None)
         }
         (S::Review, TicketEvent::MergeDone) => {
-            if next.review.turn != Some(ReviewTurn::Merging) {
-                return Err(refuse());
-            }
-            next.review.turn = None;
-            next.review.note = None;
-            review::merged(&mut effects);
-            (S::Merged, None)
+            merge::done(&mut next, &mut effects).ok_or_else(refuse)?
+        }
+        (S::Review, TicketEvent::MergeConflicted { text }) => {
+            merge::conflicted(&mut next, text, now, &mut effects)?
         }
         (S::Review, TicketEvent::PrUpdated { pr, ask_after_secs }) => {
             review::pull_request_seen(&mut next, pr.clone(), *ask_after_secs, now)

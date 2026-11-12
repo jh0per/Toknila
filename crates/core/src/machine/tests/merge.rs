@@ -202,3 +202,62 @@ fn a_new_merge_forgets_the_old_pull_request_so_stale_checks_are_never_judged() {
     let back = step(&blocked.ticket, &TicketEvent::Unblock);
     assert_eq!(back.ticket.pr, None);
 }
+
+#[test]
+fn a_conflict_at_accept_returns_the_card_to_the_worker_and_remembers_the_accept() {
+    let tr = step(
+        &merging(),
+        &TicketEvent::MergeConflicted {
+            text: "Conflicting files: a.rs.".to_owned(),
+        },
+    );
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    assert_eq!(tr.ticket.review.turn, None);
+    assert!(tr.ticket.review.accepted);
+    assert!(tr.effects.contains(&Effect::RecordCheckOutput {
+        text: "Conflicting files: a.rs.".to_owned()
+    }));
+    assert!(!tr.effects.contains(&Effect::Merge));
+    // Only a merge that is running can conflict.
+    assert!(
+        apply(
+            &in_review(ReviewTurn::Person),
+            &TicketEvent::MergeConflicted { text: "x".into() },
+            NOW
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn a_remembered_accept_merges_when_the_check_and_the_reviewer_pass_and_a_return_forgets_it() {
+    let mut t = in_review(ReviewTurn::Check);
+    t.review.accepted = true;
+    let passed = TicketEvent::CheckSkipped {
+        mode: crate::ReviewMode::Human,
+    };
+    let tr = step(&t, &passed);
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Merging));
+    assert!(tr.effects.contains(&Effect::Merge));
+    assert!(!tr.ticket.review.accepted);
+
+    let mut t = in_review(ReviewTurn::Agent { decides: false });
+    t.review.accepted = true;
+    let approve = TicketEvent::ReviewVerdict {
+        verdict: Verdict::Approve,
+        comment: "ok".to_owned(),
+        items: vec![],
+        max_rounds: 3,
+    };
+    assert_eq!(
+        step(&t, &approve).ticket.review.turn,
+        Some(ReviewTurn::Merging)
+    );
+
+    let mut t = in_review(ReviewTurn::Person);
+    t.review.accepted = true;
+    let back = TicketEvent::Return {
+        comment: "no".to_owned(),
+    };
+    assert!(!step(&t, &back).ticket.review.accepted);
+}

@@ -121,6 +121,9 @@ pub enum TicketEvent {
     /// Host: the ship's branch is merged into the base branch (or there was nothing to merge).
     /// Only a card whose merge is running takes it; the card is then Merged.
     MergeDone,
+    /// The merge of an accepted card met a conflict: the card goes back to the worker with
+    /// `text` (the files, and what to do), and the person's Accept is remembered.
+    MergeConflicted { text: String },
     /// Host: the pull request of the card's merge was opened or its checks changed. Only a
     /// card whose merge is running takes it; no status change.
     /// `ask_after_secs` is the project's timeout: a pull request with no check for that long
@@ -188,6 +191,7 @@ impl TicketEvent {
             Self::RunReviewer => "run_reviewer",
             Self::DoneOutOfOrder { .. } => "done_out_of_order",
             Self::MergeDone => "merge_done",
+            Self::MergeConflicted { .. } => "merge_conflicted",
             Self::PrUpdated { .. } => "pr_updated",
             Self::MergeUnchecked => "merge_now",
             Self::KeepWaiting => "keep_waiting",
