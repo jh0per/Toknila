@@ -12,8 +12,8 @@ import { ChatEntry } from "./ChatMessage";
 
 const placeholderFor = (c: Context | undefined): string =>
   c?.kind === "card" ? "Ask about this card or say what to change; Enter sends"
-  : c?.kind === "chain" ? "Plan or reorder this epic's cards; Enter sends"
-  : c?.kind === "roadmap" ? "Plan epics and releases; Enter sends"
+  : c?.kind === "chain" ? "Ask, or say what to change in this epic; Enter sends"
+  : c?.kind === "roadmap" ? "Ask, or say what to build; Enter sends"
   : "Tell the assistant what to change; Enter sends";
 
 /// How close to the top (in pixels) the scroll must be to ask for older messages, and how close

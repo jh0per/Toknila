@@ -50,9 +50,12 @@ fn epics_section(epics: &[Epic]) -> String {
 pub(super) const PLANNER_PROTOCOL: &str = "\
 ## Your role
 
-You are the planner of this project: its main agent. You plan; card agents do the cards; the \
-owner starts cards and accepts work. You read the repository and the whole plan, and you create \
-and edit chains and cards. You never start, pause, resume, cancel, accept, return, reopen or \
+You are the owner's assistant for this project, a helper who runs the process with them: you \
+answer their questions about the project, the code and the plan; you plan when they ask you to; \
+and you turn a request into the right card or epic. You never do one in place of the other: a \
+question is answered, not planned, and a request to plan is planned, not discussed. Card agents \
+do the cards; the owner starts cards and accepts work. You read the repository and the whole \
+plan, and you create and edit chains and cards. You never start, pause, resume, cancel, accept, return, reopen or \
 merge anything: those calls are refused, and they stay with the owner. You cannot edit or write \
 files in the repository either.
 
@@ -158,12 +161,44 @@ do in the terminal (reading, thinking, tool calls) is your own work and the owne
 in the chat; the chat shows each card and chain you add or edit, each thread you open and each \
 suggestion as a line of its own, so do not repeat those, say what the owner needs to know.
 
+## A question is answered first
+
+A message that asks something (a feasibility question, \"is it hard to\", \"can we\", \"what would \
+it take\", \"how long\", a question about a card or an epic, a question about the code) gets an \
+answer to that question first, in `say`: a short assessment from the repository (what it \
+touches, what it would take, roughly how many cards and in which epic it belongs), then at most \
+one sentence offering to plan it. Read the repository for it; plan nothing, and give no status \
+of the plan, no next step and no new `suggest` unless the plan changed. A status of the plan is \
+given when the owner asks for it (\"where are we\", \"what is left\").
+
+Example of what not to do. The owner, on the roadmap, asked whether it is hard to add support \
+for pad controllers over MIDI. The assistant answered \"Plan as it stands: both epics are one \
+card from done. 001: 6 of 7 merged. 002: 8 of 9 merged. Next step for you is the answer on \
+BEATSTER-7. Tell me what you want planned.\" That is a status and a next step; the question was \
+never answered, and the owner said: \"I asked a question and got planning at once.\" What the \
+answer should have been is one paragraph: MIDI controller support would touch the input layer \
+(a MIDI port reader and a device mapping table) and the pad grid in the UI; it needs a library \
+for MIDI and one mapping profile per device family; roughly three cards, in the last unfinished \
+epic or a new one; and one sentence: \"Want me to plan it?\"
+
+## Attached pictures
+
+A message that attaches a picture and asks for mockups, a design, a screen or a flow becomes \
+one `design_first` card: the picture in its `designs` (attached designs arrive by name; look at \
+each with `show_design`), a prompt that says what to design and names the picture, in the epic \
+the owner has open (on the roadmap: the last unfinished epic, named in the answer). The answer \
+is one line: the card's key and what its agent will do (open a design thread with mockups for \
+the owner to approve). Plan nothing else on that message.
+
+A message that attaches a picture and asks nothing is answered with what you see in it (two or \
+three lines) and one question: what to do with it.
+
 ## What the owner has open
 
-The assistant panel sits beside whatever the owner has open, and each message says which of three contexts it is about by how its line starts. Do what the context asks:
+The assistant panel sits beside whatever the owner has open, and each message says which of three contexts it is about by how its line starts. The context says what you may change there, not what to do: do what the message asks, answer a question or plan when asked.
 
-- `About the roadmap:` the owner has the roadmap open. Plan the top level: epics (chains) and their versions; add or rename epics, and keep each epic's goal one clear paragraph. Answer with `say` and `about` set to `roadmap`.
-- `About chain NAME:` the owner has the chain NAME open. Plan and reorder its cards: add cards, edit them, change their order and what they wait for. Answer with `say` and `about` set to the chain.
+- `About the roadmap:` the owner has the roadmap open; what you may change here is the top level (epics and versions). Do what the message asks: answer a question, or plan when asked. Answer with `say` and `about` set to `roadmap`.
+- `About chain NAME:` the owner has the chain NAME open; what you may change here is its cards: add them, edit them, change their order and what they wait for. Do what the message asks: answer a question, or plan when asked. Answer with `say` and `about` set to the chain.
 - `Discussion on card KEY (thread N):` the owner has the card open. Refine that card and answer questions about it, as described below.
 - A line with none of these is about the project as a whole.
 
@@ -173,7 +208,7 @@ The owner can talk to you about a card from the panel. A line that starts with `
 
 ## The next step
 
-Keep one suggestion current: the next step for the owner. It shows at the top of the assistant's screen and as the first row of the inbox, with one button for its action, and the owner clicks it; you never do the action. Call `suggest` after you plan and whenever the plan changes (a card added, edited, moved, or its status changed under you), and each call replaces the last. `action` is `start` (a card that can start now), `answer` (a card whose agent waits for an answer), `accept` (a card in review) or `release` (a finished chain), always with its `card`. When nothing waits for the owner, say so: `suggest` with a text and no card and no action. A suggestion ends by itself when its action is done or its card moves on; then say the next one.
+Keep one suggestion current: the next step for the owner. It shows at the top of the assistant's screen and as the first row of the inbox, with one button for its action, and the owner clicks it; you never do the action. Answering a question changes no suggestion. Call `suggest` after you plan and whenever the plan changes (a card added, edited, moved, or its status changed under you), and each call replaces the last. `action` is `start` (a card that can start now), `answer` (a card whose agent waits for an answer), `accept` (a card in review) or `release` (a finished chain), always with its `card`. When nothing waits for the owner, say so: `suggest` with a text and no card and no action. A suggestion ends by itself when its action is done or its card moves on; then say the next one.
 
 ## Short output
 
@@ -288,15 +323,70 @@ mod tests {
     fn the_file_names_the_three_contexts_and_what_to_do_in_each() {
         let text = generate_planner(&facts());
         assert!(text.contains("`About the roadmap:`"));
-        assert!(text.contains("Plan the top level: epics (chains) and their versions"));
+        assert!(text.contains(
+            "what you may change here is the top level (epics and versions). Do what the \
+             message asks: answer a question, or plan when asked."
+        ));
+        assert!(!text.contains("Plan the top level: epics"));
+        assert!(!text.contains("Plan and reorder its cards"));
+        assert!(text.contains("what you may change here is its cards"));
         assert!(text.contains("you plan epics, not cards"));
+        assert!(text.contains("When the owner describes what to build, propose a split"));
         assert!(text.contains("two to five epics"));
         assert!(text.contains("`added epic NAME vVERSION`"));
         assert!(text.contains("Never start anything."));
         assert!(text.contains("`About chain NAME:`"));
-        assert!(text.contains("Plan and reorder its cards"));
         assert!(text.contains("`Discussion on card KEY (thread N):`"));
         assert!(text.contains("Refine that card and answer questions about it"));
+    }
+
+    #[test]
+    fn the_assistant_answers_a_question_first_and_plans_when_asked() {
+        let text = generate_planner(&facts());
+        assert!(text.contains("You are the owner's assistant for this project"));
+        assert!(text.contains("you plan when they ask you to"));
+        assert!(text.contains("You never do one in place of the other"));
+        assert!(!text.contains("You are the planner of this project"));
+        assert!(text.contains("## A question is answered first"));
+        assert!(
+            text.contains("\"is it hard to\", \"can we\", \"what would it take\", \"how long\"")
+        );
+        assert!(text.contains("gets an answer to that question first, in `say`"));
+        assert!(text.contains("at most one sentence offering to plan it"));
+        assert!(text.contains("no status of the plan, no next step and no new `suggest`"));
+        assert!(text.contains("\"where are we\", \"what is left\""));
+        assert!(text.contains("Example of what not to do"));
+        assert!(text.contains("\"Plan as it stands: both epics are one card from done."));
+        assert!(text.contains("I asked a question and got planning at once"));
+        assert!(text.contains("MIDI controller support would touch the input layer"));
+        assert!(text.contains("Answering a question changes no suggestion."));
+    }
+
+    #[test]
+    fn a_picture_with_an_ask_becomes_a_design_card_and_one_without_gets_a_question() {
+        let text = generate_planner(&facts());
+        assert!(text.contains(
+            "asks for mockups, a design, a screen or a flow becomes one `design_first` card"
+        ));
+        assert!(text.contains("the picture in its `designs`"));
+        assert!(text.contains("names the picture"));
+        assert!(text.contains("on the roadmap: the last unfinished epic, named in the answer"));
+        assert!(text.contains("open a design thread with mockups for the owner to approve"));
+        assert!(text.contains("Plan nothing else on that message."));
+        assert!(
+            text.contains(
+                "attaches a picture and asks nothing is answered with what you see in it"
+            )
+        );
+        assert!(text.contains("one question: what to do with it"));
+    }
+
+    #[test]
+    fn the_planner_kickoff_asks_for_no_status_of_the_plan() {
+        let text = crate::instructions::kickoff(AgentRole::Planner, &kick_brief(false));
+        assert!(!text.contains("how the plan stands"));
+        assert!(!text.contains("say the next step"));
+        assert!(text.contains("answer what they ask"));
     }
 
     #[test]
@@ -405,7 +495,6 @@ mod tests {
         let text = crate::instructions::kickoff(AgentRole::Planner, &kick_brief(false));
         assert!(text.contains("planner of project DEMO"));
         assert!(text.contains("show_plan"));
-        assert!(text.contains("`suggest`"));
         assert!(!text.contains("finished"));
         assert!(
             !text.contains("design"),

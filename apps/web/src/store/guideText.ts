@@ -45,8 +45,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "plan", title: "Plan with the assistant", show: "assistant", showLabel: "Open the assistant",
     alt: "The roadmap with the assistant panel beside it and its chip, the roadmap",
     text:
-      "There is one assistant, at two levels. Open Assistant under your project: the roadmap opens with the assistant beside it, and there it plans epics (an epic holds cards and ends in a release). " +
-      "Inside an epic the same panel (Cmd/Ctrl+.) plans and talks about that epic's cards; its chip says what is open, the roadmap, the epic or the card, and you can take it off. " +
+      "The assistant is a smart helper for the process: it creates epics and their cards, steers the process, answers your questions, and turns a screenshot into a design card. " +
+      "There is one assistant, at two levels: open Assistant under your project and the roadmap opens with it beside, where it plans epics (an epic holds cards and ends in a release); inside an epic the same panel (Cmd/Ctrl+.) talks about that epic's cards, and its chip says what is open, which you can take off. " +
       "The expand button of the panel opens the chat at full width, with the assistant's terminal.",
   },
   {
