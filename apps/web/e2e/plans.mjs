@@ -72,7 +72,7 @@ try {
   const t = (id) => page.locator(`[data-testid=${id}]`);
   const plan = (rel) => page.locator(`[data-testid=found-plans] li[data-plan="${rel}"]`);
   const chainLink = (name) => page.locator(`[data-testid=chains] a[href*="/chains/${name}?"]`);
-  const row = (key) => page.locator(`[data-testid=projects] > ul > li[data-project=${key}]`);
+  const row = (key) => page.locator(`[data-testid=projects] > ul > li[data-project=${key}] > .row`);
   const enabled = async (id, want, what) => {
     if ((await t(id).isEnabled()) !== want) throw new Error(`${what}: expected ${want ? "enabled" : "disabled"}`);
     console.log(`PASS ${what}`);
