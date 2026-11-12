@@ -391,11 +391,12 @@ async fn a_pull_request_closed_or_in_conflict_on_github_blocks_with_the_link() {
     rig.gh_edit(|s| s["prs"][1]["mergeable"] = json!("CONFLICTING"));
     rig.tick().await;
     let d = rig.card("DEMO-1").await;
-    assert_eq!(reason(&d)["kind"], "merge_conflict");
+    // The card goes back to its agent with the link, as a hand-in-time conflict does.
+    assert_eq!(d["ticket"]["status"], "running", "{d}");
+    let last = d["comments"].as_array().expect("comments").last().cloned();
     assert!(
-        reason(&d)["detail"]
-            .as_str()
-            .expect("detail")
+        last.expect("the Return text")
+            .to_string()
             .contains("pull/2"),
         "{d}"
     );
