@@ -112,6 +112,23 @@ pub fn auto_decision(role: AgentRole, status: TicketStatus) -> Option<Decision> 
     })
 }
 
+/// Every decision that needs no person, for one tool call: a worker that handed in is refused
+/// ([`auto_decision`]), and a worker's shell edit is refused ([`shell_edit_denial`]; `scratch` are
+/// the folders it may write). The PermissionRequest path and the PreToolUse path both ask this, so
+/// the refusal is the same in every permission mode. `None` leaves the call to the agent or a person.
+pub fn automatic_decision(
+    role: AgentRole,
+    status: TicketStatus,
+    tool: Option<&str>,
+    scratch: &[String],
+) -> Option<Decision> {
+    auto_decision(role, status).or_else(|| {
+        (role == AgentRole::Worker)
+            .then(|| tool.and_then(|tool| shell_edit_denial(tool, scratch)))
+            .flatten()
+    })
+}
+
 /// How an answer reaches the agent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Delivery {

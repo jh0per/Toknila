@@ -23,10 +23,11 @@ use crate::runner::Grant;
 /// The only routes an agent token may call (all `POST`): the agent event contract, the activity
 /// signal of hooks, the claim of pending instructions (the Stop hook) and the plan quota a status
 /// line saw (account-wide, so it names no ticket). The ticket in a path must be the token's own.
-pub const AGENT_ROUTES: [&str; 5] = [
+pub const AGENT_ROUTES: [&str; 6] = [
     "/v1/tickets/{ticket}/events",
     "/v1/tickets/{ticket}/activity",
     "/v1/tickets/{ticket}/permission",
+    "/v1/tickets/{ticket}/pre-tool",
     "/v1/tickets/{ticket}/instructions/claim",
     "/v1/usage/quota",
 ];
