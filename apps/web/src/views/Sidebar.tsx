@@ -39,6 +39,9 @@ export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Inten
             <span className="update-dot" data-testid="settings-dot" role="img" aria-label="An update is ready" title="An update is ready" />
           )}
         </NavLink>
+        <NavLink route={{ name: "guide" }} dispatch={dispatch} className={`item${state.route.name === "guide" ? " sel" : ""}`} testId="guide-link">
+          <span className="t">Guide</span>
+        </NavLink>
         <button type="button" className="item shortcuts-link" data-testid="shortcuts-link" onClick={() => dispatch({ type: "toggleShortcuts" })}>
           <span className="t">Keyboard shortcuts</span>
           <kbd>?</kbd>

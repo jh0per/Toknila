@@ -6,6 +6,7 @@ import type { State } from "../store/state";
 import { ADD_PROJECT_FORM, AddProject } from "./AddProject";
 import { PromptField } from "./AskBox";
 import { Checks } from "./Checks";
+import { NavLink } from "./Link";
 import { TrustNote } from "./TrustNote";
 
 /// One numbered step of the page: its title, then what it asks for.
@@ -32,7 +33,8 @@ export function Onboarding({ state, dispatch }: { state: State; dispatch: (i: In
       <h1>Welcome to Toknila</h1>
       <p className="muted">
         You tell an assistant what you want to build. It plans the work as cards, and agents build them while you watch and
-        accept the result. Four steps to start.
+        accept the result. Four steps to start.{" "}
+        <NavLink route={{ name: "guide" }} dispatch={dispatch} className="inline-link" testId="onboarding-guide">How Toknila works</NavLink>
       </p>
       <Step title="1. Choose the folder of your project">
         <AddProject state={state} dispatch={dispatch} submit={false} />

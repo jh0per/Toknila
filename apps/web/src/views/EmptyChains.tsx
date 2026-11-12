@@ -3,6 +3,7 @@ import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
 import { AskBox } from "./AskBox";
 import { FoundPlans } from "./FoundPlans";
+import { NavLink } from "./Link";
 
 /// A project without chains leads with one question for the project's assistant; typing an answer
 /// and pressing Enter starts the assistant with it. Starting a chain by hand and importing a plan
@@ -34,7 +35,8 @@ export function EmptyChains({ project, state, dispatch }: { project: Project; st
         >
           Import
         </button>{" "}
-        a plan you already have.
+        a plan you already have. New to Toknila?{" "}
+        <NavLink route={{ name: "guide" }} dispatch={dispatch} className="inline-link" testId="empty-guide">How it works</NavLink>
       </p>
       {/* A dialog over the page shows the list itself; the page's copy waits behind it. */}
       {project.repo_path && !state.plan.dialog && <FoundPlans project={project.key} state={state} dispatch={dispatch} />}

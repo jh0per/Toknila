@@ -47,6 +47,18 @@ describe("the settings routes", () => {
   });
 });
 
+describe("the guide route", () => {
+  it("/guide parses and round-trips", () => {
+    expect(parseRoute("/guide")).toEqual({ name: "guide" });
+    expect(routePath({ name: "guide" })).toBe("/guide");
+    expect(parseRoute(routePath({ name: "guide" }))).toEqual({ name: "guide" });
+  });
+
+  it("an address below /guide is not the guide", () => {
+    expect(parseRoute("/guide/extra")).toEqual({ name: "chains" });
+  });
+});
+
 describe("the inbox routes", () => {
   const cases: [string, Route][] = [
     ["/inbox", { name: "inbox" }],

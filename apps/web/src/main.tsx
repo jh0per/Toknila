@@ -10,6 +10,7 @@ import "./panel.css";
 import "./threads.css";
 import "./settings.css";
 import "./usage.css";
+import "./guide.css";
 import "./plan.css";
 import "./menu.css";
 import "./updates.css";
