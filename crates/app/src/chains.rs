@@ -34,6 +34,15 @@ pub(crate) fn clean_version(text: &str) -> AppResult<String> {
     toknila_core::release_run::clean_version(text).map_err(AppError::bad_request)
 }
 
+/// The place at the end of a project's roadmap: a new or imported chain goes there.
+pub(crate) fn next_position<R: Reader + ?Sized>(
+    repo: &R,
+    project: toknila_core::ProjectId,
+) -> AppResult<u32> {
+    let chains = repo.chains(Some(project))?;
+    Ok(chains.iter().map(|c| c.position + 1).max().unwrap_or(0))
+}
+
 /// Creates an empty chain in a project.
 pub fn create<U: UnitOfWork + ?Sized>(
     uow: &mut U,
@@ -61,6 +70,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         reviewer: input.reviewer.filter(|r| !r.trim().is_empty()),
         source: None,
         version: version.clone(),
+        position: next_position(uow, p.id)?,
     };
     uow.insert_chain(&c)?;
     uow.emit(&DomainEvent::ChainCreated { chain: c.clone() })?;
@@ -137,6 +147,7 @@ pub fn import_with_designs<U: UnitOfWork + ?Sized>(
         })
         .collect();
     view.chain.source = source;
+    view.chain.position = next_position(uow, view.chain.project_id)?;
     let (chain_id, chain) = (view.chain.id, view.chain.clone());
     uow.insert_chain(&chain)?;
     uow.emit(&DomainEvent::ChainCreated { chain })?;

@@ -388,6 +388,7 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
         review_mode: None,
         reviewer: None,
         source: Some("/w/demo/specs/001-auth".to_owned()),
+        position: 0,
         version: Some("0.3.0".to_owned()),
     };
     let gone = DomainEvent::ProjectDeleted {

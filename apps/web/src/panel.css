@@ -1,78 +1,85 @@
 /* The bottom panel: tabs, the card detail, placeholders. */
-.panel { background: var(--surface); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.divider { background: var(--line); cursor: row-resize; touch-action: none; position: relative; }
-.divider::after { content: ""; position: absolute; left: 50%; top: 50%; width: 32px; height: 3px; margin: -1px 0 0 -16px; border-radius: 2px; background: var(--muted); opacity: 0.5; }
-.divider:hover, .divider:focus-visible { background: var(--accent-soft); outline: none; }
-.divider:hover::after, .divider:focus-visible::after { background: var(--accent); opacity: 1; }
-.panel.empty { padding: var(--s3) var(--s4); }
-.panel-head { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--line); }
+.panel { background: var(--surface-container); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.divider { background: var(--outline-variant); cursor: row-resize; touch-action: none; position: relative; }
+.divider::after { content: ""; position: absolute; left: 50%; top: 50%; width: var(--sp8); height: 3px; margin: -1px 0 0 calc(var(--sp4) * -1); border-radius: var(--shape-xs); background: var(--on-surface-variant); opacity: 0.5; }
+.divider:hover, .divider:focus-visible { background: var(--primary-container); outline: none; }
+.divider:hover::after, .divider:focus-visible::after { background: var(--primary); opacity: 1; }
+.panel.empty { padding: var(--sp3) var(--sp4); }
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--outline-variant); }
 .panel-head .tabs { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
-.panel-head .actions { padding: var(--s1) var(--s3); flex: 0 1 auto; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.panel-head .actions { padding: var(--sp1) var(--sp3); flex: 0 1 auto; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
 .panel-head .actions > :not(.btns) { flex-basis: 100%; }
-.tabs { display: flex; gap: 2px; padding: 0 var(--s2); border-bottom: 1px solid var(--line); align-items: center; overflow-x: auto; }
-.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 7px 11px; color: var(--muted); white-space: nowrap; }
-.tabs button.sel { color: var(--fg); border-bottom-color: var(--accent); font-weight: 500; }
-.tabs .who { margin-left: auto; font-size: var(--fs-s); white-space: nowrap; padding-left: 10px; display: flex; gap: 6px; }
-.tabpanel { padding: var(--s3) 14px; overflow: auto; flex: 1; min-height: 0; }
-.details-head { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; margin-bottom: var(--s3); }
-.details-head h3 { margin: 0; font-size: var(--fs-l); }
-.details-head .key { color: var(--muted); }
-.tag-note { font-size: 11px; border-radius: 9px; padding: 0 8px; font-weight: 500; background: var(--block-soft); color: var(--block); }
-.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
-.details h4 { margin: 0 0 6px; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+/* Tabs: a primary tab row, the open tab marked by a rounded primary indicator under it. */
+.tabs { display: flex; gap: 0; padding: 0 var(--sp2); border-bottom: 1px solid var(--outline-variant); align-items: center; overflow-x: auto; }
+.tabs button { position: relative; isolation: isolate; height: var(--tab-h); background: none; border: 0; padding: 0 var(--sp4); font-size: var(--fs-label-l); line-height: var(--lh-label-l); font-weight: var(--fw-medium); color: var(--on-surface-variant); white-space: nowrap; }
+.tabs button::before { content: ""; position: absolute; inset: 0; background: currentColor; opacity: 0; pointer-events: none; z-index: -1; }
+.tabs button:hover::before { opacity: var(--state-hover); }
+.tabs button:focus-visible::before { opacity: var(--state-focus); }
+.tabs button.sel { color: var(--primary); }
+.tabs button.sel::after { content: ""; position: absolute; left: var(--sp2); right: var(--sp2); bottom: 0; height: 3px; border-radius: var(--shape-xs) var(--shape-xs) 0 0; background: var(--primary); }
+.tabs .who { margin-left: auto; font-size: var(--fs-body-m); white-space: nowrap; padding-left: var(--sp3); display: flex; gap: var(--sp2); }
+.tabpanel { padding: var(--sp3) var(--sp4); overflow: auto; flex: 1; min-height: 0; }
+/* Details: one rhythm, `--sp4` between its blocks; a block's own margins give way to it. */
+.details { display: flex; flex-direction: column; gap: var(--sp4); }
+.details.details > * { margin: 0; }
+.details-head { display: flex; gap: var(--sp2); align-items: baseline; flex-wrap: wrap; }
+.details-head h3 { margin: 0; font-size: var(--fs-headline-m); line-height: var(--lh-headline-m); font-weight: var(--fw-semibold); }
+.details-head .key { color: var(--on-surface-variant); font-size: var(--fs-label-m); }
+.tag-note { font-size: var(--fs-label-m); line-height: var(--lh-label-m); border-radius: var(--shape-full); padding: 0 var(--sp2); font-weight: var(--fw-medium); background: var(--status-block-container); color: var(--status-block); }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp4); }
+.details h4, .depends h4 { margin: 0 0 var(--sp1); font-size: var(--fs-title-m); line-height: var(--lh-title-m); color: var(--on-surface); font-weight: var(--fw-semibold); }
 .details section { min-width: 0; }
 .details p { margin: 0; max-width: 65ch; }
 .prompt { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; font: inherit; max-width: 65ch; }
-.pr { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-s); }
-.pr .checks { margin: 0; padding-left: var(--s3); }
-.pr li[data-state=failed] { color: var(--danger); }
-.pr li[data-state=passed] { color: var(--done); }
-.ck { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-.ck li { display: flex; gap: 7px; }
-.ck li::before { content: "\25A1"; color: var(--muted); font-family: var(--mono); }
-.ck li.d::before { content: "\2611"; color: var(--done); }
-.comments { margin-top: var(--s3); }
-.comments ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.comments li { padding: 6px 10px; border-radius: var(--r-m); background: var(--surface2); }
+.pr { display: flex; flex-direction: column; gap: var(--sp1); font-size: var(--fs-body-m); }
+.pr .checks { margin: 0; padding-left: var(--sp3); }
+.pr li[data-state=failed] { color: var(--error); }
+.pr li[data-state=passed] { color: var(--status-done); }
+.ck { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp1); }
+.ck li { display: flex; gap: var(--sp2); }
+.ck li::before { content: "\25A1"; color: var(--on-surface-variant); font-family: var(--mono); }
+.ck li.d::before { content: "\2611"; color: var(--status-done); }
+.comments ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp2); }
+.comments li { padding: var(--sp2) var(--sp3); border-radius: var(--shape-s); background: var(--surface-container-high); }
 .events { list-style: none; margin: 0; padding: 0; }
-.events li { padding: var(--s1) 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-.events code { display: block; font-size: var(--fs-s); color: var(--muted); }
-.details-meta { margin: var(--s2) 0 var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
+.events li { padding: var(--sp1) 0; border-bottom: 1px solid var(--outline-variant); overflow-wrap: anywhere; }
+.events code { display: block; font-size: var(--fs-body-m); color: var(--on-surface-variant); }
+.details-meta { display: flex; flex-direction: column; gap: var(--sp2); }
 .tag-note { margin: 0; width: fit-content; }
-.details > p.muted { margin-bottom: var(--s3); }
-.actions { display: flex; flex-direction: column; gap: var(--s2); }
-.actions .btns { display: flex; gap: var(--s2); flex-wrap: wrap; }
-.actions button.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
-.actions button.danger { color: var(--danger); }
-.compose { display: flex; gap: var(--s2); align-items: flex-start; margin-top: var(--s2); flex-wrap: wrap; }
-.compose textarea { flex: 1; min-width: 200px; min-height: 52px; font: inherit; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: var(--r-s); padding: 6px 8px; }
-.comments .kind { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.rounds { margin-top: var(--s3); }
-.rounds ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-.rounds .round-items { margin: 2px 0 var(--s2) var(--s3); font-size: var(--fs-s); }
-.rounds .basis { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted); background: var(--surface2); border-radius: var(--r-pill); padding: 0 6px; white-space: nowrap; }
-.rounds [data-basis=NOT_RUN] .basis { color: var(--block); }
+/* The action bar: one filled button, the rest outlined, a dangerous one a text button. */
+.actions { display: flex; flex-direction: column; gap: var(--sp2); }
+.actions .btns { display: flex; gap: var(--sp2); flex-wrap: wrap; }
+.actions .btn.danger:not(.primary) { border-color: transparent; }
+/* A text field of the language: outlined, a primary border and ring when focused. */
+.compose { display: flex; gap: var(--sp2); align-items: flex-start; margin-top: var(--sp2); flex-wrap: wrap; }
+.compose :is(textarea, input), .cancel-confirm input { flex: 1; min-width: 200px; font: inherit; font-size: var(--fs-body-l); line-height: var(--lh-body-l); color: var(--on-surface); background: var(--surface-container); border: 1px solid var(--outline); border-radius: var(--shape-xs); padding: var(--sp2) var(--sp3); }
+.compose textarea { min-height: calc(var(--field-h) * 2); resize: vertical; }
+.compose input, .cancel-confirm input { min-height: var(--field-h); padding-block: 0; }
+.compose :is(textarea, input):focus, .cancel-confirm input:focus { outline: none; border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.comments .kind { font-size: var(--fs-label-m); text-transform: uppercase; letter-spacing: 0.06em; color: var(--on-surface-variant); }
+.rounds ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp1); }
+.rounds .round-items { margin: var(--sp1) 0 var(--sp2) var(--sp3); font-size: var(--fs-body-m); }
+.rounds .basis { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); background: var(--surface-container-high); border-radius: var(--shape-full); padding: 0 var(--sp2); white-space: nowrap; }
+.rounds [data-basis=NOT_RUN] .basis { color: var(--status-block); }
 /* The terminal tab owns the panel's height: the host takes what is left under the status row and
    shrinks with the panel (no minimum), and the grid is counted from the host's content box, so
-   every row is inside the panel at any height. */
+   every row is inside the panel at any height. The terminal's own metrics are not changed here. */
 .tabpanel[data-tab=terminal] { display: flex; flex-direction: column; overflow: hidden; }
 .terminal { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; }
-.term-status { font-size: var(--fs-s); flex: none; display: flex; align-items: center; gap: var(--s2); }
-.term-copy { margin-left: auto; display: inline-flex; align-items: center; gap: var(--s1); }
+.term-status { font-size: var(--fs-body-m); flex: none; display: flex; align-items: center; gap: var(--sp2); }
+.term-copy { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp1); }
 /* A terminal that offers a way to start shows no empty screen: the placeholder and the offer are centred. */
 .terminal.offer .term-status, .terminal.offer .term-host { display: none; }
-.terminal.offer .term-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3); text-align: center; }
+.terminal.offer .term-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp3); text-align: center; }
 .term-empty p { margin: 0; max-width: 48ch; }
-.term-host { flex: 1; min-height: 0; background: var(--term-bg); padding: 4px 6px; border-radius: var(--r-s); overflow: hidden; }
-.depends { margin: var(--s2) 0 var(--s3); display: flex; flex-direction: column; gap: var(--s1); }
-.depends h4 { margin: 0; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
-.depends ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-.depends li { display: flex; gap: var(--s2); align-items: center; }
+.term-host { flex: 1; min-height: 0; background: var(--term-bg); padding: 4px 6px; border-radius: var(--shape-xs); overflow: hidden; }
+.depends { display: flex; flex-direction: column; gap: var(--sp1); }
+.depends ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp1); }
+.depends li { display: flex; gap: var(--sp2); align-items: center; }
 .depends p { margin: 0; }
-.cancel-confirm { display: flex; flex-direction: column; gap: var(--s1); font-size: var(--fs-s); color: var(--muted); }
-.cancel-confirm label { display: flex; flex-direction: column; gap: 3px; }
-.cancel-confirm input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-s); padding: 3px var(--s2); }
-.cancel-confirm .btns { display: flex; gap: var(--s2); }
-.cancel-confirm button.danger { color: var(--danger); }
-.cancel-pop { width: 280px; padding: var(--s2); }
+.cancel-confirm { display: flex; flex-direction: column; gap: var(--sp1); font-size: var(--fs-body-m); color: var(--on-surface-variant); }
+.cancel-confirm label { display: flex; flex-direction: column; gap: var(--sp1); }
+.cancel-confirm input { flex: none; min-width: 0; }
+.cancel-confirm .btns { display: flex; gap: var(--sp2); }
+.cancel-pop { width: 280px; padding: var(--sp2); }
 .actions .cancel-confirm { max-width: 360px; }

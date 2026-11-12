@@ -4,10 +4,25 @@
 use crate::{Client, ClientResult, NO_BODY, enc};
 use toknila_api_types::{
     ChainDeletion, ChainDetail, ChainFile, ChainItem, ChainSettings, EdgeInput, EdgeMoveInput,
-    MoveInput, NewChain,
+    MoveChain, MoveInput, NewChain,
 };
 
 impl Client {
+    /// `POST /chains/{chain}/move`: the chain goes before or after another of its project;
+    /// `project` narrows the name.
+    pub fn move_chain(
+        &self,
+        chain: &str,
+        project: Option<&str>,
+        to: &MoveChain,
+    ) -> ClientResult<ChainDetail> {
+        let mut path = format!("/chains/{}/move", enc(chain));
+        if let Some(p) = project {
+            path = format!("{path}?project={}", enc(p));
+        }
+        self.call("POST", &path, Some(to))
+    }
+
     /// `POST /projects/{project}/chains`.
     pub fn create_chain(&self, project: &str, c: &NewChain) -> ClientResult<ChainDetail> {
         self.call(

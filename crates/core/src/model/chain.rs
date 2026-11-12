@@ -26,6 +26,10 @@ pub struct Chain {
     /// carries the same version; none for a chain that was made without one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// Where the chain stands in its project's roadmap, from 0; chains are listed by it. A new
+    /// or imported chain takes the place after the last one.
+    #[serde(default)]
+    pub position: u32,
 }
 
 impl Chain {

@@ -104,6 +104,7 @@ impl Mem {
             review_mode: None,
             reviewer: None,
             source: None,
+            position: 0,
             version: None,
         };
         let now = Timestamp(1_000);

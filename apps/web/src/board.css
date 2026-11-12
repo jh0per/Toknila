@@ -1,40 +1,41 @@
 /* The Designs view of a chain: the switch in the top bar, the board of mockups, the regions. */
-.view-switch { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-s); overflow: hidden; }
-.view-tab { padding: 2px 12px; font-size: var(--fs-s); color: var(--muted); text-decoration: none; background: var(--surface); }
-.view-tab + .view-tab { border-left: 1px solid var(--line); }
-.view-tab.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.view-switch { display: inline-flex; height: var(--ctl-h); border: 1px solid var(--outline); border-radius: var(--shape-full); overflow: hidden; }
+.view-tab { display: inline-flex; align-items: center; padding: 0 var(--sp3); font-size: var(--fs-label-l); line-height: var(--lh-label-l); font-weight: var(--fw-medium); color: var(--on-surface); text-decoration: none; background: none; }
+.view-tab:hover { background: color-mix(in srgb, var(--on-surface) calc(var(--state-hover) * 100%), transparent); }
+.view-tab + .view-tab { border-left: 1px solid var(--outline); }
+.view-tab.on { background: var(--primary-container); color: var(--on-primary-container); }
 
 .board-frame { flex-direction: column; }
 .board-frame > .board-scroll { flex: 1; }
-.board-empty { flex: 1; display: grid; place-items: center; padding: var(--s4); text-align: center; background: var(--bg); }
-.board-loading { padding: var(--s3); }
+.board-empty { flex: 1; display: grid; place-items: center; padding: var(--sp4); text-align: center; background: var(--background); }
+.board-loading { padding: var(--sp3); }
 .board-frame.dragging { cursor: grabbing; user-select: none; }
 
 /* The cards of the chain, always in view: a card without a region is a target here too. */
-.board-cards { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px var(--s3); background: var(--surface); border-bottom: 1px solid var(--line); font-size: var(--fs-s); }
-.board-chip { font: inherit; font-family: var(--mono); font-size: var(--fs-xs); cursor: pointer; color: var(--sc); background: var(--sc-soft); border: 1px solid color-mix(in srgb, var(--sc) 45%, var(--line)); border-radius: var(--r-pill); padding: 1px 9px; }
+.board-cards { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp2); padding: var(--sp2) var(--sp3); background: var(--surface-container); border-bottom: 1px solid var(--outline-variant); font-size: var(--fs-body-m); }
+.board-chip { font: inherit; font-family: var(--mono); font-size: var(--fs-label-m); line-height: var(--lh-label-m); cursor: pointer; color: var(--sc); background: var(--sc-soft); border: 1px solid color-mix(in srgb, var(--sc) 45%, var(--outline-variant)); border-radius: var(--shape-full); padding: 0 var(--sp2); }
 .board-chip.current { outline: 2px solid var(--sc); outline-offset: 1px; }
-.board-chip.over { outline: 3px solid var(--accent); outline-offset: 2px; }
+.board-chip.over { outline: 3px solid var(--primary); outline-offset: 2px; }
 
-.board-tile { position: absolute; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-.board-caption { display: flex; align-items: baseline; gap: var(--s2); height: 26px; font-size: var(--fs-s); overflow: hidden; white-space: nowrap; }
-.board-stage { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-s); background: var(--surface2); line-height: 0; }
+.board-tile { position: absolute; margin: 0; display: flex; flex-direction: column; gap: var(--sp2); }
+.board-caption { display: flex; align-items: baseline; gap: var(--sp2); height: 26px; font-size: var(--fs-body-m); overflow: hidden; white-space: nowrap; }
+.board-stage { position: relative; overflow: hidden; border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); background: var(--surface-container-high); line-height: 0; }
 .board-stage img { display: block; width: 100%; height: 100%; user-select: none; }
-.board-note { box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: var(--s2); padding: var(--s3); border: 1px dashed var(--line); border-radius: var(--r-s); background: var(--surface); }
-.board-note p { margin: 0; line-height: 1.4; }
-.board-note-cards { display: flex; flex-wrap: wrap; gap: 6px; }
+.board-note { box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: var(--sp2); padding: var(--sp3); border: 1px dashed var(--outline-variant); border-radius: var(--shape-xs); background: var(--surface-container); }
+.board-note p { margin: 0; line-height: var(--lh-body-l); }
+.board-note-cards { display: flex; flex-wrap: wrap; gap: var(--sp2); }
 
 /* A card's region: outlined in the card's status colour (`--sc`), tinted lightly. The box lets
    pointers through to the pins under it; its label and handle take them. */
 .board-region { position: absolute; box-sizing: border-box; border: 3px solid var(--sc); background: color-mix(in srgb, var(--sc) 10%, transparent); pointer-events: none; line-height: 1; }
 .board-region.current { border-width: 5px; }
-.board-region.over { box-shadow: 0 0 0 4px var(--accent); }
+.board-region.over { box-shadow: 0 0 0 4px var(--primary); }
 .board-tag { position: absolute; top: 0; display: inline-flex; align-items: stretch; pointer-events: auto; }
-.board-label { font: inherit; font-family: var(--mono); font-size: 14px; font-weight: 600; cursor: pointer; border: 0; padding: 3px 8px; color: var(--bg); background: var(--sc); }
-.board-handle { width: 20px; cursor: grab; touch-action: none; background: color-mix(in srgb, var(--sc) 75%, var(--fg)); border-left: 1px solid var(--bg); position: relative; }
-.board-handle::after { content: ""; position: absolute; inset: 6px 5px; border-radius: 50%; background: var(--bg); }
+.board-label { font: inherit; font-family: var(--mono); font-size: var(--fs-title-l); font-weight: var(--fw-semibold); cursor: pointer; border: 0; padding: var(--sp1) var(--sp2); color: var(--background); background: var(--sc); }
+.board-handle { width: var(--sp5); cursor: grab; touch-action: none; background: color-mix(in srgb, var(--sc) 75%, var(--on-surface)); border-left: 1px solid var(--background); position: relative; }
+.board-handle::after { content: ""; position: absolute; inset: 6px 5px; border-radius: 50%; background: var(--background); }
 
 .board-drag { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
-.board-drag line { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
-.board-drag circle { fill: var(--accent); }
-.board-drag[data-over=""] line { stroke: var(--muted); }
+.board-drag line { stroke: var(--primary); stroke-width: 2; stroke-dasharray: 5 4; }
+.board-drag circle { fill: var(--primary); }
+.board-drag[data-over=""] line { stroke: var(--on-surface-variant); }

@@ -4,6 +4,7 @@
     "goal": "Sample Feature\n\nDocuments:\n- spec.md\n- plan.md\n- contracts/\n- tasks.md",
     "id": "<id>",
     "name": "001-sample-feature",
+    "position": 0,
     "project_id": "<id>",
     "review_mode": null,
     "source": "<path>"

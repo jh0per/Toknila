@@ -30,6 +30,7 @@ pub mod question;
 pub mod release_run;
 pub mod removal;
 pub mod repo;
+pub mod roadmap;
 pub mod schedule;
 pub mod spec;
 pub mod strays;

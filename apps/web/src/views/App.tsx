@@ -1,5 +1,5 @@
 import { token } from "../api/http";
-import { activeProjects, currentChain, currentProject } from "../store/state";
+import { activeProjects, chainsOf, currentChain, currentProject } from "../store/state";
 import { useStore } from "../store/useStore";
 import { ChainScreen } from "./ChainScreen";
 import { Dialogs } from "./Dialogs";
@@ -8,6 +8,7 @@ import { Inbox } from "./Inbox";
 import { Onboarding } from "./Onboarding";
 import { OpenedNotice } from "./OpenedNotice";
 import { PlannerScreen } from "./PlannerScreen";
+import { Roadmap } from "./Roadmap";
 import { Settings } from "./Settings";
 import { SettingsSidebar } from "./SettingsSidebar";
 import { Shortcuts } from "./Shortcuts";
@@ -29,13 +30,16 @@ export function App() {
   const project = currentProject(state);
   // The planner's screen has the chain layout (a diagram above, a panel below), chain or not.
   const planning = r === "planner" && Boolean(project) && state.loaded;
-  const showChain = (Boolean(chain) || planning) && state.loaded && r !== "inbox" && r !== "settings" && r !== "usage";
+  // The project's own page is its roadmap, as long as it has epics; a project without any leads
+  // with the question for the assistant.
+  const roadmap = r === "project" && Boolean(project) && state.loaded && chainsOf(state, project).length > 0;
+  const showChain = !roadmap && (Boolean(chain) || planning) && state.loaded && r !== "inbox" && r !== "settings" && r !== "usage";
   // No project to show yet: the main area is the onboarding, with the add-a-project form on it.
   const onboarding = state.loaded && r !== "settings" && activeProjects(state).length === 0 && !project;
   return (
     <div className="ide">
       {r === "settings" ? <SettingsSidebar state={state} dispatch={dispatch} /> : <Sidebar state={state} dispatch={dispatch} />}
-      <main className={showChain ? "has-panel" : "plain"}>
+      <main className={showChain ? "has-panel" : roadmap ? "roadmap-page" : "plain"}>
         {state.error && !showChain && <p className="error">{state.error}</p>}
         {!state.loaded ? <p className="muted">Loading…</p> : r === "settings" ? (
           <Settings state={state} dispatch={dispatch} />
@@ -45,6 +49,8 @@ export function App() {
           <Usage state={state} dispatch={dispatch} />
         ) : r === "inbox" ? (
           <Inbox state={state} dispatch={dispatch} />
+        ) : roadmap && project ? (
+          <Roadmap project={project} state={state} dispatch={dispatch} />
         ) : planning && project ? (
           <PlannerScreen project={project} state={state} dispatch={dispatch} />
         ) : chain ? (

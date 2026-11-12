@@ -142,6 +142,7 @@ try {
   console.log("PASS the selection survives a resize");
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.waitForFunction(() => window.innerHeight === 720);
+  await page.waitForTimeout(500); // the terminal refits before its rows are measured again
 
   // The copy key copies the selection: Cmd+C on a Mac, Ctrl+Shift+C elsewhere.
   const mac = await page.evaluate(() => /mac/i.test(navigator.platform));
