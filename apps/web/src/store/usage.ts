@@ -1,7 +1,7 @@
 // The Usage page: the window, the metric shown and what the daemon answered. The daemon does
 // every sum; this keeps its answer and picks what to show.
 
-import type { UsageItem, UsageView } from "../api/types";
+import type { TodayUsage, UsageItem, UsageView } from "../api/types";
 import type { Effect } from "./msg";
 import type { State } from "./state";
 
@@ -14,22 +14,29 @@ export interface UsageState {
   metric: Metric;
   view: UsageView | undefined;
   error: string;
+  /// Today's spend of the open project, for the top bar and the Agents node.
+  today: { project: string; view: TodayUsage } | undefined;
 }
 
-export const initialUsage: UsageState = { days: 7, metric: "cost", view: undefined, error: "" };
+export const initialUsage: UsageState = { days: 7, metric: "cost", view: undefined, error: "", today: undefined };
 
-/// What the person did on the page.
+/// What the person did on the page, or what the window asks for.
 export type UsageIntent =
   | { type: "setUsageDays"; days: Days }
   | { type: "setUsageMetric"; metric: Metric }
-  | { type: "setMachineScan"; on: boolean };
+  | { type: "setMachineScan"; on: boolean }
+  | { type: "wantToday"; project: string };
 
 /// What the daemon answered.
-export type UsageResult = { type: "usageLoaded"; view: UsageView } | { type: "usageFailed"; error: string };
+export type UsageResult =
+  | { type: "usageLoaded"; view: UsageView }
+  | { type: "usageFailed"; error: string }
+  | { type: "todayLoaded"; project: string; view: TodayUsage };
 
 export type UsageMsg = UsageIntent | UsageResult;
 
 export type UsageEffect =
+  | { type: "loadToday"; project: string }
   | { type: "loadUsage"; days: Days }
   | { type: "saveUsageSettings"; machine_scan: boolean; days: Days }
   | { type: "pollUsage"; days: Days };
@@ -55,6 +62,10 @@ export function reduceUsage(s: State, msg: UsageMsg): [State, Effect[]] {
       return [set({ view: msg.view, error: "" }), again(s)];
     case "usageFailed":
       return [set({ error: msg.error }), again(s)];
+    case "wantToday":
+      return [s, [{ type: "loadToday", project: msg.project }]];
+    case "todayLoaded":
+      return [set({ today: { project: msg.project, view: msg.view } }), []];
   }
 }
 

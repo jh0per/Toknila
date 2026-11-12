@@ -62,6 +62,10 @@
     ],
     "used_rounds": 0
   },
+  "run_time": {
+    "done_ms": 0,
+    "since": null
+  },
   "ship": null,
   "simulated": true,
   "subtasks": [],

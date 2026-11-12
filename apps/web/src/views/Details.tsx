@@ -25,7 +25,7 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
       <div className="details-head">
         <span className="key">{card.key}</span>
         <h3>{card.title}</h3>
-        <UsageChip figures={detail?.usage} testId="details-usage" />
+        <UsageChip figures={detail?.usage} runTime={detail?.run_time} testId="details-usage" />
       </div>
       <StatusBlock state={state} card={card} detail={detail} dispatch={dispatch} />
       {card.status === "review" && (

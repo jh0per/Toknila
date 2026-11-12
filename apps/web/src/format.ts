@@ -33,9 +33,18 @@ export function agoText(thenMs: number, nowMs: number): string {
 export const shareText = (share: number): string => `${Math.round(share * 100)}%`;
 
 /// The small chip on a card: tokens and estimated cost; empty when the card used nothing.
-export function chipText(f: Pick<UsageFigures, "processed" | "cost_usd" | "messages"> | undefined): string {
-  if (!f || f.messages === 0) return "";
-  return `${tokensText(f.processed)} tok · ~${costText(f.cost_usd)}`;
+export function chipText(f: Pick<UsageFigures, "cost_usd" | "messages"> | undefined, timeMs = 0): string {
+  const cost = f && f.messages > 0 ? `est. ${costText(f.cost_usd)}` : "";
+  const time = timeMs >= 1000 ? durationText(timeMs) : "";
+  return [cost, time].filter(Boolean).join(" · ");
+}
+
+/// A running time in few characters: 45s, 2m 17s, 1h 05m.
+export function durationText(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
 }
 
 export function reasonText(r: StatusReason | null | undefined): string {

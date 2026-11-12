@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StatusReason } from "./api/types";
-import { ESTIMATE_NOTE, agoText, chipText, costText, outOfOrderText, reasonText, shareText, tokensText } from "./format";
+import { ESTIMATE_NOTE, agoText, chipText, costText, durationText, outOfOrderText, reasonText, shareText, tokensText } from "./format";
 
 describe("outOfOrderText", () => {
   it("names the earlier cards that were still open", () => {
@@ -72,9 +72,16 @@ describe("usage text", () => {
     expect(shareText(0)).toBe("0%");
   });
   it("makes the chip of a card, and none for a card that used nothing", () => {
-    expect(chipText({ processed: 1_200_000, cost_usd: 3.4, messages: 9 } as never)).toBe("1.2M tok · ~$3.40");
-    expect(chipText({ processed: 0, cost_usd: 0, messages: 0 } as never)).toBe("");
+    expect(chipText({ cost_usd: 3.8, messages: 9 }, 137_000)).toBe("est. $3.80 · 2m 17s");
+    expect(chipText({ cost_usd: 3.4, messages: 9 })).toBe("est. $3.40");
+    expect(chipText({ cost_usd: 0, messages: 0 })).toBe("");
     expect(chipText(undefined)).toBe("");
+  });
+  it("says a run's time with its biggest units", () => {
+    expect(chipText(undefined, 45_000)).toBe("45s");
+    expect(chipText(undefined, 500)).toBe("");
+    expect(durationText(125_000)).toBe("2m 5s");
+    expect(durationText(3_900_000)).toBe("1h 05m");
   });
   it("always says it is an estimate", () => {
     expect(ESTIMATE_NOTE).toMatch(/estimate/i);

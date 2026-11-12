@@ -34,6 +34,12 @@ pub fn day_of(at: Timestamp) -> i64 {
     at.0.div_euclid(DAY_MS)
 }
 
+/// The day number a time falls on for a person whose clock is `offset_minutes` east of UTC
+/// (negative to the west): the day of their wall clock, not UTC's.
+pub fn day_of_local(at: Timestamp, offset_minutes: i32) -> i64 {
+    (at.0 + i64::from(offset_minutes) * 60_000).div_euclid(DAY_MS)
+}
+
 /// `YYYY-MM-DD` of a day number.
 pub fn day_label(day: i64) -> String {
     let (y, m, d) = civil_from_days(day);

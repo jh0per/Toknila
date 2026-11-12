@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use toknila_app::reviews::ReviewView;
 use toknila_core::machine::TicketAction;
-use toknila_core::usage::UsageFigures;
+use toknila_core::usage::{RunTime, UsageFigures};
 use toknila_core::{Comment, Phase, Ship, Subtask, Ticket};
 
 /// A ticket with everything attached to it.
@@ -39,6 +39,9 @@ pub struct TicketDetail {
     /// before any run reported a transcript.
     #[serde(default)]
     pub usage: UsageFigures,
+    /// How long the card's agents ran: the finished runs, and the start of the one still going.
+    #[serde(default)]
+    pub run_time: RunTime,
     /// Set by `PATCH` when the size it asked for was out of range: that size, which the card
     /// does not have (it has the nearest one inside the limits).
     #[serde(default, skip_serializing_if = "Option::is_none")]

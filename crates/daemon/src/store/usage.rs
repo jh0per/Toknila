@@ -1,8 +1,10 @@
 //! Row <-> domain mapping for token usage: sessions (which run an agent session is), the
 //! transcript files read so far, one row per model call, and machine-wide settings.
 
+use std::collections::BTreeMap;
+
 use rusqlite::{OptionalExtension, params};
-use toknila_core::usage::{Record, Row, TokenCounts};
+use toknila_core::usage::{Record, Row, RunMark, RunTime, TokenCounts, run_time};
 use toknila_core::{AgentRole, ChainId, RunId, TicketId, Timestamp};
 
 use super::StoreError;
@@ -177,6 +179,59 @@ impl Repo<'_> {
             },
         )?;
         Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// How long the agents of each card ran (by ticket key), from the journal's runner events;
+    /// of a chain's cards, or of one ticket. A card whose process is alive now carries the start
+    /// of its current run. Cards that never ran are absent.
+    pub fn run_times(
+        &self,
+        chain: Option<ChainId>,
+        ticket: Option<TicketId>,
+    ) -> Result<BTreeMap<String, RunTime>, StoreError> {
+        let mut st = self.conn.prepare_cached(
+            "SELECT t.id, t.key, json_extract(e.payload_json, '$.run.id'), e.at, e.kind = 'runner_exited' \
+             FROM events e JOIN tickets t ON t.id = e.entity_id \
+             WHERE e.entity = 'ticket' AND e.kind IN ('runner_started', 'runner_exited') \
+               AND (?1 IS NULL OR t.chain_id = ?1) AND (?2 IS NULL OR t.id = ?2) ORDER BY e.seq",
+        )?;
+        let found = st.query_map(
+            params![chain.map(|c| c.to_string()), ticket.map(|t| t.to_string())],
+            |r| {
+                let mark = RunMark {
+                    run: r.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                    at: Timestamp(r.get(3)?),
+                    ended: r.get(4)?,
+                };
+                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, mark))
+            },
+        )?;
+        let mut by_card: BTreeMap<String, (String, Vec<RunMark>)> = BTreeMap::new();
+        for found in found {
+            let (id, key, mark) = found?;
+            by_card
+                .entry(key)
+                .or_insert_with(|| (id, Vec::new()))
+                .1
+                .push(mark);
+        }
+        let live: Vec<TicketId> = self.live_runs()?.into_iter().map(|(t, _, _)| t).collect();
+        Ok(by_card
+            .into_iter()
+            .map(|(key, (id, marks))| {
+                let alive = live.iter().any(|t| t.to_string() == id);
+                (key, run_time(&marks, alive))
+            })
+            .collect())
+    }
+
+    /// The newest journal entry that says a runner ended (0 before any): it moves when a run ends.
+    pub fn runs_ended(&self) -> Result<i64, StoreError> {
+        Ok(self.conn.query_row(
+            "SELECT COALESCE(MAX(seq), 0) FROM events WHERE entity = 'ticket' AND kind = 'runner_exited'",
+            [],
+            |r| r.get(0),
+        )?)
     }
 
     /// A machine-wide setting stored as JSON text.

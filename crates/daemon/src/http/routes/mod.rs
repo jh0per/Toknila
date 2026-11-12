@@ -94,6 +94,7 @@ fn load_chain_detail(
     })?;
     let mut detail = ChainDetail::from_view(view, at);
     detail.usage = figures_per_card(&rows, prices);
+    detail.run_time = repo.run_times(Some(chain), None)?;
     Ok(detail)
 }
 
@@ -138,6 +139,11 @@ fn load_ticket_detail(
         simulated,
         design_waiting,
         usage: figures(&rows, prices),
+        run_time: repo
+            .run_times(None, Some(t.id))?
+            .into_values()
+            .next()
+            .unwrap_or_default(),
         review,
         allowed_actions: toknila_core::machine::TicketAction::allowed(&t),
         can_edit: t.status.can_edit(),
