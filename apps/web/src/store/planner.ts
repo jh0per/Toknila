@@ -78,8 +78,8 @@ export type PlannerEffect = {
   text?: string;
   /// `ask`: the message as written, line breaks kept: it is stored in the conversation first.
   raw?: string;
-  /// `ask`: what the stored message is about (a chain), when the chip said so.
-  about?: { kind: "chain"; name: string };
+  /// `ask`: what the stored message is about (a chain or the roadmap), when the chip said so.
+  about?: { kind: "chain"; name: string } | { kind: "roadmap" };
   /// `ask`: the planner has to start first, so wait for its screen to settle before typing.
   wait?: boolean;
 };
@@ -107,7 +107,7 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
       // is stored with the chain, the roadmap's is typed with its prefix.
       const call: PlannerEffect =
         chip?.kind === "card" ? { ...base, call: "discuss", card: chip.key, draft: msg.project, text: raw }
-        : chip ? { ...base, call: "ask", text: lineFor(chip, raw), raw, about: chip.kind === "chain" ? chip : undefined }
+        : chip ? { ...base, call: "ask", text: lineFor(chip, raw), raw, about: chip.kind === "chain" || chip.kind === "roadmap" ? chip : undefined }
         : { ...base, call: "ask", text: oneLine(raw), raw };
       return [set({ error: "", sending: msg.project }), [call]];
     }

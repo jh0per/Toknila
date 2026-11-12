@@ -19,6 +19,7 @@ fn about(m: &Message) -> String {
     match &m.about {
         Some(About::Card { key }) => format!(" [{key}]"),
         Some(About::Chain { name }) => format!(" [chain {name}]"),
+        Some(About::Roadmap) => " [roadmap]".to_owned(),
         None => String::new(),
     }
 }

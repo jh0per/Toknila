@@ -12,6 +12,9 @@ import type { State } from "./state";
 /// What a message is about: the roadmap, a chain (by name) or a card (by key).
 export type Context = { kind: "roadmap" } | { kind: "chain"; name: string } | { kind: "card"; key: string };
 
+/// What an empty roadmap and an empty chat on the roadmap say to the person.
+export const ROADMAP_STARTER = "Tell the assistant what to build; it splits it into releases";
+
 export interface AssistantSlice {
   /// The panel beside the screens is open.
   open: boolean;
@@ -96,13 +99,12 @@ export function lineFor(c: Context, text: string): string {
   return c.kind === "chain" ? `About chain ${c.name}: ${one}` : `About the roadmap: ${one}`;
 }
 
-/// The messages "only about this" keeps: those about the card or chain; for the roadmap, those
-/// about neither.
+/// The messages "only about this" keeps: those about the card, the chain or the roadmap.
 export function aboutThis(messages: ConversationMessage[], c: Context): ConversationMessage[] {
   return messages.filter((m) => {
     if (c.kind === "card") return m.about?.kind === "card" && m.about.key === c.key;
     if (c.kind === "chain") return m.about?.kind === "chain" && m.about.name === c.name;
-    return !m.about;
+    return m.about?.kind === "roadmap";
   });
 }
 

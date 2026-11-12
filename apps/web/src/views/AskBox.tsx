@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { type KeyboardEvent, useEffect, useRef } from "react";
 import type { Intent } from "../store/msg";
 import { canSend } from "../store/askAttach";
 import { draftOf } from "../store/planner";
@@ -7,7 +7,9 @@ import { AskChips, AttachButton, DropFrame, useAskAttach } from "./AskAttach";
 
 /// A text box that sends on Enter (Shift+Enter makes a new line). It does not send while an input
 /// method is composing a character.
-export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, disabled = false, label, testId }: {
+export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, disabled = false, label, testId, focus = false }: {
+  /// Take the focus when it appears.
+  focus?: boolean;
   value: string;
   onChange: (text: string) => void;
   onSubmit: () => void;
@@ -22,9 +24,13 @@ export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, 
     e.preventDefault();
     onSubmit();
   };
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (focus && !disabled) box.current?.focus();
+  }, [focus, disabled]);
   return (
     <textarea
-      className="prompt-field" aria-label={label} data-testid={testId} rows={rows} value={value} disabled={disabled}
+      ref={box} className="prompt-field" aria-label={label} data-testid={testId} rows={rows} value={value} disabled={disabled}
       placeholder={placeholder} onChange={(e) => onChange(e.target.value)} onKeyDown={key}
     />
   );
@@ -33,7 +39,9 @@ export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, 
 /// The box that talks to a project's assistant (its planner): what is typed is kept in the store,
 /// Enter or the button starts the assistant if it is not running and sends it the text. While the
 /// text is on its way the box waits.
-export function AskBox({ project, state, dispatch, placeholder, button, label, rows, testId, compact = false, waiting = false }: {
+export function AskBox({ project, state, dispatch, placeholder, button, label, rows, testId, compact = false, waiting = false, focus = false }: {
+  /// The box takes the focus when it appears (a starter points at it).
+  focus?: boolean;
   project: string;
   state: State;
   dispatch: (i: Intent) => void;
@@ -54,7 +62,7 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
   return (
     <DropFrame a={a} className={`ask${compact ? " compact" : ""}`} testId={testId}>
       <PromptField
-        value={text} label={label} testId={`${testId}-input`} rows={rows ?? (compact ? 2 : 3)} disabled={sending}
+        value={text} label={label} testId={`${testId}-input`} rows={rows ?? (compact ? 2 : 3)} disabled={sending} focus={focus}
         placeholder={placeholder} onSubmit={send}
         onChange={(t) => dispatch({ type: "editPlannerDraft", where: project, text: t })}
       />

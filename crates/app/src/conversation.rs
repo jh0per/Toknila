@@ -39,7 +39,7 @@ pub struct NewPersonMessage {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Say {
     pub text: String,
-    /// The card (key, id or title) or chain (name) the words are about.
+    /// The card (key, id or title) or chain (name) the words are about, or `roadmap`.
     #[serde(default)]
     pub about: Option<String>,
 }
@@ -100,6 +100,7 @@ pub fn say_as_person<U: UnitOfWork + ?Sized>(
                 .map_err(|_| AppError::not_found(format!("chain {name}")))?;
             Some(About::Chain { name: c.name })
         }
+        Some(About::Roadmap) => Some(About::Roadmap),
         Some(About::Card { .. }) => {
             return Err(AppError::new(
                 ErrorKind::BadRequest,
@@ -115,11 +116,12 @@ pub fn say_as_person<U: UnitOfWork + ?Sized>(
 fn about_of<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> AppResult<About> {
     match planner::card(r, project, reference) {
         Ok(t) => Ok(About::Card { key: t.key }),
-        Err(e) if e.kind == ErrorKind::NotFound => {
-            let c = planner::chain(r, project, reference)
-                .map_err(|_| AppError::not_found(format!("card or chain {reference}")))?;
-            Ok(About::Chain { name: c.name })
-        }
+        Err(e) if e.kind == ErrorKind::NotFound => match planner::chain(r, project, reference) {
+            Ok(c) => Ok(About::Chain { name: c.name }),
+            // No card or chain of that name: "roadmap" names the roadmap.
+            Err(_) if reference.eq_ignore_ascii_case("roadmap") => Ok(About::Roadmap),
+            Err(_) => Err(AppError::not_found(format!("card or chain {reference}"))),
+        },
         Err(e) => Err(e),
     }
 }

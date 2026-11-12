@@ -5994,6 +5994,22 @@
               }
             },
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "description": "The roadmap: the project's top-level plan of epics.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "roadmap"
+                ]
+              }
+            },
+            "additionalProperties": false
           }
         ],
         "description": "What a message was about."
@@ -11902,7 +11918,7 @@
               "string",
               "null"
             ],
-            "description": "The card (key, id or title) or chain (name) the words are about."
+            "description": "The card (key, id or title) or chain (name) the words are about, or `roadmap`."
           },
           "text": {
             "type": "string"

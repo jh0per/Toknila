@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Project } from "../api/types";
-import { type Context, aboutThis, contextKey, contextLabel, lineFor } from "../store/assistant";
+import { ROADMAP_STARTER, type Context, aboutThis, contextKey, contextLabel, lineFor } from "../store/assistant";
 import { talkOf, unanswered, wakeWhenLate } from "../store/conversation";
 import { msUntilOverdue } from "../store/conversation";
 import type { Intent } from "../store/msg";
@@ -53,7 +53,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
     if (!owed) return;
     const about = owed.about;
     if (about?.kind === "card" && owed.thread) dispatch({ type: "nudgeCard", project: key, key: about.key, thread: owed.thread, text: owed.text });
-    else dispatch({ type: "nudgeChat", project: key, text: about?.kind === "chain" ? lineFor(about, owed.text) : owed.text });
+    else dispatch({ type: "nudgeChat", project: key, text: about?.kind === "chain" || about?.kind === "roadmap" ? lineFor(about, owed.text) : owed.text });
   };
 
   // The newest message stays in view; an older page joins above without moving what is read.
@@ -76,6 +76,8 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
   };
 
   const only = state.assistant.only && context !== undefined;
+  // An empty chat on the roadmap carries the starter, and the box takes the focus.
+  const starter = talk !== undefined && messages.length === 0 && context?.kind === "roadmap";
   return (
     <div className="chat-pane" data-testid="chat-pane">
       <label className="only-about muted" title={context ? undefined : "Open a roadmap, a chain or a card to filter by it"}>
@@ -93,7 +95,9 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
         )}
         {talk && messages.length === 0 && (
           <p className="muted chat-note" data-testid="placeholder">
-            Tell the assistant what you want to build or change. It reads your project and writes the plan as cards; you start the cards and accept the work.
+            {starter
+              ? ROADMAP_STARTER
+              : "Tell the assistant what you want to build or change. It reads your project and writes the plan as cards; you start the cards and accept the work."}
           </p>
         )}
         <ol className="chat-items" data-testid="chat-items">
@@ -124,7 +128,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
         </div>
       )}
       <AskBox
-        project={key} state={state} dispatch={dispatch} testId="planner-ask" compact waiting={waiting}
+        project={key} state={state} dispatch={dispatch} testId="planner-ask" compact waiting={waiting} focus={starter}
         label="Message to the assistant" placeholder={placeholderFor(context)} button="Send"
       />
     </div>
