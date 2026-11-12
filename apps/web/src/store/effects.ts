@@ -5,6 +5,7 @@ import type {
   ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
+import { attachFiles } from "./attachEffects";
 import { runAutostartEffect } from "./autostartEffects";
 import { runEdgeEffect } from "./edgeEffects";
 import { runEpicEffect } from "./epicEffects";
@@ -206,6 +207,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "archiveProject":
       case "clearHash":
         runPlanEffect(e, dispatch);
+        return;
+      case "attachFiles":
+        void attachFiles(e).then(dispatch);
         return;
       case "plannerCall":
         runPlannerEffect(e, dispatch);

@@ -19,6 +19,7 @@ import { type SettingsState, initialSettings } from "./settings";
 import type { Theme } from "./theme";
 import { type UpdatesState, initialUpdates } from "./updates";
 import { type UsageState, initialUsage } from "./usage";
+import { type AttachState, initialAttach } from "./attach";
 
 export type Link = "connecting" | "live" | "offline";
 
@@ -77,6 +78,8 @@ export interface State {
   quick: QuickState;
   /// The Usage page: window, metric and the daemon's answer.
   usage: UsageState;
+  /// Files on their way to a card's designs, and the last drop's refusals.
+  attach: AttachState;
   /// Updates of the desktop app (empty in a browser).
   updates: UpdatesState;
   /// The viewer's colour theme; remembered in this browser only.
@@ -123,6 +126,7 @@ export function initialState(route: Route): State {
     placement: initialPlacement,
     quick: initialQuick,
     usage: initialUsage,
+    attach: initialAttach,
     updates: initialUpdates,
     theme: "system",
     shortcutsOpen: false,

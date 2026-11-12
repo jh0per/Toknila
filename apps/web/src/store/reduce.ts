@@ -3,6 +3,7 @@
 import type { EventRecord } from "../api/types";
 import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
+import { reduceAttach } from "./attach";
 import { reduceAutostart } from "./autostart";
 import { detailsWanted, knownKey } from "./cardDetails";
 import { reduceTheme } from "./theme";
@@ -306,6 +307,9 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return [{ ...s, opened: undefined }, []];
     case "openedExpired":
       return s.opened?.seq === msg.seq ? [{ ...s, opened: undefined }, []] : [s, []];
+    case "attachFiles":
+    case "filesAttached":
+      return reduceAttach(s, msg);
     case "setUsageDays":
     case "setUsageMetric":
     case "setMachineScan":
