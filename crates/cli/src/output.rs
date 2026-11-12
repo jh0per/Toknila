@@ -241,6 +241,9 @@ pub fn ticket(d: &TicketDetail) {
         d.chain,
         t.profile.as_deref().unwrap_or("(project default)")
     );
+    if let Some(m) = &t.model {
+        println!("model: {m}");
+    }
     if let Some(s) = &d.ship {
         println!("workspace: {}  ({})", s.path, s.branch);
     }

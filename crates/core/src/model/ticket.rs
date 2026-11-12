@@ -37,6 +37,10 @@ pub struct Ticket {
     /// `<worker profile>-reviewer`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reviewer: Option<String>,
+    /// The model of the card's own agent (an alias or a full name); `None` means the project's
+    /// `worker_model`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     /// Ship branch `ship/<chain>/<slug>`; `null` until the card's ship is made.
     pub branch: Option<String>,
     /// Copy depot secrets onto the ship at start.
@@ -151,6 +155,7 @@ pub struct TicketDraft {
     pub profile: Option<String>,
     pub review_mode: Option<ReviewMode>,
     pub reviewer: Option<String>,
+    pub model: Option<String>,
     pub needs_secrets: bool,
     pub design_first: bool,
     pub designs: Vec<DesignRef>,
@@ -184,6 +189,7 @@ impl Ticket {
             profile: draft.profile,
             review_mode: draft.review_mode,
             reviewer: draft.reviewer,
+            model: draft.model,
             branch: None,
             needs_secrets: draft.needs_secrets,
             design_first: draft.design_first,
@@ -236,6 +242,9 @@ pub struct TicketPatch {
     pub profile: Option<String>,
     pub review_mode: Option<ReviewMode>,
     pub reviewer: Option<String>,
+    /// The card's own model; an empty text clears it (the project's applies again).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     pub needs_secrets: Option<bool>,
     pub design_first: Option<bool>,
     /// The card's designs, replacing the whole list (an empty list clears it); left out to keep
@@ -299,6 +308,9 @@ impl TicketPatch {
         }
         if let Some(v) = self.reviewer {
             t.reviewer = Some(v).filter(|v| !v.trim().is_empty());
+        }
+        if let Some(v) = self.model {
+            t.model = Some(v.trim().to_string()).filter(|v| !v.is_empty());
         }
         if let Some(v) = self.needs_secrets {
             t.needs_secrets = v;

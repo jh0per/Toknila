@@ -25,7 +25,7 @@ type Dispatch = (msg: Msg) => void;
 const DEBOUNCE_MS = 50;
 
 /// Waits for a pause in typing before the folder field asks for a suggestion.
-const TYPING_MS = 250;
+const TYPING_MS = 400;
 
 /// How often the open Usage page asks again (the collector reads transcripts every 30 seconds).
 const USAGE_POLL_MS = 20_000;
@@ -187,6 +187,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "loadPlaces":
       case "loadCli":
       case "pickFolder":
+      case "prepareRepo":
       case "installCli":
       case "addProject":
       case "saveProject":
@@ -194,7 +195,8 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         runSettingsEffect(e, dispatch);
         return;
       case "checkRepo":
-        debounce("checkRepo", () => runSettingsEffect(e, dispatch), TYPING_MS);
+        // After Browse or a paste at once; after typing, a pause. Either replaces a waiting check.
+        debounce("checkRepo", () => runSettingsEffect(e, dispatch), e.now ? 0 : TYPING_MS);
         return;
       case "createChain":
       case "createCard":

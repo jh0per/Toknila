@@ -123,6 +123,9 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "browseFolder":
     case "dismissSettingsNotes":
     case "repoChecked":
+    case "fixFolder":
+    case "repoPrepared":
+    case "fixRefused":
     case "saveProject":
     case "importChain":
     case "checksLoaded":

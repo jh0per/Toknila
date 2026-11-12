@@ -2,7 +2,7 @@
 // daemon suggests for the folder. Key and name follow the folder's suggestion until the person
 // types into them; the suggestion itself comes from core (`POST /v1/repos/check`).
 
-import type { MergeMode, RepoCheck } from "../api/types";
+import type { MergeMode, RepoCheck, RepoFix } from "../api/types";
 
 /// What a person types to add a project.
 export interface ProjectDraft {
@@ -27,6 +27,10 @@ export interface AddForm {
   suggested: Suggestion | undefined;
   /// Sent before the folder's suggestion came: the form goes out when the check answers.
   waiting: boolean;
+  /// A fix the daemon is making for a folder (`POST /v1/repos/prepare`); the form waits for its answer.
+  fixing: { repo_path: string; fix: RepoFix } | undefined;
+  /// The daemon's sentence about the last fix it refused, for the folder the form shows.
+  fixError: { repo_path: string; message: string } | undefined;
 }
 
 /// What the folder suggests; the check command and the merge mode come from the repository's files
@@ -49,6 +53,8 @@ export const initialAddForm: AddForm = {
   edited: { key: false, name: false, work_branch: false, check_command: false, setup_command: false, merge_mode: false },
   suggested: undefined,
   waiting: false,
+  fixing: undefined,
+  fixError: undefined,
 };
 
 /// The form after the person typed into one field. Typing into the key or the name marks it as
@@ -84,6 +90,19 @@ export function applyCheck(f: AddForm, repoPath: string, check: RepoCheck): AddF
   return { ...f, suggested, draft: { ...f.draft, ...follow } };
 }
 
+/// The form after a fix was answered or refused: the fix is over, and a refusal is kept for the
+/// folder it was about. An answer about a folder the form no longer shows leaves no trace but that.
+export function endFix(f: AddForm, repoPath: string, refusal?: string): AddForm {
+  const fixing = f.fixing?.repo_path === repoPath ? undefined : f.fixing;
+  const fixError = refusal !== undefined && repoPath === f.draft.repo_path.trim() ? { repo_path: repoPath, message: refusal } : undefined;
+  return { ...f, fixing, fixError };
+}
+
+/// The daemon's sentence about a refused fix, while the form still shows that folder.
+export function fixRefusal(f: AddForm): string | undefined {
+  return f.fixError && f.fixError.repo_path === f.draft.repo_path.trim() ? f.fixError.message : undefined;
+}
+
 /// The suggestion for the folder the form shows now, if the daemon has answered for it.
 export function currentSuggestion(f: AddForm): AddForm["suggested"] {
   return f.suggested && f.suggested.repo_path === f.draft.repo_path.trim() ? f.suggested : undefined;
@@ -96,7 +115,8 @@ export function resolvedDraft(f: AddForm): ProjectDraft {
     key: f.draft.key.trim() || s?.key || "",
     name: f.draft.name.trim() || s?.name || "",
     repo_path: f.draft.repo_path.trim(),
-    work_branch: f.draft.work_branch.trim(),
+    // Never empty when the folder suggested a branch: an empty one is not sent at all.
+    work_branch: f.draft.work_branch.trim() || s?.work_branch || "",
     check_command: f.draft.check_command.trim(),
     setup_command: f.draft.setup_command.trim(),
     merge_mode: f.draft.merge_mode,

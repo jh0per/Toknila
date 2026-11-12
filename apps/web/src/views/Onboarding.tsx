@@ -1,6 +1,6 @@
 import type { Intent } from "../store/msg";
 import { ONBOARDING_DRAFT, draftOf } from "../store/planner";
-import { fieldError } from "../store/settings";
+import { addBusy, fieldError } from "../store/settings";
 import type { State } from "../store/state";
 import { ADD_PROJECT_FORM, AddProject } from "./AddProject";
 import { PromptField } from "./AskBox";
@@ -37,7 +37,7 @@ export function Onboarding({ state, dispatch }: { state: State; dispatch: (i: In
           placeholder="What is it, and what do you want to build or change first? You can also leave this empty."
         />
         {refused && <p className="error" role="alert">{refused}</p>}
-        <button className="btn primary" type="submit" form={ADD_PROJECT_FORM} disabled={s.busy} data-testid="add-project-submit">
+        <button className="btn primary" type="submit" form={ADD_PROJECT_FORM} disabled={addBusy(s)} data-testid="add-project-submit">
           {text.trim() ? "Add project and start planning" : "Add project"}
         </button>
       </div>

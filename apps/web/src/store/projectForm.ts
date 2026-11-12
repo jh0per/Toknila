@@ -114,6 +114,9 @@ export function sectionOfField(field: string): ProjectSection {
     case "bump_command":
     case "command_policy":
     case "allowed_commands":
+    case "worker_model":
+    case "reviewer_model":
+    case "planner_model":
       return "agents";
     case "review_mode":
     case "max_review_rounds":
@@ -124,10 +127,6 @@ export function sectionOfField(field: string): ProjectSection {
     case "merge_method":
     case "no_checks_timeout_secs":
       return "review";
-    case "worker_model":
-    case "reviewer_model":
-    case "planner_model":
-      return "advanced";
     default:
       return "general";
   }
