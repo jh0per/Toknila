@@ -54,6 +54,7 @@ export function reasonText(r: StatusReason | null | undefined): string {
         case "pr_closed": return "the pull request was closed without merging";
         case "runner_lost": return "runner lost";
         case "ship_failed": return `workspace failed: ${b.detail}`;
+        case "setup_failed": return `setup failed: ${b.command}${b.output ? `\n${b.output}` : ""}`;
         case "base_behind": return `main branch ${b.base} is ${b.behind} ${b.behind === 1 ? "commit" : "commits"} behind ${b.upstream}${b.can_fast_forward ? "; fast-forward it and start, " : "; "}start anyway, or unblock to look again`;
         case "no_working_dir": return "no working directory: the project has no repository; give it a folder or use the simulated agent";
       }

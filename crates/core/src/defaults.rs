@@ -34,6 +34,9 @@ pub struct RepoTraits {
     pub node_test: Option<NodeManager>,
     /// A `Makefile` with a `test` target.
     pub make_test: bool,
+    /// The folders that hold a `package-lock.json`, relative to the repository: `""` for its
+    /// root, `apps/web` for one under `apps/`. Sorted.
+    pub npm_lock_dirs: Vec<String>,
     /// A Python project (`pyproject.toml`, `setup.py`, `setup.cfg`, `pytest.ini`, `tox.ini` or
     /// `requirements.txt`) that has tests.
     pub python_tests: bool,
@@ -60,6 +63,20 @@ pub fn check_command(t: &RepoTraits) -> Option<String> {
         return None;
     };
     Some(command.to_owned())
+}
+
+/// The setup command the repository suggests, or `None`: `npm ci` for a lock file at the root,
+/// `npm ci --prefix apps/web` for one under `apps/`; several are joined with `&&`.
+pub fn setup_command(t: &RepoTraits) -> Option<String> {
+    let steps: Vec<String> = t
+        .npm_lock_dirs
+        .iter()
+        .map(|dir| match dir.as_str() {
+            "" => "npm ci".to_owned(),
+            dir => format!("npm ci --prefix {dir}"),
+        })
+        .collect();
+    (!steps.is_empty()).then(|| steps.join(" && "))
 }
 
 /// Where accepted work lands by default: a pull request when there is a GitHub remote and `gh`
@@ -93,6 +110,24 @@ mod tests {
     #[test]
     fn a_repository_that_shows_nothing_suggests_no_check() {
         assert_eq!(check_command(&t()), None);
+    }
+
+    #[test]
+    fn a_lock_file_at_the_root_or_under_apps_suggests_npm_ci() {
+        let dirs = |d: &[&str]| RepoTraits {
+            npm_lock_dirs: d.iter().map(|s| (*s).to_owned()).collect(),
+            ..t()
+        };
+        assert_eq!(setup_command(&t()), None);
+        assert_eq!(setup_command(&dirs(&[""])).as_deref(), Some("npm ci"));
+        assert_eq!(
+            setup_command(&dirs(&["apps/web"])).as_deref(),
+            Some("npm ci --prefix apps/web")
+        );
+        assert_eq!(
+            setup_command(&dirs(&["", "apps/web"])).as_deref(),
+            Some("npm ci && npm ci --prefix apps/web")
+        );
     }
 
     #[test]

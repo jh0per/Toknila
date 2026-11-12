@@ -127,6 +127,9 @@ pub enum BlockedReason {
     RunnerLost,
     /// The ship (worktree and branch) could not be prepared.
     ShipFailed { detail: String },
+    /// The project's setup command failed in the new ship (non-zero exit, timeout), so no agent
+    /// was started; `output` is the end of what it wrote. Unblocking runs it again.
+    SetupFailed { command: String, output: String },
     /// The base branch is behind its upstream (local merge mode), so the ship would start on old
     /// code. Nothing was made. A person fast-forwards the base and starts, or starts anyway;
     /// plain unblock looks again.
@@ -229,6 +232,9 @@ impl fmt::Display for BlockedReason {
             ),
             Self::RunnerLost => f.write_str("runner lost"),
             Self::ShipFailed { detail } => write!(f, "ship_failed: {detail}"),
+            Self::SetupFailed { command, output } => {
+                write!(f, "setup_failed: setup failed: {command}\n{output}")
+            }
             Self::BaseBehind {
                 base,
                 upstream,

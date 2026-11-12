@@ -17,6 +17,7 @@ mod base;
 mod inspect;
 mod planner;
 mod retire;
+mod setup;
 mod strays;
 
 /// Makes and removes ships with the `git` on the path.
@@ -134,6 +135,14 @@ impl Shipyard for GitShipyard {
         }
         self.git(repo, &args)?;
         Ok(path_text(&path))
+    }
+
+    fn setup_ran(&self, dir: &str) -> bool {
+        self.has_setup_mark(dir)
+    }
+
+    fn mark_setup_ran(&self, dir: &str) {
+        self.set_setup_mark(dir);
     }
 
     fn remove(&self, repo: &str, ship: &Ship) -> Result<(), ShipError> {
