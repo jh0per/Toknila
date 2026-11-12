@@ -28,8 +28,9 @@ const EDITS: [&str; 14] = [
 
 /// Near neighbours of TOKNILA-58: the same edit in another spelling, after a `cd`, or by another
 /// tool.
-const NEIGHBOURS: [&str; 12] = [
+const NEIGHBOURS: [&str; 13] = [
     TOKNILA_58,
+    "cd <ship>/apps/web/src && sed -i '' 's/item\\.ticket/item.card/g; s/CardItem/InboxItem/g' views/Answer.tsx && sed -n 10,20p views/Answer.tsx",
     "cd \"/ships/x/apps/web\" && sed -i '' 's/a/b/g' src/views/Answer.tsx",
     "cd /ships/x && sed -i.bak 's/a/b/' src/lib.rs",
     "sed -i'' -e 's/a/b/' src/lib.rs",
@@ -80,6 +81,25 @@ fn shell_edits_of_the_real_runs_are_denied_with_the_reason() {
         );
     }
     assert!(SHELL_EDIT_DENIAL.contains("Edit") && SHELL_EDIT_DENIAL.contains("Write"));
+}
+
+#[test]
+fn the_automatic_decision_is_the_handed_in_refusal_or_the_workers_shell_edit_refusal() {
+    use crate::question::automatic_decision;
+    use crate::{AgentRole, TicketStatus};
+    let edit = Some("Bash: sed -i '' 's/a/b/' f.rs");
+    let denial = Some(Decision::Deny {
+        message: SHELL_EDIT_DENIAL.to_owned(),
+    });
+    let r = AgentRole::Reviewer;
+    let w = AgentRole::Worker;
+    let run = TicketStatus::Running;
+    assert_eq!(automatic_decision(w, run, edit, &[]), denial);
+    assert_eq!(automatic_decision(w, run, Some("Edit: f.rs"), &[]), None);
+    assert_eq!(automatic_decision(w, run, None, &[]), None);
+    assert_eq!(automatic_decision(r, run, edit, &[]), None);
+    let handed = automatic_decision(w, TicketStatus::Review, Some("Edit: f.rs"), &[]);
+    assert!(matches!(handed, Some(Decision::Deny { .. })));
 }
 
 #[test]

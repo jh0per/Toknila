@@ -1417,6 +1417,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tickets/{ticket}/pre-tool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The agent's `PreToolUse` hook: a tool call is about to run, in any permission mode. Answers with
+         *     the automatic decisions only (`deny` or `ask`, meaning no decision); never asks a person and
+         *     never waits.
+         */
+        post: operations["agent_pre_tool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets/{ticket}/runner/answer": {
         parameters: {
             query?: never;
@@ -7430,6 +7451,48 @@ export interface operations {
         };
     };
     agent_permission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PermissionAsk"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionReply"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    agent_pre_tool: {
         parameters: {
             query?: never;
             header?: never;

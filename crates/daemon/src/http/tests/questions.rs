@@ -160,6 +160,44 @@ async fn a_reviewers_permission_shows_in_the_inbox_and_deny_carries_the_comment(
 }
 
 #[tokio::test]
+async fn the_pre_tool_route_denies_a_workers_shell_edit_in_every_mode_and_decides_nothing_else() {
+    let (api, token) = setup().await;
+    assert_eq!(api.get("/v1/projects/DEMO").await["command_policy"], "auto");
+    let pre = |token: String, tool: &'static str| {
+        let api = &api;
+        async move {
+            api.call_with(
+                &token,
+                Method::POST,
+                "/v1/tickets/DEMO-1/pre-tool",
+                Some(json!({ "tool": tool })),
+            )
+            .await
+        }
+    };
+    let (status, reply) = pre(
+        token.clone(),
+        "Bash: cd <ship>/apps/web/src && sed -i '' 's/a/b/g' views/Answer.tsx && sed -n 10,20p views/Answer.tsx",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        reply,
+        json!({ "decision": "deny", "message": toknila_core::question::SHELL_EDIT_DENIAL })
+    );
+    let (_, reply) = pre(token.clone(), "Edit: src/views/Answer.tsx").await;
+    assert_eq!(reply, json!({ "decision": "ask" }));
+    let (_, reply) = pre(token.clone(), "Bash: sed -n '1,5p' src/lib.rs").await;
+    assert_eq!(reply, json!({ "decision": "ask" }));
+    let (reviewer, _) = api.agent_token_as("DEMO-1", AgentRole::Reviewer).await;
+    let (_, reply) = pre(reviewer, "Bash: sed -i 's/a/b/' src/lib.rs").await;
+    assert_eq!(reply, json!({ "decision": "ask" }));
+    // Nobody was asked and the card did not wait.
+    assert!(questions(&api).await.is_empty());
+    assert_eq!(api.status("DEMO-1").await, "running");
+}
+
+#[tokio::test]
 async fn a_workers_shell_edit_is_denied_at_once_with_the_edit_reason_and_never_reaches_the_inbox() {
     let (api, token) = setup().await;
     for command in [

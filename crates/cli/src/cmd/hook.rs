@@ -63,6 +63,21 @@ fn permission_output(reply: &PermissionReply) -> Option<String> {
     )
 }
 
+/// What a `PreToolUse` hook prints for a refusal: Claude Code's deny decision with the reason.
+/// Nothing for any other reply, so the call goes on as the agent's permission mode says.
+fn pre_tool_output(reply: &PermissionReply) -> Option<String> {
+    (reply.decision == PermissionDecision::Deny).then(|| {
+        serde_json::json!({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reply.message.clone().unwrap_or_default(),
+            }
+        })
+        .to_string()
+    })
+}
+
 pub(super) fn run(name: &str) -> Result<()> {
     if !hook::is_known(name) {
         let known: Vec<&str> = hook::HOOKS.iter().map(|(_, ours)| *ours).collect();
@@ -82,6 +97,29 @@ pub(super) fn run(name: &str) -> Result<()> {
         match agent.client.claim_instructions(&agent.ticket) {
             Ok(claim) => {
                 if let Some(out) = stop_output(&claim) {
+                    println!("{out}");
+                }
+            }
+            Err(e) => eprintln!("toknila hook {name}: {e}"),
+        }
+    }
+    // Only a shell command can be a shell edit; any error or timeout prints nothing, so a hook
+    // never blocks by accident.
+    if name == "pre_tool_use"
+        && activity
+            .tool
+            .as_deref()
+            .is_some_and(|t| t.starts_with("Bash"))
+    {
+        let ask = PermissionAsk {
+            tool: activity.tool.clone(),
+        };
+        match agent
+            .client
+            .pre_tool(&agent.ticket, &ask, Duration::from_secs(5))
+        {
+            Ok(reply) => {
+                if let Some(out) = pre_tool_output(&reply) {
                     println!("{out}");
                 }
             }
@@ -193,6 +231,30 @@ mod tests {
         assert_eq!(v["hookSpecificOutput"]["decision"]["message"], "not that");
         assert_eq!(
             permission_output(&reply(PermissionDecision::Ask, None)),
+            None
+        );
+    }
+
+    #[test]
+    fn the_pre_tool_hook_prints_claude_codes_deny_and_nothing_otherwise() {
+        let reply = |decision, message: Option<&str>| PermissionReply {
+            decision,
+            message: message.map(str::to_owned),
+        };
+        let deny = pre_tool_output(&reply(PermissionDecision::Deny, Some("no shell edits")))
+            .expect("deny");
+        let v: serde_json::Value = serde_json::from_str(&deny).expect("json");
+        assert_eq!(
+            v,
+            serde_json::json!({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "no shell edits"
+            }})
+        );
+        assert_eq!(pre_tool_output(&reply(PermissionDecision::Ask, None)), None);
+        assert_eq!(
+            pre_tool_output(&reply(PermissionDecision::Allow, None)),
             None
         );
     }
