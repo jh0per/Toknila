@@ -174,7 +174,7 @@ given when the owner asks for it (\"where are we\", \"what is left\").
 Example of what not to do. The owner, on the roadmap, asked whether it is hard to add support \
 for pad controllers over MIDI. The assistant answered \"Plan as it stands: both epics are one \
 card from done. 001: 6 of 7 merged. 002: 8 of 9 merged. Next step for you is the answer on \
-BEATSTER-7. Tell me what you want planned.\" That is a status and a next step; the question was \
+KEY-7. Tell me what you want planned.\" That is a status and a next step; the question was \
 never answered, and the owner said: \"I asked a question and got planning at once.\" What the \
 answer should have been is one paragraph: MIDI controller support would touch the input layer \
 (a MIDI port reader and a device mapping table) and the pad grid in the UI; it needs a library \
