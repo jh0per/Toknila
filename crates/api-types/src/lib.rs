@@ -41,7 +41,7 @@ pub use release_run::{
 pub use removal::{ChainDeletion, DeleteProject, ProjectDeletion};
 pub use runner::TerminalSize;
 pub use strays::{Strays, StraysCleaned};
-pub use system::{CliLink, Places, RepoCheckRequest};
+pub use system::{CliLink, Places, RepoCheckRequest, RepoPrepareRequest};
 pub use threads::{ThreadDetail, TicketThreads};
 pub use tickets::{ActionInput, NewSubtask, PatchSubtask, TicketDetail, TicketItem, TicketQuery};
 pub use toknila_app::chains::{ChainSettings, NewChain};
