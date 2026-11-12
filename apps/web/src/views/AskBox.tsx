@@ -1,7 +1,9 @@
 import type { KeyboardEvent } from "react";
 import type { Intent } from "../store/msg";
+import { canSend } from "../store/askAttach";
 import { draftOf } from "../store/planner";
 import type { State } from "../store/state";
+import { AskChips, AttachButton, DropFrame, useAskAttach } from "./AskAttach";
 
 /// A text box that sends on Enter (Shift+Enter makes a new line). It does not send while an input
 /// method is composing a character.
@@ -48,16 +50,24 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
   const text = draftOf(state, project);
   const sending = state.planner.sending === project || waiting;
   const send = () => dispatch({ type: "askPlanner", project });
+  const a = useAskAttach(state, dispatch, { project, where: project, prefix: project });
   return (
-    <div className={`ask${compact ? " compact" : ""}`} data-testid={testId}>
+    <DropFrame a={a} className={`ask${compact ? " compact" : ""}`} testId={testId}>
       <PromptField
         value={text} label={label} testId={`${testId}-input`} rows={rows ?? (compact ? 2 : 3)} disabled={sending}
         placeholder={placeholder} onSubmit={send}
         onChange={(t) => dispatch({ type: "editPlannerDraft", where: project, text: t })}
       />
-      <button type="button" className="btn primary" data-testid={`${testId}-send`} disabled={sending || !text.trim()} onClick={send}>
-        {state.planner.sending === project ? "Sending…" : button}
-      </button>
-    </div>
+      <AskChips a={a} project={project} testId={testId} />
+      <div className="ask-actions">
+        <AttachButton busy={sending || a.place.busy} onFiles={a.add} testId={testId} />
+        <button
+          type="button" className="btn primary" data-testid={`${testId}-send`} onClick={send}
+          disabled={sending || !canSend(state, project, text)}
+        >
+          {state.planner.sending === project ? "Sending…" : button}
+        </button>
+      </div>
+    </DropFrame>
   );
 }

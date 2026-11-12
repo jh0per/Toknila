@@ -8,6 +8,27 @@
 .ask { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; width: 100%; }
 .ask.compact { flex-direction: row; align-items: flex-end; margin-top: var(--s2); flex: none; }
 .ask.compact .prompt-field { flex: 1; resize: none; }
+.ask.compact { flex-wrap: wrap; }
+.ask.compact .prompt-field { order: 1; }
+.ask.compact .ask-actions { order: 2; }
+.ask.compact .ask-attached { order: 3; flex: 0 0 100%; }
+
+/* Attachments of a message: the attach button beside Send, the chips and the refusal under the field. */
+.ask, .discuss-drop { position: relative; }
+.ask-actions { display: flex; gap: var(--s2); align-items: center; }
+.attach-btn { padding: 0 var(--s2); min-width: 36px; }
+.ask-attached { display: flex; flex-direction: column; gap: var(--s1); width: 100%; }
+.ask-attached .error { margin: 0; }
+.ask-chips { display: flex; flex-wrap: wrap; gap: var(--s2); list-style: none; margin: 0; padding: 0; }
+.ask-chip { display: inline-flex; align-items: center; gap: var(--s2); max-width: 100%; padding: 2px var(--s2); font-size: var(--fs-s);
+  background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: var(--shape-full); }
+.ask-chip img, .ask-chip-mark { width: 24px; height: 24px; border-radius: var(--shape-s); object-fit: cover; flex: none; font-size: var(--fs-xs); display: inline-grid; place-items: center; }
+.ask-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask-chip-x { background: none; border: 0; padding: 0 var(--s1); cursor: pointer; color: inherit; font: inherit; }
+.ask-chip.busy { color: var(--muted); }
+.ask.drop-over, .discuss-drop.drop-over { outline: 2px dashed var(--primary); outline-offset: 2px; border-radius: var(--shape-m); }
+.ask-drop-hint { position: absolute; right: var(--s2); top: var(--s1); font-size: var(--fs-xs); color: var(--primary); pointer-events: none; }
+.discuss-drop { display: flex; flex-direction: column; gap: var(--s2); }
 button.inline-link { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
 .secondary-links { margin: 0; color: var(--muted); font-size: var(--fs-s); }
 .empty-state .ask { max-width: 520px; }
