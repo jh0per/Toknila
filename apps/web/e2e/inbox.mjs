@@ -39,7 +39,7 @@ const chainFile = (name, autostart, cards) =>
 let browser;
 let failed = false;
 try {
-  tok("project", "new", "INB");
+  tok("project", "new", "INB", "--sim");
   // A new project reviews with both (a reviewer agent first); this script plays the person.
   tok("review-mode", "human", "--project", "INB");
   const live = join(home, "live.toml");
@@ -108,7 +108,7 @@ try {
   // A blocked card is unblocked.
   await row("blocked", "INB-2").getByRole("button", { name: "Unblock" }).click();
   await row("blocked", "INB-2").waitFor({ state: "detached", timeout: 10_000 });
-  if (!tok("show", "INB-2").includes("running")) throw new Error("the unblocked card is not running");
+  if (!tok("show", "INB-2").includes("simulated")) throw new Error("the unblocked card is not running");
   console.log("PASS a blocked card is unblocked from the inbox");
 
   // The question is answered: the reply is an instruction, delivered to the simulated agent.
@@ -116,7 +116,7 @@ try {
   await row("question", "INB-1").getByRole("button", { name: "Reply" }).click();
   await row("question", "INB-1").waitFor({ state: "detached", timeout: 10_000 });
   const shown = tok("show", "INB-1");
-  if (!shown.includes("running") || !shown.includes("use SQLite")) {
+  if (!shown.includes("simulated") || !shown.includes("use SQLite")) {
     throw new Error(`the answer did not reach the agent:\n${shown}`);
   }
   console.log("PASS an agent question is answered and delivered");
@@ -172,7 +172,7 @@ try {
   writeFileSync(join(repo, "README.md"), "hi\n");
   git(repo, "add", "README.md");
   git(repo, "commit", "--quiet", "-m", "init");
-  tok("project", "new", "GIT", "--repo", repo, "--base", "develop");
+  tok("project", "new", "GIT", "--repo", repo, "--base", "develop", "--sim");
   tok("review-mode", "human", "--project", "GIT");
   const shipChain = join(home, "ship.toml");
   writeFileSync(shipChain, chainFile("shipped", true, [{ id: "work" }]));
@@ -263,7 +263,7 @@ try {
   await row("review", "GIT-3").locator("[data-testid=review-return]").click();
   await row("review", "GIT-3").waitFor({ state: "detached", timeout: 10_000 });
   const returned = tok("show", "GIT-3");
-  if (!returned.includes("running") || !returned.includes("add a test")) throw new Error(`Return in the row did not reach the agent:\n${returned}`);
+  if (!returned.includes("simulated") || !returned.includes("add a test")) throw new Error(`Return in the row did not reach the agent:\n${returned}`);
   console.log("PASS Return in the inbox row sends the card back with the comment");
   await row("review", "GIT-2").locator("[data-testid=review-accept]").click();
   await row("review", "GIT-2").waitFor({ state: "detached", timeout: 10_000 });

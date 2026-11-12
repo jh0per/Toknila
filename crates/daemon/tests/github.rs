@@ -121,7 +121,8 @@ impl Rig {
         };
         rig.post(
             "/v1/projects",
-            json!({ "key": "DEMO", "repo_path": rig.repo.to_string_lossy() }),
+            json!({ "key": "DEMO", "repo_path": rig.repo.to_string_lossy(),
+                "default_profile": "sim", "simulated": true }),
         )
         .await;
         rig.post("/v1/projects/DEMO/chains", json!({ "name": "auth" }))

@@ -32,7 +32,7 @@ const card = (id, title, extra = "", profile = "sim") => `\n[[ticket]]\nid = "${
 
 let browser;
 try {
-  tok("project", "new", "PLN");
+  tok("project", "new", "PLN", "--sim");
   const work = join(home, "work.toml");
   writeFileSync(
     work,

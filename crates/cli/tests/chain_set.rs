@@ -10,8 +10,8 @@ use common::Tok;
 fn tok() -> (tempfile::TempDir, Tok, String) {
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
-    tok.run(&["project", "new", "DEMO"]);
-    tok.run(&["project", "new", "OTHR"]);
+    tok.run(&["project", "new", "DEMO", "--sim"]);
+    tok.run(&["project", "new", "OTHR", "--sim"]);
     let mut demo = String::new();
     for p in ["DEMO", "OTHR"] {
         let made = tok.run(&["chain", "new", "work", "--project", p, "--no-autostart"]);

@@ -23,7 +23,7 @@ const tok = (...args) =>
 
 let browser;
 try {
-  tok("project", "new", "CHD");
+  tok("project", "new", "CHD", "--sim");
   tok("chain", "new", "phase-1", "--project", "CHD", "--no-autostart");
   tok("ticket", "new", "phase-1", "Old one");
   tok("ticket", "new", "phase-1", "Old two");

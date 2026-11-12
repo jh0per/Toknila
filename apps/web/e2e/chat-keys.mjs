@@ -28,7 +28,7 @@ const card = (id, title, extra = "") => `\n[[ticket]]\nid = "${id}"\ntitle = "${
 
 let browser;
 try {
-  tok("project", "new", "CHT");
+  tok("project", "new", "CHT", "--sim");
   const toml = join(home, "work.toml");
   writeFileSync(toml, `[chain]\nname = "work"\nautostart = false\n${card("a", "Login")}${card("b", "Profile", 'after = ["a"]\n')}`);
   tok("chain", "import", toml, "--project", "CHT");

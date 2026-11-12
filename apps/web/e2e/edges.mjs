@@ -33,7 +33,7 @@ const refusal = (...args) => {
 
 let browser;
 try {
-  tok("project", "new", "EDG");
+  tok("project", "new", "EDG", "--sim");
   tok("chain", "new", "work", "--project", "EDG", "--no-autostart");
   for (const t of ["Alpha", "Bravo", "Charlie", "Delta"]) tok("ticket", "new", "work", t);
   tok("start", "EDG-4");

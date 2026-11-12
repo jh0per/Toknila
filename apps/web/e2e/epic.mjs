@@ -23,7 +23,7 @@ const tok = (...args) =>
 
 let browser;
 try {
-  tok("project", "new", "EPC");
+  tok("project", "new", "EPC", "--sim");
   const { url } = JSON.parse(tok("open", "--json"));
   browser = await launch();
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });

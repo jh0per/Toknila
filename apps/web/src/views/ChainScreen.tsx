@@ -11,6 +11,7 @@ import { DesignBoard } from "./DesignBoard";
 import { NavLink } from "./Link";
 import { PhaseChip } from "./PhaseChip";
 import { PanelDivider } from "./PanelDivider";
+import { SimulatedBanner } from "./SimulatedBanner";
 import { Panel } from "./Panel";
 import { ThemeButton } from "./ThemeButton";
 
@@ -80,6 +81,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
         >
           {on ? "Stop chain" : "Run chain"}
         </button>
+        <SimulatedBanner project={project} />
       </header>
       {view === "designs" ? <DesignBoard chain={chain} state={state} dispatch={dispatch} /> : <Canvas
         chain={chain} state={state} dispatch={dispatch}

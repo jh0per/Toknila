@@ -9189,6 +9189,13 @@
             ],
             "description": "The command run once in every new ship before the agent starts; an empty text names none."
           },
+          "simulated": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Marks the project for simulation (`tok project new --sim`): its cards may run under the\n`sim` profile. Unset or false: a card under `sim` is refused. The window never sets it."
+          },
           "work_branch": {
             "type": [
               "string",
@@ -10702,6 +10709,10 @@
               "null"
             ],
             "description": "The command the shipyard runs once in every new ship before the card's agent starts\n(`npm ci --prefix apps/web`). `None`: no setup."
+          },
+          "simulated": {
+            "type": "boolean",
+            "description": "Marked for simulation: its cards may run under the `sim` profile, which starts no process.\nOnly `tok project new --sim` and tests set it; a project without it refuses to start a card\nunder `sim`."
           },
           "work_branch": {
             "type": "string",
@@ -12947,6 +12958,10 @@
               }
             ]
           },
+          "simulated": {
+            "type": "boolean",
+            "description": "The card's agent is the simulated one (`sim`): no process runs, and a status of Running\nmeans nothing is working on it."
+          },
           "size_clamped": {
             "oneOf": [
               {
@@ -13017,6 +13032,10 @@
             "format": "int32",
             "description": "Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.",
             "minimum": 0
+          },
+          "simulated": {
+            "type": "boolean",
+            "description": "The card's agent is the simulated one (`sim`): no process runs."
           },
           "ticket": {
             "$ref": "#/components/schemas/Ticket"

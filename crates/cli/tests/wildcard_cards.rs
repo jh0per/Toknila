@@ -31,7 +31,7 @@ fn wildcard_cards_wait_for_the_owner() {
     let tok = Tok::in_dir(dir.path());
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, CHAIN).expect("write chain");
-    tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
+    tok.run(&["project", "new", "DEMO", "--name", "Demo", "--sim"]);
     tok.run(&[
         "chain",
         "import",

@@ -26,7 +26,7 @@ const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwA
 
 let browser;
 try {
-  tok("project", "new", "ATT");
+  tok("project", "new", "ATT", "--sim");
   writeFileSync(
     join(home, "c.toml"),
     `[chain]\nname = "work"\nautostart = false\n\n[[ticket]]\nid = "A"\ntitle = "Login screen"\nprofile = "sim"\n\n[[ticket]]\nid = "B"\ntitle = "Started one"\nprofile = "sim"\n`,

@@ -211,7 +211,16 @@ impl Api {
         v
     }
 
-    async fn post(&self, uri: &str, body: Value) -> Value {
+    /// POST for tests. A project that names no profile is created as a simulation project (the
+    /// tests send events by hand); `call` posts the body as it is.
+    async fn post(&self, uri: &str, mut body: Value) -> Value {
+        if uri == "/v1/projects"
+            && let Some(o) = body.as_object_mut()
+            && !o.contains_key("default_profile")
+        {
+            o.insert("default_profile".into(), json!("sim"));
+            o.insert("simulated".into(), json!(true));
+        }
         let (s, v) = self.call(Method::POST, uri, Some(body)).await;
         assert!(s.is_success(), "POST {uri}: {s} {v}");
         v
@@ -261,7 +270,8 @@ async fn projects_create_list_get() {
         .await;
     assert_eq!(s, StatusCode::CREATED);
     assert_eq!(p["work_branch"], "develop");
-    assert_eq!(p["default_profile"], "sim");
+    assert_eq!(p["default_profile"], "claude-code");
+    assert!(p.get("simulated").is_none(), "{p}");
     assert_eq!(
         api.get("/v1/projects").await.as_array().map(Vec::len),
         Some(1)

@@ -49,7 +49,7 @@ try {
   });
   const { expectText, expectPath } = checks(page);
   const t = (id) => page.locator(`[data-testid=${id}]`);
-  const row = (key) => page.locator(`[data-testid=projects] > ul > li[data-project=${key}]`);
+  const row = (key) => page.locator(`[data-testid=projects] > ul > li[data-project=${key}] > .row`);
   const card = (key) => page.locator(`.canvas a[data-key="${key}"]`);
   const value = async (id, expected, what) => {
     await page.waitForFunction(
@@ -189,7 +189,7 @@ try {
   await t("unarchive-TOKNILA").click();
   await row("TOKNILA").waitFor({ timeout: 10_000 });
   console.log("PASS Unarchive brings a project back to the sidebar");
-  await t("archived-projects").locator("li[data-project=SPAREREPO]").click({ button: "right" });
+  await t("archived-projects").locator("li[data-project=SPAREREPO] > .row").click({ button: "right" });
   await t("menu-unarchive").click();
   await row("SPAREREPO").waitFor({ timeout: 10_000 });
   console.log("PASS the menu brings an archived project back");

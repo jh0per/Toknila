@@ -115,11 +115,21 @@ pub async fn list_tickets(
             .map(|c| (c.id, c.name))
             .collect();
         let queue = schedule::queue_positions(repo)?;
+        let projects: HashMap<_, _> = repo.projects()?.into_iter().map(|p| (p.id, p)).collect();
+        let owners: HashMap<ChainId, _> = repo
+            .chains(None)?
+            .into_iter()
+            .map(|c| (c.id, c.project_id))
+            .collect();
         Ok(repo
             .tickets(chain.map(|c| c.id))?
             .into_iter()
             .filter(|t| !q.needs_human || t.status.needs_human())
             .map(|t| TicketItem {
+                simulated: owners
+                    .get(&t.chain_id)
+                    .and_then(|p| projects.get(p))
+                    .is_some_and(|p| p.runs_simulated(&t)),
                 chain: names.get(&t.chain_id).cloned().unwrap_or_default(),
                 in_status_ms: at.millis_since(t.status_since),
                 needs_human: t.status.needs_human(),

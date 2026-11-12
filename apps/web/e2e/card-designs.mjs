@@ -26,7 +26,7 @@ const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwA
 
 let browser;
 try {
-  tok("project", "new", "CDS");
+  tok("project", "new", "CDS", "--sim");
   writeFileSync(join(home, "c.toml"), `[chain]\nname = "work"\nautostart = false\n\n[[ticket]]\nid = "A"\ntitle = "Login screen"\nprofile = "sim"\n`);
   tok("chain", "import", join(home, "c.toml"), "--project", "CDS");
   const { url } = JSON.parse(tok("open", "--json"));

@@ -175,9 +175,19 @@ pub struct Project {
     /// Hidden from the sidebar; its data is kept and it can be brought back.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub archived: bool,
+    /// Marked for simulation: its cards may run under the `sim` profile, which starts no process.
+    /// Only `tok project new --sim` and tests set it; a project without it refuses to start a card
+    /// under `sim`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub simulated: bool,
 }
 
 impl Project {
+    /// Whether a card of `ticket` would run under the simulated profile, which starts no process.
+    pub fn runs_simulated(&self, ticket: &super::Ticket) -> bool {
+        self.profile_for(ticket) == super::AgentProfile::SIM
+    }
+
     /// Work branch of a project that does not name one.
     pub const DEFAULT_WORK_BRANCH: &str = "develop";
     /// Release branch of a project that does not name one.
@@ -366,6 +376,7 @@ mod tests {
             allowed_commands: Vec::new(),
             reviewer_web_domains: Vec::new(),
             archived: false,
+            simulated: false,
         };
         let mut t = Ticket::new_backlog(
             TicketId::new(),

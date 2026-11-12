@@ -35,6 +35,10 @@ pub struct NewProject {
     pub merge_mode: Option<MergeMode>,
     /// When the agent of a card wants to run a command; default `auto`.
     pub command_policy: Option<CommandPolicy>,
+    /// Marks the project for simulation (`tok project new --sim`): its cards may run under the
+    /// `sim` profile. Unset or false: a card under `sim` is refused. The window never sets it.
+    #[serde(default)]
+    pub simulated: Option<bool>,
 }
 
 /// `PATCH /v1/projects/{project}`: the settings to change; unset fields stay.
@@ -116,9 +120,10 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
         release_branch: draft
             .release_branch
             .unwrap_or_else(|| Project::DEFAULT_RELEASE_BRANCH.to_owned()),
+        // The real agent: the simulated one is chosen by name only.
         default_profile: draft
             .default_profile
-            .unwrap_or_else(|| AgentProfile::SIM.to_owned()),
+            .unwrap_or_else(|| AgentProfile::CLAUDE_CODE.to_owned()),
         // The loop first (check, reviewer), then the person sees a card that already passes.
         default_review_mode: draft.default_review_mode.unwrap_or(ReviewMode::Both),
         max_review_rounds: draft
@@ -153,6 +158,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
         allowed_commands: Vec::new(),
         reviewer_web_domains: Vec::new(),
         archived: false,
+        simulated: draft.simulated.unwrap_or(false),
     };
     uow.insert_project(&p)?;
     uow.emit(&DomainEvent::ProjectCreated { project: p.clone() })?;
@@ -180,6 +186,10 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     };
     if let Some(v) = patch.default_profile {
         p.default_profile = name("the default profile", v)?;
+        // Choosing `sim` by name is the person's word that the project simulates.
+        if p.default_profile == AgentProfile::SIM {
+            p.simulated = true;
+        }
     }
     if let Some(v) = patch.work_branch {
         p.work_branch = name("the base branch", v)?;

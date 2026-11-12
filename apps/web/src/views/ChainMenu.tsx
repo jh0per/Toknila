@@ -15,6 +15,7 @@ export function useChainMenu(dispatch: (i: Intent) => void): {
   const close = useCallback(() => setAt(undefined), []);
   const open = (chain: ChainDetail) => (e: MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setAt({ x: e.clientX, y: e.clientY, chain });
   };
   const menu = at && (

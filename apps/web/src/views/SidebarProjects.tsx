@@ -3,19 +3,24 @@ import type { Project } from "../api/types";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import { type State, activeProjects, archivedProjects, currentProject } from "../store/state";
+import { useChainMenu } from "./ChainMenu";
 import { ContextMenu } from "./ContextMenu";
-import { NavLink } from "./Link";
 import { menuGroups } from "./menuGroups";
 import { byGroup, projectMenu } from "./projectMenu";
+import { SidebarProject } from "./SidebarProject";
+import { useTree } from "./useTree";
 
 type Menu = { x: number; y: number; project: Project | undefined };
 
-/// The sidebar's projects: a "+" that adds one, a right-click menu (on the section and on each
-/// row), and the archived projects when the person asks for them.
+/// The sidebar's tree: a "+" that adds a project, one node per project (see `SidebarProject`), a
+/// right-click menu (on the section, on each project and on each chain), and the archived projects
+/// when the person asks for them.
 export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const [menu, setMenu] = useState<Menu>();
   const close = useCallback(() => setMenu(undefined), []);
-  // The inbox and the usage page are about every project, so none is highlighted there.
+  const chainMenu = useChainMenu(dispatch);
+  const tree = useTree<HTMLElement>();
+  // The inbox and the usage page are about every project, so none is on the screen there.
   const global = state.route.name === "inbox" || state.route.name === "usage";
   const project = global ? undefined : currentProject(state);
   const archived = archivedProjects(state);
@@ -25,30 +30,16 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
     e.stopPropagation();
     setMenu({ x: e.clientX, y: e.clientY, project: p });
   };
-  const row = (p: Project) => (
-    <li key={p.id} data-project={p.key} className={p.archived ? "archived" : undefined} onContextMenu={openMenu(p)}>
-      <NavLink
-        route={{ name: "project", project: p.key }}
-        dispatch={dispatch}
-        className={`item${p.id === project?.id ? " sel" : ""}`}
-      >
-        <span className="key">{p.key}</span>
-        <span className="t">{p.name}</span>
-      </NavLink>
-      {p.archived && (
-        <button
-          type="button" className="btn mini" data-testid={`unarchive-${p.key}`}
-          onClick={() => dispatch({ type: "archiveProject", project: p.key, archived: false })}
-        >
-          Unarchive
-        </button>
-      )}
-    </li>
+  const node = (p: Project) => (
+    <SidebarProject
+      key={p.id} project={p} state={state} dispatch={dispatch} onScreen={p.id === project?.id}
+      onMenu={openMenu(p)} onChainMenu={chainMenu.open}
+    />
   );
   // On the settings page the refusal shows next to its button instead.
   const refused = state.route.name === "settings" ? undefined : planError(state.plan, "archive");
   return (
-    <section className="sec" data-testid="projects" onContextMenu={openMenu(undefined)}>
+    <section className="sec" data-testid="projects" onContextMenu={openMenu(undefined)} {...tree}>
       <h2>
         Projects
         <button
@@ -58,7 +49,7 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
           +
         </button>
       </h2>
-      <ul>{activeProjects(state).map(row)}</ul>
+      <ul role="tree" aria-label="Projects" className="tree">{activeProjects(state).map(node)}</ul>
       {archived.length > 0 && (
         <button
           type="button" className="link-btn" data-testid="show-archived"
@@ -67,8 +58,11 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
           {show ? "Hide archived" : `Show archived (${archived.length})`}
         </button>
       )}
-      {show && archived.length > 0 && <ul data-testid="archived-projects">{archived.map(row)}</ul>}
+      {show && archived.length > 0 && (
+        <ul role="tree" aria-label="Archived projects" className="tree" data-testid="archived-projects">{archived.map(node)}</ul>
+      )}
       {refused && <p className="error side-note" role="alert" data-testid="archive-error">{refused}</p>}
+      {chainMenu.menu}
       {menu && (
         <ContextMenu
           x={menu.x} y={menu.y} onClose={close}

@@ -37,6 +37,7 @@ fn project() -> Project {
         allowed_commands: Vec::new(),
         reviewer_web_domains: Vec::new(),
         archived: false,
+        simulated: false,
     }
 }
 
