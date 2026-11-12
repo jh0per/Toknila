@@ -1,33 +1,85 @@
-/* Design tokens of the approved window mockup: colors, spacing, type, radii. Light by default;
-   dark follows the system, and `data-theme` on <html> forces either one. */
+/* Design tokens: Material 3 roles adapted to a desktop tool. The only stylesheet that may hold a raw
+   colour or a px font size; every other one uses these (`cargo xtask guards` ratchets that).
+   Light by default; dark follows the system, and `data-theme` on <html> forces either one.
+   Density is compact; `data-density="default"` on <html> switches to the roomier set. */
 :root {
-  --bg: #f3f5f7; --surface: #fff; --surface2: #eaeef2; --line: #d5dbe2; --fg: #1d242c; --muted: #66727f;
-  --accent: #0b7a8a; --accent-soft: #d9eef1;
-  --todo: #7b8794; --prog: #0b7a8a; --block: #b86e00; --done: #2a8a4a; --cancel: #66727f;
-  --todo-soft: #e6eaee; --prog-soft: #d9eef1; --block-soft: #fbe9cc; --done-soft: #dbf0e1;
-  --warn: #b86e00; --danger: #c0392b; --term-bg: #12181e; --term-fg: #b9c7d3;
-  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
-  --fs-xs: 10.5px; --fs-s: 12px; --fs-m: 13px; --fs-l: 15px;
-  --r-s: 4px; --r-m: 6px; --r-pill: 999px;
-  --ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* Colour roles. `--background` is the page, `--surface-container*` the things on it. */
+  --primary: #0b7a8a; --on-primary: #fff; --primary-container: #d9eef1; --on-primary-container: #04343b;
+  --background: #f3f5f7; --surface-container: #fff; --surface-container-high: #eaeef2;
+  --on-surface: #1d242c; --on-surface-variant: #5a6672;
+  --outline: #8793a0; --outline-variant: #d5dbe2;
+  --error: #c0392b; --on-error: #fff; --error-container: #fbe1dd; --warn: #b86e00;
+  --status-todo: #7b8794; --status-prog: #0b7a8a; --status-block: #b86e00; --status-done: #2a8a4a;
+  --status-todo-container: #e6eaee; --status-prog-container: #d9eef1;
+  --status-block-container: #fbe9cc; --status-done-container: #dbf0e1;
+  --term-bg: #12181e; --term-fg: #b9c7d3;
+  --scrim: rgb(0 0 0 / 0.45);
+  --e1: 0 1px 2px rgb(0 0 0 / 0.12), 0 1px 3px rgb(0 0 0 / 0.08);
+  --e2: 0 2px 6px rgb(0 0 0 / 0.14), 0 1px 2px rgb(0 0 0 / 0.1);
+  --e3: 0 8px 24px rgb(0 0 0 / 0.22);
+  /* State layers: the content colour over the surface at these opacities; disabled content at 38%. */
+  --state-hover: 0.08; --state-focus: 0.1; --state-press: 0.1; --state-disabled: 0.38;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #12171c; --surface: #1a2128; --surface2: #222b33; --line: #2e3944; --fg: #dde4ea; --muted: #8c9aa7;
-    --accent: #4fc3d3; --accent-soft: #17353b;
-    --todo: #8d99a6; --prog: #4fc3d3; --block: #e5a23c; --done: #58c27d; --cancel: #8c9aa7;
-    --todo-soft: #252e36; --prog-soft: #17353b; --block-soft: #3a2d14; --done-soft: #17321f;
-    --warn: #e5a23c; --danger: #ef7b6d; --term-bg: #0b1014;
+    --primary: #4fc3d3; --on-primary: #00363d; --primary-container: #17353b; --on-primary-container: #c4eef4;
+    --background: #12171c; --surface-container: #1a2128; --surface-container-high: #222b33;
+    --on-surface: #dde4ea; --on-surface-variant: #9aa7b3;
+    --outline: #6b7a88; --outline-variant: #2e3944;
+    --error: #ef7b6d; --on-error: #3a0a05; --error-container: #4a1d18; --warn: #e5a23c;
+    --status-todo: #8d99a6; --status-prog: #4fc3d3; --status-block: #e5a23c; --status-done: #58c27d;
+    --status-todo-container: #252e36; --status-prog-container: #17353b;
+    --status-block-container: #3a2d14; --status-done-container: #17321f;
+    --term-bg: #0b1014;
+    --scrim: rgb(0 0 0 / 0.6);
+    --e1: 0 1px 2px rgb(0 0 0 / 0.5); --e2: 0 2px 6px rgb(0 0 0 / 0.55); --e3: 0 8px 24px rgb(0 0 0 / 0.65);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #12171c; --surface: #1a2128; --surface2: #222b33; --line: #2e3944; --fg: #dde4ea; --muted: #8c9aa7;
-  --accent: #4fc3d3; --accent-soft: #17353b;
-  --todo: #8d99a6; --prog: #4fc3d3; --block: #e5a23c; --done: #58c27d; --cancel: #8c9aa7;
-  --todo-soft: #252e36; --prog-soft: #17353b; --block-soft: #3a2d14; --done-soft: #17321f;
-  --warn: #e5a23c; --danger: #ef7b6d; --term-bg: #0b1014;
+  --primary: #4fc3d3; --on-primary: #00363d; --primary-container: #17353b; --on-primary-container: #c4eef4;
+  --background: #12171c; --surface-container: #1a2128; --surface-container-high: #222b33;
+  --on-surface: #dde4ea; --on-surface-variant: #9aa7b3;
+  --outline: #6b7a88; --outline-variant: #2e3944;
+  --error: #ef7b6d; --on-error: #3a0a05; --error-container: #4a1d18; --warn: #e5a23c;
+  --status-todo: #8d99a6; --status-prog: #4fc3d3; --status-block: #e5a23c; --status-done: #58c27d;
+  --status-todo-container: #252e36; --status-prog-container: #17353b;
+  --status-block-container: #3a2d14; --status-done-container: #17321f;
+  --term-bg: #0b1014;
+  --scrim: rgb(0 0 0 / 0.6);
+  --e1: 0 1px 2px rgb(0 0 0 / 0.5); --e2: 0 2px 6px rgb(0 0 0 / 0.55); --e3: 0 8px 24px rgb(0 0 0 / 0.65);
   color-scheme: dark;
+}
+:root {
+  /* Spacing on a 4px grid. */
+  --sp1: 4px; --sp2: 8px; --sp3: 12px; --sp4: 16px; --sp5: 20px; --sp6: 24px; --sp8: 32px;
+  /* Type scale by role: size, line height. Weights below. */
+  --fs-display: 28px; --lh-display: 36px; --fs-headline-l: 22px; --lh-headline-l: 28px;
+  --fs-headline-m: 18px; --lh-headline-m: 24px; --fs-title-l: 15px; --lh-title-l: 20px;
+  --fs-title-m: 13px; --lh-title-m: 18px; --fs-body-l: 13px; --lh-body-l: 20px;
+  --fs-body-m: 12px; --lh-body-m: 16px; --fs-label-l: 12px; --lh-label-l: 16px;
+  --fs-label-m: 11px; --lh-label-m: 16px;
+  --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600;
+  /* Shape scale. */
+  --shape-xs: 4px; --shape-s: 8px; --shape-m: 12px; --shape-l: 16px; --shape-full: 999px;
+  /* Density: compact. */
+  --ctl-h: 28px; --field-h: 32px; --row-h: 28px; --pad: var(--sp3); --gap: var(--sp2); --btn-px: var(--sp3);
+  /* Type faces; no font is loaded from the network, the fallbacks are the system's. */
+  --ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* Names the screens still use; they move to the roles above screen by screen. */
+  --bg: var(--background); --surface: var(--surface-container); --surface2: var(--surface-container-high);
+  --line: var(--outline-variant); --fg: var(--on-surface); --muted: var(--on-surface-variant);
+  --accent: var(--primary); --accent-soft: var(--primary-container); --danger: var(--error);
+  --todo: var(--status-todo); --prog: var(--status-prog); --block: var(--status-block); --done: var(--status-done);
+  --cancel: var(--on-surface-variant);
+  --todo-soft: var(--status-todo-container); --prog-soft: var(--status-prog-container);
+  --block-soft: var(--status-block-container); --done-soft: var(--status-done-container);
+  --s1: var(--sp1); --s2: var(--sp2); --s3: var(--sp3); --s4: var(--sp4);
+  --fs-xs: var(--fs-label-m); --fs-s: var(--fs-body-m); --fs-m: var(--fs-body-l); --fs-l: var(--fs-title-l);
+  --r-s: var(--shape-xs); --r-m: var(--shape-s); --r-pill: var(--shape-full);
+}
+:root[data-density="default"] {
+  --ctl-h: 36px; --field-h: 40px; --row-h: 40px; --pad: var(--sp4); --gap: var(--sp3); --btn-px: var(--sp4);
 }

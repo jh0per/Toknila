@@ -79,6 +79,7 @@ pub fn run(root: &Path) -> Result<(), String> {
         check_deps(rule)?;
     }
     check_sizes(root)?;
+    crate::css_guard::run(root)?;
     Ok(())
 }
 

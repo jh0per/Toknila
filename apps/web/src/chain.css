@@ -67,7 +67,7 @@ a.node:hover { border-color: var(--muted); }
 .node .sub .sub-bar { flex: 1; height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
 .node .sub .sub-bar i { display: block; height: 100%; background: var(--prog); }
 .node .sub b { font-family: var(--mono); font-size: var(--fs-xs); font-weight: 600; color: var(--muted); }
-.node .acts .btn { padding: 1px 10px; font-size: var(--fs-s); }
+.node .acts .btn { height: auto; padding: 1px 10px; font-size: var(--fs-s); }
 .node.g-cancelled, .node.s-cancelled { opacity: 0.6; }
 .node.g-awaiting_approval { border: 1.5px dashed var(--block); background: var(--block-soft); }
 .node.g-awaiting_approval .st { background: transparent; padding-left: 0; }
