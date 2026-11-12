@@ -18,6 +18,7 @@ pub mod hand_in;
 pub mod inbox;
 pub mod instructions;
 pub mod leftovers;
+mod lost;
 pub mod merges;
 pub mod moves;
 pub mod notes;

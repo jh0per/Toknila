@@ -3,22 +3,19 @@
 //! restart lost. The process itself runs on the host after the command committed
 //! ([`crate::external`]); nothing here starts one.
 
-use std::collections::HashSet;
-
 use toknila_core::events::DomainEvent;
 use toknila_core::machine::{Effect, TicketEvent, person_only};
 use toknila_core::{
-    Actor, AgentProfile, AgentRole, BlockedReason, Project, Run, Ticket, TicketId, TicketKey,
-    TicketStatus,
+    Actor, AgentProfile, AgentRole, BlockedReason, Project, Run, Ticket, TicketId, TicketStatus,
 };
 
 use crate::chain::tell_ticket;
 use crate::external::ExternalEffect;
 use crate::runner::{Resume, RunBrief, RunEnded, Runner, RunnerError};
-use crate::{AppError, AppResult, ChainTx, ErrorKind, UnitOfWork, reviews, with_chain};
+use crate::{AppError, AppResult, ChainTx, ErrorKind, UnitOfWork, reviews};
 
 /// Whether the ticket's agent is a process. The simulated profile starts none.
-fn runs_process(project: &Project, ticket: &Ticket) -> bool {
+pub(crate) fn runs_process(project: &Project, ticket: &Ticket) -> bool {
     project.profile_for(ticket) != AgentProfile::SIM
 }
 
@@ -310,55 +307,7 @@ fn free_slot<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: TicketId) -> AppResult
     crate::schedule::run(uow, chain.project_id)
 }
 
-/// After a daemon start: tickets whose agent is a process, and that were working, lost their
-/// runner unless `live` names it. They go to Blocked(`runner_lost`) through the machine; the
-/// simulated ones have no process to lose. Returns their keys.
-pub fn mark_lost<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    live: &HashSet<TicketId>,
-) -> AppResult<Vec<TicketKey>> {
-    let mut lost = Vec::new();
-    for chain in uow.chains(None)? {
-        let Some(project) = uow.project(chain.project_id)? else {
-            continue;
-        };
-        let mut ids: Vec<(TicketId, TicketKey)> = Vec::new();
-        for t in uow.tickets(Some(chain.id))? {
-            if live.contains(&t.id)
-                || !matches!(t.status, TicketStatus::Running | TicketStatus::Waiting)
-            {
-                continue;
-            }
-            // A paused agent has no process on purpose; its card waits for an answer.
-            if t.agent_paused.is_some() {
-                continue;
-            }
-            // A Running card with no run record never got its agent (the daemon restarted before
-            // the start landed): nothing shows it, so it is lost too, unless the project is
-            // simulated and has no processes by design.
-            let unrun = t.status == TicketStatus::Running
-                && !project.simulated
-                && uow
-                    .last_snapshot_payload("ticket", &t.id.to_string(), "run")?
-                    .is_none();
-            if runs_process(&project, &t) || unrun {
-                ids.push((t.id, t.key.clone()));
-            }
-        }
-        if ids.is_empty() {
-            continue;
-        }
-        with_chain(uow, chain.id, |tx| {
-            for (id, _) in &ids {
-                let reason = BlockedReason::RunnerLost;
-                tx.ticket_event(*id, TicketEvent::Block { reason })?;
-            }
-            Ok::<_, AppError>(())
-        })?;
-        lost.extend(ids.into_iter().map(|(_, key)| key));
-    }
-    Ok(lost)
-}
+pub use crate::lost::mark_lost;
 
 /// A person types into the terminal of the ticket's runner of `role` (an answer, a nudge, an
 /// instruction). Only a person does; the agent and the system have the event contract instead.
