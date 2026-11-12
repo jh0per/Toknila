@@ -22,6 +22,7 @@ import type { Theme } from "./theme";
 import { type UpdatesState, initialUpdates } from "./updates";
 import { type UsageState, initialUsage } from "./usage";
 import { type AttachState, initialAttach } from "./attach";
+import { type AskAttachState, initialAskAttach } from "./askAttach";
 
 export type Link = "connecting" | "live" | "offline";
 
@@ -84,6 +85,8 @@ export interface State {
   usage: UsageState;
   /// Files on their way to a card's designs, and the last drop's refusals.
   attach: AttachState;
+  /// Pictures attached to a message for the assistant, per box.
+  askAttach: AskAttachState;
   /// Updates of the desktop app (empty in a browser).
   updates: UpdatesState;
   /// The viewer's colour theme; remembered in this browser only.
@@ -134,6 +137,7 @@ export function initialState(route: Route): State {
     quick: initialQuick,
     usage: initialUsage,
     attach: initialAttach,
+    askAttach: initialAskAttach,
     updates: initialUpdates,
     theme: "system",
     assistant: initialAssistant,

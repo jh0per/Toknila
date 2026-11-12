@@ -5,7 +5,7 @@ import type {
   ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
-import { attachFiles } from "./attachEffects";
+import { attachFiles, uploadForAsk } from "./attachEffects";
 import { runAutostartEffect } from "./autostartEffects";
 import { runConversationEffect } from "./conversationEffects";
 import { runEdgeEffect } from "./edgeEffects";
@@ -212,6 +212,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "attachFiles":
         void attachFiles(e).then(dispatch);
+        return;
+      case "askUpload":
+        void uploadForAsk(e).then(dispatch);
         return;
       case "plannerCall":
         runPlannerEffect(e, dispatch);

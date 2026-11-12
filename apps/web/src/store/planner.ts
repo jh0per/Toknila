@@ -5,6 +5,7 @@
 
 import type { PlannerState } from "../api/types";
 import { lineFor, panelChip } from "./assistant";
+import { type AskAttachMsg, clearAttached, placeOf, reduceAskAttach, withAttached } from "./askAttach";
 import type { Effect } from "./msg";
 import type { State } from "./state";
 
@@ -60,7 +61,7 @@ export type PlannerResult =
   | { type: "plannerAsked"; project: string; draft?: string }
   | { type: "plannerFailed"; error: string };
 
-export type PlannerMsg = PlannerIntent | PlannerResult;
+export type PlannerMsg = PlannerIntent | PlannerResult | AskAttachMsg;
 
 export type PlannerEffect = {
   type: "plannerCall";
@@ -93,9 +94,12 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
   switch (msg.type) {
     case "editPlannerDraft":
       return [set({ drafts: { ...s.planner.drafts, [msg.where]: msg.text } }), []];
+    case "askAttach":
+      return reduceAskAttach(s, msg);
     case "askPlanner": {
-      const raw = (s.planner.drafts[msg.project] ?? "").trim();
-      if (!raw || s.planner.sending) return [s, []];
+      // The panel's one composer holds the attachments of every context (its place is the project).
+      const raw = withAttached(s.planner.drafts[msg.project] ?? "", placeOf(s, msg.project).chips);
+      if (!raw || s.planner.sending || placeOf(s, msg.project).busy) return [s, []];
       const wait = !(plannerOf(s, msg.project)?.running ?? false);
       const base = { type: "plannerCall", project: msg.project, profile: s.planner.profile, wait } as const;
       const chip = panelChip(s);
@@ -115,7 +119,7 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
     case "nudgeChat":
       return [set({ error: "" }), [{ type: "plannerCall", project: msg.project, call: "nudge", text: oneLine(msg.text) }]];
     case "plannerAsked":
-      return [set({ sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } }), []];
+      return [{ ...clearAttached(s, msg.draft ?? msg.project), planner: { ...s.planner, sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } } }, []];
     case "startPlanner":
       return [
         set({ error: "" }),
