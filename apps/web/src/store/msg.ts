@@ -11,6 +11,7 @@ import type { EpicEffect, EpicIntent, EpicResult } from "./epic";
 import type { PlacementEffect, PlacementIntent, PlacementResult } from "./placement";
 import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
 import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
+import type { ConversationEffect, ConversationIntent, ConversationResult } from "./conversation";
 import type { QuickIntent } from "./quick";
 import type { PlannerEffect, PlannerIntent, PlannerResult } from "./planner";
 import type { ReleaseEffect, ReleaseIntent, ReleaseResult } from "./release";
@@ -35,6 +36,7 @@ export type Intent =
   | SettingsIntent
   | PlanIntent
   | PlannerIntent
+  | ConversationIntent
   | ImportIntent
   | RemovalIntent
   | ReleaseIntent
@@ -92,6 +94,7 @@ export type Msg =
   | SettingsResult
   | PlanResult
   | PlannerResult
+  | ConversationResult
   | ImportResult
   | RemovalResult
   | ReleaseResult
@@ -120,6 +123,7 @@ export type Effect =
   | SettingsEffect
   | PlanEffect
   | PlannerEffect
+  | ConversationEffect
   | ImportEffect
   | RemovalEffect
   | ReleaseEffect

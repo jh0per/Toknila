@@ -1,6 +1,7 @@
 // The page's state machine: reduce(state, msg) -> [state, effects]. Pure: no DOM, no network.
 
 import type { EventRecord } from "../api/types";
+import { conversationEvent, reduceConversation, reloadTalks } from "./conversation";
 import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
 import { reduceAttach } from "./attach";
@@ -289,6 +290,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     }
     case "discussCard":
     case "nudgeCard":
+    case "nudgeChat":
     case "startPlanner":
     case "stopPlanner":
     case "refreshPlanner":
@@ -316,6 +318,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "usageLoaded":
     case "usageFailed":
       return reduceUsage(s, msg);
+    default: // what is left is the conversation's (the type says so: a new Msg must be handled somewhere)
+      return reduceConversation(s, msg);
   }
 }
 
@@ -358,6 +362,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq <= s.lastSeq) return [s, []];
   const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
   if (e.entity === "window") return applyWindow(next, e, e.seq !== s.lastSeq + 1);
+  if (e.entity === "conversation") return conversationEvent(next, e, e.seq !== s.lastSeq + 1);
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
   if (e.kind === "deleted" && (e.entity === "chain" || e.entity === "project")) {
     // A deleted project or chain is dropped; a page that showed it goes home.
@@ -366,7 +371,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
     return routeGone(dropped) ? then(dropped, fx, { name: "chains" }) : [dropped, fx];
   }
   if (e.entity === "project") return [next, [{ type: "loadProjects" }, { type: "loadAgents" }]];
-  if (e.entity === "thread") return [next, threadEventEffects(s, ticketOfEvent(e))];
+  if (e.entity === "thread") return [next, [...threadEventEffects(s, ticketOfEvent(e)), ...reloadTalks(next, e)]];
   // A pin of the assistant: the inbox lists the open ones; the mockups read the pins themselves.
   if (e.entity === "design_pin") return [next, [{ type: "loadInbox" }]];
   const chain = chainOfEvent(s, e);

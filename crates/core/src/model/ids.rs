@@ -91,6 +91,10 @@ id_type!(
     ThreadMessageId
 );
 id_type!(
+    /// Identifies a message the conversation stores itself (not a card discussion's).
+    ConversationMessageId
+);
+id_type!(
     /// Identifies a [`crate::ThreadVersion`].
     ThreadVersionId
 );

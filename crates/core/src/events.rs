@@ -221,6 +221,12 @@ pub enum DomainEvent {
         project: ProjectId,
         project_key: ProjectKey,
     },
+    /// A message joined the project's conversation with its assistant (the person's, the
+    /// assistant's, or a line of Toknila's about what the assistant did).
+    ConversationMessage {
+        project: ProjectId,
+        message: crate::conversation::Message,
+    },
 }
 
 impl DomainEvent {
@@ -267,6 +273,7 @@ impl DomainEvent {
             Self::WindowShowCard { .. }
             | Self::WindowSuggest { .. }
             | Self::WindowSuggestionCleared { .. } => "window",
+            Self::ConversationMessage { .. } => "conversation",
         }
     }
 
@@ -318,7 +325,8 @@ impl DomainEvent {
             | Self::DesignPinRemoved { pin } => pin.id.to_string(),
             Self::WindowShowCard { project, .. }
             | Self::WindowSuggest { project, .. }
-            | Self::WindowSuggestionCleared { project, .. } => project.to_string(),
+            | Self::WindowSuggestionCleared { project, .. }
+            | Self::ConversationMessage { project, .. } => project.to_string(),
         }
     }
 
@@ -365,6 +373,7 @@ impl DomainEvent {
             Self::WindowShowCard { .. } => "show_card",
             Self::WindowSuggest { .. } => "suggest",
             Self::WindowSuggestionCleared { .. } => "suggestion_cleared",
+            Self::ConversationMessage { .. } => "message",
         }
     }
 }

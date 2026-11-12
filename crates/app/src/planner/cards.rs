@@ -2,6 +2,8 @@
 //! references.
 
 use serde::{Deserialize, Serialize};
+use crate::conversation as conv;
+use toknila_core::conversation;
 use toknila_core::design::DesignRef;
 use toknila_core::planner;
 use toknila_core::{Project, ProjectId, TicketId, TicketPatch};
@@ -90,7 +92,12 @@ pub fn add_card_with_designs<U: UnitOfWork + ?Sized>(
         at_end,
         ..NewTicket::default()
     };
-    tickets::create(uow, &c.id.to_string(), input)
+    let id = tickets::create(uow, &c.id.to_string(), input)?;
+    if let Some(t) = uow.ticket(id)? {
+        let text = conversation::added_card(&t.key);
+        conv::line_about_card(uow, project, text, t.key)?;
+    }
+    Ok(id)
 }
 
 /// A rename of a checklist item.
@@ -149,6 +156,7 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
         Project::choose_model(m).map_err(AppError::bad_request)?;
     }
     let (mut prompt, mut acceptance) = (edit.prompt, edit.acceptance);
+    let mut proposed = false;
     // On a card the person talks over with the assistant, a new prompt or acceptance is a proposal
     // the person accepts or rejects; it lands only then.
     if (prompt.is_some() || acceptance.is_some())
@@ -157,6 +165,7 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
         let proposal = EditProposal::of(&t.prompt, &t.acceptance, prompt.take(), acceptance.take());
         if !proposal.is_empty() {
             discussion::propose(uow, &t, &th, &proposal)?;
+            proposed = true;
         }
     }
     let patch = TicketPatch {
@@ -168,7 +177,8 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
         designs,
         ..TicketPatch::default()
     };
-    if patch != TicketPatch::default() {
+    let changed = patch != TicketPatch::default();
+    if changed {
         tickets::edit(uow, &t, patch)?;
     }
     for item in &edit.edit_subtasks {
@@ -177,5 +187,13 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
     for text in &edit.add_subtasks {
         notes::add_subtask(uow, &t, text)?;
     }
+    // A change only proposed is not yet an edit: the card has it when the person accepts.
+    let only_proposed = proposed && !changed && edit.edit_subtasks.is_empty() && edit.add_subtasks.is_empty();
+    let text = if only_proposed {
+        conversation::proposed_edit(&t.key)
+    } else {
+        conversation::edited_card(&t.key)
+    };
+    conv::line_about_card(uow, project, text, t.key.clone())?;
     Ok(t.id)
 }

@@ -514,6 +514,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/say": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The planner says something to the person: an answer, a question, a report. The person reads
+         *     it in the chat of the assistant's screen; `about` names the card or chain it is about.
+         */
+        post: operations["planner_say"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/suggestion": {
         parameters: {
             query?: never;
@@ -619,6 +639,31 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["create_chain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The project's conversation with its assistant, a page at a time: the newest messages first
+         *     asked for, older ones with `before`. A page is oldest first; `more` says there are older ones.
+         *     A card's discussion is in it, as messages about the card.
+         */
+        get: operations["get_conversation"];
+        put?: never;
+        /**
+         * A person says something to the project's assistant: the message is stored (and shown) first.
+         *     Typing it into the assistant's terminal is the caller's next step.
+         */
+        post: operations["post_conversation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1774,6 +1819,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description What a message was about. */
+        About: {
+            key: components["schemas"]["TicketKey"];
+            /** @enum {string} */
+            kind: "card";
+        } | {
+            /** @enum {string} */
+            kind: "chain";
+            name: string;
+        };
         /** @description Body of ticket actions. `text` is required by block, return and cancel. */
         ActionInput: {
             text?: string | null;
@@ -1907,6 +1962,11 @@ export interface components {
          * @enum {string}
          */
         ArtifactFormat: "mermaid" | "markdown" | "html";
+        /**
+         * @description Who wrote a message.
+         * @enum {string}
+         */
+        Author: "person" | "assistant" | "toknila";
         /** @description Why a ticket is Blocked. */
         BlockedReason: {
             /** @enum {string} */
@@ -2225,6 +2285,12 @@ export interface components {
          * @enum {string}
          */
         CommentKind: "instruction" | "report" | "decision";
+        /** @description A page of the conversation, oldest first. */
+        ConversationPage: {
+            messages: components["schemas"]["Message"][];
+            /** @description There are older messages than the first one here: ask again with `before` set to its id. */
+            more: boolean;
+        };
         /** @description One UTC day of the series. */
         DayUsage: {
             /** @description `YYYY-MM-DD`, UTC. */
@@ -2658,6 +2724,22 @@ export interface components {
             /** @description Title of a pull request; `{key}` and `{title}` are the card's. */
             pr_title: string;
         };
+        /** @description One message of a project's conversation. */
+        Message: {
+            about?: components["schemas"]["About"] | null;
+            at: components["schemas"]["Timestamp"];
+            /** @description Names of the files that went with it. */
+            attachments?: string[];
+            author: components["schemas"]["Author"];
+            /** @description Unique across the whole conversation, including a card discussion's messages. */
+            id: string;
+            text: string;
+            /**
+             * Format: int32
+             * @description For a message of a card's discussion: the number of the thread it lives in.
+             */
+            thread?: number | null;
+        };
         /**
          * @description Plain message, or a person's request for changes.
          * @enum {string}
@@ -2774,6 +2856,12 @@ export interface components {
         };
         /** @description Body of `.../messages` and `.../changes`. */
         NewMessage: {
+            text: string;
+        };
+        /** @description What the person sends from the assistant's screen. */
+        NewPersonMessage: {
+            /** @description Names of the files that went with it. */
+            attachments?: string[];
             text: string;
         };
         /** @description What the planner may give for a new chain; a chain it makes never starts cards by itself. */
@@ -3745,6 +3833,12 @@ export interface components {
             output: string;
             state: components["schemas"]["StepState"];
             step: components["schemas"]["ReleaseStep"];
+        };
+        /** @description What the assistant says with its `say` tool. */
+        Say: {
+            /** @description The card (key, id or title) or chain (name) the words are about. */
+            about?: string | null;
+            text: string;
         };
         /** @description The worktree and branch a ticket works in, once the shipyard has made them. */
         Ship: {
@@ -5693,6 +5787,53 @@ export interface operations {
             };
         };
     };
+    planner_say: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Say"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Message"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     planner_suggest: {
         parameters: {
             query?: never;
@@ -5960,6 +6101,86 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_conversation: {
+        parameters: {
+            query?: {
+                /**
+                 * @description The id of the oldest message the caller has: the page holds the ones before it. Unset: the
+                 *     newest.
+                 */
+                before?: string | null;
+                /** @description At most this many (default 50, never more than 200). */
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationPage"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    post_conversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewPersonMessage"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Message"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

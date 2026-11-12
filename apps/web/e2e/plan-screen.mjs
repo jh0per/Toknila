@@ -350,7 +350,8 @@ try {
   must(banner.y + banner.height <= divider.y, `the update note (bottom ${Math.round(banner.y + banner.height)}) is above the divider (${Math.round(divider.y)})`);
   await shot("plan-screen-update");
 
-  // 11. The assistant's idle panel asks what to build in the middle, with no empty terminal.
+  // 11. The assistant's idle screen is the chat (it says sending starts the assistant), with no
+  //     empty terminal: the terminal is the other tab.
   await open("/projects/PLN/planner");
   await t("planner-idle").waitFor();
   must((await t("term-host").count()) === 0, "the planner's empty terminal is not drawn");

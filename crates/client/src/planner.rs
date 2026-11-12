@@ -2,12 +2,13 @@
 //! itself (a client with its run token) reads and edits the plan.
 
 use toknila_api_types::{
-    CardEdit, ChainDetail, DesignPin, EdgeInput, EditPlanChain, MoveInput, NewCard, NewMessage,
+    CardEdit, ChainDetail, ConversationPage, DesignPin, Say, EdgeInput, EditPlanChain, MoveInput, NewCard, NewMessage,
     NewPlanChain, NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain, PlannerDesign,
     PlannerOverview, PlannerPlan, PlannerState, StartPlanner, TerminalSize, ThreadDetail,
     TicketDetail,
 };
 use toknila_core::RunId;
+use toknila_core::conversation::Message;
 use toknila_core::suggestion::Suggestion;
 
 use crate::{Client, ClientResult, NO_BODY, Scrollback, enc, transport_error};
@@ -193,6 +194,35 @@ impl Client {
     /// `POST /planner/suggestion`: keeps the planner's next step, replacing the last one.
     pub fn planner_suggest(&self, s: &NewSuggestion) -> ClientResult<Suggestion> {
         self.call("POST", "/planner/suggestion", Some(s))
+    }
+
+    /// `POST /planner/say`: the planner says something to the person.
+    pub fn planner_say(&self, s: &Say) -> ClientResult<Message> {
+        self.call("POST", "/planner/say", Some(s))
+    }
+
+    /// `GET /projects/{project}/conversation`: a page of the project's conversation with its
+    /// assistant; `before` is the id of the oldest message already read.
+    pub fn conversation(
+        &self,
+        project: &str,
+        before: Option<&str>,
+        limit: Option<usize>,
+    ) -> ClientResult<ConversationPage> {
+        let mut query = Vec::new();
+        if let Some(b) = before {
+            query.push(format!("before={}", enc(b)));
+        }
+        if let Some(l) = limit {
+            query.push(format!("limit={l}"));
+        }
+        let query = if query.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", query.join("&"))
+        };
+        let path = format!("/projects/{}/conversation{query}", enc(project));
+        self.call("GET", &path, NO_BODY)
     }
 
     /// `GET /projects/{project}/suggestion`: the planner's standing suggestion, if any.

@@ -98,3 +98,7 @@ export type StraysCleaned = Schemas["StraysCleaned"];
 export type DesignPin = Schemas["DesignPin"];
 export type VersionSuggestion = Schemas["VersionSuggestion"];
 export type Finish = Schemas["Finish"];
+export type ConversationMessage = Schemas["Message"];
+export type ConversationPage = Schemas["ConversationPage"];
+export type ConversationAuthor = Schemas["Author"];
+export type ConversationAbout = Schemas["About"];

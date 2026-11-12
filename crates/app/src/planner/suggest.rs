@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use toknila_core::ProjectId;
+use toknila_core::conversation::{self, About};
 use toknila_core::events::DomainEvent;
 use toknila_core::suggestion::{self, Suggestion, SuggestionAction};
 
@@ -48,6 +49,8 @@ pub fn suggest<U: UnitOfWork + ?Sized>(
         at: uow.now(),
     };
     uow.save_suggestion(project, &s)?;
+    let about = s.card.clone().map(|key| About::Card { key });
+    crate::conversation::line(uow, project, conversation::suggested(&s.text), about)?;
     uow.emit(&DomainEvent::WindowSuggest {
         project,
         suggestion: s.clone(),

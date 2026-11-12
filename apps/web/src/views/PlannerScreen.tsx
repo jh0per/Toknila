@@ -38,7 +38,7 @@ export function PlannerScreen({ project, state, dispatch }: { project: Project; 
         </div>
       )}
       <PanelDivider />
-      <PlannerPanel project={project} state={state} dispatch={dispatch} />
+      <PlannerPanel key={project.key} project={project} state={state} dispatch={dispatch} />
     </>
   );
 }

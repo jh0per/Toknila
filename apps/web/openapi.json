@@ -1916,6 +1916,63 @@
         }
       }
     },
+    "/planner/say": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "The planner says something to the person: an answer, a question, a report. The person reads\nit in the chat of the assistant's screen; `about` names the card or chain it is about.",
+        "operationId": "planner_say",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Say"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/planner/suggestion": {
       "post": {
         "tags": [
@@ -2252,6 +2309,128 @@
             }
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/conversation": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "The project's conversation with its assistant, a page at a time: the newest messages first\nasked for, older ones with `before`. A page is oldest first; `more` says there are older ones.\nA card's discussion is in it, as messages about the card.",
+        "operationId": "get_conversation",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "The id of the oldest message the caller has: the page holds the ones before it. Unset: the\nnewest.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "At most this many (default 50, never more than 200).",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "A person says something to the project's assistant: the message is stored (and shown) first.\nTyping it into the assistant's terminal is the caller's next step.",
+        "operationId": "post_conversation",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPersonMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5774,6 +5953,49 @@
   },
   "components": {
     "schemas": {
+      "About": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A card, by key.",
+            "required": [
+              "key",
+              "kind"
+            ],
+            "properties": {
+              "key": {
+                "$ref": "#/components/schemas/TicketKey"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "card"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A chain (epic), by name.",
+            "required": [
+              "name",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "chain"
+                ]
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "description": "What a message was about."
+      },
       "ActionInput": {
         "type": "object",
         "description": "Body of ticket actions. `text` is required by block, return and cancel.",
@@ -6212,6 +6434,15 @@
           "mermaid",
           "markdown",
           "html"
+        ]
+      },
+      "Author": {
+        "type": "string",
+        "description": "Who wrote a message.",
+        "enum": [
+          "person",
+          "assistant",
+          "toknila"
         ]
       },
       "BlockedReason": {
@@ -7273,6 +7504,26 @@
           "report",
           "decision"
         ]
+      },
+      "ConversationPage": {
+        "type": "object",
+        "description": "A page of the conversation, oldest first.",
+        "required": [
+          "messages",
+          "more"
+        ],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "more": {
+            "type": "boolean",
+            "description": "There are older messages than the first one here: ask again with `before` set to its id."
+          }
+        }
       },
       "DayUsage": {
         "type": "object",
@@ -8402,6 +8653,58 @@
           }
         }
       },
+      "Message": {
+        "type": "object",
+        "description": "One message of a project's conversation.",
+        "required": [
+          "id",
+          "author",
+          "text",
+          "at"
+        ],
+        "properties": {
+          "about": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/About",
+                "description": "The card or chain it was about."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the files that went with it."
+          },
+          "author": {
+            "$ref": "#/components/schemas/Author"
+          },
+          "id": {
+            "type": "string",
+            "description": "Unique across the whole conversation, including a card discussion's messages."
+          },
+          "text": {
+            "type": "string"
+          },
+          "thread": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "For a message of a card's discussion: the number of the thread it lives in.",
+            "minimum": 0
+          }
+        }
+      },
       "MessageKind": {
         "type": "string",
         "description": "Plain message, or a person's request for changes.",
@@ -8726,6 +9029,26 @@
           "text"
         ],
         "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewPersonMessage": {
+        "type": "object",
+        "description": "What the person sends from the assistant's screen.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the files that went with it."
+          },
           "text": {
             "type": "string"
           }
@@ -11535,6 +11858,26 @@
             "$ref": "#/components/schemas/ReleaseStep"
           }
         }
+      },
+      "Say": {
+        "type": "object",
+        "description": "What the assistant says with its `say` tool.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "about": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card (key, id or title) or chain (name) the words are about."
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "Ship": {
         "type": "object",

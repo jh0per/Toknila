@@ -50,7 +50,10 @@ try {
     "print", "planner ready",
     // The planner says its next step before it is greeted, replaces it after the second line, and
     // after the third line asks the window to show a card (the last thing it does).
-    "echo", "echo",
+    // It answers the first line with `say`, which the person reads in the chat.
+    "echo",
+    "post", "/planner/say", JSON.stringify({ text: "Planned two cards", about: "WEB-1" }),
+    "echo",
     "post", "/planner/suggestion", JSON.stringify({ text: "Nothing waits for you" }),
     "echo",
     "post", "/planner/cards/WEB-1/show", "{}",
@@ -99,12 +102,18 @@ try {
   await expectPath("/projects/WEB/planner", "selecting it opens the assistant's address");
   await expectText(page.locator("[data-testid=planner-state]"), "not running", "the planner is not running");
   await expectText(page.locator("[data-testid=planner-empty]"), "Plan so far", "the diagram is labelled");
-  await expectText(page.locator("[data-testid=planner-idle]"), "Tell the assistant what you want to build or change", "a centred box asks what to build");
-  if ((await page.locator("[data-testid=term-host]").count()) !== 0) throw new Error("the idle panel should not draw a terminal");
-  console.log("PASS the idle panel draws no terminal");
+  // The chat is the tab it opens on; not running, it says sending starts it and asks what to build.
+  if ((await page.locator("[data-testid=planner-tab-chat][aria-selected=true]").count()) !== 1) throw new Error("the chat is not the default tab");
+  await expectText(page.locator("[data-testid=planner-idle]"), "Sending a message starts it", "the idle chat says sending starts the assistant");
+  await expectText(page.locator("[data-testid=placeholder]"), "Tell the assistant what you want to build or change", "an empty chat asks what to build");
+  if ((await page.locator("[data-testid=term-host]").count()) !== 0) throw new Error("the chat tab should not draw a terminal");
+  console.log("PASS the chat tab draws no terminal");
   await shot("planner-idle");
 
-  // Start with the planner profile of this test (the built-in one would launch the real agent).
+  // Start, Stop and the profile are on the Terminal tab. Pick the planner profile of this test
+  // (the built-in one would launch the real agent).
+  await page.locator("[data-testid=planner-tab-terminal]").click();
+  await expectText(page.locator("[data-testid=planner-start]"), "Start", "Start is on the Terminal tab");
   await page.locator("[data-testid=planner-profile]").selectOption("fake-planner");
 
   // The empty project asks what to build; Enter starts the planner and sends the text.
@@ -118,7 +127,12 @@ try {
   await page.keyboard.press("Enter");
   await expectPath("/projects/WEB/planner", "sending moves to the assistant's screen");
   await expectText(page.locator("[data-testid=planner-state]"), "running", "the text started the planner");
-  await expectText(page.locator("[data-testid=planner-stop]"), "Stop", "Stop replaces Start");
+  // The words are in the chat as the person's bubble (stored before the planner saw them), and the
+  // chat is where the screen opens.
+  await expectText(page.locator("[data-testid=chat-message][data-author=person]"), "hello planner", "the sent text is the person's bubble");
+  await expectText(page.locator("[data-testid=chat-message][data-author=assistant]"), "Planned two cards", "the planner's say is its bubble");
+  await page.locator("[data-testid=planner-tab-terminal]").click();
+  await expectText(page.locator("[data-testid=planner-stop]"), "Stop", "Stop replaces Start on the Terminal tab");
   await expectText(term, "planner ready", "the terminal shows the planner's live output");
   await expectText(term, "got:hello planner", "the text typed in the empty project reached the planner");
   await expectText(page.locator("[data-testid=term-status]"), "live", "the terminal is live");
@@ -167,16 +181,18 @@ try {
   const kinds = (await journal()).filter((e) => e.entity === "window").map((e) => e.kind);
   if (kinds.join() !== "suggest,suggestion_cleared") throw new Error(`expected suggest, suggestion_cleared in the journal, got ${kinds}`);
 
-  // The box under the terminal is the way to talk to it; the terminal keeps working too.
+  // The box of the chat is the way to talk to it; the terminal keeps working too.
+  await page.locator("[data-testid=planner-tab-chat]").click();
   await page.locator("[data-testid=planner-ask-input]").fill("and a second message");
   await page.locator("[data-testid=planner-ask-send]").click();
   // The planner answers that line with its next step (and its reply to the post scrolls the echo
   // off the small terminal), so the next step is the proof the box reached it.
   // Its next suggestion says nothing waits for the person: text, no button.
-  await expectText(next, "Nothing waits for you", "the box under the terminal reaches the planner, which says its next step");
+  await expectText(next, "Nothing waits for you", "the box of the chat reaches the planner, which says its next step");
   if ((await page.locator("[data-testid=suggestion-button]").count()) !== 0 || (await next.count()) !== 1) {
     throw new Error("a suggestion without an action should be one row with no button");
   }
+  await page.locator("[data-testid=planner-tab-terminal]").click();
   await term.click();
   await page.keyboard.type("typed in the terminal");
   await page.keyboard.press("Enter");
@@ -213,6 +229,7 @@ try {
   // A reload keeps the planner running and its output.
   await page.reload();
   await expectText(page.locator("[data-testid=planner-state]"), "running", "after a reload it still runs");
+  await page.locator("[data-testid=planner-tab-terminal]").click();
   await expectText(term, "planner done", "after a reload the scrollback has the output");
 
   // Stop ends it, and the panel offers Start again.

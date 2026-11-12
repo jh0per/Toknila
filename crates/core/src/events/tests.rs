@@ -449,3 +449,31 @@ fn suggestion_events_are_window_events_of_the_project() {
         json!({ "project": "01JBQ7ZJ0000000000000000P1", "project_key": "DEMO" })
     );
 }
+
+#[test]
+fn a_conversation_message_is_an_event_of_the_project_pinned_on_the_wire() {
+    use crate::conversation::{Author, Message};
+    let project = "01JBQ7ZJ0000000000000000P1"
+        .parse::<ProjectId>()
+        .expect("id");
+    let message = Message {
+        id: "01JBQ7ZJ0000000000000000M1".into(),
+        author: Author::Assistant,
+        text: "Done".into(),
+        about: None,
+        attachments: vec![],
+        thread: None,
+        at: Timestamp(9),
+    };
+    let e = DomainEvent::ConversationMessage { project, message };
+    assert_eq!(
+        (e.entity(), e.kind(), e.entity_id().as_str()),
+        ("conversation", "message", "01JBQ7ZJ0000000000000000P1")
+    );
+    assert_eq!(
+        payload(&e),
+        json!({ "project": "01JBQ7ZJ0000000000000000P1",
+                "message": { "id": "01JBQ7ZJ0000000000000000M1", "author": "assistant",
+                             "text": "Done", "at": 9 } })
+    );
+}

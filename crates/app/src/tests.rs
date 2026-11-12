@@ -55,6 +55,7 @@ struct Mem {
     pins: Vec<toknila_core::design::pin::DesignPin>,
     ships: Vec<Ship>,
     suggestion: Option<Suggestion>,
+    conversation: Vec<(ProjectId, toknila_core::conversation::Message)>,
     yard: ships::FakeYard,
     merger: merges::FakeMerger,
     checker: checks::FakeChecker,
@@ -144,6 +145,7 @@ impl Mem {
             pins: vec![],
             ships: vec![],
             suggestion: None,
+            conversation: vec![],
             yard: ships::FakeYard::default(),
             merger: merges::FakeMerger::default(),
             checker: checks::FakeChecker::default(),
@@ -253,6 +255,23 @@ impl Reader for Mem {
     }
     fn suggestion(&self, _: ProjectId) -> AppResult<Option<Suggestion>> {
         Ok(self.suggestion.clone())
+    }
+    fn conversation_page(
+        &self,
+        project: ProjectId,
+        before: Option<&str>,
+        limit: usize,
+    ) -> AppResult<Vec<toknila_core::conversation::Message>> {
+        let all: Vec<_> = self
+            .conversation
+            .iter()
+            .filter(|(p, _)| *p == project)
+            .map(|(_, m)| m.clone())
+            .collect();
+        let end = before
+            .and_then(|b| all.iter().position(|m| m.id == b))
+            .unwrap_or(all.len());
+        Ok(all[end.saturating_sub(limit)..end].to_vec())
     }
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>> {
         Ok(self.ships.iter().find(|s| s.ticket_id == ticket).cloned())
@@ -375,6 +394,14 @@ impl UnitOfWork for Mem {
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()> {
         self.ships.retain(|s| s.ticket_id != ship.ticket_id);
         self.ships.push(ship.clone());
+        Ok(())
+    }
+    fn insert_conversation_message(
+        &mut self,
+        project: ProjectId,
+        m: &toknila_core::conversation::Message,
+    ) -> AppResult<()> {
+        self.conversation.push((project, m.clone()));
         Ok(())
     }
     fn save_suggestion(&mut self, _: ProjectId, s: &Suggestion) -> AppResult<()> {
