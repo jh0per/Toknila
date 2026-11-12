@@ -1144,6 +1144,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/repos/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Does the one fix the folder's check offers (make the folder, `git init`, the first commit)
+         *     and answers the folder's new check. A fix the check does not offer is refused, nothing touched.
+         */
+        post: operations["repos_prepare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/checks": {
         parameters: {
             query?: never;
@@ -3512,17 +3532,28 @@ export interface components {
          * @enum {string}
          */
         RepoField: "repo_path" | "work_branch";
+        /**
+         * @description How a problem can be fixed by the daemon (`POST /v1/repos/prepare`).
+         * @enum {string}
+         */
+        RepoFix: "create_folder" | "init_repository" | "first_commit";
+        /** @description `POST /v1/repos/prepare`: the one fix to make to a folder (one its check offers). */
+        RepoPrepareRequest: {
+            fix: components["schemas"]["RepoFix"];
+            repo_path: string;
+        };
         /** @description One thing that stops the folder from being used. */
         RepoProblem: {
             code: components["schemas"]["RepoProblemCode"];
             field: components["schemas"]["RepoField"];
+            fix?: components["schemas"]["RepoFix"] | null;
             message: string;
         };
         /**
          * @description What is wrong.
          * @enum {string}
          */
-        RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing";
+        RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing" | "no_commits";
         /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
         Review: {
             check?: components["schemas"]["CheckPhase"] | null;
@@ -6939,6 +6970,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RepoCheck"];
+                };
+            };
+        };
+    };
+    repos_prepare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepoPrepareRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoCheck"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
         };
