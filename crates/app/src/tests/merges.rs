@@ -135,7 +135,8 @@ fn a_merge_that_lands_merges_the_card_removes_the_ship_and_starts_dependents() {
 }
 
 #[test]
-fn a_conflict_blocks_the_card_with_the_files_and_keeps_the_ship_and_dependents_waiting() {
+fn a_conflict_returns_the_card_to_its_agent_with_the_files_and_keeps_the_ship_and_dependents_waiting()
+ {
     let mut mem = in_review();
     answer(
         &mem,
@@ -146,39 +147,71 @@ fn a_conflict_blocks_the_card_with_the_files_and_keeps_the_ship_and_dependents_w
     accept(&mut mem);
     settle(&mut mem);
     let a = mem.ticket_by_title("A");
-    assert_eq!(a.status, TicketStatus::Blocked);
-    let BlockedReason::MergeConflict { detail } = blocked_reason(&a) else {
-        panic!("a merge conflict");
-    };
+    assert_eq!(a.status, TicketStatus::Running);
+    assert!(a.review.accepted, "the person's Accept is remembered");
+    let text = returned_text(&mem);
     assert!(
-        detail.contains("src/a.rs") && detail.contains("b.txt"),
-        "{detail}"
+        text.contains("src/a.rs") && text.contains("b.txt") && text.contains("git merge develop"),
+        "{text}"
     );
     assert!(mem.yard.removed.borrow().is_empty());
     assert_eq!(mem.ticket_by_title("B").status, TicketStatus::Backlog);
 }
 
+/// The text of the last instruction the system sent the worker.
+fn returned_text(mem: &Mem) -> String {
+    let c = mem
+        .comments
+        .iter()
+        .rfind(|c| c.kind == toknila_core::CommentKind::Instruction)
+        .expect("an instruction was sent");
+    assert_eq!(c.author, toknila_core::Actor::System);
+    format!(
+        "{} {}",
+        c.body.gist,
+        c.body.what.clone().unwrap_or_default()
+    )
+}
+
 #[test]
-fn unblock_after_a_conflict_merges_again() {
+fn after_a_conflict_at_accept_the_next_hand_in_merges_without_a_second_accept() {
     let mut mem = in_review();
-    answer(
-        &mem,
-        Ok(MergeOutcome::Conflict {
-            files: vec!["a.rs".to_owned()],
-        }),
-    );
+    *mem.merger.sync_answer.borrow_mut() = Ok(SyncOutcome::Conflict {
+        files: vec!["a.rs".to_owned()],
+        migrations: Vec::new(),
+    });
     accept(&mut mem);
     settle(&mut mem);
-    answer(&mem, Ok(MergeOutcome::Merged { commit: "d".into() }));
-    unblock(&mut mem);
+    assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Running);
+    // Return is not needed and not possible: the card is already with its agent.
+    *mem.merger.sync_answer.borrow_mut() = Ok(SyncOutcome::UpToDate);
     let a = mem.ticket_by_title("A");
-    assert_eq!(
-        (a.status, a.review.turn),
-        (TicketStatus::Review, Some(ReviewTurn::Merging))
-    );
+    let summary = toknila_core::handin::from_plain("merged main, resolved");
+    agent::ticket_event(&mut mem, &a, AgentEvent::Finished { summary }).expect("finished");
     settle(&mut mem);
-    assert_eq!(mem.ticket_by_title("A").status, TicketStatus::Merged);
-    assert_eq!(mem.merger.asked.borrow().len(), 2);
+    let a = mem.ticket_by_title("A");
+    assert_eq!(a.status, TicketStatus::Merged, "no second Accept");
+    assert!(!a.review.accepted);
+    assert_eq!(mem.merger.asked.borrow().len(), 1);
+}
+
+#[test]
+fn a_hand_in_that_still_conflicts_does_not_merge_and_a_person_return_forgets_the_accept() {
+    let mut mem = in_review();
+    *mem.merger.sync_answer.borrow_mut() = Ok(SyncOutcome::Conflict {
+        files: vec!["a.rs".to_owned()],
+        migrations: Vec::new(),
+    });
+    accept(&mut mem);
+    settle(&mut mem);
+    let a = mem.ticket_by_title("A");
+    let summary = toknila_core::handin::from_plain("again");
+    agent::ticket_event(&mut mem, &a, AgentEvent::Finished { summary }).expect("finished");
+    settle(&mut mem);
+    let a = mem.ticket_by_title("A");
+    assert_eq!(a.status, TicketStatus::Running, "back again, not merged");
+    assert!(mem.merger.asked.borrow().is_empty());
+    assert!(a.review.accepted);
 }
 
 #[test]
@@ -236,7 +269,7 @@ fn a_merge_running_at_a_restart_is_queued_again() {
 }
 
 #[test]
-fn accept_on_a_ship_that_fell_behind_syncs_first_and_a_conflict_blocks_with_the_files() {
+fn accept_on_a_ship_that_fell_behind_syncs_first_and_a_conflict_returns_the_card_with_the_files() {
     let mut mem = in_review();
     *mem.merger.sync_answer.borrow_mut() = Ok(SyncOutcome::Conflict {
         files: vec!["src/lib.rs".to_owned()],
@@ -250,10 +283,38 @@ fn accept_on_a_ship_that_fell_behind_syncs_first_and_a_conflict_blocks_with_the_
         mem.merger.asked.borrow().is_empty(),
         "the merge did not run"
     );
-    let BlockedReason::MergeConflict { detail } = blocked_reason(&a) else {
-        panic!("expected a merge conflict");
+    assert_eq!(a.status, TicketStatus::Running);
+    let text = returned_text(&mem);
+    assert!(text.contains("Conflicting files: src/lib.rs."), "{text}");
+    assert!(
+        text.contains("git merge develop, resolve it, run the gates")
+            || text.contains("`git merge develop` in the ship, resolve it, run the gates"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_conflict_on_a_card_without_a_ship_still_blocks_as_merge_conflict() {
+    // The sim profile: no ship, so nobody to return the card to.
+    let mut mem = Mem::demo();
+    recover(&mut mem).expect("settle");
+    let a = mem.ticket_by_title("A");
+    let summary = toknila_core::handin::from_plain("done");
+    agent::ticket_event(&mut mem, &a, AgentEvent::Finished { summary }).expect("finished");
+    accept(&mut mem);
+    let a = mem.ticket_by_title("A");
+    crate::merges::finished(
+        &mut mem,
+        a.id,
+        Ok(MergeOutcome::Conflict {
+            files: vec!["x".to_owned()],
+        }),
+    )
+    .expect("outcome");
+    let BlockedReason::MergeConflict { detail } = blocked_reason(&mem.ticket_by_title("A")) else {
+        panic!("a merge conflict");
     };
-    assert!(detail.contains("src/lib.rs"), "{detail}");
+    assert!(detail.contains('x'), "{detail}");
 }
 
 #[test]

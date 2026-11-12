@@ -3735,6 +3735,11 @@ export interface components {
         RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing" | "no_commits";
         /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
         Review: {
+            /**
+             * @description A person accepted, but the merge met a conflict and the card went back to the worker: the
+             *     next hand-in that passes the check and the reviewer merges without a second Accept.
+             */
+            accepted?: boolean;
             check?: components["schemas"]["CheckPhase"] | null;
             /**
              * @description The commit the ship's branch was at when the worker last handed in; `None` before the
