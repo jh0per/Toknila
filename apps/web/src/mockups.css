@@ -1,46 +1,46 @@
 /* A card's designs: mockups large with the region outlined, the picker, the node thumbnail. */
-.card-designs { display: flex; flex-direction: column; gap: var(--s2); margin: var(--s3) 0; }
-.card-designs.drop-over { outline: 2px solid var(--accent); outline-offset: 2px; background: var(--accent-soft); border-radius: var(--r-m); }
-.card-designs-drop { border: 1px dashed var(--line); border-radius: var(--r-m); padding: var(--s4); text-align: center; font-size: var(--fs-m); }
-.card-designs.drop-over .card-designs-drop { border: 2px solid var(--accent); }
-.card-designs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
-/* Looks like the page's h4 headings; it is not an h4 element only so the columns below stay the first. */
-.card-designs-title { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
-.card-design { display: flex; flex-direction: column; gap: var(--s1); }
-.mockup { margin: 0; display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
-.mockup-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); }
-.mockup-zoom { display: inline-flex; align-items: center; gap: var(--s1); margin-left: auto; font-family: var(--mono); font-size: var(--fs-s); }
-.mockup-frame { max-height: 70vh; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-s); background: var(--surface2); }
+.card-designs { display: flex; flex-direction: column; gap: var(--sp2); margin: var(--sp4) 0; }
+.card-designs.drop-over { outline: 2px solid var(--primary); outline-offset: 2px; background: var(--primary-container); border-radius: var(--shape-m); }
+.card-designs-drop { border: 1px dashed var(--outline); border-radius: var(--shape-m); padding: var(--sp4); text-align: center; font-size: var(--fs-body-l); }
+.card-designs.drop-over .card-designs-drop { border: 2px solid var(--primary); }
+.card-designs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp2); }
+/* Looks like the page's section titles; it is not an h4 element only so the columns below stay the first. */
+.card-designs-title { font-size: var(--fs-title-m); line-height: var(--lh-title-m); font-weight: var(--fw-semibold); }
+.card-design { display: flex; flex-direction: column; gap: var(--sp1); }
+.mockup { margin: 0; display: flex; flex-direction: column; gap: var(--sp1); min-width: 0; }
+.mockup-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp2); }
+.mockup-zoom { display: inline-flex; align-items: center; gap: var(--sp1); margin-left: auto; font-family: var(--mono); font-size: var(--fs-body-m); }
+.mockup-frame { max-height: 70vh; overflow: auto; border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); background: var(--surface-container-high); }
 .mockup-stage { position: relative; max-width: none; line-height: 0; }
 .mockup-stage img { display: block; width: 100%; height: auto; user-select: none; }
-.mockup-stage.draw { cursor: crosshair; touch-action: none; border: 1px solid var(--line); max-width: min(100%, 640px); }
+.mockup-stage.draw { cursor: crosshair; touch-action: none; border: 1px solid var(--outline-variant); max-width: min(100%, 640px); }
 /* The region: an outlined box; what lies outside it is dimmed by the shadow, which the stage's
    (or the frame's) clip cuts off at the picture's edge. */
 .mockup-stage { overflow: hidden; }
-.mockup-region { position: absolute; box-sizing: border-box; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px color-mix(in srgb, var(--fg) 38%, transparent); pointer-events: none; }
-.mockup-pdf { width: 100%; height: 70vh; border: 1px solid var(--line); }
-.mockup-region-text, .mockup-missing { margin: 0; font-size: var(--fs-s); }
-.picker-grid { margin-bottom: var(--s2); }
-.design-thumb.pick.chosen { outline: 2px solid var(--accent); outline-offset: 1px; }
-.node-thumb { display: inline-flex; align-items: center; gap: 4px; flex: none; }
-.node-thumb-pic { position: relative; display: block; width: 28px; height: 20px; overflow: hidden; border: 1px solid var(--line); border-radius: 2px; background: var(--surface2); }
+.mockup-region { position: absolute; box-sizing: border-box; border: 2px solid var(--primary); box-shadow: 0 0 0 9999px color-mix(in srgb, var(--on-surface) 38%, transparent); pointer-events: none; }
+.mockup-pdf { width: 100%; height: 70vh; border: 1px solid var(--outline-variant); }
+.mockup-region-text, .mockup-missing { margin: 0; font-size: var(--fs-body-m); }
+.picker-grid { margin-bottom: var(--sp2); }
+.design-thumb.pick.chosen { outline: 2px solid var(--primary); outline-offset: 1px; }
+.node-thumb { display: inline-flex; align-items: center; gap: var(--sp1); flex: none; }
+.node-thumb-pic { position: relative; display: block; width: 28px; height: 20px; overflow: hidden; border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); background: var(--surface-container-high); }
 .node-thumb-pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.node-thumb-pic i { position: absolute; box-sizing: border-box; border: 1px solid var(--accent); }
-.node-thumb b { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted); }
+.node-thumb-pic i { position: absolute; box-sizing: border-box; border: 1px solid var(--primary); }
+.node-thumb b { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); }
 
 /* The assistant's pins: numbered markers on the picture, and the questions under it. */
-.pin-marker { position: absolute; transform: translate(-50%, -50%); min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; border: 2px solid var(--accent); background: var(--accent); color: var(--bg); font: inherit; font-size: var(--fs-s); line-height: 18px; cursor: pointer; }
-.pin-marker[data-state="answered"] { background: var(--bg); color: var(--accent); }
-.pin-marker[aria-pressed="true"] { outline: 2px solid var(--fg); outline-offset: 2px; }
-.pin-region { position: absolute; box-sizing: border-box; border: 2px dashed var(--accent); pointer-events: none; }
-.pin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.pin-item { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; display: grid; gap: 6px; }
-.pin-item[data-active="true"] { border-color: var(--accent); }
-.pin-head { display: flex; gap: 8px; align-items: center; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-align: left; color: inherit; }
-.pin-number { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 11px; background: var(--accent); color: var(--bg); font-size: var(--fs-s); }
-.pin-item[data-state="answered"] .pin-number { background: var(--bg); color: var(--accent); border: 2px solid var(--accent); }
+.pin-marker { position: absolute; transform: translate(-50%, -50%); min-width: 22px; height: 22px; padding: 0 var(--sp1); border-radius: var(--shape-full); border: 2px solid var(--primary); background: var(--primary); color: var(--on-primary); font: inherit; font-size: var(--fs-body-m); line-height: 18px; cursor: pointer; }
+.pin-marker[data-state="answered"] { background: var(--background); color: var(--primary); }
+.pin-marker[aria-pressed="true"] { outline: 2px solid var(--on-surface); outline-offset: 2px; }
+.pin-region { position: absolute; box-sizing: border-box; border: 2px dashed var(--primary); pointer-events: none; }
+.pin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp2); }
+.pin-item { border: 1px solid var(--outline-variant); border-radius: var(--shape-s); padding: var(--sp2) var(--sp3); display: grid; gap: var(--sp2); }
+.pin-item[data-active="true"] { border-color: var(--primary); }
+.pin-head { display: flex; gap: var(--sp2); align-items: center; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-align: left; color: inherit; }
+.pin-number { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: var(--shape-full); background: var(--primary); color: var(--on-primary); font-size: var(--fs-body-m); }
+.pin-item[data-state="answered"] .pin-number { background: var(--background); color: var(--primary); border: 2px solid var(--primary); }
 .pin-text, .pin-answer { margin: 0; }
-.pin-form { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pin-form { display: flex; gap: var(--sp2); flex-wrap: wrap; align-items: center; }
 .pin-form input { flex: 1 1 200px; min-width: 0; }
 .design-large .mockup-stage { width: min(80vw, 900px); }
 .design-large .mockup-stage img { max-width: 100%; max-height: none; }
