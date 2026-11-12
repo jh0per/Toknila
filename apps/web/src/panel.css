@@ -61,6 +61,7 @@
 .rounds .round-items { margin: var(--sp1) 0 var(--sp2) var(--sp3); font-size: var(--fs-body-m); }
 .rounds .basis { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); background: var(--surface-container-high); border-radius: var(--shape-full); padding: 0 var(--sp2); white-space: nowrap; }
 .rounds [data-basis=NOT_RUN] .basis { color: var(--status-block); }
+.rounds [data-outcome=PERSON] .status { color: var(--on-surface-variant); }
 /* The terminal tab owns the panel's height: the host takes what is left under the status row and
    shrinks with the panel (no minimum), and the grid is counted from the host's content box, so
    every row is inside the panel at any height. The terminal's own metrics are not changed here. */

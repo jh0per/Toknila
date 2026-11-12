@@ -34,6 +34,8 @@ fn brief(acceptance: &[String]) -> RunBrief<'_> {
         discussion: &[],
         epic: None,
         check: None,
+        threads: &[],
+        hand_in: None,
     }
 }
 

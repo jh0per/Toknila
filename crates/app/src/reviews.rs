@@ -9,10 +9,11 @@
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
+use toknila_core::instructions::BriefThread;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{
-    AgentProfile, Chain, CheckPhase, Project, ReviewMode, ReviewRound, ReviewTurn, Ticket,
-    TicketId, TicketKey, TicketStatus, resolve_review_mode, resolve_reviewer,
+    Actor, AgentProfile, Chain, CheckPhase, Comment, CommentKind, Project, ReviewMode, ReviewRound,
+    ReviewTurn, Ticket, TicketId, TicketKey, TicketStatus, resolve_review_mode, resolve_reviewer,
 };
 
 use crate::chain::tell_ticket;
@@ -96,6 +97,8 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
         return Ok(());
     }
     let dir = uow.ship(ticket)?.map(|s| s.path);
+    let threads = BriefThread::of(&uow.threads(ticket)?);
+    let hand_in = latest_hand_in(&uow.comments(ticket)?);
     uow.defer(ExternalEffect::StartReviewer {
         ticket,
         key: t.key.clone(),
@@ -114,10 +117,23 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
             project: None,
             // The daemon's own run of the gate on this hand-in, so the reviewer does not rerun it.
             check: t.review.last_check.clone(),
+            // What the reviewer cannot open: the card's threads and the whole hand-in.
+            threads,
+            hand_in,
             ..RunBrief::default()
         },
     });
     Ok(())
+}
+
+/// The worker's latest hand-in on the card, whole; `None` when it gave none.
+fn latest_hand_in(comments: &[Comment]) -> Option<String> {
+    comments
+        .iter()
+        .filter(|c| c.kind == CommentKind::Report && c.author == Actor::Agent)
+        .filter(|c| toknila_core::handin::from_body(&c.body).is_some())
+        .max_by_key(|c| c.created_at)
+        .and_then(|c| toknila_core::handin::from_body(&c.body))
 }
 
 /// `StopReviewer`: queue stopping the reviewer's runner; the worker's keeps running.
