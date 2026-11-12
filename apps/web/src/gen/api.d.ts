@@ -1844,6 +1844,11 @@ export interface components {
             nudge: components["schemas"]["Nudge"];
             output: components["schemas"]["OutputRules"];
             permissions?: components["schemas"]["Permissions"];
+            /**
+             * @description Arguments that continue an earlier session, put after the program on a resumed run;
+             *     `{session}` is the agent's own session id. Empty: the agent cannot be resumed.
+             */
+            resume?: string[];
             role: components["schemas"]["AgentRole"];
             /**
              * Format: int64
@@ -3042,6 +3047,18 @@ export interface components {
             title?: string | null;
         };
         /**
+         * @description A Waiting card whose agent's process was ended after a grace, so the card holds no slot while
+         *     it waits for a person. It keeps what the run needs to come back: Claude Code's session id.
+         */
+        PausedAgent: {
+            /** @description The answer arrived: the card starts again as soon as a slot is free. */
+            resume?: boolean;
+            /** @description The agent's own session, for the profile's resume form; `None` when the run never said. */
+            session?: string | null;
+            /** @description When the process was ended. */
+            since: components["schemas"]["Timestamp"];
+        };
+        /**
          * @description Body of `POST /v1/tickets/{ticket}/permission`: an agent's `PermissionRequest` hook, which
          *     waits for the person's decision.
          */
@@ -3966,6 +3983,7 @@ export interface components {
         Ticket: {
             /** @description Acceptance criteria, one per entry. */
             acceptance: string[];
+            agent_paused?: components["schemas"]["PausedAgent"] | null;
             /** @description Ship branch `ship/<chain>/<slug>`; `null` until the card's ship is made. */
             branch?: string | null;
             chain_id: components["schemas"]["ChainId"];

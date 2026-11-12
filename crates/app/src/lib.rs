@@ -21,6 +21,7 @@ pub mod merges;
 pub mod moves;
 pub mod notes;
 pub mod nudge;
+pub mod paused;
 pub mod pins;
 pub mod planner;
 pub mod ports;

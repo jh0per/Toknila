@@ -15,6 +15,21 @@ describe("the status sentence", () => {
     expect(line).toEqual({ tone: "needs", text: "Waiting for your answer", next: "Which database?" });
   });
 
+  it("says the agent of a waiting card is paused, not running, and what the card waits for", () => {
+    const reason = { status: "waiting", kind: "question", text: "Which database?" } as StatusReason;
+    const paused = { since: 1, resume: false } as Ticket["agent_paused"];
+    const line = statusLine(card("waiting", { status_reason: reason, agent_paused: paused }), detail([]), pace());
+    expect(line.text).toBe("Waiting for your answer: Which database?");
+    expect(line.next).toBe("Its agent is paused, not running, and holds no slot. Answer below and it resumes.");
+  });
+
+  it("says an answered card with a paused agent resumes when a slot is free, with its place", () => {
+    const reason = { status: "waiting", kind: "question", text: "Which database?" } as StatusReason;
+    const paused = { since: 1, resume: true } as Ticket["agent_paused"];
+    const line = statusLine(card("waiting", { status_reason: reason, agent_paused: paused }), detail([]), pace({ queue: 2 }));
+    expect(line.text).toBe("Answered: the agent resumes when a slot is free (#2 in line)");
+  });
+
   it("says a card waits for you to approve its design, with a link to Threads", () => {
     const d = { ...detail([]), design_waiting: true, phase: "design" } as TicketDetail;
     const line = statusLine(card("running", { design_first: true }), d, pace());

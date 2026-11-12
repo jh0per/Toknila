@@ -72,6 +72,7 @@ impl Builder {
             status_since: Timestamp(0),
             paused: false,
             queued: false,
+            agent_paused: None,
             profile: Some("sim".to_owned()),
             review_mode: None,
             reviewer: None,

@@ -29,6 +29,7 @@ pub(super) fn ticket(n: u32, status: TicketStatus, since: i64) -> Ticket {
         status_since: Timestamp(since),
         paused: false,
         queued: false,
+        agent_paused: None,
         profile: None,
         review_mode: None,
         reviewer: None,

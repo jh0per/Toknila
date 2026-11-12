@@ -98,6 +98,19 @@ pub struct RunBrief {
     pub epic: Option<(String, String)>,
     /// What the check command said about the hand-in under review (a reviewer only).
     pub check: Option<toknila_core::CheckOutcome>,
+    /// The run continues a card's paused agent (a worker only): see [`Resume`].
+    pub resume: Option<Resume>,
+}
+
+/// A worker that starts again after its card waited for a person with no process.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Resume {
+    /// The agent's session when it paused; `None` starts fresh.
+    pub session: Option<String>,
+    /// What would have been typed to the live agent: the answer, as the first input of the run.
+    /// A run that cannot be resumed (no session, no resume form of the profile, a refused id)
+    /// starts fresh and reads it in its kickoff as an instruction that waits.
+    pub input: String,
 }
 
 /// A runner now works for the ticket.

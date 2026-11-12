@@ -152,6 +152,10 @@ pub struct AgentProfile {
     /// window shows that it waits on its screen. 0 turns the check off.
     #[serde(default = "default_startup_secs")]
     pub startup_secs: u64,
+    /// Arguments that continue an earlier session, put after the program on a resumed run;
+    /// `{session}` is the agent's own session id. Empty: the agent cannot be resumed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resume: Vec<String>,
 }
 
 fn default_startup_secs() -> u64 {
@@ -195,39 +199,6 @@ impl AgentProfile {
         name.eq_ignore_ascii_case("claude")
     }
 
-    /// The arguments that run the command on `model` (`--model <model>`, from the CLI reference
-    /// of Claude Code): none without a model, for a profile that does not run Claude Code, or
-    /// when the profile's own command already names one, which then stays the profile's choice.
-    pub fn model_args(&self, model: Option<&str>) -> Vec<String> {
-        let Some(model) = model.map(str::trim).filter(|m| !m.is_empty()) else {
-            return Vec::new();
-        };
-        let named = self
-            .command
-            .iter()
-            .any(|a| a == "--model" || a.starts_with("--model="));
-        if !self.runs_claude_code() || named {
-            return Vec::new();
-        }
-        vec!["--model".to_owned(), model.to_owned()]
-    }
-
-    /// The inherited environment variables of the agent's own kind that must not reach it:
-    /// `CLAUDECODE` and `CLAUDE_CODE_*` describe the session that started Toknila (a child-session
-    /// marker, the entrypoint), not this run. A variable the profile's `env` sets is its choice and
-    /// stays. `names` are the names in the daemon's environment.
-    pub fn inherited_to_drop<I: IntoIterator<Item = String>>(&self, names: I) -> Vec<String> {
-        let same = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
-        names
-            .into_iter()
-            .filter(|n| {
-                let up = n.to_ascii_uppercase();
-                (up == "CLAUDECODE" || up.starts_with("CLAUDE_CODE_"))
-                    && !self.env.keys().any(|k| same(k, n))
-            })
-            .collect()
-    }
-
     /// The profile as a card's worker runs it under a project's setting: the project's
     /// [`CommandPolicy`] picks the permission mode of the command (auto mode replaces
     /// `acceptEdits`) and adds its allow rules, and the rules a person remembered are allowed too.
@@ -268,6 +239,7 @@ impl AgentProfile {
             output: OutputRules::default(),
             nudge: Nudge::default(),
             startup_secs: default_startup_secs(),
+            resume: Vec::new(),
         }
     }
 
@@ -385,6 +357,7 @@ impl AgentProfile {
                 .map(str::to_owned)
                 .to_vec(),
             },
+            resume: ["--resume", Self::SESSION].map(str::to_owned).to_vec(),
             ..Self::new(
                 Self::CLAUDE_CODE,
                 AgentRole::Worker,

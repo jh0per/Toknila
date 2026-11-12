@@ -5999,6 +5999,13 @@
           "permissions": {
             "$ref": "#/components/schemas/Permissions"
           },
+          "resume": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Arguments that continue an earlier session, put after the program on a resumed run;\n`{session}` is the agent's own session id. Empty: the agent cannot be resumed."
+          },
           "role": {
             "$ref": "#/components/schemas/AgentRole"
           },
@@ -9495,6 +9502,30 @@
         },
         "additionalProperties": false
       },
+      "PausedAgent": {
+        "type": "object",
+        "description": "A Waiting card whose agent's process was ended after a grace, so the card holds no slot while\nit waits for a person. It keeps what the run needs to come back: Claude Code's session id.",
+        "required": [
+          "since"
+        ],
+        "properties": {
+          "resume": {
+            "type": "boolean",
+            "description": "The answer arrived: the card starts again as soon as a slot is free."
+          },
+          "session": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The agent's own session, for the profile's resume form; `None` when the run never said."
+          },
+          "since": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the process was ended."
+          }
+        }
+      },
       "PermissionAsk": {
         "type": "object",
         "description": "Body of `POST /v1/tickets/{ticket}/permission`: an agent's `PermissionRequest` hook, which\nwaits for the person's decision.",
@@ -12095,6 +12126,17 @@
               "type": "string"
             },
             "description": "Acceptance criteria, one per entry."
+          },
+          "agent_paused": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PausedAgent",
+                "description": "Set on a Waiting card whose agent's process was ended after a grace: it holds no slot and\ncomes back when the answer arrives. Only a Waiting card has it."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "branch": {
             "type": [

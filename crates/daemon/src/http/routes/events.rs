@@ -133,6 +133,10 @@ pub async fn ticket_activity(
     };
     let at = now();
     let (tokens, prompts) = (state.runners.tokens(), state.runners.prompts());
+    // The session a paused agent is resumed from.
+    if let Some(session) = input.session_id.clone() {
+        prompts.remember_session(t.id, role, session);
+    }
     tokens.mark_active(t.id, role, at);
     // A `PreToolUse` names the call about to run; a `PostToolUse` names the call that is done.
     let before = input.signal == "hook:pre_tool_use";

@@ -34,6 +34,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         status_since: Timestamp(1_793_487_815_000),
         paused: false,
         queued: false,
+        agent_paused: None,
         profile: Some("sim".to_owned()),
         review_mode: Some(ReviewMode::Both),
         reviewer: None,

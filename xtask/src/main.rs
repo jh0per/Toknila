@@ -21,6 +21,7 @@ use std::time::Duration;
 
 mod app;
 mod bump;
+mod css_guard;
 mod guards;
 mod leaks;
 mod updates;
