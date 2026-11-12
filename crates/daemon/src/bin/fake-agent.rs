@@ -2,6 +2,7 @@
 //! no OS tools needed. Its arguments are steps, run in order:
 //!
 //! - `print <text>`: print a line.
+//! - `osc52 <base64>`: ask the terminal to put the decoded text on the clipboard (`ESC]52;c;<base64>`).
 //! - `pwd`: print the working directory.
 //! - `env <NAME>`: print `NAME=<value>`.
 //! - `echo`: read one line from the terminal and print `got:<line>`.
@@ -142,6 +143,11 @@ fn main() {
     while let Some(step) = args.next() {
         match step.as_str() {
             "print" => say(&args.next().unwrap_or_default()),
+            // Asks the terminal to copy: the argument is the base64 payload, as an agent sends it.
+            "osc52" => say(&format!(
+                "\x1b]52;c;{}\x07",
+                args.next().unwrap_or_default()
+            )),
             "pwd" => say(&std::env::current_dir()
                 .map(|d| d.display().to_string())
                 .unwrap_or_default()),
