@@ -9,12 +9,27 @@ use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use common::{Tok, tempdir};
 use toknila_client::{Client, ClientError};
 
 const IDLE: Duration = Duration::from_millis(300);
+
+/// Connections the relay closed because they were idle (this binary has one relay).
+static CLOSED_WHILE_IDLE: AtomicUsize = AtomicUsize::new(0);
+
+/// Waits, with a deadline, until the relay has closed `n` idle connections in all.
+fn wait_for_closed(n: usize) {
+    let until = Instant::now() + Duration::from_secs(30);
+    while CLOSED_WHILE_IDLE.load(Ordering::SeqCst) < n {
+        assert!(
+            Instant::now() < until,
+            "the relay never closed idle connection {n}"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+}
 
 /// Relays one connection to `upstream`; closes both halves after `IDLE` without traffic.
 fn relay(client: TcpStream, upstream: TcpStream, posts: Arc<AtomicUsize>) {
@@ -50,6 +65,7 @@ fn relay(client: TcpStream, upstream: TcpStream, posts: Arc<AtomicUsize>) {
         if last.idle() > IDLE {
             let _ = client.shutdown(Shutdown::Both);
             let _ = upstream.shutdown(Shutdown::Both);
+            CLOSED_WHILE_IDLE.fetch_add(1, Ordering::SeqCst);
             break;
         }
     }
@@ -109,18 +125,18 @@ fn calls_after_the_daemon_closed_an_idle_connection_succeed_and_a_post_is_sent_o
         client
             .projects()
             .unwrap_or_else(|e| panic!("GET {round}: {e}"));
-        thread::sleep(IDLE * 3);
+        wait_for_closed(round * 3 + 1);
         // The daemon answers 404 for an unknown project: the request got through and was read.
         let err = client.stop_planner("NOPE").expect_err("no such project");
         assert!(
             matches!(err, ClientError::Api { status: 404, .. }),
             "POST {round}: {err:?}"
         );
-        thread::sleep(IDLE * 3);
+        wait_for_closed(round * 3 + 2);
         client
             .projects()
             .unwrap_or_else(|e| panic!("GET after POST {round}: {e}"));
-        thread::sleep(IDLE * 3);
+        wait_for_closed(round * 3 + 3);
     }
     assert_eq!(
         posts.load(Ordering::SeqCst),
