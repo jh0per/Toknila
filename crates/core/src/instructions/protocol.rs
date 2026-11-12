@@ -73,6 +73,15 @@ empty commit. Run it once, not in a loop: only one check runs on this \
 machine at a time, and the daemon runs it again on your hand-in.
 - Clean up what you started: test daemons and servers, temporary folders, placeholder files.
 
+## Writing tests
+
+- A test never blocks without a deadline on something the behaviour under test may not produce \
+(an accept, a read, a channel receive, a join of such a thread).
+- A test of an operating-system-specific failure is gated with `cfg(target_os)`, and its comment \
+says which system and why.
+- A test of a race asserts the invariant that holds whichever way the race goes, never that the \
+race went one particular way.
+
 ## Hand in once
 
 The `finished` summary is the hand-in template. The daemon refuses a summary that has no checks \

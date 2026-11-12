@@ -1,0 +1,9 @@
+# Used by `cargo xtask verify` when cargo-nextest is installed (CI installs it).
+[profile.default]
+# No retries: a flaky test fails the gate. A test that runs for minutes is stuck, not slow.
+retries = 0
+slow-timeout = { period = "60s", terminate-after = 8 }
+
+[profile.default.junit]
+# target/nextest/default/junit.xml: the time of every test, which CI uploads.
+path = "junit.xml"

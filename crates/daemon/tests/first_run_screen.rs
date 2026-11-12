@@ -275,7 +275,16 @@ async fn a_trust_dialog_waits_for_a_person_is_never_nudged_and_the_chosen_answer
         .until("the card running again", 0, |c| c["status"] == "running")
         .await;
     assert!(out["status_reason"].is_null(), "{out}");
-    assert!(rig.output().await.contains("trust=yes"));
+    // The card runs as soon as the keys are sent; the agent echoes them a moment later.
+    let until = Instant::now() + WAIT;
+    while !rig.output().await.contains("trust=yes") {
+        assert!(
+            Instant::now() < until,
+            "the agent never echoed the answer:\n{}",
+            rig.output().await
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     let kinds = rig.journal().await;
     let answered = kinds
         .iter()

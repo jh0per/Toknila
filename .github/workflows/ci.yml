@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    # `ci/**`: a branch pushed there gets the full run before it reaches main.
+    branches: [main, develop, "ci/**"]
   pull_request:
   workflow_dispatch:
 
@@ -26,7 +27,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     # A hung test must fail the job, not hold a runner for six hours.
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -46,11 +47,29 @@ jobs:
       - name: cargo xtask web
         run: cargo xtask web
 
+      # `cargo xtask verify` runs the tests with it when present (and says so), else with cargo test.
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
       # The same command developers run locally. Do not inline its steps here.
       - name: cargo xtask verify
         run: cargo xtask verify
         env:
           TOKNILA_REQUIRE_WEB: "1"
+
+      # Time of each step and of each test (junit), also when verify failed.
+      - name: Upload verify timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-timing-${{ matrix.os }}
+          path: |
+            target/verify-timing.json
+            target/nextest/default/junit.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: cargo xtask e2e-web
         run: cargo xtask e2e-web

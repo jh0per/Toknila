@@ -140,6 +140,25 @@ A check you have never seen fail is a claim, not a check.
   command here and reading the path it printed; "not runnable locally" is a reason to return the
   card, not to hand it in.
 
+## Testing
+
+- A test never blocks without a deadline on something the behaviour under test may not produce:
+  an accept, a read, a channel receive, a join of a thread that does such a thing. A hang costs a
+  runner its whole time limit; a deadline costs one failing test.
+- A test of an operating-system-specific failure is gated with `cfg(target_os = "...")`, and its
+  comment says which system and why (a reset that only macOS reports, say).
+- A test of a race asserts the invariant that holds whichever way the race goes (a GET answers
+  with the list, a POST opens one connection), never that the race went one particular way.
+- Wait for a condition (a poll with a deadline, an event), not for a fixed time. A fixed wait is
+  only for "nothing happens in this window", and then it is as short as the setting it waits on:
+  a test daemon reads `TOKNILA_TICK_MS` (its silence ticker) only under `TOKNILA_TEST_ROOT`,
+  and profiles lower `startup_secs`, grace periods and nudge windows.
+- `cargo xtask verify` runs the tests with `cargo nextest` when it is installed (one process per
+  test, binaries in parallel; it says which it used) and with `cargo test` otherwise, so a test
+  must not depend on another test of its binary having run or on sharing its process. It writes
+  `target/verify-timing.json` (time per step); nextest adds `target/nextest/default/junit.xml`
+  (time per test), which CI uploads.
+
 ## Reporting
 
 Keep output short: do not narrate what you are about to do, do not paste code back. Report each
