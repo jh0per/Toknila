@@ -21,7 +21,7 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
   const chainMenu = useChainMenu(dispatch);
   const tree = useTree<HTMLElement>();
   // The inbox and the usage page are about every project, so none is on the screen there.
-  const global = state.route.name === "inbox" || state.route.name === "usage";
+  const global = (state.route.name === "inbox" && !state.route.project) || state.route.name === "usage";
   const project = global ? undefined : currentProject(state);
   const archived = archivedProjects(state);
   const show = state.plan.showArchived;

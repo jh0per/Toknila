@@ -47,6 +47,21 @@ describe("the settings routes", () => {
   });
 });
 
+describe("the inbox routes", () => {
+  const cases: [string, Route][] = [
+    ["/inbox", { name: "inbox" }],
+    ["/projects/DEMO/inbox", { name: "inbox", project: "DEMO" }],
+  ];
+  it.each(cases)("%s parses and round-trips", (path, route) => {
+    expect(parseRoute(path)).toEqual(route);
+    expect(routePath(route)).toBe(path);
+  });
+  it("a project key with a space is encoded and decoded", () => {
+    expect(routePath({ name: "inbox", project: "a b" })).toBe("/projects/a%20b/inbox");
+    expect(parseRoute("/projects/a%20b/inbox")).toEqual({ name: "inbox", project: "a b" });
+  });
+});
+
 describe("the Designs view of a chain", () => {
   const cases: [string, Route][] = [
     ["/chains/work/designs", { name: "chain", chain: "work", view: "designs" }],

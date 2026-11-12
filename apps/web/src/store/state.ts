@@ -1,7 +1,7 @@
 // The page's one normalized store and the selectors the views read.
 
 import type {
-  ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, ProjectRun, Suggestion, Ticket, TicketDetail, TicketThreads,
+  ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, Ticket, TicketDetail, TicketThreads,
 } from "../api/types";
 import { type AssistantSlice, initialAssistant } from "./assistant";
 import { type EdgesState, initialEdges } from "./edges";
@@ -220,20 +220,6 @@ export function currentCard(s: State): Ticket | undefined {
 /// Every ticket the store knows, with its chain name, in chain order.
 export function allTickets(s: State): { ticket: Ticket; chain: ChainDetail }[] {
   return allChains(s).flatMap((chain) => chain.tickets.map((ticket) => ({ ticket, chain })));
-}
-
-/// What runs in the project on the screen, as the daemon said: its assistant first, then its cards.
-export function runsOf(s: State): ProjectRun[] {
-  return s.agents.find((x) => x.project === currentProject(s)?.id)?.runs ?? [];
-}
-
-/// The screen of a run's card, if the store knows the card's chain.
-export function runRoute(s: State, run: ProjectRun): Route | undefined {
-  const project = currentProject(s);
-  if (!project) return undefined;
-  if (!run.card) return { name: "planner", project: project.key };
-  const chain = s.chains[chainOfTicket(s, run.card.id) ?? ""];
-  return chain && { name: "card", project: project.key, chain: chain.chain.name, key: run.card.key };
 }
 
 /// The card route of a ticket, if its chain's project is known.
