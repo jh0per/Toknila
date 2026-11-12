@@ -191,7 +191,7 @@ fn path_problem(path: &str, facts: &RepoFacts) -> Option<PathProblem> {
     match (&facts.path, &facts.git) {
         (PathKind::Missing, _) => Some((
             PathMissing,
-            format!("{path} does not exist."),
+            format!("{path} does not exist. Toknila can create it."),
             Some(RepoFix::CreateFolder),
         )),
         (PathKind::File, _) => Some((
@@ -206,7 +206,7 @@ fn path_problem(path: &str, facts: &RepoFacts) -> Option<PathProblem> {
         )),
         (PathKind::Dir, GitState::NotARepo) => Some((
             NotAGitRepo,
-            format!("{path} is not a git repository."),
+            format!("{path} is not a git repository. Toknila can make it one."),
             Some(RepoFix::InitRepository),
         )),
         (PathKind::Dir, GitState::Repo { .. }) => None,
@@ -221,7 +221,8 @@ fn base_problem(base: &str, branches: &[String], git: &GitState) -> Option<RepoP
         return Some(problem(
             RepoField::RepoPath,
             RepoProblemCode::NoCommits,
-            "The repository has no commit yet, so it has no branch to work from.".to_owned(),
+            "The repository has no commit yet, so it has no branch to work from. Toknila can make the first commit."
+                .to_owned(),
             Some(RepoFix::FirstCommit),
         ));
     }
@@ -469,6 +470,23 @@ mod tests {
         assert_eq!(
             judge(ABS, "", &unborn).problems[0].fix,
             Some(RepoFix::FirstCommit)
+        );
+    }
+
+    #[test]
+    fn a_fixable_problem_says_what_is_true_and_what_can_be_done() {
+        let say = |f: &RepoFacts| judge(ABS, "main", f).problems[0].message.clone();
+        let missing = say(&facts(PathKind::Missing, GitState::NotARepo));
+        assert_eq!(missing, format!("{ABS} does not exist. Toknila can create it."));
+        let plain = say(&facts(PathKind::Dir, GitState::NotARepo));
+        assert_eq!(
+            plain,
+            format!("{ABS} is not a git repository. Toknila can make it one.")
+        );
+        let unborn = say(&facts(PathKind::Dir, state(&[], Some("main"), None)));
+        assert_eq!(
+            unborn,
+            "The repository has no commit yet, so it has no branch to work from. Toknila can make the first commit."
         );
     }
 
