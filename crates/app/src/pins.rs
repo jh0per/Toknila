@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use toknila_core::design::Region;
 use toknila_core::design::pin::{self, DesignPin};
 use toknila_core::events::DomainEvent;
-use toknila_core::{DesignId, PinId, ProjectId, TicketPatch};
+use toknila_core::{
+    CommentBody, CommentKind, DesignId, PinId, ProjectId, TicketPatch, TicketStatus,
+};
 
 use crate::{AppError, AppResult, Reader, UnitOfWork, planner, tickets};
 
@@ -98,6 +100,24 @@ pub fn answer<U: UnitOfWork + ?Sized>(
     uow.upsert_design_pin(&pin)?;
     uow.emit(&DomainEvent::DesignPinAnswered { pin: pin.clone() })?;
     if let Some(key) = &pin.card
+        && let Some(card) = uow.ticket_by_key(key)?
+        && card.status == TicketStatus::Waiting
+        && card.agent_paused.is_some()
+    {
+        // The card's agent has no process: the answer is its first input when it comes back,
+        // as a comment is.
+        let gist = format!(
+            "Design pin {} on {}: {}",
+            pin.number,
+            pin.design_name,
+            pin.answer.as_deref().unwrap_or_default()
+        );
+        let body = CommentBody {
+            gist,
+            ..CommentBody::default()
+        };
+        tickets::comment(uow, &card, CommentKind::Instruction, body)?;
+    } else if let Some(key) = &pin.card
         && let Some(card) = uow.ticket_by_key(key)?
         && card.status.can_edit()
     {

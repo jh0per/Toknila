@@ -131,6 +131,9 @@ pub struct RunEnded {
     pub exit: ProcessExit,
     /// The host killed it because a stop was requested, so it is not a crash.
     pub stopped: bool,
+    /// The run was a resume the agent refused (it does not know the session); this is the answer
+    /// that run carried as its first input, which the fresh start must carry too.
+    pub refused: Option<String>,
 }
 
 /// Runs agents on the host.

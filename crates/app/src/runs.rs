@@ -29,7 +29,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
     ctx: &ChainTx,
     ticket: TicketId,
 ) -> AppResult<()> {
-    start_with(uow, ctx, ticket, None)
+    start_with(uow, ctx, ticket, None, None)
 }
 
 /// `ResumeRunner`: queue starting the agent of a card that waited for a person with no process,
@@ -40,7 +40,7 @@ pub(crate) fn queue_resume<U: UnitOfWork + ?Sized>(
     ticket: TicketId,
     session: Option<String>,
 ) -> AppResult<()> {
-    start_with(uow, ctx, ticket, Some(session))
+    start_with(uow, ctx, ticket, Some(session), None)
 }
 
 /// What the person answered, as it would have been typed to the live agent: the instruction
@@ -63,6 +63,7 @@ fn start_with<U: UnitOfWork + ?Sized>(
     ctx: &ChainTx,
     ticket: TicketId,
     resume: Option<Option<String>>,
+    answer: Option<String>,
 ) -> AppResult<()> {
     let Some(t) = ctx.view.tickets.iter().find(|t| t.id == ticket) else {
         return Ok(());
@@ -100,7 +101,8 @@ fn start_with<U: UnitOfWork + ?Sized>(
                 setup_command: project.setup_command.clone(),
                 earlier: toknila_core::instructions::earlier(&comments),
                 discussion: crate::discussion::transcript(uow, ticket)?,
-                waiting: waiting.texts,
+                // An answer a refused resume carried comes first: it was delivered already.
+                waiting: answer.into_iter().chain(waiting.texts).collect(),
                 waiting_ids: waiting.ids,
                 returned,
                 design_first: t.design_first,
@@ -177,7 +179,12 @@ pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
 ///
 /// Returns `true` when it queued a replacement worker run (see [`replace_worker`]).
 pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<bool> {
-    let RunEnded { run, exit, stopped } = ended;
+    let RunEnded {
+        run,
+        exit,
+        stopped,
+        refused,
+    } = ended;
     let ticket = run.ticket_id;
     let role = run.role;
     if role == AgentRole::Planner {
@@ -211,8 +218,37 @@ pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<
         reviews::failed(uow, ticket, detail)?;
         return Ok(false);
     }
+    if let Some(answer) = refused
+        && restart_fresh(uow, ticket, answer)?
+    {
+        return Ok(true);
+    }
     tell_ticket(uow, ticket, TicketEvent::Block { reason })?;
     Ok(false)
+}
+
+/// The agent refused to resume its session (it does not know the id): the card's agent starts
+/// fresh, once, with the kickoff and the answer that the refused run carried. A fresh run is not a
+/// resume, so it cannot be refused again. Returns whether a start was queued; a card that is not
+/// Running any more is left to the caller.
+fn restart_fresh<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    answer: String,
+) -> AppResult<bool> {
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(false);
+    };
+    if t.status != TicketStatus::Running {
+        return Ok(false);
+    }
+    let Some(view) = uow.chain_view(t.chain_id)? else {
+        return Ok(false);
+    };
+    let ctx = ChainTx::new(view, uow.now());
+    crate::ships::queue_prepare(uow, &ctx, ticket, Default::default())?;
+    start_with(uow, &ctx, ticket, None, Some(answer))?;
+    Ok(true)
 }
 
 /// A run younger than this that the host stopped gets no second replacement.
@@ -284,15 +320,29 @@ pub fn mark_lost<U: UnitOfWork + ?Sized>(
         let Some(project) = uow.project(chain.project_id)? else {
             continue;
         };
-        let ids: Vec<(TicketId, TicketKey)> = uow
-            .tickets(Some(chain.id))?
-            .iter()
-            .filter(|t| matches!(t.status, TicketStatus::Running | TicketStatus::Waiting))
+        let mut ids: Vec<(TicketId, TicketKey)> = Vec::new();
+        for t in uow.tickets(Some(chain.id))? {
+            if live.contains(&t.id)
+                || !matches!(t.status, TicketStatus::Running | TicketStatus::Waiting)
+            {
+                continue;
+            }
             // A paused agent has no process on purpose; its card waits for an answer.
-            .filter(|t| t.agent_paused.is_none())
-            .filter(|t| runs_process(&project, t) && !live.contains(&t.id))
-            .map(|t| (t.id, t.key.clone()))
-            .collect();
+            if t.agent_paused.is_some() {
+                continue;
+            }
+            // A Running card with no run record never got its agent (the daemon restarted before
+            // the start landed): nothing shows it, so it is lost too, unless the project is
+            // simulated and has no processes by design.
+            let unrun = t.status == TicketStatus::Running
+                && !project.simulated
+                && uow
+                    .last_snapshot_payload("ticket", &t.id.to_string(), "run")?
+                    .is_none();
+            if runs_process(&project, &t) || unrun {
+                ids.push((t.id, t.key.clone()));
+            }
+        }
         if ids.is_empty() {
             continue;
         }

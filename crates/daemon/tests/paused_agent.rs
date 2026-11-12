@@ -93,6 +93,16 @@ impl Rig {
             ),
         )
         .expect("profile");
+        // The asker whose agent does not know the session id it is resumed with.
+        std::fs::write(
+            dir.join("refuser.toml"),
+            format!(
+                "command = ['{AGENT}', '--prompt', '{{kickoff}}', 'refuseresume', 'post', \
+                 '/tickets/{{ticket}}/activity', '{activity}', 'print', 'asking', 'post', '{path}', \
+                 '{body}', 'hold']\n{form}"
+            ),
+        )
+        .expect("profile");
         std::fs::write(
             dir.join("holder.toml"),
             format!("command = ['{AGENT}', 'print', 'holding', 'hold']\n"),
@@ -365,6 +375,84 @@ async fn a_permission_answer_restarts_a_paused_card_with_the_answer_as_its_first
     rig.until("running again", 1, is("running")).await;
     let out = rig.output_has(1, "resume=sess-1").await;
     assert!(out.contains("Allowed"), "{out}");
+}
+
+#[tokio::test]
+async fn a_design_pin_answer_restarts_a_paused_card_with_the_answer_as_its_first_input() {
+    use toknila_app::pins::{self, NewPin};
+    use toknila_core::design::Region;
+    use toknila_core::{Actor, DesignId, ProjectId};
+    use toknila_daemon::http::error::ApiError;
+
+    let rig = Rig::new(2, Wait::Question, true, &["asker"]).await;
+    rig.paused(1).await;
+    let project: ProjectId = rig
+        .send(Method::GET, "/v1/projects/DEMO", Value::Null)
+        .await["id"]
+        .as_str()
+        .expect("project id")
+        .parse()
+        .expect("id");
+    let new = NewPin {
+        design: DesignId::new(),
+        design_name: "Home".into(),
+        region: Region {
+            x: 10,
+            y: 10,
+            w: 20,
+            h: 20,
+        },
+        text: "Which colour?".into(),
+        card: Some("DEMO-1".into()),
+    };
+    let (pin, _) = rig
+        .store
+        .write(Actor::Agent, now(), move |tx| -> Result<_, ApiError> {
+            Ok(pins::ask(tx, project, new)?)
+        })
+        .await
+        .expect("pin");
+    rig.send(
+        Method::POST,
+        &format!("/v1/projects/DEMO/design-pins/{}/answer", pin.id),
+        json!({ "text": "teal" }),
+    )
+    .await;
+    rig.until("running again", 1, is("running")).await;
+    let out = rig.output_has(1, "resume=sess-1").await;
+    assert!(out.contains("teal"), "{out}");
+}
+
+#[tokio::test]
+async fn a_refused_resume_falls_back_to_one_fresh_start_with_the_kickoff_and_the_answer() {
+    let rig = Rig::new(2, Wait::Question, true, &["refuser"]).await;
+    rig.paused(1).await;
+    rig.send(
+        Method::POST,
+        "/v1/tickets/DEMO-1/comments",
+        json!({ "text": "use sqlite" }),
+    )
+    .await;
+    // The resumed run printed the refusal and ended; the card is not blocked as crashed: its agent
+    // starts again from the kickoff, which carries the answer.
+    let until = Instant::now() + WAIT;
+    let out = loop {
+        let out = rig.output(1).await;
+        if out.contains("prompt=Start ticket DEMO-1")
+            && out.contains("use sqlite")
+            && !out.contains("resume=")
+        {
+            break out;
+        }
+        assert!(Instant::now() < until, "no fresh start: {out:?}");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    };
+    assert!(!out.contains("No conversation found"), "{out}");
+    // The fresh run asks again and its card waits; it never reads Blocked.
+    let c = rig
+        .until("waiting again", 1, |c| c["ticket"]["status"] == "waiting")
+        .await;
+    assert_eq!(c["ticket"]["status"], "waiting", "{c}");
 }
 
 #[tokio::test]
