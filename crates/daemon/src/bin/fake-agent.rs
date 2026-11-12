@@ -18,6 +18,8 @@
 //!   read one line of keys: a Down arrow before Enter prints `trust=yes`, anything else
 //!   `trust=no`.
 //! - `pid`: print `pid=<own process id>`, so a test can end the agent from outside.
+//! - `refuseresume`: when `--resume` was given, print the sentence Claude Code prints for a session
+//!   it does not know and exit 1.
 //! - `--resume <session>`: print `resume=<session>`; `--prompt <text>`: print `prompt=<text>` on
 //!   one line. `ifresumed`: hold at once when `--resume` was given. A test profile puts `--prompt {kickoff}` first and gives a resume form
 //!   `--resume {session}`, so the run records how it was started.
@@ -206,6 +208,12 @@ fn main() {
                 std::thread::sleep(Duration::from_secs(3600));
             },
             "ifresumed" => {}
+            // Claude Code's answer to `--resume` with an id it does not know.
+            "refuseresume" if resumed => {
+                say("No conversation found with session ID: sess-1");
+                std::process::exit(1);
+            }
+            "refuseresume" => {}
             "--prompt" => {
                 let text = args.next().unwrap_or_default();
                 say(&format!(

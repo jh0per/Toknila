@@ -288,6 +288,7 @@ fn ended(mem: &Mem, role: AgentRole, code: i32, stopped: bool) -> RunEnded {
             signal: None,
         },
         stopped,
+        refused: None,
     }
 }
 
@@ -686,6 +687,7 @@ fn a_recorded_verdict_stops_the_reviewer_and_its_slot_starts_the_next_card() {
             signal: Some("SIGTERM".to_owned()),
         },
         stopped: true,
+        refused: None,
     };
     runs::ended(&mut mem, end).expect("ended");
     settle(&mut mem);

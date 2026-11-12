@@ -56,6 +56,14 @@ impl AgentProfile {
         argv.splice(1..1, form);
         Some(argv)
     }
+
+    /// The sentence Claude Code prints when `--resume` names a session it does not know.
+    pub const RESUME_REFUSED: &'static str = "No conversation found with session ID";
+
+    /// Whether the first output of a resumed run says the agent refused the session.
+    pub fn resume_refused(head: &str) -> bool {
+        head.contains(Self::RESUME_REFUSED)
+    }
 }
 
 #[cfg(test)]
