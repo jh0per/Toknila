@@ -2,7 +2,8 @@
 //!
 //! Every command commits state and journal together, so after a kill the store is at the last
 //! committed command. Recovery proves it instead of assuming it: every ticket and milestone is
-//! compared with the snapshot in its newest journal event, then every chain settles once
+//! compared with the snapshot in its newest journal event that carries one (`ship_removed` and
+//! `runner_exited` carry none and are skipped), then every chain settles once
 //! (autostart that a crash interrupted between commands). Simulated tickets have no process to
 //! lose, so Running stays Running. A ticket whose agent is a process lost it with the daemon:
 //! it goes to Blocked(`runner_lost`) before anything settles, so a restart is never silent. A card
@@ -58,13 +59,13 @@ pub fn recover<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Recovery> {
             if t.status == TicketStatus::Running {
                 report.running += 1;
             }
-            let snap = uow.last_event_payload("ticket", &t.id.to_string())?;
+            let snap = uow.last_snapshot_payload("ticket", &t.id.to_string(), "ticket")?;
             if !matches(snap.as_ref(), "ticket", to_value(t)?) {
                 report.drift.push(t.key.to_string());
             }
         }
         for r in &view.releases {
-            let snap = uow.last_event_payload("release", &r.id.to_string())?;
+            let snap = uow.last_snapshot_payload("release", &r.id.to_string(), "release")?;
             if !matches(snap.as_ref(), "release", to_value(r)?) {
                 report.drift.push(format!("{} {}", c.name, r.version));
             }
