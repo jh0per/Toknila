@@ -3,6 +3,7 @@
 import type {
   ChainDetail, EventRecord, InboxItem, Project, ProjectAgents, ProjectRun, Suggestion, Ticket, TicketDetail, TicketThreads,
 } from "../api/types";
+import { type AssistantSlice, initialAssistant } from "./assistant";
 import { type EdgesState, initialEdges } from "./edges";
 import { type EpicUi, initialEpic } from "./epic";
 import { type RoadmapUi, initialRoadmap } from "./roadmap";
@@ -87,6 +88,8 @@ export interface State {
   updates: UpdatesState;
   /// The viewer's colour theme; remembered in this browser only.
   theme: Theme;
+  /// The assistant panel beside the screens: open, width, filter, the context chip.
+  assistant: AssistantSlice;
   /// The "?" list of keyboard shortcuts is open.
   shortcutsOpen: boolean;
   /// The card the assistant just opened here, while its notice (with Back) is up.
@@ -133,6 +136,7 @@ export function initialState(route: Route): State {
     attach: initialAttach,
     updates: initialUpdates,
     theme: "system",
+    assistant: initialAssistant,
     shortcutsOpen: false,
     opened: undefined,
   };

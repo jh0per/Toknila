@@ -4,6 +4,7 @@ import type { Intent } from "../store/msg";
 import { readFinishedOpen, storeFinishedOpen, versionText } from "../store/phase";
 import { dropMove, moveStep, roadmapPhase, splitRoadmap } from "../store/roadmap";
 import { type State, chainsOf } from "../store/state";
+import { AssistantButton } from "./AssistantButton";
 import { NavLink } from "./Link";
 import { ThemeButton } from "./ThemeButton";
 
@@ -138,6 +139,7 @@ export function Roadmap({ project, state, dispatch }: { project: Project; state:
         {state.roadmap.error && <span className="error" role="alert" data-testid="roadmap-error">{state.roadmap.error}</span>}
         <span className="grow" />
         <ThemeButton theme={state.theme} dispatch={dispatch} />
+        <AssistantButton state={state} dispatch={dispatch} />
       </header>
       <div className="roadmap" data-testid="roadmap">
         <ol className="rm-road">{items}</ol>

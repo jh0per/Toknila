@@ -4,6 +4,7 @@ import type {
   AgentRole, AnswerKind, ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, TicketAction, TicketDetail,
   TicketThreads,
 } from "../api/types";
+import type { AssistantEffect, AssistantIntent } from "./assistant";
 import type { AttachEffect, AttachIntent, AttachResult } from "./attach";
 import type { AutostartEffect, AutostartIntent, AutostartResult } from "./autostart";
 import type { EdgeEffect, EdgeIntent, EdgeResult } from "./edges";
@@ -47,6 +48,7 @@ export type Intent =
   | AutostartIntent
   | QuickIntent
   | ThemeIntent
+  | AssistantIntent
   | ShortcutIntent
   | UpdateIntent
   | UsageIntent
@@ -133,6 +135,7 @@ export type Effect =
   | PlacementEffect
   | AutostartEffect
   | ThemeEffect
+  | AssistantEffect
   | UpdateEffect
   | UsageEffect
   | FollowEffect

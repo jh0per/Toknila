@@ -35,7 +35,7 @@ async function ask(base: string, e: PlannerEffect, dispatch: Dispatch): Promise<
   // The person's words are kept in the conversation first, so they show (and stay) whatever the
   // planner does with the line.
   if (e.raw !== undefined) {
-    const message = await post<ConversationMessage>(`/projects/${encodeURIComponent(e.project)}/conversation`, { text: e.raw });
+    const message = await post<ConversationMessage>(`/projects/${encodeURIComponent(e.project)}/conversation`, { text: e.raw, about: e.about });
     dispatch({ type: "conversationMessage", project: e.project, message });
   }
   const state = await post<PlannerState>(`${base}/start`, { profile: e.profile });
@@ -54,7 +54,7 @@ async function ask(base: string, e: PlannerEffect, dispatch: Dispatch): Promise<
 async function discuss(base: string, e: PlannerEffect, dispatch: Dispatch): Promise<void> {
   const card = e.card ?? "";
   const said = await post<ThreadDetail>(`/tickets/${encodeURIComponent(card)}/discussion`, { text: e.text });
-  await ask(base, { ...e, text: askLine(card, said.thread.number, e.text ?? ""), wait: false }, dispatch);
+  await ask(base, { ...e, text: askLine(card, said.thread.number, e.text ?? "") }, dispatch);
 }
 
 /// Types the card's unanswered message into the live planner's terminal once more: the same

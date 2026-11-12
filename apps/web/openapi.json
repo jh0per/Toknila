@@ -5972,7 +5972,8 @@
                   "card"
                 ]
               }
-            }
+            },
+            "additionalProperties": false
           },
           {
             "type": "object",
@@ -5991,7 +5992,8 @@
               "name": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           }
         ],
         "description": "What a message was about."
@@ -9044,6 +9046,17 @@
           "text"
         ],
         "properties": {
+          "about": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/About",
+                "description": "The chain the message is about (the window's context chip); a card's words go to the\ncard's discussion instead."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "attachments": {
             "type": "array",
             "items": {

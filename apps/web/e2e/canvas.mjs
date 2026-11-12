@@ -36,7 +36,7 @@ try {
   const { url } = JSON.parse(tok("open", "--json"));
 
   browser = await launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const { expectText, expectPath } = checks(page);

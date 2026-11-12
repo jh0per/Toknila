@@ -17,6 +17,7 @@ import { runPlanEffect } from "./planEffects";
 import { runPlannerEffect } from "./plannerEffects";
 import { runReleaseEffect } from "./releaseEffects";
 import { runSettingsEffect } from "./settingsEffects";
+import { saveAssistant } from "./assistantEffects";
 import { saveTheme } from "./themeEffects";
 import { runUpdateEffect } from "./updatesEffects";
 import { runUsageEffect } from "./usageEffects";
@@ -253,6 +254,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "saveTheme":
         saveTheme(e.theme);
+        return;
+      case "saveAssistant":
+        saveAssistant(e);
         return;
       case "watchUpdates":
         stopWatch = runUpdateEffect(e, dispatch);
