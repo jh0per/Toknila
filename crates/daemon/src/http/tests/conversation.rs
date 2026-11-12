@@ -218,8 +218,6 @@ async fn a_card_discussion_is_in_the_conversation_with_its_card_and_is_stored_on
     let planner = api.planner_token("DEMO").await;
     api.post(CONVERSATION, json!({ "text": "General question" }))
         .await;
-    // Two messages in one millisecond have no order of their own.
-    tokio::time::sleep(std::time::Duration::from_millis(3)).await;
     api.post(
         "/v1/tickets/DEMO-1/discussion",
         json!({ "text": "Why this card?" }),
@@ -234,7 +232,6 @@ async fn a_card_discussion_is_in_the_conversation_with_its_card_and_is_stored_on
         )
         .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    tokio::time::sleep(std::time::Duration::from_millis(3)).await;
     api.call_with(
         &planner,
         Method::POST,
@@ -280,6 +277,50 @@ async fn a_card_discussion_is_in_the_conversation_with_its_card_and_is_stored_on
     )
     .await;
     assert_eq!(messages(&api, "").await.len(), 4);
+}
+
+#[tokio::test]
+async fn messages_with_one_timestamp_keep_the_order_they_were_said_in() {
+    let api = Api::new();
+    api.two_projects().await;
+    api.post("/v1/chains/plan/tickets", json!({ "title": "Card" }))
+        .await;
+    let planner = api.planner_token("DEMO").await;
+    // Stored, thread, stored, thread: interleaved across the two tables.
+    api.post(CONVERSATION, json!({ "text": "one" })).await;
+    api.post("/v1/tickets/DEMO-1/discussion", json!({ "text": "two" }))
+        .await;
+    api.post(CONVERSATION, json!({ "text": "three" })).await;
+    let (s, v) = api
+        .call_with(
+            &planner,
+            Method::POST,
+            "/v1/planner/cards/DEMO-1/threads/1/messages",
+            Some(json!({ "text": "four" })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // Every message at the very same millisecond, as on a fast or coarse clock.
+    let db = rusqlite::Connection::open(api._dir.path().join("t.db")).expect("db");
+    db.execute_batch(
+        "UPDATE conversation_messages SET created_at = 1000; UPDATE thread_messages SET created_at = 1000;",
+    )
+    .expect("pin the time");
+    let want = [
+        "person: one",
+        "person: two",
+        "person: three",
+        "assistant: four",
+    ];
+    let all = messages(&api, "").await;
+    assert_eq!(all.iter().map(gist).collect::<Vec<_>>(), want);
+    // A page cut in the middle of the tie holds the same order.
+    let page = messages(
+        &api,
+        &format!("?before={}&limit=2", all[3]["id"].as_str().expect("id")),
+    )
+    .await;
+    assert_eq!(page.iter().map(gist).collect::<Vec<_>>(), &want[1..3]);
 }
 
 #[tokio::test]

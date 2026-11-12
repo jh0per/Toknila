@@ -26,6 +26,10 @@ pub enum RunError {
 /// How long the daemon waits for effect tasks (git, merges, checks) when it stops.
 const EFFECTS_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// How long open connections get to end by themselves when the daemon stops (an agent's permission
+/// hook waits for a person for as long as it takes, so it never ends alone).
+const CONNECTIONS_GRACE: std::time::Duration = std::time::Duration::from_secs(1);
+
 /// Is a daemon answering at the address in `daemon.json`?
 pub async fn probe(info: &DaemonInfo) -> bool {
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, info.port));
@@ -116,14 +120,29 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
     info.write(&paths.daemon_json())?;
     tracing::info!(port, pid = info.pid, "daemon listening on 127.0.0.1");
 
-    let result = axum::serve(listener, router(state))
-        .with_graceful_shutdown(async move {
-            tokio::select! {
-                () = shutdown.notified() => {}
-                () = terminate_signal() => tracing::info!("termination signal"),
-            }
-        })
-        .await;
+    // Graceful shutdown waits for every open request, and an agent's permission hook stays open
+    // until a person answers it (the e2e specs that leave one pending held the stop open): after the stop signal, connections get
+    // `CONNECTIONS_GRACE` to finish, then the daemon stops with them still open.
+    let (stopping_tx, stopping_rx) = tokio::sync::oneshot::channel::<()>();
+    let serve = axum::serve(listener, router(state)).with_graceful_shutdown(async move {
+        tokio::select! {
+            () = shutdown.notified() => {}
+            () = terminate_signal() => tracing::info!("termination signal"),
+        }
+        let _ = stopping_tx.send(());
+    });
+    let serve = std::future::IntoFuture::into_future(serve);
+    tokio::pin!(serve);
+    let result = tokio::select! {
+        r = &mut serve => r,
+        () = async {
+            let _ = stopping_rx.await;
+            tokio::time::sleep(CONNECTIONS_GRACE).await;
+        } => {
+            tracing::warn!("connections still open at stop; closing them");
+            Ok(())
+        }
+    };
 
     // A check still running is killed with the daemon (the next start hands its card to a person);
     // other effect tasks get a few seconds to record what they did.
