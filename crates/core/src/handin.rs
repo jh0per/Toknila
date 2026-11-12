@@ -210,9 +210,33 @@ pub fn to_body(summary: &str) -> Option<CommentBody> {
     })
 }
 
+/// The whole hand-in as its three blocks, from the report comment [`to_body`] made of it; `None`
+/// for a report that is not a hand-in (no checks block).
+pub fn from_body(body: &CommentBody) -> Option<String> {
+    let checks = body.how_to_verify.as_deref()?;
+    let mut changed = body.gist.trim().to_owned();
+    if let Some(more) = body.what.as_deref().filter(|w| !w.trim().is_empty()) {
+        changed.push('\n');
+        changed.push_str(more.trim_end());
+    }
+    let left = body.consequences.as_deref().unwrap_or("").trim();
+    Some(format!(
+        "**What changed:** {changed}\n**Checks:**\n{}\n**Left:** {left}",
+        checks.trim_end()
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_hand_in_reads_back_whole_from_its_report() {
+        let body = to_body(GOOD).expect("body");
+        let text = from_body(&body).expect("hand-in");
+        assert_eq!(sections(&text), sections(GOOD));
+        assert_eq!(from_body(&CommentBody::default()), None);
+    }
 
     const GOOD: &str = "**What changed:** the hand-in has a template\n**Checks:**\n- PASS cargo xtask verify: test result: ok. 412 passed\n- NOT_RUN e2e-web: no browser\n**Left:** nothing";
 
