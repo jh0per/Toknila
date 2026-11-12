@@ -11,7 +11,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -85,6 +85,7 @@ try {
   await expectText(t("usage-estimate"), "subscription", "the estimate is labelled");
   await expectText(t("usage-prices"), "platform.claude.com", "the price source is shown");
   await expectText(t("quota-unavailable"), "Not available", "no quota reported: it says so");
+  await shoot(page, "usage");
 
   const chart = t("usage-chart");
   if ((await chart.locator("g[data-day]").count()) !== 7) throw new Error("the 7-day chart should have 7 bars");

@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch, shipOf } from "./helpers.mjs";
+import { checks, cleanup, launch, shipOf, shoot } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -85,6 +85,7 @@ try {
   await expectText(row("question", "INB-1").locator(".row-head .t"), "asks", "a row leads with the card's title");
   await expectText(row("question", "INB-1").locator("[data-testid=inbox-kind]"), "waiting for your answer", "the kind is the second line");
   await expectText(row("proposal", "INB-3").locator(".row-head .t"), "Found work", "a proposal leads with its title");
+  await shoot(page, "inbox");
   for (const [kind, key] of [["proposal", "INB-3"], ["question", "INB-1"], ["blocked", "INB-2"], ["leftovers", "INB-4"]]) {
     await row(kind, key).locator("[data-testid=inbox-open-card]").waitFor({ timeout: 10_000 });
   }

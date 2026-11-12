@@ -46,6 +46,12 @@ pub struct UsageFigures {
 pub struct UsageItem {
     pub label: String,
     pub figures: UsageFigures,
+    /// A workspace line only: the folder of the main repository the folder belongs to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+    /// A workspace line only: the last folder name of `repo`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
 /// One UTC day of the series.
@@ -129,6 +135,8 @@ fn breakdown<'a>(
         .map(|(label, rows)| UsageItem {
             label,
             figures: figures(rows, prices),
+            repo: None,
+            name: None,
         })
         .collect();
     items.sort_by(|a, b| {
