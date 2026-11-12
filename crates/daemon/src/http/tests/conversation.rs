@@ -234,6 +234,7 @@ async fn a_card_discussion_is_in_the_conversation_with_its_card_and_is_stored_on
         )
         .await;
     assert_eq!(s, StatusCode::OK, "{v}");
+    tokio::time::sleep(std::time::Duration::from_millis(3)).await;
     api.call_with(
         &planner,
         Method::POST,
