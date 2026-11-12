@@ -36,6 +36,35 @@
 .tree li.archived > .row > .item { opacity: var(--state-disabled); font-style: italic; }
 .tree li.archived > .row .btn.mini { flex: none; }
 .tree .badge { flex: none; }
+/* Three kinds of row. Project: the strongest (initials badge, title-m semibold, the open one on
+   surface-container-high). Node: a 16px outline icon and label-l; the selected one on
+   primary-container with the icon in primary. Chain: a plain label-l row one level deeper. */
+.tree .row { min-height: var(--row-h); }
+.tree .row > .item { min-height: var(--row-h); font-size: var(--fs-label-l); line-height: var(--lh-label-l); }
+.tree .row.proj { border-radius: var(--shape-s); margin-top: var(--sp1); }
+.tree .row.proj > .item { font-size: var(--fs-title-m); line-height: var(--lh-title-m); }
+.tree .row.proj:has(> .item.cur) { background: var(--surface-container-high); }
+.pbadge { width: var(--sp5); height: var(--sp5); flex: none; display: grid; place-items: center; border-radius: var(--shape-xs); background: var(--primary-container); color: var(--on-primary-container); font-size: var(--fs-label-m); line-height: 1; font-weight: var(--fw-semibold); letter-spacing: 0; }
+.pbadge::before { content: attr(data-initials); }
+.tree li.archived .pbadge { opacity: var(--state-disabled); }
+.ico, .side-foot .ico { width: var(--sp4); height: var(--sp4); flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: var(--on-surface-variant); }
+.item.sel .ico { color: var(--primary); }
+.tree .row > .item { border-radius: var(--shape-s); }
+.tree .ver { font-size: var(--fs-label-m); }
+@media (max-width: 720px) { .tree .row > .item .ver { display: none; } }
+
+/* The foot is a menu: a divided list in the node style, state layers on hover and press, the
+   shortcut as a chip. */
+.side-foot { display: flex; flex-direction: column; gap: 1px; }
+.side-foot .item { position: relative; isolation: isolate; min-height: var(--row-h); font-size: var(--fs-label-l); line-height: var(--lh-label-l); border-radius: var(--shape-s); color: var(--on-surface); width: 100%; text-align: left; }
+.side-foot .item::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; pointer-events: none; z-index: -1; }
+.side-foot .item:hover { background: none; }
+.side-foot .item:hover::after { opacity: var(--state-hover); }
+.side-foot .item:focus-visible::after { opacity: var(--state-focus); }
+.side-foot .item:active::after { opacity: var(--state-press); }
+.side-foot .item.sel { background: var(--primary-container); }
+.side-foot .shortcuts-link { color: var(--on-surface); }
+.side-foot kbd { margin-left: auto; flex: none; font-family: var(--mono); font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--on-surface-variant); background: none; border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); padding: 0 var(--sp1); }
 .empty-state { max-width: var(--w-narrow); margin: 10vh auto 0; display: flex; flex-direction: column; gap: var(--sp3); align-items: flex-start; }
 .empty-state h2 { margin: 0; font-size: var(--fs-headline-m); line-height: var(--lh-headline-m); font-weight: var(--fw-semibold); }
 .empty-state p { margin: 0; }
