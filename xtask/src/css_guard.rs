@@ -106,7 +106,9 @@ pub(crate) fn problems(measured: &[(String, usize)], baseline: &[(&str, usize)])
     }
     for (path, _) in baseline {
         if !measured.iter().any(|(p, _)| p == path) {
-            out.push(format!("{path}: listed in BASELINE but gone; remove the entry"));
+            out.push(format!(
+                "{path}: listed in BASELINE but gone; remove the entry"
+            ));
         }
     }
     out
