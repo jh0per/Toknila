@@ -66,7 +66,7 @@ describe("what a message sent with a chip is", () => {
     const [s, fx] = reduce(typed(at({ name: "project", project: "DEMO" }), "hi"), { type: "askPlanner", project: "DEMO" });
     expect(s.route).toEqual({ name: "project", project: "DEMO" });
     expect(s.assistant.open).toBe(true);
-    expect(fx).toContainEqual({ type: "saveAssistant", open: true, width: 360, only: false });
+    expect(fx).toContainEqual({ type: "saveAssistant", open: true, width: 440, only: false });
   });
 
   it("asked from a screen the panel cannot sit beside opens the panel on the roadmap", () => {
@@ -99,7 +99,7 @@ describe("only about this", () => {
     expect(s.assistant.only).toBe(false);
     const [on, fx] = reduce(s, { type: "setOnlyAboutThis", only: true });
     expect(on.assistant.only).toBe(true);
-    expect(fx).toEqual([{ type: "saveAssistant", open: false, width: 360, only: true }]);
+    expect(fx).toEqual([{ type: "saveAssistant", open: false, width: 440, only: true }]);
   });
 });
 
@@ -114,7 +114,7 @@ describe("the panel's state survives a reload", () => {
 
   it("falls back to the default for a value that is not readable", () => {
     kept.set(ASSISTANT_KEY, "{nope");
-    expect(readAssistant()).toEqual({ open: false, width: 360, only: false, chipOff: false });
-    expect(parseAssistant(JSON.stringify({ open: true, width: 10 })).width).toBe(280);
+    expect(readAssistant()).toEqual({ open: false, width: 440, only: false, chipOff: false });
+    expect(parseAssistant(JSON.stringify({ open: true, width: 10 })).width).toBe(320);
   });
 });

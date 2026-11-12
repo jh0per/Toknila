@@ -1,13 +1,18 @@
-import { type KeyboardEvent, useEffect, useRef } from "react";
+import { type KeyboardEvent, useEffect, useLayoutEffect, useRef } from "react";
 import type { Intent } from "../store/msg";
 import { canSend } from "../store/askAttach";
 import { draftOf } from "../store/planner";
 import type { State } from "../store/state";
 import { AskChips, AttachButton, DropFrame, useAskAttach } from "./AskAttach";
 
+/// The most rows the chat's composer grows to.
+const MAX_ROWS = 8;
+
 /// A text box that sends on Enter (Shift+Enter makes a new line). It does not send while an input
 /// method is composing a character.
-export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, disabled = false, label, testId, focus = false }: {
+export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, grow, disabled = false, label, testId, focus = false }: {
+  /// Grow with the text from `rows` rows up to this many rows, then scroll.
+  grow?: number;
   /// Take the focus when it appears.
   focus?: boolean;
   value: string;
@@ -28,6 +33,18 @@ export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, 
   useEffect(() => {
     if (focus && !disabled) box.current?.focus();
   }, [focus, disabled]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || !grow) return;
+    const cs = getComputedStyle(el);
+    const line = parseFloat(cs.lineHeight);
+    if (!Number.isFinite(line)) return;
+    const frame = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    el.style.height = "auto";
+    const max = line * grow + frame;
+    el.style.height = `${Math.min(el.scrollHeight + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth), max)}px`;
+    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+  }, [value, grow]);
   return (
     <textarea
       ref={box} className="prompt-field" aria-label={label} data-testid={testId} rows={rows} value={value} disabled={disabled}
@@ -62,20 +79,24 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
   return (
     <DropFrame a={a} className={`ask${compact ? " compact" : ""}`} testId={testId}>
       <PromptField
-        value={text} label={label} testId={`${testId}-input`} rows={rows ?? (compact ? 2 : 3)} disabled={sending} focus={focus}
+        value={text} label={label} testId={`${testId}-input`} rows={rows ?? 3} grow={compact ? MAX_ROWS : undefined} disabled={sending} focus={focus}
         placeholder={placeholder} onSubmit={send}
         onChange={(t) => dispatch({ type: "editPlannerDraft", where: project, text: t })}
       />
       <AskChips a={a} project={project} testId={testId} />
       <div className="ask-actions">
         <AttachButton busy={sending || a.place.busy} onFiles={a.add} testId={testId} />
-        <button
-          type="button" className="btn primary" data-testid={`${testId}-send`} onClick={send}
-          disabled={sending || !canSend(state, project, text)}
-        >
-          {state.planner.sending === project ? "Sending…" : button}
-        </button>
+        {/* The end group: the microphone button of TOKNILA-100 goes here, left of Send, the same size as the attach button. */}
+        <div className="ask-actions-end">
+          <button
+            type="button" className={`btn send ${compact ? "tonal" : "primary"}`} data-testid={`${testId}-send`} onClick={send}
+            disabled={sending || !canSend(state, project, text)}
+          >
+            {state.planner.sending === project ? "Sending…" : button}
+          </button>
+        </div>
       </div>
+      <p className="ask-hint">Enter sends, Shift+Enter for a new line</p>
     </DropFrame>
   );
 }
