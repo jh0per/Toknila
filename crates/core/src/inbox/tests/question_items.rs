@@ -26,6 +26,26 @@ fn run(t: &Ticket, role: AgentRole, tail: &str) -> RunFacts {
 }
 
 #[test]
+fn the_trust_dialog_offers_yes_and_no_and_a_card_that_waits_on_it_keeps_its_item() {
+    let mut t = ticket(1, TicketStatus::Waiting, 5);
+    t.status_reason = Some(StatusReason::Waiting(WaitingReason::Screen));
+    let mut d = data(vec![t.clone()], 21_000);
+    d.runs.push(run(
+        &t,
+        AgentRole::Worker,
+        "Is this a project you trust?\r\n\u{276f} No, exit\r\n  Yes, I trust this folder\r\n",
+    ));
+    let got = compute(&d);
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert_eq!(got[0].answers, [AnswerKind::Yes, AnswerKind::No]);
+    assert_eq!(got[0].lines.len(), 3);
+    // Control: another screen keeps the generic keys, and the card's reason adds no item.
+    d.runs[0].tail = b"Log in to continue\r\n".to_vec();
+    let got = compute(&d);
+    assert_eq!(got[0].answers.first(), Some(&AnswerKind::Enter));
+}
+
+#[test]
 fn a_workers_question_says_whose_it_is_and_what_answers_it_takes() {
     let q = waiting(
         ticket(1, TicketStatus::Running, 5),

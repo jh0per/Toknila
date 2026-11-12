@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use toknila_app::{AppError, paused};
-use toknila_core::{Actor, AgentRole, TicketStatus, Timestamp};
+use toknila_core::{Actor, AgentRole, StatusReason, TicketStatus, Timestamp, WaitingReason};
 
 use super::Runners;
 use crate::store::Store;
@@ -50,6 +50,10 @@ pub async fn tick(store: &Store, runners: &Arc<Runners>, at: Timestamp) {
         };
         let waited = at.0.saturating_sub(t.status_since.0);
         if t.status != TicketStatus::Waiting || t.agent_paused.is_some() || waited < grace {
+            continue;
+        }
+        // The screen is the process's own: ending it would lose the question it holds.
+        if t.status_reason == Some(StatusReason::Waiting(WaitingReason::Screen)) {
             continue;
         }
         let session = runners.prompts().session(id, AgentRole::Worker);

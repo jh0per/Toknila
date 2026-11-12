@@ -1,6 +1,7 @@
 import type { Intent } from "../store/msg";
 import { isProjectSection, settingsSection } from "../store/route";
 import { type State, currentProject } from "../store/state";
+import { trustFacts } from "../store/trustAsked";
 import { About } from "./About";
 import { Checks } from "./Checks";
 import { ProfilesSettings } from "./ProfilesSettings";
@@ -28,7 +29,7 @@ export function Settings({ state, dispatch }: { state: State; dispatch: (i: Inte
         {section === "checks" && (
           <>
             <Checks state={state} dispatch={dispatch} title={false} />
-            <TrustNote />
+            <TrustNote {...trustFacts(state.events, state.settings.places?.ships, project?.key)} />
           </>
         )}
       </div>

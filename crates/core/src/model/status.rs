@@ -88,6 +88,9 @@ pub enum WaitingReason {
     },
     /// The agent stopped responding to nudges.
     Silent,
+    /// The agent's own screen asks something (a trust dialog, a login) before it has shown any
+    /// sign of life; only a person answers it.
+    Screen,
 }
 
 /// Why a ticket is Blocked.
@@ -189,6 +192,7 @@ impl fmt::Display for WaitingReason {
             Self::Question { text } => write!(f, "question: {text}"),
             Self::Permission { text, .. } => write!(f, "permission: {text}"),
             Self::Silent => f.write_str("silent"),
+            Self::Screen => f.write_str("Claude Code asks on its screen"),
         }
     }
 }
@@ -312,6 +316,10 @@ mod tests {
                 "permission: rm",
             ),
             (StatusReason::Waiting(WaitingReason::Silent), "silent"),
+            (
+                StatusReason::Waiting(WaitingReason::Screen),
+                "Claude Code asks on its screen",
+            ),
             (
                 blocked(BlockedReason::Manual {
                     text: "wait".into(),

@@ -56,10 +56,15 @@ async fn look(
     ticket: toknila_core::TicketId,
     at: Timestamp,
 ) -> Result<(), String> {
-    let (Some(cfg), Some(reported)) = (runners.nudge_of(ticket), runners.tokens().reported(ticket))
+    let (Some(cfg), Some(mut reported)) =
+        (runners.nudge_of(ticket), runners.tokens().reported(ticket))
     else {
         return Ok(());
     };
+    // An open screen question is a person's: the rule never types into it.
+    reported.screen_open = runners
+        .prompts()
+        .screen_flagged(ticket, toknila_core::AgentRole::Worker);
     // The process list is read here, outside the store, so the writer is never held up by it.
     let live = toknila_app::Runner::state(runners.as_ref(), ticket);
     let cfg_read = cfg.clone();

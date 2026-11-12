@@ -106,7 +106,7 @@ function designLine(detail: TicketDetail | undefined): StatusLine | undefined {
 /// agent is running, and how it comes back.
 function pausedLine(card: Ticket, queue: number | undefined): StatusLine {
   const r = card.status_reason;
-  const asks = r?.status === "waiting" && r.kind !== "silent" ? `: ${r.text}` : "";
+  const asks = r?.status === "waiting" && r.kind !== "silent" && r.kind !== "screen" ? `: ${r.text}` : "";
   if (card.agent_paused?.resume) {
     const place = queue === undefined ? "" : queue === 1 ? " (next in line)" : ` (#${queue} in line)`;
     return {
@@ -127,6 +127,7 @@ function waitingText(card: Ticket): string | undefined {
   const r = card.status_reason;
   if (r?.status !== "waiting") return undefined;
   if (r.kind === "silent") return "The agent went silent. Look at its Terminal, or write to it below.";
+  if (r.kind === "screen") return "Claude Code asks on its screen. Answer it in the Inbox or in the card's Terminal tab.";
   return r.text;
 }
 
