@@ -26,11 +26,27 @@ describe("SidebarChains", () => {
     expect(html).toContain("Finished (1)");
     expect(html).not.toContain('data-chain-item="old"');
   });
-  it("opens the group, dimmed with the date, for a selected finished chain", () => {
+  it("opens the group, dimmed, for a selected finished chain", () => {
     const html = render("old");
     expect(html).toContain('data-chain-item="old"');
     expect(html).toContain("dim");
-    expect(html).toContain("12 Nov");
+    expect(html).not.toContain("12 Nov");
+  });
+  it("renders a long finished chain's name, no date, no phase word, in one line", () => {
+    const name = "a-very-long-chain-name-that-cannot-fit-in-the-sidebar-width";
+    const html = renderToStaticMarkup(
+      <SidebarChains chains={[chain(name, "finished")]} project="DEMO" selected={name} dispatch={() => {}} onMenu={() => () => {}} />,
+    );
+    expect(html).toContain(`<span class="t chain-name">${name}</span>`);
+    expect(html).toContain(`title="${name}"`);
+    expect(html).not.toContain("12 Nov");
+    expect(html).not.toContain("phase-word");
+    expect(html).not.toContain("finished</span>");
+    expect(html).toContain("4/4");
+    expect(html).not.toContain("<br");
+  });
+  it("shows the phase word only for an active chain", () => {
+    expect(render("now")).toContain('<span class="phase-word">active</span>');
   });
 });
 
