@@ -878,8 +878,12 @@ A project has a limit of agents working at once, `Project::max_parallel` (defaul
   cards that start now and those that wait. A card is wanted when it is Ready, not paused, has
   its dependencies done, and is `queued` or in a chain with autostart on. So a chain with
   autostart off only runs cards a person started; the queue never starts an unrequested card. The
-  order is chain order (creation order across the project), then the card's place in its chain's
-  dependency order, so a card never goes before the cards it waits for. `Start` is now sent only
+  order is chain order, then the card's place in its chain's dependency order, so a card never
+  goes before the cards it waits for. Chain order is the project's roadmap: `chains.position`,
+  from 0 per project. A new or imported chain goes to the end, a person moves one with
+  `POST /chains/{chain}/move` (`tok chain mv`), and the store lists chains `ORDER BY position,
+  rowid` everywhere, so scheduling priority, `show_plan` and the assistant's epics list follow it
+  by themselves. The roadmap's pure rules (the move, the next version) are `core::roadmap`. `Start` is now sent only
   by the schedule; the graph's settle no longer starts autostart cards itself.
 - **When.** `with_chain` ends every command on a chain by running the schedule for its project
   (`toknila-app::schedule::run`): the cards that have a slot get `Start` through the machine in

@@ -15,6 +15,7 @@ import type { QuickIntent } from "./quick";
 import type { PlannerEffect, PlannerIntent, PlannerResult } from "./planner";
 import type { ReleaseEffect, ReleaseIntent, ReleaseResult } from "./release";
 import type { RemovalEffect, RemovalIntent, RemovalResult } from "./removal";
+import type { RoadmapEffect, RoadmapIntent, RoadmapResult } from "./roadmap";
 import type { Route, Tab } from "./route";
 import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
 import type { ShortcutIntent } from "./shortcuts";
@@ -38,6 +39,7 @@ export type Intent =
   | RemovalIntent
   | ReleaseIntent
   | EpicIntent
+  | RoadmapIntent
   | EdgeIntent
   | PlacementIntent
   | AutostartIntent
@@ -94,6 +96,7 @@ export type Msg =
   | RemovalResult
   | ReleaseResult
   | EpicResult
+  | RoadmapResult
   | EdgeResult
   | PlacementResult
   | AutostartResult
@@ -121,6 +124,7 @@ export type Effect =
   | RemovalEffect
   | ReleaseEffect
   | EpicEffect
+  | RoadmapEffect
   | EdgeEffect
   | PlacementEffect
   | AutostartEffect

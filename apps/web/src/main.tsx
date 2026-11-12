@@ -5,6 +5,7 @@ import { App } from "./views/App";
 import "./tokens.css";
 import "./style.css";
 import "./chain.css";
+import "./roadmap.css";
 import "./panel.css";
 import "./threads.css";
 import "./settings.css";

@@ -44,18 +44,19 @@ export interface CardLayout {
   lines: string[];
 }
 
-/// Space a card spends around its text, in pixels: 10 px padding and the border on each side,
-/// 8 px padding, a 4 px top and a 1 px bottom border, and 3 px between rows.
-const SIDE = 22;
+/// Space a card spends around its text, in pixels (chain.css `.node`, from the spacing tokens):
+/// 12 px padding (`--sp3`) and the border on each side, 8 px padding (`--sp2`), a 4 px top and a
+/// 1 px bottom border, and 4 px (`--sp1`) between rows. Lines are `--lh-label-m`, 16 px.
+const SIDE = 26;
 const CHROME_Y = 21;
-const GAP = 3;
+const GAP = 4;
 const LINE_H = 16;
 const DESC_H = 16;
 const PILL_H = 16;
-/// The pill's padding and dot, the gap before the key, in pixels.
-const PILL_EXTRA = 8 * 2 + 8 + 5;
-const KEY_GAP = 6;
-const FOOT_H: Record<Foot, number> = { none: 0, extras: 20, actions: 26 };
+/// The pill's padding (`--sp2` a side) and dot (8 px, `--sp1` gap), the gap before the key (`--sp1`).
+const PILL_EXTRA = 8 * 2 + 8 + 4;
+const KEY_GAP = 4;
+const FOOT_H: Record<Foot, number> = { none: 0, extras: 20, actions: 28 };
 const ELLIPSIS = "…";
 
 const up = (v: number): number => Math.ceil(v / GRID) * GRID;

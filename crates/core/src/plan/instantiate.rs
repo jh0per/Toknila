@@ -56,6 +56,7 @@ impl Plan {
             review_mode: self.chain.review_mode,
             reviewer: None,
             source: None,
+            position: 0,
             version: None,
         };
         let tickets: Vec<Ticket> = self

@@ -41,10 +41,12 @@ code, pre, .key { font-family: var(--mono); }
 /* The top bar, the diagram, the divider, the bottom panel. The panel's height is `--panel-h`: 45% of
    the window until the person drags the divider (PanelDivider sets it in pixels). */
 .ide > main { display: grid; grid-template-rows: auto minmax(160px, 1fr) 8px var(--panel-h, max(45%, 240px)); min-width: 0; min-height: 0; }
+/* The planner's next-step row is one more row above the diagram. */
+.ide > main:has(> .planner-next) { grid-template-rows: auto auto minmax(160px, 1fr) 8px var(--panel-h, max(45%, 240px)); }
 .ide > main.plain { display: block; padding: var(--sp4); overflow: auto; }
-.top { display: flex; align-items: center; gap: var(--sp2); padding: var(--sp2) var(--sp3); background: var(--surface-container); border-bottom: 1px solid var(--outline-variant); flex-wrap: wrap; }
-.autostart { display: inline-flex; gap: var(--sp1); align-items: center; font-size: var(--fs-body-m); color: var(--on-surface-variant); cursor: pointer; }
-.crumb { font-family: var(--mono); font-size: var(--fs-body-m); display: flex; gap: var(--sp1); }
+.top { display: flex; align-items: center; gap: var(--sp3); min-height: var(--top-h); padding: var(--sp1) var(--sp4); background: var(--surface-container); border-bottom: 1px solid var(--outline-variant); flex-wrap: wrap; }
+.autostart { display: inline-flex; gap: var(--sp2); align-items: center; font-size: var(--fs-body-m); color: var(--on-surface-variant); cursor: pointer; }
+.crumb { font-family: var(--mono); font-size: var(--fs-title-m); line-height: var(--lh-title-m); font-weight: var(--fw-semibold); display: flex; gap: var(--sp1); }
 .crumb i { color: var(--on-surface-variant); font-style: normal; }
 .pill { font-family: var(--mono); font-size: var(--fs-label-m); line-height: var(--lh-label-m); border: 1px solid var(--outline-variant); border-radius: var(--shape-full); padding: 0 var(--sp2); display: inline-flex; gap: var(--sp1); align-items: center; background: var(--surface-container-high); white-space: nowrap; }
 .pill[class*="tone-"] { color: var(--sc); background: var(--sc-soft); border-color: color-mix(in srgb, var(--sc) 40%, var(--outline-variant)); font-weight: var(--fw-medium); }

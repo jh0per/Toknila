@@ -9,6 +9,7 @@ use toknila_core::{
 use super::*;
 
 mod removal;
+mod roadmap;
 
 const NOW: Timestamp = Timestamp(42);
 
@@ -49,6 +50,7 @@ fn chain(project: ProjectId) -> Chain {
         review_mode: Some(ReviewMode::Both),
         reviewer: None,
         source: None,
+        position: 0,
         version: None,
     }
 }
@@ -506,6 +508,7 @@ async fn chain_view_saves_and_loads_without_loss() {
     let p = project();
     let c = Chain {
         source: Some("/w/demo/specs/001-demo".to_owned()),
+        position: 0,
         version: Some("0.3.0".to_owned()),
         ..chain(p.id)
     };

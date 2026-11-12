@@ -49,15 +49,15 @@ describe("card size from content", () => {
   });
 
   it("is as wide as the title needs between the two", () => {
-    // 30 characters: 210 px of text and 22 of padding, on the 8 px grid.
-    expect(autoWidth(card("y".repeat(30)), m)).toBe(232);
+    // 30 characters: 210 px of text and 26 of padding, on the 8 px grid.
+    expect(autoWidth(card("y".repeat(30)), m)).toBe(240);
   });
 
   it("is wide enough for the pill and the key side by side", () => {
     const wide = card("Hi", { pill: "awaiting approval", key: "TOKNILA-123" });
-    // 17 * 6 + 28 + 6 + 11 * 5 = 191, plus 22 of padding.
+    // 17 * 6 + 28 + 4 + 11 * 5 = 189, plus 26 of padding.
     expect(autoWidth(wide, m)).toBeGreaterThan(MIN_W);
-    expect(autoWidth(wide, m)).toBeGreaterThanOrEqual(191 + 22);
+    expect(autoWidth(wide, m)).toBeGreaterThanOrEqual(189 + 26);
   });
 
   it("shows two lines and no ellipsis for the long title of a real card", () => {

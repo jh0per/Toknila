@@ -37,6 +37,7 @@ mod releases;
 mod removal;
 mod resume;
 mod reviews;
+mod roadmap;
 mod settings;
 mod ship_guard;
 mod ships;
@@ -970,6 +971,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/edges",
             "/chains/{chain}/edges/move",
             "/chains/{chain}/export",
+            "/chains/{chain}/move",
             "/chains/{chain}/release",
             "/chains/{chain}/releases",
             "/chains/{chain}/tickets",

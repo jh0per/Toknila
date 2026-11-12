@@ -135,6 +135,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chains/{chain}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Puts the chain right before or right after another chain of its project in the roadmap, a
+         *     finished one too. The chains whose place changed are journaled as updated (`chain.updated`).
+         */
+        post: operations["move_chain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chains/{chain}/release": {
         parameters: {
             query?: never;
@@ -358,7 +378,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Changes the name, goal and version of a chain of the planner's project whose release is not
+         *     cut.
+         */
+        patch: operations["planner_edit_chain"];
         trace?: never;
     };
     "/planner/chains/{chain}/cards": {
@@ -864,8 +888,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The version a new chain of the project suggests: the next patch of the repository's newest
-         *     tag, or `0.1.0` when it has none or the project has no repository.
+         * The version a new chain of the project suggests: the next patch after the greatest of the
+         *     repository's newest version tag and the versions the project's chains plan, or `0.1.0` when
+         *     there is none.
          */
         get: operations["next_version"];
         put?: never;
@@ -1978,6 +2003,12 @@ export interface components {
             goal: string;
             id: components["schemas"]["ChainId"];
             name: string;
+            /**
+             * Format: int32
+             * @description Where the chain stands in its project's roadmap, from 0; chains are listed by it. A new
+             *     or imported chain takes the place after the last one.
+             */
+            position?: number;
             project_id: components["schemas"]["ProjectId"];
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Overrides the project's reviewer profile for every ticket that does not set its own. */
@@ -2322,6 +2353,12 @@ export interface components {
             /** @description The dependency that is dropped (its `kind` is ignored). */
             old: components["schemas"]["EdgeInput"];
         };
+        /** @description What the planner may change on an epic: a field left out is kept. */
+        EditPlanChain: {
+            goal?: string | null;
+            name?: string | null;
+            version?: string | null;
+        };
         /** @description Error body of every failed request. */
         ErrorBody: {
             /** @description Stable machine code: not_found, bad_request, conflict, ambiguous, internal, unauthorized. */
@@ -2627,6 +2664,16 @@ export interface components {
          */
         MessageKind: "message" | "changes_requested" | "edit_proposal" | "edit_accepted" | "edit_rejected";
         /**
+         * @description `POST /v1/chains/{chain}/move`: the chain goes right before or right after another chain of
+         *     the same project; exactly one of the two is given.
+         */
+        MoveChain: {
+            /** @description The chain to go behind (id or name). */
+            after?: string | null;
+            /** @description The chain to go in front of (id or name). */
+            before?: string | null;
+        };
+        /**
          * @description `POST /v1/chains/{chain}/tickets/{ticket}/move`: put the card directly before or after
          *     another card of the chain.
          */
@@ -2733,6 +2780,8 @@ export interface components {
         NewPlanChain: {
             goal?: string | null;
             name: string;
+            /** @description The version the epic releases (`0.4.0`); the roadmap suggests the next one. */
+            version?: string | null;
         };
         /** @description `POST /v1/projects`: a new project; unset fields take the project defaults. */
         NewProject: {
@@ -4611,6 +4660,51 @@ export interface operations {
             };
         };
     };
+    move_chain: {
+        parameters: {
+            query?: {
+                /** @description Project id or key, when two projects have a chain of this name */
+                project?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveChain"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     release_offer: {
         parameters: {
             query?: never;
@@ -5209,6 +5303,64 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_edit_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditPlanChain"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

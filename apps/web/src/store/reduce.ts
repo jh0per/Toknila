@@ -5,13 +5,14 @@ import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
 import { reduceAttach } from "./attach";
 import { reduceAutostart } from "./autostart";
-import { detailsWanted, knownKey } from "./cardDetails";
+import { detailsWanted, knownKey, threadEventEffects } from "./cardDetails";
 import { reduceTheme } from "./theme";
 import { reduceEdges } from "./edges";
 import { reduceEpic, renamedRoute, reopen } from "./epic";
 import { followTarget, opened } from "./follow";
 import { reducePlacement } from "./placement";
 import { reduceQuick } from "./quick";
+import { reduceRoadmap } from "./roadmap";
 import { type Dialog, reducePlan, withChain } from "./plan";
 import { ONBOARDING_DRAFT, loadPlanner, reducePlanner } from "./planner";
 import { reduceShortcuts } from "./shortcuts";
@@ -224,6 +225,10 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       const [moved, more] = then(next, fx, renamedRoute(msg.project, name));
       return [reopen(moved), more];
     }
+    case "moveChain":
+    case "chainMoved":
+    case "chainMoveRefused":
+      return reduceRoadmap(s, msg);
     case "selectEdge":
     case "dismissEdgeError":
     case "addEdge":
@@ -385,13 +390,4 @@ function applyWindow(s: State, e: EventRecord, gap: boolean): [State, Effect[]] 
   if (!target) return [s, fx];
   const [moved, more] = go(s, target);
   return [{ ...moved, opened: opened(s, target, e.seq) }, [...fx, ...more, { type: "expireOpened", seq: e.seq }]];
-}
-
-/// A thread event changes the card's threads and its phase; the hand-in gate may move its status.
-function threadEventEffects(s: State, key: string | undefined): Effect[] {
-  const fx: Effect[] = [{ type: "loadInbox" }, { type: "loadAgents" }];
-  if (key && s.route.name === "card" && s.route.key === key) {
-    fx.push({ type: "loadThreads", key }, { type: "loadDetail", key });
-  }
-  return fx;
 }

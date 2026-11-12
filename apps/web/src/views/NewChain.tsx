@@ -45,7 +45,7 @@ export function NewChain({ project, state, dispatch }: { project: string; state:
       </Field>
       <Field
         label="Version (optional)" name="chain-version" error={planError(p, "chain", "version")}
-        hint={state.epic.suggested ? `The chain ends in a release of this version; suggested: the next patch of the newest tag.` : "The chain ends in a release of this version."}
+        hint={state.epic.suggested ? `The chain ends in a release of this version; suggested: the next patch after the newest tag and the versions the roadmap plans.` : "The chain ends in a release of this version."}
       >
         <input data-testid="chain-version" value={version} placeholder="0.3.0" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
       </Field>

@@ -194,10 +194,10 @@ try {
   await row("SPAREREPO").waitFor({ timeout: 10_000 });
   console.log("PASS the menu brings an archived project back");
 
-  // 9. A project with chains and none picked shows one by itself.
+  // 9. A project with chains and none picked shows its roadmap, with the chain as an epic.
   await row("TOKNILA").locator("a").click();
   await expectPath("/projects/TOKNILA", "the project opens");
-  await expectText(t("chain-name-top"), "plan", "its chain is shown without a pick");
+  await expectText(t("roadmap"), "plan", "its roadmap lists the chain without a pick");
   if (pageError) throw new Error(`page error: ${pageError}`);
   console.log("web planning: PASS");
 } catch (e) {

@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Subcommand};
-use toknila_api_types::{ChainSettings, EdgeInput, EdgeMoveInput, NewChain};
+use toknila_api_types::{ChainSettings, EdgeInput, EdgeMoveInput, MoveChain, NewChain};
 use toknila_client::Client;
 use toknila_core::EdgeKind;
 
@@ -55,6 +55,19 @@ pub enum ChainCmd {
         /// The version the chain releases; refused once its release was cut.
         #[arg(long)]
         version: Option<String>,
+    },
+    /// Move a chain in its project's roadmap: right before or right after another chain.
+    Mv {
+        chain: String,
+        /// Put it right before this chain.
+        #[arg(long, conflicts_with = "after", required_unless_present = "after")]
+        before: Option<String>,
+        /// Put it right after this chain.
+        #[arg(long)]
+        after: Option<String>,
+        /// The project, when two projects have a chain of this name.
+        #[arg(long)]
+        project: Option<String>,
     },
     /// Show a chain as a graph in dependency order with its status.
     Show { chain: String },
@@ -177,6 +190,16 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
                 ..ChainSettings::default()
             };
             let detail = c.patch_chain(&chain, project.as_deref(), &settings)?;
+            emit(json_out, &detail, output::chain);
+        }
+        ChainCmd::Mv {
+            chain,
+            before,
+            after,
+            project,
+        } => {
+            let to = MoveChain { before, after };
+            let detail = c.move_chain(&chain, project.as_deref(), &to)?;
             emit(json_out, &detail, output::chain);
         }
         ChainCmd::Show { chain } => emit(json_out, &c.chain(&chain)?, output::chain),

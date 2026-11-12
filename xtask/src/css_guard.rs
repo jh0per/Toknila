@@ -13,12 +13,7 @@ const STYLE_DIR: &str = "apps/web/src";
 
 /// Raw values (hex colours plus px font sizes) per stylesheet when the guard was introduced.
 /// Each may only shrink; the guard says when an entry can be lowered or removed.
-const BASELINE: &[(&str, usize)] = &[
-    ("board.css", 1),
-    ("chain.css", 11),
-    ("panel.css", 1),
-    ("threads.css", 2),
-];
+const BASELINE: &[(&str, usize)] = &[];
 
 /// Raw values in one stylesheet's text: hex colours, and `font-size` or `font` shorthand in px.
 pub(crate) fn raw_values(css: &str) -> usize {

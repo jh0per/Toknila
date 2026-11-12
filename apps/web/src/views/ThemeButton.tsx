@@ -12,7 +12,7 @@ export function ThemeButton({ theme, dispatch }: { theme: Theme; dispatch: (i: I
   return (
     <>
       <button
-        ref={button} type="button" className="btn" data-testid="theme-button" data-theme-choice={theme}
+        ref={button} type="button" className="btn text" data-testid="theme-button" data-theme-choice={theme}
         aria-haspopup="menu" aria-expanded={at !== undefined} title={`Colour theme: ${THEME_LABEL[theme]}`}
         onClick={() => {
           const r = button.current?.getBoundingClientRect();
