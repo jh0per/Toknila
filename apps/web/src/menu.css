@@ -6,6 +6,15 @@
 .ctx-menu [role^=menuitem] { display: flex; align-items: center; gap: var(--sp3); width: 100%; min-height: var(--row-h); border: 0; background: none; text-align: left; padding: 0 var(--sp3); border-radius: var(--shape-xs); }
 .ctx-menu [role^=menuitem]:hover, .ctx-menu [role^=menuitem]:focus-visible { background: var(--primary-container); outline: none; }
 .ctx-menu [role^=menuitem].danger { color: var(--error); }
+/* The project switcher: the crumb's button and its menu (a .ctx-menu with a filter on top). */
+.switcher-btn { display: inline-flex; align-items: center; gap: var(--sp2); padding: 0 var(--sp2); min-height: var(--row-h); border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); background: var(--surface-container); color: inherit; font: inherit; }
+.switcher-btn:hover, .switcher-btn[aria-expanded=true] { background: var(--primary-container); }
+.switcher-btn .chev { color: var(--on-surface-variant); }
+.switcher { min-width: var(--w-field); }
+.switcher-filter { margin: 0 0 var(--sp1); }
+.switcher [role=menuitem].on { background: var(--primary-container); }
+.switcher-plus { width: var(--sp5); flex: none; text-align: center; color: var(--on-surface-variant); }
+.more-projects .item { color: var(--on-surface-variant); }
 .ctx-label { flex: 1; white-space: nowrap; }
 .ctx-check { width: var(--sp3); flex: none; color: var(--primary); }
 .ctx-menu kbd { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); padding: 0 var(--sp1); }

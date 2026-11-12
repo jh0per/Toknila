@@ -139,7 +139,7 @@ try {
   await page.keyboard.press("?");
   await t("shortcuts").waitFor();
   const rows = await page.locator("[data-testid=shortcut]").evaluateAll((els) => els.map((e) => e.querySelector("dt").innerText.replace(/\s+/g, " ").trim()));
-  must(rows.join("|") === "N|S|Enter|Delete|Esc|Cmd/Ctrl + ,|Cmd/Ctrl + .|?", `the popover lists the keys (${rows.join("|")})`);
+  must(rows.join("|") === "N|S|Enter|Delete|Esc|Cmd/Ctrl + ,|Cmd/Ctrl + .|Cmd/Ctrl + K|?", `the popover lists the keys (${rows.join("|")})`);
   await shot("shortcuts");
   must(await focusedInside("[data-testid=shortcuts]"), "the focus moved into the popover");
   for (let i = 0; i < 4; i++) {

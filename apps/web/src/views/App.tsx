@@ -12,6 +12,7 @@ import { Inbox } from "./Inbox";
 import { Onboarding } from "./Onboarding";
 import { OpenedNotice } from "./OpenedNotice";
 import { PlannerScreen } from "./PlannerScreen";
+import { SwitcherMenu } from "./ProjectSwitcher";
 import { Roadmap } from "./Roadmap";
 import { Settings } from "./Settings";
 import { SpendLine } from "./SpendLine";
@@ -24,12 +25,14 @@ import { Usage } from "./Usage";
 import { useAssistantShortcut } from "./useAssistantShortcut";
 import { useSettingsShortcut } from "./useSettingsShortcut";
 import { useShortcutsKey } from "./useShortcutsKey";
+import { useSwitcherKey } from "./useSwitcherKey";
 
 export function App() {
   const [state, dispatch] = useStore();
   useSettingsShortcut(state, dispatch);
   useShortcutsKey(state, dispatch);
   useAssistantShortcut(state, dispatch);
+  useSwitcherKey(dispatch, state.switcherOpen, Boolean(state.plan.dialog));
   useToday(state, dispatch);
   if (!token()) {
     return <main><p className="error">Open the address that <code>tok open</code> prints; it carries the access token.</p></main>;
@@ -88,6 +91,7 @@ export function App() {
       {aside && project && <AssistantPanel project={project} state={state} dispatch={dispatch} />}
       <Dialogs state={state} dispatch={dispatch} inline={onboarding} />
       <Shortcuts state={state} dispatch={dispatch} />
+      {state.switcherOpen && <SwitcherMenu state={state} dispatch={dispatch} />}
     </div>
   );
 }

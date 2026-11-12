@@ -5,6 +5,7 @@ import { suggestionOfProject } from "../store/suggestion";
 import { NavLink } from "./Link";
 import { PlannerPanel } from "./PlannerPanel";
 import { SuggestionRow } from "./SuggestionRow";
+import { SwitcherButton } from "./ProjectSwitcher";
 import { SpendLine } from "./SpendLine";
 import { ThemeButton } from "./ThemeButton";
 
@@ -17,7 +18,7 @@ export function PlannerScreen({ project, state, dispatch }: { project: Project; 
     <>
       <header className="top">
         <div className="crumb">
-          <b>{project.key}</b><i>/</i><b data-testid="planner-title">Assistant</b>
+          <SwitcherButton project={project} state={state} dispatch={dispatch} /><i>/</i><b data-testid="planner-title">Assistant</b>
         </div>
         <SpendLine state={state} dispatch={dispatch} />
         <NavLink

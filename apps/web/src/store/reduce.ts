@@ -299,8 +299,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "plannerLoaded":
     case "plannerFailed":
       return reducePlanner(s, msg);
-    case "toggleShortcuts":
-    case "closeShortcuts":
+    case "toggleShortcuts": case "closeShortcuts": case "toggleSwitcher": case "closeSwitcher": // the keyboard's two popups
       return [reduceShortcuts(s, msg), []];
     case "backFromOpened":
       return s.opened ? go(s, s.opened.back) : [s, []];
