@@ -2,7 +2,7 @@
 # These are estimates: a subscription is not billed per token. Override any model in
 # `usage-prices.toml` in the Toknila data home (same format; its entries win by id).
 source = "https://platform.claude.com/docs/en/about-claude/pricing"
-retrieved = "2026-11-06"
+retrieved = "2026-11-12"
 
 # `id` is the model id transcripts name; a trailing date such as -20251001 is ignored.
 # `cache_write` is the 5-minute cache write rate (transcripts do not split 5-minute and 1-hour
@@ -10,6 +10,22 @@ retrieved = "2026-11-06"
 # `[model.long_prompt]` tier: the prices of a call whose prompt (input + cache writes + cache reads,
 # output not counted) is over `over_tokens`; they apply to that whole call. Haiku 5.5's base row is
 # the "up to 100,000 tokens" tier.
+
+[[model]]
+id = "claude-fable-5-2"
+name = "Claude Fable 5.2"
+input = 8
+cache_write = 10
+cache_read = 0.2
+output = 40
+
+[[model]]
+id = "claude-mythos-5-2"
+name = "Claude Mythos 5.2"
+input = 8
+cache_write = 10
+cache_read = 0.2
+output = 40
 
 [[model]]
 id = "claude-fable-5-1"
