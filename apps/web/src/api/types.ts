@@ -54,6 +54,7 @@ export type TicketAction = Schemas["TicketAction"];
 export type ReviewView = Schemas["ReviewView"];
 export type ReviewRound = Schemas["ReviewRound"];
 export type ProjectAgents = Schemas["ProjectAgents"];
+export type ProjectRun = Schemas["ProjectRun"];
 export type SystemChecks = Schemas["SystemChecks"];
 export type Check = Schemas["Check"];
 export type CliLink = Schemas["CliLink"];

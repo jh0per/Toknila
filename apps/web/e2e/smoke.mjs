@@ -67,7 +67,8 @@ try {
   if (keyWraps) throw new Error("a card key wraps or is clipped");
   console.log("PASS card keys do not wrap");
   await expectText(page.locator('[data-version="R1"]'), "planned", "milestone R1 is a node");
-  await expectText(page.locator("[data-testid=running]"), "DEMO-1", "running agents list");
+  // A simulated agent is a card status, not a live run: the daemon lists no run for it.
+  await expectText(page.locator("[data-testid=running]"), "None running", "agents list shows live runs only");
   const nodes = await page.locator(".canvas .node").count();
   if (nodes !== 7) throw new Error(`canvas: expected 7 nodes, got ${nodes}`);
   console.log("PASS canvas: 4 cards, 1 milestone, Start and Finish");

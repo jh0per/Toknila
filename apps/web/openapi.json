@@ -9988,7 +9988,8 @@
           "project",
           "limit",
           "used",
-          "queued"
+          "queued",
+          "runs"
         ],
         "properties": {
           "limit": {
@@ -10006,6 +10007,13 @@
               "$ref": "#/components/schemas/QueuedCard"
             },
             "description": "Waiting cards, first in line first."
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectRun"
+            },
+            "description": "What runs in the project now: the assistant first (`role: planner`, no card), then the\nruns of its cards. The assistant holds no slot: it is in `runs`, never in `used`."
           },
           "used": {
             "type": "integer",
@@ -10080,6 +10088,35 @@
           "DEMO"
         ],
         "pattern": "^[A-Z][A-Z0-9]{1,9}$"
+      },
+      "ProjectRun": {
+        "type": "object",
+        "description": "One live run of a project. The assistant (`role: planner`) has no card and holds no slot.",
+        "required": [
+          "role",
+          "since"
+        ],
+        "properties": {
+          "card": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RunCard",
+                "description": "The card the run works for; none for the assistant."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/AgentRole",
+            "description": "`worker`, `reviewer` or `planner`."
+          },
+          "since": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the process started."
+          }
+        }
       },
       "Proposal": {
         "type": "object",
@@ -10982,6 +11019,26 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          }
+        }
+      },
+      "RunCard": {
+        "type": "object",
+        "description": "The card a run works for.",
+        "required": [
+          "id",
+          "key",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/TicketId"
+          },
+          "key": {
+            "$ref": "#/components/schemas/TicketKey"
+          },
+          "title": {
+            "type": "string"
           }
         }
       },

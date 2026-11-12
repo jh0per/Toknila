@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use toknila_core::graph::ChainView;
 use toknila_core::machine::TicketEvent;
-use toknila_core::schedule::{Plan, plan};
+use toknila_core::schedule::{Plan, ProjectRun, plan, project_runs};
 use toknila_core::{Project, ProjectId, TicketId};
 
 use crate::chain::run_chain;
@@ -35,6 +35,22 @@ pub fn plans<R: Reader + ?Sized>(r: &R) -> AppResult<Vec<(Project, Plan)>> {
     r.projects()?
         .into_iter()
         .map(|p| plan_of(r, &p).map(|plan| (p, plan)))
+        .collect()
+}
+
+/// Every project with its plan and its live runs (its assistant and its cards' runs), in
+/// project order.
+pub fn agents<R: Reader + ?Sized>(r: &R) -> AppResult<Vec<(Project, Plan, Vec<ProjectRun>)>> {
+    let live = r.live_runs()?;
+    r.projects()?
+        .into_iter()
+        .map(|p| {
+            let chains = views(r, p.id)?;
+            let pairs: Vec<_> = live.iter().map(|(t, role, _)| (*t, *role)).collect();
+            let plan = plan(&chains, p.max_parallel, &pairs);
+            let runs = project_runs(p.id, &chains, &live);
+            Ok((p, plan, runs))
+        })
         .collect()
 }
 

@@ -4,7 +4,7 @@
 use toknila_core::events::DomainEvent;
 use toknila_core::usage::{Record, TokenCounts};
 use toknila_core::{
-    ArtifactFormat, MessageKind, Ship, Thread, ThreadId, ThreadKind, ThreadMessage,
+    AgentRole, ArtifactFormat, MessageKind, Ship, Thread, ThreadId, ThreadKind, ThreadMessage,
     ThreadMessageId, ThreadState, ThreadVersion, ThreadVersionId,
 };
 

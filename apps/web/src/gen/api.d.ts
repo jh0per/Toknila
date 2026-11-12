@@ -3242,6 +3242,11 @@ export interface components {
             /** @description Waiting cards, first in line first. */
             queued: components["schemas"]["QueuedCard"][];
             /**
+             * @description What runs in the project now: the assistant first (`role: planner`, no card), then the
+             *     runs of its cards. The assistant holds no slot: it is in `runs`, never in `used`.
+             */
+            runs: components["schemas"]["ProjectRun"][];
+            /**
              * Format: int32
              * @description Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
              */
@@ -3274,6 +3279,14 @@ export interface components {
         ProjectId: string;
         /** @example DEMO */
         ProjectKey: string;
+        /** @description One live run of a project. The assistant (`role: planner`) has no card and holds no slot. */
+        ProjectRun: {
+            card?: components["schemas"]["RunCard"] | null;
+            /** @description `worker`, `reviewer` or `planner`. */
+            role: components["schemas"]["AgentRole"];
+            /** @description When the process started. */
+            since: components["schemas"]["Timestamp"];
+        };
         /**
          * @description A wildcard card as proposed: work nobody planned, found during a ticket. References are
          *     ticket keys, titles or release versions of the same chain.
@@ -3561,6 +3574,12 @@ export interface components {
             rounds: components["schemas"]["ReviewRound"][];
             /** Format: int32 */
             used_rounds: number;
+        };
+        /** @description The card a run works for. */
+        RunCard: {
+            id: components["schemas"]["TicketId"];
+            key: components["schemas"]["TicketKey"];
+            title: string;
         };
         /** @description Identifies a [`crate::Run`] of a runner process. */
         RunId: string;
