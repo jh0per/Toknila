@@ -3,6 +3,7 @@
 // types into them; the suggestion itself comes from core (`POST /v1/repos/check`).
 
 import type { MergeMode, RepoCheck, RepoFix } from "../api/types";
+import { REAL_AGENT } from "./profiles";
 
 /// What a person types to add a project.
 export interface ProjectDraft {
@@ -120,6 +121,16 @@ export function resolvedDraft(f: AddForm): ProjectDraft {
     check_command: f.draft.check_command.trim(),
     setup_command: f.draft.setup_command.trim(),
     merge_mode: f.draft.merge_mode,
+  };
+}
+
+/// The body of `POST /v1/projects` for a draft. The agent is named: a project added from the window
+/// runs the real one, never the simulated agent the daemon would not default to either.
+export function newProjectBody(d: ProjectDraft) {
+  return {
+    key: d.key, name: d.name || undefined, repo_path: d.repo_path, work_branch: d.work_branch || undefined,
+    check_command: d.check_command || undefined, setup_command: d.setup_command || undefined, merge_mode: d.merge_mode,
+    default_profile: REAL_AGENT,
   };
 }
 

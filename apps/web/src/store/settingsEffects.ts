@@ -3,6 +3,7 @@
 
 import { Refusal, get, patch, post } from "../api/http";
 import type { ChainDetail, CliLink, Places, ProfileList, Project, RepoCheck, SystemChecks } from "../api/types";
+import { newProjectBody } from "./addForm";
 import type { Msg } from "./msg";
 import { pickFolder } from "./shell";
 import type { SettingsEffect } from "./settings";
@@ -16,16 +17,13 @@ const reject = (dispatch: Dispatch, e: unknown, fallback?: string) => {
 };
 
 async function addProject(e: Extract<SettingsEffect, { type: "addProject" }>, dispatch: Dispatch) {
-  const { key, name, repo_path, work_branch, check_command, setup_command, merge_mode } = e.draft;
+  const { repo_path, work_branch } = e.draft;
   const check = await post<RepoCheck>("/repos/check", { repo_path, work_branch });
   if (check.problems.length) {
     dispatch({ type: "addRejected", problems: check.problems, branches: check.branches });
     return;
   }
-  const project = await post<Project>("/projects", {
-    key, name: name || undefined, repo_path, work_branch: work_branch || undefined,
-    check_command: check_command || undefined, setup_command: setup_command || undefined, merge_mode,
-  });
+  const project = await post<Project>("/projects", newProjectBody(e.draft));
   dispatch({ type: "projectAdded", project });
 }
 

@@ -26,9 +26,14 @@ pub enum ProjectCmd {
         /// branch the repository is on, else the remote's default branch).
         #[arg(long)]
         base: Option<String>,
-        /// Agent profile tickets run with unless they name one (default: sim).
+        /// Agent profile tickets run with unless they name one (default: claude-code).
         #[arg(long)]
         profile: Option<String>,
+        /// A simulation project: marks it for the simulated agent (`sim`, no process; a person
+        /// sends its events with `tok sim`) and makes it the default profile unless `--profile`
+        /// says another.
+        #[arg(long)]
+        sim: bool,
         /// The test command, optional: agents run it before they hand in (default: detected from the
         /// repository, e.g. `cargo xtask verify`, `npm test`; an empty text names none).
         #[arg(long)]
@@ -124,10 +129,12 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             repo,
             base,
             profile,
+            sim,
             check_command,
             merge,
             commands,
         } => {
+            let profile = profile.or_else(|| sim.then(|| "sim".to_owned()));
             let mut merge_mode = merge
                 .as_deref()
                 .map(|m| from_wire_name(m).ok_or_else(|| anyhow!("unknown merge mode {m}")))
@@ -161,6 +168,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 repo_path: repo,
                 work_branch: base,
                 default_profile: profile,
+                simulated: sim.then_some(true),
                 check_command,
                 merge_mode,
                 command_policy: commands.as_deref().map(policy).transpose()?,

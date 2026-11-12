@@ -90,7 +90,7 @@ fn strip(v: &mut Value) {
 fn steps(file: &str) -> Vec<Vec<String>> {
     let s = |a: &[&str]| a.iter().map(|x| (*x).to_owned()).collect::<Vec<_>>();
     vec![
-        s(&["project", "new", "DEMO"]),
+        s(&["project", "new", "DEMO", "--sim"]),
         s(&["chain", "import", file, "--project", "DEMO"]),
         s(&["sim", "DEMO-1", "subtask", "1", "done"]),
         s(&["sim", "DEMO-1", "subtask", "2", "done"]),

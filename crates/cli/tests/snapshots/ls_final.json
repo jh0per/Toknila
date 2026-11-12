@@ -4,6 +4,7 @@
     "in_status_ms": 0,
     "needs_human": false,
     "queue_position": null,
+    "simulated": true,
     "ticket": {
       "acceptance": [
         "A is done"
@@ -48,6 +49,7 @@
     "in_status_ms": 0,
     "needs_human": false,
     "queue_position": null,
+    "simulated": true,
     "ticket": {
       "acceptance": [],
       "branch": null,
@@ -83,6 +85,7 @@
     "in_status_ms": 0,
     "needs_human": false,
     "queue_position": null,
+    "simulated": true,
     "ticket": {
       "acceptance": [],
       "branch": null,
@@ -118,6 +121,7 @@
     "in_status_ms": 0,
     "needs_human": false,
     "queue_position": null,
+    "simulated": true,
     "ticket": {
       "acceptance": [],
       "branch": null,

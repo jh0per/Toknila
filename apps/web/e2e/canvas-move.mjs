@@ -25,7 +25,7 @@ const savedPos = (key) => JSON.parse(tok("chain", "show", "flow", "--json")).tic
 
 let browser;
 try {
-  tok("project", "new", "MOV");
+  tok("project", "new", "MOV", "--sim");
   tok("chain", "new", "flow", "--project", "MOV", "--goal", "Make the thing work", "--no-autostart");
   for (const t of ["Alpha", "Bravo", "Charlie"]) tok("ticket", "new", "flow", t);
   tok("dep", "add", "MOV-1", "MOV-2");

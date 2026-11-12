@@ -70,6 +70,16 @@ fn start_with<U: UnitOfWork + ?Sized>(
     let project = uow
         .project(ctx.view.chain.project_id)?
         .ok_or_else(|| AppError::not_found("project of the chain"))?;
+    if t.profile.is_none() && project.runs_simulated(t) && !project.simulated {
+        // A card that only gets `sim` from its project's default starts no process: on a project
+        // that did not ask for simulation it would read Running with no agent behind it. A card
+        // that names `sim` itself (a chain file) chose it.
+        return Err(AppError::conflict(format!(
+            "{} would run under the simulated agent `sim`, which starts no process, and project {} is not marked for simulation; choose a real agent (Settings, Agents) or mark the project simulated",
+            t.key,
+            project.key.as_str(),
+        )));
+    }
     if runs_process(&project, t) {
         let comments = uow.comments(ticket)?;
         let returned = toknila_core::instructions::Returned::of(&t.review);

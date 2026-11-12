@@ -3,6 +3,7 @@ import { epicPanel } from "../store/epic";
 import type { Intent } from "../store/msg";
 import { type Tab, visibleTabs } from "../store/route";
 import { statusText } from "../store/groups";
+import { runsSimulated } from "../store/profiles";
 import { tabAfterKey } from "../store/shortcuts";
 import { type State, currentCard, currentProject } from "../store/state";
 import { ActionBar } from "./ActionBar";
@@ -64,7 +65,7 @@ export function Panel({ state, dispatch }: { state: State; dispatch: (i: Intent)
             </button>
           ))}
           <span className="who">
-            <span className="key">{card.key}</span> {card.title} <span className="muted">{statusText(card.status)}</span>
+            <span className="key">{card.key}</span> {card.title} <span className="muted" data-testid="panel-status">{card.status === "running" && runsSimulated(card.profile, currentProject(state)?.default_profile) ? "simulated" : statusText(card.status)}</span>
           </span>
         </div>
         {!actionsInDetails && <ActionBar key={card.key} card={card} detail={state.details[card.key]} dispatch={dispatch} />}

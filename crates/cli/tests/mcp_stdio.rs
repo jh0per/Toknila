@@ -38,7 +38,7 @@ fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
     let file = dir.path().join("demo.toml");
     std::fs::write(&file, DEMO).expect("write demo");
     let file = file.to_str().expect("utf-8 path");
-    tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
+    tok.run(&["project", "new", "DEMO", "--name", "Demo", "--sim"]);
     tok.run(&["chain", "import", file, "--project", "DEMO"]);
     tok.run(&["sim", "DEMO-1", "finish", "A is done"]);
     tok.run(&["accept", "DEMO-1"]);
@@ -172,7 +172,7 @@ fn mcp_tool_calls_move_a_ticket_exactly_like_tok_sim() {
 fn a_refused_event_and_a_bad_token_come_back_as_tool_errors_and_change_nothing() {
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
-    tok.run(&["project", "new", "DEMO", "--name", "Demo"]);
+    tok.run(&["project", "new", "DEMO", "--name", "Demo", "--sim"]);
     tok.run(&["chain", "new", "demo", "--goal", "g"]);
     tok.run(&["ticket", "new", "demo", "A"]);
     assert_eq!(tok.status("DEMO-1"), "running");

@@ -43,6 +43,10 @@ pub struct TicketDetail {
     /// does not have (it has the nearest one inside the limits).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size_clamped: Option<toknila_core::Size>,
+    /// The card's agent is the simulated one (`sim`): no process runs, and a status of Running
+    /// means nothing is working on it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub simulated: bool,
 }
 
 /// A ticket in a list.
@@ -59,6 +63,9 @@ pub struct TicketItem {
     /// check command since a time. Absent otherwise, and before the checker reports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check: Option<toknila_core::CheckPhase>,
+    /// The card's agent is the simulated one (`sim`): no process runs.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub simulated: bool,
 }
 
 /// Filters for `GET /v1/tickets`.
