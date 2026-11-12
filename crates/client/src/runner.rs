@@ -2,8 +2,6 @@
 //! so these calls bypass the typed-JSON helper; the frame format of the live stream is in
 //! `toknila_api_types::runner`.
 
-use std::io::Read;
-
 use toknila_api_types::TerminalSize;
 use toknila_api_types::runner::{HEADER_END, HEADER_OFFSET, HEADER_RUN};
 use toknila_core::{AgentRole, RunId};
