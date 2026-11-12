@@ -10,6 +10,7 @@ fn brief_with<'a>(check: Option<&'a CheckOutcome>) -> RunBrief<'a> {
         prompt: "p",
         acceptance: &[],
         check_command: Some("cargo xtask verify"),
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,

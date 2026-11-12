@@ -310,6 +310,7 @@ mod tests {
             prompt: "",
             acceptance: &[],
             check_command: None,
+            setup_command: None,
             earlier: &[],
             waiting: &[],
             returned: None,

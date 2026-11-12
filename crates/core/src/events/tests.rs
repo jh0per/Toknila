@@ -368,6 +368,7 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
         max_review_rounds: 3,
         merge: Default::default(),
         check_command: None,
+        setup_command: None,
         bump_command: None,
         worker_model: None,
         reviewer_model: None,

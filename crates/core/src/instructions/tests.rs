@@ -25,6 +25,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         prompt: "Generate the instructions for the run.\n",
         acceptance,
         check_command: None,
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,
@@ -127,6 +128,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         prompt: "p",
         acceptance: &[],
         check_command: None,
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,
@@ -215,6 +217,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         prompt: "p",
         acceptance: &[],
         check_command: check,
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,
@@ -241,6 +244,27 @@ fn the_worker_kickoff_says_to_begin_commit_and_call_finished() {
         text.contains("Run `cargo xtask verify` before you hand in"),
         "{text}"
     );
+}
+
+#[test]
+fn the_worker_is_told_the_setup_command_ran_and_not_to_run_it_again() {
+    let with = RunBrief {
+        setup_command: Some("npm ci --prefix apps/web"),
+        ..brief(None)
+    };
+    let kick = kickoff(crate::AgentRole::Worker, &with);
+    assert!(
+        kick.contains("`npm ci --prefix apps/web` already ran in your workspace"),
+        "{kick}"
+    );
+    let file = generate(&with);
+    assert!(
+        file.contains("## Workspace setup") && file.contains("`npm ci --prefix apps/web`"),
+        "{file}"
+    );
+    let without = generate(&brief(None));
+    assert!(!without.contains("Workspace setup"), "{without}");
+    assert!(!kickoff(crate::AgentRole::Reviewer, &with).contains("already ran"));
 }
 
 #[test]

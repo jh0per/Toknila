@@ -122,6 +122,10 @@ pub struct RepoCheck {
     /// The check command the repository suggests (`cargo xtask verify`, `npm test`, ...); `null`
     /// when it suggests none.
     pub suggested_check_command: Option<String>,
+    /// The setup command the repository suggests (`npm ci --prefix apps/web` for a lock file
+    /// under `apps/web`); `null` when it suggests none.
+    #[serde(default)]
+    pub suggested_setup_command: Option<String>,
     /// Where accepted work should land: `github` for a GitHub remote with a working `gh` login,
     /// else `local`; `null` when the folder is not a usable repository.
     pub suggested_merge_mode: Option<MergeMode>,
@@ -177,6 +181,7 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
             suggested_name,
             suggested_branch: None,
             suggested_check_command: None,
+            suggested_setup_command: None,
             suggested_merge_mode: None,
         };
     }
@@ -200,6 +205,7 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
         suggested_name,
         suggested_branch: default_base(&facts.git).ok(),
         suggested_check_command: defaults::check_command(&facts.traits),
+        suggested_setup_command: defaults::setup_command(&facts.traits),
         suggested_merge_mode: Some(defaults::merge_mode(&facts.traits)),
     }
 }

@@ -1889,6 +1889,11 @@ export interface components {
             /** @enum {string} */
             kind: "ship_failed";
         } | {
+            command: string;
+            /** @enum {string} */
+            kind: "setup_failed";
+            output: string;
+        } | {
             base: string;
             /** Format: int32 */
             behind: number;
@@ -2704,6 +2709,8 @@ export interface components {
             name?: string | null;
             release_branch?: string | null;
             repo_path?: string | null;
+            /** @description The command run once in every new ship before the agent starts; an empty text names none. */
+            setup_command?: string | null;
             work_branch?: string | null;
         };
         /** @description `POST /v1/chains/{chain}/releases`. */
@@ -2944,6 +2951,11 @@ export interface components {
              *     old one, an empty list denies the web again.
              */
             reviewer_web_domains?: string[] | null;
+            /**
+             * @description The command run once in every new ship before the agent starts (`npm ci --prefix
+             *     apps/web`). An empty text clears it.
+             */
+            setup_command?: string | null;
             /** @description The base branch ships start from and merges go into. */
             work_branch?: string | null;
             /**
@@ -3223,6 +3235,11 @@ export interface components {
              *     card cites stays unread.
              */
             reviewer_web_domains?: string[];
+            /**
+             * @description The command the shipyard runs once in every new ship before the card's agent starts
+             *     (`npm ci --prefix apps/web`). `None`: no setup.
+             */
+            setup_command?: string | null;
             /** @description Branch ships start from and merge into (`develop`). */
             work_branch: string;
             /**
@@ -3457,6 +3474,11 @@ export interface components {
             suggested_merge_mode?: components["schemas"]["MergeMode"] | null;
             /** @description The project name the folder suggests: its base name. */
             suggested_name?: string | null;
+            /**
+             * @description The setup command the repository suggests (`npm ci --prefix apps/web` for a lock file
+             *     under `apps/web`); `null` when it suggests none.
+             */
+            suggested_setup_command?: string | null;
         };
         /** @description `POST /v1/repos/check`: the folder a person is about to make a project of. */
         RepoCheckRequest: {

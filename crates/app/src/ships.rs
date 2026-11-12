@@ -57,6 +57,16 @@ pub trait Shipyard: std::fmt::Debug {
     /// Makes the worktree and branch of `spec` and returns the worktree's absolute path. Safe to
     /// call again: an existing ship is reused, an existing branch is checked out as it is.
     fn prepare(&self, spec: &ShipSpec) -> Result<String, ShipError>;
+    /// Whether the project's setup command already ran in the ship at `dir` (a recreated ship
+    /// starts without that mark). A yard that keeps none says no.
+    fn setup_ran(&self, dir: &str) -> bool {
+        let _ = dir;
+        false
+    }
+    /// Marks that the setup command ran in the ship at `dir`.
+    fn mark_setup_ran(&self, dir: &str) {
+        let _ = dir;
+    }
     /// Removes the ship's worktree from the repository at `repo` and keeps its branch. A worktree
     /// that is already gone is fine.
     fn remove(&self, repo: &str, ship: &Ship) -> Result<(), ShipError>;

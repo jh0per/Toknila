@@ -34,6 +34,7 @@ pub mod reviews;
 pub mod runner;
 pub mod runs;
 pub mod schedule;
+pub mod setup;
 pub mod ships;
 pub mod strays;
 pub mod sync;

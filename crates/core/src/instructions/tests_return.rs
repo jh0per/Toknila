@@ -24,6 +24,7 @@ fn brief(acceptance: &[String]) -> RunBrief<'_> {
         prompt: "Work.\n",
         acceptance,
         check_command: None,
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,

@@ -29,6 +29,8 @@ pub struct NewProject {
     pub max_review_rounds: Option<u32>,
     /// The command that checks the work; an empty text names none.
     pub check_command: Option<String>,
+    /// The command run once in every new ship before the agent starts; an empty text names none.
+    pub setup_command: Option<String>,
     /// Where accepted work lands; default `local`.
     pub merge_mode: Option<MergeMode>,
     /// When the agent of a card wants to run a command; default `auto`.
@@ -63,6 +65,9 @@ pub struct PatchProject {
     /// The command that checks the work (`cargo xtask verify`); agents are told to run it and may
     /// without asking. An empty text clears it.
     pub check_command: Option<String>,
+    /// The command run once in every new ship before the agent starts (`npm ci --prefix
+    /// apps/web`). An empty text clears it.
+    pub setup_command: Option<String>,
     /// The command a release runs to bump the version (`npm version {version}
     /// --no-git-tag-version`; `{version}` is the version). An empty text clears it.
     pub bump_command: Option<String>,
@@ -136,6 +141,10 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             Some(c) => Project::clean_check_command(&c).map_err(AppError::bad_request)?,
             None => None,
         },
+        setup_command: match draft.setup_command {
+            Some(c) => Project::clean_setup_command(&c).map_err(AppError::bad_request)?,
+            None => None,
+        },
         bump_command: None,
         worker_model: None,
         reviewer_model: None,
@@ -187,6 +196,9 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     }
     if let Some(c) = patch.check_command {
         p.check_command = Project::clean_check_command(&c).map_err(AppError::bad_request)?;
+    }
+    if let Some(c) = patch.setup_command {
+        p.setup_command = Project::clean_setup_command(&c).map_err(AppError::bad_request)?;
     }
     if let Some(c) = patch.bump_command {
         p.bump_command = Project::clean_bump_command(&c).map_err(AppError::bad_request)?;

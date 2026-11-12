@@ -393,6 +393,47 @@ async fn the_check_command_is_saved_cleared_refused_at_its_field_and_survives_a_
 }
 
 #[tokio::test]
+async fn the_setup_command_is_saved_cleared_refused_at_its_field_and_survives_a_restart() {
+    let api = Api::new();
+    api.post("/v1/projects", json!({ "key": "DEMO" })).await;
+    assert!(
+        api.get("/v1/projects/DEMO")
+            .await
+            .get("setup_command")
+            .is_none()
+    );
+    let patch = |body: Value| api.call(Method::PATCH, "/v1/projects/DEMO", Some(body));
+
+    let (s, p) = patch(json!({ "setup_command": " npm ci --prefix apps/web " })).await;
+    assert_eq!(
+        (s, p["setup_command"].as_str()),
+        (StatusCode::OK, Some("npm ci --prefix apps/web"))
+    );
+    let (s, e) = patch(json!({ "setup_command": "npm ci\nnpm run gen" })).await;
+    assert_eq!(
+        (s, e["field"].as_str()),
+        (StatusCode::BAD_REQUEST, Some("setup_command"))
+    );
+    let api = api.restart();
+    assert_eq!(
+        api.get("/v1/projects/DEMO").await["setup_command"],
+        "npm ci --prefix apps/web"
+    );
+    let (s, p) = api
+        .call(
+            Method::PATCH,
+            "/v1/projects/DEMO",
+            Some(json!({ "setup_command": "" })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(
+        p.get("setup_command").is_none(),
+        "an empty text clears it: {p}"
+    );
+}
+
+#[tokio::test]
 async fn a_project_without_a_base_takes_the_branch_the_repository_is_on() {
     let tmp = tempfile::tempdir().expect("tmp");
     let main = repo(tmp.path());

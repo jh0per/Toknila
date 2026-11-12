@@ -13,6 +13,7 @@
 mod gate;
 mod planner;
 mod protocol;
+mod setup;
 pub mod terminal;
 #[cfg(test)]
 mod tests;
@@ -42,6 +43,9 @@ pub struct RunBrief<'a> {
     pub acceptance: &'a [String],
     /// The project's check command, named in both roles' instructions.
     pub check_command: Option<&'a str>,
+    /// The project's setup command, which the daemon ran in the workspace before the worker
+    /// started (a worker only).
+    pub setup_command: Option<&'a str>,
     /// Instructions a person gave to an earlier run of this card ([`earlier`]), as quoted text.
     pub earlier: &'a [String],
     /// Instructions no run has acted on yet ([`waiting`]), as quoted text: the run reads them
@@ -216,6 +220,9 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         );
     }
     let first = waiting::kickoff_part(brief.waiting, brief.returned);
+    if matches!(role, crate::AgentRole::Worker | crate::AgentRole::Release) {
+        checks.push_str(&setup::kickoff_part(brief));
+    }
     if brief.design_first {
         checks.push_str(
             " Before any code, open a design thread with a first version and wait for the \
@@ -301,6 +308,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
     out.push_str(&discussion_section(brief));
     out.push_str(&waiting::sections(brief.waiting, brief.returned));
     out.push_str(&earlier_section(brief));
+    out.push_str(&setup::section(brief));
     out.push_str(&checks_section(
         brief,
         "Run it before you call `finished`; the work is not done while it fails.",

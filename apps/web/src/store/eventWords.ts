@@ -33,7 +33,7 @@ const turn = (p: Fields): string => (p.role === "reviewer" ? "The reviewer" : "T
 const BLOCKED: Record<string, string> = {
   manual: "blocked by hand", crashed: "crashed", terminated: "the agent was terminated from outside", dependency_reopened: "a card it depends on was reopened",
   merge_conflict: "the merge conflicts", merge_failed: "the merge failed", ci_failed: "the checks failed",
-  pr_closed: "the pull request was closed", runner_lost: "the agent was lost", ship_failed: "its workspace failed",
+  pr_closed: "the pull request was closed", runner_lost: "the agent was lost", ship_failed: "its workspace failed", setup_failed: "the setup of its workspace failed",
 };
 
 /// Why a card moved to its new status, when the journal says.
