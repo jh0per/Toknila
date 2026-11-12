@@ -1007,6 +1007,7 @@ async fn openapi_describes_every_route() {
             "/planner/suggestion",
             "/profiles",
             "/projects",
+            "/projects/{key}/usage/today",
             "/projects/{project}",
             "/projects/{project}/archive",
             "/projects/{project}/chains",

@@ -591,6 +591,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{key}/usage/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What today cost, by the person's local day: the project's Toknila runs, the whole machine, the
+         *     plan windows when a status line reported them within the hour, and the project's spend by card.
+         *     Estimates at API list prices; on a subscription the real cost differs. Kept for a minute and
+         *     dropped when a run ends.
+         */
+        get: operations["get_usage_today"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}": {
         parameters: {
             query?: never;
@@ -1765,9 +1787,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Tokens and estimated API cost over the last 7, 30 or 90 days: totals, a series per UTC day and
-         *     breakdowns by model, project, chain, card and workspace. Costs are estimates at API list
-         *     prices; on a subscription the real cost differs.
+         * Tokens and estimated API cost over the last 7, 30 or 90 days: totals, a series per day (UTC,
+         *     or the person's own with `tz`) and breakdowns by model, project, chain, card and workspace.
+         *     Costs are estimates at API list prices; on a subscription the real cost differs.
          */
         get: operations["get_usage"];
         put?: never;
@@ -2119,6 +2141,10 @@ export interface components {
             order: components["schemas"]["NodeRef"][];
             release_tickets: components["schemas"]["ReleaseMember"][];
             releases: components["schemas"]["Release"][];
+            /** @description How long each card's agents ran, by ticket key; cards that never ran are absent. */
+            run_time?: {
+                [key: string]: components["schemas"]["RunTime"];
+            };
             summary: components["schemas"]["ChainSummary"];
             tickets: components["schemas"]["Ticket"][];
             /** @description Estimated token usage per card, by ticket key; cards that used none are absent. */
@@ -2309,9 +2335,9 @@ export interface components {
             /** @description There are older messages than the first one here: ask again with `before` set to its id. */
             more: boolean;
         };
-        /** @description One UTC day of the series. */
+        /** @description One day of the series. */
         DayUsage: {
-            /** @description `YYYY-MM-DD`, UTC. */
+            /** @description `YYYY-MM-DD`, in the clock the caller asked for (UTC unless it sent an offset). */
             day: string;
             figures: components["schemas"]["UsageFigures"];
         };
@@ -3879,6 +3905,15 @@ export interface components {
             state: components["schemas"]["StepState"];
             step: components["schemas"]["ReleaseStep"];
         };
+        /** @description The time a card's runs took. */
+        RunTime: {
+            /**
+             * Format: int64
+             * @description Milliseconds the finished runs lasted, together.
+             */
+            done_ms: number;
+            since?: components["schemas"]["Timestamp"] | null;
+        };
         /** @description What the assistant says with its `say` tool. */
         Say: {
             /** @description The card (key, id or title) or chain (name) the words are about, or `roadmap`. */
@@ -4259,6 +4294,8 @@ export interface components {
             queue_position?: number | null;
             /** @description How the card is reviewed (mode, reviewer, whose turn) and the rounds so far. */
             review: components["schemas"]["ReviewView"];
+            /** @description How long the card's agents ran: the finished runs, and the start of the one still going. */
+            run_time?: components["schemas"]["RunTime"];
             ship?: components["schemas"]["Ship"] | null;
             /**
              * @description The card's agent is the simulated one (`sim`): no process runs, and a status of Running
@@ -4311,6 +4348,21 @@ export interface components {
          * @description Milliseconds since the Unix epoch, UTC.
          */
         Timestamp: number;
+        /**
+         * @description `GET /v1/projects/{key}/usage/today`: what today cost, for the line of the window's top bar.
+         *     Every cost is an estimate at API list prices; on a subscription the real cost differs.
+         */
+        TodayUsage: {
+            /** @description The project's spend today by card key, for the running agents of the sidebar. */
+            cards?: {
+                [key: string]: components["schemas"]["UsageFigures"];
+            };
+            /** @description Every project and, when counted, every Claude Code session on this machine. */
+            machine: components["schemas"]["UsageFigures"];
+            /** @description The open project's Toknila runs, since local midnight. */
+            project: components["schemas"]["UsageFigures"];
+            quota?: components["schemas"]["QuotaReport"] | null;
+        };
         /** @description The four token counts a model call reports. */
         TokenCounts: {
             /**
@@ -6008,6 +6060,47 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_usage_today: {
+        parameters: {
+            query?: {
+                /** @description Minutes the person's clock is east of UTC (negative to the west); UTC when absent. */
+                tz?: number | null;
+            };
+            header?: never;
+            path: {
+                /** @description The project's key */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayUsage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8672,6 +8765,11 @@ export interface operations {
             query?: {
                 /** @description The window in days: 7 (default), 30 or 90. */
                 days?: number | null;
+                /**
+                 * @description Minutes the person's clock is east of UTC (negative to the west); the days of the series
+                 *     are theirs. UTC when absent.
+                 */
+                tz?: number | null;
             };
             header?: never;
             path?: never;

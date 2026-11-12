@@ -9,6 +9,7 @@
 mod refresh;
 mod repo;
 mod scan;
+mod today;
 mod watch;
 
 use std::collections::HashSet;
@@ -17,7 +18,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use toknila_api_types::{PriceInfo, QuotaReport, UsageView};
 use toknila_core::usage::quota::{self, QuotaSnapshot, QuotaView};
-use toknila_core::usage::{ClaudeCode, PriceTable, TranscriptFormat, summarize};
+use toknila_core::usage::{ClaudeCode, PriceTable, TranscriptFormat, summarize_local};
 use toknila_core::{Actor, AgentRole, RunId, TicketId, Timestamp};
 
 pub use refresh::Scope;
@@ -56,6 +57,8 @@ pub struct Usage {
     known: Mutex<HashSet<String>>,
     /// The repository of each workspace path, asked of git once.
     repos: Arc<repo::RepoCache>,
+    /// The answers of `today`, kept for a minute.
+    today: Mutex<Vec<today::Kept>>,
 }
 
 impl std::fmt::Debug for Usage {
@@ -106,6 +109,7 @@ impl Usage {
             gate: tokio::sync::Mutex::new(()),
             known: Mutex::new(HashSet::new()),
             repos: Arc::default(),
+            today: Mutex::new(Vec::new()),
         }
     }
 
@@ -188,11 +192,17 @@ impl Usage {
 
     /// The usage page: totals, series and breakdowns of the last `days` days, after reading what
     /// the transcripts gained.
-    pub async fn view(&self, store: &Store, days: u32) -> Result<UsageView, StoreError> {
+    pub async fn view(
+        &self,
+        store: &Store,
+        days: u32,
+        offset_minutes: i32,
+    ) -> Result<UsageView, StoreError> {
         self.refresh(store, Scope::All).await?;
         let (prices, info) = self.prices();
         let at = now();
-        let since = Timestamp(at.0 - i64::from(days) * DAY_MS);
+        // One day more than the window: its first local day can start before `days` x 24 h ago.
+        let since = Timestamp(at.0 - (i64::from(days) + 1) * DAY_MS);
         let (machine, rows, snapshot) = store
             .read(move |repo| {
                 let machine = machine_scan(repo)?;
@@ -205,7 +215,7 @@ impl Usage {
             })
             .await?;
         let snapshot: Option<QuotaSnapshot> = snapshot.and_then(|s| serde_json::from_str(&s).ok());
-        let mut summary = summarize(&rows, &prices, at, days);
+        let mut summary = summarize_local(&rows, &prices, at, days, offset_minutes);
         let repos = self.repos.clone();
         summary = tokio::task::spawn_blocking(move || {
             repos.annotate(&mut summary.by_workspace);
@@ -229,6 +239,7 @@ impl Usage {
                     .app_setting_set(MACHINE_SCAN, if on { "true" } else { "false" })
             })
             .await?;
+        self.forget_today();
         Ok(())
     }
 
@@ -245,6 +256,7 @@ impl Usage {
                 tx.repo().app_setting_set(QUOTA, &json)
             })
             .await?;
+        self.forget_today();
         Ok(())
     }
 

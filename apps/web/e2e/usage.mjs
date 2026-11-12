@@ -120,8 +120,8 @@ try {
 
   // The card carries a chip, on the canvas and in its details.
   await page.goto(at("/projects/DEMO/chains/demo/cards/DEMO-1"));
-  await expectText(page.locator("a.node[data-key=DEMO-1] [data-testid=usage-chip]"), "3.1M tok · ~$8.50", "the card's chip on the canvas");
-  await expectText(t("details-usage"), "~$8.50", "the card's chip in its details");
+  await expectText(page.locator("a.node[data-key=DEMO-1] [data-testid=usage-chip]"), "est. $8.50", "the card's chip on the canvas");
+  await expectText(t("details-usage"), "est. $8.50", "the card's chip in its details");
 
   // Strictly: the chip's whole text and tooltip, and no chip on any card that used nothing.
   const chip = page.locator("a.node[data-key=DEMO-1] [data-testid=usage-chip]");
@@ -129,16 +129,59 @@ try {
     if (got !== want) throw new Error(`${what}: expected "${want}", got "${got}"`);
     console.log(`PASS ${what}: ${want}`);
   };
-  await exact((await chip.textContent())?.trim(), "3.1M tok · ~$8.50", "the canvas chip reads exactly tokens and cost");
+  await exact((await chip.textContent())?.trim(), "est. $8.50", "the canvas chip reads exactly the estimated cost (no run, no time)");
   await exact(
     await chip.getAttribute("title"),
-    "3.1M tok · ~$8.50. Estimate at API list prices; on a subscription the real cost differs.",
-    "the chip's tooltip says it is an estimate",
+    "3.1M tokens. Estimate at API list prices; on a subscription the real cost differs.",
+    "the chip's tooltip carries the tokens and says it is an estimate",
   );
   const chips = await page.locator("a.node [data-testid=usage-chip]").count();
   await exact(String(chips), "1", "only the card that used tokens has a chip on the canvas");
   const other = await page.locator("a.node:not([data-key=DEMO-1]) [data-testid=usage-chip]").count();
   await exact(String(other), "0", "a card without usage has no chip");
+
+  // The top bar's line, on the chain screen: the open project's spend today (the card's $8.50),
+  // the machine's in its title (the other session's $1.00 too), no quota reported yet.
+  const line = t("spend-line");
+  await expectText(t("spend-today"), "est. $8.50 today", "the top bar says what the project spent today");
+  const title = (await line.getAttribute("title")) ?? "";
+  if (!title.includes("all projects: $9.50 today") || !/subscription/.test(title)) {
+    throw new Error(`the line's title lacks the machine figure or the estimate note: ${title}`);
+  }
+  console.log("PASS the line's title carries the machine-wide figure and the estimate note");
+  await exact(String(await t("spend-window").count()), "0", "no quota window on the line before a report");
+  const mono = await t("spend-today").locator(".mono").evaluate((el) => getComputedStyle(el).fontFamily);
+  if (!/mono|Menlo|Consolas/i.test(mono)) throw new Error(`the amount is not in the mono face: ${mono}`);
+  console.log("PASS the amount is set in mono");
+
+  // A status line reports the plan windows: they join the line, which links to the Usage page.
+  const resets = Math.floor(Date.now() / 1000) + 3 * 3600;
+  const quota = await fetch(`${base.origin}/v1/usage/quota`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ windows: [
+      { name: "five_hour", used_percentage: 48.2, resets_at: resets },
+      { name: "seven_day", used_percentage: 8.1, resets_at: resets + 86_400 },
+    ] }),
+  });
+  if (quota.status !== 204) throw new Error(`the quota was refused: ${quota.status} ${await quota.text()}`);
+  const clock = await page.evaluate((s) => {
+    const d = new Date(s * 1000);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }, resets);
+  // A new report drops the daemon's kept answer, so a page load shows the windows at once.
+  await page.goto(at("/projects/DEMO/chains/demo/cards/DEMO-1"));
+  await t("spend-window").first().waitFor({ timeout: 10_000 });
+  const windows = await t("spend-window").allTextContents();
+  await exact(windows[0].replace(/\s+/g, " ").trim(), `5h 48% used · resets ${clock}`, "the 5-hour window with its reset, in local time");
+  await exact(windows[1].trim(), "7d 8%", "the 7-day window");
+  await line.click();
+  await t("usage").waitFor({ timeout: 10_000 });
+  console.log("PASS the line links to the Usage page");
+  // On every screen: the Usage page has the line too, and its figure is the page's today row.
+  await expectText(t("spend-today"), "est. $8.50 today", "the line on the Usage page");
+  await t("usage-chart").locator("g[data-day]").last().locator("rect.hit").hover();
+  await expectText(t("usage-readout"), "$9.50", "the Usage page's today row is the machine figure the line's title carries");
 
   // Only Toknila's runs: the other session disappears.
   await page.goto(at("/usage"));

@@ -271,6 +271,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "pollUsage":
         later("usagePoll", () => run({ type: "loadUsage", days: e.days }), USAGE_POLL_MS);
         return;
+      case "loadToday":
       case "loadUsage":
       case "saveUsageSettings":
         if (e.type === "loadUsage") later("usage", () => runUsageEffect(e, dispatch), DEBOUNCE_MS);

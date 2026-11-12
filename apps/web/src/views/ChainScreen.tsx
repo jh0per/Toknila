@@ -15,6 +15,7 @@ import { PhaseChip } from "./PhaseChip";
 import { PanelDivider } from "./PanelDivider";
 import { SimulatedBanner } from "./SimulatedBanner";
 import { Panel } from "./Panel";
+import { SpendLine } from "./SpendLine";
 import { ThemeButton } from "./ThemeButton";
 
 /// A chain: its top bar (where it stands, a new card, Run chain, the agent slots), the canvas and
@@ -38,6 +39,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
           <i>/</i><b data-testid="chain-name-top">{epicTitle(chain)}</b>
           {chain.summary.version && <span className="ver" data-testid="chain-version-top">{versionText(chain.summary)}</span>}
         </div>
+        <SpendLine state={state} dispatch={dispatch} />
         <nav className="view-switch" aria-label="View" data-testid="view-switch">
           {([undefined, "designs"] as const).map((v) => (
             <NavLink

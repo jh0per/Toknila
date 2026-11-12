@@ -451,3 +451,40 @@ fn a_workspace_line_carries_its_repository_only_when_it_has_one() {
     );
     assert_eq!(json(&without), r#"{"label":"/work/loose"}"#);
 }
+
+#[test]
+fn a_run_at_2350_and_one_at_0010_local_fall_on_two_days() {
+    // A clock two hours east of UTC: 21:50Z is 23:50 on the 5th, 22:10Z is 00:10 on the 6th.
+    let before_midnight = row(
+        "m-big",
+        "2026-11-05T21:50:00.000Z",
+        counts(1_000_000, 0, 0, 0),
+    );
+    let after_midnight = row(
+        "m-big",
+        "2026-11-05T22:10:00.000Z",
+        counts(0, 0, 0, 1_000_000),
+    );
+    let all = [before_midnight, after_midnight];
+    let now = ts("2026-11-06T12:00:00.000Z");
+
+    let today = today_figures(&all, &prices(), now, 120);
+    assert_eq!(today.messages, 1);
+    assert_eq!(today.tokens, counts(0, 0, 0, 1_000_000));
+    assert!((today.cost_usd - 50.0).abs() < 1e-9);
+
+    // UTC sees both on the 5th and none today.
+    assert_eq!(today_figures(&all, &prices(), now, 0).messages, 0);
+
+    // A clock west of UTC moves the same rows the other way: 21:50Z is 16:50 on the 5th.
+    let west = today_figures(&all, &prices(), ts("2026-11-05T23:00:00.000Z"), -300);
+    assert_eq!(west.messages, 2);
+
+    // The usage page's last day is the same figure.
+    let summary = summarize_local(&all, &prices(), now, 7, 120);
+    let last = summary.series.last().expect("today");
+    assert_eq!(last.day, "2026-11-06");
+    assert_eq!(last.figures, today);
+    assert_eq!(summary.series[5].day, "2026-11-05");
+    assert_eq!(summary.series[5].figures.messages, 1);
+}

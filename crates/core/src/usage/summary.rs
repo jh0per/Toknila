@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use super::{PriceTable, TokenCounts, day_label, day_of};
+use super::{PriceTable, TokenCounts, day_label, day_of_local};
 use crate::Timestamp;
 
 /// One model call with what it belongs to.
@@ -54,11 +54,11 @@ pub struct UsageItem {
     pub name: Option<String>,
 }
 
-/// One UTC day of the series.
+/// One day of the series.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DayUsage {
-    /// `YYYY-MM-DD`, UTC.
+    /// `YYYY-MM-DD`, in the clock the caller asked for (UTC unless it sent an offset).
     pub day: String,
     pub figures: UsageFigures,
 }
@@ -149,8 +149,52 @@ fn breakdown<'a>(
     items
 }
 
+/// The figures of the local day `now` falls on, for a clock `offset_minutes` east of UTC: the
+/// number the usage page shows on its last day.
+pub fn today_figures<'a>(
+    rows: impl IntoIterator<Item = &'a Row>,
+    prices: &PriceTable,
+    now: Timestamp,
+    offset_minutes: i32,
+) -> UsageFigures {
+    let today = day_of_local(now, offset_minutes);
+    figures(
+        rows.into_iter()
+            .filter(|r| day_of_local(r.at, offset_minutes) == today),
+        prices,
+    )
+}
+
+/// Today's figures of each card (by ticket key) that made calls today.
+pub fn today_per_card(
+    rows: &[Row],
+    prices: &PriceTable,
+    now: Timestamp,
+    offset_minutes: i32,
+) -> BTreeMap<String, UsageFigures> {
+    let today = day_of_local(now, offset_minutes);
+    let todays: Vec<Row> = rows
+        .iter()
+        .filter(|r| day_of_local(r.at, offset_minutes) == today)
+        .cloned()
+        .collect();
+    figures_per_card(&todays, prices)
+}
+
 /// Summarises the last `days` UTC days up to `now`; rows outside them are ignored.
 pub fn summarize(rows: &[Row], prices: &PriceTable, now: Timestamp, days: u32) -> UsageSummary {
+    summarize_local(rows, prices, now, days, 0)
+}
+
+/// [`summarize`] by the days of a clock `offset_minutes` east of UTC.
+pub fn summarize_local(
+    rows: &[Row],
+    prices: &PriceTable,
+    now: Timestamp,
+    days: u32,
+    offset_minutes: i32,
+) -> UsageSummary {
+    let day_of = |at: Timestamp| day_of_local(at, offset_minutes);
     let last = day_of(now);
     let first = last - i64::from(days.max(1)) + 1;
     let inside: Vec<&Row> = rows
