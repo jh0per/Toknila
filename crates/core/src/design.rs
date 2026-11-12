@@ -54,6 +54,22 @@ pub fn sniff(bytes: &[u8]) -> Option<Sniffed> {
     }
 }
 
+/// Whether a media type is a picture an agent can be shown as image content (png, jpg, webp).
+pub fn is_picture_mime(mime: &str) -> bool {
+    matches!(mime, "image/png" | "image/jpeg" | "image/webp")
+}
+
+/// The words that say a design has no file to look at, for a link whose image was not fetched.
+pub fn no_file_words(name: &str, hint: Option<&str>) -> String {
+    let base = format!(
+        "{name} has no file: it is a link whose image was not fetched, so there is no picture to look at."
+    );
+    match hint {
+        Some(h) if !h.is_empty() => format!("{base} {h}"),
+        _ => base,
+    }
+}
+
 /// The frame a Figma link points at.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
