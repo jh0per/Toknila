@@ -229,18 +229,18 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
             })
         }
         Ok(MergeOutcome::PrClosed { url }) => block(BlockedReason::PrClosed { url }),
-        Ok(MergeOutcome::PrConflict { url }) => block(BlockedReason::MergeConflict {
-            detail: format!(
-                "GitHub reports a merge conflict on {url}. Resolve it on the ship (merge the base branch into it), unblock pushes it and watches the pull request again."
-            ),
-        }),
-        Ok(MergeOutcome::BaseConflict { detail }) => block(BlockedReason::MergeConflict { detail }),
-        Ok(MergeOutcome::Conflict { files }) => block(BlockedReason::MergeConflict {
-            detail: format!(
-                "conflicting files: {}. Resolve them on the ship (merge the base branch into it), then unblock.",
-                files.join(", ")
-            ),
-        }),
+        Ok(MergeOutcome::PrConflict { url }) => {
+            let text = format!(
+                "GitHub reports a merge conflict on {url}. Merge the base branch into the ship, resolve it, run the gates, commit, then finish again."
+            );
+            conflict(uow, ticket, text)?
+        }
+        Ok(MergeOutcome::BaseConflict { detail }) => conflict(uow, ticket, detail)?,
+        Ok(MergeOutcome::Conflict { files }) => {
+            let base = base_of(uow, ticket)?.unwrap_or_else(|| "the base branch".to_owned());
+            let text = sync::conflict_text(&base, &files, &[]);
+            conflict(uow, ticket, text)?
+        }
         Ok(MergeOutcome::ShipUncommitted { files }) => {
             block(BlockedReason::ShipUncommitted { files })
         }
@@ -253,6 +253,35 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
         }),
     };
     tell_ticket(uow, ticket, event)
+}
+
+/// A conflict at Accept: a card with a ship goes back to its agent as a round (the Accept is
+/// remembered); a card without one (the sim profile) is blocked with `merge_conflict`.
+fn conflict<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    ticket: TicketId,
+    text: String,
+) -> AppResult<TicketEvent> {
+    Ok(if uow.ship(ticket)?.is_some() {
+        TicketEvent::MergeConflicted { text }
+    } else {
+        block(BlockedReason::MergeConflict { detail: text })
+    })
+}
+
+/// The base branch the card's work merges into, when it has a project to say.
+fn base_of<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: TicketId) -> AppResult<Option<String>> {
+    let Some(t) = uow.ticket(ticket)? else {
+        return Ok(None);
+    };
+    let (Some(chain), Some(ship)) = (uow.chain(t.chain_id)?, uow.ship(ticket)?) else {
+        return Ok(None);
+    };
+    let Some(project) = uow.project(chain.project_id)? else {
+        return Ok(None);
+    };
+    Ok(ShipSpec::for_ticket(&project, &chain, &t)
+        .map(|s| s.merge_spec(&t.title, &ship.path).look.start))
 }
 
 /// The card's pull request as the host last saw it (an unchanged one changes nothing, so the

@@ -28,6 +28,10 @@ pub(super) fn enter(next: &mut Ticket, mode: ReviewMode, effects: &mut Vec<Effec
     next.review.turn = Some(turn);
     next.review.nudged = false;
     next.review.note = None;
+    // A person accepted before a merge conflict: nobody is asked again when it passes.
+    if next.review.accepted && turn == ReviewTurn::Person {
+        start_merge(next, effects);
+    }
 }
 
 /// The card leaves Review: nobody is awaited any more.
@@ -51,6 +55,7 @@ pub(super) fn person_decides(
     effects: &mut Vec<Effect>,
 ) {
     leave(next, effects);
+    next.review.accepted &= verdict == Verdict::Approve;
     next.review.record(Actor::Human, verdict, comment, now);
 }
 
@@ -170,7 +175,7 @@ pub(super) fn agent_decides(
     // The reviewer is done: its process ends and its slot is free. The worker's runner stays.
     effects.push(Effect::StopReviewer);
     match said.verdict {
-        Verdict::Approve if !decides => {
+        Verdict::Approve if !decides && !next.review.accepted => {
             next.review.turn = Some(ReviewTurn::Person);
             Ok((TicketStatus::Review, None))
         }
@@ -266,6 +271,7 @@ pub(super) fn rerun(
 /// whoever has to fix a conflict can do it on the ship.
 pub(super) fn start_merge(next: &mut Ticket, effects: &mut Vec<Effect>) {
     next.review.turn = Some(ReviewTurn::Merging);
+    next.review.accepted = false;
     // A merge that starts opens its pull request (again): the one seen before is stale, and
     // only a card with a pull request is watched, so the ticker cannot judge old checks.
     next.pr = None;
@@ -351,11 +357,4 @@ pub(super) fn not_merging(
     } else {
         Ok(())
     }
-}
-
-/// The merge landed: what that does to the host and the graph.
-pub(super) fn merged(effects: &mut Vec<Effect>) {
-    effects.push(Effect::RemoveShip);
-    effects.push(Effect::StopRunner);
-    effects.push(Effect::DependencySatisfied);
 }

@@ -76,7 +76,7 @@ pub fn conflict_text(base: &str, files: &[String], clashes: &[Clash]) -> String 
         text.push('.');
     }
     text.push_str(&format!(
-        "\nRun `git merge {base}` in the ship, resolve it, commit, then finish again."
+        "\nRun `git merge {base}` in the ship, resolve it, run the gates, commit, then finish again."
     ));
     text
 }

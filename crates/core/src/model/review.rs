@@ -252,12 +252,17 @@ pub struct Review {
     /// project has no check command, or after a new hand-in until it ran again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_check: Option<super::CheckOutcome>,
+    /// A person accepted, but the merge met a conflict and the card went back to the worker: the
+    /// next hand-in that passes the check and the reviewer merges without a second Accept.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub accepted: bool,
 }
 
 impl Review {
     /// True before the first review: nothing to show or store.
     pub fn is_empty(&self) -> bool {
         self.turn.is_none()
+            && !self.accepted
             && self.check.is_none()
             && self.rounds.is_empty()
             && !self.nudged

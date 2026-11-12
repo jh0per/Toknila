@@ -11503,6 +11503,10 @@
         "type": "object",
         "description": "A ticket's review state: whose turn it is while in Review, and every round so far.",
         "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "A person accepted, but the merge met a conflict and the card went back to the worker: the\nnext hand-in that passes the check and the reviewer merges without a second Accept."
+          },
           "check": {
             "oneOf": [
               {
