@@ -57,6 +57,9 @@ pub struct RunBrief {
     pub acceptance: Vec<String>,
     /// The project's check command, named in the agent's instructions.
     pub check_command: Option<String>,
+    /// The project's setup command: the host runs it once in a new ship before the agent starts,
+    /// and the agent is told it ran.
+    pub setup_command: Option<String>,
     /// Instructions the card's earlier runs were given (`toknila_core::instructions::earlier`),
     /// for a run that replaces one.
     pub earlier: Vec<String>,

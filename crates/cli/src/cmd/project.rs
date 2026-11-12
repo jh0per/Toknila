@@ -81,6 +81,10 @@ pub enum ProjectCmd {
         /// and may without asking. An empty text clears it.
         #[arg(long)]
         check_command: Option<String>,
+        /// The command run once in every new workspace before the agent starts (e.g. `npm ci
+        /// --prefix apps/web`). An empty text clears it.
+        #[arg(long)]
+        setup_command: Option<String>,
         /// The command a release runs to bump the version, optional (e.g. `npm version {version}
         /// --no-git-tag-version`; `{version}` is the version). An empty text clears it.
         #[arg(long)]
@@ -187,6 +191,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             merge_method,
             no_checks_timeout,
             check_command,
+            setup_command,
             bump_command,
             worker_model,
             reviewer_model,
@@ -220,6 +225,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     .transpose()?,
                 no_checks_timeout_secs: no_checks_timeout,
                 check_command,
+                setup_command,
                 bump_command,
                 worker_model,
                 reviewer_model,
@@ -238,6 +244,9 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 );
                 if let Some(c) = &p.check_command {
                     println!("test command: {c}");
+                }
+                if let Some(c) = &p.setup_command {
+                    println!("setup command: {c}");
                 }
                 if let Some(c) = &p.bump_command {
                     println!("bump command: {c}");
