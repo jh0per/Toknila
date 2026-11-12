@@ -63,7 +63,7 @@ try {
   ];
   const list = steps.map((s) => `'${s}'`);
   writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', ${list.join(", ")}]\nstartup_secs = 0\n`);
-  tok("project", "new", "WEB", "--repo", repo, "--base", "develop");
+  tok("project", "new", "WEB", "--repo", repo, "--base", "develop", "--sim");
   // A second project, looked at by a second window: it must not follow the first one's assistant.
   const otherRepo = join(home, "other-repo");
   mkdirSync(otherRepo, { recursive: true });
@@ -72,7 +72,7 @@ try {
   writeFileSync(join(otherRepo, "README.md"), "hi\n");
   git(otherRepo, "add", "README.md");
   git(otherRepo, "commit", "--quiet", "-m", "init");
-  tok("project", "new", "OTH", "--repo", otherRepo, "--base", "develop");
+  tok("project", "new", "OTH", "--repo", otherRepo, "--base", "develop", "--sim");
   const { url } = JSON.parse(tok("open", "--json"));
 
   browser = await launch();
@@ -203,11 +203,12 @@ try {
   if (firstChild !== "suggestion") throw new Error(`the suggestion is not the first row of the inbox: ${firstChild}`);
   console.log("PASS the suggestion is the first row of the inbox");
   await shot("planner-next-step");
-  // Doing its action ends it: the card starts (the simulated agent), the suggestion is cleared.
+  // Doing its action ends it: the card starts (the simulated agent: the project is `--sim`, so the
+  // start never spawns a real agent), the suggestion is cleared.
   await page.locator("[data-testid=suggestion-button]").click();
   await next.waitFor({ state: "detached" });
   await page.locator("[data-testid=chains] li a").first().click();
-  await expectText(page.locator("a[data-key=WEB-1] [data-testid=status]"), "running", "the button started the card");
+  await expectText(page.locator("a[data-key=WEB-1] [data-testid=status]"), "simulated", "the button started the card");
   await page.locator("[data-testid=planner-link]").click();
   await page.locator("[data-testid=assistant-expand]").click();
   await inbox.locator("[data-testid=suggestion]").waitFor({ state: "detached" });
