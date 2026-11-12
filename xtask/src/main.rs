@@ -26,6 +26,7 @@ mod css_guard;
 mod guards;
 mod leaks;
 mod shots;
+mod testrun;
 mod updates;
 mod versions;
 
@@ -75,19 +76,19 @@ fn verify() -> Result<(), String> {
 }
 
 fn verify_in(root: &std::path::Path) -> Result<(), String> {
-    cargo(&["fmt", "--all", "--check"])?;
-    cargo(&[
-        "clippy",
-        "--workspace",
-        "--all-targets",
-        "--locked",
-        "--",
-        "-D",
-        "warnings",
-    ])?;
-    leaks::cargo_test(&cargo_bin(), root)?;
-    guards()?;
-    leaks::check(Some(root), Duration::from_secs(5))?;
+    let mut t = testrun::Timings::default();
+    let clippy = ["clippy", "--workspace", "--all-targets", "--locked"];
+    let result = (|| {
+        t.phase("fmt", || cargo(&["fmt", "--all", "--check"]))?;
+        t.phase("clippy", || {
+            cargo(&[clippy.as_slice(), &["--", "-D", "warnings"]].concat())
+        })?;
+        t.phase("tests", || testrun::cargo_test(&cargo_bin(), root))?;
+        t.phase("guards", guards)?;
+        t.phase("leaks", || leaks::check(Some(root), Duration::from_secs(5)))
+    })();
+    t.write(&testrun::target_dir(&app::root().unwrap_or_default()));
+    result?;
     eprintln!("xtask verify: PASS");
     Ok(())
 }

@@ -25,9 +25,7 @@ import { reduceSettings, setupLoads } from "./settings";
 import { nextSettingsFrom } from "./settingsNav";
 import { reduceUpdates } from "./updates";
 import { loadUsage, reduceUsage } from "./usage";
-import {
-  FIRST_RETRY_MS, MAX_RETRY_MS, type State, activeProjects, cardRoute, chainOfEvent, currentProject, ticketOfEvent,
-} from "./state";
+import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, activeProjects, cardRoute, chainOfEvent, currentProject, ticketOfEvent } from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
   switch (msg.type) {
@@ -317,6 +315,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "setMachineScan":
     case "usageLoaded":
     case "usageFailed":
+    case "wantToday":
+    case "todayLoaded":
       return reduceUsage(s, msg);
     default: // what is left is the assistant's and the conversation's (the type says so: a new Msg must be handled somewhere)
       return reduceAssistant(s, msg);

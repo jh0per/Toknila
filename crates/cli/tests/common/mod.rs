@@ -243,6 +243,12 @@ impl Drop for Tok {
 /// A folder that does not exist has no transcripts.
 pub fn isolate(cmd: &mut Command, home: &Path) {
     cmd.env("CLAUDE_CONFIG_DIR", home.join("no-claude-config"));
+    // A test daemon looks at its runs every quarter second, not every five (it reads the
+    // variable only because `TOKNILA_TEST_ROOT` is set, which `cargo xtask verify` does too).
+    cmd.env("TOKNILA_TICK_MS", "250");
+    if std::env::var_os("TOKNILA_TEST_ROOT").is_none() {
+        cmd.env("TOKNILA_TEST_ROOT", home);
+    }
 }
 
 /// Write ends of the lifeline pipes of the daemons this test binary started. A daemon reads the

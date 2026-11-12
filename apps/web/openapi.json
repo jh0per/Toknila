@@ -2117,6 +2117,68 @@
         }
       }
     },
+    "/projects/{key}/usage/today": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "What today cost, by the person's local day: the project's Toknila runs, the whole machine, the\nplan windows when a status line reported them within the hour, and the project's spend by card.\nEstimates at API list prices; on a subscription the real cost differs. Kept for a minute and\ndropped when a run ends.",
+        "operationId": "get_usage_today",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The project's key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "description": "Minutes the person's clock is east of UTC (negative to the west); UTC when absent.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodayUsage"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}": {
       "get": {
         "tags": [
@@ -5847,7 +5909,7 @@
         "tags": [
           "usage"
         ],
-        "summary": "Tokens and estimated API cost over the last 7, 30 or 90 days: totals, a series per UTC day and\nbreakdowns by model, project, chain, card and workspace. Costs are estimates at API list\nprices; on a subscription the real cost differs.",
+        "summary": "Tokens and estimated API cost over the last 7, 30 or 90 days: totals, a series per day (UTC,\nor the person's own with `tz`) and breakdowns by model, project, chain, card and workspace.\nCosts are estimates at API list prices; on a subscription the real cost differs.",
         "operationId": "get_usage",
         "parameters": [
           {
@@ -5862,6 +5924,19 @@
               ],
               "format": "int32",
               "minimum": 0
+            }
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "description": "Minutes the person's clock is east of UTC (negative to the west); the days of the series\nare theirs. UTC when absent.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
             }
           }
         ],
@@ -7005,6 +7080,16 @@
               "$ref": "#/components/schemas/Release"
             }
           },
+          "run_time": {
+            "type": "object",
+            "description": "How long each card's agents ran, by ticket key; cards that never ran are absent.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RunTime"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
           "summary": {
             "$ref": "#/components/schemas/ChainSummary"
           },
@@ -7547,7 +7632,7 @@
       },
       "DayUsage": {
         "type": "object",
-        "description": "One UTC day of the series.",
+        "description": "One day of the series.",
         "required": [
           "day",
           "figures"
@@ -7555,7 +7640,7 @@
         "properties": {
           "day": {
             "type": "string",
-            "description": "`YYYY-MM-DD`, UTC."
+            "description": "`YYYY-MM-DD`, in the clock the caller asked for (UTC unless it sent an offset)."
           },
           "figures": {
             "$ref": "#/components/schemas/UsageFigures"
@@ -11906,6 +11991,32 @@
           }
         }
       },
+      "RunTime": {
+        "type": "object",
+        "description": "The time a card's runs took.",
+        "required": [
+          "done_ms"
+        ],
+        "properties": {
+          "done_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Milliseconds the finished runs lasted, together.",
+            "minimum": 0
+          },
+          "since": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the newest run that has not ended started; `null` while nothing runs."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "Say": {
         "type": "object",
         "description": "What the assistant says with its `say` tool.",
@@ -12981,6 +13092,10 @@
             "$ref": "#/components/schemas/ReviewView",
             "description": "How the card is reviewed (mode, reviewer, whose turn) and the rounds so far."
           },
+          "run_time": {
+            "$ref": "#/components/schemas/RunTime",
+            "description": "How long the card's agents ran: the finished runs, and the start of the one still going."
+          },
           "ship": {
             "oneOf": [
               {
@@ -13127,6 +13242,45 @@
         "type": "integer",
         "format": "int64",
         "description": "Milliseconds since the Unix epoch, UTC."
+      },
+      "TodayUsage": {
+        "type": "object",
+        "description": "`GET /v1/projects/{key}/usage/today`: what today cost, for the line of the window's top bar.\nEvery cost is an estimate at API list prices; on a subscription the real cost differs.",
+        "required": [
+          "project",
+          "machine"
+        ],
+        "properties": {
+          "cards": {
+            "type": "object",
+            "description": "The project's spend today by card key, for the running agents of the sidebar.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/UsageFigures"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "machine": {
+            "$ref": "#/components/schemas/UsageFigures",
+            "description": "Every project and, when counted, every Claude Code session on this machine."
+          },
+          "project": {
+            "$ref": "#/components/schemas/UsageFigures",
+            "description": "The open project's Toknila runs, since local midnight."
+          },
+          "quota": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuotaReport",
+                "description": "The plan windows, when a status line reported them within the hour."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "TokenCounts": {
         "type": "object",

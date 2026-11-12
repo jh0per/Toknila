@@ -15,6 +15,8 @@ import { PlannerScreen } from "./PlannerScreen";
 import { SwitcherMenu } from "./ProjectSwitcher";
 import { Roadmap } from "./Roadmap";
 import { Settings } from "./Settings";
+import { SpendLine } from "./SpendLine";
+import { useToday } from "./useToday";
 import { SettingsSidebar } from "./SettingsSidebar";
 import { Shortcuts } from "./Shortcuts";
 import { Sidebar } from "./Sidebar";
@@ -31,6 +33,7 @@ export function App() {
   useShortcutsKey(state, dispatch);
   useAssistantShortcut(state, dispatch);
   useSwitcherKey(dispatch, state.switcherOpen, Boolean(state.plan.dialog));
+  useToday(state, dispatch);
   if (!token()) {
     return <main><p className="error">Open the address that <code>tok open</code> prints; it carries the access token.</p></main>;
   }
@@ -51,6 +54,12 @@ export function App() {
     <div className={`ide${aside ? " with-assistant" : ""}`} style={aside ? ({ "--assistant-w": `${state.assistant.width}px` } as CSSProperties) : undefined}>
       {r === "settings" ? <SettingsSidebar state={state} dispatch={dispatch} /> : <Sidebar state={state} dispatch={dispatch} />}
       <main className={showChain ? "has-panel" : roadmap ? "roadmap-page" : planning ? "planner-page" : "plain"}>
+        {/* The screens with no top bar of their own get one, so the spend line is on every screen. */}
+        {!showChain && !roadmap && !planning && state.loaded && !onboarding && (
+          <header className="top plain-top">
+            <SpendLine state={state} dispatch={dispatch} />
+          </header>
+        )}
         {state.error && !showChain && <p className="error">{state.error}</p>}
         {!state.loaded ? <p className="muted">Loading…</p> : r === "settings" ? (
           <Settings state={state} dispatch={dispatch} />

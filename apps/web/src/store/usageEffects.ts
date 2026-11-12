@@ -1,7 +1,7 @@
 // The network side of the Usage page. It decides nothing: the daemon's answer goes to the reducer.
 
 import { get, put } from "../api/http";
-import type { UsageView } from "../api/types";
+import type { TodayUsage, UsageView } from "../api/types";
 import type { Msg } from "./msg";
 import type { UsageEffect } from "./usage";
 
@@ -12,7 +12,16 @@ const failed = (dispatch: Dispatch) => (e: unknown) =>
 
 /// Runs one effect of the page; the answer is the whole page again.
 export function runUsageEffect(e: UsageEffect, dispatch: Dispatch): void {
-  const load = () => get<UsageView>(`/usage?days=${e.days}`);
+  // The person's own days: minutes east of UTC, so "today" is the one on their clock.
+  const tz = -new Date().getTimezoneOffset();
+  if (e.type === "loadToday") {
+    // The line is a convenience: an answer that fails leaves the last one on the screen.
+    get<TodayUsage>(`/projects/${encodeURIComponent(e.project)}/usage/today?tz=${tz}`)
+      .then((view) => dispatch({ type: "todayLoaded", project: e.project, view }))
+      .catch(() => {});
+    return;
+  }
+  const load = () => get<UsageView>(`/usage?days=${e.days}&tz=${tz}`);
   const done = (view: UsageView) => dispatch({ type: "usageLoaded", view });
   switch (e.type) {
     case "loadUsage":

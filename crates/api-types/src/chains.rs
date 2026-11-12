@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use toknila_core::graph::ChainSummary;
 use toknila_core::graph::ChainView;
-use toknila_core::usage::UsageFigures;
+use toknila_core::usage::{RunTime, UsageFigures};
 use toknila_core::{
     Chain, Edge, EdgeKind, NodeRef, Release, ReleaseId, Ticket, TicketId, Timestamp,
 };
@@ -24,6 +24,9 @@ pub struct ChainDetail {
     /// Estimated token usage per card, by ticket key; cards that used none are absent.
     #[serde(default)]
     pub usage: BTreeMap<String, UsageFigures>,
+    /// How long each card's agents ran, by ticket key; cards that never ran are absent.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub run_time: BTreeMap<String, RunTime>,
     /// What an import left out (a design the project does not have); only an import answers it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
@@ -48,6 +51,7 @@ impl ChainDetail {
             summary,
             order,
             usage: BTreeMap::new(),
+            run_time: BTreeMap::new(),
             warnings: Vec::new(),
         }
     }

@@ -1,5 +1,5 @@
 import { type CSSProperties, type MouseEvent, type PointerEvent, useState } from "react";
-import type { ChainSummary, Release, Ticket, TicketDetail, UsageFigures } from "../api/types";
+import type { ChainSummary, Release, RunTime, Ticket, TicketDetail, UsageFigures } from "../api/types";
 import { outOfOrderText } from "../format";
 import { nodeKey } from "../layout";
 import { allows, subtaskProgress } from "../store/cardDetails";
@@ -16,7 +16,7 @@ import { UsageChip } from "./UsageChip";
 /// subtasks are when it has any, and a proposed card carries its own Approve and Reject, the same
 /// actions the Inbox offers, when the daemon allows them. The agent's runner shows only when it is
 /// not the project's default; the usage figures show here and nowhere else on the page.
-export function TicketNode({ ticket: t, projectKey, layout, href, style, selected, moving, over, linking, detail, usage, queued, defaultProfile, onHover, handlers }: {
+export function TicketNode({ ticket: t, projectKey, layout, href, style, selected, moving, over, linking, detail, usage, runTime, queued, defaultProfile, onHover, handlers }: {
   ticket: Ticket;
   /// The key of the card's project: its designs are served under it.
   projectKey: string;
@@ -33,6 +33,8 @@ export function TicketNode({ ticket: t, projectKey, layout, href, style, selecte
   linking: boolean;
   detail: TicketDetail | undefined;
   usage: UsageFigures | undefined;
+  /// How long the card's agents ran.
+  runTime: RunTime | undefined;
   /// Place in line while it waits for a free agent slot.
   queued: number | undefined;
   /// The project's default profile: the runner chip stays away when the card uses it.
@@ -59,7 +61,7 @@ export function TicketNode({ ticket: t, projectKey, layout, href, style, selecte
     selected ? "sel" : "", moving ? "moving" : "", over ? "over" : "", linking ? "linkable" : "",
   ].filter(Boolean).join(" ");
   const proposal = t.status === "proposed" && (allows(detail, "approve") || allows(detail, "reject"));
-  const extras = Boolean(progress || queued !== undefined || t.pr || t.done_out_of_order || usage || t.designs?.length);
+  const extras = Boolean(progress || queued !== undefined || t.pr || t.done_out_of_order || usage || runTime || t.designs?.length);
   const act = (f: () => void) => (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -120,7 +122,7 @@ export function TicketNode({ ticket: t, projectKey, layout, href, style, selecte
           )}
           {t.pr && <PrChip pr={t.pr} />}
           {t.done_out_of_order && <span className="mark" title={outOfOrderText(t.done_out_of_order)}>out of order</span>}
-          <UsageChip figures={usage} />
+          <UsageChip figures={usage} runTime={runTime} />
         </span>
       )}
       <span
