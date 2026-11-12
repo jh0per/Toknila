@@ -19,26 +19,6 @@ pub fn with_run_root(f: impl FnOnce(&Path) -> Result<(), String>) -> Result<(), 
     result
 }
 
-/// `cargo test --workspace` with the test homes created under `root`.
-pub fn cargo_test(cargo: &str, root: &Path) -> Result<(), String> {
-    eprintln!(
-        "$ cargo test --workspace --locked ({ROOT_VAR}={})",
-        root.display()
-    );
-    let status = Command::new(cargo)
-        .args(["test", "--workspace", "--locked"])
-        .env(ROOT_VAR, root)
-        .status()
-        .map_err(|e| format!("cannot run cargo: {e}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "`cargo test --workspace --locked` exited with {status}"
-        ))
-    }
-}
-
 /// One running `tok daemon run`.
 #[derive(Debug, PartialEq)]
 pub struct Daemon {

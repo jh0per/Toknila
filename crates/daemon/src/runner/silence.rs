@@ -17,10 +17,23 @@ use crate::store::Store;
 /// How often live runs are looked at.
 const EVERY: Duration = Duration::from_secs(5);
 
+/// How often live runs are looked at: [`EVERY`], or the milliseconds in `TOKNILA_TICK_MS` when
+/// `TOKNILA_TEST_ROOT` is set too (a test daemon; a real one ignores the variable).
+fn every() -> Duration {
+    if std::env::var_os("TOKNILA_TEST_ROOT").is_none() {
+        return EVERY;
+    }
+    std::env::var("TOKNILA_TICK_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|ms| *ms > 0)
+        .map_or(EVERY, Duration::from_millis)
+}
+
 /// Evaluates every live run until the daemon ends.
 pub fn watch(store: Store, runners: Arc<Runners>) -> JoinHandle<()> {
     tokio::spawn(async move {
-        let mut timer = tokio::time::interval(EVERY);
+        let mut timer = tokio::time::interval(every());
         loop {
             timer.tick().await;
             tick(&store, &runners, now()).await;
