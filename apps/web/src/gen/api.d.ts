@@ -1828,6 +1828,9 @@ export interface components {
             /** @enum {string} */
             kind: "chain";
             name: string;
+        } | {
+            /** @enum {string} */
+            kind: "roadmap";
         };
         /** @description Body of ticket actions. `text` is required by block, return and cancel. */
         ActionInput: {
@@ -3848,7 +3851,7 @@ export interface components {
         };
         /** @description What the assistant says with its `say` tool. */
         Say: {
-            /** @description The card (key, id or title) or chain (name) the words are about. */
+            /** @description The card (key, id or title) or chain (name) the words are about, or `roadmap`. */
             about?: string | null;
             text: string;
         };

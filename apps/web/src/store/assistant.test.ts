@@ -49,10 +49,10 @@ describe("what a message sent with a chip is", () => {
     });
   });
 
-  it("about the roadmap is typed `About the roadmap: …` and stored with no context", () => {
+  it("about the roadmap is typed `About the roadmap: …` and stored about the roadmap", () => {
     const [, fx] = reduce(typed(open({ name: "project", project: "DEMO" }), "add an epic"), { type: "askPlanner", project: "DEMO" });
     expect(fx[0]).toMatchObject({ call: "ask", text: "About the roadmap: add an epic", raw: "add an epic" });
-    expect(fx[0]).toHaveProperty("about", undefined);
+    expect(fx[0]).toHaveProperty("about", { kind: "roadmap" });
   });
 
   it("is plain without a chip", () => {
@@ -90,10 +90,10 @@ describe("what a message sent with a chip is", () => {
 });
 
 describe("only about this", () => {
-  const all = [msg("a"), msg("b", { kind: "card", key: "DEMO-1" }), msg("c", { kind: "chain", name: "plan" }), msg("d", { kind: "card", key: "DEMO-2" })];
+  const all = [msg("a"), msg("b", { kind: "card", key: "DEMO-1" }), msg("c", { kind: "chain", name: "plan" }), msg("d", { kind: "card", key: "DEMO-2" }), msg("e", { kind: "roadmap" })];
   it("keeps the messages of the open card", () => expect(aboutThis(all, { kind: "card", key: "DEMO-1" }).map((m) => m.id)).toEqual(["b"]));
   it("keeps the messages of the open chain", () => expect(aboutThis(all, { kind: "chain", name: "plan" }).map((m) => m.id)).toEqual(["c"]));
-  it("keeps the messages about neither on the roadmap", () => expect(aboutThis(all, { kind: "roadmap" }).map((m) => m.id)).toEqual(["a"]));
+  it("keeps the messages about the roadmap on the roadmap", () => expect(aboutThis(all, { kind: "roadmap" }).map((m) => m.id)).toEqual(["e"]));
   it("is off by default and the choice is remembered", () => {
     const s = at({ name: "project", project: "DEMO" });
     expect(s.assistant.only).toBe(false);

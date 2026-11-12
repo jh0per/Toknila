@@ -88,6 +88,8 @@ pub enum About {
     Card { key: TicketKey },
     /// A chain (epic), by name.
     Chain { name: String },
+    /// The roadmap: the project's top-level plan of epics.
+    Roadmap,
 }
 
 /// One message of a project's conversation.
@@ -185,9 +187,12 @@ pub fn opened_thread(number: u32, key: &TicketKey) -> String {
     format!("opened thread {number} on {key}")
 }
 
-/// What Toknila says when the assistant added a chain.
-pub fn added_chain(name: &str) -> String {
-    format!("added chain {name}")
+/// What Toknila says when the assistant added an epic (a chain) with its release version.
+pub fn added_chain(name: &str, version: Option<&str>) -> String {
+    match version.map(|v| v.trim().trim_start_matches('v')) {
+        Some(v) if !v.is_empty() => format!("added epic {name} v{v}"),
+        _ => format!("added epic {name}"),
+    }
 }
 
 /// What Toknila says when the assistant edited a chain.
@@ -277,5 +282,11 @@ mod tests {
             serde_json::to_value(&chain).expect("json"),
             serde_json::json!({ "kind": "chain", "name": "plan" })
         );
+        assert_eq!(
+            serde_json::to_value(About::Roadmap).expect("json"),
+            serde_json::json!({ "kind": "roadmap" })
+        );
+        assert_eq!(added_chain("plan", Some("0.4.0")), "added epic plan v0.4.0");
+        assert_eq!(added_chain("plan", None), "added epic plan");
     }
 }

@@ -43,6 +43,7 @@ fn message(r: Row) -> Result<Message, StoreError> {
                 .map_err(|_| StoreError::Corrupt(format!("bad card key: {key:?}")))?,
         }),
         (Some("chain"), Some(name)) => Some(About::Chain { name }),
+        (Some("roadmap"), _) => Some(About::Roadmap),
         _ => None,
     };
     Ok(Message {
@@ -66,6 +67,7 @@ impl Repo<'_> {
         let (kind, reference) = match &m.about {
             Some(About::Card { key }) => (Some("card"), Some(key.to_string())),
             Some(About::Chain { name }) => (Some("chain"), Some(name.clone())),
+            Some(About::Roadmap) => (Some("roadmap"), None),
             None => (None, None),
         };
         self.conn.execute(

@@ -136,6 +136,7 @@ export function wakeWhenLate(messages: ConversationMessage[], now: number, wake:
 /// the card, else the chain's, else nowhere.
 export function aboutRoute(s: State, project: string, about: ConversationAbout | null | undefined): Route | undefined {
   if (!about) return undefined;
+  if (about.kind === "roadmap") return { name: "project", project };
   if (about.kind === "chain") return { name: "projectChain", project, chain: about.name };
   for (const id of s.chainOrder) {
     const chain = s.chains[id];
@@ -145,4 +146,5 @@ export function aboutRoute(s: State, project: string, about: ConversationAbout |
 }
 
 /// What a context chip says.
-export const aboutLabel = (about: ConversationAbout): string => (about.kind === "chain" ? `chain ${about.name}` : about.key);
+export const aboutLabel = (about: ConversationAbout): string =>
+  about.kind === "roadmap" ? "roadmap" : about.kind === "chain" ? `chain ${about.name}` : about.key;

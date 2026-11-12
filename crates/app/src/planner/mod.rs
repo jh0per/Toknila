@@ -115,7 +115,10 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
     };
     let id = chains::create(uow, &project.to_string(), input)?;
     if let Some(c) = uow.chain(id)? {
-        let text = conversation::added_chain(&c.name);
+        let version = uow
+            .chain_view(id)?
+            .and_then(|v| v.finish_release().map(|r| r.version.clone()));
+        let text = conversation::added_chain(&c.name, version.as_deref());
         conv::line(uow, project, text, Some(About::Chain { name: c.name }))?;
     }
     Ok(id)
