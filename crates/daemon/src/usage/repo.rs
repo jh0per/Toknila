@@ -136,10 +136,8 @@ mod tests {
             .iter()
             .map(|i| (i.repo.clone(), i.name.clone()))
             .collect();
-        // The cache names the repository by its resolved path (`\\?\C:\...` on Windows).
-        let resolved = main.canonicalize().expect("canonical");
         let want = (
-            Some(resolved.display().to_string()),
+            Some(main.display().to_string()),
             Some("imagegen-backend".to_owned()),
         );
         assert_eq!(
