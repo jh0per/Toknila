@@ -6717,6 +6717,32 @@
           }
         }
       },
+      "CheckOutcome": {
+        "type": "object",
+        "description": "The result of the project's check command on one hand-in.",
+        "required": [
+          "passed",
+          "output",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the check finished."
+          },
+          "command": {
+            "type": "string",
+            "description": "The command that ran; empty when the checker never said which."
+          },
+          "output": {
+            "type": "string",
+            "description": "The command and the end of its output, as the worker reads it."
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      },
       "CheckPhase": {
         "oneOf": [
           {
@@ -10690,6 +10716,17 @@
               "null"
             ],
             "description": "The commit the ship's branch was at when the worker last handed in; `None` before the\nfirst hand-in, or when the host could not look."
+          },
+          "last_check": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CheckOutcome",
+                "description": "What the check command said about the current hand-in; `None` before it ran, when the\nproject has no check command, or after a new hand-in until it ran again."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "note": {
             "oneOf": [
