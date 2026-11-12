@@ -5,6 +5,8 @@ import type { Intent } from "../store/msg";
 import { draftOf, plannerOf } from "../store/planner";
 import type { State } from "../store/state";
 import { canTalk } from "../store/chat";
+import { canSend } from "../store/askAttach";
+import { AskChips, AttachButton, DropFrame, useAskAttach } from "./AskAttach";
 import { PromptField } from "./AskBox";
 import { DiffView } from "./DiffView";
 
@@ -34,6 +36,7 @@ export function Discuss({ state, card, project, dispatch }: { state: State; card
   const send = () => dispatch({ type: "discussCard", project, key: card.key });
   const decide = (id: string, action: "accept_edit" | "reject_edit") =>
     dispatch({ type: "threadAction", key: card.key, thread: String(thread?.thread.number ?? 1), action, text: id });
+  const a = useAskAttach(state, dispatch, { project, where: draftKey(card.key), prefix: card.key });
   if (!canTalk(card)) return null;
   return (
     <section className="discuss" data-testid="discuss">
@@ -72,14 +75,18 @@ export function Discuss({ state, card, project, dispatch }: { state: State; card
       )}
       {state.planner.error &&<p className="error" role="alert" data-testid="discuss-error">{state.planner.error}</p>}
       {running ? (
-        <form className="chat-box" data-testid="discuss-box" onSubmit={(e) => { e.preventDefault(); if (!waiting) send(); }}>
-          <PromptField
-            value={text} rows={2} label="Message to the assistant" testId="discuss-input" disabled={waiting}
-            placeholder="Ask about this card or say what to change; Enter sends"
-            onChange={(t) => dispatch({ type: "editPlannerDraft", where: draftKey(card.key), text: t })} onSubmit={() => { if (!waiting) send(); }}
-          />
-          <button type="submit" className="btn primary" data-testid="discuss-send" disabled={waiting || !text.trim()}>Send</button>
-        </form>
+        <DropFrame a={a} className="discuss-drop">
+          <form className="chat-box" data-testid="discuss-box" onSubmit={(e) => { e.preventDefault(); if (!waiting) send(); }}>
+            <PromptField
+              value={text} rows={2} label="Message to the assistant" testId="discuss-input" disabled={waiting}
+              placeholder="Ask about this card or say what to change; Enter sends"
+              onChange={(t) => dispatch({ type: "editPlannerDraft", where: draftKey(card.key), text: t })} onSubmit={() => { if (!waiting) send(); }}
+            />
+            <AttachButton busy={waiting || a.place.busy} onFiles={a.add} testId="discuss" />
+            <button type="submit" className="btn primary" data-testid="discuss-send" disabled={waiting || !canSend(state, draftKey(card.key), text)}>Send</button>
+          </form>
+          <AskChips a={a} project={project} testId="discuss" />
+        </DropFrame>
       ) : (
         <div className="chat-box" data-testid="discuss-off">
           <p className="muted">The assistant is not running, so there is nobody to talk to.</p>

@@ -4,6 +4,7 @@
 // the refusal of the last command, and what is typed to the assistant before it is sent.
 
 import type { PlannerState } from "../api/types";
+import { type AskAttachMsg, clearAttached, placeOf, reduceAskAttach, withAttached } from "./askAttach";
 import { draftKey } from "./discussion";
 import type { Effect } from "./msg";
 import type { State } from "./state";
@@ -64,7 +65,7 @@ export type PlannerResult =
   | { type: "plannerAsked"; project: string; draft?: string }
   | { type: "plannerFailed"; error: string };
 
-export type PlannerMsg = PlannerIntent | PlannerResult;
+export type PlannerMsg = PlannerIntent | PlannerResult | AskAttachMsg;
 
 export type PlannerEffect = {
   type: "plannerCall";
@@ -95,19 +96,21 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
   switch (msg.type) {
     case "editPlannerDraft":
       return [set({ drafts: { ...s.planner.drafts, [msg.where]: msg.text } }), []];
+    case "askAttach":
+      return reduceAskAttach(s, msg);
     case "askPlanner": {
-      const text = oneLine(s.planner.drafts[msg.project] ?? "");
-      if (!text || s.planner.sending) return [s, []];
+      const raw = withAttached(s.planner.drafts[msg.project] ?? "", placeOf(s, msg.project).chips);
+      if (!raw || s.planner.sending || placeOf(s, msg.project).busy) return [s, []];
       const running = plannerOf(s, msg.project)?.running ?? false;
       return [
         set({ error: "", sending: msg.project }),
-        [{ type: "plannerCall", project: msg.project, call: "ask", profile: s.planner.profile, text, raw: (s.planner.drafts[msg.project] ?? "").trim(), wait: !running }],
+        [{ type: "plannerCall", project: msg.project, call: "ask", profile: s.planner.profile, text: oneLine(raw), raw, wait: !running }],
       ];
     }
     case "discussCard": {
       const draft = draftKey(msg.key);
-      const text = (s.planner.drafts[draft] ?? "").trim();
-      if (!text || s.planner.sending) return [s, []];
+      const text = withAttached(s.planner.drafts[draft] ?? "", placeOf(s, draft).chips);
+      if (!text || s.planner.sending || placeOf(s, draft).busy) return [s, []];
       return [
         set({ error: "", sending: draft }),
         [{ type: "plannerCall", project: msg.project, call: "discuss", card: msg.key, draft, text, profile: s.planner.profile }],
@@ -121,7 +124,7 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
     case "nudgeChat":
       return [set({ error: "" }), [{ type: "plannerCall", project: msg.project, call: "nudge", text: oneLine(msg.text) }]];
     case "plannerAsked":
-      return [set({ sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } }), []];
+      return [{ ...clearAttached(s, msg.draft ?? msg.project), planner: { ...s.planner, sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } } }, []];
     case "startPlanner":
       return [
         set({ error: "" }),

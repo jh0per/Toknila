@@ -5,6 +5,7 @@ import type {
   TicketThreads,
 } from "../api/types";
 import type { AttachEffect, AttachIntent, AttachResult } from "./attach";
+import type { AskAttachMsg, AskUploadEffect } from "./askAttach";
 import type { AutostartEffect, AutostartIntent, AutostartResult } from "./autostart";
 import type { EdgeEffect, EdgeIntent, EdgeResult } from "./edges";
 import type { EpicEffect, EpicIntent, EpicResult } from "./epic";
@@ -51,7 +52,8 @@ export type Intent =
   | UpdateIntent
   | UsageIntent
   | FollowIntent
-  | AttachIntent;
+  | AttachIntent
+  | AskAttachMsg;
 
 /// What a person decides about the open subtasks left behind a card done out of order.
 export type LeftoverAction = "move" | "close" | "leave";
@@ -137,5 +139,6 @@ export type Effect =
   | UsageEffect
   | FollowEffect
   | AttachEffect
+  | AskUploadEffect
   | { type: "connect"; since: number; delayMs: number }
   | { type: "pushUrl"; path: string };
