@@ -2,22 +2,27 @@
 // apps/web/src/assets/guide/<section>-<scheme>.png.
 // Usage: node scripts/guide-shots.mjs <path to tok binary>   (cargo xtask guide-shots runs it)
 //
-// A throwaway daemon (a temporary TOKNILA_HOME, simulated agents, a temporary git repository) holds
+// A throwaway daemon (a temporary TOKNILA_HOME, the workspace's fake agent behind a real-agent
+// profile so no simulated-agent banner shows, a repository under a short path) holds
 // example data only: one project with a card waiting for review, a question, a blocked card, a
 // proposal and a finished chain that can be released. Nothing of the person's is read, and the
 // page loads nothing from the network. Commit the changed pictures with the change that moved a screen.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { checks, cleanup, launch, shipOf } from "../e2e/helpers.mjs";
 
-const tokBin = process.argv[2];
-if (!tokBin) {
-  console.error("usage: node scripts/guide-shots.mjs <tok binary>");
+const [tokBin, fakeAgent] = process.argv.slice(2).map((p) => (p ? resolve(p) : p));
+if (!tokBin || !fakeAgent) {
+  console.error("usage: node scripts/guide-shots.mjs <tok binary> <fake-agent binary>");
   process.exit(2);
 }
+// A short folder the field of the Add-a-project picture reads like a person's own.
+const shotsRoot = process.platform === "win32" ? join(tmpdir(), "toknila-guide") : "/tmp/toknila-guide";
+rmSync(shotsRoot, { recursive: true, force: true });
+mkdirSync(shotsRoot, { recursive: true });
 const out = resolve(import.meta.dirname, "../src/assets/guide");
 const home = mkdtempSync(join(tmpdir(), "toknila-guide-"));
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
@@ -29,12 +34,15 @@ const until = async (what, ok) => {
 };
 const chainFile = (name, version, cards) =>
   `[chain]\nname = "${name}"\nautostart = true\nversion = "${version}"\n` +
-  cards.map((c) => `\n[[ticket]]\nid = "${c.id}"\ntitle = "${c.title}"\nprofile = "sim"\n${c.after ? `after = ["${c.after}"]\n` : ""}`).join("");
+  cards.map((c) => `\n[[ticket]]\nid = "${c.id}"\ntitle = "${c.title}"\nprofile = "claude-code"\n${c.after ? `after = ["${c.after}"]\n` : ""}`).join("");
 
 let browser;
 try {
-  const repo = join(home, "example-app");
+  const repo = join(shotsRoot, "example-app");
   mkdirSync(repo);
+  // A user profile named like a real agent's, running the fake agent: it holds, as a working agent does.
+  mkdirSync(join(home, "profiles"), { recursive: true });
+  writeFileSync(join(home, "profiles", "claude-code.toml"), `command = ['${fakeAgent}', 'print', 'working', 'hold']\n`);
   git(repo, "init", "--quiet");
   git(repo, "symbolic-ref", "HEAD", "refs/heads/main");
   writeFileSync(join(repo, "README.md"), "Example app\n");
@@ -68,7 +76,7 @@ try {
   await shoot("add-project", t("add-project"));
 
   // The project and its example cards, after the picture: the form is not submitted by the script.
-  tok("project", "new", "APP", "--repo", repo, "--base", "main", "--check-command", "echo checked", "--merge", "local", "--sim");
+  tok("project", "new", "APP", "--repo", repo, "--base", "main", "--check-command", "echo checked", "--merge", "local", "--profile", "claude-code");
   tok("review-mode", "human", "--project", "APP");
   const chains = {
     shipped: ["0.1.0", [{ id: "ship", title: "Sign-in page" }]],
@@ -160,4 +168,5 @@ try {
 } finally {
   await browser?.close();
   await cleanup(tok, home);
+  rmSync(shotsRoot, { recursive: true, force: true });
 }

@@ -11,15 +11,29 @@ pub(crate) fn guide_shots() -> Result<(), String> {
     // must show the window as it is now.
     ensure_web_bundle(&web)?;
     cargo(&["build", "--locked", "--bin", "tok"])?;
+    cargo(&[
+        "build",
+        "--locked",
+        "-p",
+        "toknila-daemon",
+        "--bin",
+        "fake-agent",
+    ])?;
     let target = std::env::var_os("CARGO_TARGET_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| root.join("target"));
-    let tok = target
-        .join("debug")
-        .join(format!("tok{}", std::env::consts::EXE_SUFFIX))
-        .to_string_lossy()
-        .into_owned();
-    run("node", &["scripts/guide-shots.mjs", &tok], &web)?;
+    let exe = |name: &str| {
+        target
+            .join("debug")
+            .join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
+            .to_string_lossy()
+            .into_owned()
+    };
+    run(
+        "node",
+        &["scripts/guide-shots.mjs", &exe("tok"), &exe("fake-agent")],
+        &web,
+    )?;
     eprintln!("xtask guide-shots: pictures written to apps/web/src/assets/guide");
     Ok(())
 }
