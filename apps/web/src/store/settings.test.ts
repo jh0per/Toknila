@@ -69,6 +69,31 @@ describe("adding a project", () => {
     expect(again.settings.problems).toEqual([]);
   });
 
+  it("changing the folder removes its problems, the branches and the form's error", () => {
+    const problems = [
+      { field: "repo_path", code: "path_missing", message: "gone" },
+      { field: "work_branch", code: "branch_missing", message: "no branch" },
+    ] as RepoProblem[];
+    const [rejected] = reduce(typed(ready([])), { type: "addRejected", problems, branches: ["main"] });
+    const [failed] = reduce(rejected, { type: "settingsRejected", field: undefined, message: "broke" });
+    expect(formError(failed.settings)).toBe("broke");
+    const [s] = reduce(failed, { type: "editDraft", field: "repo_path", value: "/work/other" });
+    expect(s.settings.problems).toEqual([]);
+    expect(s.settings.branches).toEqual([]);
+    expect(s.settings.error).toBeUndefined();
+  });
+
+  it("changing the branch removes its problem and keeps the key's refusal", () => {
+    const problems = [{ field: "work_branch", code: "branch_missing", message: "no branch" }] as RepoProblem[];
+    const [rejected] = reduce(typed(ready([])), { type: "addRejected", problems, branches: ["main"] });
+    const [refused] = reduce(rejected, { type: "settingsRejected", field: "key", message: "taken" });
+    const [s] = reduce(refused, { type: "editDraft", field: "work_branch", value: "main" });
+    expect(fieldError(s.settings, "work_branch")).toBeUndefined();
+    expect(fieldError(s.settings, "key")).toBe("taken");
+    const [named] = reduce(refused, { type: "editDraft", field: "name", value: "X" });
+    expect(fieldError(named.settings, "key")).toBe("taken");
+  });
+
   it("an added project empties the form and closes its dialog", () => {
     const [open] = reduce(typed(ready([project({ id: "p0", key: "OLD" })])), {
       type: "openDialog", dialog: { kind: "addProject" },
