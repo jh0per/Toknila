@@ -21,6 +21,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: ["Esc"], what: "Close a menu or a dialog, or let go of what you picked" },
   { keys: ["Cmd/Ctrl", ","], what: "Open Settings" },
   { keys: ["Cmd/Ctrl", "."], what: "Show or hide the assistant beside the roadmap, an epic or a story" },
+  { keys: ["Cmd/Ctrl", "K"], what: "Switch project: open the project list, type to filter" },
   { keys: ["?"], what: "Show this list" },
 ];
 

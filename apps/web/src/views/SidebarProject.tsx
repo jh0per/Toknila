@@ -13,6 +13,11 @@ import { Chev, indent } from "./TreeRow";
 /// The letters in a project's badge: the first two of its key.
 const initials = (p: Project) => p.key.slice(0, 2).toUpperCase();
 
+/// A project's badge: its initials in a small square (the sidebar's rows and the switcher share it).
+export const projectBadge = (p: Project) => (
+  <span className="pbadge" aria-hidden="true" data-testid="project-badge" data-initials={initials(p)} />
+);
+
 /// What the Assistant row says it is: one assistant, at the roadmap and inside an epic.
 export const ASSISTANT_HINT = "plans epics on the roadmap, stories inside an epic";
 
@@ -72,7 +77,7 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
           <Chev open={open} />
         </button>
         <NavLink route={{ name: "project", project: key }} dispatch={dispatch} row title={project.name} className={`item${onScreen ? " cur" : ""}`}>
-          <span className="pbadge" aria-hidden="true" data-testid="project-badge" data-initials={initials(project)} />
+          {projectBadge(project)}
           <span className="t">{project.name}</span>
           {!open && running > 0 && <span className="dot pulse" role="img" aria-label="An agent is running" title="An agent is running" />}
           {!open && waiting > 0 && <span className="badge" title={`${waiting} waiting for you`} data-testid="project-waiting">{waiting}</span>}

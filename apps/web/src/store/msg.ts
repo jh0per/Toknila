@@ -22,6 +22,7 @@ import type { RoadmapEffect, RoadmapIntent, RoadmapResult } from "./roadmap";
 import type { Route, Tab } from "./route";
 import type { SettingsEffect, SettingsIntent, SettingsResult } from "./settings";
 import type { ShortcutIntent } from "./shortcuts";
+import type { SwitcherIntent } from "./switcher";
 import type { ThemeEffect, ThemeIntent } from "./theme";
 import type { UpdateEffect, UpdateIntent, UpdateResult } from "./updates";
 import type { UsageEffect, UsageIntent, UsageResult } from "./usage";
@@ -51,6 +52,7 @@ export type Intent =
   | ThemeIntent
   | AssistantIntent
   | ShortcutIntent
+  | SwitcherIntent
   | UpdateIntent
   | UsageIntent
   | FollowIntent

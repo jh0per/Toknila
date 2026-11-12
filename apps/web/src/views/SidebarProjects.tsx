@@ -3,6 +3,7 @@ import type { Project } from "../api/types";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import { type State, activeProjects, archivedProjects, currentProject } from "../store/state";
+import { sidebarOthers } from "../store/switcher";
 import { useChainMenu } from "./ChainMenu";
 import { ContextMenu } from "./ContextMenu";
 import { menuGroups } from "./menuGroups";
@@ -23,6 +24,11 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
   // The inbox and the usage page are about every project, so none is on the screen there.
   const global = (state.route.name === "inbox" && !state.route.project) || state.route.name === "usage";
   const project = global ? undefined : currentProject(state);
+  // The open project's tree and the other projects as collapsed rows; past three others, the rest
+  // wait behind one "+ N more" row that opens the switcher. The daemon's order stays.
+  const active = activeProjects(state);
+  const { shown, more } = sidebarOthers(active.filter((p) => p.id !== project?.id));
+  const listed = active.filter((p) => p.id === project?.id || shown.includes(p));
   const archived = archivedProjects(state);
   const show = state.plan.showArchived;
   const openMenu = (p: Project | undefined) => (e: MouseEvent) => {
@@ -49,7 +55,16 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
           +
         </button>
       </h2>
-      <ul role="tree" aria-label="Projects" className="tree">{activeProjects(state).map(node)}</ul>
+      <ul role="tree" aria-label="Projects" className="tree">
+        {listed.map(node)}
+        {more > 0 && (
+          <li role="none" className="more-projects">
+            <button type="button" className="item" data-testid="sidebar-more" onClick={() => dispatch({ type: "toggleSwitcher" })}>
+              <span className="t">+ {more} more project{more === 1 ? "" : "s"}</span>
+            </button>
+          </li>
+        )}
+      </ul>
       {archived.length > 0 && (
         <button
           type="button" className="link-btn" data-testid="show-archived"

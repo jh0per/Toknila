@@ -11,6 +11,7 @@ import { Canvas } from "./Canvas";
 import { DesignBoard } from "./DesignBoard";
 import { NavLink } from "./Link";
 import { PhaseChip } from "./PhaseChip";
+import { SwitcherButton } from "./ProjectSwitcher";
 import { PanelDivider } from "./PanelDivider";
 import { SimulatedBanner } from "./SimulatedBanner";
 import { Panel } from "./Panel";
@@ -30,9 +31,12 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
       <header className="top">
         <div className="crumb">
           {project ? (
-            <NavLink route={{ name: "project", project: project.key }} dispatch={dispatch} testId="crumb-roadmap" className="crumb-link">
-              <b>{project.key}</b>
-            </NavLink>
+            <>
+              <SwitcherButton project={project} state={state} dispatch={dispatch} /><i>/</i>
+              <NavLink route={{ name: "project", project: project.key }} dispatch={dispatch} testId="crumb-roadmap" className="crumb-link">
+                <b>Roadmap</b>
+              </NavLink>
+            </>
           ) : <b />}
           <i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
           {chain.summary.version && <span className="ver" data-testid="chain-version-top">{versionText(chain.summary)}</span>}

@@ -143,6 +143,42 @@ try {
   const tabStops = await page.locator("[data-testid=projects] [data-row][tabindex='0']").count();
   must(tabStops === 1, `the tree has one tab stop (${tabStops})`);
 
+  // The project switcher in the top bar: a menu of projects, filtered by typing, the screen kind kept.
+  const t = (id) => page.locator(`[data-testid=${id}]`);
+  await page.goto(url.replace("/?", "/projects/TRA?"));
+  await t("project-switcher").waitFor();
+  await expectText(t("project-switcher"), "TRA", "the crumb's project segment is the switcher button");
+  await t("project-switcher").click();
+  await t("switcher-menu").waitFor();
+  must((await t("switcher-item-TRA").getAttribute("data-current")) === "true", "the project on the screen is marked in the menu");
+  must((await t("switcher-item-TRB").getAttribute("data-current")) === null, "the other project is not marked");
+  must((await t("switcher-all").count()) === 1 && (await t("switcher-add").count()) === 1, "the menu has All projects and Add project");
+  await page.keyboard.press("Escape");
+  await t("switcher-menu").waitFor({ state: "detached" });
+  must(true, "Escape closes the menu");
+  await t("project-switcher").click();
+  await t("switcher-filter").fill("trb");
+  must((await t("switcher-item-TRA").count()) === 0 && (await t("switcher-item-TRB").count()) === 1, "typing filters the projects");
+  await page.keyboard.press("Enter");
+  await expectPath("/projects/TRB", "choosing a project from the roadmap opens its roadmap");
+  await t("switcher-menu").waitFor({ state: "detached" });
+
+  // The key opens it from a screen without the crumb, and the same screen opens in the other project.
+  await page.goto(url.replace("/?", "/projects/TRA/settings/designs?"));
+  await page.keyboard.press("Control+k");
+  await t("switcher-menu").waitFor();
+  await t("switcher-filter").fill("trb");
+  await t("switcher-item-TRB").click();
+  await expectPath("/projects/TRB/settings/designs", "Ctrl+K opens the switcher and the settings screen is kept across projects");
+  await page.keyboard.press("Control+k");
+  await t("switcher-all").click();
+  await expectPath("/settings", "All projects opens the machine's Projects list");
+  await page.keyboard.press("Control+k");
+  await t("switcher-add").click();
+  await page.locator("[role=dialog]").first().waitFor({ timeout: 10_000 });
+  must(true, "Add project opens the add-project dialog");
+  await page.keyboard.press("Escape");
+
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
   console.log("web sidebar-tree: PASS");
 } catch (e) {

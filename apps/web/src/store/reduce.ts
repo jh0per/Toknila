@@ -18,6 +18,7 @@ import { reduceRoadmap } from "./roadmap";
 import { type Dialog, reducePlan, withChain } from "./plan";
 import { ONBOARDING_DRAFT, loadPlanner, reducePlanner } from "./planner";
 import { reduceShortcuts } from "./shortcuts";
+import { reduceSwitcher } from "./switcher";
 import { initialRelease, reduceRelease } from "./release";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
@@ -304,6 +305,9 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "toggleShortcuts":
     case "closeShortcuts":
       return [reduceShortcuts(s, msg), []];
+    case "toggleSwitcher":
+    case "closeSwitcher":
+      return [reduceSwitcher(s, msg), []];
     case "backFromOpened":
       return s.opened ? go(s, s.opened.back) : [s, []];
     case "dismissOpened":

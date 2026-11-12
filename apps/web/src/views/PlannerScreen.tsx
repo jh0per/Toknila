@@ -5,6 +5,7 @@ import { suggestionOfProject } from "../store/suggestion";
 import { NavLink } from "./Link";
 import { PlannerPanel } from "./PlannerPanel";
 import { SuggestionRow } from "./SuggestionRow";
+import { SwitcherButton } from "./ProjectSwitcher";
 import { ThemeButton } from "./ThemeButton";
 
 /// The assistant's own screen, at /projects/KEY/planner: the chat of the panel at full width, with
@@ -16,7 +17,7 @@ export function PlannerScreen({ project, state, dispatch }: { project: Project; 
     <>
       <header className="top">
         <div className="crumb">
-          <b>{project.key}</b><i>/</i><b data-testid="planner-title">Assistant</b>
+          <SwitcherButton project={project} state={state} dispatch={dispatch} /><i>/</i><b data-testid="planner-title">Assistant</b>
         </div>
         <NavLink
           route={{ name: "project", project: project.key }} dispatch={dispatch} className="btn" testId="planner-collapse"
