@@ -2,6 +2,7 @@
 // that list, and how the arrow keys move between the tabs of a tab list.
 
 import type { State } from "./state";
+import { type SwitcherIntent, reduceSwitcher } from "./switcher";
 
 /// What the person did.
 export type ShortcutIntent = { type: "toggleShortcuts" } | { type: "closeShortcuts" };
@@ -21,11 +22,13 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: ["Esc"], what: "Close a menu or a dialog, or let go of what you picked" },
   { keys: ["Cmd/Ctrl", ","], what: "Open Settings" },
   { keys: ["Cmd/Ctrl", "."], what: "Show or hide the assistant beside the roadmap, an epic or a story" },
+  { keys: ["Cmd/Ctrl", "K"], what: "Switch project: open the project list, type to filter" },
   { keys: ["?"], what: "Show this list" },
 ];
 
-/// The reducer of the shortcuts popover.
-export function reduceShortcuts(s: State, msg: ShortcutIntent): State {
+/// The reducer of the keyboard's two popups: the shortcuts list and the project switcher.
+export function reduceShortcuts(s: State, msg: ShortcutIntent | SwitcherIntent): State {
+  if (msg.type === "toggleSwitcher" || msg.type === "closeSwitcher") return reduceSwitcher(s, msg);
   return { ...s, shortcutsOpen: msg.type === "toggleShortcuts" ? !s.shortcutsOpen : false };
 }
 

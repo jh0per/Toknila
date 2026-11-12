@@ -7,6 +7,7 @@ import { type State, chainsOf } from "../store/state";
 import { epicTitle } from "../store/title";
 import { AssistantButton } from "./AssistantButton";
 import { NavLink } from "./Link";
+import { SwitcherButton } from "./ProjectSwitcher";
 import { SpendLine } from "./SpendLine";
 import { ThemeButton } from "./ThemeButton";
 
@@ -134,7 +135,7 @@ export function Roadmap({ project, state, dispatch }: { project: Project; state:
     <>
       <header className="top">
         <div className="crumb">
-          <b>{project.key}</b><i>/</i><b data-testid="roadmap-title">Roadmap</b>
+          <SwitcherButton project={project} state={state} dispatch={dispatch} /><i>/</i><b data-testid="roadmap-title">Roadmap</b>
         </div>
         <SpendLine state={state} dispatch={dispatch} />
         <span className="muted">{finished.length + rest.length} epics</span>

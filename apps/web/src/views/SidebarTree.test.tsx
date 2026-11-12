@@ -86,6 +86,18 @@ describe("the sidebar tree", () => {
     for (const n of ["usage", "settings", "guide", "shortcuts"]) expect(foot).toContain(`data-icon="${n}"`);
     expect(foot).toContain("<kbd>?</kbd>");
   });
+  it("lists three other projects as rows and folds the rest into one '+ N more' row", () => {
+    expect(html(world())).not.toContain("sidebar-more");
+    const s = world();
+    const extra = ["DDD", "EEE", "FFF"].map((k) => project(`p${k}`, k));
+    const h = html({ ...s, projects: [...s.projects, ...extra] });
+    // AAA is on the screen, BBB, DDD and EEE are the three rows, FFF waits behind the count.
+    for (const k of ["AAA", "BBB", "DDD", "EEE"]) expect(h).toContain(`data-project="${k}"`);
+    expect(h).not.toContain('data-project="FFF"');
+    expect(h).toContain("+ 1 more project<");
+    const two = html({ ...s, projects: [...s.projects, ...["DDD", "EEE", "FFF", "GGG"].map((k) => project(`p${k}`, k))] });
+    expect(two).toContain("+ 2 more projects<");
+  });
   it("lists an archived project only when asked", () => {
     expect(html(world())).not.toContain('data-project="CCC"');
     const s = world();

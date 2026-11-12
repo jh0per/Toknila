@@ -95,6 +95,8 @@ export interface State {
   assistant: AssistantSlice;
   /// The "?" list of keyboard shortcuts is open.
   shortcutsOpen: boolean;
+  /// The project switcher's menu (top bar) is open.
+  switcherOpen: boolean;
   /// The card the assistant just opened here, while its notice (with Back) is up.
   opened: OpenedCard | undefined;
 }
@@ -142,6 +144,7 @@ export function initialState(route: Route): State {
     theme: "system",
     assistant: initialAssistant,
     shortcutsOpen: false,
+    switcherOpen: false,
     opened: undefined,
   };
 }
