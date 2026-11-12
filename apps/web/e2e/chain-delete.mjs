@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -42,7 +42,7 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   const { expectText } = checks(page);
   const shot = async (name) => {
-    if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: join(process.env.SCREENSHOT_DIR, `${name}.png`) });
+    await shoot(page, name);
   };
   const item = (name) => page.locator(`[data-testid=chains] li[data-chain-item="${name}"]`);
   const chains = () => JSON.parse(tok("chain", "ls", "--json")).map((c) => c.chain.name).sort();

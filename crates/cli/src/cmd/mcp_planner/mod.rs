@@ -4,11 +4,10 @@
 //! token; the daemon's use cases decide, so a refused call comes back as the tool's error text.
 //! There is no tool that starts, pauses, resumes, cancels, accepts, returns, reopens or merges.
 
-use serde::Deserialize;
 use serde_json::Value;
 use toknila_api_types::{
-    CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewDesignPin, NewMessage, NewPlanChain,
-    NewSuggestion, NewThread, NewVersion, TicketDetail,
+    CardEdit, ChainDetail, EdgeInput, EditPlanChain, MoveInput, NewCard, NewDesignPin, NewMessage,
+    NewPlanChain, NewSuggestion, NewThread, NewVersion, TicketDetail,
 };
 use toknila_client::Client;
 use toknila_core::graph::Place;
@@ -17,11 +16,16 @@ use toknila_core::{ArtifactFormat, EdgeKind, NodeRef, ThreadKind};
 use super::mcp_tools::ToolError;
 
 mod answer;
+mod args;
 mod scope;
 mod strict;
 mod tools;
 
 pub(super) use answer::Answer;
+use args::{
+    AddCard, Dependency, EditCard, EditChain, Move, OpenThread, ShowCard, ShowDesign,
+    ThreadMessage, ThreadVersion,
+};
 use scope::{PlanScope, plan_scope};
 use strict::{args, refuse_unknown_keys};
 
@@ -36,6 +40,10 @@ pub(super) enum PlannerCall {
         design: String,
     },
     NewChain(NewPlanChain),
+    EditChain {
+        chain: String,
+        edit: EditPlanChain,
+    },
     AddCard {
         chain: String,
         card: NewCard,
@@ -83,67 +91,6 @@ pub(super) enum PlannerCall {
     },
 }
 
-#[derive(Deserialize)]
-struct AddCard {
-    chain: String,
-    #[serde(flatten)]
-    card: NewCard,
-}
-
-#[derive(Deserialize)]
-struct EditCard {
-    card: String,
-    #[serde(flatten)]
-    edit: CardEdit,
-}
-
-#[derive(Deserialize)]
-struct ShowCard {
-    card: String,
-}
-
-#[derive(Deserialize)]
-struct ShowDesign {
-    design: String,
-}
-
-#[derive(Deserialize)]
-struct Dependency {
-    chain: String,
-    from: String,
-    to: String,
-}
-
-#[derive(Deserialize)]
-struct Move {
-    chain: String,
-    card: String,
-    anchor: String,
-    place: Place,
-}
-
-#[derive(Deserialize)]
-struct OpenThread {
-    card: String,
-    kind: ThreadKind,
-    title: String,
-}
-
-#[derive(Deserialize)]
-struct ThreadMessage {
-    card: String,
-    thread: String,
-    text: String,
-}
-
-#[derive(Deserialize)]
-struct ThreadVersion {
-    card: String,
-    thread: String,
-    format: ArtifactFormat,
-    body: String,
-}
-
 /// The call a tool name and its arguments mean.
 pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolError> {
     let tools = list();
@@ -158,6 +105,10 @@ pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolErr
             PlannerCall::ShowDesign { design }
         }
         "new_chain" => PlannerCall::NewChain(args(arguments)?),
+        "edit_chain" => {
+            let EditChain { chain, edit } = args(arguments)?;
+            PlannerCall::EditChain { chain, edit }
+        }
         "add_card" => {
             let AddCard { chain, card } = args(arguments)?;
             PlannerCall::AddCard { chain, card }
@@ -285,6 +236,16 @@ fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
                 d.chain.name
             ))
         }
+        PlannerCall::EditChain { chain, edit } => client
+            .planner_edit_chain(chain, edit)
+            .map(|d| {
+                format!(
+                    "chain {} updated (version {})",
+                    d.chain.name,
+                    d.chain.version.as_deref().unwrap_or("none")
+                )
+            })
+            .map_err(e),
         PlannerCall::AddCard { chain, card } => client
             .planner_add_card(chain, card)
             .map(|d| card_line("added", &d))
@@ -403,9 +364,10 @@ mod tests {
     }
 
     #[test]
-    fn the_planner_has_its_fourteen_tools_and_none_that_starts_or_accepts_anything() {
+    fn the_planner_has_its_fifteen_tools_and_none_that_starts_or_accepts_anything() {
         let names = names();
-        assert_eq!(names.len(), 14, "{names:?}");
+        assert_eq!(names.len(), 15, "{names:?}");
+        assert!(names.iter().any(|n| n == "edit_chain"));
         assert!(names.iter().any(|n| n == "design_question"));
         for forbidden in [
             "start", "pause", "resume", "cancel", "accept", "return", "reopen", "merge", "approve",
@@ -464,6 +426,15 @@ mod tests {
         assert!(matches!(
             c("new_chain", json!({ "name": "plan", "goal": "g" })),
             PlannerCall::NewChain(n) if n.name == "plan" && n.goal.as_deref() == Some("g")
+        ));
+        assert!(matches!(
+            c("new_chain", json!({ "name": "plan", "version": "0.4.0" })),
+            PlannerCall::NewChain(n) if n.version.as_deref() == Some("0.4.0")
+        ));
+        assert!(matches!(
+            c("edit_chain", json!({ "chain": "plan", "version": "0.5.0", "goal": "g" })),
+            PlannerCall::EditChain { chain, edit }
+                if chain == "plan" && edit.version.as_deref() == Some("0.5.0") && edit.name.is_none()
         ));
         let PlannerCall::AddCard { chain, card } = c(
             "add_card",

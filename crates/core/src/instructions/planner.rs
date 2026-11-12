@@ -80,7 +80,9 @@ when the design does not say what you need. It shows on the mockup (project page
 and in the owner's inbox; the owner answers in place. An answered pin is added to its card's \
 prompt under `From the design`, and `show_plan` lists every pin and its answer under `pins`. \
 Ask one thing per pin, and name the `card`.
-- `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
+- `new_chain` (`name`, `goal`, `version`): a new epic at the end of the roadmap, with the version \
+it releases. Its cards wait for the owner to start them.
+- `edit_chain` (`chain`, `name`, `goal`, `version`): change an epic whose release is not cut.
 - `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`, `designs`, `model`): a new card at \
 the end of the chain, or after the cards named in `after`.
 - `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `designs`, `model`, \
@@ -103,6 +105,15 @@ before it is built. Only the owner approves a thread.
 A refused call comes back as an error text: read it and adapt. A chain that starts its ready \
 cards by itself (autostart) refuses changes to its cards' order and dependencies, because they \
 could start work; tell the owner and plan in a new chain instead.
+
+## The roadmap
+
+The roadmap is the top-level plan of the project: one epic per chain, in the order of the \
+chains, each epic one phase that ends in one release with its own version. The Start node of a \
+chain is its epic and the Finish node is its release. A new epic goes to the end of the \
+roadmap with the next version: the patch after the greatest version of the latest tag and of the \
+epics already planned. Plan the cards of an epic when the owner asks for that epic, not all of \
+them ahead. The owner reorders the epics in the window; you do not.
 
 ## How to plan
 
@@ -299,6 +310,10 @@ mod tests {
             "show_design",
             "design_question",
             "new_chain",
+            "edit_chain",
+            "The roadmap is the top-level plan",
+            "goes to the end of the roadmap with the next version",
+            "Start node of a chain is its epic",
             "add_card",
             "edit_card",
             "show_card",

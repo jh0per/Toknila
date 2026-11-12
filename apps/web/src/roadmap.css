@@ -1,0 +1,56 @@
+/* The roadmap: a project's epics as a sequence from left to right, joined by lines. */
+.ide > main.roadmap-page { grid-template-rows: auto minmax(0, 1fr); }
+.crumb-link { color: inherit; text-decoration: none; }
+.crumb-link:hover { text-decoration: underline; }
+.roadmap { padding: var(--sp6) var(--sp4); overflow: auto; }
+.rm-road { list-style: none; margin: 0; padding: var(--sp1) var(--sp1) var(--sp3); display: flex; align-items: stretch; }
+.rm-join { flex: 0 0 var(--sp5); align-self: center; height: 2px; background: var(--outline-variant); }
+.rm-join.cur { background: var(--primary); }
+.rm-node {
+  position: relative; flex: 0 0 176px; box-sizing: border-box; background: var(--surface-container);
+  border: 1px solid var(--outline-variant); border-radius: var(--shape-m); color: var(--on-surface);
+}
+.rm-node[data-active] {
+  border: 2px solid var(--primary); background: var(--primary-container); box-shadow: var(--e2);
+}
+.rm-node[data-phase="finished"], .rm-node[data-phase="released"] { --bar: var(--status-done); }
+.rm-node.dragging { opacity: 0.55; }
+.rm-node.drop { outline: 2px solid var(--primary); outline-offset: 2px; }
+.rm-body {
+  display: grid; grid-template-columns: 1fr auto; gap: var(--sp1) var(--sp2); padding: var(--sp2) var(--sp3);
+  color: inherit; text-decoration: none; cursor: pointer; border-radius: inherit;
+}
+.rm-top { grid-column: 1 / -1; display: flex; align-items: baseline; gap: var(--sp2); padding-right: var(--sp5); min-width: 0; }
+.rm-name { font-size: var(--fs-title-m); font-weight: var(--fw-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-phase, .rm-count { font-size: var(--fs-label-m); color: var(--on-surface-variant); }
+.rm-node[data-active] .rm-phase { color: var(--on-primary-container); }
+.rm-count { text-align: right; }
+.rm-bar { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: var(--outline-variant); overflow: hidden; }
+.rm-bar i { display: block; height: 100%; background: var(--bar, var(--status-prog)); }
+.rm-kebab {
+  position: absolute; top: var(--sp1); right: var(--sp1); width: var(--sp6); height: var(--sp6); border: 0; background: none;
+  color: var(--on-surface-variant); border-radius: var(--shape-full); cursor: pointer;
+}
+.rm-kebab:hover { background: var(--surface-container-high); }
+.rm-menu {
+  position: absolute; z-index: 5; top: var(--sp8); right: var(--sp1); min-width: 150px; padding: var(--sp1) 0;
+  background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-s); box-shadow: var(--e3);
+}
+.rm-menu button {
+  display: block; width: 100%; text-align: left; padding: var(--sp2) var(--sp3); border: 0; background: none;
+  color: var(--on-surface); font-size: var(--fs-body-m); cursor: pointer;
+}
+.rm-menu button:hover:not(:disabled) { background: var(--primary-container); }
+.rm-menu button:disabled { opacity: var(--state-disabled); cursor: default; }
+.rm-fold, .rm-new { flex: 0 0 132px; box-sizing: border-box; display: flex; }
+.rm-fold button, .rm-new button {
+  flex: 1; border-radius: var(--shape-m); padding: var(--sp2) var(--sp3); cursor: pointer; text-align: left; font: inherit;
+}
+.rm-fold button { border: 1px dashed var(--outline); background: var(--status-done-container); color: var(--on-surface); }
+.rm-fold small { display: block; color: var(--on-surface-variant); font-size: var(--fs-label-m); }
+.rm-new button { border: 1px dashed var(--primary); background: none; color: var(--primary); font-weight: var(--fw-semibold); text-align: center; min-height: 64px; }
+@media (max-width: 639px) {
+  .rm-road { flex-direction: column; }
+  .rm-join { flex: 0 0 var(--sp4); width: 2px; height: auto; align-self: center; }
+  .rm-node, .rm-fold, .rm-new { flex: 0 0 auto; }
+}

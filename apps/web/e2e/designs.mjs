@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -57,7 +57,7 @@ try {
   }, undefined, { timeout: 10_000 });
   if (!(await loaded())) throw new Error("the thumbnail did not load");
   console.log("PASS the dropped png is a card with a thumbnail the daemon served");
-  if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: join(process.env.SCREENSHOT_DIR, "designs.png") });
+  await shoot(page, "designs");
 
   // A Figma link without a token is kept, with the hint.
   await t("figma-url").fill("https://www.figma.com/design/AbC123/App?node-id=1-2");

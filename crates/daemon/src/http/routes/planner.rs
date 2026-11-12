@@ -8,7 +8,9 @@ use axum::Extension;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use toknila_api_types::{PlanCard, PlanChain, PlannerDesign, PlannerOverview, PlannerPlan};
-use toknila_app::planner::{self, CardEdit, DesignPick, NewCard, NewPlanChain, NewSuggestion};
+use toknila_app::planner::{
+    self, CardEdit, DesignPick, EditPlanChain, NewCard, NewPlanChain, NewSuggestion,
+};
 use toknila_app::threads::{self, NewMessage, NewThread, NewVersion};
 use toknila_core::design::DesignRef;
 use toknila_core::suggestion::Suggestion;
@@ -126,6 +128,25 @@ pub async fn planner_new_chain(
     })
     .await?;
     Ok((StatusCode::CREATED, Json(detail)))
+}
+
+#[utoipa::path(patch, path = "/planner/chains/{chain}", tag = "planner", request_body = EditPlanChain,
+    params(("chain" = String, Path, description = CHAIN)),
+    responses((status = 200, body = ChainDetail), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Changes the name, goal and version of a chain of the planner's project whose release is not
+/// cut.
+pub async fn planner_edit_chain(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Path(chain): Path<String>,
+    Json(edit): Json<EditPlanChain>,
+) -> ApiResult<Json<ChainDetail>> {
+    let project = principal.planner_project()?;
+    let detail = chain_write(&state, Actor::Agent, move |tx| {
+        Ok(planner::edit_chain(tx, project, &chain, edit)?)
+    })
+    .await?;
+    Ok(Json(detail))
 }
 
 /// The designs a planner named, found in its project's library (a design the project lacks is a

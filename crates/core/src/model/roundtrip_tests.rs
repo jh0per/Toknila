@@ -93,6 +93,7 @@ fn chain_and_edges_roundtrip() {
         review_mode: None,
         reviewer: None,
         source: None,
+        position: 0,
         version: None,
     };
     roundtrip(&chain);

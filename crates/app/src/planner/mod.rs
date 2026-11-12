@@ -92,9 +92,12 @@ pub fn card<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> A
 pub struct NewPlanChain {
     pub name: String,
     pub goal: Option<String>,
+    /// The version the epic releases (`0.4.0`); the roadmap suggests the next one.
+    #[serde(default)]
+    pub version: Option<String>,
 }
 
-/// A new chain in the planner's project.
+/// A new chain (epic) at the end of the planner's project's roadmap.
 pub fn new_chain<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     project: ProjectId,
@@ -106,9 +109,47 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
         autostart: Some(planner::NEW_CHAIN_AUTOSTART),
         review_mode: None,
         reviewer: None,
-        version: None,
+        version: input.version,
     };
     chains::create(uow, &project.to_string(), input)
+}
+
+/// What the planner may change on an epic: a field left out is kept.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct EditPlanChain {
+    pub name: Option<String>,
+    pub goal: Option<String>,
+    pub version: Option<String>,
+}
+
+/// Changes the name, goal and version of a chain of the planner's project whose release is not
+/// cut; a cut or released epic is the owner's.
+pub fn edit_chain<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    project: ProjectId,
+    chain_ref: &str,
+    edit: EditPlanChain,
+) -> AppResult<ChainId> {
+    let c = chain(uow, project, chain_ref)?;
+    let view = uow
+        .chain_view(c.id)?
+        .ok_or_else(|| AppError::not_found(format!("chain {chain_ref}")))?;
+    if let Some(r) = view.finish_release()
+        && r.state != toknila_core::ReleaseState::Planned
+    {
+        return Err(AppError::conflict(format!(
+            "release {} of chain {} is cut or released: the epic can no longer change",
+            r.version, c.name
+        )));
+    }
+    let settings = crate::epic::ChainSettings {
+        name: edit.name,
+        goal: edit.goal,
+        version: edit.version,
+        ..Default::default()
+    };
+    crate::epic::set_settings(uow, &c.id.to_string(), None, settings)
 }
 
 /// Makes `to` wait for `from` in a chain of the planner's project.

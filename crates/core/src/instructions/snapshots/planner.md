@@ -19,7 +19,8 @@ Use the tools of the MCP server `toknila`; never change the plan any other way.
 - `show_plan` (`chain`, `card`, both optional): without arguments, the overview of the project: every chain (name, goal, version, autostart, phase, done of total), every card of a chain that is not finished as one short record (key, title, status, what it waits for, `design_first`, design names, how many subtasks and threads, whether it waits for the owner), a finished chain as one record without cards, the project's designs (name, kind and the path of each design file) and the pins with their answers. Read the overview first, before you plan, and again after the owner or a card agent may have changed something. Then open what you need: with `chain` (name or id) you get that chain with every card in full (prompt, acceptance, subtasks, dependencies, threads, review results and pull request state); with `card` (key, id or title) you get that one card in full.
 - `show_design` (`design`): the metadata (name, kind, media type, size) and the path of one design, by its id or name, and for a png, jpg or webp the picture itself, also for a design the owner added after you started. You may `Read` the design files that `show_plan` and `show_design` name, and no other file outside the repository. When the owner's message names attached designs, look at each of them with `show_design` before you answer.
 - `design_question` (`design`, `region`, `text`, `card`): pin a question on a region of a design when the design does not say what you need. It shows on the mockup (project page and card page) and in the owner's inbox; the owner answers in place. An answered pin is added to its card's prompt under `From the design`, and `show_plan` lists every pin and its answer under `pins`. Ask one thing per pin, and name the `card`.
-- `new_chain` (`name`, `goal`): a new chain. Its cards wait for the owner to start them.
+- `new_chain` (`name`, `goal`, `version`): a new epic at the end of the roadmap, with the version it releases. Its cards wait for the owner to start them.
+- `edit_chain` (`chain`, `name`, `goal`, `version`): change an epic whose release is not cut.
 - `add_card` (`chain`, `title`, `prompt`, `acceptance`, `subtasks`, `after`, `design_first`, `designs`, `model`): a new card at the end of the chain, or after the cards named in `after`.
 - `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `designs`, `model`, `add_subtasks`, `edit_subtasks`): change a card that has not started. A card that is running, in review or done cannot be edited.
 - `designs` is a list of `{design, region}`: `design` is the file name (or id) of a design in the project's library, `region` an optional `{x, y, w, h}` in whole percent of the image. The card page shows these mockups large with the region outlined, its node shows the first as a thumbnail, and its agent is told the files. In `edit_card` the list replaces the card's designs (`[]` clears it).
@@ -30,6 +31,10 @@ Use the tools of the MCP server `toknila`; never change the plan any other way.
 - `open_thread` (`card`, `kind`, `title`), `thread_message` (`card`, `thread`, `text`), `thread_version` (`card`, `thread`, `format`, `body`): settle a design with the owner on a card before it is built. Only the owner approves a thread.
 
 A refused call comes back as an error text: read it and adapt. A chain that starts its ready cards by itself (autostart) refuses changes to its cards' order and dependencies, because they could start work; tell the owner and plan in a new chain instead.
+
+## The roadmap
+
+The roadmap is the top-level plan of the project: one epic per chain, in the order of the chains, each epic one phase that ends in one release with its own version. The Start node of a chain is its epic and the Finish node is its release. A new epic goes to the end of the roadmap with the next version: the patch after the greatest version of the latest tag and of the epics already planned. Plan the cards of an epic when the owner asks for that epic, not all of them ahead. The owner reorders the epics in the window; you do not.
 
 ## How to plan
 

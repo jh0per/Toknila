@@ -150,6 +150,7 @@ fn view(tickets: Vec<Ticket>, edges: &[(usize, usize)]) -> ChainView {
         review_mode: None,
         reviewer: None,
         source: None,
+        position: 0,
         version: None,
     };
     let edges = edges

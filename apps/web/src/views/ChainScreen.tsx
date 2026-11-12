@@ -28,7 +28,12 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
     <>
       <header className="top">
         <div className="crumb">
-          <b>{project?.key ?? ""}</b><i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
+          {project ? (
+            <NavLink route={{ name: "project", project: project.key }} dispatch={dispatch} testId="crumb-roadmap" className="crumb-link">
+              <b>{project.key}</b>
+            </NavLink>
+          ) : <b />}
+          <i>/</i><b data-testid="chain-name-top">{chain.chain.name}</b>
           {chain.summary.version && <span className="ver" data-testid="chain-version-top">{versionText(chain.summary)}</span>}
         </div>
         <nav className="view-switch" aria-label="View" data-testid="view-switch">

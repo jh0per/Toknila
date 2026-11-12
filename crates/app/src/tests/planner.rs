@@ -10,8 +10,8 @@ use toknila_core::{
 use super::Mem;
 use super::runs::with_agents;
 use crate::planner::{
-    self, CardEdit, NewCard, NewPlanChain, SubtaskEdit, add_card, add_dependency, edit_card,
-    move_card, new_chain, open_thread, remove_dependency,
+    self, CardEdit, EditPlanChain, NewCard, NewPlanChain, SubtaskEdit, add_card, add_dependency,
+    edit_card, edit_chain, move_card, new_chain, open_thread, remove_dependency,
 };
 use crate::recovery::recover;
 use crate::{ErrorKind, Runner, threads};
@@ -77,12 +77,62 @@ fn a_new_chain_never_starts_its_cards_by_itself() {
         NewPlanChain {
             name: "plan".to_owned(),
             goal: Some("g".to_owned()),
+            version: Some("v0.4.0".to_owned()),
         },
     )
     .expect("chain");
     assert_eq!(mem.view.chain.id, id);
     assert!(!mem.view.chain.autostart);
     assert_eq!(mem.view.chain.project_id, p);
+    assert_eq!(mem.view.chain.version.as_deref(), Some("0.4.0"));
+}
+
+#[test]
+fn the_planner_edits_name_goal_and_version_of_an_epic_whose_release_is_not_cut() {
+    let mut mem = manual_demo();
+    let p = project(&mem);
+    new_chain(
+        &mut mem,
+        p,
+        NewPlanChain {
+            name: "plan".to_owned(),
+            version: Some("0.4.0".to_owned()),
+            ..NewPlanChain::default()
+        },
+    )
+    .expect("chain");
+    edit_chain(
+        &mut mem,
+        p,
+        "plan",
+        EditPlanChain {
+            name: Some("phase-4".to_owned()),
+            goal: Some("ship it".to_owned()),
+            version: Some("0.5.0".to_owned()),
+        },
+    )
+    .expect("edit");
+    let c = &mem.view.chain;
+    assert_eq!(
+        (c.name.as_str(), c.goal.as_str(), c.version.as_deref()),
+        ("phase-4", "ship it", Some("0.5.0"))
+    );
+    assert_eq!(mem.view.finish_release().expect("release").version, "0.5.0");
+
+    let end = mem.view.finish_release().expect("release").id;
+    mem.view.cut_release(end, mem.now).expect("cut");
+    let refused = edit_chain(
+        &mut mem,
+        p,
+        "phase-4",
+        EditPlanChain {
+            name: Some("other".to_owned()),
+            ..EditPlanChain::default()
+        },
+    )
+    .expect_err("cut");
+    assert_eq!(refused.kind, ErrorKind::Conflict);
+    assert_eq!(mem.view.chain.name, "phase-4");
 }
 
 #[test]
