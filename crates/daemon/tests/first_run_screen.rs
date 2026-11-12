@@ -201,6 +201,11 @@ fn waits_on_screen(c: &Value) -> bool {
     c["status"] == "waiting" && c["status_reason"]["kind"] == "screen"
 }
 
+/// Not on Windows: ConPTY turns the Down arrow written to the pty into a key event, and a plain
+/// stdin reader (the fake agent) in the console's cooked mode never sees it, so `trust=yes` cannot
+/// arrive there; the real agent enables virtual-terminal input and reads it. The waiting and the
+/// no-nudge rules are covered by the other test of this file on every platform.
+#[cfg(not(windows))]
 #[tokio::test]
 async fn a_trust_dialog_waits_for_a_person_is_never_nudged_and_the_chosen_answer_reaches_the_terminal()
  {
