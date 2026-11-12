@@ -114,8 +114,9 @@ describe("adding a project", () => {
   it("the first project leads into the assistant instead", () => {
     const [s, fx] = reduce(ready([]), { type: "projectAdded", project: project() });
     expect(s.projects.map((p) => p.key)).toEqual(["DEMO"]);
-    expect(s.route).toEqual({ name: "planner", project: "DEMO" });
-    expect(fx).toContainEqual({ type: "pushUrl", path: "/projects/DEMO/planner" });
+    expect(s.route).toEqual({ name: "project", project: "DEMO" });
+    expect(s.assistant.open).toBe(true);
+    expect(fx).toContainEqual({ type: "pushUrl", path: "/projects/DEMO" });
     expect(fx).toContainEqual({ type: "loadAgents" });
   });
 });

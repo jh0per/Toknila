@@ -30,7 +30,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  const { expectPath } = checks(page);
+  const { expectPath, expectText } = checks(page);
   const node = (key) => page.locator(`[data-testid=projects] li[data-project=${key}]`);
   const rowOf = (key) => page.locator(`[data-testid=projects] li[data-project=${key}] > .row`);
   const chev = (key) => rowOf(key).locator("[data-toggle]");
@@ -61,7 +61,7 @@ try {
   must((await page.locator("[data-testid=projects] ul[role=tree]").count()) >= 1, "the projects are a tree");
   must((await page.locator("[data-testid=projects] [role=treeitem]").count()) > 4, "its rows are treeitems");
   const rows = (await node("TRA").locator("> ul > li").allTextContents()).map((t) => t.replace(/^[^A-Za-z]+/, "").match(/^[A-Za-z]+/)?.[0]);
-  must(rows.join(",").startsWith("Roadmap,Assistant,Inbox,Agents,Chains"), `the rows under an open project are Roadmap, Assistant, Inbox, Agents, Chains... (${rows})`);
+  must(rows.join(",").startsWith("Roadmap,Assistant,Inbox,Agents,Epics"), `the rows under an open project are Roadmap, Assistant, Inbox, Agents, Epics... (${rows})`);
   must(rows.at(-2) === "Designs" && rows.at(-1) === "Settings", "Designs and Settings close the list");
   await chain("alpha").waitFor();
   must((await chain("beta").count()) === 0, "a closed project shows none of its chains");
@@ -95,7 +95,9 @@ try {
   await expectPath("/projects/TRA", "the project's name opens its page");
   await page.locator("[data-testid=roadmap-link]").first().waitFor();
   await node("TRB").locator("[data-testid=planner-link]").click();
-  await expectPath("/projects/TRB/planner", "the Assistant row opens the project's assistant");
+  await expectPath("/projects/TRB", "the Assistant row opens the roadmap");
+  await page.locator("[data-testid=assistant-panel]").waitFor({ timeout: 10_000 });
+  await expectText(page.locator("[data-testid=context-chip]"), "Roadmap", "with the assistant beside it and the roadmap chip on");
   await node("TRB").locator("a", { hasText: "Designs" }).click();
   await expectPath("/projects/TRB/settings/designs", "the Designs row opens the project's designs");
   await page.goto(url.replace("/?", "/projects/TRA?"));

@@ -139,7 +139,7 @@ try {
   await expectText(t("branches"), "main", "the repository's branches are offered");
   await page.locator("[data-branch=main]").click();
   await t("add-project-submit").click();
-  await expectPath("/projects/DEMO/planner", "the first project leads into the assistant");
+  await expectPath("/projects/DEMO", "the first project leads to its roadmap with the assistant");
   await t("settings-link").click();
   await expectPath("/projects/DEMO/settings", "the settings open");
 

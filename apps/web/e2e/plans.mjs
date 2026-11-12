@@ -81,7 +81,7 @@ try {
     await t("repo-path").fill(dir);
     await page.waitForFunction((k) => document.querySelector("[data-testid=project-key]")?.value === k, key, { timeout: 10_000 });
     await t("add-project-submit").click();
-    await expectPath(`/projects/${key}/planner`, `${key} is added and leads into the assistant`);
+    await expectPath(`/projects/${key}`, `${key} is added and leads to its roadmap with the assistant`);
   };
 
   // 1. Adding the project offers the plans its repository holds; two of three are imported.
