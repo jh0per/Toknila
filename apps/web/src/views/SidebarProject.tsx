@@ -9,6 +9,9 @@ import { SidebarChains } from "./SidebarChains";
 import { AgentsNode, InboxNode } from "./SidebarNodes";
 import { Chev, indent } from "./TreeRow";
 
+/// What the Assistant row says it is: one assistant, at the roadmap and inside an epic.
+export const ASSISTANT_HINT = "plans epics on the roadmap, cards inside an epic";
+
 type Props = {
   project: Project;
   state: State;
@@ -41,11 +44,11 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
   const selected = onScreen && chainRoute ? currentChain(state)?.chain.id : undefined;
   const running = agentsOf(state, project).runs.length;
   const waiting = waitingIn(state, project);
-  const leaf = (label: string, to: Route, sel: boolean, extra?: ReactNode, testId?: string) => (
+  const leaf = (label: string, to: Route, sel: boolean, extra?: ReactNode, testId?: string, hint?: string, also?: Intent) => (
     <li role="treeitem" aria-selected={sel} data-testid={testId?.replace("-link", "-entry")}>
       <div className="row" style={indent(1)}>
         <Chev />
-        <NavLink route={to} dispatch={dispatch} row className={`item${sel ? " sel" : ""}`} testId={testId}>
+        <NavLink route={to} dispatch={dispatch} row className={`item${sel ? " sel" : ""}`} testId={testId} title={hint} also={also}>
           <span className="t">{label}</span>
           {extra}
         </NavLink>
@@ -80,14 +83,14 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
       {open && (
         <ul role="group">
           {leaf("Roadmap", { name: "project", project: key }, onScreen && route.name === "project", undefined, "roadmap-link")}
-          {leaf("Assistant", { name: "planner", project: key }, onScreen && route.name === "planner", <span className="n" title="The project's main agent: it plans, you start the cards">✦</span>, "planner-link")}
+          {leaf("Assistant", { name: "project", project: key }, onScreen && route.name === "planner", <span className="n" aria-hidden="true">✦</span>, "planner-link", ASSISTANT_HINT, { type: "openAssistant" })}
           <InboxNode project={project} state={state} dispatch={dispatch} onScreen={onScreen} />
           <AgentsNode project={project} state={state} dispatch={dispatch} onScreen={onScreen} />
           <li role="treeitem" aria-expanded={chainsOpen} data-testid="chains" data-project-chains={key}>
             <div className="row" style={indent(1)}>
               <Chev open={chainsOpen} />
               <button type="button" className="item group-toggle" data-row data-toggle onClick={() => setChainsOpen(!chainsOpen)}>
-                <span className="t">Chains</span>
+                <span className="t">Epics</span>
               </button>
               <span className="h-btns">
                 <button

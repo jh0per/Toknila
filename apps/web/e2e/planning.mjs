@@ -74,7 +74,9 @@ try {
   await value("project-key", "TOKNILA", "the folder suggests the key");
   await value("project-name", "Toknila", "the folder suggests the name");
   await t("add-project-submit").click();
-  await expectPath("/projects/TOKNILA/planner", "the first project leads into the assistant");
+  await expectPath("/projects/TOKNILA", "the first project leads to its roadmap");
+  await t("assistant-panel").waitFor({ timeout: 10_000 });
+  console.log("PASS the assistant's panel is open beside it");
 
   // 2. No chains yet: the window asks what to build, and offers New chain and Import below.
   await row("TOKNILA").locator("a").click();

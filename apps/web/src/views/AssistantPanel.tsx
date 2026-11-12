@@ -5,6 +5,7 @@ import type { Intent } from "../store/msg";
 import { plannerOf } from "../store/planner";
 import type { State } from "../store/state";
 import { ChatPane } from "./ChatPane";
+import { NavLink } from "./Link";
 
 const KEY_STEP_PX = 24;
 
@@ -64,6 +65,12 @@ export function AssistantPanel({ project, state, dispatch }: { project: Project;
           <b>Assistant</b>
           <span className="muted" data-testid="assistant-state">{running === undefined ? "…" : running ? "running" : "not running"}</span>
           <span className="grow" />
+          <NavLink
+            route={{ name: "planner", project: project.key }} dispatch={dispatch} className="icon-btn" testId="assistant-expand"
+            title="Open the chat at full width"
+          >
+            ⤢
+          </NavLink>
           <button type="button" className="icon-btn" data-testid="assistant-close" aria-label="Close the assistant panel" onClick={() => dispatch({ type: "closeAssistant" })}>
             ×
           </button>

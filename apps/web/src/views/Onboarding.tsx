@@ -22,7 +22,7 @@ function Step({ title, children }: { title: string; children: ReactNode }) {
 /// What the window shows when there is no project yet. It asks for the project's folder first (the
 /// rest of what the folder tells is under Details), then checks this machine, then the one thing
 /// to do in Claude Code, and the last step is describing what to build: adding the project leads
-/// straight into the assistant, which gets that description.
+/// straight to the roadmap with the assistant beside it, which gets that description.
 export function Onboarding({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const s = state.settings;
   const text = draftOf(state, ONBOARDING_DRAFT);
