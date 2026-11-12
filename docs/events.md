@@ -126,7 +126,9 @@ environment.
 
 An agent token may call only the routes in `AGENT_ROUTES`, all `POST`: for its own ticket
 `/v1/tickets/{ticket}/events` (every agent event, including the agent's thread posts and
-`propose`), `/v1/tickets/{ticket}/activity` and the instruction claim, and `/v1/usage/quota` (the
+`propose`), `/v1/tickets/{ticket}/activity`, `/v1/tickets/{ticket}/pre-tool` (the automatic decisions for a
+tool call, asked by the PreToolUse hook of a `Bash` call in every permission mode) and the
+instruction claim, and `/v1/usage/quota` (the
 plan limits a status line saw; account-wide, no ticket). Everything else answers `403` with code
 `forbidden`: approve and reject of wildcards, approve and request changes on threads, accept,
 return, cancel, runner input, comments, edits, the stream, release events, shutdown. The rule is

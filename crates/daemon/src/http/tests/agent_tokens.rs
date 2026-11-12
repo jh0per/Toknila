@@ -72,7 +72,7 @@ fn is_agent_route(method: &str, uri: &str) -> bool {
 }
 
 #[tokio::test]
-async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_five() {
+async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_six() {
     let api = Api::new();
     api.demo_with(&["A"]).await;
     let (token, _) = api.agent_token("DEMO-1").await;
@@ -147,9 +147,19 @@ async fn an_agent_token_is_refused_with_403_on_every_route_but_its_own_five() {
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body, json!({ "decision": "ask" }));
+    let (status, body) = api
+        .call_with(
+            &token,
+            Method::POST,
+            "/v1/tickets/DEMO-1/pre-tool",
+            Some(json!({ "tool": "Bash: ls" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body, json!({ "decision": "ask" }));
     assert_eq!(
         routes.iter().filter(|(m, u)| is_agent_route(m, u)).count(),
-        5
+        6
     );
 }
 
