@@ -197,6 +197,7 @@ fn brief_of_key<'a>(
         prompt: &cx.brief.prompt,
         acceptance: &cx.brief.acceptance,
         check_command: cx.brief.check_command.as_deref(),
+        setup_command: cx.brief.setup_command.as_deref(),
         earlier: &cx.brief.earlier,
         waiting: &cx.brief.waiting,
         returned: cx.brief.returned.as_ref(),
@@ -208,6 +209,7 @@ fn brief_of_key<'a>(
             .epic
             .as_ref()
             .map(|(name, goal)| (name.as_str(), goal.as_str())),
+        check: cx.brief.check.as_ref(),
     }
 }
 

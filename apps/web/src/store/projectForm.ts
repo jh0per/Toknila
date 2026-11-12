@@ -10,6 +10,8 @@ export interface ProjectForm {
   default_profile: string;
   max_parallel: string;
   check_command: string;
+  /// The command run once in every new workspace before the agent starts.
+  setup_command: string;
   /// The command a release runs to bump the version (`{version}` is the version).
   bump_command: string;
   worker_model: string;
@@ -41,6 +43,7 @@ export function formOf(p: Project): ProjectForm {
     default_profile: p.default_profile,
     max_parallel: String(p.max_parallel),
     check_command: p.check_command ?? "",
+    setup_command: p.setup_command ?? "",
     bump_command: p.bump_command ?? "",
     worker_model: p.worker_model ?? "",
     reviewer_model: p.reviewer_model ?? "",
@@ -58,7 +61,7 @@ export function formOf(p: Project): ProjectForm {
   };
 }
 
-const TEXT = ["work_branch", "check_command", "bump_command", "worker_model", "reviewer_model", "planner_model", "pr_title"] as const;
+const TEXT = ["work_branch", "check_command", "setup_command", "bump_command", "worker_model", "reviewer_model", "planner_model", "pr_title"] as const;
 
 /// The form with its text fields trimmed, as Save sends them.
 export function tidy(f: ProjectForm): ProjectForm {
@@ -76,6 +79,7 @@ export function patchOf(f: ProjectForm): PatchProject {
     default_profile: t.default_profile,
     max_parallel: Number(t.max_parallel),
     check_command: t.check_command,
+    setup_command: t.setup_command,
     bump_command: t.bump_command,
     worker_model: t.worker_model,
     reviewer_model: t.reviewer_model,
@@ -106,9 +110,13 @@ export function sectionOfField(field: string): ProjectSection {
     case "default_profile":
     case "max_parallel":
     case "check_command":
+    case "setup_command":
     case "bump_command":
     case "command_policy":
     case "allowed_commands":
+    case "worker_model":
+    case "reviewer_model":
+    case "planner_model":
       return "agents";
     case "review_mode":
     case "max_review_rounds":
@@ -119,10 +127,6 @@ export function sectionOfField(field: string): ProjectSection {
     case "merge_method":
     case "no_checks_timeout_secs":
       return "review";
-    case "worker_model":
-    case "reviewer_model":
-    case "planner_model":
-      return "advanced";
     default:
       return "general";
   }

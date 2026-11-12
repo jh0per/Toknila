@@ -2,7 +2,7 @@ import type { ChainDetail } from "../api/types";
 import { chainTone } from "../store/groups";
 import { versionText } from "../store/phase";
 import type { Intent } from "../store/msg";
-import { type State, currentProject, runningAgents, slotsOf } from "../store/state";
+import { type State, currentProject, slotsOf } from "../store/state";
 import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
 import { AskBox } from "./AskBox";
 import { viewOf, withView } from "../store/route";
@@ -18,8 +18,8 @@ import { ThemeButton } from "./ThemeButton";
 /// the panel. The chain's status pill takes the colour of its status: a chain that needs a person
 /// reads amber, a running one teal, a finished one green.
 export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; state: State; dispatch: (i: Intent) => void }) {
-  const running = runningAgents(state).length;
   const slots = slotsOf(state);
+  const running = slots?.used ?? 0;
   const on = chain.chain.autostart;
   const project = currentProject(state);
   const view = viewOf(state.route);

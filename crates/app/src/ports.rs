@@ -64,8 +64,23 @@ pub trait Reader {
     fn live_runners(&self) -> AppResult<Vec<(TicketId, AgentRole)>> {
         Ok(Vec::new())
     }
-    /// Payload of the newest journal event about one entity.
-    fn last_event_payload(&self, entity: &str, entity_id: &str) -> AppResult<Option<Value>>;
+    /// [`Reader::live_runners`] with the time each process started. A host that does not know
+    /// the times reports the epoch.
+    fn live_runs(&self) -> AppResult<Vec<toknila_core::schedule::LiveRun>> {
+        Ok(self
+            .live_runners()?
+            .into_iter()
+            .map(|(t, r)| (t, r, toknila_core::Timestamp(0)))
+            .collect())
+    }
+    /// Payload of the newest journal event about one entity that carries a snapshot under
+    /// `field`; events without one are skipped.
+    fn last_snapshot_payload(
+        &self,
+        entity: &str,
+        entity_id: &str,
+        field: &str,
+    ) -> AppResult<Option<Value>>;
 }
 
 /// One atomic command: reads, writes and journal entries land together or not at all.

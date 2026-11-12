@@ -194,26 +194,9 @@ pub async fn agent_permission(
     let at = now();
     let prompts = state.runners.prompts();
     let tool = ask.tool.or_else(|| prompts.last_tool(t.id, role));
-    // A worker that handed in and still wants to run something is refused without asking anyone.
-    if let Some(Decision::Deny { message }) = question::auto_decision(role, t.status) {
-        log_refusal(&t, role, tool.as_deref(), "handed in");
-        return Ok(Json(PermissionReply {
-            decision: PermissionDecision::Deny,
-            message: Some(message),
-        }));
-    }
-    // A worker's shell edit is refused at once, without a question: Edit and Write are approved.
-    if role == AgentRole::Worker
-        && let Some(Decision::Deny { message }) = tool.as_deref().and_then(|tool| {
-            let scratch = [std::env::temp_dir().to_string_lossy().into_owned()];
-            question::shell_edit_denial(tool, &scratch)
-        })
-    {
-        log_refusal(&t, role, tool.as_deref(), "shell edit");
-        return Ok(Json(PermissionReply {
-            decision: PermissionDecision::Deny,
-            message: Some(message),
-        }));
+    // A handed-in worker's call and a worker's shell edit are refused without asking anyone.
+    if let Some(reply) = automatic_reply(&t, role, tool.as_deref()) {
+        return Ok(Json(reply));
     }
     // A command the person allowed always (the project remembers a rule for it) is not asked
     // again, not even by an agent that started before the rule was made. Under trust every tool
@@ -273,6 +256,50 @@ pub async fn agent_permission(
         },
     };
     Ok(Json(reply))
+}
+
+#[utoipa::path(post, path = "/tickets/{ticket}/pre-tool", tag = "agent", request_body = PermissionAsk,
+    params(("ticket" = String, Path, description = "Ticket id or key")),
+    responses((status = 200, body = PermissionReply), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// The agent's `PreToolUse` hook: a tool call is about to run, in any permission mode. Answers with
+/// the automatic decisions only (`deny` or `ask`, meaning no decision); never asks a person and
+/// never waits.
+pub async fn agent_pre_tool(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Path(ticket): Path<String>,
+    Json(ask): Json<PermissionAsk>,
+) -> ApiResult<Json<PermissionReply>> {
+    let t = state
+        .store
+        .read(move |repo| Ok(resolve::ticket(repo, &ticket)))
+        .await??;
+    principal.owns(&t)?;
+    let role = match principal {
+        Principal::Agent(grant) => grant.role,
+        Principal::Person => AgentRole::Worker,
+    };
+    Ok(Json(
+        automatic_reply(&t, role, ask.tool.as_deref()).unwrap_or(PermissionReply {
+            decision: PermissionDecision::Ask,
+            message: None,
+        }),
+    ))
+}
+
+/// The refusal a tool call gets without asking a person, from core's one function.
+fn automatic_reply(t: &Ticket, role: AgentRole, tool: Option<&str>) -> Option<PermissionReply> {
+    let scratch = [std::env::temp_dir().to_string_lossy().into_owned()];
+    match question::automatic_decision(role, t.status, tool, &scratch)? {
+        Decision::Deny { message } => {
+            log_refusal(t, role, tool, "automatic decision");
+            Some(PermissionReply {
+                decision: PermissionDecision::Deny,
+                message: Some(message),
+            })
+        }
+        Decision::Allow => None,
+    }
 }
 
 /// One info line for a request the daemon refused without asking a person, so afterwards it can

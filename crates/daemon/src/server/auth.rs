@@ -23,10 +23,11 @@ use crate::runner::Grant;
 /// The only routes an agent token may call (all `POST`): the agent event contract, the activity
 /// signal of hooks, the claim of pending instructions (the Stop hook) and the plan quota a status
 /// line saw (account-wide, so it names no ticket). The ticket in a path must be the token's own.
-pub const AGENT_ROUTES: [&str; 5] = [
+pub const AGENT_ROUTES: [&str; 6] = [
     "/v1/tickets/{ticket}/events",
     "/v1/tickets/{ticket}/activity",
     "/v1/tickets/{ticket}/permission",
+    "/v1/tickets/{ticket}/pre-tool",
     "/v1/tickets/{ticket}/instructions/claim",
     "/v1/usage/quota",
 ];
@@ -34,8 +35,11 @@ pub const AGENT_ROUTES: [&str; 5] = [
 /// The only routes a planner's token may call, as `(method, path)`. Each acts on the planner's own
 /// project, which the token names, so no path carries a project. Every route here runs a use case
 /// of `toknila_app::planner`, which checks the scope again.
-pub const PLANNER_ROUTES: [(&str, &str); 14] = [
+pub const PLANNER_ROUTES: [(&str, &str); 17] = [
     ("GET", "/v1/planner/plan"),
+    ("GET", "/v1/planner/overview"),
+    ("GET", "/v1/planner/chains/{chain}"),
+    ("GET", "/v1/planner/cards/{card}"),
     ("GET", "/v1/planner/designs/{design}"),
     ("POST", "/v1/planner/pins"),
     ("POST", "/v1/planner/chains"),

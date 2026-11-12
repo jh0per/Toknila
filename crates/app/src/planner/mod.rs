@@ -7,6 +7,7 @@
 //! The planner's own run (start, stop, input, size) is here too: a project has at most one.
 
 mod cards;
+mod overview;
 mod plan;
 mod suggest;
 mod window;
@@ -25,7 +26,8 @@ pub use cards::{
     CardEdit, DesignPick, NewCard, SubtaskEdit, add_card, add_card_with_designs, edit_card,
     edit_card_with_designs,
 };
-pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, plan};
+pub use overview::{OverviewCard, OverviewChain, OverviewSummary, PlanOverview, overview};
+pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, card_in_full, chain_in_full, plan};
 pub use suggest::{NewSuggestion, suggest};
 pub use window::show_card;
 pub use with_designs::{request_with, start_with};

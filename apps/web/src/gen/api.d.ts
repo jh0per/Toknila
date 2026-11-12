@@ -245,7 +245,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * One card of the planner's project in full: prompt, acceptance, subtasks, threads with their
+         *     messages, review results and pull request.
+         */
+        get: operations["planner_card"];
         put?: never;
         post?: never;
         delete?: never;
@@ -340,6 +344,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/chains/{chain}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One chain of the planner's project with every card in full. */
+        get: operations["planner_chain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/chains/{chain}/cards": {
         parameters: {
             query?: never;
@@ -401,6 +422,26 @@ export interface paths {
         };
         /** One design of the planner's project: its metadata and the path of its file. */
         get: operations["planner_design"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planner/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The plan of the planner's project in short records (every chain, the cards of the chains that
+         *     are not finished, the designs with their paths, the pins): small at any size of the plan.
+         */
+        get: operations["planner_overview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1103,6 +1144,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/repos/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Does the one fix the folder's check offers (make the folder, `git init`, the first commit)
+         *     and answers the folder's new check. A fix the check does not offer is refused, nothing touched.
+         */
+        post: operations["repos_prepare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/checks": {
         parameters: {
             query?: never;
@@ -1370,6 +1431,27 @@ export interface paths {
          *     own dialog (`decision: ask`).
          */
         post: operations["agent_permission"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/pre-tool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The agent's `PreToolUse` hook: a tool call is about to run, in any permission mode. Answers with
+         *     the automatic decisions only (`deny` or `ask`, meaning no decision); never asks a person and
+         *     never waits.
+         */
+        post: operations["agent_pre_tool"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1848,6 +1930,11 @@ export interface components {
             /** @enum {string} */
             kind: "ship_failed";
         } | {
+            command: string;
+            /** @enum {string} */
+            kind: "setup_failed";
+            output: string;
+        } | {
             base: string;
             /** Format: int32 */
             behind: number;
@@ -1871,6 +1958,8 @@ export interface components {
             designs?: components["schemas"]["DesignPick"][] | null;
             /** @description Checklist items to rename. */
             edit_subtasks?: components["schemas"]["SubtaskEdit"][];
+            /** @description The card's own model, an alias or a full name; empty text clears it. */
+            model?: string | null;
             prompt?: string | null;
             title?: string | null;
         };
@@ -2005,6 +2094,16 @@ export interface components {
             tool: components["schemas"]["Tool"];
             /** @description The version the tool reported, when it did. */
             version?: string | null;
+        };
+        /** @description The result of the project's check command on one hand-in. */
+        CheckOutcome: {
+            /** @description When the check finished. */
+            at: components["schemas"]["Timestamp"];
+            /** @description The command that ran; empty when the checker never said which. */
+            command?: string;
+            /** @description The command and the end of its output, as the worker reads it. */
+            output: string;
+            passed: boolean;
         };
         /**
          * @description Where a card's check stands while its turn is `Check`. The checker reports `Syncing` and
@@ -2575,6 +2674,8 @@ export interface components {
             design_first?: boolean;
             /** @description Designs of the project the card is about, by file name or id. */
             designs?: components["schemas"]["DesignPick"][];
+            /** @description The card's own model: an alias or a full name; left out, the project's runs it. */
+            model?: string | null;
             prompt?: string;
             /** @description Checklist items. */
             subtasks?: string[];
@@ -2653,6 +2754,8 @@ export interface components {
             name?: string | null;
             release_branch?: string | null;
             repo_path?: string | null;
+            /** @description The command run once in every new ship before the agent starts; an empty text names none. */
+            setup_command?: string | null;
             work_branch?: string | null;
         };
         /** @description `POST /v1/chains/{chain}/releases`. */
@@ -2701,6 +2804,8 @@ export interface components {
             design_first?: boolean;
             /** @description Designs of the project the card is about (by id), with an optional region of each. */
             designs?: components["schemas"]["DesignRef"][];
+            /** @description The card's own model (an alias or a full name); left out, the project's worker model runs. */
+            model?: string | null;
             needs_secrets?: boolean;
             paused?: boolean;
             profile?: string | null;
@@ -2802,6 +2907,47 @@ export interface components {
              */
             strip_ansi: boolean;
         };
+        /** @description One card of an unfinished chain as one short record. */
+        OverviewCard: {
+            /** @description What it waits for: card keys and `release <version>` labels. */
+            after?: string[];
+            design_first?: boolean;
+            /** @description Names of the designs the card is about. */
+            designs?: string[];
+            key: components["schemas"]["TicketKey"];
+            /** @description The card's own model; absent when the project's runs it. */
+            model?: string | null;
+            status: components["schemas"]["TicketStatus"];
+            /** Format: int32 */
+            subtasks?: number;
+            /** Format: int32 */
+            threads?: number;
+            title: string;
+            /**
+             * @description The card waits for the owner: it is proposed, asks a question, is in review, or has a
+             *     thread version the owner has not answered.
+             */
+            waits_for_owner?: boolean;
+        };
+        /** @description A chain: its facts, and its cards unless it is finished. */
+        OverviewChain: {
+            autostart: boolean;
+            /** @description Empty for a finished chain: open it with `chain` to read its cards. */
+            cards?: components["schemas"]["OverviewCard"][];
+            goal: string;
+            id: components["schemas"]["ChainId"];
+            name: string;
+            summary: components["schemas"]["OverviewSummary"];
+            version?: string | null;
+        };
+        /** @description Where a chain stands. */
+        OverviewSummary: {
+            /** Format: int32 */
+            done: number;
+            phase: components["schemas"]["PhaseState"];
+            /** Format: int32 */
+            total: number;
+        };
         /** @description `PATCH /v1/projects/{project}`: the settings to change; unset fields stay. */
         PatchProject: {
             /**
@@ -2854,6 +3000,11 @@ export interface components {
              *     old one, an empty list denies the web again.
              */
             reviewer_web_domains?: string[] | null;
+            /**
+             * @description The command run once in every new ship before the agent starts (`npm ci --prefix
+             *     apps/web`). An empty text clears it.
+             */
+            setup_command?: string | null;
             /** @description The base branch ships start from and merges go into. */
             work_branch?: string | null;
             /**
@@ -2879,6 +3030,8 @@ export interface components {
              *     them.
              */
             designs?: components["schemas"]["DesignRef"][] | null;
+            /** @description The card's own model; an empty text clears it (the project's applies again). */
+            model?: string | null;
             needs_secrets?: boolean | null;
             pos?: components["schemas"]["Pos"] | null;
             profile?: string | null;
@@ -2975,6 +3128,12 @@ export interface components {
          * @enum {string}
          */
         PlanKind: "spec_folder" | "chain_file";
+        /** @description The project, every chain in short, and the pins with their answers. */
+        PlanOverview: {
+            chains: components["schemas"]["OverviewChain"][];
+            pins?: components["schemas"]["DesignPin"][];
+            project: components["schemas"]["Project"];
+        };
         /** @description `GET /v1/projects/{project}/plans`: the plans of the project's repository. */
         PlanScan: {
             behind?: components["schemas"]["WorkingCopyBehind"] | null;
@@ -3016,6 +3175,11 @@ export interface components {
              * @description Bytes of the kept file; zero without one.
              */
             size: number;
+        };
+        /** @description Answer of `GET /v1/planner/overview`: the plan in short records and the project's designs. */
+        PlannerOverview: components["schemas"]["PlanOverview"] & {
+            /** @description Oldest first, each with the path of its file. */
+            designs: components["schemas"]["PlannerDesign"][];
         };
         /** @description Answer of `GET /v1/planner/plan`: the plan and the project's designs. */
         PlannerPlan: components["schemas"]["PlanView"] & {
@@ -3122,6 +3286,11 @@ export interface components {
              *     card cites stays unread.
              */
             reviewer_web_domains?: string[];
+            /**
+             * @description The command the shipyard runs once in every new ship before the card's agent starts
+             *     (`npm ci --prefix apps/web`). `None`: no setup.
+             */
+            setup_command?: string | null;
             /** @description Branch ships start from and merge into (`develop`). */
             work_branch: string;
             /**
@@ -3140,6 +3309,11 @@ export interface components {
             project: components["schemas"]["ProjectId"];
             /** @description Waiting cards, first in line first. */
             queued: components["schemas"]["QueuedCard"][];
+            /**
+             * @description What runs in the project now: the assistant first (`role: planner`, no card), then the
+             *     runs of its cards. The assistant holds no slot: it is in `runs`, never in `used`.
+             */
+            runs: components["schemas"]["ProjectRun"][];
             /**
              * Format: int32
              * @description Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
@@ -3173,6 +3347,14 @@ export interface components {
         ProjectId: string;
         /** @example DEMO */
         ProjectKey: string;
+        /** @description One live run of a project. The assistant (`role: planner`) has no card and holds no slot. */
+        ProjectRun: {
+            card?: components["schemas"]["RunCard"] | null;
+            /** @description `worker`, `reviewer` or `planner`. */
+            role: components["schemas"]["AgentRole"];
+            /** @description When the process started. */
+            since: components["schemas"]["Timestamp"];
+        };
         /**
          * @description A wildcard card as proposed: work nobody planned, found during a ticket. References are
          *     ticket keys, titles or release versions of the same chain.
@@ -3343,6 +3525,11 @@ export interface components {
             suggested_merge_mode?: components["schemas"]["MergeMode"] | null;
             /** @description The project name the folder suggests: its base name. */
             suggested_name?: string | null;
+            /**
+             * @description The setup command the repository suggests (`npm ci --prefix apps/web` for a lock file
+             *     under `apps/web`); `null` when it suggests none.
+             */
+            suggested_setup_command?: string | null;
         };
         /** @description `POST /v1/repos/check`: the folder a person is about to make a project of. */
         RepoCheckRequest: {
@@ -3355,17 +3542,28 @@ export interface components {
          * @enum {string}
          */
         RepoField: "repo_path" | "work_branch";
+        /**
+         * @description How a problem can be fixed by the daemon (`POST /v1/repos/prepare`).
+         * @enum {string}
+         */
+        RepoFix: "create_folder" | "init_repository" | "first_commit";
+        /** @description `POST /v1/repos/prepare`: the one fix to make to a folder (one its check offers). */
+        RepoPrepareRequest: {
+            fix: components["schemas"]["RepoFix"];
+            repo_path: string;
+        };
         /** @description One thing that stops the folder from being used. */
         RepoProblem: {
             code: components["schemas"]["RepoProblemCode"];
             field: components["schemas"]["RepoField"];
+            fix?: components["schemas"]["RepoFix"] | null;
             message: string;
         };
         /**
          * @description What is wrong.
          * @enum {string}
          */
-        RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing";
+        RepoProblemCode: "path_empty" | "path_not_absolute" | "path_missing" | "not_a_directory" | "not_a_git_repo" | "git_missing" | "branch_missing" | "no_commits";
         /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
         Review: {
             check?: components["schemas"]["CheckPhase"] | null;
@@ -3374,6 +3572,7 @@ export interface components {
              *     first hand-in, or when the host could not look.
              */
             handed_in?: string | null;
+            last_check?: components["schemas"]["CheckOutcome"] | null;
             note?: components["schemas"]["ReviewNote"] | null;
             /** @description The reviewer was already nudged for a verdict in this round of review. */
             nudged?: boolean;
@@ -3459,6 +3658,12 @@ export interface components {
             rounds: components["schemas"]["ReviewRound"][];
             /** Format: int32 */
             used_rounds: number;
+        };
+        /** @description The card a run works for. */
+        RunCard: {
+            id: components["schemas"]["TicketId"];
+            key: components["schemas"]["TicketKey"];
+            title: string;
         };
         /** @description Identifies a [`crate::Run`] of a runner process. */
         RunId: string;
@@ -3777,6 +3982,11 @@ export interface components {
             done_out_of_order?: components["schemas"]["OutOfOrder"] | null;
             id: components["schemas"]["TicketId"];
             key: components["schemas"]["TicketKey"];
+            /**
+             * @description The model of the card's own agent (an alias or a full name); `None` means the project's
+             *     `worker_model`.
+             */
+            model?: string | null;
             /** @description Copy depot secrets onto the ship at start. */
             needs_secrets: boolean;
             /** @description Paused tickets stay in Backlog and are skipped by autostart. */
@@ -4653,6 +4863,44 @@ export interface operations {
             };
         };
     };
+    planner_card: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Card id, key or title */
+                card: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanCard"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     planner_edit_card: {
         parameters: {
             query?: never;
@@ -4910,6 +5158,44 @@ export interface operations {
             };
         };
     };
+    planner_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChain"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     planner_add_card: {
         parameters: {
             query?: never;
@@ -5127,6 +5413,33 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    planner_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannerOverview"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6676,6 +6989,37 @@ export interface operations {
             };
         };
     };
+    repos_prepare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepoPrepareRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepoCheck"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     system_checks: {
         parameters: {
             query?: never;
@@ -7206,6 +7550,48 @@ export interface operations {
         };
     };
     agent_permission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PermissionAsk"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionReply"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    agent_pre_tool: {
         parameters: {
             query?: never;
             header?: never;

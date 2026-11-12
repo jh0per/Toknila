@@ -129,7 +129,10 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
       return [s, [loadPlanner(msg.project)]];
     case "plannerLoaded": {
       const seen = msg.state.running ? { ...s.planner.seen, [msg.project]: true } : s.planner.seen;
-      return [set({ byProject: { ...s.planner.byProject, [msg.project]: msg.state }, seen }), []];
+      // The assistant starting or stopping changes what runs in the project.
+      const changed = (plannerOf(s, msg.project)?.running ?? false) !== msg.state.running;
+      const fx: Effect[] = changed ? [{ type: "loadAgents" }] : [];
+      return [set({ byProject: { ...s.planner.byProject, [msg.project]: msg.state }, seen }), fx];
     }
     case "plannerFailed":
       return [set({ error: msg.error, sending: undefined }), []];

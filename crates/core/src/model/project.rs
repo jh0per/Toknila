@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 
 use super::{ProjectId, ProjectKey};
 
+/// The model aliases the assistant may name for a card (the window's list, in `models.ts`).
+pub const MODEL_ALIASES: [&str; 7] = [
+    "sonnet",
+    "opus",
+    "haiku",
+    "fable",
+    "opusplan",
+    "sonnet[1m]",
+    "opus[1m]",
+];
+
 /// Who reviews a finished ticket before it merges.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
@@ -132,6 +143,10 @@ pub struct Project {
     /// told to use it, and may run it without asking. `None`: the project names none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_command: Option<String>,
+    /// The command the shipyard runs once in every new ship before the card's agent starts
+    /// (`npm ci --prefix apps/web`). `None`: no setup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup_command: Option<String>,
     /// The command a release runs to put its version into the project's files (`npm version
     /// {version} --no-git-tag-version`; `{version}` is the version). `None`: no bump step.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -189,9 +204,20 @@ impl Project {
     /// setting). It is one line without parentheses, because it goes into an agent's permission
     /// rule (`Bash(<command> *)`).
     pub fn clean_check_command(text: &str) -> Result<Option<String>, &'static str> {
+        Self::clean_command(text, "the check command is one line without parentheses")
+    }
+
+    /// The setup command as a person typed it, cleaned like the check command.
+    pub fn clean_setup_command(text: &str) -> Result<Option<String>, &'static str> {
+        Self::clean_command(text, "the setup command is one line without parentheses")
+    }
+
+    /// The shared cleaner of a command a person typed: trimmed, `None` when empty, one line
+    /// without parentheses; `refusal` is the error text.
+    fn clean_command(text: &str, refusal: &'static str) -> Result<Option<String>, &'static str> {
         let text = text.trim();
         if text.contains(['\n', '\r', '(', ')']) {
-            return Err("the check command is one line without parentheses");
+            return Err(refusal);
         }
         Ok(Some(text.to_owned()).filter(|c| !c.is_empty()))
     }
@@ -214,6 +240,19 @@ impl Project {
             return Err("the model is one word, such as sonnet or a full model name");
         }
         Ok(Some(text.to_owned()).filter(|m| !m.is_empty()))
+    }
+
+    /// The model an assistant names for a card: an alias or a full model name (`claude-…`);
+    /// anything else is refused with the aliases named. Empty text clears it.
+    pub fn choose_model(text: &str) -> Result<Option<String>, String> {
+        let model = Self::clean_model(text).map_err(str::to_owned)?;
+        match model.as_deref() {
+            Some(m) if !MODEL_ALIASES.contains(&m) && !m.starts_with("claude-") => Err(format!(
+                "unknown model {m:?}: use one of {} or a full model name such as claude-opus-5-5",
+                MODEL_ALIASES.join(", ")
+            )),
+            _ => Ok(model),
+        }
     }
 
     /// The model the project names for an agent of `role` (a release agent works like a card's).
@@ -269,6 +308,16 @@ mod tests {
     }
 
     #[test]
+    fn a_setup_command_is_cleaned_like_the_check_command() {
+        assert_eq!(
+            Project::clean_setup_command("  npm ci --prefix apps/web "),
+            Ok(Some("npm ci --prefix apps/web".to_owned()))
+        );
+        assert_eq!(Project::clean_setup_command(" "), Ok(None));
+        assert!(Project::clean_setup_command("a\nb").is_err());
+    }
+
+    #[test]
     fn a_model_is_trimmed_cleared_when_empty_and_refused_when_it_is_not_one_word() {
         assert_eq!(
             Project::clean_model(" opus[1m] "),
@@ -278,6 +327,18 @@ mod tests {
         for bad in ["two words", "a\nb", "--effort"] {
             assert!(Project::clean_model(bad).is_err(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn the_assistant_names_an_alias_or_a_full_name_and_nothing_else() {
+        assert_eq!(Project::choose_model("fable"), Ok(Some("fable".to_owned())));
+        assert_eq!(
+            Project::choose_model("claude-opus-5-5"),
+            Ok(Some("claude-opus-5-5".to_owned()))
+        );
+        assert_eq!(Project::choose_model(" "), Ok(None));
+        let err = Project::choose_model("gpt").expect_err("gpt is no alias");
+        assert!(err.contains("sonnet, opus, haiku, fable"), "{err}");
     }
 
     #[test]
@@ -296,6 +357,7 @@ mod tests {
             max_review_rounds: Project::DEFAULT_REVIEW_ROUNDS,
             merge: Default::default(),
             check_command: None,
+            setup_command: None,
             bump_command: None,
             worker_model: None,
             reviewer_model: None,

@@ -25,6 +25,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         prompt: "Generate the instructions for the run.\n",
         acceptance,
         check_command: None,
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,
@@ -33,6 +34,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         has_designs: false,
         discussion: &[],
         epic: None,
+        check: None,
     }
 }
 
@@ -70,10 +72,9 @@ fn the_check_command_is_to_be_run_as_given_and_files_changed_with_the_edit_tools
         check_command: Some("cargo xtask verify"),
         ..pinned_brief(&[])
     };
-    for text in [generate(&brief), generate_review(&brief)] {
-        assert!(text.contains("with no `cd` or `export` in front"), "{text}");
-        assert!(text.contains("the ship is already your working directory"));
-    }
+    let text = generate(&brief);
+    assert!(text.contains("with no `cd` or `export` in front"), "{text}");
+    assert!(text.contains("the ship is already your working directory"));
     assert!(generate(&brief).contains("Change files with the Edit and Write tools"));
     assert!(!generate_review(&brief).contains("Edit and Write tools"));
 }
@@ -84,11 +85,7 @@ fn both_roles_are_told_to_run_the_check_once_not_in_a_loop() {
         check_command: Some("cargo xtask verify"),
         ..pinned_brief(&[])
     };
-    for text in [
-        protocol().to_owned(),
-        generate(&brief),
-        generate_review(&brief),
-    ] {
+    for text in [protocol().to_owned(), generate(&brief)] {
         assert!(
             text.contains("Run it once, not in a loop"),
             "the check is run once: {text}"
@@ -131,6 +128,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         prompt: "p",
         acceptance: &[],
         check_command: None,
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,
@@ -139,6 +137,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         has_designs: false,
         discussion: &[],
         epic: None,
+        check: None,
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -218,6 +217,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         prompt: "p",
         acceptance: &[],
         check_command: check,
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,
@@ -226,6 +226,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         has_designs: false,
         discussion: &[],
         epic: None,
+        check: None,
     }
 }
 
@@ -246,6 +247,27 @@ fn the_worker_kickoff_says_to_begin_commit_and_call_finished() {
 }
 
 #[test]
+fn the_worker_is_told_the_setup_command_ran_and_not_to_run_it_again() {
+    let with = RunBrief {
+        setup_command: Some("npm ci --prefix apps/web"),
+        ..brief(None)
+    };
+    let kick = kickoff(crate::AgentRole::Worker, &with);
+    assert!(
+        kick.contains("`npm ci --prefix apps/web` already ran in your workspace"),
+        "{kick}"
+    );
+    let file = generate(&with);
+    assert!(
+        file.contains("## Workspace setup") && file.contains("`npm ci --prefix apps/web`"),
+        "{file}"
+    );
+    let without = generate(&brief(None));
+    assert!(!without.contains("Workspace setup"), "{without}");
+    assert!(!kickoff(crate::AgentRole::Reviewer, &with).contains("already ran"));
+}
+
+#[test]
 fn the_reviewer_kickoff_says_to_review_and_call_the_verdict_tool() {
     let text = kickoff(
         crate::AgentRole::Reviewer,
@@ -255,23 +277,15 @@ fn the_reviewer_kickoff_says_to_review_and_call_the_verdict_tool() {
         text.contains("DEMO-3") && text.contains("`review_verdict`"),
         "{text}"
     );
-    assert!(
-        !text.contains("`finished`") && !text.contains('\n'),
-        "{text}"
-    );
+    assert!(!text.contains("`finished`"), "{text}");
 }
 
 #[test]
-fn both_roles_instructions_name_the_check_command_only_when_there_is_one() {
-    let with = brief(Some("cargo xtask verify"));
-    for text in [generate(&with), generate_review(&with)] {
-        assert!(text.contains("## Checks"), "{text}");
-        assert!(text.contains("`cargo xtask verify`") && text.contains("without asking"));
-    }
-    let without = brief(None);
-    for text in [generate(&without), generate_review(&without)] {
-        assert!(!text.contains("## Checks"), "{text}");
-    }
+fn the_worker_instructions_name_the_check_command_only_when_there_is_one() {
+    let text = generate(&brief(Some("cargo xtask verify")));
+    assert!(text.contains("## Checks"), "{text}");
+    assert!(text.contains("`cargo xtask verify`") && text.contains("without asking"));
+    assert!(!generate(&brief(None)).contains("## Checks"));
 }
 
 fn sent(gist: &str, at: i64, delivered: bool) -> Comment {

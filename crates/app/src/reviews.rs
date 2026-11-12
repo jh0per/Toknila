@@ -112,6 +112,8 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
             model: project.reviewer_model.clone(),
             web_domains: project.reviewer_web_domains.clone(),
             project: None,
+            // The daemon's own run of the gate on this hand-in, so the reviewer does not rerun it.
+            check: t.review.last_check.clone(),
             ..RunBrief::default()
         },
     });

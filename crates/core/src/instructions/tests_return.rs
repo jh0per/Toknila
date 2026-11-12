@@ -24,6 +24,7 @@ fn brief(acceptance: &[String]) -> RunBrief<'_> {
         prompt: "Work.\n",
         acceptance,
         check_command: None,
+        setup_command: None,
         earlier: &[],
         waiting: &[],
         returned: None,
@@ -32,6 +33,7 @@ fn brief(acceptance: &[String]) -> RunBrief<'_> {
         has_designs: false,
         discussion: &[],
         epic: None,
+        check: None,
     }
 }
 
@@ -162,7 +164,6 @@ fn the_reviewer_of_a_hand_in_after_a_return_is_told_to_read_what_changed_since_i
     ] {
         assert!(first.contains(want), "{want}: {first}");
     }
-    assert!(!first.contains('\n'), "{first}");
     let text = generate_review(&with);
     assert!(text.contains("## Since the Return"), "{text}");
     assert!(

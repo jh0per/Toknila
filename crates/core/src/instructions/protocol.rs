@@ -129,13 +129,16 @@ acceptance item. Do not edit files and do not commit.
 
 ## Run what the hand-in names
 
-Do not approve by reading alone. Run the project's check command and every test the hand-in \
-names (the `cargo test -p <crate> <name>` of a check line, say), and quote their result lines \
-(`test result: ok. 12 passed`) as the evidence of the item. Run a long gate as \
-`cargo xtask verify 2>&1 | tail -n 30` and never redirect output to a file: a large output \
-spills to a file you may not read back. You may run the tests and checks of \
+Do not approve by reading alone. The gate's result is in your kickoff and in \"The gate's \
+result\" of your instructions: Toknila ran the project's check command on this hand-in's commit. \
+Quote it as the evidence of the check item with basis `ran`, and do not run the whole gate again. \
+Run the single tests the hand-in names (the `cargo test -p <crate> <name>` of a check line, say) \
+and whatever the diff makes you doubt, and quote their result lines (`test result: ok. 12 \
+passed`) as the evidence of the item. Never redirect output to a file: a large output spills to \
+a file you may not read back. You may run single tests and the checks of \
 the project's toolchain and read-only git; nothing that writes (no commit, checkout or install) \
-is allowed. When you could not run something (the command is refused, the tool is missing, it \
+is allowed. When the kickoff has no gate result, say `NOT_RUN` and why for the check item. When \
+you could not run something else (the command is refused, the tool is missing, it \
 fails to start), do not pass it silently: say `NOT_RUN` and why. Give each item a `basis`: \
 `ran` when you ran what shows it and quoted the result, `read` when you judged it from the diff \
 and the files, `not_run` when the check or test it names could not be run.

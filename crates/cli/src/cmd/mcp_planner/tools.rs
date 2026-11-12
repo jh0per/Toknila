@@ -12,13 +12,16 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
     vec![
         tool(
             "show_plan",
-            "Read the whole plan of the project: every chain with its cards in dependency order (the order is the priority), each card's status, prompt, acceptance, subtasks, what it waits for, threads, review results and pull request state; and `designs`, the project's designs with the path of each file you may Read.",
-            json!({}),
+            "Read the plan of the project. Without arguments it answers the overview: every chain (name, goal, version, autostart, phase, done/total), every card of an unfinished chain as one short record (key, title, status, what it waits for, design_first, design names, counts of subtasks and threads, whether it waits for the owner), a finished chain as one record without cards, `designs` (with the path of each file you may Read) and `pins` with their answers. With `chain` it answers that chain with every card in full; with `card`, that one card in full (prompt, acceptance, subtasks, threads with their messages, review results, pull request state).",
+            json!({
+                "chain": text("Open this chain in full: its name or id"),
+                "card": text("Open this card in full: its key (DEMO-3), id or title"),
+            }),
             &[],
         ),
         tool(
             "show_design",
-            "Read one design of the project: its name, kind, media type, size and the path of its file, which you may Read. Name the design by its id or its name (see `designs` in show_plan).",
+            "Look at one design of the project, also one the owner added a moment ago. It answers the design's name, kind, media type, size and the path of its file as text and, for a png, jpg or webp, the picture itself as image content: you see it without reading any file. For a pdf it answers the metadata and path only. A Figma link whose image was not fetched has no file, and the answer says so in words. Name the design by its id or its name (see `designs` in show_plan).",
             json!({ "design": text("The design: its id or its name") }),
             &["design"],
         ),
@@ -58,6 +61,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "subtasks": list_of_text("Checklist items"),
                 "design_first": { "type": "boolean", "description": "True for a card that changes what the person sees (screens, flows): its agent then shows a design for approval before any code" },
                 "designs": designs_param("The project's designs the card is about; the first is the card's thumbnail"),
+                "model": model_param("Leave out for routine work: the project's model runs it"),
             }),
             &["chain", "title"],
         ),
@@ -71,6 +75,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "acceptance": list_of_text("The new acceptance list; it replaces the old one"),
                 "design_first": { "type": "boolean", "description": "Whether the agent shows a design for approval before any code" },
                 "designs": designs_param("The card's designs; the list replaces the old one, [] clears it, left out keeps it"),
+                "model": model_param("The card's model; an empty text clears it, left out keeps it"),
                 "add_subtasks": list_of_text("Checklist items to append"),
                 "edit_subtasks": { "type": "array", "description": "Checklist items to rename",
                     "items": { "type": "object", "properties": {
@@ -148,6 +153,15 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             &["card", "thread", "format", "body"],
         ),
     ]
+}
+
+/// The `model` argument: an alias or a full model name; anything else is refused.
+fn model_param(description: &str) -> Value {
+    let aliases = toknila_core::MODEL_ALIASES.join(", ");
+    json!({
+        "type": "string",
+        "description": format!("{description}. One of {aliases}, or a full model name (claude-…)"),
+    })
 }
 
 /// The `designs` argument: references to designs of the project's library.

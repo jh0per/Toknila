@@ -877,6 +877,53 @@
       }
     },
     "/planner/cards/{card}": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "One card of the planner's project in full: prompt, acceptance, subtasks, threads with their\nmessages, review results and pull request.",
+        "operationId": "planner_card",
+        "parameters": [
+          {
+            "name": "card",
+            "in": "path",
+            "description": "Card id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCard"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "planner"
@@ -1236,6 +1283,55 @@
         }
       }
     },
+    "/planner/chains/{chain}": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "One chain of the planner's project with every card in full.",
+        "operationId": "planner_chain",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanChain"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/planner/chains/{chain}/cards": {
       "post": {
         "tags": [
@@ -1551,6 +1647,35 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/planner/overview": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "The plan of the planner's project in short records (every chain, the cards of the chains that\nare not finished, the designs with their paths, the pins): small at any size of the plan.",
+        "operationId": "planner_overview",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerOverview"
+                }
+              }
+            }
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3649,6 +3774,45 @@
         }
       }
     },
+    "/repos/prepare": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Does the one fix the folder's check offers (make the folder, `git init`, the first commit)\nand answers the folder's new check. A fix the check does not offer is refused, nothing touched.",
+        "operationId": "repos_prepare",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoPrepareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoCheck"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/system/checks": {
       "get": {
         "tags": [
@@ -4374,6 +4538,65 @@
         ],
         "summary": "The agent's `PermissionRequest` hook: a permission dialog is about to show. The worker's card\nwaits for the person (a reviewer's dialog is listed in the inbox), and the call is held until\nthe person allows or denies in the window, up to the daemon's wait; then the agent shows its\nown dialog (`decision: ask`).",
         "operationId": "agent_permission",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionReply"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/pre-tool": {
+      "post": {
+        "tags": [
+          "agent"
+        ],
+        "summary": "The agent's `PreToolUse` hook: a tool call is about to run, in any permission mode. Answers with\nthe automatic decisions only (`deny` or `ask`, meaning no decision); never asks a person and\nnever waits.",
+        "operationId": "agent_pre_tool",
         "parameters": [
           {
             "name": "ticket",
@@ -6094,6 +6317,29 @@
           },
           {
             "type": "object",
+            "description": "The project's setup command failed in the new ship (non-zero exit, timeout), so no agent\nwas started; `output` is the end of what it wrote. Unblocking runs it again.",
+            "required": [
+              "command",
+              "output",
+              "kind"
+            ],
+            "properties": {
+              "command": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "setup_failed"
+                ]
+              },
+              "output": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "The base branch is behind its upstream (local merge mode), so the ship would start on old\ncode. Nothing was made. A person fast-forwards the base and starts, or starts anyway;\nplain unblock looks again.",
             "required": [
               "base",
@@ -6187,6 +6433,13 @@
               "$ref": "#/components/schemas/SubtaskEdit"
             },
             "description": "Checklist items to rename."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card's own model, an alias or a full name; empty text clears it."
           },
           "prompt": {
             "type": [
@@ -6589,6 +6842,32 @@
               "null"
             ],
             "description": "The version the tool reported, when it did."
+          }
+        }
+      },
+      "CheckOutcome": {
+        "type": "object",
+        "description": "The result of the project's check command on one hand-in.",
+        "required": [
+          "passed",
+          "output",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the check finished."
+          },
+          "command": {
+            "type": "string",
+            "description": "The command that ran; empty when the checker never said which."
+          },
+          "output": {
+            "type": "string",
+            "description": "The command and the end of its output, as the worker reads it."
+          },
+          "passed": {
+            "type": "boolean"
           }
         }
       },
@@ -8079,6 +8358,13 @@
             },
             "description": "Designs of the project the card is about, by file name or id."
           },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card's own model: an alias or a full name; left out, the project's runs it."
+          },
           "prompt": {
             "type": "string"
           },
@@ -8362,6 +8648,13 @@
               "null"
             ]
           },
+          "setup_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command run once in every new ship before the agent starts; an empty text names none."
+          },
           "work_branch": {
             "type": [
               "string",
@@ -8523,6 +8816,13 @@
               "$ref": "#/components/schemas/DesignRef"
             },
             "description": "Designs of the project the card is about (by id), with an optional region of each."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card's own model (an alias or a full name); left out, the project's worker model runs."
           },
           "needs_secrets": {
             "type": "boolean"
@@ -8784,6 +9084,129 @@
         },
         "additionalProperties": false
       },
+      "OverviewCard": {
+        "type": "object",
+        "description": "One card of an unfinished chain as one short record.",
+        "required": [
+          "key",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What it waits for: card keys and `release <version>` labels."
+          },
+          "design_first": {
+            "type": "boolean"
+          },
+          "designs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the designs the card is about."
+          },
+          "key": {
+            "$ref": "#/components/schemas/TicketKey"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card's own model; absent when the project's runs it."
+          },
+          "status": {
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "subtasks": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "threads": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string"
+          },
+          "waits_for_owner": {
+            "type": "boolean",
+            "description": "The card waits for the owner: it is proposed, asks a question, is in review, or has a\nthread version the owner has not answered."
+          }
+        }
+      },
+      "OverviewChain": {
+        "type": "object",
+        "description": "A chain: its facts, and its cards unless it is finished.",
+        "required": [
+          "id",
+          "name",
+          "goal",
+          "autostart",
+          "summary"
+        ],
+        "properties": {
+          "autostart": {
+            "type": "boolean"
+          },
+          "cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewCard"
+            },
+            "description": "Empty for a finished chain: open it with `chain` to read its cards."
+          },
+          "goal": {
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ChainId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/OverviewSummary"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "OverviewSummary": {
+        "type": "object",
+        "description": "Where a chain stands.",
+        "required": [
+          "phase",
+          "done",
+          "total"
+        ],
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "phase": {
+            "$ref": "#/components/schemas/PhaseState"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "PatchProject": {
         "type": "object",
         "description": "`PATCH /v1/projects/{project}`: the settings to change; unset fields stay.",
@@ -8928,6 +9351,13 @@
             },
             "description": "The domains the project's reviewers may read on the web (`docs.rs`); the list replaces the\nold one, an empty list denies the web again."
           },
+          "setup_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command run once in every new ship before the agent starts (`npm ci --prefix\napps/web`). An empty text clears it."
+          },
           "work_branch": {
             "type": [
               "string",
@@ -8992,6 +9422,13 @@
               "$ref": "#/components/schemas/DesignRef"
             },
             "description": "The card's designs, replacing the whole list (an empty list clears it); left out to keep\nthem."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The card's own model; an empty text clears it (the project's applies again)."
           },
           "needs_secrets": {
             "type": [
@@ -9248,6 +9685,31 @@
           "chain_file"
         ]
       },
+      "PlanOverview": {
+        "type": "object",
+        "description": "The project, every chain in short, and the pins with their answers.",
+        "required": [
+          "project",
+          "chains"
+        ],
+        "properties": {
+          "chains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewChain"
+            }
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignPin"
+            }
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          }
+        }
+      },
       "PlanScan": {
         "type": "object",
         "description": "`GET /v1/projects/{project}/plans`: the plans of the project's repository.",
@@ -9379,6 +9841,29 @@
             "minimum": 0
           }
         }
+      },
+      "PlannerOverview": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlanOverview"
+          },
+          {
+            "type": "object",
+            "required": [
+              "designs"
+            ],
+            "properties": {
+              "designs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PlannerDesign"
+                },
+                "description": "Oldest first, each with the path of its file."
+              }
+            }
+          }
+        ],
+        "description": "Answer of `GET /v1/planner/overview`: the plan in short records and the project's designs."
       },
       "PlannerPlan": {
         "allOf": [
@@ -9653,6 +10138,13 @@
             },
             "description": "Domains the project's reviewers may read on the web (`docs.rs`); empty: none, so a page a\ncard cites stays unread."
           },
+          "setup_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command the shipyard runs once in every new ship before the card's agent starts\n(`npm ci --prefix apps/web`). `None`: no setup."
+          },
           "work_branch": {
             "type": "string",
             "description": "Branch ships start from and merge into (`develop`)."
@@ -9673,7 +10165,8 @@
           "project",
           "limit",
           "used",
-          "queued"
+          "queued",
+          "runs"
         ],
         "properties": {
           "limit": {
@@ -9691,6 +10184,13 @@
               "$ref": "#/components/schemas/QueuedCard"
             },
             "description": "Waiting cards, first in line first."
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectRun"
+            },
+            "description": "What runs in the project now: the assistant first (`role: planner`, no card), then the\nruns of its cards. The assistant holds no slot: it is in `runs`, never in `used`."
           },
           "used": {
             "type": "integer",
@@ -9765,6 +10265,35 @@
           "DEMO"
         ],
         "pattern": "^[A-Z][A-Z0-9]{1,9}$"
+      },
+      "ProjectRun": {
+        "type": "object",
+        "description": "One live run of a project. The assistant (`role: planner`) has no card and holds no slot.",
+        "required": [
+          "role",
+          "since"
+        ],
+        "properties": {
+          "card": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RunCard",
+                "description": "The card the run works for; none for the assistant."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/AgentRole",
+            "description": "`worker`, `reviewer` or `planner`."
+          },
+          "since": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the process started."
+          }
+        }
       },
       "Proposal": {
         "type": "object",
@@ -10279,6 +10808,13 @@
               "null"
             ],
             "description": "The project name the folder suggests: its base name."
+          },
+          "suggested_setup_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The setup command the repository suggests (`npm ci --prefix apps/web` for a lock file\nunder `apps/web`); `null` when it suggests none."
           }
         }
       },
@@ -10310,6 +10846,32 @@
           "work_branch"
         ]
       },
+      "RepoFix": {
+        "type": "string",
+        "description": "How a problem can be fixed by the daemon (`POST /v1/repos/prepare`).",
+        "enum": [
+          "create_folder",
+          "init_repository",
+          "first_commit"
+        ]
+      },
+      "RepoPrepareRequest": {
+        "type": "object",
+        "description": "`POST /v1/repos/prepare`: the one fix to make to a folder (one its check offers).",
+        "required": [
+          "repo_path",
+          "fix"
+        ],
+        "properties": {
+          "fix": {
+            "$ref": "#/components/schemas/RepoFix"
+          },
+          "repo_path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "RepoProblem": {
         "type": "object",
         "description": "One thing that stops the folder from being used.",
@@ -10324,6 +10886,17 @@
           },
           "field": {
             "$ref": "#/components/schemas/RepoField"
+          },
+          "fix": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RepoFix",
+                "description": "What the daemon can do about it; `null` when only the person can."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "message": {
             "type": "string"
@@ -10340,7 +10913,8 @@
           "not_a_directory",
           "not_a_git_repo",
           "git_missing",
-          "branch_missing"
+          "branch_missing",
+          "no_commits"
         ]
       },
       "Review": {
@@ -10364,6 +10938,17 @@
               "null"
             ],
             "description": "The commit the ship's branch was at when the worker last handed in; `None` before the\nfirst hand-in, or when the host could not look."
+          },
+          "last_check": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CheckOutcome",
+                "description": "What the check command said about the current hand-in; `None` before it ran, when the\nproject has no check command, or after a new hand-in until it ran again."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "note": {
             "oneOf": [
@@ -10656,6 +11241,26 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          }
+        }
+      },
+      "RunCard": {
+        "type": "object",
+        "description": "The card a run works for.",
+        "required": [
+          "id",
+          "key",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/TicketId"
+          },
+          "key": {
+            "$ref": "#/components/schemas/TicketKey"
+          },
+          "title": {
+            "type": "string"
           }
         }
       },
@@ -11528,6 +12133,13 @@
           },
           "key": {
             "$ref": "#/components/schemas/TicketKey"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The model of the card's own agent (an alias or a full name); `None` means the project's\n`worker_model`."
           },
           "needs_secrets": {
             "type": "boolean",

@@ -93,6 +93,21 @@ pub enum RepoProblemCode {
     NotAGitRepo,
     GitMissing,
     BranchMissing,
+    /// A repository whose HEAD names a branch that has no commit yet.
+    NoCommits,
+}
+
+/// How a problem can be fixed by the daemon (`POST /v1/repos/prepare`).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RepoFix {
+    /// Make the folder and its missing parents.
+    CreateFolder,
+    /// `git init`, then the first commit.
+    InitRepository,
+    /// An empty commit named "Initial commit".
+    FirstCommit,
 }
 
 /// One thing that stops the folder from being used.
@@ -102,6 +117,9 @@ pub struct RepoProblem {
     pub field: RepoField,
     pub code: RepoProblemCode,
     pub message: String,
+    /// What the daemon can do about it; `null` when only the person can.
+    #[serde(default)]
+    pub fix: Option<RepoFix>,
 }
 
 /// The answer to "may this folder be a project's repository, with this base branch?".
@@ -122,6 +140,10 @@ pub struct RepoCheck {
     /// The check command the repository suggests (`cargo xtask verify`, `npm test`, ...); `null`
     /// when it suggests none.
     pub suggested_check_command: Option<String>,
+    /// The setup command the repository suggests (`npm ci --prefix apps/web` for a lock file
+    /// under `apps/web`); `null` when it suggests none.
+    #[serde(default)]
+    pub suggested_setup_command: Option<String>,
     /// Where accepted work should land: `github` for a GitHub remote with a working `gh` login,
     /// else `local`; `null` when the folder is not a usable repository.
     pub suggested_merge_mode: Option<MergeMode>,
@@ -134,34 +156,97 @@ impl RepoCheck {
     }
 }
 
-fn problem(field: RepoField, code: RepoProblemCode, message: String) -> RepoProblem {
+fn problem(
+    field: RepoField,
+    code: RepoProblemCode,
+    message: String,
+    fix: Option<RepoFix>,
+) -> RepoProblem {
     RepoProblem {
         field,
         code,
         message,
+        fix,
     }
 }
 
-fn path_problem(path: &str, facts: &RepoFacts) -> Option<(RepoProblemCode, String)> {
+type PathProblem = (RepoProblemCode, String, Option<RepoFix>);
+
+fn path_problem(path: &str, facts: &RepoFacts) -> Option<PathProblem> {
     use RepoProblemCode::*;
     if path.is_empty() {
-        return Some((PathEmpty, "Enter the path of the repository.".to_owned()));
+        return Some((
+            PathEmpty,
+            "Enter the path of the repository.".to_owned(),
+            None,
+        ));
     }
     if !std::path::Path::new(path).is_absolute() {
-        return Some((PathNotAbsolute, format!("{path} is not an absolute path.")));
+        return Some((
+            PathNotAbsolute,
+            format!("{path} is not an absolute path."),
+            None,
+        ));
     }
     match (&facts.path, &facts.git) {
-        (PathKind::Missing, _) => Some((PathMissing, format!("{path} does not exist."))),
-        (PathKind::File, _) => Some((NotADirectory, format!("{path} is a file, not a folder."))),
+        (PathKind::Missing, _) => Some((
+            PathMissing,
+            format!("{path} does not exist. Toknila can create it."),
+            Some(RepoFix::CreateFolder),
+        )),
+        (PathKind::File, _) => Some((
+            NotADirectory,
+            format!("{path} is a file, not a folder."),
+            None,
+        )),
         (PathKind::Dir, GitState::GitMissing) => Some((
             GitMissing,
             "git is not installed, so the folder cannot be checked.".to_owned(),
+            None,
         )),
-        (PathKind::Dir, GitState::NotARepo) => {
-            Some((NotAGitRepo, format!("{path} is not a git repository.")))
-        }
+        (PathKind::Dir, GitState::NotARepo) => Some((
+            NotAGitRepo,
+            format!("{path} is not a git repository. Toknila can make it one."),
+            Some(RepoFix::InitRepository),
+        )),
         (PathKind::Dir, GitState::Repo { .. }) => None,
     }
+}
+
+/// What is wrong with the base branch; an empty `base` means the repository's own.
+fn base_problem(base: &str, branches: &[String], git: &GitState) -> Option<RepoProblem> {
+    let field = RepoField::WorkBranch;
+    let code = RepoProblemCode::BranchMissing;
+    if branches.is_empty() {
+        return Some(problem(
+            RepoField::RepoPath,
+            RepoProblemCode::NoCommits,
+            "The repository has no commit yet, so it has no branch to work from. Toknila can make the first commit."
+                .to_owned(),
+            Some(RepoFix::FirstCommit),
+        ));
+    }
+    if base.is_empty() {
+        return match default_base(git) {
+            Ok(own) if branches.contains(&own) => None,
+            Ok(own) => Some(problem(
+                field,
+                code,
+                format!("The repository's own branch {own:?} does not exist; name a branch."),
+                None,
+            )),
+            Err(e) => Some(problem(field, code, format!("Name a branch: {e}."), None)),
+        };
+    }
+    if branches.iter().any(|b| b == base) {
+        return None;
+    }
+    Some(problem(
+        field,
+        code,
+        format!("The repository has no branch {base:?}."),
+        None,
+    ))
 }
 
 /// Judges the path text first, then what the host found there.
@@ -169,30 +254,24 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
     let path = path.trim();
     let suggested_key = crate::suggest::project_key(path);
     let suggested_name = crate::suggest::project_name(path);
-    if let Some((code, message)) = path_problem(path, facts) {
+    if let Some((code, message, fix)) = path_problem(path, facts) {
         return RepoCheck {
-            problems: vec![problem(RepoField::RepoPath, code, message)],
+            problems: vec![problem(RepoField::RepoPath, code, message, fix)],
             branches: Vec::new(),
             suggested_key,
             suggested_name,
             suggested_branch: None,
             suggested_check_command: None,
+            suggested_setup_command: None,
             suggested_merge_mode: None,
         };
     }
     let GitState::Repo { branches, .. } = &facts.git else {
         unreachable!("path_problem accepts only a repository");
     };
-    let base = base.trim();
-    let problems = if branches.iter().any(|b| b == base) {
-        Vec::new()
-    } else {
-        vec![problem(
-            RepoField::WorkBranch,
-            RepoProblemCode::BranchMissing,
-            format!("The repository has no branch {base:?}."),
-        )]
-    };
+    let problems = base_problem(base.trim(), branches, &facts.git)
+        .into_iter()
+        .collect();
     RepoCheck {
         problems,
         branches: branches.clone(),
@@ -200,6 +279,7 @@ pub fn judge(path: &str, base: &str, facts: &RepoFacts) -> RepoCheck {
         suggested_name,
         suggested_branch: default_base(&facts.git).ok(),
         suggested_check_command: defaults::check_command(&facts.traits),
+        suggested_setup_command: defaults::setup_command(&facts.traits),
         suggested_merge_mode: Some(defaults::merge_mode(&facts.traits)),
     }
 }
@@ -352,10 +432,75 @@ mod tests {
     }
 
     #[test]
-    fn a_blank_base_branch_counts_as_missing() {
+    fn a_blank_base_branch_is_the_repositorys_own() {
+        let c = judge(ABS, " ", &repo(&["main"]));
+        assert!(c.is_ok(), "{c:?}");
+        let detached = facts(PathKind::Dir, state(&["main", "next"], None, None));
+        let c = judge(ABS, "", &detached);
         assert_eq!(
-            only(&judge(ABS, " ", &repo(&["main"]))).1,
-            RepoProblemCode::BranchMissing
+            only(&c),
+            (RepoField::WorkBranch, RepoProblemCode::BranchMissing)
         );
+        assert!(c.problems[0].message.contains("Name a branch"), "{c:?}");
+        assert_eq!(c.problems[0].fix, None);
+    }
+
+    #[test]
+    fn a_problem_says_how_it_can_be_fixed() {
+        let fix = |f: &RepoFacts| judge(ABS, "main", f).problems[0].fix;
+        assert_eq!(
+            fix(&facts(PathKind::Missing, GitState::NotARepo)),
+            Some(RepoFix::CreateFolder)
+        );
+        assert_eq!(
+            fix(&facts(PathKind::Dir, GitState::NotARepo)),
+            Some(RepoFix::InitRepository)
+        );
+        assert_eq!(fix(&facts(PathKind::File, GitState::NotARepo)), None);
+        assert_eq!(
+            judge("rel/path", "main", &repo(&["main"])).problems[0].fix,
+            None
+        );
+        let unborn = facts(PathKind::Dir, state(&[], Some("main"), None));
+        let c = judge(ABS, "main", &unborn);
+        assert_eq!(only(&c), (RepoField::RepoPath, RepoProblemCode::NoCommits));
+        assert_eq!(c.problems[0].fix, Some(RepoFix::FirstCommit));
+        assert_eq!(c.suggested_branch.as_deref(), Some("main"));
+        // An empty base does not hide it.
+        assert_eq!(
+            judge(ABS, "", &unborn).problems[0].fix,
+            Some(RepoFix::FirstCommit)
+        );
+    }
+
+    #[test]
+    fn a_fixable_problem_says_what_is_true_and_what_can_be_done() {
+        let say = |f: &RepoFacts| judge(ABS, "main", f).problems[0].message.clone();
+        let missing = say(&facts(PathKind::Missing, GitState::NotARepo));
+        assert_eq!(
+            missing,
+            format!("{ABS} does not exist. Toknila can create it.")
+        );
+        let plain = say(&facts(PathKind::Dir, GitState::NotARepo));
+        assert_eq!(
+            plain,
+            format!("{ABS} is not a git repository. Toknila can make it one.")
+        );
+        let unborn = say(&facts(PathKind::Dir, state(&[], Some("main"), None)));
+        assert_eq!(
+            unborn,
+            "The repository has no commit yet, so it has no branch to work from. Toknila can make the first commit."
+        );
+    }
+
+    #[test]
+    fn a_problem_is_pinned_on_the_wire() {
+        let c = judge(ABS, "main", &facts(PathKind::Dir, GitState::NotARepo));
+        let json = serde_json::to_value(&c.problems[0]).expect("json");
+        assert_eq!(json["code"], "not_a_git_repo");
+        assert_eq!(json["fix"], "init_repository");
+        assert_eq!(json["field"], "repo_path");
+        let json = serde_json::to_value(RepoProblemCode::NoCommits).expect("json");
+        assert_eq!(json, "no_commits");
     }
 }

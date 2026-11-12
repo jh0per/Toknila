@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use toknila_core::design::DesignRef;
 use toknila_core::planner;
-use toknila_core::{ProjectId, TicketId, TicketPatch};
+use toknila_core::{Project, ProjectId, TicketId, TicketPatch};
 
 use super::{card, chain};
 use crate::tickets;
@@ -12,7 +12,7 @@ use crate::tickets::NewTicket;
 use toknila_core::discussion::EditProposal;
 
 use crate::discussion;
-use crate::{AppResult, UnitOfWork, notes};
+use crate::{AppError, AppResult, UnitOfWork, notes};
 
 /// What the planner gives for a new card.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -36,6 +36,9 @@ pub struct NewCard {
     /// Designs of the project the card is about, by file name or id.
     #[serde(default)]
     pub designs: Vec<DesignPick>,
+    /// The card's own model: an alias or a full name; left out, the project's runs it.
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 /// A design the planner names: its file name (or id) in the project's library, and the part of
@@ -70,6 +73,10 @@ pub fn add_card_with_designs<U: UnitOfWork + ?Sized>(
 ) -> AppResult<TicketId> {
     let c = chain(uow, project, chain_ref)?;
     planner::ensure_graph_change(&c)?;
+    let model = match input.model.as_deref() {
+        Some(m) => Project::choose_model(m).map_err(AppError::bad_request)?,
+        None => None,
+    };
     let at_end = input.after.is_empty();
     let input = NewTicket {
         title: input.title,
@@ -79,6 +86,7 @@ pub fn add_card_with_designs<U: UnitOfWork + ?Sized>(
         subtasks: input.subtasks,
         design_first: input.design_first,
         designs,
+        model,
         at_end,
         ..NewTicket::default()
     };
@@ -103,6 +111,9 @@ pub struct CardEdit {
     pub acceptance: Option<Vec<String>>,
     /// Whether the agent shows a design for approval before any code.
     pub design_first: Option<bool>,
+    /// The card's own model, an alias or a full name; empty text clears it.
+    #[serde(default)]
+    pub model: Option<String>,
     /// The card's designs, replacing the list (`[]` clears it); left out keeps them.
     #[serde(default)]
     pub designs: Option<Vec<DesignPick>>,
@@ -134,6 +145,9 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
 ) -> AppResult<TicketId> {
     let t = card(uow, project, card_ref)?;
     planner::ensure_card_editable(&t)?;
+    if let Some(m) = edit.model.as_deref() {
+        Project::choose_model(m).map_err(AppError::bad_request)?;
+    }
     let (mut prompt, mut acceptance) = (edit.prompt, edit.acceptance);
     // On a card the person talks over with the assistant, a new prompt or acceptance is a proposal
     // the person accepts or rejects; it lands only then.
@@ -150,6 +164,7 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
         prompt,
         acceptance,
         design_first: edit.design_first,
+        model: edit.model,
         designs,
         ..TicketPatch::default()
     };

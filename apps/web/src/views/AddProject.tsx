@@ -1,8 +1,8 @@
 import { type ChangeEvent, useState } from "react";
-import type { MergeMode } from "../api/types";
-import type { DraftField } from "../store/addForm";
+import type { MergeMode, RepoFix } from "../api/types";
+import { type DraftField, currentSuggestion, fixRefusal } from "../store/addForm";
 import type { Intent } from "../store/msg";
-import { fieldError, formError } from "../store/settings";
+import { addBusy, fieldError, formError } from "../store/settings";
 import type { State } from "../store/state";
 import { canBrowse } from "../store/shell";
 import { Field } from "./Field";
@@ -10,7 +10,13 @@ import { Field } from "./Field";
 /// The id of the add-project form, for a button that sits outside it.
 export const ADD_PROJECT_FORM = "add-project-form";
 
-const DETAIL_FIELDS =["work_branch", "key", "name", "check_command", "merge_mode"];
+const FIX_LABEL: Record<RepoFix, string> = {
+  create_folder: "Create the folder",
+  init_repository: "Make it a git repository",
+  first_commit: "Make the first commit",
+};
+
+const DETAIL_FIELDS = ["key", "name", "check_command", "setup_command", "merge_mode"];
 
 /// Add a project from a folder. In the desktop app Browse opens the system's folder picker; in a
 /// browser (and beside it) the path is typed or pasted. Toknila fills in what it finds in the
@@ -32,7 +38,21 @@ export function AddProject({ state, dispatch, focus = false, submit = true }: {
   const refused = DETAIL_FIELDS.some((f) => fieldError(s, f));
   const edit = (field: DraftField) => (e: ChangeEvent<HTMLInputElement>) =>
     dispatch({ type: "editDraft", field, value: e.target.value });
-  const found = s.add.suggested;
+  const found = currentSuggestion(s.add);
+  const folderProblem = s.problems.find((p) => p.field === "repo_path");
+  // The folder is a usable repository as far as the daemon has answered for the text on the screen.
+  const ready = found !== undefined && !folderProblem;
+  const checking = d.repo_path.trim() !== "" && found === undefined && !folderProblem;
+  const fixing = s.add.fixing;
+  const refusal = fixRefusal(s.add);
+  const fixButton = folderProblem?.fix ? (
+    <button
+      type="button" className="btn" data-testid="fix-folder" data-fix={folderProblem.fix} disabled={fixing !== undefined}
+      onClick={() => dispatch({ type: "fixFolder", fix: folderProblem.fix as RepoFix })}
+    >
+      {fixing ? "Working…" : FIX_LABEL[folderProblem.fix]}
+    </button>
+  ) : undefined;
   return (
     <form
       className="card-block form add-project"
@@ -45,11 +65,17 @@ export function AddProject({ state, dispatch, focus = false, submit = true }: {
     >
       <h2>Add a project</h2>
       <Field
-        label="Folder of your project" name="repo_path" error={fieldError(s, "repo_path")}
+        label="Folder of your project" name="repo_path" error={fieldError(s, "repo_path")} action={fixButton}
         hint={canBrowse() ? "Pick it with Browse, or paste its path." : "Paste the path of the folder that holds your project (a git repository)."}
       >
         <span className="path-row">
-          <input data-testid="repo-path" value={d.repo_path} spellCheck={false} autoFocus={focus} onChange={edit("repo_path")} />
+          <input
+            data-testid="repo-path" value={d.repo_path} spellCheck={false} autoFocus={focus}
+            onChange={(e) => dispatch({
+              type: "editDraft", field: "repo_path", value: e.target.value,
+              now: (e.nativeEvent as InputEvent).inputType === "insertFromPaste",
+            })}
+          />
           {canBrowse() && (
             <button type="button" className="btn" data-testid="browse-folder" onClick={() => dispatch({ type: "browseFolder" })}>
               Browse…
@@ -57,34 +83,40 @@ export function AddProject({ state, dispatch, focus = false, submit = true }: {
           )}
         </span>
       </Field>
+      {refusal && <p className="field-error" role="alert" data-testid="fix-error">{refusal}</p>}
+      {checking && <p className="muted" data-testid="add-checking">Checking the folder…</p>}
+      {ready && (
+        <>
+          <Field label="Main branch" name="work_branch" error={fieldError(s, "work_branch")} hint="Agents start from it, and approved work lands on it.">
+            <input data-testid="work-branch" value={d.work_branch} spellCheck={false} onChange={edit("work_branch")} />
+          </Field>
+          {s.branches.length > 0 && fieldError(s, "work_branch") && (
+            <p className="branches" data-testid="branches">
+              Branches in this folder:{" "}
+              {s.branches.map((b) => (
+                <button
+                  type="button" className="btn" key={b} data-branch={b}
+                  onClick={() => dispatch({ type: "editDraft", field: "work_branch", value: b })}
+                >
+                  {b}
+                </button>
+              ))}
+            </p>
+          )}
+        </>
+      )}
       <details
         className="fold" data-testid="add-details" open={opened || refused}
         onToggle={(e) => setOpened((e.currentTarget as HTMLDetailsElement).open)}
       >
         <summary>
           Details
-          {found && (
+          {ready && found && (
             <span className="muted found" data-testid="add-found">
-              {found.key} · {found.work_branch} · {found.merge_mode === "github" ? "pull requests" : "merges locally"}
+              {found.key} · {d.work_branch.trim() || found.work_branch} · {found.merge_mode === "github" ? "pull requests" : "merges locally"}
             </span>
           )}
         </summary>
-        <Field label="Main branch" name="work_branch" error={fieldError(s, "work_branch")} hint="Agents start from it, and approved work lands on it.">
-          <input data-testid="work-branch" value={d.work_branch} spellCheck={false} onChange={edit("work_branch")} />
-        </Field>
-        {s.branches.length > 0 && fieldError(s, "work_branch") && (
-          <p className="branches" data-testid="branches">
-            Branches in this folder:{" "}
-            {s.branches.map((b) => (
-              <button
-                type="button" className="btn" key={b} data-branch={b}
-                onClick={() => dispatch({ type: "editDraft", field: "work_branch", value: b })}
-              >
-                {b}
-              </button>
-            ))}
-          </p>
-        )}
         <Field label="Card prefix" name="key" error={fieldError(s, "key")} hint="Cards are named with it, like DEMO-1.">
           <input data-testid="project-key" value={d.key} spellCheck={false} onChange={edit("key")} />
         </Field>
@@ -93,6 +125,9 @@ export function AddProject({ state, dispatch, focus = false, submit = true }: {
         </Field>
         <Field label="Test command (optional)" name="check_command" error={fieldError(s, "check_command")} hint="Agents run it before they hand in.">
           <input data-testid="new-check-command" value={d.check_command} spellCheck={false} onChange={edit("check_command")} />
+        </Field>
+        <Field label="Setup command (optional)" name="setup_command" error={fieldError(s, "setup_command")} hint="Runs once in every new workspace before the agent starts, for example npm ci --prefix apps/web.">
+          <input data-testid="new-setup-command" value={d.setup_command} spellCheck={false} onChange={edit("setup_command")} />
         </Field>
         <Field label="When a card is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
           <select
@@ -109,7 +144,7 @@ export function AddProject({ state, dispatch, focus = false, submit = true }: {
         </p>
       </details>
       {formError(s) && <p className="error" role="alert">{formError(s)}</p>}
-      {submit && <button className="btn primary" type="submit" disabled={s.busy} data-testid="add-project-submit">Add project</button>}
+      {submit && <button className="btn primary" type="submit" disabled={addBusy(s)} data-testid="add-project-submit">Add project</button>}
     </form>
   );
 }

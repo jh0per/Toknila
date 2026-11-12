@@ -57,6 +57,9 @@ pub struct RunBrief {
     pub acceptance: Vec<String>,
     /// The project's check command, named in the agent's instructions.
     pub check_command: Option<String>,
+    /// The project's setup command: the host runs it once in a new ship before the agent starts,
+    /// and the agent is told it ran.
+    pub setup_command: Option<String>,
     /// Instructions the card's earlier runs were given (`toknila_core::instructions::earlier`),
     /// for a run that replaces one.
     pub earlier: Vec<String>,
@@ -93,6 +96,8 @@ pub struct RunBrief {
     pub designs: Vec<std::path::PathBuf>,
     /// The card's chain as its epic: the chain's name and goal (a card's agent only).
     pub epic: Option<(String, String)>,
+    /// What the check command said about the hand-in under review (a reviewer only).
+    pub check: Option<toknila_core::CheckOutcome>,
 }
 
 /// A runner now works for the ticket.
@@ -126,6 +131,13 @@ pub trait Runner: std::fmt::Debug {
     fn stop_role(&self, ticket: TicketId, role: AgentRole);
     /// Every runner process that is alive, by ticket and role.
     fn live_runners(&self) -> Vec<(TicketId, AgentRole)>;
+    /// [`Runner::live_runners`] with the time each process started; the epoch when unknown.
+    fn live_runs(&self) -> Vec<toknila_core::schedule::LiveRun> {
+        self.live_runners()
+            .into_iter()
+            .map(|(t, r)| (t, r, toknila_core::Timestamp(0)))
+            .collect()
+    }
     /// Writes bytes to the terminal of the ticket's runner of `role`.
     fn write(&self, ticket: TicketId, role: AgentRole, bytes: &[u8]) -> Result<(), RunnerError>;
     /// What a live run is like, for choosing how to reach it; `None` without a live process.

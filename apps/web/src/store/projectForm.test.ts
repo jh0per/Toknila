@@ -24,13 +24,24 @@ describe("the project form", () => {
     expect(isDirty({ ...f, check_command: "npm test" }, project)).toBe(true);
   });
 
+  it("saves the setup command: dirty after a change, an emptied field clears it, and the Agents tab shows its refusals", () => {
+    const f = formOf(project);
+    expect(f.setup_command).toBe("");
+    expect(isDirty({ ...f, setup_command: "npm ci" }, project)).toBe(true);
+    const set = { ...project, setup_command: "npm ci" } as Project;
+    expect(formOf(set).setup_command).toBe("npm ci");
+    expect(patchOf({ ...formOf(set), setup_command: "  " }).setup_command).toBe("");
+    expect(sectionOfField("setup_command")).toBe("agents");
+  });
+
   it("sends every field, trimmed, with the limit as a number", () => {
     const patch = patchOf({
-      ...formOf(project), max_parallel: "4", check_command: " npm test ", bump_command: " npm version {version} ", worker_model: "sonnet",
+      ...formOf(project), max_parallel: "4", check_command: " npm test ", setup_command: " npm ci --prefix apps/web ",
+      bump_command: " npm version {version} ", worker_model: "sonnet",
     });
     expect(patch).toEqual({
       work_branch: "main", default_profile: "claude-code", max_parallel: 4, check_command: "npm test",
-      bump_command: "npm version {version}",
+      setup_command: "npm ci --prefix apps/web", bump_command: "npm version {version}",
       worker_model: "sonnet", reviewer_model: "", planner_model: "opus", review_mode: "human", max_review_rounds: 3, reviewer: "",
       merge_mode: "local", pr_title: "{key}: {title}", merge_method: "merge", no_checks_timeout_secs: 600,
       command_policy: "ask", allowed_commands: [], reviewer_web_domains: [],
@@ -50,6 +61,8 @@ describe("the project form", () => {
     expect(sectionOfField("work_branch")).toBe("general");
     expect(sectionOfField("max_parallel")).toBe("agents");
     expect(sectionOfField("pr_title")).toBe("review");
-    expect(sectionOfField("planner_model")).toBe("advanced");
+    expect(sectionOfField("planner_model")).toBe("agents");
+    expect(sectionOfField("worker_model")).toBe("agents");
+    expect(sectionOfField("reviewer_model")).toBe("agents");
   });
 });

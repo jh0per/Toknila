@@ -46,6 +46,8 @@ pub(super) struct Channels {
 /// A run, live or finished.
 pub(super) struct Active {
     run: Run,
+    /// When the process started.
+    started: toknila_core::Timestamp,
     state: Mutex<State>,
     writer: Mutex<Box<dyn Write + Send>>,
     killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
@@ -67,6 +69,20 @@ impl std::fmt::Debug for Active {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Active").field("run", &self.run.id).finish()
     }
+}
+
+type Table = std::collections::HashMap<(TicketId, toknila_core::AgentRole), Arc<Active>>;
+
+/// The processes of `table` that have not ended, with when each started.
+pub(super) fn live_runs(table: &Table) -> Vec<toknila_core::schedule::LiveRun> {
+    let alive = table.iter().filter(|(_, a)| !a.is_over());
+    alive.map(|((t, r), a)| (*t, *r, a.started())).collect()
+}
+
+/// [`live_runs`] without the start times.
+pub(super) fn live_pairs(table: &Table) -> Vec<(TicketId, toknila_core::AgentRole)> {
+    let alive = table.iter().filter(|(_, a)| !a.is_over());
+    alive.map(|(key, _)| *key).collect()
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -100,6 +116,7 @@ impl Active {
         } = process;
         let active = Arc::new(Active {
             run,
+            started: crate::server::now(),
             state: Mutex::new(State {
                 scrollback: Scrollback::new(lines),
                 exit: None,
@@ -229,6 +246,11 @@ impl Active {
 
     pub fn run(&self) -> &Run {
         &self.run
+    }
+
+    /// When the process started.
+    pub fn started(&self) -> toknila_core::Timestamp {
+        self.started
     }
 
     /// The process has ended and its output is complete.

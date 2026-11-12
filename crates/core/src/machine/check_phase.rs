@@ -13,6 +13,7 @@ pub(super) fn enter_check(next: &mut Ticket, effects: &mut Vec<Effect>) {
     effects.push(Effect::RunCheck);
     next.review.turn = Some(ReviewTurn::Check);
     next.review.check = None;
+    next.review.last_check = None;
     next.review.nudged = false;
     next.review.note = None;
 }

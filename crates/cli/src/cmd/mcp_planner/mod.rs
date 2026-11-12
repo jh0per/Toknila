@@ -5,7 +5,7 @@
 //! There is no tool that starts, pauses, resumes, cancels, accepts, returns, reopens or merges.
 
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use toknila_api_types::{
     CardEdit, ChainDetail, EdgeInput, MoveInput, NewCard, NewDesignPin, NewMessage, NewPlanChain,
     NewSuggestion, NewThread, NewVersion, TicketDetail,
@@ -16,14 +16,22 @@ use toknila_core::{ArtifactFormat, EdgeKind, NodeRef, ThreadKind};
 
 use super::mcp_tools::ToolError;
 
+mod answer;
+mod scope;
+mod strict;
 mod tools;
+
+pub(super) use answer::Answer;
+use scope::{PlanScope, plan_scope};
+use strict::{args, refuse_unknown_keys};
 
 pub(in crate::cmd) use tools::list;
 
 /// One planner tool call, with its arguments checked.
 #[derive(Debug)]
 pub(super) enum PlannerCall {
-    ShowPlan,
+    /// The overview; one chain in full; or one card in full.
+    ShowPlan(PlanScope),
     ShowDesign {
         design: String,
     },
@@ -136,21 +144,15 @@ struct ThreadVersion {
     body: String,
 }
 
-fn args<T: serde::de::DeserializeOwned>(arguments: &Value) -> Result<T, ToolError> {
-    let value = match arguments {
-        Value::Null => json!({}),
-        other => other.clone(),
-    };
-    serde_json::from_value(value).map_err(|e| ToolError::BadArguments(e.to_string()))
-}
-
 /// The call a tool name and its arguments mean.
 pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolError> {
-    if !list().iter().any(|t| t["name"] == name) {
+    let tools = list();
+    let Some(tool) = tools.iter().find(|t| t["name"] == name) else {
         return Err(ToolError::Unknown);
-    }
+    };
+    refuse_unknown_keys(name, tool, arguments)?;
     Ok(match name {
-        "show_plan" => PlannerCall::ShowPlan,
+        "show_plan" => PlannerCall::ShowPlan(plan_scope(arguments)?),
         "show_design" => {
             let ShowDesign { design } = args(arguments)?;
             PlannerCall::ShowDesign { design }
@@ -245,18 +247,30 @@ fn card_line(verb: &str, d: &TicketDetail) -> String {
     )
 }
 
+/// Sends the call to the daemon and answers what came of it: `show_design` also gives the picture.
+pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<Answer, String> {
+    match call {
+        PlannerCall::ShowDesign { design } => answer::show_design(client, design),
+        other => send_text(client, other).map(Answer::from),
+    }
+}
+
 /// Sends the call to the daemon and says in a few lines what came of it.
-pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<String, String> {
+fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
     let e = |e: toknila_client::ClientError| e.to_string();
     match call {
-        PlannerCall::ShowPlan => {
-            let plan = client.planner_plan().map_err(e)?;
-            serde_json::to_string_pretty(&plan).map_err(|x| x.to_string())
+        PlannerCall::ShowPlan(scope) => {
+            // Compact JSON: the overview must stay small at any size of the plan.
+            let text = match scope {
+                PlanScope::Overview => {
+                    serde_json::to_string(&client.planner_overview().map_err(e)?)
+                }
+                PlanScope::Chain(c) => serde_json::to_string(&client.planner_chain(c).map_err(e)?),
+                PlanScope::Card(c) => serde_json::to_string(&client.planner_card(c).map_err(e)?),
+            };
+            text.map_err(|x| x.to_string())
         }
-        PlannerCall::ShowDesign { design } => {
-            let found = client.planner_design(design).map_err(e)?;
-            serde_json::to_string_pretty(&found).map_err(|x| x.to_string())
-        }
+        PlannerCall::ShowDesign { design } => answer::show_design(client, design).map(|a| a.text),
         PlannerCall::DesignQuestion(q) => {
             let pin = client.planner_pin(q).map_err(e)?;
             Ok(format!(
@@ -377,6 +391,8 @@ pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<String, String
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     fn names() -> Vec<String> {
@@ -411,7 +427,19 @@ mod tests {
     #[test]
     fn every_tool_turns_its_arguments_into_its_call() {
         let c = |name, args| call(name, &args).unwrap_or_else(|e| panic!("{name}: {e:?}"));
-        assert!(matches!(c("show_plan", json!({})), PlannerCall::ShowPlan));
+        assert!(matches!(
+            c("show_plan", json!({})),
+            PlannerCall::ShowPlan(PlanScope::Overview)
+        ));
+        assert!(matches!(
+            c("show_plan", json!({ "chain": "phase-6" })),
+            PlannerCall::ShowPlan(PlanScope::Chain(n)) if n == "phase-6"
+        ));
+        assert!(matches!(
+            c("show_plan", json!({ "card": "DEMO-2" })),
+            PlannerCall::ShowPlan(PlanScope::Card(n)) if n == "DEMO-2"
+        ));
+        assert!(call("show_plan", &json!({ "chain": "a", "card": "b" })).is_err());
         assert!(matches!(
             c("show_design", json!({ "design": "Home" })),
             PlannerCall::ShowDesign { design } if design == "Home"

@@ -3,6 +3,7 @@
 //! This crate performs no I/O and does not depend on an async runtime or a database.
 //! The daemon owns persistence and transport; core owns meaning.
 
+pub mod address;
 pub mod agent;
 pub mod dag;
 pub mod defaults;

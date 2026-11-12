@@ -32,6 +32,7 @@ pub(super) fn ticket(n: u32, status: TicketStatus, since: i64) -> Ticket {
         profile: None,
         review_mode: None,
         reviewer: None,
+        model: None,
         review: crate::Review::default(),
         pos: None,
         size: None,

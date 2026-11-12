@@ -10,11 +10,15 @@
 //! - [`typed`] and [`for_hook`]: the text of that delivery.
 //! - [`terminal`]: the bounds of a terminal size.
 
+mod gate;
 mod planner;
 mod protocol;
+mod setup;
 pub mod terminal;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_gate;
 #[cfg(test)]
 mod tests_return;
 mod waiting;
@@ -39,6 +43,9 @@ pub struct RunBrief<'a> {
     pub acceptance: &'a [String],
     /// The project's check command, named in both roles' instructions.
     pub check_command: Option<&'a str>,
+    /// The project's setup command, which the daemon ran in the workspace before the worker
+    /// started (a worker only).
+    pub setup_command: Option<&'a str>,
     /// Instructions a person gave to an earlier run of this card ([`earlier`]), as quoted text.
     pub earlier: &'a [String],
     /// Instructions no run has acted on yet ([`waiting`]), as quoted text: the run reads them
@@ -58,6 +65,9 @@ pub struct RunBrief<'a> {
     /// The chain the card belongs to, as its epic: the chain's name and its goal, which is what
     /// every card of the chain works toward. `None` or an empty goal says nothing.
     pub epic: Option<(&'a str, &'a str)>,
+    /// What the daemon's check command said about the hand-in under review (a reviewer only);
+    /// `None` when it did not run, e.g. the project has no check command.
+    pub check: Option<&'a crate::CheckOutcome>,
 }
 
 /// The section that carries the discussion of the card with the assistant; empty when there is
@@ -210,6 +220,9 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         );
     }
     let first = waiting::kickoff_part(brief.waiting, brief.returned);
+    if matches!(role, crate::AgentRole::Worker | crate::AgentRole::Release) {
+        checks.push_str(&setup::kickoff_part(brief));
+    }
     if brief.design_first {
         checks.push_str(
             " Before any code, open a design thread with a first version and wait for the \
@@ -233,11 +246,14 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         ),
         crate::AgentRole::Reviewer => format!(
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
-             branch, run the check command and the tests the hand-in names and quote their \
-             result lines (each command plain, one per call, no `cd` or `&&`), mark NOT_RUN what \
-             you could not run (never FAIL it), then call `review_verdict` once. You do not change the code.{since}",
+             branch, run the single tests the hand-in names and whatever the diff makes you doubt \
+             and quote their result lines (each command plain, one per call, no `cd` or `&&`), \
+             mark NOT_RUN what you could not run (never FAIL it), then call `review_verdict` \
+             once. You do not change the code. Do not run the whole gate again.{since}\n\n\
+             {gate}",
             key = brief.key,
             since = waiting::reviewer_part(brief.returned),
+            gate = gate::text(brief.check),
         ),
         _ => format!(
             "Start ticket {key} now. Read your Toknila instructions, work the card, commit your \
@@ -292,6 +308,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
     out.push_str(&discussion_section(brief));
     out.push_str(&waiting::sections(brief.waiting, brief.returned));
     out.push_str(&earlier_section(brief));
+    out.push_str(&setup::section(brief));
     out.push_str(&checks_section(
         brief,
         "Run it before you call `finished`; the work is not done while it fails.",
@@ -330,9 +347,9 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
             s.text()
         ));
     }
-    out.push_str(&checks_section(
-        brief,
-        "Run it to see the result for yourself, quote its result line, and report it as a check in your verdict.",
+    out.push_str(&format!(
+        "\n## The gate's result\n\n{}\n",
+        gate::text(brief.check)
     ));
     out.push('\n');
     out.push_str(protocol::REVIEW_PROTOCOL);

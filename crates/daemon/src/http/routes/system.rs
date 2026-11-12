@@ -9,7 +9,8 @@ use toknila_core::repo::{NoDefaultBase, RepoCheck, RepoProblem};
 use toknila_core::system::SystemChecks;
 
 use super::{ApiResult, read};
-use crate::http::dto::RepoCheckRequest;
+use crate::http::dto::{RepoCheckRequest, RepoPrepareRequest};
+use crate::http::error::ErrorBody;
 use crate::server::AppState;
 use crate::tools;
 
@@ -70,6 +71,23 @@ pub async fn repos_check(
             .unwrap_or_else(|_| Project::DEFAULT_WORK_BRANCH.to_owned()),
     };
     Ok(Json(check_repo(&state, input.repo_path, base).await?))
+}
+
+#[utoipa::path(post, path = "/repos/prepare", tag = "system", request_body = RepoPrepareRequest,
+    responses((status = 200, body = RepoCheck), (status = 409, body = ErrorBody)))]
+/// Does the one fix the folder's check offers (make the folder, `git init`, the first commit)
+/// and answers the folder's new check. A fix the check does not offer is refused, nothing touched.
+pub async fn repos_prepare(
+    State(state): State<AppState>,
+    Json(input): Json<RepoPrepareRequest>,
+) -> ApiResult<Json<RepoCheck>> {
+    let t = state.tools.clone();
+    let done = tokio::task::spawn_blocking(move || {
+        tools::prepare_repo(t.as_ref(), &input.repo_path, input.fix)
+    })
+    .await?;
+    done.map(Json)
+        .map_err(|e| toknila_app::AppError::conflict(e.to_string()).into())
 }
 
 /// The daemon's own binary, the person's home folder and `PATH`, as the link needs them.

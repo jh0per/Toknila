@@ -1,6 +1,7 @@
 //! Domain types. Plain data with serde; rules that change them live in sibling modules.
 
 mod chain;
+mod check_outcome;
 pub mod command_policy;
 mod comment;
 mod ids;
@@ -22,6 +23,7 @@ mod time;
 
 pub use crate::pr::{CheckRun, CheckState, PullRequest};
 pub use chain::{Chain, Edge, EdgeKind, NodeRef};
+pub use check_outcome::CheckOutcome;
 pub use command_policy::CommandPolicy;
 pub use comment::{Actor, Comment, CommentBody, CommentKind};
 pub use ids::{
@@ -32,7 +34,7 @@ pub use keys::{KeyError, ProjectKey, TicketKey};
 pub use profile::{
     AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules, Permissions,
 };
-pub use project::{MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
+pub use project::{MODEL_ALIASES, MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
 pub use review::{
     CheckPhase, ItemBasis, ItemOutcome, ItemVerdict, ItemsError, Review, ReviewNote, ReviewRound,

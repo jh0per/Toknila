@@ -3,8 +3,8 @@
 
 use toknila_api_types::{
     CardEdit, ChainDetail, DesignPin, EdgeInput, MoveInput, NewCard, NewMessage, NewPlanChain,
-    NewSuggestion, NewThread, NewVersion, PlannerDesign, PlannerPlan, PlannerState, StartPlanner,
-    TerminalSize, ThreadDetail, TicketDetail,
+    NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain, PlannerDesign, PlannerOverview,
+    PlannerPlan, PlannerState, StartPlanner, TerminalSize, ThreadDetail, TicketDetail,
 };
 use toknila_core::RunId;
 use toknila_core::suggestion::Suggestion;
@@ -36,10 +36,11 @@ impl Client {
         self.call("POST", &path, Some(&body))
     }
 
-    /// `POST /projects/{project}/planner/stop`.
+    /// `POST /projects/{project}/planner/stop`; stopping a stopped planner is fine, so a lost
+    /// connection is retried.
     pub fn stop_planner(&self, project: &str) -> ClientResult<PlannerState> {
         let path = format!("/projects/{}/planner/stop", enc(project));
-        self.call("POST", &path, Some(&serde_json::json!({})))
+        self.call_idempotent("POST", &path, Some(&serde_json::json!({})))
     }
 
     /// `GET /projects/{project}/planner/scrollback`.
@@ -86,6 +87,21 @@ impl Client {
     /// `GET /planner/plan`.
     pub fn planner_plan(&self) -> ClientResult<PlannerPlan> {
         self.call("GET", "/planner/plan", NO_BODY)
+    }
+
+    /// `GET /planner/overview`: the plan in short records, at any size.
+    pub fn planner_overview(&self) -> ClientResult<PlannerOverview> {
+        self.call("GET", "/planner/overview", NO_BODY)
+    }
+
+    /// `GET /planner/chains/{chain}`: one chain with every card in full.
+    pub fn planner_chain(&self, chain: &str) -> ClientResult<PlanChain> {
+        self.call("GET", &format!("/planner/chains/{}", enc(chain)), NO_BODY)
+    }
+
+    /// `GET /planner/cards/{card}`: one card in full.
+    pub fn planner_card(&self, card: &str) -> ClientResult<PlanCard> {
+        self.call("GET", &format!("/planner/cards/{}", enc(card)), NO_BODY)
     }
 
     /// `GET /planner/designs/{design}`.

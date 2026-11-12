@@ -2,10 +2,12 @@
 // changing its settings. The daemon judges every input; this only keeps what it answered so the
 // views can show it next to the field it is about.
 
-import type { CliLink, ListedProfile, PatchProject, Places, Project, RepoCheck, RepoProblem, SystemChecks } from "../api/types";
+import type {
+  CliLink, ListedProfile, PatchProject, Places, Project, RepoCheck, RepoFix, RepoProblem, SystemChecks,
+} from "../api/types";
 import {
-  type AddForm, type DraftField, type ProjectDraft, applyCheck, editDraft, initialAddForm, mustWait, needsCheck,
-  resolvedDraft,
+  type AddForm, type DraftField, type ProjectDraft, applyCheck, editDraft, endFix, initialAddForm, mustWait,
+  needsCheck, resolvedDraft,
 } from "./addForm";
 import type { Effect } from "./msg";
 import type { State } from "./state";
@@ -56,7 +58,10 @@ export const initialSettings: SettingsState = {
 export type SettingsIntent =
   | { type: "recheck" }
   | { type: "installCli" }
-  | { type: "editDraft"; field: DraftField; value: string }
+  /// `now`: the folder came by Browse or a paste, so the check runs at once, not after a pause.
+  | { type: "editDraft"; field: DraftField; value: string; now?: boolean }
+  /// Press the button beside a folder problem: the daemon makes the folder, the repository or the first commit.
+  | { type: "fixFolder"; fix: RepoFix }
   | { type: "submitProject" }
   | { type: "browseFolder" }
   | { type: "dismissSettingsNotes" }
@@ -71,6 +76,8 @@ export type SettingsResult =
   | { type: "profilesLoaded"; profiles: ListedProfile[]; folder: string }
   | { type: "placesLoaded"; places: Places }
   | { type: "repoChecked"; repo_path: string; check: RepoCheck }
+  | { type: "repoPrepared"; repo_path: string; check: RepoCheck }
+  | { type: "fixRefused"; repo_path: string; message: string }
   | { type: "addRejected"; problems: RepoProblem[]; branches: string[] }
   | { type: "projectAdded"; project: Project }
   | { type: "projectSaved"; project: Project }
@@ -87,7 +94,8 @@ export type SettingsEffect =
   | { type: "loadCli" }
   | { type: "installCli" }
   | { type: "pickFolder" }
-  | { type: "checkRepo"; repo_path: string; work_branch: string }
+  | { type: "checkRepo"; repo_path: string; work_branch: string; now?: boolean }
+  | { type: "prepareRepo"; repo_path: string; fix: RepoFix }
   | { type: "addProject"; draft: ProjectDraft }
   | Extract<SettingsIntent, { type: "saveProject" | "importChain" }>;
 
@@ -111,9 +119,34 @@ const start = (s: State): SettingsState => ({
   ...s.settings, problems: [], branches: [], error: undefined, busy: true, saved: false, imported: undefined,
 });
 
-const checkOf = (f: AddForm): Effect => ({
-  type: "checkRepo", repo_path: f.draft.repo_path.trim(), work_branch: f.draft.work_branch.trim(),
+/// What an edit of `field` makes stale: the problem and the refusal about that field only; a new
+/// folder also takes the main-branch ones, the offered branches and the error without a field.
+function staleAfterEdit(s: SettingsState, field: DraftField): Pick<SettingsState, "problems" | "branches" | "error"> {
+  const folder = field === "repo_path";
+  const gone = (f: string | undefined) => f === field || (folder && f === "work_branch");
+  return {
+    problems: s.problems.filter((p) => !gone(p.field)),
+    branches: folder ? [] : s.branches,
+    error: s.error && (gone(s.error.field) || (folder && !s.error.field)) ? undefined : s.error,
+  };
+}
+
+/// Whether the add button is off: a send or a fix is on its way.
+export const addBusy = (s: SettingsState): boolean => s.busy || s.add.fixing !== undefined;
+
+/// The check of the folder on the screen. Only a branch the person typed goes with it: without one
+/// the daemon answers with the repository's own, which fills the field.
+const checkOf = (f: AddForm, now = false): Effect => ({
+  type: "checkRepo", repo_path: f.draft.repo_path.trim(), work_branch: f.edited.work_branch ? f.draft.work_branch.trim() : "",
+  ...(now ? { now } : {}),
 });
+
+/// What the folder's answer changes on the screen, when it is about the text shown: its problems
+/// and branches. An answer about an older text changes nothing.
+function answered(s: SettingsState, repoPath: string, check: RepoCheck): { add: AddForm } & Partial<SettingsState> {
+  const add = applyCheck(s.add, repoPath, check);
+  return add === s.add ? { add } : { add, problems: check.problems, branches: check.branches };
+}
 
 const addOf = (f: AddForm): Effect => ({ type: "addProject", draft: resolvedDraft(f) });
 
@@ -128,14 +161,26 @@ export function reduceSettings(s: State, msg: SettingsMsg): [State, Effect[]] {
       return [set({ checks: undefined }), [{ type: "loadChecks" }]];
     case "editDraft": {
       const add = editDraft(s.settings.add, msg.field, msg.value);
-      return [set({ add }), needsCheck(s.settings.add, msg.field, msg.value) ? [checkOf(add)] : []];
+      return [set({ add, ...staleAfterEdit(s.settings, msg.field) }), needsCheck(s.settings.add, msg.field, msg.value) ? [checkOf(add, msg.now)] : []];
     }
     case "repoChecked": {
-      const add = applyCheck(s.settings.add, msg.repo_path, msg.check);
+      const shown = answered(s.settings, msg.repo_path, msg.check);
       // A form sent before the suggestion came goes out now, with it.
-      if (!s.settings.add.waiting || add === s.settings.add) return [set({ add }), []];
-      return [sending({ ...add, waiting: false }), [addOf(add)]];
+      if (!s.settings.add.waiting || shown.add === s.settings.add) return [set(shown), []];
+      return [sending({ ...shown.add, waiting: false }), [addOf(shown.add)]];
     }
+    case "fixFolder": {
+      const add = s.settings.add;
+      const path = add.draft.repo_path.trim();
+      if (add.fixing || !path) return [s, []];
+      return [set({ add: { ...add, fixing: { repo_path: path, fix: msg.fix }, fixError: undefined } }), [{ type: "prepareRepo", repo_path: path, fix: msg.fix }]];
+    }
+    case "repoPrepared": {
+      const shown = answered(s.settings, msg.repo_path, msg.check);
+      return [set({ ...shown, add: endFix(shown.add, msg.repo_path) }), []];
+    }
+    case "fixRefused":
+      return [set({ add: endFix(s.settings.add, msg.repo_path, msg.message) }), []];
     case "submitProject": {
       const add = s.settings.add;
       if (mustWait(add)) return [sending({ ...add, waiting: true }), [checkOf(add)]];

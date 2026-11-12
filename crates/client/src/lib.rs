@@ -8,6 +8,7 @@ use serde::de::DeserializeOwned;
 use toknila_api_types::ErrorBody;
 
 mod agents;
+mod body;
 mod chains;
 mod events;
 mod inbox;
@@ -55,20 +56,17 @@ const NO_BODY: Option<&()> = None;
 impl Client {
     /// A client of the daemon at `base` (`http://127.0.0.1:<port>`) with its bearer token.
     pub fn new(base: impl Into<String>, token: impl Into<String>) -> Self {
-        let agent = ureq::AgentBuilder::new()
-            .timeout(Duration::from_secs(30))
-            .build();
         Self {
             base: base.into(),
             token: token.into(),
-            agent,
+            agent: agent(Duration::from_secs(30)),
         }
     }
 
     /// Whether a daemon answers `/healthz` at `base`.
     pub fn healthy(base: &str) -> bool {
-        ureq::get(&format!("{base}/healthz"))
-            .timeout(Duration::from_secs(2))
+        agent(Duration::from_secs(2))
+            .get(&format!("{base}/healthz"))
             .call()
             .is_ok()
     }
@@ -79,48 +77,111 @@ impl Client {
         format!("{ws}/v1/stream?since={since}&token={}", self.token)
     }
 
+    /// One call. A call that lost its connection is repeated once on a new one only when the
+    /// method is idempotent (`GET`, `PUT`, `DELETE`); a `POST` is never sent twice, since the
+    /// daemon may have acted on it before the connection went.
     fn call<T: DeserializeOwned>(
         &self,
         method: &str,
         path: &str,
         body: Option<&impl Serialize>,
     ) -> ClientResult<T> {
+        self.call_as(
+            method,
+            path,
+            body,
+            matches!(method, "GET" | "PUT" | "DELETE"),
+        )
+    }
+
+    /// Like [`Client::call`] for a route whose repeat is harmless whatever its method (the
+    /// daemon documents it: a second stop of a stopped planner is fine).
+    fn call_idempotent<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&impl Serialize>,
+    ) -> ClientResult<T> {
+        self.call_as(method, path, body, true)
+    }
+
+    fn call_as<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&impl Serialize>,
+        repeatable: bool,
+    ) -> ClientResult<T> {
+        let json = body
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|e| ClientError::Decode(e.to_string()))?;
+        let mut tries = if repeatable { 2 } else { 1 };
+        let text = loop {
+            tries -= 1;
+            match self.once(method, path, json.as_ref()) {
+                Ok(text) => break text,
+                Err((_, true)) if tries > 0 => {}
+                Err((e, _)) => return Err(e),
+            }
+        };
+        // An empty answer (202 Accepted) reads as JSON null.
+        let text = if text.is_empty() { "null" } else { &text };
+        serde_json::from_str(text).map_err(|e| ClientError::Decode(e.to_string()))
+    }
+
+    /// One try: the answer's text, or the error and whether the connection was lost.
+    fn once(
+        &self,
+        method: &str,
+        path: &str,
+        json: Option<&serde_json::Value>,
+    ) -> Result<String, (ClientError, bool)> {
         let req = self
             .agent
             .request(method, &format!("{}/v1{path}", self.base))
             .set("Authorization", &format!("Bearer {}", self.token));
-        let resp = match body {
-            Some(b) => {
-                let json =
-                    serde_json::to_value(b).map_err(|e| ClientError::Decode(e.to_string()))?;
-                req.send_json(json)
-            }
+        let resp = match json {
+            Some(j) => req.send_json(j.clone()),
             None => req.call(),
         };
         match resp {
             Ok(r) => {
-                let text = r
-                    .into_string()
-                    .map_err(|e| ClientError::Decode(e.to_string()))?;
-                // An empty answer (202 Accepted) reads as JSON null.
-                let text = if text.is_empty() { "null" } else { &text };
-                serde_json::from_str(text).map_err(|e| ClientError::Decode(e.to_string()))
+                body::text(r).map_err(|e| (ClientError::Decode(e.to_string()), body::lost(&e)))
             }
-            Err(e) => Err(transport_error(e)),
+            Err(e) => {
+                let lost = matches!(&e, ureq::Error::Transport(t) if body::lost(t));
+                Err((transport_error(e), lost))
+            }
         }
     }
+}
+
+/// An HTTP agent whose limits are per operation, each set once on the socket. Never use ureq's
+/// overall `timeout`: it re-arms the socket timeouts before every read, and macOS refuses that
+/// with `EINVAL` once the daemon has answered and closed, which surfaced as `Error encountered
+/// in a header: Invalid argument (os error 22)` on a slow, loaded client.
+pub(crate) fn agent(limit: Duration) -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout_connect(limit)
+        .timeout_read(limit)
+        .timeout_write(limit)
+        .build()
 }
 
 /// A failed `ureq` call as a [`ClientError`]: the daemon's error body, or the transport failure.
 fn transport_error(e: ureq::Error) -> ClientError {
     match e {
         ureq::Error::Status(status, r) => {
-            let body = r.into_json().unwrap_or_else(|_| ErrorBody {
-                error: format!("HTTP {status}"),
-                code: String::new(),
-                field: None,
-                used_by: None,
-            });
+            let body = body::text(r)
+                .ok()
+                .and_then(|t| serde_json::from_str(&t).ok())
+                .unwrap_or_else(|| ErrorBody {
+                    error: format!("HTTP {status}"),
+                    code: String::new(),
+                    field: None,
+                    used_by: None,
+                });
             ClientError::Api { status, body }
         }
         e => ClientError::Transport(e.to_string()),
@@ -177,6 +238,80 @@ mod tests {
             "{err:?}"
         );
         assert_eq!(err.to_string(), message);
+    }
+
+    /// A daemon that has closed before the headers end must not make the client re-arm socket
+    /// timeouts on the dead socket: macOS answers that with `os error 22`.
+    #[test]
+    fn a_peer_that_closed_mid_headers_is_not_an_invalid_argument() {
+        use std::io::Write;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let base = format!("http://{}", listener.local_addr().expect("addr"));
+        let server = std::thread::spawn(move || {
+            let (mut s, _) = listener.accept().expect("accept");
+            // Let the request arrive, never read it: closing with unread data resets the socket.
+            std::thread::sleep(Duration::from_millis(200));
+            s.write_all(b"HTTP/1.1 200 OK\r\n").expect("write");
+            drop(s);
+        });
+        let err = Client::new(base, "t0k").projects().expect_err("cut");
+        server.join().expect("server");
+        let text = err.to_string();
+        assert!(!text.contains("os error 22"), "{text}");
+        assert!(!text.contains("Invalid argument"), "{text}");
+    }
+
+    /// A daemon that answers completely and closes at once (a reset, as the unread request is
+    /// still in its buffer) must not turn the finished answer into `os error 22`, nor an error
+    /// answer into a bare "HTTP 400".
+    #[test]
+    fn an_answer_the_daemon_closed_right_after_is_read_whole() {
+        // The first connection is answered and reset (the request stays unread); the next ones
+        // are answered after their request was read. Returns the connections it accepted.
+        fn serve(connections: usize) -> (String, std::thread::JoinHandle<()>) {
+            use std::io::{Read, Write};
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+            let base = format!("http://{}", listener.local_addr().expect("addr"));
+            let server = std::thread::spawn(move || {
+                for n in 0..connections {
+                    let (mut s, _) = listener.accept().expect("accept");
+                    if n > 0 {
+                        // The whole request (headers and body may arrive apart), so that the
+                        // close is a plain FIN and not a reset.
+                        s.set_read_timeout(Some(Duration::from_millis(300)))
+                            .expect("timeout");
+                        while s.read(&mut [0u8; 4096]).is_ok_and(|n| n > 0) {}
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                    let reply = "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n[]";
+                    s.write_all(reply.as_bytes()).expect("write");
+                }
+            });
+            (base, server)
+        }
+
+        // A GET whose connection was lost is repeated once on a new connection.
+        let (base, server) = serve(2);
+        let got = Client::new(base, "t0k").projects();
+        server.join().expect("server");
+        assert!(got.expect("repeated").is_empty());
+
+        // A route that is harmless to repeat is too (its answer here is not a planner state, so
+        // it is a decode error, but it came from the second connection, not from `os error 22`).
+        let (base, server) = serve(2);
+        let got = Client::new(base, "t0k").stop_planner("DEMO");
+        server.join().expect("server");
+        let text = format!("{got:?}");
+        assert!(!text.contains("os error 22"), "{text}");
+
+        // A POST is sent once: its failure is shown, and no second connection was opened (the
+        // server would otherwise wait for it, and `join` would never return).
+        let (base, server) = serve(1);
+        let err = Client::new(base, "t0k")
+            .start_planner("DEMO", None)
+            .expect_err("a POST is never repeated");
+        server.join().expect("server");
+        assert!(err.to_string().contains("os error 22"), "{err}");
     }
 
     #[test]

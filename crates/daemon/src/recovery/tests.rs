@@ -80,3 +80,59 @@ async fn state_changed_behind_the_journal_is_reported() {
     let r = recover(&store).await.expect("recover");
     assert_eq!(r.drift, ["DEMO-3"]);
 }
+
+/// Appends journal events with no snapshot after the last one of an entity, as the daemon does.
+fn append_bare_events(dir: &tempfile::TempDir, entity: &str, id: &str, kinds: &[&str]) {
+    let raw = rusqlite::Connection::open(dir.path().join("t.db")).expect("raw");
+    for kind in kinds {
+        let n = raw
+            .execute(
+                "INSERT INTO events (at, actor, entity, entity_id, kind, payload_json) \
+                 VALUES (1, 'system', ?1, ?2, ?3, '{}')",
+                rusqlite::params![entity, id, kind],
+            )
+            .expect("insert");
+        assert_eq!(n, 1);
+    }
+}
+
+fn one_id(dir: &tempfile::TempDir, sql: &str) -> String {
+    let raw = rusqlite::Connection::open(dir.path().join("t.db")).expect("raw");
+    raw.query_row(sql, [], |r| r.get(0)).expect("id")
+}
+
+#[tokio::test]
+async fn a_merged_card_whose_last_events_carry_no_snapshot_has_no_drift() {
+    let (dir, store) = seeded().await;
+    let id = one_id(&dir, "SELECT id FROM tickets WHERE key = 'DEMO-1'");
+    // DEMO-1 was accepted (status_changed); the real tail is ship_removed, runner_exited.
+    append_bare_events(&dir, "ticket", &id, &["ship_removed", "runner_exited"]);
+    let r = recover(&store).await.expect("recover");
+    assert_eq!(r.drift, Vec::<String>::new());
+}
+
+#[tokio::test]
+async fn a_tampered_row_still_drifts_behind_snapshotless_events() {
+    let (dir, store) = seeded().await;
+    let id = one_id(&dir, "SELECT id FROM tickets WHERE key = 'DEMO-1'");
+    append_bare_events(&dir, "ticket", &id, &["ship_removed", "runner_exited"]);
+    let raw = rusqlite::Connection::open(dir.path().join("t.db")).expect("raw");
+    let n = raw
+        .execute(
+            "UPDATE tickets SET title = 'tampered' WHERE key = 'DEMO-1'",
+            [],
+        )
+        .expect("update");
+    assert_eq!(n, 1);
+    let r = recover(&store).await.expect("recover");
+    assert_eq!(r.drift, ["DEMO-1"]);
+}
+
+#[tokio::test]
+async fn a_release_whose_last_event_carries_no_snapshot_has_no_drift() {
+    let (dir, store) = seeded().await;
+    let id = one_id(&dir, "SELECT id FROM releases LIMIT 1");
+    append_bare_events(&dir, "release", &id, &["note_added"]);
+    let r = recover(&store).await.expect("recover");
+    assert_eq!(r.drift, Vec::<String>::new());
+}

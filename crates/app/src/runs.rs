@@ -48,6 +48,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 prompt: t.prompt.clone(),
                 acceptance: t.acceptance.clone(),
                 check_command: project.check_command.clone(),
+                setup_command: project.setup_command.clone(),
                 earlier: toknila_core::instructions::earlier(&comments),
                 discussion: crate::discussion::transcript(uow, ticket)?,
                 waiting: waiting.texts,
@@ -56,7 +57,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 design_first: t.design_first,
                 card_designs: t.designs.clone(),
                 design_project: Some(project.id),
-                model: project.worker_model.clone(),
+                model: t.model.clone().or_else(|| project.worker_model.clone()),
                 command_policy: project.command_policy,
                 allowed_commands: project.allowed_commands.clone(),
                 web_domains: Vec::new(),
@@ -64,6 +65,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
                 project: None,
                 designs: Vec::new(),
                 epic: Some((ctx.view.chain.name.clone(), ctx.view.chain.goal.clone())),
+                check: None,
             },
         });
     }

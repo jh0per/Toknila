@@ -13,7 +13,7 @@ use toknila_api_types::{AgentEvent, TicketDetail};
 use toknila_core::AgentRole;
 
 use super::agent::AgentEnv;
-use super::mcp_planner::{self, PlannerCall};
+use super::mcp_planner::{self, Answer, PlannerCall};
 use super::mcp_tools::{self, ToolError};
 
 /// The protocol revision answered when the client names none.
@@ -27,7 +27,7 @@ const INVALID_PARAMS: i64 = -32602;
 type Forward<'a> = dyn Fn(&AgentEvent) -> Result<String, String> + 'a;
 
 /// Sends a planner's call to the daemon and says in a few lines what came of it, or why not.
-type PlannerForward<'a> = dyn Fn(&PlannerCall) -> Result<String, String> + 'a;
+type PlannerForward<'a> = dyn Fn(&PlannerCall) -> Result<Answer, String> + 'a;
 
 /// Where a role's tool calls go: a card's agent reports events, a planner edits the plan.
 #[derive(Clone, Copy)]
@@ -49,6 +49,13 @@ fn tool_result(text: &str, is_error: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": text }], "isError": is_error })
 }
 
+/// A planner tool's result: its text, then any further blocks (a design's picture).
+fn answer_result(answer: &Answer) -> Value {
+    let mut content = vec![json!({ "type": "text", "text": answer.text })];
+    content.extend(answer.more.iter().cloned());
+    json!({ "content": content, "isError": false })
+}
+
 fn call_tool(
     role: AgentRole,
     params: &Value,
@@ -58,12 +65,13 @@ fn call_tool(
     let outcome = if role == AgentRole::Planner {
         mcp_planner::call(name, &params["arguments"]).map(|c| (forward.planner)(&c))
     } else {
-        mcp_tools::event(role, name, &params["arguments"]).map(|e| (forward.event)(&e))
+        mcp_tools::event(role, name, &params["arguments"])
+            .map(|e| (forward.event)(&e).map(Answer::from))
     };
     match outcome {
         Err(ToolError::Unknown) => Err((INVALID_PARAMS, format!("unknown tool {name:?}"))),
         Err(ToolError::BadArguments(e)) => Ok(tool_result(&format!("{name}: {e}"), true)),
-        Ok(Ok(line)) => Ok(tool_result(&line, false)),
+        Ok(Ok(answer)) => Ok(answer_result(&answer)),
         Ok(Err(e)) => Ok(tool_result(&e, true)),
     }
 }
@@ -159,7 +167,7 @@ pub(super) fn run() -> Result<()> {
 mod tests {
     use super::*;
 
-    fn no_planner(_: &PlannerCall) -> Result<String, String> {
+    fn no_planner(_: &PlannerCall) -> Result<Answer, String> {
         Err("a worker has no planner tools".to_owned())
     }
 

@@ -40,7 +40,8 @@ pub async fn probe(info: &DaemonInfo) -> bool {
 /// Runs the daemon in the foreground until Ctrl-C, SIGTERM or `POST /v1/shutdown`.
 pub async fn run(paths: Paths) -> Result<(), RunError> {
     std::fs::create_dir_all(&paths.home)?;
-    let previous = DaemonInfo::read(&paths.daemon_json())?;
+    // A leftover cut file is no daemon: it is replaced by the write below.
+    let previous = DaemonInfo::read(&paths.daemon_json()).ok().flatten();
     let reuse = match &previous {
         Some(p) => Some(p.clone()),
         None => DaemonInfo::read(&paths.daemon_last_json()).ok().flatten(),

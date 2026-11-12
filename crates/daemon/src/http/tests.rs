@@ -30,6 +30,7 @@ mod pins;
 mod planner;
 mod planning;
 mod plans;
+mod prepare;
 mod profiles;
 mod questions;
 mod releases;
@@ -981,10 +982,12 @@ async fn openapi_describes_every_route() {
             "/planner/cards/{card}/threads/{thread}/messages",
             "/planner/cards/{card}/threads/{thread}/versions",
             "/planner/chains",
+            "/planner/chains/{chain}",
             "/planner/chains/{chain}/cards",
             "/planner/chains/{chain}/cards/{card}/move",
             "/planner/chains/{chain}/edges",
             "/planner/designs/{design}",
+            "/planner/overview",
             "/planner/pins",
             "/planner/plan",
             "/planner/suggestion",
@@ -1022,6 +1025,7 @@ async fn openapi_describes_every_route() {
             "/releases/{release}/events",
             "/releases/{release}/run",
             "/repos/check",
+            "/repos/prepare",
             "/system/checks",
             "/system/cli",
             "/system/cli/install",
@@ -1037,6 +1041,7 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/instructions/claim",
             "/tickets/{ticket}/leftovers/{action}",
             "/tickets/{ticket}/permission",
+            "/tickets/{ticket}/pre-tool",
             "/tickets/{ticket}/runner/answer",
             "/tickets/{ticket}/runner/input",
             "/tickets/{ticket}/runner/scrollback",

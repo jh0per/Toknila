@@ -181,6 +181,7 @@ fn only_a_card_that_has_not_started_is_edited_and_its_checklist_with_it() {
         acceptance: Some(vec!["a".to_owned(), "b".to_owned()]),
         design_first: Some(true),
         designs: None,
+        model: None,
         add_subtasks: vec!["first".to_owned()],
         edit_subtasks: vec![],
     };
@@ -385,6 +386,49 @@ fn the_planner_is_started_on_the_planner_model_of_its_project() {
     mem.project.planner_model = Some("opus".to_owned());
     let req = planner::request(&mem.project, &profile).expect("request");
     assert_eq!(req.brief.model.as_deref(), Some("opus"));
+}
+
+#[test]
+fn a_card_takes_a_model_by_alias_or_full_name_and_a_wrong_one_is_refused_with_the_aliases() {
+    let mut mem = manual_demo();
+    let p = project(&mem);
+    let id = add_card(
+        &mut mem,
+        p,
+        "demo",
+        NewCard {
+            model: Some("fable".to_owned()),
+            ..card("C")
+        },
+    )
+    .expect("an alias");
+    assert_eq!(mem.ticket_by_id(id).model.as_deref(), Some("fable"));
+    let e = add_card(
+        &mut mem,
+        p,
+        "demo",
+        NewCard {
+            model: Some("gpt".to_owned()),
+            ..card("D")
+        },
+    )
+    .expect_err("gpt is no model of ours");
+    assert_eq!(e.kind, ErrorKind::BadRequest);
+    assert!(
+        e.message.contains("sonnet, opus, haiku, fable"),
+        "{}",
+        e.message
+    );
+    let edit = |model: &str| CardEdit {
+        model: Some(model.to_owned()),
+        ..CardEdit::default()
+    };
+    let one = edit_card(&mut mem, p, "DEMO-1", edit("opus")).expect("edit");
+    assert_eq!(mem.ticket_by_id(one).model.as_deref(), Some("opus"));
+    assert!(edit_card(&mut mem, p, "DEMO-1", edit("gpt")).is_err());
+    assert_eq!(mem.ticket_by_id(one).model.as_deref(), Some("opus"));
+    edit_card(&mut mem, p, "DEMO-1", edit("")).expect("clear");
+    assert_eq!(mem.ticket_by_id(one).model, None);
 }
 
 fn ready(mem: &mut Mem, key: &str, status: TicketStatus) {

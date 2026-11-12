@@ -68,8 +68,9 @@ reader! {
     design_pins(project: ProjectId) -> Vec<DesignPin>;
     design_pin(id: PinId) -> Option<DesignPin>;
     suggestion(project: ProjectId) -> Option<Suggestion>;
-    last_event_payload(entity: &str, entity_id: &str) -> Option<Value>;
+    last_snapshot_payload(entity: &str, entity_id: &str, field: &str) -> Option<Value>;
     live_runners() -> Vec<(TicketId, AgentRole)>;
+    live_runs() -> Vec<toknila_core::schedule::LiveRun>;
 }
 
 impl UnitOfWork for WriteTx<'_> {

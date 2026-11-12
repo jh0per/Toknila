@@ -47,6 +47,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         profile: None,
         review_mode: None,
         reviewer: None,
+        model: None,
         branch: None,
         needs_secrets: false,
         design_first: false,
