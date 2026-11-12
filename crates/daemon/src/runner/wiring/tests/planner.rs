@@ -216,7 +216,7 @@ fn the_kickoff_of_a_planner_with_designs_says_to_look_at_them_first() {
     let w = rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);
     let kickoff = w.command.last().expect("kickoff");
     assert!(kickoff.contains("Read every design file"), "{kickoff}");
-    assert!(kickoff.contains("name the designs each card"), "{kickoff}");
+    assert!(kickoff.contains("name the designs each story"), "{kickoff}");
 }
 
 #[test]

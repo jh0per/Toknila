@@ -5,6 +5,18 @@ thin clients (CLI, web page, desktop shell) that talk to the daemon over HTTP an
 `127.0.0.1`. This page is the target shape of the code and the rules that keep it there. Where
 the code does not match it yet, the refactoring plan below says which step fixes it.
 
+## Two vocabularies
+
+People and code use different words on purpose. People (the window, the Guide, the onboarding
+text, the planner's and the agents' instructions, `docs/glossary.md`, the sentences `tok`
+prints) say **epic, story and task**; the code (routes such as `/chains` and `/cards`, API
+types, `tok chain` and `tok ticket`, the TOML keys `[chain]` and `[[ticket]]`, event names,
+`data-testid`s, file, type and tool names such as `add_card`) says **chain, card and
+subtask**. The two are one-to-one: an epic is a chain, a story is a card (a ticket), a task is
+a subtask. Keys stay `TOKNILA-12`. Do not rename the code to match the words, and do not put
+the code's words in front of a person: a rename of identifiers would break stored data, the
+API, plan files and every client for no gain, and the glossary is where the bridge lives.
+
 Decision records: [ADR 0001](adr/0001-layered-architecture-and-mvi.md),
 [ADR 0002](adr/0002-wildcard-cards.md) (wildcard cards),
 [ADR 0003](adr/0003-card-threads.md) (threads on a card),

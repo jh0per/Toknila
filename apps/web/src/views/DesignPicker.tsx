@@ -33,7 +33,7 @@ export function DesignPicker({ project, library, initial, busy, error, onSave, o
   return (
     <Modal label="Pick a design" testId="design-picker" onClose={onClose}>
       <section className="card-block design-picker">
-        <h2>{initial ? "Change the design of this card" : "Pick a design"}</h2>
+        <h2>{initial ? "Change the design of this story" : "Pick a design"}</h2>
         {library.length === 0 ? (
           <p className="muted" data-testid="picker-none">The project has no designs yet. Add them under Settings, Designs.</p>
         ) : (
@@ -76,7 +76,7 @@ export function DesignPicker({ project, library, initial, busy, error, onSave, o
         {error && <p className="field-error" role="alert" data-testid="picker-error">{error}</p>}
         <div className="plan-btns">
           <button type="button" className="btn primary" disabled={busy || !design} data-testid="picker-save" onClick={() => design && onSave({ design: design.id, region: region ?? null })}>
-            {initial ? "Save" : "Add to the card"}
+            {initial ? "Save" : "Add to the story"}
           </button>
           <button type="button" className="btn" data-testid="picker-cancel" onClick={onClose}>Cancel</button>
         </div>

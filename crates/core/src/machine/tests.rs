@@ -711,7 +711,7 @@ fn an_agent_cannot_approve_or_reject_a_card() {
             actor: Actor::Agent
         }
         .to_string(),
-        "only a person can approve a card; this came from Agent"
+        "only a person can approve a story; this came from Agent"
     );
 }
 

@@ -32,7 +32,7 @@ export function Panel({ state, dispatch }: { state: State; dispatch: (i: Intent)
     return <EpicPanel chain={epicChain} kind={epic.kind} project={currentProject(state)?.key ?? ""} state={state} dispatch={dispatch} />;
   }
   if (!card) {
-    return <section className="panel empty" data-testid="panel"><p className="muted">Select a card to see it here.</p></section>;
+    return <section className="panel empty" data-testid="panel"><p className="muted">Select a story to see it here.</p></section>;
   }
   const tabs = visibleTabs(currentProject(state)?.merge.mode === "github", Boolean(card.pr));
   const tab = tabs.includes(state.tab) ? state.tab : "details";
@@ -48,7 +48,7 @@ export function Panel({ state, dispatch }: { state: State; dispatch: (i: Intent)
   return (
     <section className="panel" data-testid="panel">
       <div className="panel-head">
-        <div role="tablist" aria-label="Card" className="tabs" onKeyDown={onKeys}>
+        <div role="tablist" aria-label="Story" className="tabs" onKeyDown={onKeys}>
           {tabs.map((t) => (
             <button
               key={t}

@@ -38,12 +38,12 @@ pub enum ProjectCmd {
         /// repository, e.g. `cargo xtask verify`, `npm test`; an empty text names none).
         #[arg(long)]
         check_command: Option<String>,
-        /// What happens when a card is approved: `local` (merge into the main branch) or `github`
+        /// What happens when a story is approved: `local` (merge into the main branch) or `github`
         /// (open a pull request); default: `github` when the repository has a GitHub remote and
         /// `gh auth status` succeeds, else `local`.
         #[arg(long)]
         merge: Option<String>,
-        /// When a card's agent wants to run a command: `auto` (default; Claude Code decides and
+        /// When a story's agent wants to run a command: `auto` (default; Claude Code decides and
         /// asks only about risky actions), `ask` (you answer each prompt) or `trust` (never asked).
         #[arg(long)]
         commands: Option<String>,
@@ -53,7 +53,7 @@ pub enum ProjectCmd {
     /// Change a project's settings.
     Set {
         key: String,
-        /// When a card's agent wants to run a command: `ask` (you answer each prompt), `auto`
+        /// When a story's agent wants to run a command: `ask` (you answer each prompt), `auto`
         /// (Claude Code decides and asks only about risky actions) or `trust` (never asked).
         #[arg(long)]
         commands: Option<String>,
@@ -61,18 +61,18 @@ pub enum ProjectCmd {
         /// (repeat for more).
         #[arg(long)]
         forget_command: Vec<String>,
-        /// Most agents working at once (1 to 64, default 2); more started cards wait in a queue.
+        /// Most agents working at once (1 to 64, default 2); more started stories wait in a queue.
         #[arg(long)]
         parallel: Option<u32>,
-        /// How many times the loop (the check, then the reviewer agent) may return a card to its
+        /// How many times the loop (the check, then the reviewer agent) may return a story to its
         /// worker before it waits for you (0 to 20, default 3).
         #[arg(long)]
         review_rounds: Option<u32>,
-        /// What happens when a card is approved: `local` (merge into the main branch) or `github`
+        /// What happens when a story is approved: `local` (merge into the main branch) or `github`
         /// (open a pull request, merge it there when its checks pass).
         #[arg(long)]
         merge: Option<String>,
-        /// Pull request title; {key} and {title} are the card's (default: "{key}: {title}").
+        /// Pull request title; {key} and {title} are the story's (default: "{key}: {title}").
         #[arg(long)]
         pr_title: Option<String>,
         /// How a pull request merges: merge, squash or rebase (default: merge).
@@ -94,7 +94,7 @@ pub enum ProjectCmd {
         /// --no-git-tag-version`; `{version}` is the version). An empty text clears it.
         #[arg(long)]
         bump_command: Option<String>,
-        /// The Claude model of card agents (`sonnet`, `opus`, `haiku`, or a full model name);
+        /// The Claude model of story agents (`sonnet`, `opus`, `haiku`, or a full model name);
         /// passed as `--model` to profiles that run Claude Code. An empty text goes back to your
         /// Claude Code default.
         #[arg(long)]
@@ -108,8 +108,8 @@ pub enum ProjectCmd {
     },
     /// List projects.
     Ls,
-    /// Delete a project with its chains, cards and everything attached to them. The workspaces
-    /// and run files go too; the project folder and the branches made for its cards stay.
+    /// Delete a project with its epics, stories and everything attached to them. The workspaces
+    /// and run files go too; the project folder and the branches made for its stories stay.
     Rm {
         key: String,
         /// Also move the repository folder to the system Trash; asks you to type the project key.
@@ -355,11 +355,13 @@ fn confirm(input: &mut impl BufRead, terminal: bool, key: &str, folder: &str) ->
 /// What a deletion did, for a person: what went, where the folder is, and what stayed behind.
 fn deleted(d: &ProjectDeletion) {
     println!(
-        "project {} deleted: {} chain(s) {:?}, {} card(s)",
+        "project {} deleted: {} {} {:?}, {} {}",
         d.project.key,
         d.chains.len(),
+        if d.chains.len() == 1 { "epic" } else { "epics" },
         d.chains,
-        d.tickets
+        d.tickets,
+        if d.tickets == 1 { "story" } else { "stories" }
     );
     for w in &d.worktrees_removed {
         println!("removed workspace {w}");

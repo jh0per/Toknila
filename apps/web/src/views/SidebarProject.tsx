@@ -14,7 +14,7 @@ import { Chev, indent } from "./TreeRow";
 const initials = (p: Project) => p.key.slice(0, 2).toUpperCase();
 
 /// What the Assistant row says it is: one assistant, at the roadmap and inside an epic.
-export const ASSISTANT_HINT = "plans epics on the roadmap, cards inside an epic";
+export const ASSISTANT_HINT = "plans epics on the roadmap, stories inside an epic";
 
 type Props = {
   project: Project;
@@ -107,7 +107,7 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
                   ↓
                 </button>
                 <button
-                  type="button" className="icon-btn" aria-label="New chain" title="New chain" data-testid="new-chain-plus"
+                  type="button" className="icon-btn" aria-label="New epic" title="New epic" data-testid="new-chain-plus"
                   onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newChain", project: key } })}
                 >
                   +

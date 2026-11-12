@@ -76,7 +76,7 @@ fn autostart_on_starts_the_ready_card_and_off_leaves_it_running() {
 fn a_name_two_projects_share_needs_the_project() {
     let (_dir, tok, _) = tok();
     let err = tok.fails(&["chain", "set", "work", "--autostart", "on"]);
-    assert!(err.contains("2 chains are named work"), "{err}");
+    assert!(err.contains("2 epics are named work"), "{err}");
     let bad = tok.fails(&[
         "chain",
         "set",

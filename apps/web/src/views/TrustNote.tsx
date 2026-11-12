@@ -12,14 +12,14 @@ import type { ScreenAsked } from "../store/trustAsked";
 export function TrustNote({ folder, asked }: { folder?: string; asked?: ScreenAsked | null }) {
   return (
     <div className="trust-note muted" data-testid="trust-note">
-      <p>Claude Code asks once to trust a project folder; until you answer, its cards wait on that question.</p>
+      <p>Claude Code asks once to trust a project folder; until you answer, its stories wait on that question.</p>
       <details className="fold inline">
         <summary>How to</summary>
         <p>
           Open <code>claude</code> in the project&apos;s ships folder
           {folder ? <> (<code data-testid="trust-folder">{folder}</code>)</> : <> (the project&apos;s own folder under the workspaces folder, <code>&lt;ships&gt;/&lt;project&gt;</code>)</>}
           {" "}and accept its &ldquo;trust this folder&rdquo; question once. Claude Code keeps that answer for the folder and for every
-          card&apos;s workspace under it, so cards will not stop on that question again. Or answer the question when a card shows it
+          story&apos;s workspace under it, so stories will not stop on that question again. Or answer the question when a story shows it
           in the Inbox. Toknila never changes Claude Code&apos;s configuration files for you.
         </p>
       </details>

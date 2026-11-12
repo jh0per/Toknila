@@ -89,9 +89,9 @@ fn discussion_section(brief: &RunBrief<'_>) -> String {
     }
     let mut out = String::from(
         "\n## Discussion with the assistant\n\n\
-         The person talked this card over with the project's assistant. The Task and Acceptance \
+         The person talked this story over with the project's assistant. The Task and Acceptance \
          above already hold every edit the person accepted; a proposal that is rejected or still \
-         waiting is not part of the card. Oldest first:\n\n",
+         waiting is not part of the story. Oldest first:\n\n",
     );
     for line in brief.discussion {
         out.push_str(&format!("- {line}\n"));
@@ -103,8 +103,8 @@ fn discussion_section(brief: &RunBrief<'_>) -> String {
 fn epic_section(brief: &RunBrief<'_>) -> String {
     match brief.epic {
         Some((name, goal)) if !goal.trim().is_empty() => format!(
-            "\n## Epic: {name}\n\nThis card is a task of the chain {name}. The chain's goal is \
-             the purpose of every card in it; keep the work toward it:\n\n{}\n",
+            "\n## Epic: {name}\n\nThis story belongs to the epic {name}. The epic's goal is \
+             the purpose of every story in it; keep the work toward it:\n\n{}\n",
             goal.trim()
         ),
         _ => String::new(),
@@ -138,7 +138,7 @@ fn earlier_section(brief: &RunBrief<'_>) -> String {
     }
     let mut out = String::from(
         "\n## Instructions you were given earlier\n\n\
-         A person gave these to the run of this card before you. They were delivered, and they \
+         A person gave these to the run of this story before you. They were delivered, and they \
          still apply: some may be done already in the commits on this branch, so look at what is \
          there, then carry on and follow the rest. Oldest first:\n",
     );
@@ -187,14 +187,14 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         crate::AgentRole::Planner if brief.has_designs => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
              `show_plan`. The project has designs: Read every design file `show_plan` lists \
-             first, say in a few lines what screens and flows you see, then propose the cards, \
-             and name the designs each card you add comes from. Do not start any card.",
+             first, say in a few lines what screens and flows you see, then propose the stories, \
+             and name the designs each story you add comes from. Do not start any story.",
             key = brief.key
         ),
         crate::AgentRole::Planner => format!(
             "You are the planner of project {key}. Read your Toknila instructions, call \
              `show_plan` to know the plan, say nothing about it yet, and wait for the owner's \
-             message: answer what they ask, and plan only when they ask you to. Do not start any card.",
+             message: answer what they ask, and plan only when they ask you to. Do not start any story.",
             key = brief.key
         ),
         crate::AgentRole::Reviewer => format!(
@@ -209,7 +209,7 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
             gate = gate::text(brief.check),
         ),
         _ => format!(
-            "Start ticket {key} now. Read your Toknila instructions, work the card, commit your \
+            "Start ticket {key} now. Read your Toknila instructions, work the story, commit your \
              work on this branch, then call `finished` and stop. Ask with `ask_human` when you \
              need a decision.{checks}{first}",
             key = brief.key

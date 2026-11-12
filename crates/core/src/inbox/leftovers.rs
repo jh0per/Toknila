@@ -52,7 +52,7 @@ pub fn new_card_title(card: &Ticket) -> String {
 /// The prompt of the card that takes the leftovers of `card`.
 pub fn new_card_prompt(card: &Ticket) -> String {
     format!(
-        "Finish the subtasks that were left open on {} ({}) when later cards were done before it.",
+        "Finish the tasks that were left open on {} ({}) when later stories were done before it.",
         card.title, card.key
     )
 }
@@ -120,7 +120,7 @@ pub fn close(checklist: &[Subtask], by: Actor) -> Vec<Subtask> {
 }
 
 fn count(n: usize) -> String {
-    format!("{n} leftover subtask{}", if n == 1 { "" } else { "s" })
+    format!("{n} leftover task{}", if n == 1 { "" } else { "s" })
 }
 
 fn bullets(subtasks: &[Subtask]) -> Option<String> {

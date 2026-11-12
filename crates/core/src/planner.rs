@@ -27,15 +27,15 @@ pub enum Refusal {
     OtherProject { what: String, project: String },
     /// A change of the graph in a chain that starts its cards by itself could start one.
     #[error(
-        "chain {chain} starts its ready cards by itself (autostart), so changing its cards' \
-         order or dependencies could start work, and only the owner starts cards. Ask the owner \
-         to turn autostart off, or plan in a new chain"
+        "epic {chain} starts its ready stories by itself (autostart), so changing its stories' \
+         order or dependencies could start work, and only the owner starts stories. Ask the owner \
+         to turn autostart off, or plan in a new epic"
     )]
     AutostartChain { chain: String },
     /// The card's agent has its prompt already, or the card is done.
     #[error(
-        "{card} is {status}; the planner edits only cards that have not started. Tell the owner \
-         what should change, or open a thread on the card"
+        "{card} is {status}; the planner edits only stories that have not started. Tell the owner \
+         what should change, or open a thread on the story"
     )]
     CardStarted { card: String, status: String },
     /// A planner reads the repository, so the project needs one.
@@ -136,7 +136,7 @@ mod tests {
         assert!(ensure_graph_change(&chain(false)).is_ok());
         let refused = ensure_graph_change(&chain(true)).expect_err("refused");
         assert!(matches!(refused, Refusal::AutostartChain { .. }));
-        assert!(refused.to_string().contains("only the owner starts cards"));
+        assert!(refused.to_string().contains("only the owner starts stories"));
     }
 
     #[test]

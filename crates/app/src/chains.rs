@@ -51,7 +51,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
 ) -> AppResult<ChainId> {
     let name = input.name.trim();
     if name.is_empty() {
-        return Err(AppError::bad_request("chain name is empty"));
+        return Err(AppError::bad_request("epic name is empty"));
     }
     let version = input
         .version
@@ -115,7 +115,7 @@ pub fn import_with_designs<U: UnitOfWork + ?Sized>(
     let p = resolve::project(uow, project)?;
     if uow.chain_by_name(p.id, &plan.chain.name)?.is_some() {
         return Err(AppError::conflict(format!(
-            "chain {} already exists in {}",
+            "epic {} already exists in {}",
             plan.chain.name, p.key
         )));
     }
@@ -140,7 +140,7 @@ pub fn import_with_designs<U: UnitOfWork + ?Sized>(
         .flat_map(|(t, l)| {
             l.dropped_designs.iter().map(move |name| {
                 format!(
-                    "{}: the project has no design named {name:?}; the card has no reference to it",
+                    "{}: the project has no design named {name:?}; the story has no reference to it",
                     t.key
                 )
             })
@@ -262,7 +262,7 @@ pub fn export_with_designs<R: Reader + ?Sized>(
     let c = resolve::chain(repo, chain)?;
     let view = repo
         .chain_view(c.id)?
-        .ok_or_else(|| AppError::not_found(format!("chain {chain}")))?;
+        .ok_or_else(|| AppError::not_found(format!("epic {chain}")))?;
     let mut subtasks = HashMap::new();
     for t in &view.tickets {
         let texts: Vec<(String, bool)> = repo
@@ -347,7 +347,7 @@ pub fn move_ticket<U: UnitOfWork + ?Sized>(
         let (toknila_core::NodeRef::Ticket(card), toknila_core::NodeRef::Ticket(anchor)) =
             (card, anchor)
         else {
-            return Err(AppError::bad_request("only cards can be moved"));
+            return Err(AppError::bad_request("only stories can be moved"));
         };
         let plan = ctx.view.plan_move(card, anchor, place)?;
         for e in plan.remove {

@@ -98,7 +98,7 @@ try {
   // 1. A connector released on empty canvas: a field for a card after the one it came from.
   await dragTo(handle("CAN-1"), await empty());
   await quick.waitFor();
-  await expectText(page.locator("[data-testid=quick-card-label]"), "New card that waits for CAN-1", "the drop opens the field");
+  await expectText(page.locator("[data-testid=quick-card-label]"), "New story that waits for CAN-1", "the drop opens the field");
   await shot("drop-menu");
   await page.keyboard.press("Escape");
   await quick.waitFor({ state: "detached" });
@@ -121,7 +121,7 @@ try {
   // 2. Double-click on empty canvas: a card at the end of the chain, no dependency named.
   const p = await empty(120);
   await page.mouse.dblclick(p.x, p.y);
-  await expectText(page.locator("[data-testid=quick-card-label]"), "New card", "a double-click opens the field");
+  await expectText(page.locator("[data-testid=quick-card-label]"), "New story", "a double-click opens the field");
   await title.fill("Delta");
   await page.keyboard.press("Enter");
   await card("CAN-4").waitFor();
@@ -134,7 +134,7 @@ try {
   await page.mouse.click(q.x, q.y, { button: "right" });
   await page.locator("[data-testid=context-menu]").waitFor();
   const canvasMenu = await menuLabels();
-  if (canvasMenu.join("|") !== "New card|New chain|Import a plan|Plan with the assistant") throw new Error(`canvas menu: ${canvasMenu}`);
+  if (canvasMenu.join("|") !== "New story|New epic|Import a plan|Plan with the assistant") throw new Error(`canvas menu: ${canvasMenu}`);
   console.log(`PASS the canvas menu: ${canvasMenu.join(", ")}`);
   await shot("canvas-menu");
   await page.locator("[data-testid=menu-canvas-new-card]").click();
@@ -155,7 +155,7 @@ try {
   await page.mouse.click(q.x, q.y, { button: "right" });
   await page.locator("[data-testid=menu-canvas-planner]").click();
   await page.locator("[data-testid=assistant-panel]").waitFor({ timeout: 10_000 });
-  await expectText(page.locator("[data-testid=context-chip]"), "the card CAN-4", "Plan with the assistant opens the panel where the person is, on the open card");
+  await expectText(page.locator("[data-testid=context-chip]"), "the story CAN-4", "Plan with the assistant opens the panel where the person is, on the open card");
   await page.locator("[data-testid=assistant-close]").click();
   await page.locator("[data-testid=assistant-panel]").waitFor({ state: "detached" });
 
@@ -165,11 +165,11 @@ try {
   await card("CAN-2").click({ button: "right" });
   await page.locator("[data-testid=menu-card-start]").waitFor();
   const readyMenu = await menuLabels();
-  if (readyMenu.join("|") !== "Open|Edit|Open terminal|Start|Pause|Ask for a design|Add card before|Add card after|Add dependency…|Cancel") throw new Error(`ready card menu: ${readyMenu}`);
+  if (readyMenu.join("|") !== "Open|Edit|Open terminal|Start|Pause|Ask for a design|Add story before|Add story after|Add dependency…|Cancel") throw new Error(`ready card menu: ${readyMenu}`);
   console.log(`PASS a ready card's menu: ${readyMenu.join(", ")}`);
   await shot("card-menu");
   await page.locator("[data-testid=menu-card-add-before]").click();
-  await expectText(page.locator("[data-testid=quick-card-label]"), "New card that CAN-2 waits for", "Add card before opens the field");
+  await expectText(page.locator("[data-testid=quick-card-label]"), "New story that CAN-2 waits for", "Add story before opens the field");
   await title.fill("Prelude");
   await page.keyboard.press("Enter");
   await edge("CAN-5>CAN-2").waitFor({ state: "attached" });
@@ -179,7 +179,7 @@ try {
   const waitingMenu = await menuLabels();
   console.log(`PASS a card that waits: ${waitingMenu.join(", ")}`);
   await page.locator("[data-testid=menu-card-add-after]").click();
-  await expectText(page.locator("[data-testid=quick-card-label]"), "New card that waits for CAN-2", "Add card after opens the field");
+  await expectText(page.locator("[data-testid=quick-card-label]"), "New story that waits for CAN-2", "Add story after opens the field");
   await title.fill("Epilogue");
   await page.keyboard.press("Enter");
   await edge("CAN-2>CAN-6").waitFor({ state: "attached" });
@@ -192,7 +192,7 @@ try {
   await card("CAN-1").click({ button: "right" });
   await page.locator("[data-testid=menu-card-cancel]").waitFor();
   const runningMenu = await menuLabels();
-  if (runningMenu.includes("Start") || runningMenu.includes("Add card before")) throw new Error(`running card menu: ${runningMenu}`);
+  if (runningMenu.includes("Start") || runningMenu.includes("Add story before")) throw new Error(`running card menu: ${runningMenu}`);
   console.log(`PASS a running card's menu: ${runningMenu.join(", ")}`);
   // Cancel asks first: Keep it changes nothing, the confirmation cancels.
   await page.locator("[data-testid=menu-card-cancel]").click();
@@ -228,18 +228,18 @@ try {
   // 5. Run chain / Stop chain.
   await open("RUN", "go");
   const run = page.locator("[data-testid=run-chain]");
-  await expectText(run, "Run chain", "a chain without autostart offers Run chain");
+  await expectText(run, "Run epic", "an epic without autostart offers Run epic");
   const hint = (await run.getAttribute("title")) ?? "";
-  if (!/ready cards up to the free agent slots/.test(hint) || !/already running keep running/.test(hint)) throw new Error(`hint: ${hint}`);
+  if (!/ready stories up to the free agent slots/.test(hint) || !/already running keep running/.test(hint)) throw new Error(`hint: ${hint}`);
   console.log(`PASS the hint says both: ${hint}`);
   await shot("run-chain");
   await run.click();
   await expectText(status("RUN-1"), "simulated", "Run chain started the ready card");
-  await expectText(run, "Stop chain", "the button reads Stop chain while autostart is on");
+  await expectText(run, "Stop epic", "the button reads Stop epic while autostart is on");
   if (chainOf("go").chain.autostart !== true) throw new Error("the daemon does not have autostart on");
   await shot("stop-chain");
   await run.click();
-  await expectText(run, "Run chain", "Stop chain turns it off");
+  await expectText(run, "Run epic", "Stop epic turns it off");
   if (chainOf("go").chain.autostart !== false) throw new Error("the daemon still has autostart on");
   await expectText(status("RUN-1"), "simulated", "the running card keeps running");
 
@@ -249,7 +249,7 @@ try {
   await page.locator("[data-testid=canvas]").click({ position: { x: 700, y: 400 } });
   await page.keyboard.press("n");
   await quick.waitFor();
-  await expectText(page.locator("[data-testid=quick-card-label]"), "New card", "N opens the field");
+  await expectText(page.locator("[data-testid=quick-card-label]"), "New story", "N opens the field");
   await title.type("nsn");
   if ((await title.inputValue()) !== "nsn") throw new Error("the keys were taken while typing in the field");
   console.log("PASS no key is taken while a text field has focus");

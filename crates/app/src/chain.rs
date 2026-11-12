@@ -203,14 +203,14 @@ impl ChainTx {
         };
         if a == b {
             return Err(AppError::bad_request(
-                "the reference is already on that card",
+                "the reference is already on that story",
             ));
         }
         for i in [a, b] {
             let t = &self.view.tickets[i];
             if !t.status.can_edit() {
                 return Err(AppError::conflict(format!(
-                    "{} is {}; a finished card cannot be edited",
+                    "{} is {}; a finished story cannot be edited",
                     t.key,
                     toknila_core::wire::wire_name(&t.status).unwrap_or_default()
                 )));
@@ -283,7 +283,7 @@ where
 {
     let view = uow
         .chain_view(chain)?
-        .ok_or_else(|| AppError::not_found(format!("chain {chain}")))?;
+        .ok_or_else(|| AppError::not_found(format!("epic {chain}")))?;
     let project = view.chain.project_id;
     let mut ctx = ChainTx::new(view, uow.now());
     let out = f(&mut ctx)?;

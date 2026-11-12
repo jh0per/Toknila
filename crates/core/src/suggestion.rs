@@ -71,9 +71,9 @@ pub struct Suggestion {
 pub enum SuggestionRefusal {
     #[error("a suggestion needs a text")]
     NoText,
-    #[error("an action needs the card it is about")]
+    #[error("an action needs the story it is about")]
     ActionNeedsCard,
-    #[error("a card needs the action to do with it; to only point at a card use show_card")]
+    #[error("a story needs the action to do with it; to only point at a story use show_card")]
     CardNeedsAction,
     #[error("{card} is {status}: {action} does not apply to it now")]
     NotNow {

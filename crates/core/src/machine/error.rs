@@ -9,7 +9,7 @@ pub enum TransitionError {
         from: TicketStatus,
     },
     #[error(
-        "cannot {event} yet: the card is still being checked (brought up to main and the check command run); Return or Accept once it waits for a person"
+        "cannot {event} yet: the story is still being checked (brought up to main and the check command run); Return or Accept once it waits for a person"
     )]
     BeingChecked { event: &'static str },
     #[error("ticket is paused; resume it first")]
@@ -28,10 +28,10 @@ pub enum TransitionError {
          `thread_version`, and wait for the person to approve it; then call `finished` again"
     )]
     DesignNotApproved(TicketKey),
-    #[error("a card is done out of order only when a card before it is still open")]
+    #[error("a story is done out of order only when a story before it is still open")]
     NothingBehind,
     #[error(transparent)]
     Items(#[from] crate::ItemsError),
-    #[error("only a person can {event} a card; this came from {actor:?}")]
+    #[error("only a person can {event} a story; this came from {actor:?}")]
     PersonOnly { event: &'static str, actor: Actor },
 }

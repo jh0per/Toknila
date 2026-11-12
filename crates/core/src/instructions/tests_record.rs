@@ -57,7 +57,7 @@ fn the_reviewer_reads_the_threads_and_the_whole_hand_in_in_its_instructions() {
         key: "DEMO-3",
         ..RunBrief::default()
     });
-    assert!(none.contains("The card has no design threads."));
+    assert!(none.contains("The story has no design threads."));
     assert!(!none.contains("## The hand-in"));
 }
 
@@ -68,5 +68,5 @@ fn the_review_protocol_names_the_person_verdict() {
         text.contains("`outcome: person` (shown as PERSON)"),
         "{text}"
     );
-    assert!(text.contains("Never ask for files the card did not ask for"));
+    assert!(text.contains("Never ask for files the story did not ask for"));
 }

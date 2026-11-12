@@ -31,7 +31,7 @@ function defaultAgentOptions(state: State, current: string): string[] {
 }
 
 const REVIEW_MODES: { value: ReviewMode; label: string }[] = [
-  { value: "human", label: "I review every finished card" },
+  { value: "human", label: "I review every finished story" },
   { value: "agent", label: "A reviewer agent reviews it" },
   { value: "both", label: "A reviewer agent first, then me" },
 ];
@@ -48,7 +48,7 @@ export function GeneralSection({ project, state, form, set }: FormProps) {
       <dl className="facts">
         <dt>Name</dt>
         <dd data-testid="project-name-shown">{project.name}</dd>
-        <dt>Card prefix</dt>
+        <dt>Story prefix</dt>
         <dd>{project.key}</dd>
         <dt>Folder</dt>
         <dd data-testid="project-repo-shown"><code>{project.repo_path ?? "none"}</code></dd>
@@ -69,13 +69,13 @@ export function AgentsSection({ state, form, set }: FormProps) {
   const s = state.settings;
   return (
     <div className="page-section" data-testid="project-agents">
-      <Field label="Default agent" name="default_profile" error={fieldError(s, "default_profile")} hint="Runs every card that does not name another one.">
+      <Field label="Default agent" name="default_profile" error={fieldError(s, "default_profile")} hint="Runs every story that does not name another one.">
         <select data-testid="default-profile" value={form.default_profile} onChange={(e) => set("default_profile", e.target.value)}>
           {defaultAgentOptions(state, form.default_profile).map((n) => <option key={n} value={n}>{profileLabel(n)}</option>)}
         </select>
       </Field>
       <ModelsFields state={state} form={form} set={set} />
-      <Field label="Agents working at once" name="max_parallel" error={fieldError(s, "max_parallel")} hint="More cards than this wait in line for a free slot.">
+      <Field label="Agents working at once" name="max_parallel" error={fieldError(s, "max_parallel")} hint="More stories than this wait in line for a free slot.">
         <input data-testid="max-parallel" type="number" min={1} max={64} value={form.max_parallel} onChange={(e) => set("max_parallel", e.target.value)} />
       </Field>
       <Field label="Test command (optional)" name="check_command" error={fieldError(s, "check_command")} hint="Agents run it before they hand in.">
@@ -95,7 +95,7 @@ export function ReviewSection({ state, form, set }: FormProps) {
   const s = state.settings;
   return (
     <div className="page-section" data-testid="project-review">
-      <Field label="Who reviews finished cards" name="review_mode" error={fieldError(s, "review_mode")}>
+      <Field label="Who reviews finished stories" name="review_mode" error={fieldError(s, "review_mode")}>
         <select data-testid="review-mode" value={form.review_mode} onChange={(e) => set("review_mode", e.target.value as ReviewMode)}>
           {REVIEW_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
@@ -104,33 +104,33 @@ export function ReviewSection({ state, form, set }: FormProps) {
         label="Rounds before it waits for you"
         name="max_review_rounds"
         error={fieldError(s, "max_review_rounds")}
-        hint="How many times the check and the reviewer agent may send a card back to its worker before it waits for you."
+        hint="How many times the check and the reviewer agent may send a story back to its worker before it waits for you."
       >
         <input data-testid="review-rounds" type="number" min={0} max={20} value={form.max_review_rounds} onChange={(e) => set("max_review_rounds", e.target.value)} />
       </Field>
       <Field label="Reviewer agent" name="reviewer" error={fieldError(s, "reviewer")}>
         <select data-testid="reviewer" value={form.reviewer} onChange={(e) => set("reviewer", e.target.value)}>
-          <option value="">The default for the card's agent</option>
+          <option value="">The default for the story's agent</option>
           {profileOptions(state, "reviewer", form.reviewer).map((n) => <option key={n}>{n}</option>)}
         </select>
       </Field>
       <Field
         label="Sites the reviewer may read" name="reviewer_web_domains" error={fieldError(s, "reviewer_web_domains")}
-        hint="One per line, such as docs.rs. A page a card cites on any other site stays unread. Empty: none."
+        hint="One per line, such as docs.rs. A page a story cites on any other site stays unread. Empty: none."
       >
         <textarea
           data-testid="reviewer-web-domains" rows={3} spellCheck={false} value={form.reviewer_web_domains}
           onChange={(e) => set("reviewer_web_domains", e.target.value)}
         />
       </Field>
-      <Field label="When a card is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
+      <Field label="When a story is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
         <select data-testid="merge-mode" value={form.merge_mode} onChange={(e) => set("merge_mode", e.target.value as MergeMode)}>
           {MERGE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
       </Field>
       {form.merge_mode === "github" && (
         <>
-          <Field label="Pull request title" name="pr_title" error={fieldError(s, "pr_title")} hint="{key} and {title} are the card's.">
+          <Field label="Pull request title" name="pr_title" error={fieldError(s, "pr_title")} hint="{key} and {title} are the story's.">
             <input data-testid="pr-title" value={form.pr_title} spellCheck={false} onChange={(e) => set("pr_title", e.target.value)} />
           </Field>
           <Field label="How to merge it" name="merge_method" error={fieldError(s, "merge_method")}>

@@ -26,14 +26,14 @@ export function Dialogs({ state, dispatch, inline }: { state: State; dispatch: (
       );
     case "newChain":
       return (
-        <Modal label="New chain" testId="new-chain-dialog" onClose={close}>
+        <Modal label="New epic" testId="new-chain-dialog" onClose={close}>
           <NewChain project={d.project} state={state} dispatch={dispatch} />
         </Modal>
       );
     case "newCard": {
       const chain = state.chains[d.chain];
       return chain ? (
-        <Modal label="New card" testId="new-card-dialog" onClose={close}>
+        <Modal label="New story" testId="new-card-dialog" onClose={close}>
           <NewCard chain={chain} state={state} dispatch={dispatch} />
         </Modal>
       ) : null;
@@ -57,7 +57,7 @@ export function Dialogs({ state, dispatch, inline }: { state: State; dispatch: (
     }
     case "deleteChain":
       return (
-        <Modal label="Delete a chain" testId="delete-chain-dialog" onClose={close}>
+        <Modal label="Delete an epic" testId="delete-chain-dialog" onClose={close}>
           <DeleteChain chain={d.chain} state={state} dispatch={dispatch} />
         </Modal>
       );

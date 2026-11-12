@@ -37,7 +37,7 @@ fn removes_the_chain_and_its_cards_and_keeps_the_others() {
     assert_eq!(left.as_array().map(Vec::len), Some(1));
     assert_eq!(left[0]["chain"]["name"], "keep");
     let again = tok.fails(&["chain", "rm", "old", "--yes"]);
-    assert!(again.contains("chain old not found"), "{again}");
+    assert!(again.contains("epic old not found"), "{again}");
     assert_eq!(tok.status("DEMO-3"), "ready");
 }
 

@@ -126,14 +126,14 @@ pub fn begin<U: UnitOfWork + ?Sized>(
     let release = with_chain(uow, c.id, |ctx| -> AppResult<Release> {
         if !ctx.view.releasable() {
             return Err(AppError::conflict(
-                "the chain still has open cards: release it when every card is merged",
+                "the epic still has open stories: release it when every story is merged",
             ));
         }
         let existing = ctx.view.end_release().cloned();
         let id = match existing {
             Some(r) if r.version != version => {
                 return Err(AppError::bad_request(format!(
-                    "the chain's release is {}, not {version}",
+                    "the epic's release is {}, not {version}",
                     r.version
                 )));
             }

@@ -117,7 +117,7 @@ export function AddProject({ state, dispatch, focus = false, submit = true }: {
             </span>
           )}
         </summary>
-        <Field label="Card prefix" name="key" error={fieldError(s, "key")} hint="Cards are named with it, like DEMO-1.">
+        <Field label="Story prefix" name="key" error={fieldError(s, "key")} hint="Stories are named with it, like DEMO-1.">
           <input data-testid="project-key" value={d.key} spellCheck={false} onChange={edit("key")} />
         </Field>
         <Field label="Name" name="name" error={fieldError(s, "name")}>
@@ -129,7 +129,7 @@ export function AddProject({ state, dispatch, focus = false, submit = true }: {
         <Field label="Setup command (optional)" name="setup_command" error={fieldError(s, "setup_command")} hint="Runs once in every new workspace before the agent starts, for example npm ci --prefix apps/web.">
           <input data-testid="new-setup-command" value={d.setup_command} spellCheck={false} onChange={edit("setup_command")} />
         </Field>
-        <Field label="When a card is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
+        <Field label="When a story is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
           <select
             data-testid="new-merge-mode" value={d.merge_mode}
             onChange={(e) => dispatch({ type: "editDraft", field: "merge_mode", value: e.target.value as MergeMode })}

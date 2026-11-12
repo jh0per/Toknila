@@ -148,7 +148,7 @@ pub fn chain(d: &ChainDetail) {
         if d.chain.autostart {
             ""
         } else {
-            "  (cards start only when you start them)"
+            "  (stories start only when you start them)"
         }
     );
     if let Some(f) = &s.finish {
@@ -244,7 +244,7 @@ pub fn ticket(d: &TicketDetail) {
     crate::paused_output::reason(t, d.queue_position, &reason(t.status_reason.as_ref()));
     crate::allow_always::print_request(t.status_reason.as_ref());
     println!(
-        "chain: {}  profile: {}",
+        "epic: {}  profile: {}",
         d.chain,
         t.profile.as_deref().unwrap_or("(project default)")
     );

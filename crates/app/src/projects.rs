@@ -257,9 +257,9 @@ pub fn patch<U: UnitOfWork + ?Sized>(
 pub fn of_ticket<R: Reader + ?Sized>(r: &R, t: &toknila_core::Ticket) -> AppResult<Project> {
     let chain = r
         .chain(t.chain_id)?
-        .ok_or_else(|| AppError::not_found("chain of the ticket"))?;
+        .ok_or_else(|| AppError::not_found("epic of the ticket"))?;
     r.project(chain.project_id)?
-        .ok_or_else(|| AppError::not_found("project of the chain"))
+        .ok_or_else(|| AppError::not_found("project of the epic"))
 }
 
 /// "Allow always": remembers in the project of `t` the rule for the Bash call `tool` (its text,

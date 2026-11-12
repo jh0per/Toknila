@@ -47,7 +47,7 @@ export function ChatTab({ state, card, dispatch }: { state: State; card: Ticket;
   return (
     <div className="chat" data-testid="chat">
       {!detail ? <p className="muted">Loading…</p> : items.length === 0 && !asked ? (
-        <p className="muted" data-testid="chat-empty">Nothing said yet. What you and the card's agent tell each other appears here.</p>
+        <p className="muted" data-testid="chat-empty">Nothing said yet. What you and the story's agent tell each other appears here.</p>
       ) : (
         <ol className="bubbles" data-testid="chat-items">{items.map((i) => <Bubble key={i.key} item={i} />)}</ol>
       )}
@@ -66,7 +66,7 @@ export function ChatTab({ state, card, dispatch }: { state: State; card: Ticket;
           <button type="submit" className="btn primary" data-testid="chat-send" disabled={!text.trim()}>Send to the agent</button>
         </form>
       )}
-      {!asked && !canTalk(card) && <p className="muted" data-testid="chat-closed">This card is finished, so there is nobody to tell.</p>}
+      {!asked && !canTalk(card) && <p className="muted" data-testid="chat-closed">This story is finished, so there is nobody to tell.</p>}
       <div ref={end} />
     </div>
   );

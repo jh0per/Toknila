@@ -12,8 +12,8 @@ function Outcome({ o }: { o: PlanOutcome | undefined }) {
 
 const what = (p: FoundPlan): string =>
   [
-    p.kind === "spec_folder" ? "spec folder" : "chain file",
-    p.cards == null ? "does not parse" : `${p.cards} card${p.cards === 1 ? "" : "s"}`,
+    p.kind === "spec_folder" ? "spec folder" : "epic file",
+    p.cards == null ? "does not parse" : `${p.cards} ${p.cards === 1 ? "story" : "stories"}`,
     p.imported ? "already imported" : "",
   ].filter(Boolean).join(" · ");
 

@@ -14,14 +14,14 @@ export function PlansSection({ project, state, dispatch }: Props) {
       <section className="card-block" data-testid="repo-plans">
         <h2>Plans found in the project</h2>
         <p className="muted">
-          Spec folders (<code>specs/*/tasks.md</code>) and chain files (<code>plans/*.toml</code>) in {project.key}'s folder.
+          Spec folders (<code>specs/*/tasks.md</code>) and epic files (<code>plans/*.toml</code>) in {project.key}'s folder.
         </p>
         <FoundPlans project={project.key} state={state} dispatch={dispatch} />
       </section>
       <ImportChain project={project} state={state} dispatch={dispatch} />
       <section className="card-block">
         <h2>Import from a path or pasted text</h2>
-        <p className="muted">A chain file or a spec folder on this computer, or a chain file pasted as text.</p>
+        <p className="muted">An epic file or a spec folder on this computer, or an epic file pasted as text.</p>
         <button
           type="button" className="btn" data-testid="open-import-dialog"
           onClick={() => dispatch({ type: "openDialog", dialog: { kind: "import", project: project.key } })}

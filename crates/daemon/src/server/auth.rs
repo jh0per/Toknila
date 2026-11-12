@@ -101,7 +101,7 @@ impl Principal {
                 "a reviewer agent may only send its review_verdict",
             )),
             (AgentRole::Planner, false) => Err(AppError::forbidden(
-                "a planner may not send card events; it plans through its own tools",
+                "a planner may not send story events; it plans through its own tools",
             )),
             (_, true) => Err(AppError::forbidden(
                 "only the reviewer agent may send a review_verdict",
@@ -166,7 +166,7 @@ pub(super) async fn require_token(
         };
         if !allowed {
             let what = if grant.role == AgentRole::Planner {
-                "a planner token may only plan: read the plan, edit chains and cards, write in threads"
+                "a planner token may only plan: read the plan, edit epics and stories, write in threads"
             } else {
                 "an agent token may only send agent events for its own ticket"
             };

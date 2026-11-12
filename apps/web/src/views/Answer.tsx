@@ -59,7 +59,7 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
         </div>
       )}
       {reply === "screen" && (
-        <p className="muted" data-testid="answer-terminal-hint">Answer with the keys or text here, or in the card&apos;s Terminal tab.</p>
+        <p className="muted" data-testid="answer-terminal-hint">Answer with the keys or text here, or in the story&apos;s Terminal tab.</p>
       )}
       {reply === "screen" ? (
         <form

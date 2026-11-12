@@ -79,8 +79,8 @@ export function Usage({ state, dispatch }: { state: State; dispatch: (i: Intent)
             <BreakdownTable id="model" title="Model" items={s.by_model} metric={metric} />
             <BreakdownTable id="workspace" title="Workspace" items={s.by_workspace} metric={metric} />
             <BreakdownTable id="project" title="Project" note="Toknila runs only" items={s.by_project} metric={metric} />
-            <BreakdownTable id="chain" title="Chain" note="Toknila runs only" items={s.by_chain} metric={metric} />
-            <BreakdownTable id="card" title="Card" note="Toknila runs only" items={s.by_card} metric={metric} />
+            <BreakdownTable id="chain" title="Epic" note="Toknila runs only" items={s.by_chain} metric={metric} />
+            <BreakdownTable id="card" title="Story" note="Toknila runs only" items={s.by_card} metric={metric} />
           </div>
           <p className="muted" data-testid="usage-prices">
             Prices: {view.prices.source}, {view.prices.retrieved}

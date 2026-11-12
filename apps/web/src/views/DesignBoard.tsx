@@ -14,7 +14,7 @@ import { useFit } from "./useFit";
 import { useRefDrag } from "./useRefDrag";
 
 /// The hint of a chain that has no designs.
-export const EMPTY_HINT = "No designs yet. Add a design to a card and its mockup shows here.";
+export const EMPTY_HINT = "No designs yet. Add a design to a story and its mockup shows here.";
 
 const enc = encodeURIComponent;
 
@@ -82,8 +82,8 @@ function BoardView({ chain, state, dispatch }: { chain: ChainDetail; state: Stat
 
   return (
     <div className={`canvas-frame board-frame${drag ? " dragging" : ""}`} ref={frame} data-testid="design-board" data-chain={chain.chain.name}>
-      <div className="board-cards" data-testid="board-cards" role="group" aria-label="Cards">
-        <span className="muted">Cards</span>
+      <div className="board-cards" data-testid="board-cards" role="group" aria-label="Stories">
+        <span className="muted">Stories</span>
         {live.map((t) => (
           <button
             key={t.id} type="button" className={`board-chip s-${t.status}${current === t.key ? " current" : ""}${drag?.over === t.key ? " over" : ""}`}
@@ -123,13 +123,13 @@ function BoardView({ chain, state, dispatch }: { chain: ChainDetail; state: Stat
           <circle cx={drag.at.x} cy={drag.at.y} r={5} />
         </svg>
       )}
-      <p className="canvas-hint" data-testid="board-hint">Click a label to open its card. Drag a handle onto another card to move the reference.</p>
+      <p className="canvas-hint" data-testid="board-hint">Click a label to open its story. Drag a handle onto another story to move the reference.</p>
       <div className="canvas-corner">
         {fit.cut && !fit.fitted && <span className="canvas-cut" data-testid="cut-hint">Some designs are out of view.</span>}
         <ZoomControls
           zoom={fit.zoom} fitted={fit.fitted} cut={fit.cut} onFit={fit.fit} onZoomIn={fit.zoomIn} onZoomOut={fit.zoomOut} what="every design"
         />
-        <p className="canvas-legend" data-testid="canvas-legend" title="The colour of a card's status">
+        <p className="canvas-legend" data-testid="canvas-legend" title="The colour of a story's status">
           <span className="tone-todo">todo</span>
           <span className="tone-prog">in progress</span>
           <span className="tone-attn">needs you</span>

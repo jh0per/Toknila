@@ -91,7 +91,7 @@ pub fn decide<U: UnitOfWork + ?Sized>(
     threads::tell_worker(
         uow,
         t,
-        "The person accepted a change of this card's prompt or acceptance; read the card again."
+        "The person accepted a change of this story's prompt or acceptance; read the story again."
             .to_owned(),
         None,
     )?;

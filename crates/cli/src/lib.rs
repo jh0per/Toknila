@@ -20,7 +20,7 @@ use clap::Parser;
 
 pub use cmd::Command;
 
-/// Toknila: plan work as chains of tickets and let a fleet of coding agents execute them.
+/// Toknila: plan work as epics of stories and let a fleet of coding agents execute them.
 #[derive(Debug, Parser)]
 #[command(name = "toknila", version = toknila_core::VERSION, about, long_about = None)]
 pub struct Cli {

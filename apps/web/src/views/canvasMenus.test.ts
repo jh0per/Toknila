@@ -14,23 +14,23 @@ const shape = (d: TicketDetail | undefined) =>
 
 describe("the card menu", () => {
   it("offers only what needs no state until the daemon's word on the card is known", () => {
-    expect(shape(undefined)).toEqual(["Open", "Open terminal", "|Add card after"]);
+    expect(shape(undefined)).toEqual(["Open", "Open terminal", "|Add story after"]);
   });
 
   it("is grouped: open | the daemon's actions | around the card | cancel", () => {
     expect(shape(detail(["start", "pause", "cancel"], true, true))).toEqual([
-      "Open", "Edit", "Open terminal", "|Start", "Pause", "|Add card before", "Add card after", "Add dependency…", "|Cancel",
+      "Open", "Edit", "Open terminal", "|Start", "Pause", "|Add story before", "Add story after", "Add dependency…", "|Cancel",
     ]);
   });
 
   it("follows the daemon: no Edit unless can_edit, no Add before or dependency unless can_move", () => {
-    expect(shape(detail(["resume", "cancel"], false))).toEqual(["Open", "Open terminal", "|Resume", "|Add card after", "|Cancel"]);
-    expect(shape(detail([], false))).toEqual(["Open", "Open terminal", "|Add card after"]);
+    expect(shape(detail(["resume", "cancel"], false))).toEqual(["Open", "Open terminal", "|Resume", "|Add story after", "|Cancel"]);
+    expect(shape(detail([], false))).toEqual(["Open", "Open terminal", "|Add story after"]);
   });
 
   it("offers a proposed card Approve and Reject, and a card in review Accept and Return", () => {
-    expect(shape(detail(["approve", "reject"], false))).toEqual(["Open", "Open terminal", "|Approve", "Reject…", "|Add card after"]);
-    expect(shape(detail(["accept", "return", "reopen"], false)).slice(2, 6)).toEqual(["|Accept", "Return…", "Reopen", "|Add card after"]);
+    expect(shape(detail(["approve", "reject"], false))).toEqual(["Open", "Open terminal", "|Approve", "Reject…", "|Add story after"]);
+    expect(shape(detail(["accept", "return", "reopen"], false)).slice(2, 6)).toEqual(["|Accept", "Return…", "Reopen", "|Add story after"]);
   });
 
   it("has at most one red entry and it is last", () => {
@@ -86,7 +86,7 @@ describe("the canvas menu", () => {
   it("has its entries in three groups, New card first with its key", () => {
     const h = { newCard: vi.fn(), newChain: vi.fn(), importPlan: vi.fn(), askPlanner: vi.fn() };
     const e = canvasEntries(h);
-    expect(e.map((x) => `${x.sep ? "|" : ""}${x.label}`)).toEqual(["New card", "|New chain", "Import a plan", "|Plan with the assistant"]);
+    expect(e.map((x) => `${x.sep ? "|" : ""}${x.label}`)).toEqual(["New story", "|New epic", "Import a plan", "|Plan with the assistant"]);
     expect(e[0].keys).toBe("N");
     e[3].run();
     expect(h.askPlanner).toHaveBeenCalled();

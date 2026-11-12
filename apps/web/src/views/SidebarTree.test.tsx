@@ -45,7 +45,7 @@ describe("the sidebar tree", () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(open).toContain('data-testid="planner-link"');
     // The Assistant row opens the roadmap (with the panel), says what it is, and no longer links to the screen.
-    expect(open).toContain('title="plans epics on the roadmap, cards inside an epic"');
+    expect(open).toContain('title="plans epics on the roadmap, stories inside an epic"');
     expect(open).not.toContain("/projects/AAA/planner");
     expect(open).toContain('data-testid="new-chain-plus"');
     expect(open).toContain('data-testid="import-plus"');

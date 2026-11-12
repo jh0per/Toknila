@@ -122,7 +122,7 @@ try {
   console.log("PASS an agent question is answered and delivered");
 
   // The three leftover actions.
-  await row("leftovers", "INB-4").getByRole("button", { name: "Move to a new card" }).click();
+  await row("leftovers", "INB-4").getByRole("button", { name: "Move to a new story" }).click();
   await row("leftovers", "INB-4").waitFor({ state: "detached", timeout: 10_000 });
   if (!tok("ls").includes("Leftovers from L1")) throw new Error("no card for the moved leftovers");
   await row("leftovers", "INB-5").getByRole("button", { name: "Close them" }).click();
@@ -153,7 +153,7 @@ try {
   console.log("PASS no Pull request tab for a project that merges locally");
   await expectText(page.locator("[data-testid=details] h4").first(), "Description", "the columns are Description, Acceptance criteria and Subtasks");
   const headings = await page.locator("[data-testid=details] .cols h4").allTextContents();
-  if (headings.join("|") !== "Description|Acceptance criteria|Subtasks") throw new Error(`columns: ${headings}`);
+  if (headings.join("|") !== "Description|Acceptance criteria|Tasks") throw new Error(`columns: ${headings}`);
   console.log("PASS Details have the three columns");
   if ((await t("actions").count()) !== 1) throw new Error("the action bar should be there once");
   console.log("PASS the action bar is there once");

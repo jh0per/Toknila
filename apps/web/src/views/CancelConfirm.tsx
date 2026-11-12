@@ -42,7 +42,7 @@ export function CancelConfirm({ cardKey, onSend, onKeep }: {
         />
       </label>
       <span className="btns">
-        <button type="submit" className="danger" data-testid="cancel-send">Cancel card</button>
+        <button type="submit" className="danger" data-testid="cancel-send">Cancel story</button>
         <button type="button" data-testid="cancel-keep" onClick={onKeep}>Keep it</button>
       </span>
     </form>

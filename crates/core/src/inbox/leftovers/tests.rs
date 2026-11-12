@@ -123,7 +123,7 @@ fn notes_say_what_was_closed_or_moved() {
     let a = ticket(1, TicketStatus::Ready);
     let closed = close(&checklist(&a), Actor::Human);
     let note = closing_note(&a, &closed);
-    assert_eq!(note.gist, "Closed 2 leftover subtasks of DEMO-1");
+    assert_eq!(note.gist, "Closed 2 leftover tasks of DEMO-1");
     assert_eq!(
         note.what.as_deref(),
         Some("- T002  open  one\n- T004 open two")
@@ -132,11 +132,11 @@ fn notes_say_what_was_closed_or_moved() {
     let moved = move_out(&checklist(&a), TicketId::new()).moved;
     assert_eq!(
         moving_note(&a, &to, &moved).gist,
-        "Moved 2 leftover subtasks of DEMO-1 to DEMO-9"
+        "Moved 2 leftover tasks of DEMO-1 to DEMO-9"
     );
     assert_eq!(
         closing_note(&a, &closed.into_iter().take(1).collect::<Vec<_>>()).gist,
-        "Closed 1 leftover subtask of DEMO-1"
+        "Closed 1 leftover task of DEMO-1"
     );
 }
 

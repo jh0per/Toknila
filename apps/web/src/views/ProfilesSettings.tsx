@@ -4,7 +4,7 @@ import type { State } from "../store/state";
 import { currentProject } from "../store/state";
 import { NavLink } from "./Link";
 
-const ROLE: Record<string, string> = { worker: "Works on cards", reviewer: "Reviews finished cards", planner: "Plans the project" };
+const ROLE: Record<string, string> = { worker: "Works on stories", reviewer: "Reviews finished stories", planner: "Plans the project" };
 
 /// Agents: the agents Toknila can start (the profiles), which one plans, and where to add more.
 export function ProfilesSettings({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {

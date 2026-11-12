@@ -20,7 +20,7 @@ export function TerminalTab({ card }: { card: Ticket }) {
       streamKey={`${card.key}:${role}`}
       connect={(sink) => openTerminal(card.key, sink, role)}
       noneText="no runner yet"
-      placeholder="No runner yet. Start the card to see its terminal."
+      placeholder="No runner yet. Start the story to see its terminal."
       lead={lead}
     />
   );

@@ -54,7 +54,7 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
           )}
         </section>
         <section>
-          <h4>Subtasks</h4>
+          <h4>Tasks</h4>
           {!detail ? <p className="muted">Loading…</p> : detail.subtasks.length === 0 ? <p className="muted">None.</p> : (
             <ul className="ck">
               {detail.subtasks.map((s) => (

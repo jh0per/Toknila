@@ -7,7 +7,7 @@ import { type State, ticketEvents } from "../store/state";
 /// raw event behind a disclosure for whoever needs it.
 export function EventsTab({ state, card }: { state: State; card: Ticket }) {
   const events = ticketEvents(state, card.id);
-  if (events.length === 0) return <p className="muted" data-testid="events">Nothing has happened to this card yet.</p>;
+  if (events.length === 0) return <p className="muted" data-testid="events">Nothing has happened to this story yet.</p>;
   return (
     <ol className="events" data-testid="events">
       {events.map((e) => (

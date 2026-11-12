@@ -3,7 +3,7 @@ import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
 import { DiffView } from "./DiffView";
 
-const OUTCOME = { accepted: "Accepted: the card has it now.", rejected: "Rejected: the card is unchanged." } as const;
+const OUTCOME = { accepted: "Accepted: the story has it now.", rejected: "Rejected: the story is unchanged." } as const;
 
 /// The changes the assistant proposed to the open card (its prompt and acceptance) as bubbles in
 /// the panel's chat: each a diff with Accept and Reject, and what became of it once decided.

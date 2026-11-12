@@ -21,7 +21,7 @@ pub(super) fn designs_section(brief: &RunBrief<'_>) -> String {
     }
     let mut out = String::from(
         "\n## Designs\n\n\
-         The card is about these designs. Read the files (an image or a pdf) before you build \
+         The story is about these designs. Read the files (an image or a pdf) before you build \
          what they show; you may read these files and no others of the library. A region is in \
          percent of the image, from its top left corner.\n\n",
     );
@@ -51,7 +51,7 @@ pub(super) fn design_section(brief: &RunBrief<'_>) -> String {
     "\n## Design first\n\n\
      The person asked to see and approve a design before you write any code. Before you touch \
      the code: call `open_thread` with kind `design` (kind `flow` or `architecture` when that \
-     fits the card better), then post a first version with `thread_version` that the person can \
+     fits the story better), then post a first version with `thread_version` that the person can \
      judge: a Mermaid diagram, or the screen described as its states and layout. Then stop and \
      wait: the person's approval or request for changes arrives as an instruction. Do not ask \
      for it with `ask_human`, and do not open a second thread for the same design; answer a \

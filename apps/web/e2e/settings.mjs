@@ -159,7 +159,7 @@ try {
   await t("settings-nav-plans").click();
   await expectPath("/projects/DEMO/settings/plans", "Plans has its own address");
   await t("chain-file").setInputFiles(demo);
-  await expectText(t("imported"), "Imported chain demo", "chain file imported");
+  await expectText(t("imported"), "Imported epic demo", "chain file imported");
 
   // Agents: the limit and the test command the form detected.
   await t("settings-nav-agents").click();
@@ -170,8 +170,8 @@ try {
   await t("max-parallel").fill("3");
   await t("savebar").waitFor();
   await expectText(t("savebar"), "unsaved changes", "the Save bar appears with the first change");
-  // The models are in Agents, named for a person: the assistant, the card agents, the reviewer.
-  for (const [id, label] of [["planner-model", "Assistant"], ["worker-model", "Card agents"], ["reviewer-model", "Reviewer"]]) {
+  // The models are in Agents, named for a person: the assistant, the story agents, the reviewer.
+  for (const [id, label] of [["planner-model", "Assistant"], ["worker-model", "Story agents"], ["reviewer-model", "Reviewer"]]) {
     if ((await t(id).inputValue()) !== "") throw new Error(`${id} should be empty (Claude Code's own default)`);
     await expectText(page.locator("[data-testid=project-models] .field-label").filter({ hasText: label }), label, `the ${id} field is named ${label}`);
   }
@@ -233,7 +233,7 @@ try {
   await t("review-rounds").fill("5");
   await t("review-mode").selectOption("agent");
   if ((await t("merge-mode").inputValue()) !== "local") throw new Error("the default merge mode should be local");
-  await expectText(page.locator("[data-testid=project-review]"), "When a card is approved", "the merge setting says when it applies");
+  await expectText(page.locator("[data-testid=project-review]"), "When a story is approved", "the merge setting says when it applies");
   await absent(t("pr-title"), "the pull request fields belong to github mode");
   await t("merge-mode").selectOption("github");
   await value("pr-title", "{key}: {title}", "the default title template");

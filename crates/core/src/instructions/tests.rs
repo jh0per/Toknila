@@ -373,7 +373,7 @@ fn a_card_reads_the_goal_of_its_chain_as_the_epic() {
     };
     let text = generate(&brief);
     assert!(
-        text.contains("## Epic: checkout\n\nThis card is a task of the chain checkout."),
+        text.contains("## Epic: checkout\n\nThis story belongs to the epic checkout."),
         "{text}"
     );
     assert!(text.contains("\n\nPay with saved cards.\n"), "{text}");

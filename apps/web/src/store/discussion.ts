@@ -87,7 +87,7 @@ export const draftKey = (card: string): string => `card:${card}`;
 /// submit it half-way). The planner's instructions say what to do with it.
 export function askLine(card: string, thread: number, text: string): string {
   const one = text.trim().replace(/\s*\n\s*/g, " ");
-  return `Discussion on card ${card} (thread ${thread}): ${one}`;
+  return `Discussion on story ${card} (thread ${thread}): ${one}`;
 }
 
 export type DiffOp = "same" | "add" | "del";

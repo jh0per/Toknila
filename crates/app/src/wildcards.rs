@@ -67,7 +67,7 @@ pub fn propose<U: UnitOfWork + ?Sized>(
 ) -> AppResult<TicketId> {
     let title = card.title.trim();
     if title.is_empty() {
-        return Err(AppError::bad_request("card title is empty"));
+        return Err(AppError::bad_request("story title is empty"));
     }
     let c = resolve::chain(uow, chain)?;
     let key = next_key(uow, c.project_id)?;

@@ -61,12 +61,12 @@ impl BriefThread {
 /// The section with the card's threads; says so when there are none.
 pub(super) fn threads_section(brief: &RunBrief<'_>) -> String {
     let mut out = String::from(
-        "\n## The card's threads\n\nThe record of the card's design threads. You cannot open \
+        "\n## The story's threads\n\nThe record of the story's design threads. You cannot open \
          them; judge \"the thread shows ... and the owner approved it before code\" from this \
          list (basis `ran`). Times are UTC, to compare with the commit times.\n\n",
     );
     if brief.threads.is_empty() {
-        out.push_str("The card has no design threads.\n");
+        out.push_str("The story has no design threads.\n");
     }
     for t in brief.threads {
         out.push_str(&t.line());

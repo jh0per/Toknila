@@ -116,7 +116,7 @@ fn wildcard_cards_wait_for_the_owner() {
     let msg = tok.fails(&["approve", "DEMO-4"]);
     assert!(
         msg.contains(
-            "DEMO-2 is already running; a card can only go before work that has not started"
+            "DEMO-2 is already running; a story can only go before work that has not started"
         ),
         "{msg}"
     );

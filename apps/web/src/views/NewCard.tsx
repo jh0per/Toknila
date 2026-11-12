@@ -38,7 +38,7 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
         });
       }}
     >
-      <h2>New card in {chain.chain.name}</h2>
+      <h2>New story in {chain.chain.name}</h2>
       <Field label="What should the agent do?" name="card-prompt" error={undefined} hint="Say it the way you would to a colleague. Several lines are fine.">
         <textarea data-testid="card-prompt" rows={5} value={task} autoFocus onChange={(e) => setTask(e.target.value)} />
       </Field>
@@ -50,16 +50,16 @@ export function NewCard({ chain, state, dispatch }: { chain: ChainDetail; state:
       </Field>
       <Field label="Comes after" name="card-after" error={undefined}>
         <select data-testid="card-after" value={after} onChange={(e) => setAfter(e.target.value)}>
-          <option value="">The end of the chain</option>
+          <option value="">The end of the epic</option>
           {ticketsInOrder(chain).map((t) => <option key={t.id} value={t.key}>{t.key} · {t.title}</option>)}
         </select>
       </Field>
-      <Field label="Model (optional)" name="card-model" error={planError(p, "card", "model")} hint="Leave it to the project's model for routine work; pick a stronger one for a card that needs careful thought.">
+      <Field label="Model (optional)" name="card-model" error={planError(p, "card", "model")} hint="Leave it to the project's model for routine work; pick a stronger one for a story that needs careful thought.">
         <ModelPicker value={model} onChange={setModel} testId="card-model" defaultLabel="The project's model" />
       </Field>
       <DesignFirst checked={designFirst} onChange={setDesignFirst} />
       {refused && <p className="error" role="alert" data-testid="card-error">{refused}</p>}
-      <button className="btn primary" type="submit" disabled={p.busy} data-testid="create-card">Add card</button>
+      <button className="btn primary" type="submit" disabled={p.busy} data-testid="create-card">Add story</button>
     </form>
   );
 }

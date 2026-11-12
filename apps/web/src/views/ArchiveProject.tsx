@@ -13,8 +13,8 @@ export function ArchiveProject({ project, state, dispatch }: { project: Project;
       <h2>{archived ? `${project.key} is archived` : "Archive"}</h2>
       <p className="muted">
         {archived
-          ? "It is hidden from the sidebar; its chains, cards and history are kept."
-          : `Hides ${project.key} from the sidebar and keeps its chains, cards and history. Not while its agents work.`}
+          ? "It is hidden from the sidebar; its epics, stories and history are kept."
+          : `Hides ${project.key} from the sidebar and keeps its epics, stories and history. Not while its agents work.`}
       </p>
       <div className="row">
         <button

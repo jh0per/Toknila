@@ -119,7 +119,7 @@ pub enum Decision {
 }
 
 /// What the worker's permission hook is told when it asks after the hand-in.
-pub const HANDED_IN_DENIAL: &str = "This card is handed in and waits for review. Nothing more should run, so this is refused automatically; stop here and do not verify again, unless the card is returned to you.";
+pub const HANDED_IN_DENIAL: &str = "This story is handed in and waits for review. Nothing more should run, so this is refused automatically; stop here and do not verify again, unless the story is returned to you.";
 
 /// The answer a permission request gets without asking a person: a worker whose card is in
 /// Review has handed in (`finished` was accepted), so anything it still wants to run, such as a
