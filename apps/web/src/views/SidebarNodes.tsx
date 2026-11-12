@@ -1,5 +1,7 @@
 import { type ReactNode, useState } from "react";
 import type { Project } from "../api/types";
+import { ESTIMATE_NOTE, costText } from "../format";
+import { runningSpend, todayOf } from "../store/spend";
 import { KIND_TITLE, itemKey, itemRoute } from "../store/inbox";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
@@ -88,6 +90,7 @@ export function AgentsNode({ project, state, dispatch, onScreen }: Props) {
   const [touched, setTouched] = useState<boolean>();
   const open = touched ?? onScreen;
   const { runs, used, limit } = agentsOf(state, project);
+  const spent = runningSpend(todayOf(state, project.key), runs);
   return (
     <Node
       id="Agents" open={open} onToggle={() => setTouched(!open)} testId={onScreen ? "running" : `agents-node-${project.key}`}
@@ -96,6 +99,11 @@ export function AgentsNode({ project, state, dispatch, onScreen }: Props) {
           <NavIcon name="agents" />
           <span className="t">Agents</span>
           <span className="n" data-testid="project-slots" title="Agents running out of slots">{used} / {limit}</span>
+          {spent !== undefined && (
+            <span className="side-spend" data-testid="agents-spend" title={`Spent today by the agents running now. ${ESTIMATE_NOTE}`}>
+              est. {costText(spent)}
+            </span>
+          )}
         </button>
       }
     >

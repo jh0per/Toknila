@@ -197,6 +197,72 @@ async fn the_summary_totals_the_window_and_breaks_it_down() {
 }
 
 #[tokio::test]
+async fn today_is_the_projects_spend_the_machines_and_the_fresh_quota() {
+    let api = Api::new();
+    api.demo_with(&["A"]).await;
+    let (worker, _) = api.agent_token("DEMO-1").await;
+    let path = api.transcript("-work-demo", "sess-w");
+    append(&path, &call("m1", OPUS, [1_000_000, 0, 0, 0]));
+    api.hook(&worker, "hook:stop", "sess-w", &path).await;
+    // A session of the machine that is not a Toknila run: in the machine's figure only.
+    let other = api.transcript("-work-other", "sess-x");
+    append(
+        &other,
+        &call("m5", OPUS, [0, 0, 1_000_000, 0]).replace("/work/demo", "/work/other"),
+    );
+    let (status, body) = api
+        .call_with(
+            &worker,
+            Method::POST,
+            "/v1/usage/quota",
+            Some(json!({ "windows": [
+                { "name": "five_hour", "used_percentage": 48.0, "resets_at": 4_102_444_800_i64 },
+                { "name": "seven_day", "used_percentage": 8.0, "resets_at": 4_102_444_900_i64 },
+            ] })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+
+    let today = api.get("/v1/projects/DEMO/usage/today?tz=0").await;
+    let cost = |v: &Value| v["cost_usd"].as_f64().expect("cost");
+    // 1M input tokens at $5; the other session adds 1M cached reads at $0.50.
+    assert!((cost(&today["project"]) - 5.0).abs() < 1e-6, "{today}");
+    assert!((cost(&today["machine"]) - 5.5).abs() < 1e-6, "{today}");
+    assert!(
+        (cost(&today["cards"]["DEMO-1"]) - 5.0).abs() < 1e-6,
+        "{today}"
+    );
+    let windows = today["quota"]["windows"].as_array().expect("quota windows");
+    let names: Vec<_> = windows.iter().map(|w| w["name"].clone()).collect();
+    assert_eq!(names, [json!("five_hour"), json!("seven_day")], "{today}");
+    assert_eq!(windows[0]["used_percentage"], 48.0);
+
+    // The usage page's last day is the same figure.
+    let page = api.get("/v1/usage?days=7&tz=0").await;
+    let last = page["summary"]["series"]
+        .as_array()
+        .expect("series")
+        .last()
+        .cloned();
+    assert!((cost(&last.expect("today")["figures"]) - 5.5).abs() < 1e-6);
+
+    // Kept for a minute: a call that is written afterwards is not in the next answer.
+    append(&path, &call("m2", OPUS, [1_000_000, 0, 0, 0]));
+    api.hook(&worker, "hook:stop", "sess-w", &path).await;
+    let again = api.get("/v1/projects/DEMO/usage/today?tz=0").await;
+    assert_eq!(again, today);
+
+    let (status, _) = api
+        .call(Method::GET, "/v1/projects/NOPE/usage/today", None)
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = api
+        .call(Method::GET, "/v1/projects/DEMO/usage/today?tz=5000", None)
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn the_window_is_7_30_or_90_days() {
     let api = Api::new();
     assert_eq!(api.get("/v1/usage").await["summary"]["days"], 7);

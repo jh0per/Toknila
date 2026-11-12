@@ -6,6 +6,7 @@ import { dropMove, moveStep, roadmapPhase, splitRoadmap } from "../store/roadmap
 import { type State, chainsOf } from "../store/state";
 import { AssistantButton } from "./AssistantButton";
 import { NavLink } from "./Link";
+import { SpendLine } from "./SpendLine";
 import { ThemeButton } from "./ThemeButton";
 
 type Dispatch = (i: Intent) => void;
@@ -134,6 +135,7 @@ export function Roadmap({ project, state, dispatch }: { project: Project; state:
         <div className="crumb">
           <b>{project.key}</b><i>/</i><b data-testid="roadmap-title">Roadmap</b>
         </div>
+        <SpendLine state={state} dispatch={dispatch} />
         <span className="muted">{finished.length + rest.length} epics</span>
         {state.error && <span className="error">{state.error}</span>}
         {state.roadmap.error && <span className="error" role="alert" data-testid="roadmap-error">{state.roadmap.error}</span>}

@@ -6,6 +6,7 @@
 mod civil;
 mod price;
 pub mod quota;
+mod runtime;
 mod summary;
 mod transcript;
 
@@ -16,10 +17,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::Timestamp;
 
-pub use civil::{day_label, day_of, parse_rfc3339};
+pub use civil::{day_label, day_of, day_of_local, parse_rfc3339};
 pub use price::{LongPromptPrice, ModelPrice, PriceError, PriceTable};
+pub use runtime::{RunMark, RunTime, run_time};
 pub use summary::{
     DayUsage, Row, UsageFigures, UsageItem, UsageSummary, figures, figures_per_card, summarize,
+    summarize_local, today_figures, today_per_card,
 };
 pub use transcript::{Chunk, ClaudeCode, TranscriptFormat, accepted_transcript, session_of};
 

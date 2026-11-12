@@ -43,4 +43,10 @@
 .usage-scan { display: flex; gap: var(--sp2); align-items: center; font-size: var(--fs-body-m); }
 .usage-chip { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); background: var(--surface-container-high); border-radius: var(--shape-full); padding: 0 var(--sp2); white-space: nowrap; }
 .node .usage-chip { align-self: flex-start; }
-@media (max-width: 760px) { .usage-tables { grid-template-columns: minmax(0, 1fr); } }
+/* The top bar's spend line: label-m on surface-variant, the amounts in mono. */
+.spend-line { display: inline-flex; gap: var(--sp3); align-items: center; font-size: var(--fs-label-m); line-height: var(--lh-label-m); font-weight: var(--fw-medium); color: var(--on-surface-variant); text-decoration: none; white-space: nowrap; }
+.spend-line:hover { color: var(--on-surface); }
+.spend-line .mono { font-family: var(--mono); }
+.ide > main.plain > .plain-top { margin: calc(-1 * var(--sp4)) calc(-1 * var(--sp4)) var(--sp4); }
+.side-spend { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); white-space: nowrap; }
+@media (max-width: 760px) { .usage-tables { grid-template-columns: minmax(0, 1fr); } .spend-line, .ide > main.plain > .plain-top { display: none; } }

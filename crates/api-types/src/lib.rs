@@ -65,5 +65,6 @@ pub use toknila_core::agent::{AgentEvent, Proposal, ReleaseEvent};
 pub use toknila_core::design::pin::DesignPin;
 pub use toknila_core::plans::{FoundPlan, PlanKind, PlanScan, WorkingCopyBehind};
 pub use toknila_core::removal::FolderFate;
+pub use toknila_core::usage::RunTime;
 pub use toknila_core::usage::UsageFigures;
-pub use usage::{PriceInfo, QuotaReport, UsageSettings, UsageView};
+pub use usage::{PriceInfo, QuotaReport, TodayUsage, UsageSettings, UsageView};

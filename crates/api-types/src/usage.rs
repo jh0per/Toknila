@@ -1,8 +1,10 @@
 //! Bodies of the usage routes. Numbers only: no prompt or message content ever crosses here.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use toknila_core::usage::quota::{QuotaView, QuotaWindow};
-use toknila_core::usage::{PriceTable, UsageSummary};
+use toknila_core::usage::{PriceTable, UsageFigures, UsageSummary};
 
 /// Where the cost estimate's prices come from.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -41,6 +43,22 @@ pub struct UsageView {
     pub prices: PriceInfo,
     /// The remaining plan quota, when Claude Code reported one.
     pub quota: QuotaView,
+}
+
+/// `GET /v1/projects/{key}/usage/today`: what today cost, for the line of the window's top bar.
+/// Every cost is an estimate at API list prices; on a subscription the real cost differs.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TodayUsage {
+    /// The open project's Toknila runs, since local midnight.
+    pub project: UsageFigures,
+    /// Every project and, when counted, every Claude Code session on this machine.
+    pub machine: UsageFigures,
+    /// The plan windows, when a status line reported them within the hour.
+    pub quota: Option<QuotaReport>,
+    /// The project's spend today by card key, for the running agents of the sidebar.
+    #[serde(default)]
+    pub cards: BTreeMap<String, UsageFigures>,
 }
 
 /// Body of `PUT /v1/usage/settings`.
