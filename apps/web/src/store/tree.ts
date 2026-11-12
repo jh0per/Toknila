@@ -1,4 +1,5 @@
-import type { InboxItem } from "../api/types";
+import type { InboxItem, ProjectRun } from "../api/types";
+import type { Route } from "./route";
 import type { State } from "./state";
 
 const KEY = "toknila.project-open.";
@@ -27,10 +28,32 @@ export function storeProjectOpen(project: string, open: boolean): void {
 /// remembered, closed when nothing was.
 export const projectOpen = (stored: boolean | undefined, onScreen: boolean): boolean => onScreen || stored === true;
 
-/// How many items wait for the person in a project (the ones that belong to a card or name it).
-export function waitingIn(s: Pick<State, "inbox" | "chains">, project: { id: string }): number {
+/// The items that wait for the person in a project: the item's own project, else its chain's.
+export function inboxOf(s: Pick<State, "inbox" | "chains">, project: { id: string }): InboxItem[] {
   const of = (i: InboxItem) => i.project ?? (i.chain ? s.chains[i.chain]?.chain.project_id : undefined);
-  return s.inbox.filter((i) => of(i) === project.id).length;
+  return s.inbox.filter((i) => of(i) === project.id);
+}
+
+/// How many items wait for the person in a project.
+export const waitingIn = (s: Pick<State, "inbox" | "chains">, project: { id: string }): number => inboxOf(s, project).length;
+
+/// What runs in a project as the daemon said: its runs (assistant first, then cards), the slots
+/// in use and the limit. Without a report: nothing runs and the limit is the project's own.
+export function agentsOf(s: Pick<State, "agents">, project: { id: string; max_parallel?: number }): {
+  runs: ProjectRun[];
+  used: number;
+  limit: number;
+} {
+  const a = s.agents.find((x) => x.project === project.id);
+  return { runs: a?.runs ?? [], used: a?.used ?? 0, limit: a?.limit ?? project.max_parallel ?? 0 };
+}
+
+/// The screen of a run of a project: the assistant's page, or the card if the store knows its chain.
+export function runRouteIn(s: Pick<State, "chains">, project: { key: string }, run: ProjectRun): Route | undefined {
+  if (!run.card) return { name: "planner", project: project.key };
+  const id = run.card.id;
+  const chain = Object.values(s.chains).find((c) => c.tickets.some((t) => t.id === id));
+  return chain && { name: "card", project: project.key, chain: chain.chain.name, key: run.card.key };
 }
 
 /// What a key does in the tree, given the row it is pressed on.

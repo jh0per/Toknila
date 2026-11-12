@@ -134,6 +134,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/projects/{project}", get(crate::web::index))
         .route("/projects/{project}/planner", get(crate::web::index))
+        .route("/projects/{project}/inbox", get(crate::web::index))
         .route("/projects/{project}/chains/{chain}", get(crate::web::index))
         .route(
             "/projects/{project}/chains/{chain}/designs",

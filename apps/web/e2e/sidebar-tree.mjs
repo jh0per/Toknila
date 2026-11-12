@@ -61,7 +61,7 @@ try {
   must((await page.locator("[data-testid=projects] ul[role=tree]").count()) >= 1, "the projects are a tree");
   must((await page.locator("[data-testid=projects] [role=treeitem]").count()) > 4, "its rows are treeitems");
   const rows = (await node("TRA").locator("> ul > li").allTextContents()).map((t) => t.replace(/^[^A-Za-z]+/, "").match(/^[A-Za-z]+/)?.[0]);
-  must(rows.join(",").startsWith("Roadmap,Assistant,Chains"), `the rows under an open project are Roadmap, Assistant, Chains... (${rows})`);
+  must(rows.join(",").startsWith("Roadmap,Assistant,Inbox,Agents,Chains"), `the rows under an open project are Roadmap, Assistant, Inbox, Agents, Chains... (${rows})`);
   must(rows.at(-2) === "Designs" && rows.at(-1) === "Settings", "Designs and Settings close the list");
   await chain("alpha").waitFor();
   must((await chain("beta").count()) === 0, "a closed project shows none of its chains");
