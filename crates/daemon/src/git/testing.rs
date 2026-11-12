@@ -1,7 +1,22 @@
 //! Helpers for tests that run the real `git` on temporary repositories.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+
+/// The canonical form of `p` in the spelling git accepts everywhere: on Windows
+/// `canonicalize` adds the `\\?\` prefix, which git refuses ("could not create leading
+/// directories"), so it goes.
+pub(crate) fn canonical(p: &Path) -> PathBuf {
+    let c = p.canonicalize().expect("canonical");
+    #[cfg(windows)]
+    {
+        let s = c.to_string_lossy();
+        if let Some(rest) = s.strip_prefix(r"\\?\") {
+            return PathBuf::from(rest);
+        }
+    }
+    c
+}
 
 /// Runs `git -C dir args` with a fixed identity and returns its trimmed stdout; panics on failure.
 pub(crate) fn git(dir: &Path, args: &[&str]) -> String {
