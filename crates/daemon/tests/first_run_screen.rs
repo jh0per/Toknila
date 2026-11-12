@@ -175,6 +175,7 @@ impl Rig {
         }
     }
 
+    #[cfg(not(windows))] // used by the keystroke test only
     async fn journal(&self) -> Vec<Value> {
         self.send(Method::GET, "/v1/events?since=0&limit=10000", Value::Null)
             .await
@@ -183,6 +184,7 @@ impl Rig {
             .clone()
     }
 
+    #[cfg(not(windows))] // used by the keystroke test only
     async fn question(&self) -> Value {
         let inbox = self
             .send(Method::GET, "/v1/projects/DEMO/inbox", Value::Null)
