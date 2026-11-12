@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -99,6 +99,7 @@ try {
   await chainLink("x").waitFor();
   await chainLink("001-a").waitFor();
   console.log("PASS both chains are in the sidebar");
+  await shoot(page, "plans-found");
   await t("skip-plans").click();
   await t("found-plans-dialog").waitFor({ state: "detached" });
 
