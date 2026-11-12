@@ -72,6 +72,9 @@ fn chain_section(view: &ChainView, designs: &[String], out: &mut Lines) {
     let c = &view.chain;
     out.raw("[chain]");
     out.str("name", &c.name);
+    if let Some(title) = &c.title {
+        out.str("title", title);
+    }
     if !c.goal.is_empty() {
         out.str("goal", &c.goal);
     }

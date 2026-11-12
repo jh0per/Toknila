@@ -20,6 +20,9 @@ pub struct DeleteProject {
 pub struct ChainDeletion {
     /// The chain as it was.
     pub chain: Chain,
+    /// The words a person read for it: its title, or its name made readable.
+    #[serde(default)]
+    pub display_title: String,
     /// Key of the project it belonged to.
     pub project: String,
     /// How many cards went with it.

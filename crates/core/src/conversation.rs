@@ -78,10 +78,19 @@ impl std::str::FromStr for Author {
 pub enum About {
     /// A card, by key.
     Card { key: TicketKey },
-    /// A chain (epic), by name.
+    /// A chain (epic), by name; the window shows the chain's title.
     Chain { name: String },
     /// The roadmap: the project's top-level plan of epics.
     Roadmap,
+}
+
+impl About {
+    /// A message about this chain.
+    pub fn chain_of(c: &crate::Chain) -> Self {
+        Self::Chain {
+            name: c.name.clone(),
+        }
+    }
 }
 
 /// One message of a project's conversation.
@@ -179,17 +188,18 @@ pub fn opened_thread(number: u32, key: &TicketKey) -> String {
     format!("opened thread {number} on {key}")
 }
 
-/// What Toknila says when the assistant added an epic (a chain) with its release version.
-pub fn added_chain(name: &str, version: Option<&str>) -> String {
+/// What Toknila says when the assistant added an epic (a chain) with its release version; `title`
+/// is what a person reads.
+pub fn added_chain(title: &str, version: Option<&str>) -> String {
     match version.map(|v| v.trim().trim_start_matches('v')) {
-        Some(v) if !v.is_empty() => format!("added epic {name} v{v}"),
-        _ => format!("added epic {name}"),
+        Some(v) if !v.is_empty() => format!("added epic {title} v{v}"),
+        _ => format!("added epic {title}"),
     }
 }
 
 /// What Toknila says when the assistant edited a chain.
-pub fn edited_chain(name: &str) -> String {
-    format!("edited epic {name}")
+pub fn edited_chain(title: &str) -> String {
+    format!("edited epic {title}")
 }
 
 /// What Toknila says when the assistant set its suggestion.

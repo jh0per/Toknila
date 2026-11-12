@@ -121,6 +121,7 @@
     }
   ],
   "summary": {
+    "display_title": "Demo",
     "done": 4,
     "finished_at": 0,
     "next_release": null,

@@ -21,6 +21,7 @@ impl World {
             id: ChainId::new(),
             project_id: self.project,
             name: format!("c{}", self.chains.len()),
+            title: None,
             goal: String::new(),
             autostart,
             review_mode: None,

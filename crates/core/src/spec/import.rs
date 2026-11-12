@@ -28,6 +28,8 @@ struct File {
 #[derive(Serialize)]
 struct Chain {
     name: String,
+    /// The first heading of the folder's `spec.md`; without one the name is made readable.
+    title: String,
     goal: String,
     autostart: bool,
 }
@@ -110,6 +112,10 @@ pub fn import(
     let file = File {
         chain: Chain {
             name: name.trim().to_owned(),
+            title: spec_title
+                .map(str::trim)
+                .filter(|t| !t.is_empty())
+                .map_or_else(|| crate::readable_name(name), str::to_owned),
             goal: goal(spec.title.as_deref(), docs),
             autostart: false,
         },

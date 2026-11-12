@@ -4,6 +4,7 @@ import { aboutLabel, aboutRoute } from "../store/conversation";
 import { whenText } from "../store/chat";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
+import { titleByName } from "../store/title";
 import { writeClipboard } from "../terminal/clipboard";
 import { NavLink } from "./Link";
 
@@ -30,7 +31,7 @@ function CopyButton({ text }: { text: string }) {
 function Chip({ m, project, state, dispatch }: { m: ConversationMessage; project: string; state: State; dispatch: (i: Intent) => void }) {
   if (!m.about) return null;
   const route = aboutRoute(state, project, m.about);
-  const label = aboutLabel(m.about);
+  const label = aboutLabel(m.about, m.about.kind === "chain" ? titleByName(state, m.about.name) : undefined);
   return route ? (
     <NavLink route={route} dispatch={dispatch} className="chip" testId="chat-chip">{label}</NavLink>
   ) : (
@@ -42,7 +43,7 @@ function Chip({ m, project, state, dispatch }: { m: ConversationMessage; project
 /// name inside the words is the link; a line that does not name it gets the link after the words.
 function DidLine({ m, project, state, dispatch }: { m: ConversationMessage; project: string; state: State; dispatch: (i: Intent) => void }) {
   const route = aboutRoute(state, project, m.about);
-  const label = m.about ? (m.about.kind === "chain" ? m.about.name : m.about.kind === "card" ? m.about.key : "") : "";
+  const label = m.about ? (m.about.kind === "chain" ? titleByName(state, m.about.name) : m.about.kind === "card" ? m.about.key : "") : "";
   const at = route && label ? m.text.indexOf(label) : -1;
   const link = (text: string): ReactNode =>
     route ? <NavLink route={route} dispatch={dispatch} testId="chat-did-link">{text}</NavLink> : text;

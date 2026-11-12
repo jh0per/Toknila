@@ -74,8 +74,10 @@ try {
   const fin = chain(longName);
   await fin.waitFor();
   const finText = (await fin.innerText()).replace(/\s+/g, " ");
-  must(finText.includes("a-finished-chain"), `a finished row shows its chain name (${finText})`);
-  must(!/\d+ [A-Z][a-z]{2}/.test(finText) && !/finished/.test(finText.replace(longName, "")), `a finished row has no date and no phase word (${finText})`);
+  // The row reads the name made readable, not the slug.
+  const longTitle = "A finished chain with a really long name for the sidebar";
+  must(finText.includes(longTitle), `a finished row shows its chain's title (${finText})`);
+  must(!/\d+ [A-Z][a-z]{2}/.test(finText) && !/finished/.test(finText.replace(longTitle, "")), `a finished row has no date and no phase word (${finText})`);
   const geo = await fin.locator("a.item").evaluate((a) => {
     const t = a.querySelector(".chain-name");
     const side = document.querySelector(".sidebar").getBoundingClientRect().right;

@@ -101,6 +101,7 @@ impl Mem {
             id: ChainId::new(),
             project_id: project.id,
             name: "demo".to_owned(),
+            title: None,
             goal: String::new(),
             autostart: true,
             review_mode: None,

@@ -114,6 +114,7 @@ mod tests {
             id: crate::ChainId::new(),
             project_id: ProjectId::new(),
             name: "plan".to_owned(),
+            title: None,
             goal: String::new(),
             autostart,
             review_mode: None,

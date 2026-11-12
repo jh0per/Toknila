@@ -2,6 +2,7 @@ import { type MouseEvent, type ReactNode, useCallback, useState } from "react";
 import type { ChainDetail } from "../api/types";
 import type { Intent } from "../store/msg";
 import { AUTOSTART_HINT } from "../store/autostart";
+import { epicTitle } from "../store/title";
 import { ContextMenu } from "./ContextMenu";
 import { menuGroups } from "./menuGroups";
 
@@ -21,7 +22,7 @@ export function useChainMenu(dispatch: (i: Intent) => void): {
   const menu = at && (
     <ContextMenu
       x={at.x} y={at.y} onClose={close}
-      title={at.chain.chain.name}
+      title={epicTitle(at.chain)}
       entries={menuGroups([{
         label: at.chain.chain.autostart ? "Stop starting stories automatically" : "Start stories automatically",
         testId: "menu-autostart",

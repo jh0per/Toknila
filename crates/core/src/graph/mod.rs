@@ -206,6 +206,10 @@ pub struct Finish {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainSummary {
+    /// The words a person reads for the chain: its title, or its name made readable. The page
+    /// shows this and never repeats the rule.
+    #[serde(default)]
+    pub display_title: String,
     pub status: ChainStatus,
     /// Finished, active, waiting, idle or empty.
     pub phase: PhaseState,

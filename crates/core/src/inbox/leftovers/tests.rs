@@ -145,6 +145,7 @@ fn view(tickets: Vec<Ticket>, edges: &[(usize, usize)]) -> ChainView {
         id: ChainId::new(),
         project_id: ProjectId::new(),
         name: "c".to_owned(),
+        title: None,
         goal: String::new(),
         autostart: false,
         review_mode: None,

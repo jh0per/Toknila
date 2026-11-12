@@ -51,6 +51,7 @@ impl Plan {
             id: ChainId::new(),
             project_id: project,
             name: self.chain.name.clone(),
+            title: self.chain.title.clone(),
             goal: self.chain.goal.clone(),
             autostart: self.chain.autostart,
             review_mode: self.chain.review_mode,

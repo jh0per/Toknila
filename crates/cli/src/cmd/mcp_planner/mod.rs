@@ -441,7 +441,11 @@ mod tests {
         ));
         assert!(matches!(
             c("new_chain", json!({ "name": "plan", "goal": "g" })),
-            PlannerCall::NewChain(n) if n.name == "plan" && n.goal.as_deref() == Some("g")
+            PlannerCall::NewChain(n) if n.name.as_deref() == Some("plan") && n.goal.as_deref() == Some("g")
+        ));
+        assert!(matches!(
+            c("new_chain", json!({ "title": "MIDI controllers" })),
+            PlannerCall::NewChain(n) if n.name.is_none() && n.title.as_deref() == Some("MIDI controllers")
         ));
         assert!(matches!(
             c("new_chain", json!({ "name": "plan", "version": "0.4.0" })),

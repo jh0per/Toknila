@@ -1,6 +1,7 @@
 import type { ChainDeletion } from "../api/types";
 import type { Intent } from "../store/msg";
 import { type State } from "../store/state";
+import { epicTitle } from "../store/title";
 
 const cards = (n: number) => `${n} ${n === 1 ? "story" : "stories"}`;
 
@@ -15,9 +16,9 @@ export function DeleteChain({ chain: id, state, dispatch }: { chain: string; sta
   const n = chain.tickets.length;
   return (
     <div className="card-block form" data-testid="delete-chain">
-      <h2>Delete epic {chain.chain.name}</h2>
+      <h2>Delete epic {epicTitle(chain)}</h2>
       <p data-testid="delete-chain-what">
-        Deletes the epic <b>{chain.chain.name}</b> and its <b>{cards(n)}</b> from Toknila, with their threads, journal
+        Deletes the epic <b>{epicTitle(chain)}</b> and its <b>{cards(n)}</b> from Toknila, with their threads, journal
         entries, run files and workspaces. The project folder and the branches Toknila made for the stories stay untouched.
       </p>
       {r.error && (
@@ -41,7 +42,7 @@ export function DeleteChain({ chain: id, state, dispatch }: { chain: string; sta
 function Deleted({ d, dispatch }: { d: ChainDeletion; dispatch: (i: Intent) => void }) {
   return (
     <div className="card-block form" data-testid="delete-chain-result">
-      <h2>{d.chain.name} was deleted</h2>
+      <h2>{d.display_title || d.chain.name} was deleted</h2>
       <p>
         {cards(d.tickets)} deleted
         {d.worktrees_removed.length > 0 ? `; workspaces removed: ${d.worktrees_removed.join(", ")}` : ""}.

@@ -44,6 +44,8 @@ try {
     "post", "/planner/say", JSON.stringify({ text: "Two releases: the list, then billing. Shall I add them?", about: "roadmap" }),
     "post", "/planner/chains", JSON.stringify({ name: "list", goal: "Show the items.", version: "0.5.0" }),
     "post", "/planner/chains", JSON.stringify({ name: "billing", goal: "Take payments.", version: "0.6.0" }),
+    // An epic the owner named in words: the title only, the daemon derives the slug.
+    "post", "/planner/chains", JSON.stringify({ title: "MIDI controllers", goal: "Play it with a keyboard.", version: "0.7.0" }),
     "hold",
   ].map((x) => `'${x}'`).join(", ");
   writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', ${steps}]\nstartup_secs = 0\n`);
@@ -92,15 +94,43 @@ try {
   const said = page.locator("[data-author=assistant]");
   await expectText(said, "Two releases", "the planner's say is an assistant bubble");
   await expectText(said.locator("[data-testid=chat-chip]"), "roadmap", "with the roadmap as its chip");
-  await page.waitForFunction(() => document.querySelectorAll("[data-testid=roadmap-node]").length === 2, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=roadmap-node]").length === 3, null, { timeout: 15_000 });
   const names = await t("roadmap-name").allInnerTexts();
   const versions = await t("roadmap-version").allInnerTexts();
-  if (JSON.stringify(names) !== JSON.stringify(["list", "billing"])) throw new Error(`epics out of order: ${names}`);
-  if (!versions[0].includes("0.5.0") || !versions[1].includes("0.6.0")) throw new Error(`versions: ${versions}`);
-  console.log("PASS two epics at the end of the roadmap, in order, with their versions");
+  // A name without a title reads made readable ("list" -> "List"); the titled epic reads as titled.
+  if (JSON.stringify(names) !== JSON.stringify(["List", "Billing", "MIDI controllers"])) throw new Error(`epics out of order: ${names}`);
+  if (!versions[0].includes("0.5.0") || !versions[1].includes("0.6.0") || !versions[2].includes("0.7.0")) throw new Error(`versions: ${versions}`);
+  console.log("PASS three epics at the end of the roadmap, in order, with their versions and titles");
   const did = (await t("chat-did").allInnerTexts()).map((l) => l.split("\n")[0].replace(/\s+/g, " ").trim());
-  if (JSON.stringify(did) !== JSON.stringify(["added epic list v0.5.0", "added epic billing v0.6.0"])) throw new Error(`did-lines: ${JSON.stringify(did)}`);
-  console.log("PASS each epic is a did-line `added epic NAME vVERSION`");
+  if (JSON.stringify(did) !== JSON.stringify(["added epic List v0.5.0", "added epic Billing v0.6.0", "added epic MIDI controllers v0.7.0"])) throw new Error(`did-lines: ${JSON.stringify(did)}`);
+  console.log("PASS each epic is a did-line `added epic TITLE vVERSION`");
+  // The titled epic: the daemon derived the slug, the window reads the title and keeps the slug for the machine.
+  const shown = JSON.parse(tok("chain", "show", "midi-controllers", "--json"));
+  if (shown.chain.title !== "MIDI controllers" || shown.chain.name !== "midi-controllers" || shown.summary.display_title !== "MIDI controllers") {
+    throw new Error(`the titled epic: ${JSON.stringify(shown.chain)} ${shown.summary.display_title}`);
+  }
+  const node = page.locator("[data-testid=roadmap-node][data-chain=midi-controllers]");
+  await expectText(node.locator("[data-testid=roadmap-name]"), "MIDI controllers", "the roadmap node of the titled epic reads its title");
+  await expectText(page.locator("[data-chain-item=midi-controllers] .chain-name"), "MIDI controllers", "the sidebar row reads the title");
+  await expectText(t("chat-did-link").last(), "MIDI controllers", "the did-line links the title");
+  console.log("PASS the slug is derived from the title and stays out of the window's words");
+  // An empty chain shows a prompt over the diagram; with a story the Start node is in reach.
+  tok("ticket", "new", "midi-controllers", "Map the pads");
+  const epicUrl = new URL(url);
+  epicUrl.pathname = "/projects/RA/chains/midi-controllers";
+  await page.goto(epicUrl.href);
+  await expectText(t("chain-name-top"), "MIDI controllers", "the chain header and breadcrumb read the title");
+  await t("start-node").click();
+  await t("epic-panel").waitFor();
+  await expectText(t("epic-slug"), "midi-controllers", "the epic panel shows the slug as the machine side");
+  await t("epic-name").fill("MIDI pads and keys");
+  await t("epic-save").click();
+  await expectText(t("epic-title"), "MIDI pads and keys", "the Start node edits the title in place");
+  const renamed = JSON.parse(tok("chain", "show", "midi-controllers", "--json"));
+  if (renamed.chain.title !== "MIDI pads and keys" || renamed.chain.name !== "midi-controllers") throw new Error(`rename: ${JSON.stringify(renamed.chain)}`);
+  console.log("PASS the new title is stored and the slug is untouched");
+  await page.goto(u.href);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=roadmap-node]").length === 3, null, { timeout: 15_000 });
 
   // 4. "Only about this" on the roadmap shows the roadmap's messages (the person's and the say).
   await t("only-about").check();

@@ -7,7 +7,34 @@ use toknila_core::{
 };
 
 use crate::chains::clean_version;
-use crate::{AppError, AppResult, ChainTx, UnitOfWork, resolve, with_chain};
+use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork, resolve, with_chain};
+
+/// A title as a person typed it: trimmed, none when empty.
+pub(crate) fn clean_title(text: Option<&str>) -> Option<String> {
+    text.map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(str::to_owned)
+}
+
+/// A name for a chain that a person only titled: the title's slug, or `epic-<n>` when the title
+/// has no ASCII letters or digits even transliterated; a name the project has gets `-2`, `-3`...
+pub(crate) fn unique_name<R: Reader + ?Sized>(
+    repo: &R,
+    project: toknila_core::ProjectId,
+    title: &str,
+) -> AppResult<String> {
+    let base = match toknila_core::slug_from_title(title) {
+        Some(s) => s,
+        None => format!("epic-{}", repo.chains(Some(project))?.len() + 1),
+    };
+    let mut name = base.clone();
+    let mut n = 1;
+    while repo.chain_by_name(project, &name)?.is_some() {
+        n += 1;
+        name = format!("{base}-{n}");
+    }
+    Ok(name)
+}
 
 /// Sets the chain's version while nothing is released: the end release is renamed, or made, so
 /// the chain and its end release always say the same version. A release that was cut or released
@@ -73,6 +100,9 @@ pub struct ChainSettings {
     pub autostart: Option<bool>,
     /// The epic's name; unique in the project.
     pub name: Option<String>,
+    /// The words a person reads for the epic; an empty text goes back to the name made readable.
+    #[serde(default)]
+    pub title: Option<String>,
     /// The epic's goal, markdown: what every card of the chain works toward.
     pub goal: Option<String>,
     /// The version the chain releases; refused once its release was cut.
@@ -108,6 +138,9 @@ pub fn set_settings<U: UnitOfWork + ?Sized>(
         ctx.edit_chain(|c| {
             if let Some(n) = name {
                 c.name = n;
+            }
+            if let Some(t) = settings.title.as_deref() {
+                c.title = clean_title(Some(t));
             }
             if let Some(g) = settings.goal {
                 c.goal = g.trim().to_owned();

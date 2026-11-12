@@ -62,6 +62,9 @@ pub struct OverviewSummary {
 pub struct OverviewChain {
     pub id: ChainId,
     pub name: String,
+    /// What the owner reads for the epic: its title, or the name made readable.
+    #[serde(default)]
+    pub title: String,
     pub goal: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
@@ -148,6 +151,7 @@ pub fn overview<R: Reader + ?Sized>(
         let finished = s.phase == PhaseState::Finished;
         chains.push(OverviewChain {
             id: chain.id,
+            title: chain.display_title(),
             name: chain.name,
             goal: chain.goal,
             version: chain.version,

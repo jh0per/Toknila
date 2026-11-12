@@ -75,9 +75,10 @@ fn a_new_chain_never_starts_its_cards_by_itself() {
         &mut mem,
         p,
         NewPlanChain {
-            name: "plan".to_owned(),
+            name: Some("plan".to_owned()),
             goal: Some("g".to_owned()),
             version: Some("v0.4.0".to_owned()),
+            title: None,
         },
     )
     .expect("chain");
@@ -88,6 +89,35 @@ fn a_new_chain_never_starts_its_cards_by_itself() {
 }
 
 #[test]
+fn a_new_chain_with_only_a_title_gets_a_unique_slug_and_the_did_line_says_the_title() {
+    let mut mem = manual_demo();
+    let p = project(&mem);
+    let make = |mem: &mut Mem, title: &str| {
+        new_chain(
+            mem,
+            p,
+            NewPlanChain {
+                title: Some(title.to_owned()),
+                version: Some("0.4.0".to_owned()),
+                ..NewPlanChain::default()
+            },
+        )
+        .expect("chain");
+        mem.view.chain.clone()
+    };
+    let c = make(&mut mem, "MIDI controllers");
+    assert_eq!(c.name, "midi-controllers");
+    assert_eq!(c.title.as_deref(), Some("MIDI controllers"));
+    assert_eq!(c.display_title(), "MIDI controllers");
+    let (_, line) = mem.conversation.last().expect("a did-line");
+    assert_eq!(line.text, "added epic MIDI controllers v0.4.0");
+    let c = make(&mut mem, "安卓发布");
+    assert!(c.name.starts_with("epic-"), "{}", c.name);
+    let err = new_chain(&mut mem, p, NewPlanChain::default()).expect_err("no title, no name");
+    assert_eq!(err.kind, ErrorKind::BadRequest);
+}
+
+#[test]
 fn the_planner_edits_name_goal_and_version_of_an_epic_whose_release_is_not_cut() {
     let mut mem = manual_demo();
     let p = project(&mem);
@@ -95,7 +125,7 @@ fn the_planner_edits_name_goal_and_version_of_an_epic_whose_release_is_not_cut()
         &mut mem,
         p,
         NewPlanChain {
-            name: "plan".to_owned(),
+            name: Some("plan".to_owned()),
             version: Some("0.4.0".to_owned()),
             ..NewPlanChain::default()
         },
@@ -107,11 +137,13 @@ fn the_planner_edits_name_goal_and_version_of_an_epic_whose_release_is_not_cut()
         "plan",
         EditPlanChain {
             name: Some("phase-4".to_owned()),
+            title: Some("Phase four".to_owned()),
             goal: Some("ship it".to_owned()),
             version: Some("0.5.0".to_owned()),
         },
     )
     .expect("edit");
+    assert_eq!(mem.view.chain.title.as_deref(), Some("Phase four"));
     let c = &mem.view.chain;
     assert_eq!(
         (c.name.as_str(), c.goal.as_str(), c.version.as_deref()),
