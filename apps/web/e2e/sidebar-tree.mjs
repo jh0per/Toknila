@@ -24,6 +24,9 @@ try {
     writeFileSync(join(home, `${chain}.toml`), `[chain]\nname = "${chain}"\n\n[[ticket]]\nid = "${key}1"\ntitle = "${key}1"\nprofile = "sim"\n`);
     tok("chain", "import", join(home, `${chain}.toml`), "--project", key);
   }
+  const longName = "a-finished-chain-with-a-really-long-name-for-the-sidebar";
+  writeFileSync(join(home, "long.toml"), `[chain]\nname = "${longName}"\n\n[[ticket]]\nid = "TRL1"\ntitle = "TRL1"\nprofile = "sim"\ndone = true\n`);
+  tok("chain", "import", join(home, "long.toml"), "--project", "TRA");
   const { url } = JSON.parse(tok("open", "--json"));
 
   browser = await launch();
@@ -65,6 +68,23 @@ try {
   must(rows.at(-2) === "Designs" && rows.at(-1) === "Settings", "Designs and Settings close the list");
   await chain("alpha").waitFor();
   must((await chain("beta").count()) === 0, "a closed project shows none of its chains");
+
+  // A finished chain's row: its name (cut by an ellipsis, never missing), one line, no date, no repeated word.
+  await page.locator("[data-testid=finished-toggle]").click();
+  const fin = chain(longName);
+  await fin.waitFor();
+  const finText = (await fin.innerText()).replace(/\s+/g, " ");
+  must(finText.includes("a-finished-chain"), `a finished row shows its chain name (${finText})`);
+  must(!/\d+ [A-Z][a-z]{2}/.test(finText) && !/finished/.test(finText.replace(longName, "")), `a finished row has no date and no phase word (${finText})`);
+  const geo = await fin.locator("a.item").evaluate((a) => {
+    const t = a.querySelector(".chain-name");
+    const side = document.querySelector(".sidebar").getBoundingClientRect().right;
+    const lh = parseFloat(getComputedStyle(a).lineHeight) || 20;
+    return { h: a.getBoundingClientRect().height, right: a.getBoundingClientRect().right, side, lh, clipped: t.scrollWidth > t.clientWidth, face: getComputedStyle(t).fontFamily };
+  });
+  must(geo.h < geo.lh * 2, `a finished row is one line (${geo.h}px)`);
+  must(geo.right <= geo.side && geo.clipped, "a long name ends in an ellipsis inside the sidebar");
+  must(!/mono/i.test(geo.face), `a chain name is in the body face (${geo.face})`);
 
   // Each project opens its own rows; a chain of the second one is reachable without its page.
   await chev("TRB").click();
