@@ -21,7 +21,8 @@ function Totals({ t }: { t: UsageFigures }) {
     <div className="usage-totals">
       <Stat id="processed" label="Tokens processed" value={tokensText(t.processed)} />
       <Stat id="cached" label="Cached share" value={shareText(t.cached_share)} hint="Input served from the cache" />
-      <Stat id="uncached" label="Uncached input" value={tokensText(t.uncached_input)} />
+      <Stat id="uncached" label="Uncached input" value={tokensText(t.tokens.input)} hint="Input that was neither read from the cache nor written to it" />
+      <Stat id="cache-writes" label="Cache writes" value={tokensText(t.tokens.cache_write)} hint="Input written to the cache; it counted as uncached input before" />
       <Stat id="output" label="Output" value={tokensText(t.tokens.output)} />
       <Stat id="cost" label="Est. cost" value={costText(t.cost_usd)} hint={ESTIMATE_NOTE} />
       <Stat id="savings" label="Est. cache savings" value={costText(t.cache_savings_usd)} hint={ESTIMATE_NOTE} />

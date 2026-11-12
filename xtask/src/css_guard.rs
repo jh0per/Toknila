@@ -16,10 +16,8 @@ const STYLE_DIR: &str = "apps/web/src";
 const BASELINE: &[(&str, usize)] = &[
     ("board.css", 1),
     ("chain.css", 11),
-    ("inbox.css", 2),
     ("panel.css", 1),
     ("threads.css", 2),
-    ("usage.css", 1),
 ];
 
 /// Raw values in one stylesheet's text: hex colours, and `font-size` or `font` shorthand in px.
