@@ -237,3 +237,44 @@ fn a_planner_run_without_the_projects_facts_is_refused() {
     let e = super::prepare(&AgentProfile::claude_code_planner(), &cx).expect_err("no facts");
     assert!(e.to_string().contains("project's facts"), "{e}");
 }
+
+#[test]
+fn a_design_added_after_the_start_is_not_read_through_a_rule_and_the_data_home_stays_denied() {
+    // The planner started with one design; the owner uploads another and a second project has one.
+    let (rig, files) = rig_with_designs();
+    let home = rig.dir.path();
+    for d in ["db", "runs/t1", "runs/t2", "designs/p2"] {
+        std::fs::create_dir_all(home.join(d)).expect("mkdir");
+    }
+    std::fs::write(home.join("designs/p2/theirs.png"), b"x").expect("write");
+    rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);
+    let late = home.join("designs/p1/late.png");
+    std::fs::write(&late, b"x").expect("a design added after the start");
+
+    let s = settings_of(&rig);
+    let allow = strings(&s["permissions"]["allow"]);
+    let deny = strings(&s["permissions"]["deny"]);
+    let rule =
+        |p: &std::path::Path| toknila_core::private::read_allow_rule(&p.display().to_string());
+    // The rules did not widen: the late file has no allow rule, and no folder of designs is allowed.
+    assert!(!allow.contains(&rule(&late)), "{allow:?}");
+    assert!(allow.contains(&rule(&files[0])), "{allow:?}");
+    assert!(
+        !allow
+            .iter()
+            .any(|r| r.contains("designs") && r.contains("**"))
+    );
+    // Denied: the database, a sibling run, the library's index, another project's designs.
+    for denied in [
+        home.join("db"),
+        home.join("runs/t2"),
+        home.join("designs/p1/index.json"),
+        home.join("designs/p2"),
+    ] {
+        assert!(deny.contains(&rule(&denied)), "{denied:?} in {deny:?}");
+    }
+    // Control: the run's own folder and the kept design are not denied.
+    for open in [home.join("runs/t1"), files[0].clone()] {
+        assert!(!deny.contains(&rule(&open)), "{open:?} must stay open");
+    }
+}

@@ -21,7 +21,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
         ),
         tool(
             "show_design",
-            "Read one design of the project: its name, kind, media type, size and the path of its file, which you may Read. Name the design by its id or its name (see `designs` in show_plan).",
+            "Look at one design of the project, also one the owner added a moment ago. It answers the design's name, kind, media type, size and the path of its file as text and, for a png, jpg or webp, the picture itself as image content: you see it without reading any file. For a pdf it answers the metadata and path only. A Figma link whose image was not fetched has no file, and the answer says so in words. Name the design by its id or its name (see `designs` in show_plan).",
             json!({ "design": text("The design: its id or its name") }),
             &["design"],
         ),
