@@ -57,10 +57,7 @@ impl Client {
             .parse()
             .map_err(|e| ClientError::Decode(format!("{HEADER_RUN}: {e}")))?;
         let (offset, end) = (number(HEADER_OFFSET)?, number(HEADER_END)?);
-        let mut bytes = Vec::new();
-        resp.into_reader()
-            .read_to_end(&mut bytes)
-            .map_err(|e| ClientError::Decode(e.to_string()))?;
+        let bytes = crate::body::bytes(resp).map_err(|e| ClientError::Decode(e.to_string()))?;
         Ok(Scrollback {
             run,
             offset,
