@@ -1,6 +1,13 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { Terminal } from "@xterm/xterm";
+import { writeClipboard } from "../terminal/clipboard";
 import { type TermStatus, type TerminalConnection, type TerminalSink } from "../terminal/connect";
 import { fitTerminal } from "../terminal/fit";
+import { isMac, keyAction } from "../terminal/keys";
+import { keepingSelection } from "../terminal/keepSelection";
+import { decodeOsc52 } from "../terminal/osc52";
+import { allText, visibleText } from "../terminal/screen";
+import { TermCopy } from "./TermCopy";
 import { currentRenderer } from "../terminal/renderer";
 import { type SizeReporter, sizeReporter } from "../terminal/size";
 import { exitText } from "../terminal/wire";
@@ -39,6 +46,33 @@ export function LiveTerminal({ streamKey, connect, noneText, placeholder, offer,
   const host = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<TermStatus>({ kind: "connecting" });
   const [refused, setRefused] = useState("");
+  const termRef = useRef<Terminal | null>(null);
+  // Text an agent asked to copy that the clipboard refused, until a click puts it there.
+  const [pending, setPending] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const flash = useRef<number>();
+  const put = async (text: string): Promise<boolean> => {
+    const ok = await writeClipboard(text);
+    if (ok) {
+      setCopied(true);
+      window.clearTimeout(flash.current);
+      flash.current = window.setTimeout(() => setCopied(false), 1500);
+    }
+    return ok;
+  };
+  const copy = () => {
+    const t = termRef.current;
+    if (t) void put(t.hasSelection() ? t.getSelection() : visibleText(t.buffer.active, t.rows));
+  };
+  const copyAll = () => {
+    const t = termRef.current;
+    if (t) void put(allText(t.buffer.active));
+  };
+  const takeReady = () => {
+    if (pending !== null) void put(pending).then((ok) => ok && setPending(null));
+  };
+  const deliver = useRef((_text: string) => {});
+  deliver.current = (text) => void put(text).then((ok) => setPending(ok ? null : text));
   // The latest callbacks, so a re-render does not reconnect.
   const latest = useRef({ connect, onEnded });
   latest.current = { connect, onEnded };
@@ -59,9 +93,28 @@ export function LiveTerminal({ streamKey, connect, noneText, placeholder, offer,
         cursorBlink: false,
         smoothScrollDuration: 0,
         scrollback: 5000,
+        // The agent owns the mouse (tracking is on), so selecting is Option-drag on a Mac; Shift-drag
+        // elsewhere is xterm's own.
+        macOptionClickForcesSelection: true,
         theme: { background: css.getPropertyValue("--term-bg").trim(), foreground: css.getPropertyValue("--term-fg").trim() },
       });
       term.open(el);
+      termRef.current = term;
+      // The agent's own copy (OSC 52) goes to the clipboard; every OSC 52 is consumed, a query
+      // included (the agent never reads the clipboard).
+      const osc = term.parser.registerOscHandler(52, (data) => {
+        const text = decodeOsc52(data);
+        if (text !== null) deliver.current(text);
+        return true;
+      });
+      // Cmd+C (Mac), Ctrl+Shift+C, and Ctrl+C with a selection copy; the agent does not get them.
+      const mac = isMac(navigator.platform);
+      term.attachCustomKeyEventHandler((e) => {
+        if (e.type !== "keydown" || keyAction(e, mac, term.hasSelection()) !== "copy") return true;
+        e.preventDefault();
+        if (term.hasSelection()) void put(term.getSelection());
+        return false;
+      });
       // The canvas renderer draws a TUI's full-frame redraws without flicker; if WebGL is missing
       // or its context is lost, the DOM renderer (the default) carries on.
       if (currentRenderer() === "webgl") {
@@ -77,7 +130,7 @@ export function LiveTerminal({ streamKey, connect, noneText, placeholder, offer,
       }
       // The grid follows the host's box: on every resize of the panel or the window, and once the
       // font is loaded (the cell size is known only then).
-      const fit = () => fitTerminal(el, term);
+      const fit = () => keepingSelection(term, () => fitTerminal(el, term));
       fit();
       const resize = new ResizeObserver(fit);
       resize.observe(el);
@@ -107,6 +160,8 @@ export function LiveTerminal({ streamKey, connect, noneText, placeholder, offer,
       const typing = new TextEncoder();
       const onData = term.onData((d) => conn.send(typing.encode(d)));
       dispose = () => {
+        osc.dispose();
+        termRef.current = null;
         onData.dispose();
         onResize.dispose();
         sizes?.dispose();
@@ -127,6 +182,7 @@ export function LiveTerminal({ streamKey, connect, noneText, placeholder, offer,
         {lead}
         <span className="muted">{statusText(status, noneText)}</span>
         {refused && <span className="error"> · {refused}</span>}
+        <TermCopy copy={copy} copyAll={copyAll} ready={pending !== null} takeReady={takeReady} copied={copied} />
       </div>
       {status.kind === "none" && (
         <div className="term-empty">
