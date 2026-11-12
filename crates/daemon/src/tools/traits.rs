@@ -33,6 +33,25 @@ fn node_test(dir: &Path) -> Option<NodeManager> {
     })
 }
 
+/// The folders with a `package-lock.json`: `""` for the root, `apps/<name>` for each one under
+/// `apps/`; sorted.
+fn npm_lock_dirs(dir: &Path) -> Vec<String> {
+    let mut found = Vec::new();
+    if exists(dir, "package-lock.json") {
+        found.push(String::new());
+    }
+    if let Ok(entries) = std::fs::read_dir(dir.join("apps")) {
+        for e in entries.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if e.path().join("package-lock.json").is_file() {
+                found.push(format!("apps/{name}"));
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
 /// Whether the Makefile has a `test` target (a line `test:` that is not an assignment).
 fn make_test(dir: &Path) -> bool {
     let Some(text) = read(dir, "Makefile").or_else(|| read(dir, "makefile")) else {
@@ -111,6 +130,7 @@ pub(super) fn gather(tools: &dyn Tools, dir: &str) -> RepoTraits {
         xtask_verify: cargo && xtask_verify(path),
         node_test: node_test(path),
         make_test: make_test(path),
+        npm_lock_dirs: npm_lock_dirs(path),
         python_tests: python_tests(path),
         github_remote,
         gh_logged_in: github_remote && gh_logged_in(tools),

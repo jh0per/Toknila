@@ -132,6 +132,10 @@ pub struct Project {
     /// told to use it, and may run it without asking. `None`: the project names none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_command: Option<String>,
+    /// The command the shipyard runs once in every new ship before the card's agent starts
+    /// (`npm ci --prefix apps/web`). `None`: no setup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup_command: Option<String>,
     /// The command a release runs to put its version into the project's files (`npm version
     /// {version} --no-git-tag-version`; `{version}` is the version). `None`: no bump step.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -189,9 +193,20 @@ impl Project {
     /// setting). It is one line without parentheses, because it goes into an agent's permission
     /// rule (`Bash(<command> *)`).
     pub fn clean_check_command(text: &str) -> Result<Option<String>, &'static str> {
+        Self::clean_command(text, "the check command is one line without parentheses")
+    }
+
+    /// The setup command as a person typed it, cleaned like the check command.
+    pub fn clean_setup_command(text: &str) -> Result<Option<String>, &'static str> {
+        Self::clean_command(text, "the setup command is one line without parentheses")
+    }
+
+    /// The shared cleaner of a command a person typed: trimmed, `None` when empty, one line
+    /// without parentheses; `refusal` is the error text.
+    fn clean_command(text: &str, refusal: &'static str) -> Result<Option<String>, &'static str> {
         let text = text.trim();
         if text.contains(['\n', '\r', '(', ')']) {
-            return Err("the check command is one line without parentheses");
+            return Err(refusal);
         }
         Ok(Some(text.to_owned()).filter(|c| !c.is_empty()))
     }
@@ -269,6 +284,16 @@ mod tests {
     }
 
     #[test]
+    fn a_setup_command_is_cleaned_like_the_check_command() {
+        assert_eq!(
+            Project::clean_setup_command("  npm ci --prefix apps/web "),
+            Ok(Some("npm ci --prefix apps/web".to_owned()))
+        );
+        assert_eq!(Project::clean_setup_command(" "), Ok(None));
+        assert!(Project::clean_setup_command("a\nb").is_err());
+    }
+
+    #[test]
     fn a_model_is_trimmed_cleared_when_empty_and_refused_when_it_is_not_one_word() {
         assert_eq!(
             Project::clean_model(" opus[1m] "),
@@ -296,6 +321,7 @@ mod tests {
             max_review_rounds: Project::DEFAULT_REVIEW_ROUNDS,
             merge: Default::default(),
             check_command: None,
+            setup_command: None,
             bump_command: None,
             worker_model: None,
             reviewer_model: None,

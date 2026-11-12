@@ -144,6 +144,8 @@ pub enum ExternalOutcome {
         ticket: TicketId,
         text: String,
     },
+    /// The project's setup command ran in the new ship (or could not run).
+    SetupFinished(crate::setup::SetupRun),
 }
 
 /// The host's ports for [`execute`].
@@ -212,6 +214,21 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
             } => {
                 if failed.contains(&ticket) {
                     continue;
+                }
+                if let Some(dir) = dirs.get(&ticket)
+                    && let Some((outcome, ready)) = crate::setup::run_on_host(
+                        &host,
+                        ticket,
+                        brief.setup_command.as_deref(),
+                        dir,
+                    )
+                {
+                    outcomes.push(outcome);
+                    if !ready {
+                        // The workspace is not ready: no agent starts on it.
+                        failed.insert(ticket);
+                        continue;
+                    }
                 }
                 let waiting_ids = brief.waiting_ids.clone();
                 let result = dirs
@@ -362,6 +379,7 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             ExternalOutcome::SyncConflict { ticket, text } => {
                 checks::sync_conflict(uow, ticket, text)?;
             }
+            ExternalOutcome::SetupFinished(run) => crate::setup::finished(uow, run)?,
             ExternalOutcome::CheckFinished {
                 ticket,
                 spec,

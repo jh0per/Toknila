@@ -6219,6 +6219,29 @@
           },
           {
             "type": "object",
+            "description": "The project's setup command failed in the new ship (non-zero exit, timeout), so no agent\nwas started; `output` is the end of what it wrote. Unblocking runs it again.",
+            "required": [
+              "command",
+              "output",
+              "kind"
+            ],
+            "properties": {
+              "command": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "setup_failed"
+                ]
+              },
+              "output": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "The base branch is behind its upstream (local merge mode), so the ship would start on old\ncode. Nothing was made. A person fast-forwards the base and starts, or starts anyway;\nplain unblock looks again.",
             "required": [
               "base",
@@ -8513,6 +8536,13 @@
               "null"
             ]
           },
+          "setup_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command run once in every new ship before the agent starts; an empty text names none."
+          },
           "work_branch": {
             "type": [
               "string",
@@ -9194,6 +9224,13 @@
               "type": "string"
             },
             "description": "The domains the project's reviewers may read on the web (`docs.rs`); the list replaces the\nold one, an empty list denies the web again."
+          },
+          "setup_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command run once in every new ship before the agent starts (`npm ci --prefix\napps/web`). An empty text clears it."
           },
           "work_branch": {
             "type": [
@@ -9968,6 +10005,13 @@
             },
             "description": "Domains the project's reviewers may read on the web (`docs.rs`); empty: none, so a page a\ncard cites stays unread."
           },
+          "setup_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command the shipyard runs once in every new ship before the card's agent starts\n(`npm ci --prefix apps/web`). `None`: no setup."
+          },
           "work_branch": {
             "type": "string",
             "description": "Branch ships start from and merge into (`develop`)."
@@ -10631,6 +10675,13 @@
               "null"
             ],
             "description": "The project name the folder suggests: its base name."
+          },
+          "suggested_setup_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The setup command the repository suggests (`npm ci --prefix apps/web` for a lock file\nunder `apps/web`); `null` when it suggests none."
           }
         }
       },

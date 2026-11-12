@@ -57,7 +57,13 @@ fn an_old_store_is_seeded_by_name_and_only_the_new_migrations_run() {
         [],
     )
     .expect("project");
-    let mut files: Vec<(&str, &str)> = FILES.to_vec();
+    // The 24 legacy files, then one new one: the files of later cards are not part of the story.
+    let mut files: Vec<(&str, &str)> = FILES
+        .iter()
+        .copied()
+        .filter(|(file, _)| file.starts_with("00"))
+        .collect();
+    assert_eq!(files.len(), 24);
     files.push(A);
     let list = parse(&files).expect("list");
     let dir = tempfile::tempdir().expect("dir");

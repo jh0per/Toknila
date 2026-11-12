@@ -12,6 +12,8 @@ export interface ProjectDraft {
   work_branch: string;
   /// The command that checks the work; empty names none.
   check_command: string;
+  /// The command run once in every new workspace; empty names none.
+  setup_command: string;
   merge_mode: MergeMode;
 }
 
@@ -20,7 +22,7 @@ export type DraftField = keyof ProjectDraft;
 export interface AddForm {
   draft: ProjectDraft;
   /// Key, name and base branch the person typed into: the folder's suggestion no longer replaces them.
-  edited: { key: boolean; name: boolean; work_branch: boolean; check_command: boolean; merge_mode: boolean };
+  edited: { key: boolean; name: boolean; work_branch: boolean; check_command: boolean; setup_command: boolean; merge_mode: boolean };
   /// What the daemon suggested for a folder, and which folder (trimmed) it was for.
   suggested: Suggestion | undefined;
   /// Sent before the folder's suggestion came: the form goes out when the check answers.
@@ -35,15 +37,16 @@ export interface Suggestion {
   name: string;
   work_branch: string;
   check_command: string;
+  setup_command: string;
   merge_mode: MergeMode;
 }
 
-const FOLLOWING = ["key", "name", "work_branch", "check_command", "merge_mode"] as const;
+const FOLLOWING = ["key", "name", "work_branch", "check_command", "setup_command", "merge_mode"] as const;
 
 export const initialAddForm: AddForm = {
   // The base branch is the repository's own (the branch it is on): the folder's check fills it in.
-  draft: { key: "", name: "", repo_path: "", work_branch: "", check_command: "", merge_mode: "local" },
-  edited: { key: false, name: false, work_branch: false, check_command: false, merge_mode: false },
+  draft: { key: "", name: "", repo_path: "", work_branch: "", check_command: "", setup_command: "", merge_mode: "local" },
+  edited: { key: false, name: false, work_branch: false, check_command: false, setup_command: false, merge_mode: false },
   suggested: undefined,
   waiting: false,
 };
@@ -74,8 +77,9 @@ export function applyCheck(f: AddForm, repoPath: string, check: RepoCheck): AddF
   const name = check.suggested_name ?? "";
   const work_branch = check.suggested_branch ?? "";
   const check_command = check.suggested_check_command ?? "";
+  const setup_command = check.suggested_setup_command ?? "";
   const merge_mode = check.suggested_merge_mode ?? "local";
-  const suggested: Suggestion = { repo_path: repoPath, key, name, work_branch, check_command, merge_mode };
+  const suggested: Suggestion = { repo_path: repoPath, key, name, work_branch, check_command, setup_command, merge_mode };
   const follow = Object.fromEntries(FOLLOWING.map((k) => [k, f.edited[k] ? f.draft[k] : suggested[k]]));
   return { ...f, suggested, draft: { ...f.draft, ...follow } };
 }
@@ -94,6 +98,7 @@ export function resolvedDraft(f: AddForm): ProjectDraft {
     repo_path: f.draft.repo_path.trim(),
     work_branch: f.draft.work_branch.trim(),
     check_command: f.draft.check_command.trim(),
+    setup_command: f.draft.setup_command.trim(),
     merge_mode: f.draft.merge_mode,
   };
 }
