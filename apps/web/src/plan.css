@@ -21,8 +21,21 @@
 .btn.mini { height: auto; padding: 0 var(--sp2); font-size: var(--fs-label-m); }
 .link-btn { border: 0; background: none; color: var(--on-surface-variant); font-size: var(--fs-body-m); text-align: left; padding: var(--sp1) var(--sp2); }
 .link-btn:hover { color: var(--on-surface); text-decoration: underline; }
-.sec li.archived { display: flex; align-items: center; gap: var(--sp1); }
-.sec li.archived .item { flex: 1; opacity: var(--state-disabled); }
+/* The sidebar's tree: a row is a chevron and one control, indented by its level (--lv); the
+   nested lists carry no indent of their own. Long names end in an ellipsis. */
+.sec .tree, .sec .tree ul { gap: 0; }
+.tree .row { display: flex; align-items: center; gap: var(--sp1); min-width: 0; padding-left: calc(var(--lv, 0) * var(--sp4)); }
+.tree .row > .item { flex: 1; min-width: 0; }
+.tree .row > .item:focus-visible, .tree .chev-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.tree .chev { width: var(--sp3); flex: none; text-align: center; font-size: var(--fs-label-m); color: var(--on-surface-variant); }
+.tree .chev-btn { display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; padding: 0; height: var(--ctl-h); color: inherit; cursor: pointer; border-radius: var(--shape-xs); }
+.tree .row.proj > .item { font-weight: var(--fw-semibold); }
+.tree .row.proj > .item.cur { color: var(--on-surface); }
+.tree .group-toggle { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.tree .row .h-btns { margin-right: var(--sp1); }
+.tree li.archived > .row > .item { opacity: var(--state-disabled); font-style: italic; }
+.tree li.archived > .row .btn.mini { flex: none; }
+.tree .badge { flex: none; }
 .empty-state { max-width: var(--w-narrow); margin: 10vh auto 0; display: flex; flex-direction: column; gap: var(--sp3); align-items: flex-start; }
 .empty-state h2 { margin: 0; font-size: var(--fs-headline-m); line-height: var(--lh-headline-m); font-weight: var(--fw-semibold); }
 .empty-state p { margin: 0; }

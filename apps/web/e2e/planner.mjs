@@ -90,9 +90,15 @@ try {
   const webUrl = new URL(url);
   webUrl.pathname = "/projects/WEB";
   await page.goto(webUrl.href);
-  // The entry is at the top of the project's section, above its chains.
-  const entry = page.locator("[data-testid=chains] li").first();
-  await expectText(entry, "Plan with the assistant", "the assistant entry is first in the project's section");
+  // The entry is the project's Assistant row, above its Chains row (the tree: Roadmap, Assistant, Chains).
+  const entry = page.locator("[data-testid=planner-entry]");
+  await expectText(entry, "Assistant", "the assistant entry is a row of the project's node");
+  const entryBefore = await page.evaluate(() => {
+    const e = document.querySelector("[data-testid=planner-entry]");
+    const c = document.querySelector("[data-testid=chains]");
+    return Boolean(e && c && e.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  if (!entryBefore) throw new Error("the assistant row should come before the chains");
   if ((await page.locator("[data-testid=planner-entry]").count()) !== 1) throw new Error("expected one planner entry");
 
   await page.locator("[data-testid=planner-link]").click();
@@ -108,7 +114,7 @@ try {
   await page.locator("[data-testid=planner-profile]").selectOption("fake-planner");
 
   // The empty project asks what to build; Enter starts the planner and sends the text.
-  await page.locator("[data-testid=projects] li[data-project=WEB] a").click();
+  await page.locator("[data-testid=projects] li[data-project=WEB] > .row a").click();
   await expectPath("/projects/WEB", "the project opens");
   await expectText(page.locator("[data-testid=no-chains]"), "What do you want to build?", "an empty project leads with the question");
   await expectText(page.locator("[data-testid=empty-new-chain]"), "New chain", "New chain is a quieter link below");
