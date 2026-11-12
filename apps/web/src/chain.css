@@ -121,7 +121,10 @@ a.node.moving { z-index: 6; cursor: grabbing; box-shadow: var(--e3); }
 /* Phase: the dot, the word, the dimmed finished rows and their fold. */
 .phase-dot { width: var(--sp2); height: var(--sp2); border-radius: 50%; background: var(--sc); flex: none; display: inline-block; }
 .phase-dot[data-empty] { background: transparent; border: 1px solid var(--outline-variant); }
-.item .phase-word { font-size: var(--fs-label-m); color: var(--sc, var(--on-surface-variant)); font-family: var(--mono); }
+.item .phase-word { font-size: var(--fs-label-m); color: var(--sc, var(--on-surface-variant)); font-family: var(--ui); }
+/* A chain row is one line: the name takes the flexible column, the rest keep their width. */
+.item .chain-name { flex: 1 1 0; min-width: 0; font-family: var(--ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .chain-name ~ * { flex: none; white-space: nowrap; }
 .item.dim { opacity: 0.6; }
 .finished-group > .group-toggle { width: 100%; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
 .finished-group ul { list-style: none; margin: 0; padding: 0; }
