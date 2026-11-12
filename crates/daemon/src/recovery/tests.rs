@@ -26,7 +26,12 @@ async fn seeded() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().expect("tempdir");
     let store = Store::open(&dir.path().join("t.db")).expect("store");
     let app = router(AppState::for_test(store.clone(), "t", dir.path()));
-    post(&app, "/v1/projects", json!({ "key": "DEMO" })).await;
+    post(
+        &app,
+        "/v1/projects",
+        json!({ "key": "DEMO", "default_profile": "sim", "simulated": true }),
+    )
+    .await;
     let toml = include_str!("../../../../examples/demo.toml");
     post(&app, "/v1/projects/DEMO/import", json!({ "toml": toml })).await;
     post(

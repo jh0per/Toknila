@@ -57,7 +57,7 @@ function png(w, h, [r, g, b]) {
 
 let browser;
 try {
-  tok("project", "new", "BRD");
+  tok("project", "new", "BRD", "--sim");
   writeFileSync(
     join(home, "c.toml"),
     `[chain]\nname = "work"\nautostart = false\n\n` +

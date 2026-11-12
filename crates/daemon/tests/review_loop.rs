@@ -143,8 +143,9 @@ impl Rig {
                 "/v1/projects",
                 match check {
                     Some(c) => json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(),
-                        "check_command": c }),
-                    None => json!({ "key": "DEMO", "repo_path": repo.to_string_lossy() }),
+                        "check_command": c, "default_profile": "sim", "simulated": true }),
+                    None => json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(),
+                        "default_profile": "sim", "simulated": true }),
                 },
             )
             .await;

@@ -9,7 +9,7 @@ use super::codec::{Repo, enum_from, enum_str, parse};
 const PROJECT_COLS: &str = "id, key, name, repo_path, work_branch, release_branch, default_profile, \
      default_review_mode, max_parallel, default_reviewer, merge_mode, pr_title, merge_method, check_command, archived, \
      worker_model, reviewer_model, planner_model, command_policy, allowed_commands, reviewer_web_domains, max_review_rounds, \
-     no_checks_timeout_secs, bump_command, setup_command";
+     no_checks_timeout_secs, bump_command, setup_command, simulated";
 
 type RawProject = (
     String,
@@ -37,6 +37,7 @@ type RawProject = (
     i64,
     Option<String>,
     Option<String>,
+    bool,
 );
 
 fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
@@ -66,6 +67,7 @@ fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
         r.get(22)?,
         r.get(23)?,
         r.get(24)?,
+        r.get(25)?,
     ))
 }
 
@@ -96,6 +98,7 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         no_checks_timeout_secs,
         bump_command,
         setup_command,
+        simulated,
     ) = c;
     Ok(Project {
         id: parse(&id, "project id")?,
@@ -134,6 +137,7 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         reviewer_web_domains: serde_json::from_str(&reviewer_web_domains)
             .map_err(|e| StoreError::Corrupt(format!("bad reviewer_web_domains: {e}")))?,
         archived,
+        simulated,
     })
 }
 
@@ -141,7 +145,7 @@ impl Repo<'_> {
     pub fn insert_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)"
+                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)"
             ),
             params![
                 p.id.to_string(),
@@ -169,6 +173,7 @@ impl Repo<'_> {
                 i64::try_from(p.merge.no_checks_timeout_secs).unwrap_or(i64::MAX),
                 p.bump_command,
                 p.setup_command,
+                p.simulated,
             ],
         )?;
         Ok(())
@@ -181,7 +186,7 @@ impl Repo<'_> {
              default_profile = ?6, default_review_mode = ?7, max_parallel = ?8, default_reviewer = ?9, \
              merge_mode = ?10, pr_title = ?11, merge_method = ?12, check_command = ?13, archived = ?14, \
              worker_model = ?15, reviewer_model = ?16, planner_model = ?17, command_policy = ?18, allowed_commands = ?19, reviewer_web_domains = ?20, \
-             max_review_rounds = ?21, no_checks_timeout_secs = ?22, bump_command = ?23, setup_command = ?24 WHERE id = ?1",
+             max_review_rounds = ?21, no_checks_timeout_secs = ?22, bump_command = ?23, setup_command = ?24, simulated = ?25 WHERE id = ?1",
             params![
                 p.id.to_string(),
                 p.name,
@@ -207,6 +212,7 @@ impl Repo<'_> {
                 i64::try_from(p.merge.no_checks_timeout_secs).unwrap_or(i64::MAX),
                 p.bump_command,
                 p.setup_command,
+                p.simulated,
             ],
         )?;
         Ok(())

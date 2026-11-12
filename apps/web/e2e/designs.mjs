@@ -26,7 +26,7 @@ const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwA
 
 let browser;
 try {
-  tok("project", "new", "DES");
+  tok("project", "new", "DES", "--sim");
   const { url } = JSON.parse(tok("open", "--json"));
   const at = (path) => url.replace("/?", `${path}?`);
   browser = await launch();

@@ -12,7 +12,7 @@ use common::{Tok, snapshot, spawn_watch};
 fn watch_json_prints_each_journal_entry_as_one_json_line() {
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
-    tok.run(&["project", "new", "DEMO"]);
+    tok.run(&["project", "new", "DEMO", "--sim"]);
 
     let mut child = spawn_watch(&tok.home, &["--json", "--since", "0"]);
     let out = child.stdout.take().expect("stdout");
@@ -44,7 +44,7 @@ fn watch_json_prints_each_journal_entry_as_one_json_line() {
 fn watch_plain_line_starts_with_the_local_time() {
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
-    tok.run(&["project", "new", "DEMO"]);
+    tok.run(&["project", "new", "DEMO", "--sim"]);
 
     let mut child = spawn_watch(&tok.home, &["--since", "0"]);
     let out = child.stdout.take().expect("stdout");

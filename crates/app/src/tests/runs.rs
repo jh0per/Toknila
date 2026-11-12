@@ -245,6 +245,29 @@ fn a_simulated_ticket_queues_no_runner() {
 }
 
 #[test]
+fn a_card_under_sim_on_a_project_not_marked_for_simulation_is_refused() {
+    let mut mem = with_agents();
+    mem.project.default_profile = "sim".to_owned();
+    mem.project.simulated = false;
+    let err = recover(&mut mem).expect_err("refused");
+    assert_eq!(err.kind, ErrorKind::Conflict);
+    assert!(err.message.contains("not marked for simulation"), "{err:?}");
+    assert!(
+        mem.deferred
+            .iter()
+            .all(|e| !matches!(e, ExternalEffect::StartRunner { .. }))
+    );
+}
+
+#[test]
+fn a_card_that_names_sim_itself_is_not_refused() {
+    let mut mem = with_agents();
+    mem.project.simulated = false;
+    mem.view.tickets[0].profile = Some("sim".to_owned());
+    recover(&mut mem).expect("a named choice");
+}
+
+#[test]
 fn a_ticket_profile_beats_the_project_default() {
     let mut mem = with_agents();
     mem.project.default_profile = "sim".to_owned();

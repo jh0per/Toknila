@@ -24,13 +24,13 @@ const chainOf = (name) => JSON.parse(tok("chain", "show", name, "--json"));
 
 let browser;
 try {
-  tok("project", "new", "CAN");
+  tok("project", "new", "CAN", "--sim");
   tok("chain", "new", "work", "--project", "CAN", "--no-autostart");
   for (const t of ["Alpha", "Bravo"]) tok("ticket", "new", "work", t);
-  tok("project", "new", "RUN");
+  tok("project", "new", "RUN", "--sim");
   tok("chain", "new", "go", "--project", "RUN", "--no-autostart");
   tok("ticket", "new", "go", "Runner");
-  tok("project", "new", "KEY");
+  tok("project", "new", "KEY", "--sim");
   tok("chain", "new", "keys", "--project", "KEY", "--no-autostart");
   for (const t of ["One", "Two"]) tok("ticket", "new", "keys", t);
   const { url } = JSON.parse(tok("open", "--json"));
@@ -185,7 +185,7 @@ try {
   // Start from the menu, then the menu of a running card has no Start and no Add card before.
   await card("CAN-1").click({ button: "right" });
   await page.locator("[data-testid=menu-card-start]").click();
-  await expectText(status("CAN-1"), "running", "Start in the menu started the card");
+  await expectText(status("CAN-1"), "simulated", "Start in the menu started the card");
   await card("CAN-1").click({ button: "right" });
   await page.locator("[data-testid=menu-card-cancel]").waitFor();
   const runningMenu = await menuLabels();
@@ -198,7 +198,7 @@ try {
   console.log("PASS the confirmation has the reason prefilled");
   await page.locator("[data-testid=cancel-keep]").click();
   await page.waitForTimeout(300);
-  await expectText(status("CAN-1"), "running", "Keep it left the card running");
+  await expectText(status("CAN-1"), "simulated", "Keep it left the card running");
   await card("CAN-1").click({ button: "right" });
   await page.locator("[data-testid=menu-card-cancel]").click();
   await shot("cancel-asks");
@@ -231,14 +231,14 @@ try {
   console.log(`PASS the hint says both: ${hint}`);
   await shot("run-chain");
   await run.click();
-  await expectText(status("RUN-1"), "running", "Run chain started the ready card");
+  await expectText(status("RUN-1"), "simulated", "Run chain started the ready card");
   await expectText(run, "Stop chain", "the button reads Stop chain while autostart is on");
   if (chainOf("go").chain.autostart !== true) throw new Error("the daemon does not have autostart on");
   await shot("stop-chain");
   await run.click();
   await expectText(run, "Run chain", "Stop chain turns it off");
   if (chainOf("go").chain.autostart !== false) throw new Error("the daemon still has autostart on");
-  await expectText(status("RUN-1"), "running", "the running card keeps running");
+  await expectText(status("RUN-1"), "simulated", "the running card keeps running");
 
   // 6. Keys: N, S, Enter.
   await open("KEY", "keys");
@@ -259,13 +259,13 @@ try {
   await page.locator("[data-testid=canvas]").waitFor();
   await page.waitForTimeout(400);
   await page.keyboard.press("s");
-  await expectText(status("KEY-1"), "running", "S started the focused card");
+  await expectText(status("KEY-1"), "simulated", "S started the focused card");
   await card("KEY-2").focus();
   await page.keyboard.press("Enter");
   await expectPath("/projects/KEY/chains/keys/cards/KEY-2", "Enter opened the focused card");
   await page.waitForTimeout(400);
   await page.keyboard.press("s");
-  await expectText(status("KEY-2"), "running", "S started the open card");
+  await expectText(status("KEY-2"), "simulated", "S started the open card");
 
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
   console.log("web canvas: PASS");

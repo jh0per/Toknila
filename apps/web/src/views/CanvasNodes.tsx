@@ -5,7 +5,7 @@ import { nodeKey } from "../layout";
 import { allows, subtaskProgress } from "../store/cardDetails";
 import { statusClass, statusGroup } from "../store/groups";
 import { finishText, finishView } from "../store/phase";
-import { showAgentName } from "../store/profiles";
+import { runsSimulated, showAgentName, statusWord } from "../store/profiles";
 import type { CardLayout } from "./cardSize";
 import { Markdown } from "./Markdown";
 import { NodeThumb } from "./NodeThumb";
@@ -83,7 +83,7 @@ export function TicketNode({ ticket: t, projectKey, layout, href, style, selecte
       <span className="row">
         <span className="st" data-testid="status">
           <span className={`dot${t.status === "running" ? " pulse" : ""}`} data-testid={t.status === "running" ? "live" : undefined} />
-          {t.status === "proposed" ? "awaiting approval" : t.status}
+          {t.status === "proposed" ? "awaiting approval" : statusWord(t.status, runsSimulated(t.profile, defaultProfile))}
         </span>
         {t.profile && showAgentName(t.profile, defaultProfile, import.meta.env.DEV) && <span className="runner">{t.profile}</span>}
         <span className="key">{t.key}</span>

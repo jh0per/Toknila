@@ -29,7 +29,7 @@ const tok = (...args) =>
 let browser;
 let failed = false;
 try {
-  tok("project", "new", "DEMO");
+  tok("project", "new", "DEMO", "--sim");
   tok("chain", "import", demo, "--project", "DEMO");
   const { url } = JSON.parse(tok("open", "--json"));
   console.log(`page: ${url.replace(/token=.*/, "token=…")}`);
@@ -61,7 +61,12 @@ try {
   await expectLink("live", "stream connected");
   await expectText(page.locator("[data-testid=projects]"), "DEMO", "project listed");
   await openChain();
-  await expectText(status("DEMO-1"), "running", "DEMO-1 autostarted");
+  await expectText(status("DEMO-1"), "simulated", "DEMO-1 autostarted, and reads simulated (no real agent)");
+  await expectText(
+    page.locator("[data-testid=simulated-banner]"),
+    "This project runs a simulated agent: cards run without a real agent. Change it in Settings, Agents.",
+    "the chain screen of a simulated project shows the banner",
+  );
   await expectText(status("DEMO-2"), "backlog", "DEMO-2 waits for DEMO-1");
   const keyWraps = await page.locator(".node .key").evaluateAll((els) => els.filter((e) => e.getClientRects().length > 1 || e.scrollWidth > e.clientWidth).length);
   if (keyWraps) throw new Error("a card key wraps or is clipped");
@@ -130,7 +135,7 @@ try {
 
   // The comment answered the question, so the card runs again; ask once more for the inbox.
   await page.getByRole("tab", { name: "Details" }).click();
-  await expectText(status("DEMO-1"), "running", "a comment answers the question");
+  await expectText(status("DEMO-1"), "simulated", "a comment answers the question");
   tok("sim", "DEMO-1", "ask", "and now?");
   await expectText(status("DEMO-1"), "waiting", "asked again");
 
@@ -179,7 +184,7 @@ try {
   await page.getByRole("tab", { name: "Details" }).click();
 
   // The thread decisions answered the open question (the card runs again); ask once more.
-  await expectText(status("DEMO-1"), "running", "a thread decision answers the question");
+  await expectText(status("DEMO-1"), "simulated", "a thread decision answers the question");
   tok("sim", "DEMO-1", "ask", "still there?");
   await expectText(status("DEMO-1"), "waiting", "asked after the thread");
 

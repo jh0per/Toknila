@@ -377,6 +377,7 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
         allowed_commands: Vec::new(),
         reviewer_web_domains: Vec::new(),
         archived: false,
+        simulated: false,
     };
     let chain = crate::Chain {
         id: "01JBQ7ZJ0000000000000000C1".parse().expect("id"),

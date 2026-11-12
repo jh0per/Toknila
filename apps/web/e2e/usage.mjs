@@ -45,7 +45,7 @@ const transcript = (project, session, lines) => {
 let browser;
 let failed = false;
 try {
-  tok("project", "new", "DEMO");
+  tok("project", "new", "DEMO", "--sim");
   tok("chain", "import", demo, "--project", "DEMO");
   // The card's session writes one call twice (streaming); it counts once.
   const card = transcript("-work-demo", "sess-card",

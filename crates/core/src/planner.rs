@@ -171,6 +171,7 @@ mod tests {
             allowed_commands: Vec::new(),
             reviewer_web_domains: Vec::new(),
             archived: false,
+            simulated: false,
         };
         assert!(matches!(ensure_can_run(&p), Err(Refusal::NoRepository(_))));
         p.repo_path = Some("/work/demo".to_owned());

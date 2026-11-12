@@ -25,7 +25,7 @@ const LONG = "Shell edits are refused, not asked about, so the agent never waits
 
 let browser;
 try {
-  tok("project", "new", "CSZ");
+  tok("project", "new", "CSZ", "--sim");
   tok("chain", "new", "sizes", "--project", "CSZ", "--goal", "Fit the text", "--no-autostart");
   tok("ticket", "new", "sizes", LONG, "--profile", "sim");
   tok("ticket", "new", "sizes", "Short", "--prompt", "# Say what the card is for\n\nA second paragraph.");

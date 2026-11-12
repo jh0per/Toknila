@@ -50,7 +50,7 @@ try {
   ];
   const list = steps.map((s) => `'${s}'`);
   writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', ${list.join(", ")}]\nstartup_secs = 0\n`);
-  tok("project", "new", "PIN", "--repo", repo, "--base", "develop");
+  tok("project", "new", "PIN", "--repo", repo, "--base", "develop", "--sim");
   writeFileSync(join(home, "c.toml"), `[chain]\nname = "work"\nautostart = false\n\n[[ticket]]\nid = "A"\ntitle = "Login screen"\nprompt = "Build the login screen."\nprofile = "sim"\n`);
   tok("chain", "import", join(home, "c.toml"), "--project", "PIN");
   const { url } = JSON.parse(tok("open", "--json"));
