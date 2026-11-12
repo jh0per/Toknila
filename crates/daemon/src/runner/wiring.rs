@@ -233,6 +233,19 @@ pub(super) fn repo_tools(dir: &Path) -> Vec<String> {
     tools
 }
 
+/// The command that continues the paused agent's session with the answer as its first input, when
+/// the brief asks for it and the profile has a resume form; `None` starts the run fresh.
+pub(super) fn resumed_argv(profile: &AgentProfile, brief: &RunBrief) -> Option<Vec<String>> {
+    let resume = brief.resume.as_ref()?;
+    profile.resume_argv(resume.session.as_deref()?, &resume.input)
+}
+
+/// Whether the run's first message carries the brief's waiting instructions: the profile reads a
+/// kickoff or an instructions file, or the answer is the first input of a resumed session.
+pub(super) fn briefed(profile: &AgentProfile, brief: &RunBrief) -> bool {
+    profile.reads_brief() || resumed_argv(profile, brief).is_some()
+}
+
 /// Generates the files `profile` asks for and returns the flags and environment of the process.
 pub(super) fn prepare(profile: &AgentProfile, cx: &Context<'_>) -> Result<Wiring, RunnerError> {
     let inherited = std::env::vars_os().filter_map(|(k, _)| k.into_string().ok());
@@ -264,8 +277,10 @@ pub(super) fn prepare_with(
     };
     let (design_briefs, worker_files) = worker_designs(cx);
     let brief = brief_of_key(cx, &key, &design_briefs);
+    let command = resumed_argv(profile, cx.brief)
+        .unwrap_or_else(|| profile.argv(&instructions::kickoff(cx.role, &brief)));
     let mut wiring = Wiring {
-        command: profile.argv(&instructions::kickoff(cx.role, &brief)),
+        command,
         env_remove: profile.inherited_to_drop(inherited),
         ..Wiring::default()
     };

@@ -231,10 +231,7 @@ pub fn ticket(d: &TicketDetail) {
         queued(d.queue_position),
         duration(d.in_status_ms)
     );
-    let r = reason(t.status_reason.as_ref());
-    if !r.is_empty() {
-        println!("reason: {r}");
-    }
+    crate::paused_output::reason(t, d.queue_position, &reason(t.status_reason.as_ref()));
     crate::allow_always::print_request(t.status_reason.as_ref());
     println!(
         "chain: {}  profile: {}",

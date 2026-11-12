@@ -18,6 +18,9 @@
 //!   read one line of keys: a Down arrow before Enter prints `trust=yes`, anything else
 //!   `trust=no`.
 //! - `pid`: print `pid=<own process id>`, so a test can end the agent from outside.
+//! - `--resume <session>`: print `resume=<session>`; `--prompt <text>`: print `prompt=<text>` on
+//!   one line. `ifresumed`: hold at once when `--resume` was given. A test profile puts `--prompt {kickoff}` first and gives a resume form
+//!   `--resume {session}`, so the run records how it was started.
 //! - `flagfile <flag>`: read the file named by the argument after `<flag>` in this process's
 //!   whole command line, last occurrence (the instructions file a runner appends) and print each line as `file:<line>`.
 //! - `readcheck <flag> <path>`: judge a `Read` of `path` (`{cwd}` is the working directory) by
@@ -140,6 +143,7 @@ fn readcheck(flag: &str, target: &str) -> String {
 
 fn main() {
     let mut args = std::env::args().skip(1);
+    let mut resumed = false;
     while let Some(step) = args.next() {
         match step.as_str() {
             "print" => say(&args.next().unwrap_or_default()),
@@ -187,6 +191,24 @@ fn main() {
                 r#"{"signal":"hook:stop"}"#,
             )),
             "pid" => say(&format!("pid={}", std::process::id())),
+            // What a resumed Claude Code run is given: `--resume <session>` before the program's
+            // own arguments and the first prompt (`--prompt <text>`); both are recorded as lines.
+            "--resume" => {
+                resumed = true;
+                say(&format!("resume={}", args.next().unwrap_or_default()));
+            }
+            // A resumed run goes on from here as if its earlier turn had been answered: it holds.
+            "ifresumed" if resumed => loop {
+                std::thread::sleep(Duration::from_secs(3600));
+            },
+            "ifresumed" => {}
+            "--prompt" => {
+                let text = args.next().unwrap_or_default();
+                say(&format!(
+                    "prompt={}",
+                    text.split_whitespace().collect::<Vec<_>>().join(" ")
+                ));
+            }
             "flagfile" => {
                 let flag = args.next().unwrap_or_default();
                 let all: Vec<String> = std::env::args().collect();

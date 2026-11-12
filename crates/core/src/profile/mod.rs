@@ -6,7 +6,8 @@
 //! command = ["my-agent", "{kickoff}"]   # argv list, never a shell string; {kickoff} is the first prompt
 //! instructions_file = "AGENTS.md"       # optional, relative to the working directory
 //! instructions_flag = "--append-system-prompt-file"  # takes the path of the generated per-run instructions
-//! startup_secs = 20                     # no hook or MCP sign of life this long after spawn: the window shows the agent's screen (0 = off)
+//! resume = ["--resume", "{session}"]   # optional: arguments after the program that continue an earlier session; without it a paused card's agent starts fresh
+//! startup_secs = 20                    # no hook or MCP sign of life this long after spawn: the window shows the agent's screen (0 = off)
 //!
 //! [env]
 //! MY_AGENT_MODE = "headless"

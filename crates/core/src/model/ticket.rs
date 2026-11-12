@@ -29,6 +29,10 @@ pub struct Ticket {
     /// `schedule`). Only a Ready card has it. Its place in the queue is computed, never stored.
     #[serde(default)]
     pub queued: bool,
+    /// Set on a Waiting card whose agent's process was ended after a grace: it holds no slot and
+    /// comes back when the answer arrives. Only a Waiting card has it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_paused: Option<super::PausedAgent>,
     /// Agent profile name; `None` means the project default.
     pub profile: Option<String>,
     /// `None` means the chain's, then the project's review mode.
@@ -181,6 +185,7 @@ impl Ticket {
             status_since: now,
             paused: draft.paused,
             queued: false,
+            agent_paused: None,
             profile: draft.profile,
             review_mode: draft.review_mode,
             reviewer: draft.reviewer,

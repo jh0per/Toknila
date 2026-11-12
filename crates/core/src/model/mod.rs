@@ -6,8 +6,10 @@ pub mod command_policy;
 mod comment;
 mod ids;
 mod keys;
+mod paused;
 mod profile;
 mod profile_brief;
+mod profile_launch;
 mod project;
 mod release;
 mod review;
@@ -31,6 +33,7 @@ pub use ids::{
     ThreadMessageId, ThreadVersionId, TicketId,
 };
 pub use keys::{KeyError, ProjectKey, TicketKey};
+pub use paused::PausedAgent;
 pub use profile::{
     AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules, Permissions,
 };

@@ -87,6 +87,10 @@
             "mcp__toknila"
           ]
         },
+        "resume": [
+          "--resume",
+          "{session}"
+        ],
         "role": "worker",
         "startup_secs": 20
       }
@@ -173,6 +177,10 @@
             "mcp__toknila"
           ]
         },
+        "resume": [
+          "--resume",
+          "{session}"
+        ],
         "role": "reviewer",
         "startup_secs": 20
       }
@@ -224,6 +232,10 @@
             "mcp__toknila"
           ]
         },
+        "resume": [
+          "--resume",
+          "{session}"
+        ],
         "role": "planner",
         "startup_secs": 0
       }

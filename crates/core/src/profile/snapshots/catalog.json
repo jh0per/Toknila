@@ -78,7 +78,11 @@
           "window_secs": 900,
           "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck or have a question (only ask_human gets an answer), or finished if you are done."
         },
-        "startup_secs": 20
+        "startup_secs": 20,
+        "resume": [
+          "--resume",
+          "{session}"
+        ]
       },
       "file": null
     },
@@ -164,7 +168,11 @@
           "window_secs": 900,
           "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck or have a question (only ask_human gets an answer), or finished if you are done."
         },
-        "startup_secs": 20
+        "startup_secs": 20,
+        "resume": [
+          "--resume",
+          "{session}"
+        ]
       },
       "file": null
     },
@@ -215,7 +223,11 @@
           "window_secs": 900,
           "message": "Report your state through the Toknila tools: call note with progress, ask_human if you are stuck or have a question (only ask_human gets an answer), or finished if you are done."
         },
-        "startup_secs": 0
+        "startup_secs": 0,
+        "resume": [
+          "--resume",
+          "{session}"
+        ]
       },
       "file": null
     },

@@ -44,6 +44,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         status_since: T0,
         paused: false,
         queued: false,
+        agent_paused: None,
         profile: None,
         review_mode: None,
         reviewer: None,
@@ -1043,4 +1044,39 @@ fn fast_forward_is_not_offered_when_it_is_not_possible_and_other_blocks_have_nei
     let other = ticket_in(TicketStatus::Blocked);
     assert!(apply(&other, &TicketEvent::StartAnyway, NOW).is_err());
     assert!(apply(&other, &TicketEvent::FastForwardStart, NOW).is_err());
+}
+
+#[test]
+fn a_paused_agent_keeps_its_session_and_comes_back_through_a_resume_start() {
+    let waiting = ticket_in(TicketStatus::Waiting);
+    let session = Some("abc".to_owned());
+    let paused = apply(
+        &waiting,
+        &TicketEvent::AgentPaused {
+            session: session.clone(),
+        },
+        NOW,
+    )
+    .expect("pause")
+    .ticket;
+    assert_eq!(paused.status, TicketStatus::Waiting);
+    let held = paused.agent_paused.clone().expect("paused");
+    assert_eq!(
+        (held.session, held.since, held.resume),
+        (session.clone(), NOW, false)
+    );
+    assert_eq!(check_invariants(&paused), Ok(()));
+    // The answer marks it (the schedule starts only marked cards), and the start runs it.
+    let wanted = apply(&paused, &TicketEvent::ResumeWanted, NOW)
+        .expect("want")
+        .ticket;
+    assert!(wanted.agent_paused.as_ref().is_some_and(|p| p.resume));
+    let started = apply(&wanted, &TicketEvent::ResumeStart, NOW).expect("start");
+    assert_eq!(
+        (started.ticket.status, started.ticket.agent_paused),
+        (TicketStatus::Running, None)
+    );
+    assert!(started.effects.contains(&Effect::ResumeRunner { session }));
+    // A card whose agent was never paused cannot be resumed.
+    assert!(apply(&waiting, &TicketEvent::ResumeWanted, NOW).is_err());
 }

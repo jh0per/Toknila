@@ -48,7 +48,8 @@ pub(crate) fn queue<U: UnitOfWork + ?Sized>(
     let Some(project) = uow.project(view.chain.project_id)? else {
         return Ok(());
     };
-    if project.profile_for(ticket) != AgentProfile::SIM {
+    // A paused agent has no terminal to type into: the answer starts it again (`tickets::comment`).
+    if project.profile_for(ticket) != AgentProfile::SIM && ticket.agent_paused.is_none() {
         uow.defer(ExternalEffect::DeliverInstruction {
             ticket: ticket.id,
             comment: comment.clone(),

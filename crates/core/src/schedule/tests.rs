@@ -238,3 +238,46 @@ fn working_cards_are_those_that_hold_a_slot_or_have_a_live_runner_in_review() {
     );
     assert!(!working_cards(&w.chains, &[]).contains(&idle_review));
 }
+
+fn paused(w: &mut World, c: usize, resume: bool) -> TicketId {
+    let id = w.card(c, TicketStatus::Waiting, false);
+    let t = w.chains[c].tickets.last_mut().expect("card");
+    t.agent_paused = Some(crate::PausedAgent {
+        session: Some("s-1".to_owned()),
+        since: Timestamp(0),
+        resume,
+    });
+    id
+}
+
+#[test]
+fn a_waiting_card_with_a_paused_agent_holds_no_slot_and_the_next_card_starts() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let _alive = w.card(c, TicketStatus::Waiting, false);
+    let _gone = paused(&mut w, c, false);
+    let next = w.card(c, TicketStatus::Ready, true);
+    // Two slots, a Waiting card with its agent alive and a Waiting card without one.
+    let p = w.plan(2);
+    assert_eq!((p.used, p.start), (1, vec![next]));
+    // A Waiting card with an agent and no pause still holds its slot.
+    let q = plan(&w.chains, 1, &[]);
+    assert_eq!((q.used, q.start, q.queue), (1, vec![], vec![next]));
+}
+
+#[test]
+fn a_paused_card_with_an_answer_starts_when_a_slot_is_free_and_queues_otherwise() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let _busy = w.card(c, TicketStatus::Running, false);
+    let answered = paused(&mut w, c, true);
+    let silent = paused(&mut w, c, false);
+    let full = w.plan(1);
+    assert_eq!(
+        (full.start.clone(), full.queue.clone()),
+        (vec![], vec![answered])
+    );
+    assert_eq!(full.position(answered), Some(1));
+    assert_eq!(full.position(silent), None);
+    assert_eq!(w.plan(2).start, vec![answered]);
+}
