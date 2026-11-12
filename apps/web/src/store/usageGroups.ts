@@ -20,7 +20,11 @@ export interface WorkspaceRow {
   cost: number;
   /// A folder inside a group is indented.
   inGroup: boolean;
+  /// How many folders a group holds (0 on a folder).
+  count: number;
 }
+
+const shortName = (path: string): string => path.split(/[\\/]+/).filter((s) => s !== "").slice(-1)[0] ?? path;
 
 const MARK = ".toknila-ships";
 
@@ -66,24 +70,42 @@ function folderNames(paths: string[]): Map<string, string> {
 /// The table rows: each repository as a line with its worktrees under it, every other folder as
 /// a line of its own, all ordered by the metric shown, largest first. Bars are of the largest line.
 export function workspaceRows(items: UsageItem[], metric: Metric): WorkspaceRow[] {
-  const groups = new Map<string, UsageItem[]>();
+  // Group by the repository the daemon found (`repo`, the main repository's folder). A folder
+  // the daemon knows no repository for is grouped by its ship path when it is a ship of a
+  // repository already shown, else it is a line of its own.
+  const groups = new Map<string, { name: string; members: UsageItem[] }>();
+  for (const item of items) {
+    if (!item.repo) continue;
+    const g = groups.get(item.repo) ?? { name: item.name ?? shortName(item.repo), members: [] };
+    g.members.push(item);
+    groups.set(item.repo, g);
+  }
   const loose: UsageItem[] = [];
   for (const item of items) {
+    if (item.repo) continue;
     const ship = shipOf(item.label);
-    if (!ship) loose.push(item);
-    else groups.set(ship.repo, [...(groups.get(ship.repo) ?? []), item]);
+    if (!ship) {
+      loose.push(item);
+      continue;
+    }
+    const home = [...groups.values()].find((g) => g.name === ship.repo);
+    if (home) home.members.push(item);
+    else groups.set(ship.repo, { name: ship.repo, members: [item] });
   }
   const names = folderNames(loose.map((i) => i.label));
-  const row = (kind: WorkspaceRow["kind"], label: string, short: string, sum: Sum, value: number, inGroup: boolean): WorkspaceRow => ({
+  const row = (kind: WorkspaceRow["kind"], label: string, short: string, sum: Sum, value: number, inGroup: boolean, count = 0): WorkspaceRow => ({
     kind, label, short, value, share: 0, processed: sum.processed, cost: sum.cost,
-    cachedShare: sum.input === 0 ? 0 : sum.read / sum.input, inGroup,
+    cachedShare: sum.input === 0 ? 0 : sum.read / sum.input, inGroup, count,
   });
   const entries: { value: number; rows: WorkspaceRow[] }[] = [];
-  for (const [repo, members] of groups) {
+  for (const [repo, { name, members }] of groups) {
     const sorted = [...members].sort((a, b) => metricOf(b, metric) - metricOf(a, metric));
     const value = members.reduce((n, i) => n + metricOf(i, metric), 0);
-    const kids = sorted.map((i) => row("folder", i.label, shipOf(i.label)?.short ?? i.label, sumOf([i]), metricOf(i, metric), true));
-    entries.push({ value, rows: [row("group", repo, repo, sumOf(members), value, false), ...kids] });
+    const kidNames = folderNames(sorted.map((i) => i.label));
+    const kids = sorted.map((i) =>
+      row("folder", i.label, shipOf(i.label)?.short ?? kidNames.get(i.label) ?? i.label, sumOf([i]), metricOf(i, metric), true),
+    );
+    entries.push({ value, rows: [row("group", repo, name, sumOf(members), value, false, members.length), ...kids] });
   }
   for (const i of loose) {
     entries.push({ value: metricOf(i, metric), rows: [row("folder", i.label, names.get(i.label) ?? i.label, sumOf([i]), metricOf(i, metric), false)] });

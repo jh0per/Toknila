@@ -4179,6 +4179,10 @@ export interface components {
         UsageItem: {
             figures: components["schemas"]["UsageFigures"];
             label: string;
+            /** @description A workspace line only: the last folder name of `repo`. */
+            name?: string | null;
+            /** @description A workspace line only: the folder of the main repository the folder belongs to. */
+            repo?: string | null;
         };
         /** @description Body of `PUT /v1/usage/settings`. */
         UsageSettings: {

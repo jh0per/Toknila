@@ -45,3 +45,34 @@ describe("workspace grouping", () => {
     expect(rows.map((r) => r.short)).toEqual(["a/app", "b/app", "solo"]);
   });
 });
+
+describe("grouping by the repository the daemon found", () => {
+  const repo = "/Users/h0per/Work/web/imagegen-backend";
+  const inRepo = (label: string, processed: number): UsageItem =>
+    ({ ...item(label, processed, 0), repo, name: "imagegen-backend" }) as UsageItem;
+
+  it("puts worktrees of other tools under one repository row, with a count", () => {
+    const rows = workspaceRows(
+      [
+        inRepo(`${repo}/app`, 100),
+        inRepo("/Users/h0per/.paradev/worktrees/imagegen-backend/feat-a", 300),
+        inRepo("/Users/h0per/.superset/worktrees/imagegen-backend/feat-b", 200),
+        item("/Users/h0per/scratch", 50, 0),
+      ],
+      "tokens",
+    );
+    expect(rows.map((r) => [r.kind, r.short, r.label, r.count, r.inGroup])).toEqual([
+      ["group", "imagegen-backend", repo, 3, false],
+      ["folder", "feat-a", "/Users/h0per/.paradev/worktrees/imagegen-backend/feat-a", 0, true],
+      ["folder", "feat-b", "/Users/h0per/.superset/worktrees/imagegen-backend/feat-b", 0, true],
+      ["folder", "app", `${repo}/app`, 0, true],
+      ["folder", "scratch", "/Users/h0per/scratch", 0, false],
+    ]);
+    expect(rows[0].processed).toBe(600);
+  });
+
+  it("leaves a folder with no repository as a row of its own", () => {
+    const rows = workspaceRows([item("/tmp/loose", 5, 0)], "tokens");
+    expect(rows.map((r) => [r.kind, r.short, r.count])).toEqual([["folder", "loose", 0]]);
+  });
+});

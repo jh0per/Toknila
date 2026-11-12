@@ -29,6 +29,8 @@
 .usage td.label { font-family: var(--mono); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .usage tr.group td { background: var(--surface-container-high); font-weight: var(--fw-semibold); }
 .usage tr.child td.label { padding-left: var(--sp6); }
+.usage .group-toggle { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.usage .group-toggle:focus-visible { outline: var(--sp1) solid var(--primary); }
 .usage td.meter { width: 22%; }
 .usage td.meter > span { display: block; height: var(--sp1); background: var(--primary); border-radius: var(--shape-full); }
 .usage span.meter { display: inline-block; background: var(--surface-container-high); border-radius: var(--shape-full); height: var(--sp1); width: 100%; overflow: hidden; vertical-align: middle; }

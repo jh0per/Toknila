@@ -12638,6 +12638,20 @@
           },
           "label": {
             "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A workspace line only: the last folder name of `repo`."
+          },
+          "repo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A workspace line only: the folder of the main repository the folder belongs to."
           }
         }
       },
