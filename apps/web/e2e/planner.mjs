@@ -122,6 +122,11 @@ try {
   await expectText(term, "planner ready", "the terminal shows the planner's live output");
   await expectText(term, "got:hello planner", "the text typed in the empty project reached the planner");
   await expectText(page.locator("[data-testid=term-status]"), "live", "the terminal is live");
+  // The assistant's terminal has the copy controls too (the card's are checked in terminal-copy).
+  for (const id of ["term-copy", "term-copy-more"]) {
+    if ((await page.locator(`[data-testid=term-status] [data-testid=${id}]`).count()) !== 1) throw new Error(`the assistant's terminal has no ${id}`);
+  }
+  console.log("PASS the assistant's terminal has the Copy controls");
   await shot("planner-running");
 
   // What the planner makes shows in the diagram above, live, and in the sidebar.
