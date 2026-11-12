@@ -1,23 +1,21 @@
 /* The assistant panel beside the work: a third column of the shell on the right of the roadmap, a
    chain or a card. Under 1100px it overlays the screen with a scrim instead. Tokens only. */
-.ide.with-assistant { grid-template-columns: 230px minmax(0, 1fr) var(--assistant-w, 360px); }
+.ide.with-assistant { grid-template-columns: 230px minmax(0, 1fr) var(--assistant-w, var(--assistant-w-default)); }
 .assistant-panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface-container); border-left: 1px solid var(--outline-variant); }
 .assistant-head { display: flex; align-items: center; gap: var(--sp2); min-height: var(--top-h); padding: var(--sp1) var(--sp3) var(--sp1) var(--sp4); border-bottom: 1px solid var(--outline-variant); }
 .assistant-head b { font-size: var(--fs-title-m); }
 /* The width handle sits on the left edge and reaches over it a little to be easy to catch. */
 .assistant-handle { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 1; }
 .assistant-handle:hover, .assistant-handle:focus-visible { background: var(--primary); opacity: 0.5; }
-.assistant-panel.overlay { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--assistant-w, 360px), 100vw - var(--sp6)); z-index: 30; box-shadow: var(--e3); }
+.assistant-panel.overlay { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--assistant-w, var(--assistant-w-default)), 100vw - var(--sp6)); z-index: 30; box-shadow: var(--e3); }
 .assistant-scrim { position: fixed; inset: 0; z-index: 29; background: var(--scrim); }
 .only-about { display: flex; align-items: center; gap: var(--sp2); padding: var(--sp1) var(--sp4); border-bottom: 1px solid var(--outline-variant); cursor: pointer; }
 .only-about:has(input:disabled) { cursor: default; opacity: var(--state-disabled); }
-.context-chip-row { padding: var(--sp2) var(--sp4) 0; border-top: 1px solid var(--outline-variant); }
+.context-chip-row { padding: var(--sp2) var(--side, var(--sp4)) 0; border-top: 1px solid var(--outline-variant); }
 .context-chip { display: inline-flex; align-items: center; gap: var(--sp1); padding: 0 var(--sp1) 0 var(--sp3); font-size: var(--fs-label-m); line-height: var(--lh-label-m); border-radius: var(--shape-full); border: 1px solid var(--primary); background: var(--primary-container); color: var(--on-primary-container); }
 .context-chip .icon-btn { width: var(--sp5); height: var(--sp5); font-size: var(--fs-title-m); color: inherit; }
 .context-chip-row + .ask.compact { border-top: 0; }
 .chat-proposals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp2); }
 .chat-proposals .bubble.proposal { max-width: 100%; align-self: stretch; }
 .chat-proposals .row { display: flex; gap: var(--sp2); }
-.assistant-panel .chat-pane .ask.compact { padding-inline: var(--sp3); }
-.assistant-panel .chat-log { padding-inline: var(--sp3); }
-.assistant-panel .bubble.msg { max-width: 100%; }
+.assistant-panel .chat-pane { --gutter: var(--sp3); }

@@ -26,8 +26,9 @@ export interface AssistantSlice {
   chipOff: boolean;
 }
 
-export const DEFAULT_WIDTH = 360;
-export const MIN_WIDTH = 280;
+/// Mirrors `--assistant-w-default` and `--assistant-w-min` of tokens.css (a test holds them equal).
+export const DEFAULT_WIDTH = 440;
+export const MIN_WIDTH = 320;
 export const MAX_WIDTH = 720;
 /// Under this window width the panel overlays the screen instead of sitting beside it.
 export const OVERLAY_PX = 1100;
