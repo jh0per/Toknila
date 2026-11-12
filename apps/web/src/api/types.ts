@@ -62,6 +62,7 @@ export type Places = Schemas["Places"];
 export type NewProject = Schemas["NewProject"];
 export type RepoCheck = Schemas["RepoCheck"];
 export type RepoProblem = Schemas["RepoProblem"];
+export type RepoFix = Schemas["RepoFix"];
 export type ListedProfile = Schemas["ListedProfile"];
 export type ProfileList = Schemas["ProfileList"];
 export type PatchProject = Schemas["PatchProject"];

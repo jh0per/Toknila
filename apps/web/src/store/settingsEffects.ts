@@ -38,9 +38,17 @@ export function runSettingsEffect(e: SettingsEffect, dispatch: Dispatch): void {
         .then((check) => dispatch({ type: "repoChecked", repo_path: e.repo_path, check }))
         .catch(() => undefined);
       return;
+    case "prepareRepo":
+      // The daemon's own sentence is the refusal; it is shown next to the folder.
+      post<RepoCheck>("/repos/prepare", { repo_path: e.repo_path, fix: e.fix })
+        .then((check) => dispatch({ type: "repoPrepared", repo_path: e.repo_path, check }))
+        .catch((err) => dispatch({
+          type: "fixRefused", repo_path: e.repo_path, message: err instanceof Error ? err.message : String(err),
+        }));
+      return;
     case "pickFolder":
       pickFolder()
-        .then((path) => path && dispatch({ type: "editDraft", field: "repo_path", value: path }))
+        .then((path) => path && dispatch({ type: "editDraft", field: "repo_path", value: path, now: true }))
         .catch(() => undefined);
       return;
     case "loadChecks":
