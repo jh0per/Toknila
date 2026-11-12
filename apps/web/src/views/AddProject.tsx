@@ -10,7 +10,7 @@ import { Field } from "./Field";
 /// The id of the add-project form, for a button that sits outside it.
 export const ADD_PROJECT_FORM = "add-project-form";
 
-const DETAIL_FIELDS =["work_branch", "key", "name", "check_command", "merge_mode"];
+const DETAIL_FIELDS =["work_branch", "key", "name", "check_command", "setup_command", "merge_mode"];
 
 /// Add a project from a folder. In the desktop app Browse opens the system's folder picker; in a
 /// browser (and beside it) the path is typed or pasted. Toknila fills in what it finds in the
@@ -93,6 +93,9 @@ export function AddProject({ state, dispatch, focus = false, submit = true }: {
         </Field>
         <Field label="Test command (optional)" name="check_command" error={fieldError(s, "check_command")} hint="Agents run it before they hand in.">
           <input data-testid="new-check-command" value={d.check_command} spellCheck={false} onChange={edit("check_command")} />
+        </Field>
+        <Field label="Setup command (optional)" name="setup_command" error={fieldError(s, "setup_command")} hint="Runs once in every new workspace before the agent starts, for example npm ci --prefix apps/web.">
+          <input data-testid="new-setup-command" value={d.setup_command} spellCheck={false} onChange={edit("setup_command")} />
         </Field>
         <Field label="When a card is approved" name="merge_mode" error={fieldError(s, "merge_mode")}>
           <select

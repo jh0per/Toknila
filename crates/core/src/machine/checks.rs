@@ -53,6 +53,7 @@ pub(super) fn block(
             | BlockedReason::Terminated { .. }
             | BlockedReason::RunnerLost
             | BlockedReason::ShipFailed { .. }
+            | BlockedReason::SetupFailed { .. }
             | BlockedReason::BaseBehind { .. }
             | BlockedReason::NoWorkingDir
     ) {

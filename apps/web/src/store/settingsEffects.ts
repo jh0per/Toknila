@@ -16,7 +16,7 @@ const reject = (dispatch: Dispatch, e: unknown, fallback?: string) => {
 };
 
 async function addProject(e: Extract<SettingsEffect, { type: "addProject" }>, dispatch: Dispatch) {
-  const { key, name, repo_path, work_branch, check_command, merge_mode } = e.draft;
+  const { key, name, repo_path, work_branch, check_command, setup_command, merge_mode } = e.draft;
   const check = await post<RepoCheck>("/repos/check", { repo_path, work_branch });
   if (check.problems.length) {
     dispatch({ type: "addRejected", problems: check.problems, branches: check.branches });
@@ -24,7 +24,7 @@ async function addProject(e: Extract<SettingsEffect, { type: "addProject" }>, di
   }
   const project = await post<Project>("/projects", {
     key, name: name || undefined, repo_path, work_branch: work_branch || undefined,
-    check_command: check_command || undefined, merge_mode,
+    check_command: check_command || undefined, setup_command: setup_command || undefined, merge_mode,
   });
   dispatch({ type: "projectAdded", project });
 }

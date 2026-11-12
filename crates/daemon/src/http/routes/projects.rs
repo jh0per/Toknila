@@ -39,6 +39,17 @@ pub async fn create_project(
             e,
         ));
     }
+    if let Some(Err(e)) = input
+        .setup_command
+        .as_deref()
+        .map(Project::clean_setup_command)
+    {
+        return Err(FormError::field(
+            "setup_command",
+            "setup_command_invalid",
+            e,
+        ));
+    }
     if let Some(path) = input.repo_path.clone() {
         // No base named: the branch the repository is on, else its remote's default.
         if input
@@ -182,6 +193,17 @@ pub async fn patch_project(
         return Err(FormError::field(
             "check_command",
             "check_command_invalid",
+            e,
+        ));
+    }
+    if let Some(Err(e)) = patch
+        .setup_command
+        .as_deref()
+        .map(Project::clean_setup_command)
+    {
+        return Err(FormError::field(
+            "setup_command",
+            "setup_command_invalid",
             e,
         ));
     }
