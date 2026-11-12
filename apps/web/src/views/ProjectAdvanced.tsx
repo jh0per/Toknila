@@ -1,22 +1,8 @@
 import type { Intent } from "../store/msg";
-import { MODEL_ALIASES } from "../store/models";
-import { fieldError } from "../store/settings";
 import type { State } from "../store/state";
 import { ArchiveProject } from "./ArchiveProject";
-import { Field } from "./Field";
 import type { FormProps } from "./ProjectSections";
 import { Strays } from "./Strays";
-
-/// One model field: free text with the documented aliases offered.
-function ModelField({ label, name, testId, form, set, state }: FormProps & {
-  label: string; name: "worker_model" | "reviewer_model" | "planner_model"; testId: string;
-}) {
-  return (
-    <Field label={label} name={name} error={fieldError(state.settings, name)}>
-      <input data-testid={testId} value={form[name]} spellCheck={false} list="model-aliases" onChange={(e) => set(name, e.target.value)} />
-    </Field>
-  );
-}
 
 /// Where Toknila keeps its files on this machine.
 function Places({ state }: { state: State }) {
@@ -37,10 +23,9 @@ function Places({ state }: { state: State }) {
   );
 }
 
-/// Advanced: the Claude models, the release branch when it is not the main branch, where things
-/// live, and the danger zone (archive, delete), the last two folded away.
-export function AdvancedSection({ project, state, form, set, dispatch }: FormProps & { dispatch: (i: Intent) => void }) {
-  const props = { project, state, form, set };
+/// Advanced: the release branch when it is not the main branch, where things live, and the
+/// danger zone (archive, delete), the last two folded away.
+export function AdvancedSection({ project, state, dispatch }: FormProps & { dispatch: (i: Intent) => void }) {
   return (
     <div className="page-section" data-testid="project-advanced">
       {project.release_branch !== project.work_branch && (
@@ -49,14 +34,6 @@ export function AdvancedSection({ project, state, form, set, dispatch }: FormPro
           <dd data-testid="release-branch">{project.release_branch}</dd>
         </dl>
       )}
-      <h3 className="sub">Claude models</h3>
-      <ModelField {...props} label="Model of card agents" name="worker_model" testId="worker-model" />
-      <ModelField {...props} label="Model of reviewers" name="reviewer_model" testId="reviewer-model" />
-      <ModelField {...props} label="Model of the planner" name="planner_model" testId="planner-model" />
-      <datalist id="model-aliases">{MODEL_ALIASES.map((m) => <option key={m} value={m} />)}</datalist>
-      <p className="muted" data-testid="model-aliases">
-        Leave empty to use your Claude Code default. Names you can type: {MODEL_ALIASES.join(", ")}, or a full model name.
-      </p>
       <Places state={state} />
       <Strays project={project.key} />
       <details className="fold danger-fold" data-testid="danger-zone">

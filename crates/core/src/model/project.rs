@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 
 use super::{ProjectId, ProjectKey};
 
+/// The model aliases the assistant may name for a card (the window's list, in `models.ts`).
+pub const MODEL_ALIASES: [&str; 7] = [
+    "sonnet",
+    "opus",
+    "haiku",
+    "fable",
+    "opusplan",
+    "sonnet[1m]",
+    "opus[1m]",
+];
+
 /// Who reviews a finished ticket before it merges.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
@@ -231,6 +242,19 @@ impl Project {
         Ok(Some(text.to_owned()).filter(|m| !m.is_empty()))
     }
 
+    /// The model an assistant names for a card: an alias or a full model name (`claude-…`);
+    /// anything else is refused with the aliases named. Empty text clears it.
+    pub fn choose_model(text: &str) -> Result<Option<String>, String> {
+        let model = Self::clean_model(text).map_err(str::to_owned)?;
+        match model.as_deref() {
+            Some(m) if !MODEL_ALIASES.contains(&m) && !m.starts_with("claude-") => Err(format!(
+                "unknown model {m:?}: use one of {} or a full model name such as claude-opus-5-5",
+                MODEL_ALIASES.join(", ")
+            )),
+            _ => Ok(model),
+        }
+    }
+
     /// The model the project names for an agent of `role` (a release agent works like a card's).
     pub fn model_for(&self, role: super::AgentRole) -> Option<&str> {
         use super::AgentRole::*;
@@ -303,6 +327,18 @@ mod tests {
         for bad in ["two words", "a\nb", "--effort"] {
             assert!(Project::clean_model(bad).is_err(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn the_assistant_names_an_alias_or_a_full_name_and_nothing_else() {
+        assert_eq!(Project::choose_model("fable"), Ok(Some("fable".to_owned())));
+        assert_eq!(
+            Project::choose_model("claude-opus-5-5"),
+            Ok(Some("claude-opus-5-5".to_owned()))
+        );
+        assert_eq!(Project::choose_model(" "), Ok(None));
+        let err = Project::choose_model("gpt").expect_err("gpt is no alias");
+        assert!(err.contains("sonnet, opus, haiku, fable"), "{err}");
     }
 
     #[test]

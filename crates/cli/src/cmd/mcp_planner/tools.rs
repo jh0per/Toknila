@@ -61,6 +61,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "subtasks": list_of_text("Checklist items"),
                 "design_first": { "type": "boolean", "description": "True for a card that changes what the person sees (screens, flows): its agent then shows a design for approval before any code" },
                 "designs": designs_param("The project's designs the card is about; the first is the card's thumbnail"),
+                "model": model_param("Leave out for routine work: the project's model runs it"),
             }),
             &["chain", "title"],
         ),
@@ -74,6 +75,7 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
                 "acceptance": list_of_text("The new acceptance list; it replaces the old one"),
                 "design_first": { "type": "boolean", "description": "Whether the agent shows a design for approval before any code" },
                 "designs": designs_param("The card's designs; the list replaces the old one, [] clears it, left out keeps it"),
+                "model": model_param("The card's model; an empty text clears it, left out keeps it"),
                 "add_subtasks": list_of_text("Checklist items to append"),
                 "edit_subtasks": { "type": "array", "description": "Checklist items to rename",
                     "items": { "type": "object", "properties": {
@@ -151,6 +153,15 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             &["card", "thread", "format", "body"],
         ),
     ]
+}
+
+/// The `model` argument: an alias or a full model name; anything else is refused.
+fn model_param(description: &str) -> Value {
+    let aliases = toknila_core::MODEL_ALIASES.join(", ");
+    json!({
+        "type": "string",
+        "description": format!("{description}. One of {aliases}, or a full model name (claude-…)"),
+    })
 }
 
 /// The `designs` argument: references to designs of the project's library.

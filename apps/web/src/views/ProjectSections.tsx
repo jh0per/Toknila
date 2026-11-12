@@ -4,6 +4,7 @@ import { listProfile } from "../store/profiles";
 import { fieldError } from "../store/settings";
 import type { State } from "../store/state";
 import { Field } from "./Field";
+import { ModelsFields } from "./ProjectModels";
 import { CommandsFields, SetupCommandField } from "./ProjectCommands";
 
 export type FormProps = {
@@ -55,7 +56,8 @@ export function GeneralSection({ project, state, form, set }: FormProps) {
   );
 }
 
-/// Agents: which agent runs new cards, how many at once, and the test command.
+/// Agents: which agent runs new cards, the models of the assistant, the card agents and the
+/// reviewer, how many run at once, and the test command.
 export function AgentsSection({ state, form, set }: FormProps) {
   const s = state.settings;
   return (
@@ -65,6 +67,7 @@ export function AgentsSection({ state, form, set }: FormProps) {
           {profileOptions(state, "worker", form.default_profile).map((n) => <option key={n}>{n}</option>)}
         </select>
       </Field>
+      <ModelsFields state={state} form={form} set={set} />
       <Field label="Agents working at once" name="max_parallel" error={fieldError(s, "max_parallel")} hint="More cards than this wait in line for a free slot.">
         <input data-testid="max-parallel" type="number" min={1} max={64} value={form.max_parallel} onChange={(e) => set("max_parallel", e.target.value)} />
       </Field>

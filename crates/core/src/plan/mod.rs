@@ -73,6 +73,9 @@ pub struct PlanTicket {
     pub subtasks: Vec<String>,
     pub profile: Option<String>,
     pub review_mode: Option<ReviewMode>,
+    /// The card's own model; `None` means the project's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     pub needs_secrets: bool,
     /// Show a design for approval before any code (`design_first = true`).
     #[serde(skip_serializing_if = "std::ops::Not::not")]

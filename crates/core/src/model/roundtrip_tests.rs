@@ -37,6 +37,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         profile: Some("sim".to_owned()),
         review_mode: Some(ReviewMode::Both),
         reviewer: None,
+        model: None,
         branch: None,
         needs_secrets: true,
         design_first: true,
