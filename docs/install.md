@@ -193,11 +193,11 @@ gh secret set APPLE_CERTIFICATE_PASSWORD   # the .p12 password
 gh secret set APPLE_SIGNING_IDENTITY       # the certificate's name, e.g. "Developer ID Application: Name (TEAMID)"
 ```
 
-The Release workflow imports the certificate into a temporary keychain, lets Tauri sign the app
-with `APPLE_SIGNING_IDENTITY`, deletes the keychain, and the step "Check the app signature" runs
+The Release workflow imports the certificate into a temporary keychain, `cargo xtask app` signs
+the bundle (`dist/app/Toknila.app`) with `APPLE_SIGNING_IDENTITY`, the keychain is deleted, and the step "Check the app signature" runs
 `codesign -dv --verbose=2` on the app: it prints the identity, and fails the release when the
 secrets were given and the app is still ad hoc. Without the secrets the app is signed ad hoc and
-the step says so (`bundle.macOS.signingIdentity` stays unset in `tauri.conf.json`).
+both `cargo xtask app` and the step say so.
 
 What to expect: the first update to a build with the new identity resets the permissions once;
 every later update keeps them. The updater changes nothing, but the new bundle must carry the same

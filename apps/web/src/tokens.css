@@ -68,6 +68,8 @@
   /* Density: compact. */
   --ctl-h: 28px; --field-h: 32px; --row-h: 28px; --pad: var(--sp3); --gap: var(--sp2); --btn-px: var(--sp3);
   --top-h: 48px; --tab-h: 40px;
+  /* The assistant panel beside the work: its default width and the narrowest a drag may make it. */
+  --assistant-w-default: 440px; --assistant-w-min: 320px;
   /* Sizes of the settings pages and dialogs: the half step, the widths of a page, a form, a dialog,
      a menu and a note, and the design thumbnails. */
   --sp-half: 2px; --w-page: 720px; --w-form: 640px; --w-dialog: 560px; --w-narrow: 520px; --w-field: 260px;

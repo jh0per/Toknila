@@ -6,12 +6,17 @@
 .prompt-field:focus { border-color: var(--accent); outline: none; }
 .prompt-field:disabled { opacity: 0.6; }
 .ask { display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; width: 100%; }
-.ask.compact { flex-direction: row; align-items: flex-end; margin-top: var(--s2); flex: none; }
-.ask.compact .prompt-field { flex: 1; resize: none; }
-.ask.compact { flex-wrap: wrap; }
-.ask.compact .prompt-field { order: 1; }
-.ask.compact .ask-actions { order: 2; }
-.ask.compact .ask-attached { order: 3; flex: 0 0 100%; }
+/* The composer of the chat: the field on top (it grows from three rows to eight), then one row of
+   attach, room for the microphone, and Send, then the hint. */
+.ask.compact { align-items: stretch; margin-top: var(--s2); flex: none; }
+.ask.compact .prompt-field { resize: none; line-height: var(--lh-body-l); }
+.ask.compact .ask-attached { order: 3; }
+.ask.compact .ask-actions { order: 4; justify-content: space-between; }
+.ask.compact .ask-hint { order: 5; }
+.ask-actions-end { display: flex; gap: var(--sp2); align-items: center; }
+.ask-actions .btn.icon, .ask-actions .btn.send { height: var(--field-h); }
+.ask-actions .btn.icon { min-width: var(--field-h); }
+.ask-hint { margin: 0; font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--on-surface-variant); }
 
 /* Attachments of a message: the attach button beside Send, the chips and the refusal under the field. */
 .ask, .discuss-drop { position: relative; }
@@ -50,24 +55,33 @@ button.inline-link { background: none; border: 0; padding: 0; font: inherit; cur
 .planner-page > .panel { border-top: 1px solid var(--outline-variant); }
 .planner-tabpanel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .term-controls { display: flex; gap: var(--sp2); align-items: center; padding: var(--sp2) var(--sp4); border-bottom: 1px solid var(--outline-variant); }
-.chat-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.chat-log { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp3) var(--sp4); display: flex; flex-direction: column; gap: var(--sp2); }
+/* The chat: the log and the composer sit at a readable measure (72ch), centred on a wide screen; in a
+   narrow panel the gutter wins. */
+.chat-pane { --gutter: var(--sp4); --measure: 72ch; --side: max(var(--gutter), calc((100% - var(--measure)) / 2)); flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.chat-log { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp3) var(--side); display: flex; flex-direction: column; gap: var(--sp2); }
 .chat-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp2); }
 .chat-note { margin: 0; text-align: center; }
-.chat-idle { padding: 0 var(--sp4); }
-.chat-pane .ask.compact { padding: var(--sp2) var(--sp4) var(--sp3); margin-top: 0; border-top: 1px solid var(--outline-variant); }
-.bubble.msg { user-select: text; max-width: min(85%, 72ch); }
-.bubble.msg .gist { font-weight: var(--fw-regular); }
-.bubble.msg .bubble-head { flex-wrap: wrap; }
-.bubble.msg .bubble-head time { margin-left: auto; }
+.chat-idle { padding: 0 var(--side); }
+.chat-pane .ask.compact { padding: var(--sp2) var(--side) var(--sp3); margin-top: 0; border-top: 1px solid var(--outline-variant); }
+/* One bubble for both voices: the same padding and radius; the person's on the right, the assistant's on the left. */
+.bubble.chat-bubble { user-select: text; box-sizing: border-box; max-width: 85%; padding: var(--sp3) var(--sp4); border-radius: var(--shape-m); display: flex; flex-direction: column; flex-wrap: nowrap; gap: var(--sp1); }
+.bubble.chat-bubble.you { align-self: flex-end; background: var(--primary-container); color: var(--on-primary-container); }
+.bubble.chat-bubble.agent { align-self: flex-start; background: var(--surface-container-high); color: var(--on-surface); }
+.bubble.chat-bubble .gist { margin: 0; font-weight: var(--fw-regular); white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble.chat-bubble .bubble-head { display: flex; flex-wrap: nowrap; align-items: baseline; gap: var(--sp2); font-size: var(--fs-label-m); line-height: var(--lh-label-m); }
+.bubble.chat-bubble .bubble-head b, .bubble.chat-bubble .bubble-head .copy { flex: none; }
+.bubble.chat-bubble .bubble-head .chip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bubble.chat-bubble .bubble-head time { flex: none; white-space: nowrap; margin-left: auto; }
 .copy { font: inherit; font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--on-surface-variant); background: none; border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); padding: 0 var(--sp2); cursor: pointer; }
 .copy:hover { color: var(--on-surface); border-color: var(--outline); }
 .bubble.you .copy { color: inherit; }
 .chip { display: inline-block; font-size: var(--fs-label-m); line-height: var(--lh-label-m); border-radius: var(--shape-full); padding: 0 var(--sp2); background: var(--surface-container-high); color: var(--primary); border: 1px solid var(--outline-variant); text-decoration: none; }
-.did { align-self: center; max-width: 100%; display: flex; gap: var(--sp2); align-items: baseline; font-size: var(--fs-body-m); line-height: var(--lh-body-m); color: var(--on-surface-variant); overflow-wrap: anywhere; user-select: text; }
-.did::before { content: "\25CF"; font-size: var(--fs-label-m); color: var(--outline); }
+/* A line of Toknila's: the dot, the words (they wrap) and the time (it never does), on label-m. */
+.did { align-self: stretch; max-width: 100%; display: flex; gap: var(--sp2); align-items: baseline; font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--on-surface-variant); user-select: text; }
+.did::before { content: "\25CF"; flex: none; font-size: var(--fs-label-m); color: var(--outline); }
+.did .did-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .did a { color: var(--primary); }
-.did time { font-size: var(--fs-label-m); }
+.did time { flex: none; white-space: nowrap; font-size: var(--fs-label-m); }
 
 /* An empty chain asks what it should do, over its own (still working) canvas. */
 .canvas-empty { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; pointer-events: none; z-index: 1; padding: var(--s4); overflow: auto; }

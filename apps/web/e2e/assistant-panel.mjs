@@ -83,17 +83,34 @@ try {
   await shown("the top bar's button opens the panel", true);
   await expectText(t("context-chip"), "the epic work", "the chip says which epic is open");
   const grid = await t("assistant-panel").boundingBox();
-  if (!grid || Math.abs(grid.width - 360) > 2) throw new Error(`the panel is not 360 px wide by default: ${grid?.width}`);
-  console.log("PASS the panel is 360 px wide by default");
+  if (!grid || Math.abs(grid.width - 440) > 2) throw new Error(`the panel is not 440 px wide by default: ${grid?.width}`);
+  console.log("PASS the panel is 440 px wide by default");
+
+  // The composer: three rows empty, the whole placeholder visible, growing to eight rows and then scrolling.
+  const field = t("planner-ask-input");
+  const lines = (n) => Array.from({ length: n }, (_, i) => `line ${i}`).join("\n");
+  const rect = () => field.evaluate((el) => ({ h: el.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(el).lineHeight), pad: parseFloat(getComputedStyle(el).paddingTop) * 2 + 2, clipped: el.scrollHeight > el.clientHeight + 1, rows: el.rows }));
+  const empty = await rect();
+  if (empty.rows !== 3 || Math.abs(empty.h - (3 * empty.lh + empty.pad)) > 2 || empty.clipped) throw new Error(`the empty composer is not three rows or clips its placeholder: ${JSON.stringify(empty)}`);
+  await field.fill(lines(5));
+  const five = await rect();
+  if (Math.abs(five.h - (5 * five.lh + five.pad)) > 2) throw new Error(`the composer does not grow with the text: ${JSON.stringify(five)}`);
+  await field.fill(lines(20));
+  const many = await rect();
+  if (Math.abs(many.h - (8 * many.lh + many.pad)) > 2 || !many.clipped) throw new Error(`the composer does not stop at eight rows: ${JSON.stringify(many)}`);
+  await field.fill("");
+  const hint = await t("planner-ask").locator(".ask-hint").innerText();
+  if (!hint.includes("Shift+Enter")) throw new Error(`no hint under the composer: ${hint}`);
+  console.log("PASS the composer grows from three rows to eight and has its hint");
 
   // 2. Its width and state survive a reload.
   await t("assistant-handle").focus();
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowLeft");
-  await page.waitForFunction(() => document.querySelector("[data-testid=assistant-handle]")?.getAttribute("aria-valuenow") === "408");
+  await page.waitForFunction(() => document.querySelector("[data-testid=assistant-handle]")?.getAttribute("aria-valuenow") === "488");
   await page.reload();
   await shown("the panel is still open after a reload", true);
-  if ((await t("assistant-handle").getAttribute("aria-valuenow")) !== "408") throw new Error("the width was not remembered");
+  if ((await t("assistant-handle").getAttribute("aria-valuenow")) !== "488") throw new Error("the width was not remembered");
   console.log("PASS the width survived the reload");
 
   // 3. A message with the chain chip is typed `About chain work: ...` and stored with the chain.

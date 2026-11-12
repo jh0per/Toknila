@@ -145,14 +145,28 @@ pub fn app() -> Result<(), String> {
         &out,
     )?;
 
-    // Ad-hoc ("-"): runs here, carries no identity. Nested code first, then the bundle.
+    // One identity for every build when `APPLE_SIGNING_IDENTITY` names one (macOS keeps the
+    // privacy permissions it granted under it across updates); ad hoc ("-") otherwise: runs here,
+    // carries no identity. Nested code first, then the bundle.
+    let identity = std::env::var("APPLE_SIGNING_IDENTITY")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "-".to_owned());
+    match identity.as_str() {
+        "-" => println!("xtask app: signing ad hoc (APPLE_SIGNING_IDENTITY not set)"),
+        id => println!("xtask app: signing with {id}"),
+    }
     let path = |p: &Path| p.to_string_lossy().into_owned();
     for name in ["toknila", "tok", "toknila-desktop"] {
         let bin = path(&macos.join(name));
-        run("codesign", &["--force", "--sign", "-", &bin], &out)?;
+        run("codesign", &["--force", "--sign", &identity, &bin], &out)?;
     }
     let app_path = path(&bundle);
-    run("codesign", &["--force", "--sign", "-", &app_path], &out)?;
+    run(
+        "codesign",
+        &["--force", "--sign", &identity, &app_path],
+        &out,
+    )?;
     run("codesign", &["--verify", "--strict", &app_path], &out)?;
 
     let stage = out.join("dmg");

@@ -133,6 +133,12 @@ A check you have never seen fail is a claim, not a check.
   (`TOKNILA_UPDATE_SNAPSHOTS=1 cargo test -p <crate> <test>`), read the snapshot diff and keep it
   only if it is the change you intended. Never run the whole workspace with the variable set:
   that rewrites every pinned output and hides regressions.
+- A browser spec that starts a card creates its project with `--sim` or a fake `--profile`,
+  never with the default: a new project runs the real agent, which is missing on CI (the card
+  blocks) and present on a developer's Mac (a real agent starts in every run).
+- A workflow step, a script or a doc that names a path or a command is proven by running that
+  command here and reading the path it printed; "not runnable locally" is a reason to return the
+  card, not to hand it in.
 
 ## Testing
 
