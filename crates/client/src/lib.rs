@@ -55,20 +55,17 @@ const NO_BODY: Option<&()> = None;
 impl Client {
     /// A client of the daemon at `base` (`http://127.0.0.1:<port>`) with its bearer token.
     pub fn new(base: impl Into<String>, token: impl Into<String>) -> Self {
-        let agent = ureq::AgentBuilder::new()
-            .timeout(Duration::from_secs(30))
-            .build();
         Self {
             base: base.into(),
             token: token.into(),
-            agent,
+            agent: agent(Duration::from_secs(30)),
         }
     }
 
     /// Whether a daemon answers `/healthz` at `base`.
     pub fn healthy(base: &str) -> bool {
-        ureq::get(&format!("{base}/healthz"))
-            .timeout(Duration::from_secs(2))
+        agent(Duration::from_secs(2))
+            .get(&format!("{base}/healthz"))
             .call()
             .is_ok()
     }
@@ -109,6 +106,18 @@ impl Client {
             Err(e) => Err(transport_error(e)),
         }
     }
+}
+
+/// An HTTP agent whose limits are per operation, each set once on the socket. Never use ureq's
+/// overall `timeout`: it re-arms the socket timeouts before every read, and macOS refuses that
+/// with `EINVAL` once the daemon has answered and closed, which surfaced as `Error encountered
+/// in a header: Invalid argument (os error 22)` on a slow, loaded client.
+pub(crate) fn agent(limit: Duration) -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout_connect(limit)
+        .timeout_read(limit)
+        .timeout_write(limit)
+        .build()
 }
 
 /// A failed `ureq` call as a [`ClientError`]: the daemon's error body, or the transport failure.
@@ -177,6 +186,27 @@ mod tests {
             "{err:?}"
         );
         assert_eq!(err.to_string(), message);
+    }
+
+    /// A daemon that has closed before the headers end must not make the client re-arm socket
+    /// timeouts on the dead socket: macOS answers that with `os error 22`.
+    #[test]
+    fn a_peer_that_closed_mid_headers_is_not_an_invalid_argument() {
+        use std::io::Write;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let base = format!("http://{}", listener.local_addr().expect("addr"));
+        let server = std::thread::spawn(move || {
+            let (mut s, _) = listener.accept().expect("accept");
+            // Let the request arrive, never read it: closing with unread data resets the socket.
+            std::thread::sleep(Duration::from_millis(200));
+            s.write_all(b"HTTP/1.1 200 OK\r\n").expect("write");
+            drop(s);
+        });
+        let err = Client::new(base, "t0k").projects().expect_err("cut");
+        server.join().expect("server");
+        let text = err.to_string();
+        assert!(!text.contains("os error 22"), "{text}");
+        assert!(!text.contains("Invalid argument"), "{text}");
     }
 
     #[test]
