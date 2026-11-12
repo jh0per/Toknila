@@ -25,6 +25,9 @@ pub enum ItemOutcome {
     Pass,
     /// The item does not hold.
     Fail,
+    /// Only a person can judge it (a picture, a look, a feeling, an approval the record does not
+    /// hold). It is neither a pass nor a failure and does not count against the hand-in.
+    Person,
 }
 
 /// How the reviewer came to its judgement of an item.
@@ -116,7 +119,22 @@ pub fn check_items(
     Ok(())
 }
 
-/// The verdict as the round and the worker read it: one `PASS`/`FAIL` line per acceptance item
+/// The verdict the daemon acts on. A request for changes whose only non-PASS items are `PERSON`
+/// ones (at least one) is an approval: nothing the reviewer could judge fails, and the rest is a
+/// person's. Any other verdict stands as given.
+pub fn effective_verdict(verdict: Verdict, items: &[ItemVerdict]) -> Verdict {
+    let for_a_person = items.iter().any(|i| i.outcome == ItemOutcome::Person);
+    let only_pass_or_person = items
+        .iter()
+        .all(|i| matches!(i.outcome, ItemOutcome::Pass | ItemOutcome::Person));
+    if for_a_person && only_pass_or_person {
+        Verdict::Approve
+    } else {
+        verdict
+    }
+}
+
+/// The verdict as the round and the worker read it: one `PASS`/`FAIL`/`PERSON` line per acceptance item
 /// in the list's order, then the reviewer's own remarks.
 pub fn render_items(acceptance: &[String], items: &[ItemVerdict], comment: &str) -> String {
     let mut sorted: Vec<&ItemVerdict> = items.iter().collect();
@@ -128,6 +146,7 @@ pub fn render_items(acceptance: &[String], items: &[ItemVerdict], comment: &str)
             .map_or("", String::as_str);
         let word = match i.outcome {
             ItemOutcome::Pass => "PASS",
+            ItemOutcome::Person => "PERSON",
             // A failure that rests on nothing run is not a failure: it is recorded as not run.
             ItemOutcome::Fail if i.basis == ItemBasis::NotRun => "NOT_RUN",
             ItemOutcome::Fail => "FAIL",

@@ -73,7 +73,7 @@ pub enum SimThreadCmd {
 fn item_verdict(text: &str) -> Result<ItemVerdict> {
     let (n, outcome) = text
         .split_once('=')
-        .with_context(|| format!("{text:?}: give an item as N=pass or N=fail"))?;
+        .with_context(|| format!("{text:?}: give an item as N=pass, N=fail or N=person"))?;
     Ok(ItemVerdict {
         item: n
             .trim()
@@ -82,7 +82,8 @@ fn item_verdict(text: &str) -> Result<ItemVerdict> {
         outcome: match outcome.trim() {
             "pass" => ItemOutcome::Pass,
             "fail" => ItemOutcome::Fail,
-            other => anyhow::bail!("{other:?}: an item is judged pass or fail"),
+            "person" => ItemOutcome::Person,
+            other => anyhow::bail!("{other:?}: an item is judged pass, fail or person"),
         },
         basis: toknila_core::ItemBasis::default(),
         note: String::new(),

@@ -10,9 +10,11 @@
 //! - [`typed`] and [`for_hook`]: the text of that delivery.
 //! - [`terminal`]: the bounds of a terminal size.
 
+mod designs;
 mod gate;
 mod planner;
 mod protocol;
+mod record;
 mod setup;
 pub mod terminal;
 #[cfg(test)]
@@ -20,10 +22,15 @@ mod tests;
 #[cfg(test)]
 mod tests_gate;
 #[cfg(test)]
+mod tests_record;
+#[cfg(test)]
 mod tests_return;
 mod waiting;
 
+pub use designs::BriefDesign;
+use designs::{design_section, designs_section};
 pub use planner::{Epic, ProjectFacts, generate_planner};
+pub use record::BriefThread;
 pub use waiting::{Returned, Waiting, returned_by, short_commit, waiting};
 
 use crate::{Comment, CommentKind, template};
@@ -35,7 +42,7 @@ pub fn planner_protocol() -> &'static str {
 }
 
 /// What the generated file says about one run.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct RunBrief<'a> {
     pub key: &'a str,
     pub title: &'a str,
@@ -68,6 +75,10 @@ pub struct RunBrief<'a> {
     /// What the daemon's check command said about the hand-in under review (a reviewer only);
     /// `None` when it did not run, e.g. the project has no check command.
     pub check: Option<&'a crate::CheckOutcome>,
+    /// The card's threads, which the reviewer cannot open (a reviewer only).
+    pub threads: &'a [BriefThread],
+    /// The whole hand-in report under review (a reviewer only).
+    pub hand_in: Option<&'a str>,
 }
 
 /// The section that carries the discussion of the card with the assistant; empty when there is
@@ -98,63 +109,6 @@ fn epic_section(brief: &RunBrief<'_>) -> String {
         ),
         _ => String::new(),
     }
-}
-
-/// A design a card references, as the instructions name it: the file the agent may read and the
-/// part of the image that matters.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BriefDesign {
-    pub name: String,
-    /// The design's kept file; `None` for a Figma link without an image.
-    pub path: Option<String>,
-    pub region: Option<crate::design::Region>,
-}
-
-/// The section that names the designs of the card, with the files the agent may read; empty
-/// when the card has none.
-fn designs_section(brief: &RunBrief<'_>) -> String {
-    if brief.designs.is_empty() {
-        return String::new();
-    }
-    let mut out = String::from(
-        "\n## Designs\n\n\
-         The card is about these designs. Read the files (an image or a pdf) before you build \
-         what they show; you may read these files and no others of the library. A region is in \
-         percent of the image, from its top left corner.\n\n",
-    );
-    for d in brief.designs {
-        out.push_str(&format!("- {}: ", d.name));
-        match &d.path {
-            Some(p) => out.push_str(&format!("`{p}`")),
-            None => out.push_str("no image is kept for it (a Figma link)"),
-        }
-        if let Some(r) = d.region {
-            out.push_str(&format!(
-                "; region: x {}%, y {}%, width {}%, height {}%",
-                r.x, r.y, r.w, r.h
-            ));
-        }
-        out.push('\n');
-    }
-    out
-}
-
-/// The section of the instructions file for a card that must show a design first; empty
-/// otherwise.
-fn design_section(brief: &RunBrief<'_>) -> String {
-    if !brief.design_first {
-        return String::new();
-    }
-    "\n## Design first\n\n\
-     The person asked to see and approve a design before you write any code. Before you touch \
-     the code: call `open_thread` with kind `design` (kind `flow` or `architecture` when that \
-     fits the card better), then post a first version with `thread_version` that the person can \
-     judge: a Mermaid diagram, or the screen described as its states and layout. Then stop and \
-     wait: the person's approval or request for changes arrives as an instruction. Do not ask \
-     for it with `ask_human`, and do not open a second thread for the same design; answer a \
-     request with a new version in the same thread. Write code only after the person approved a \
-     version. `finished` is refused until one is approved.\n"
-        .to_owned()
 }
 
 /// How many earlier instructions a replacement run is shown, the newest ones.
@@ -347,6 +301,8 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
             s.text()
         ));
     }
+    out.push_str(&record::threads_section(brief));
+    out.push_str(&record::hand_in_section(brief));
     out.push_str(&format!(
         "\n## The gate's result\n\n{}\n",
         gate::text(brief.check)
