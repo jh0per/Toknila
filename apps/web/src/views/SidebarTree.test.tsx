@@ -74,6 +74,18 @@ describe("the sidebar tree", () => {
   it("puts the full name in a title so a long one can end in an ellipsis", () => {
     expect(html(world())).toContain('title="BBB name"');
   });
+  it("tells the kinds apart: an initials badge on a project, an icon on a node, an icon per foot row", () => {
+    const h = html(world());
+    const a = h.split('data-project="AAA"')[1].split('data-project="BBB"')[0];
+    expect(a).toContain('class="pbadge" aria-hidden="true" data-testid="project-badge" data-initials="AA"');
+    expect(h.split('data-project="BBB"')[1]).toContain('data-initials="BB"');
+    for (const n of ["roadmap", "assistant", "inbox", "agents", "chains", "designs", "settings"]) expect(a).toContain(`data-icon="${n}"`);
+    const chain = a.split('data-chain-item="ca"')[1].split("</li>")[0];
+    expect(chain).not.toContain("data-icon");
+    const foot = h.split('class="side-foot"')[1];
+    for (const n of ["usage", "settings", "guide", "shortcuts"]) expect(foot).toContain(`data-icon="${n}"`);
+    expect(foot).toContain("<kbd>?</kbd>");
+  });
   it("lists an archived project only when asked", () => {
     expect(html(world())).not.toContain('data-project="CCC"');
     const s = world();

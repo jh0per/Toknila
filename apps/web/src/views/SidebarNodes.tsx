@@ -5,6 +5,7 @@ import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
 import { agentsOf, inboxOf, runRouteIn } from "../store/tree";
 import { NavLink } from "./Link";
+import { NavIcon } from "./NavIcon";
 import { SlotStepper } from "./SlotStepper";
 import { Chev, indent } from "./TreeRow";
 
@@ -55,6 +56,7 @@ export function InboxNode({ project, state, dispatch, onScreen }: Props) {
           route={{ name: "inbox", project: project.key }} dispatch={dispatch} row className={`item${sel ? " sel" : ""}`}
           testId="project-inbox-link"
         >
+          <NavIcon name="inbox" />
           <span className="t">Inbox</span>
           <span className={`badge${items.length === 0 ? " zero" : ""}`} data-testid="project-inbox-count">{items.length}</span>
         </NavLink>
@@ -91,6 +93,7 @@ export function AgentsNode({ project, state, dispatch, onScreen }: Props) {
       id="Agents" open={open} onToggle={() => setTouched(!open)} testId={onScreen ? "running" : `agents-node-${project.key}`}
       head={
         <button type="button" className="item group-toggle" data-row data-toggle onClick={() => setTouched(!open)}>
+          <NavIcon name="agents" />
           <span className="t">Agents</span>
           <span className="n" data-testid="project-slots" title="Agents running out of slots">{used} / {limit}</span>
         </button>

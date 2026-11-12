@@ -20,19 +20,11 @@ pub const MAX_PAGE: usize = 200;
 /// The longest text of one message, in characters.
 pub const MAX_TEXT: usize = 20_000;
 
-static IDS: std::sync::Mutex<ulid::Generator> = std::sync::Mutex::new(ulid::Generator::new());
-
-/// A fresh id for a message the conversation stores. Ids grow with every call, also within one
-/// millisecond, so sorting by (time, id) lists messages in the order they were said.
+/// A fresh id for a message the conversation stores. Ids grow with every call (and with every
+/// id of any other entity made in this process), also within one millisecond, so sorting by
+/// (time, id) lists messages, stored or from a thread, in the order they were said.
 pub fn next_id() -> String {
-    let mut ids = IDS
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    match ids.generate() {
-        Ok(id) => id.to_string(),
-        // The random part ran out within one millisecond: a plain id is later by then.
-        Err(_) => ulid::Ulid::generate().to_string(),
-    }
+    crate::model::next_ulid().to_string()
 }
 
 /// Who wrote a message.

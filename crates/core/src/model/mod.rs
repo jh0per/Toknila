@@ -28,6 +28,7 @@ pub use chain::{Chain, Edge, EdgeKind, NodeRef};
 pub use check_outcome::CheckOutcome;
 pub use command_policy::CommandPolicy;
 pub use comment::{Actor, Comment, CommentBody, CommentKind};
+pub(crate) use ids::next_ulid;
 pub use ids::{
     ChainId, CommentId, DesignId, PinId, ProjectId, ReleaseId, RunId, SubtaskId, ThreadId,
     ThreadMessageId, ThreadVersionId, TicketId,

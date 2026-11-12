@@ -276,6 +276,8 @@ impl Runners {
                 wake: self.wake.clone(),
                 ended: self.ended.clone(),
                 tokens: self.tokens.clone(),
+                resumed: wiring::resumed_argv(profile, &brief)
+                    .and(brief.resume.as_ref().map(|r| r.input.clone())),
             },
         )
     }

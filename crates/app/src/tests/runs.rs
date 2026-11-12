@@ -192,6 +192,7 @@ fn ended(mem: &Mem, code: Option<i32>, stopped: bool) -> RunEnded {
         }),
         exit: ProcessExit { code, signal: None },
         stopped,
+        refused: None,
     }
 }
 

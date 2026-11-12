@@ -7,6 +7,18 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
+static ULIDS: std::sync::Mutex<ulid::Generator> = std::sync::Mutex::new(ulid::Generator::new());
+
+/// A fresh ULID that is larger than every one this process made before, also within one
+/// millisecond, so ids of any entity sort in the order they were made.
+pub fn next_ulid() -> Ulid {
+    let mut g = ULIDS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    // The random part ran out within one millisecond: a plain id is later by then.
+    g.generate().unwrap_or_else(|_| Ulid::generate())
+}
+
 macro_rules! id_type {
     ($(#[$doc:meta])* $name:ident) => {
         $(#[$doc])*
@@ -19,7 +31,7 @@ macro_rules! id_type {
             /// A fresh, time-ordered identifier. Reads the clock and OS randomness, so rules
             /// in core never call it; the daemon mints ids and passes them in.
             pub fn new() -> Self {
-                Self(Ulid::generate())
+                Self(next_ulid())
             }
         }
 
