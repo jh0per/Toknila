@@ -594,3 +594,85 @@ fn show_plan_without_arguments_stays_small_for_a_project_of_a_hundred_big_cards(
     common::snapshot("planner_overview_chain", mini);
     tok.run(&["planner", "stop", "DEMO"]);
 }
+
+#[test]
+fn show_design_gives_the_picture_of_a_design_added_after_the_planner_started() {
+    let (_dir, tok, _) = setup(&["env", "TOKNILA_RUN_TOKEN", "hold"]);
+    tok.run(&["planner", "start", "DEMO", "--profile", "fake-planner"]);
+    wait_for(&tok, "the token line", || {
+        planner_logs(&tok).contains("TOKNILA_RUN_TOKEN=")
+    });
+    let token = planner_logs(&tok)
+        .lines()
+        .find_map(|l| {
+            l.trim()
+                .strip_prefix("TOKNILA_RUN_TOKEN=")
+                .map(str::to_owned)
+        })
+        .expect("token");
+
+    // Uploaded while the planner runs: its run was started without any design.
+    let png: &[u8] = &[
+        0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D, b'I', b'H', b'D', b'R',
+    ];
+    let info = tok.info();
+    let upload = |path: &str, body: &[u8], content_type: &str| {
+        ureq::post(&format!("{}/v1/projects/{path}", info.base_url()))
+            .set("Authorization", &format!("Bearer {}", info.token))
+            .set("Content-Type", content_type)
+            .send_bytes(body)
+            .expect("upload");
+    };
+    upload(
+        "DEMO/designs?name=late.png",
+        png,
+        "application/octet-stream",
+    );
+    let link = json!({ "url": "https://www.figma.com/design/abc123/App?node-id=1-2",
+                       "name": "Checkout" })
+    .to_string();
+    upload("DEMO/designs/figma", link.as_bytes(), "application/json");
+    tok.run(&["project", "new", "OTHER"]);
+    upload(
+        "OTHER/designs?name=theirs.png",
+        png,
+        "application/octet-stream",
+    );
+
+    let answers = mcp_session(
+        &info.base_url(),
+        &token,
+        &[("TOKNILA_ROLE", "planner")],
+        &[
+            call(1, "show_design", json!({ "design": "late.png" })),
+            call(2, "show_design", json!({ "design": "Checkout" })),
+            call(3, "show_design", json!({ "design": "theirs.png" })),
+        ],
+    );
+    let by_id = |id: u64| answers.iter().find(|a| a["id"] == id).expect("answer");
+    let content = by_id(1)["result"]["content"].as_array().expect("content");
+    assert_eq!(content.len(), 2, "{content:?}");
+    let meta: Value = serde_json::from_str(&text_of(by_id(1))).expect("metadata is JSON");
+    assert_eq!(meta["name"], "late.png");
+    assert_eq!(content[1]["type"], "image");
+    assert_eq!(content[1]["mimeType"], "image/png");
+    // The well-known base64 of the 16 bytes of a png header.
+    assert_eq!(content[1]["data"], "iVBORw0KGgoAAAANSUhEUg==");
+
+    // A link without a fetched image has no file, and the answer says so in words.
+    let figma = by_id(2)["result"]["content"].as_array().expect("content");
+    assert_eq!(by_id(2)["result"]["isError"], false);
+    assert_eq!(figma.len(), 2, "{figma:?}");
+    assert_eq!(figma[1]["type"], "text");
+    assert!(
+        figma[1]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Checkout has no file"),
+        "{figma:?}"
+    );
+
+    // Another project's design is refused.
+    assert_eq!(by_id(3)["result"]["isError"], true, "{}", by_id(3));
+    tok.run(&["planner", "stop", "DEMO"]);
+}

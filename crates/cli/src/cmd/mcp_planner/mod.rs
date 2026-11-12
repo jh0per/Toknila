@@ -16,9 +16,11 @@ use toknila_core::{ArtifactFormat, EdgeKind, NodeRef, ThreadKind};
 
 use super::mcp_tools::ToolError;
 
+mod answer;
 mod scope;
 mod tools;
 
+pub(super) use answer::Answer;
 use scope::{PlanScope, plan_scope};
 
 pub(in crate::cmd) use tools::list;
@@ -249,8 +251,16 @@ fn card_line(verb: &str, d: &TicketDetail) -> String {
     )
 }
 
+/// Sends the call to the daemon and answers what came of it: `show_design` also gives the picture.
+pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<Answer, String> {
+    match call {
+        PlannerCall::ShowDesign { design } => answer::show_design(client, design),
+        other => send_text(client, other).map(Answer::from),
+    }
+}
+
 /// Sends the call to the daemon and says in a few lines what came of it.
-pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<String, String> {
+fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
     let e = |e: toknila_client::ClientError| e.to_string();
     match call {
         PlannerCall::ShowPlan(scope) => {
@@ -264,10 +274,7 @@ pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<String, String
             };
             text.map_err(|x| x.to_string())
         }
-        PlannerCall::ShowDesign { design } => {
-            let found = client.planner_design(design).map_err(e)?;
-            serde_json::to_string_pretty(&found).map_err(|x| x.to_string())
-        }
+        PlannerCall::ShowDesign { design } => answer::show_design(client, design).map(|a| a.text),
         PlannerCall::DesignQuestion(q) => {
             let pin = client.planner_pin(q).map_err(e)?;
             Ok(format!(
