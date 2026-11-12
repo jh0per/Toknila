@@ -3,6 +3,7 @@
 //! `toknila daemon run` is the daemon itself. Business rules live in core, not here.
 
 mod allow_always;
+mod chat_output;
 mod check_words;
 mod client;
 mod cmd;

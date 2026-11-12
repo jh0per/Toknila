@@ -5,6 +5,7 @@
 
 pub mod address;
 pub mod agent;
+pub mod conversation;
 pub mod dag;
 pub mod defaults;
 pub mod design;

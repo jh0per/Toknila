@@ -25,6 +25,7 @@ Use the tools of the MCP server `toknila`; never change the plan any other way.
 - `edit_card` (`card`, `title`, `prompt`, `acceptance`, `design_first`, `designs`, `model`, `add_subtasks`, `edit_subtasks`): change a card that has not started. A card that is running, in review or done cannot be edited.
 - `designs` is a list of `{design, region}`: `design` is the file name (or id) of a design in the project's library, `region` an optional `{x, y, w, h}` in whole percent of the image. The card page shows these mockups large with the region outlined, its node shows the first as a thumbnail, and its agent is told the files. In `edit_card` the list replaces the card's designs (`[]` clears it).
 - `show_card` (`card`): open a card in the owner's window (its page, with its designs) while you talk about it; a window that looks at this project shows it with a small notice and a Back button. It changes nothing in the plan.
+- `say` (`text`, `about`): say something to the owner; see "Talking to the owner" below.
 - `suggest` (`text`, `card`, `action`): say the owner's next step; see "The next step" below.
 - `add_dependency` / `remove_dependency` (`chain`, `from`, `to`): `to` waits for `from`.
 - `move_card` (`chain`, `card`, `anchor`, `place`): put a card directly before or after another.
@@ -46,7 +47,11 @@ The roadmap is the top-level plan of the project: one epic per chain, in the ord
 - Read the repository before you plan, so a card names real files and real constraints.
 - When the project has designs, look at every one of them before you propose a card: `Read` each design file, say in a few lines what screens and flows you see, then propose the cards. Every card you add names the designs it comes from, by name, in its prompt. A design without a file (a Figma link that was not fetched) cannot be read: say so and ask the owner for an export.
 - Never start a card. When the plan is ready, say the next step with `suggest` (action `start`, the first card).
-- When you are unsure what the owner wants, ask them in this terminal instead of guessing.
+- When you are unsure what the owner wants, ask them with `say` instead of guessing.
+
+## Talking to the owner
+
+The owner reads the chat of the assistant's screen, not this terminal. A line the owner types reaches you here, and is also kept in the chat. Answer every message with `say` (`text`, and `about`: the card or chain it is about, so the chat shows it as a chip), in the language the owner writes in. A question to the owner is a `say` too: ask it, then wait for the next message. What you do in the terminal (reading, thinking, tool calls) is your own work and the owner does not see it in the chat; the chat shows each card and chain you add or edit, each thread you open and each suggestion as a line of its own, so do not repeat those, say what the owner needs to know.
 
 ## Talking about a card
 

@@ -6,6 +6,7 @@
 mod agents;
 mod card_size;
 mod chains;
+mod conversation;
 mod designs;
 mod events;
 mod planner;
@@ -26,6 +27,7 @@ pub use card_size::{CARD_MAX_H, CARD_MAX_W, CARD_MIN_W, SizeLimits, clamp_size};
 pub use chains::{
     ChainDetail, ChainItem, DesignMoveInput, EdgeInput, EdgeMoveInput, MoveInput, ReleaseMember,
 };
+pub use conversation::ConversationQuery;
 pub use designs::{
     Design, DesignList, FigmaToken, NewDesignPin, NewFigmaDesign, PlannerDesign, PlannerOverview,
     PlannerPlan, RenameDesign,
@@ -45,6 +47,7 @@ pub use system::{CliLink, Places, RepoCheckRequest, RepoPrepareRequest};
 pub use threads::{ThreadDetail, TicketThreads};
 pub use tickets::{ActionInput, NewSubtask, PatchSubtask, TicketDetail, TicketItem, TicketQuery};
 pub use toknila_app::chains::{ChainSettings, NewChain};
+pub use toknila_app::conversation::{ConversationPage, NewPersonMessage, Say};
 pub use toknila_app::pins::PinAnswer;
 pub use toknila_app::planner::{
     CardEdit, EditPlanChain, NewCard, NewPlanChain, NewSuggestion, OverviewCard, OverviewChain,

@@ -336,6 +336,8 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
         call(28, "show_plan", json!({ "card": "DEMO-1" })),
         call(29, "show_plan", json!({ "card": "DEMO-99" })),
         call(30, "show_plan", json!({ "chain": "mcp", "card": "DEMO-1" })),
+        call(31, "say", json!({ "text": "Planned.", "about": "DEMO-1" })),
+        call(32, "say", json!({ "text": "Who?", "about": "DEMO-99" })),
         // The owner's calls are not tools.
         call(16, "start", json!({ "card": "DEMO-1" })),
         call(17, "accept", json!({ "card": "DEMO-1" })),
@@ -375,6 +377,7 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
             "edit_chain",
             "add_card",
             "edit_card",
+            "say",
             "show_card",
             "suggest",
             "add_dependency",
@@ -385,6 +388,13 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
             "thread_version"
         ]
     );
+    assert_eq!(
+        text_of(by_id(31)),
+        "said: the owner reads it in the chat",
+        "{}",
+        by_id(31)
+    );
+    assert_eq!(by_id(32)["result"]["isError"], true, "no card DEMO-99");
     assert!(text_of(by_id(3)).contains("chain mcp created"));
     assert!(
         text_of(by_id(4)).contains("DEMO-1 added in chain mcp"),

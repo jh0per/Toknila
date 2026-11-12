@@ -102,6 +102,10 @@ const TABLE: Record<string, Words> = {
   "window.show_card": (p) => `The assistant opened ${str(p.ticket) || "a card"}`,
   "window.suggest": (p) => `The assistant says the next step: ${str(p.suggestion?.text)}`,
   "window.suggestion_cleared": () => "The assistant's next step is done",
+  "conversation.message": (p) => {
+    const who = ({ person: "You", assistant: "The assistant", toknila: "Toknila" } as Record<string, string>)[str(p.message?.author)] ?? "Someone";
+    return `${who} in the assistant's chat: ${str(p.message?.text)}`;
+  },
 };
 
 /// Every (entity, kind) the journal has words for.

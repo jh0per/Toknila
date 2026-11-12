@@ -24,6 +24,18 @@ pub enum PlannerCmd {
         /// Project key.
         project: String,
     },
+    /// Print the project's conversation with its assistant, oldest first: what you said, what it
+    /// said, and what it did (a card added, a thread opened). A card's discussion is in it.
+    Chat {
+        /// Project key.
+        project: String,
+        /// At most this many messages (default 50, never more than 200): the newest ones.
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Only messages older than the one with this id (printed with `--json`).
+        #[arg(long)]
+        before: Option<String>,
+    },
     /// Print what the planner has written to its terminal; `--follow` keeps going live.
     Logs {
         /// Project key.
@@ -62,6 +74,27 @@ pub(super) fn run(c: &Client, cmd: PlannerCmd, json_out: bool) -> Result<()> {
             let s = c.stop_planner(&project)?;
             emit(json_out, &s, |_| {
                 println!("{}", stopped(&project, was_running))
+            });
+        }
+        PlannerCmd::Chat {
+            project,
+            limit,
+            before,
+        } => {
+            let page = c.conversation(&project, before.as_deref(), limit)?;
+            emit(json_out, &page, |page| {
+                if page.messages.is_empty() {
+                    println!("nothing said yet");
+                }
+                if let (true, Some(first)) = (page.more, page.messages.first()) {
+                    println!("(older messages: --before {})", first.id);
+                }
+                for m in &page.messages {
+                    let offset = chrono::Local::now().offset().to_owned();
+                    for line in crate::chat_output::message_lines(m, offset) {
+                        println!("{line}");
+                    }
+                }
             });
         }
         PlannerCmd::Logs { project, follow } => {

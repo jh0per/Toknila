@@ -37,9 +37,9 @@ impl Modify for BearerAuth {
 /// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
-        agents::*, chains::*, designs::*, events::*, inbox::*, pins::*, planner::*, planner_run::*,
-        plans::*, profiles::*, projects::*, questions::*, releases::*, runner::*, strays::*,
-        system::*, threads::*, tickets::*, usage::*,
+        agents::*, chains::*, conversation::*, designs::*, events::*, inbox::*, pins::*,
+        planner::*, planner_run::*, plans::*, profiles::*, projects::*, questions::*, releases::*,
+        runner::*, strays::*, system::*, threads::*, tickets::*, usage::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -103,6 +103,8 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(post_discussion))
         .routes(routes!(accept_edit))
         .routes(routes!(reject_edit))
+        .routes(routes!(get_conversation, post_conversation))
+        .routes(routes!(planner_say))
         .routes(routes!(get_planner))
         .routes(routes!(start_planner))
         .routes(routes!(stop_planner))

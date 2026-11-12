@@ -1,6 +1,7 @@
 //! Ports: what the use cases need from storage. The daemon implements them over SQLite.
 
 use serde_json::Value;
+use toknila_core::conversation::Message;
 use toknila_core::design::pin::DesignPin;
 use toknila_core::events::DomainEvent;
 use toknila_core::graph::ChainView;
@@ -52,6 +53,15 @@ pub trait Reader {
     fn thread_versions(&self, thread: ThreadId) -> AppResult<Vec<ThreadVersion>>;
     /// The project's standing suggestion from its planner, if it has one.
     fn suggestion(&self, project: ProjectId) -> AppResult<Option<Suggestion>>;
+    /// The project's conversation with its assistant: the newest `limit` messages that are older
+    /// than the message `before` (the newest when unset), oldest first. A card discussion's
+    /// messages are among them, read from the card's thread.
+    fn conversation_page(
+        &self,
+        project: ProjectId,
+        before: Option<&str>,
+        limit: usize,
+    ) -> AppResult<Vec<Message>>;
     /// The ship a ticket has now, if any.
     fn ship(&self, ticket: TicketId) -> AppResult<Option<Ship>>;
     /// The assistant's pins on a project's designs, oldest first.
@@ -116,6 +126,8 @@ pub trait UnitOfWork: Reader {
     fn insert_thread_message(&mut self, message: &ThreadMessage) -> AppResult<()>;
     /// Stores a new artifact version; versions are never changed after.
     fn insert_thread_version(&mut self, version: &ThreadVersion) -> AppResult<()>;
+    /// Stores a new message of the project's conversation; messages are never changed after.
+    fn insert_conversation_message(&mut self, project: ProjectId, m: &Message) -> AppResult<()>;
     /// Remembers a ticket's ship, replacing the one it had.
     fn save_ship(&mut self, ship: &Ship) -> AppResult<()>;
     /// Inserts a pin, or sets its answer.

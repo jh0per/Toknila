@@ -13,7 +13,9 @@ mod suggest;
 mod window;
 mod with_designs;
 
+use crate::conversation as conv;
 use serde::{Deserialize, Serialize};
+use toknila_core::conversation::{self, About};
 use toknila_core::instructions::ProjectFacts;
 use toknila_core::machine::person_only;
 use toknila_core::planner::{self, Refusal};
@@ -111,7 +113,12 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
         reviewer: None,
         version: input.version,
     };
-    chains::create(uow, &project.to_string(), input)
+    let id = chains::create(uow, &project.to_string(), input)?;
+    if let Some(c) = uow.chain(id)? {
+        let text = conversation::added_chain(&c.name);
+        conv::line(uow, project, text, Some(About::Chain { name: c.name }))?;
+    }
+    Ok(id)
 }
 
 /// What the planner may change on an epic: a field left out is kept.
@@ -149,7 +156,12 @@ pub fn edit_chain<U: UnitOfWork + ?Sized>(
         version: edit.version,
         ..Default::default()
     };
-    crate::epic::set_settings(uow, &c.id.to_string(), None, settings)
+    let id = crate::epic::set_settings(uow, &c.id.to_string(), None, settings)?;
+    // The chain as it is now: an edit may have renamed it.
+    let name = uow.chain(id)?.map_or(c.name, |now| now.name);
+    let text = conversation::edited_chain(&name);
+    conv::line(uow, project, text, Some(About::Chain { name }))?;
+    Ok(id)
 }
 
 /// Makes `to` wait for `from` in a chain of the planner's project.
@@ -202,6 +214,8 @@ pub fn open_thread<U: UnitOfWork + ?Sized>(
 ) -> AppResult<(Ticket, Thread)> {
     let t = card(uow, project, card_ref)?;
     let th = threads::open(uow, &t, kind, title)?;
+    let text = conversation::opened_thread(th.number, &t.key);
+    conv::line_about_card(uow, project, text, t.key.clone())?;
     Ok((t, th))
 }
 

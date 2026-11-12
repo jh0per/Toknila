@@ -2,7 +2,7 @@
 // answer goes to the reducer.
 
 import { get, getBytes, post, postBytes } from "../api/http";
-import type { PlannerState, ThreadDetail } from "../api/types";
+import type { ConversationMessage, PlannerState, ThreadDetail } from "../api/types";
 import { askLine } from "./discussion";
 import type { Msg } from "./msg";
 import type { PlannerEffect } from "./planner";
@@ -32,6 +32,12 @@ async function settled(base: string): Promise<void> {
 /// Starts the planner (or keeps the live one), waits for its screen when it was just started,
 /// types the message and presses Enter in a write of its own, so the line is taken as typed.
 async function ask(base: string, e: PlannerEffect, dispatch: Dispatch): Promise<void> {
+  // The person's words are kept in the conversation first, so they show (and stay) whatever the
+  // planner does with the line.
+  if (e.raw !== undefined) {
+    const message = await post<ConversationMessage>(`/projects/${encodeURIComponent(e.project)}/conversation`, { text: e.raw });
+    dispatch({ type: "conversationMessage", project: e.project, message });
+  }
   const state = await post<PlannerState>(`${base}/start`, { profile: e.profile });
   dispatch({ type: "plannerLoaded", project: e.project, state });
   if (e.wait) await settled(base);
@@ -55,7 +61,8 @@ async function discuss(base: string, e: PlannerEffect, dispatch: Dispatch): Prom
 /// input route and line as the first delivery. A planner that is not running is refused (409).
 async function nudge(base: string, e: PlannerEffect): Promise<void> {
   const typing = new TextEncoder();
-  await postBytes(`${base}/input`, typing.encode(askLine(e.card ?? "", e.thread ?? 1, e.text ?? "")));
+  const line = e.card ? askLine(e.card, e.thread ?? 1, e.text ?? "") : (e.text ?? "");
+  await postBytes(`${base}/input`, typing.encode(line));
   await sleep(150);
   await postBytes(`${base}/input`, typing.encode("\r"));
 }

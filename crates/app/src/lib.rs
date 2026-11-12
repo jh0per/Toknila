@@ -8,6 +8,7 @@ pub mod agent;
 pub mod chain;
 pub mod chains;
 pub mod checks;
+pub mod conversation;
 pub mod design_use;
 pub mod discussion;
 pub(crate) mod epic;

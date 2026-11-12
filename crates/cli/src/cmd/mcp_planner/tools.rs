@@ -101,6 +101,15 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
             &["card"],
         ),
         tool(
+            "say",
+            "Say something to the owner. The owner reads the chat of the assistant's screen, not your terminal: every answer, question, report or heads-up for them goes through `say`, in the owner's own language. A question to the owner is a `say` too: ask it and wait for their next message. Give `about` (a card key, id or title, or a chain name) when the words are about one: the chat shows it as a chip on your message. Keep the terminal for your own work.",
+            json!({
+                "text": text("What you say, in the owner's language"),
+                "about": { "type": "string", "description": "The card (key, id or title) or chain (name) the words are about" },
+            }),
+            &["text"],
+        ),
+        tool(
             "show_card",
             "Open a card in the owner's window (its page, with the designs on it), when they have this project's assistant or chain open. They get a small notice with a Back button. Use it to point at a card you are talking about; it changes nothing in the plan.",
             json!({ "card": card }),

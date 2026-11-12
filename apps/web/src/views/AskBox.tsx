@@ -31,7 +31,7 @@ export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, 
 /// The box that talks to a project's assistant (its planner): what is typed is kept in the store,
 /// Enter or the button starts the assistant if it is not running and sends it the text. While the
 /// text is on its way the box waits.
-export function AskBox({ project, state, dispatch, placeholder, button, label, rows, testId, compact = false }: {
+export function AskBox({ project, state, dispatch, placeholder, button, label, rows, testId, compact = false, waiting = false }: {
   project: string;
   state: State;
   dispatch: (i: Intent) => void;
@@ -42,9 +42,11 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
   testId: string;
   /// A single row beside its button, under a terminal.
   compact?: boolean;
+  /// The assistant is answering the last message: the box waits, as it does while sending.
+  waiting?: boolean;
 }) {
   const text = draftOf(state, project);
-  const sending = state.planner.sending === project;
+  const sending = state.planner.sending === project || waiting;
   const send = () => dispatch({ type: "askPlanner", project });
   return (
     <div className={`ask${compact ? " compact" : ""}`} data-testid={testId}>
@@ -54,7 +56,7 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
         onChange={(t) => dispatch({ type: "editPlannerDraft", where: project, text: t })}
       />
       <button type="button" className="btn primary" data-testid={`${testId}-send`} disabled={sending || !text.trim()} onClick={send}>
-        {sending ? "Sending…" : button}
+        {state.planner.sending === project ? "Sending…" : button}
       </button>
     </div>
   );
