@@ -4,6 +4,7 @@ import type {
   AgentRole, AnswerKind, ChainDetail, CommentKind, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, TicketAction, TicketDetail,
   TicketThreads,
 } from "../api/types";
+import type { AttachEffect, AttachIntent, AttachResult } from "./attach";
 import type { AutostartEffect, AutostartIntent, AutostartResult } from "./autostart";
 import type { EdgeEffect, EdgeIntent, EdgeResult } from "./edges";
 import type { EpicEffect, EpicIntent, EpicResult } from "./epic";
@@ -45,7 +46,8 @@ export type Intent =
   | ShortcutIntent
   | UpdateIntent
   | UsageIntent
-  | FollowIntent;
+  | FollowIntent
+  | AttachIntent;
 
 /// What a person decides about the open subtasks left behind a card done out of order.
 export type LeftoverAction = "move" | "close" | "leave";
@@ -97,7 +99,8 @@ export type Msg =
   | AutostartResult
   | UpdateResult
   | UsageResult
-  | FollowResult;
+  | FollowResult
+  | AttachResult;
 
 /// A side effect for the runner; the reducer only describes it.
 export type Effect =
@@ -125,5 +128,6 @@ export type Effect =
   | UpdateEffect
   | UsageEffect
   | FollowEffect
+  | AttachEffect
   | { type: "connect"; since: number; delayMs: number }
   | { type: "pushUrl"; path: string };
