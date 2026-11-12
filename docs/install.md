@@ -279,3 +279,5 @@ Spec-driven projects (`specs/<n>-<name>/tasks.md`) import and export the same wa
 | Start over | stop the daemon, delete the folder |
 
 Every command takes `--json` for scripts.
+
+New to Toknila? Open **Guide** at the foot of the window's sidebar: it walks the work from a folder to a release.

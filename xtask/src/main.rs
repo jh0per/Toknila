@@ -8,6 +8,7 @@
 //! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
 //!   Runs every `apps/web/e2e/*.mjs` spec, rebuilds the bundle when it is stale.
 //!   With `CI` set it first installs Chromium; locally it uses an installed one.
+//! - `guide-shots`: retake the pictures of the Guide page from the real window (see [`shots`]).
 //! - `dist <target>`: release archive for one target triple in `dist/` (web page embedded).
 //! - `app [--target <triple>]`: the macOS `Toknila.app`, `.dmg` and the signed update archive
 //!   (see [`app`] and [`updates`]).
@@ -24,6 +25,7 @@ mod bump;
 mod css_guard;
 mod guards;
 mod leaks;
+mod shots;
 mod updates;
 mod versions;
 
@@ -41,6 +43,7 @@ fn main() -> ExitCode {
         ),
         "web" => web(),
         "e2e-web" => e2e_web(),
+        "guide-shots" => shots::guide_shots(),
         "dist" => dist(std::env::args().nth(2)),
         "desktop" => desktop(),
         "app" => app::app(),
@@ -53,7 +56,7 @@ fn main() -> ExitCode {
             .map(|notes| print!("{notes}")),
         _ => {
             eprintln!(
-                "usage: cargo xtask <verify|guards|web|e2e-web|desktop|app [--target <triple>]|dist <target>|bump <X.Y.Z>|latest-json|release-notes <tag>>"
+                "usage: cargo xtask <verify|guards|web|e2e-web|guide-shots|desktop|app [--target <triple>]|dist <target>|bump <X.Y.Z>|latest-json|release-notes <tag>>"
             );
             return ExitCode::from(2);
         }

@@ -1,0 +1,21 @@
+/* The Guide page: a table of sections, then one block per section (text beside its picture on a
+   wide window, the picture under the text on a narrow one). Tokens only. */
+.guide { max-width: var(--w-viewer); display: flex; flex-direction: column; gap: var(--sp6); padding: var(--sp2); }
+.guide h1 { margin: 0; font-size: var(--fs-headline-l); line-height: var(--lh-headline-l); font-weight: var(--fw-semibold); }
+.guide p { margin: 0; }
+.guide-top { display: flex; flex-direction: column; gap: var(--sp3); }
+.guide-toc { display: flex; flex-direction: column; gap: var(--sp1); margin: 0; padding: 0; list-style: none; }
+.guide-toc a { color: var(--primary); text-decoration: none; }
+.guide-toc a:hover { text-decoration: underline; }
+.guide-toc .n { color: var(--muted); font-family: var(--mono); margin-right: var(--sp2); }
+.guide-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: var(--sp4); align-items: start; scroll-margin-top: var(--sp4); }
+.guide-section h2 { margin: 0 0 var(--sp2); font-size: var(--fs-title-l); line-height: var(--lh-title-l); font-weight: var(--fw-semibold); }
+.guide-section h2 .n { color: var(--muted); font-family: var(--mono); margin-right: var(--sp2); }
+.guide-text { display: flex; flex-direction: column; gap: var(--sp2); }
+.guide-show { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp1); }
+.guide-show .btn[aria-disabled="true"] { opacity: var(--state-disabled); cursor: default; }
+.guide-pic { margin: 0; border: 1px solid var(--outline-variant); border-radius: var(--shape-m); background: var(--surface-container); overflow: hidden; }
+.guide-pic img { display: block; width: 100%; height: auto; }
+@media (max-width: 720px) {
+  .guide-section { grid-template-columns: minmax(0, 1fr); }
+}
