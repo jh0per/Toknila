@@ -1866,7 +1866,7 @@ export interface components {
          * @description One way a person answers a question.
          * @enum {string}
          */
-        AnswerKind: "allow" | "deny" | "text" | "enter" | "one" | "two" | "escape" | "up" | "down";
+        AnswerKind: "allow" | "deny" | "text" | "enter" | "one" | "two" | "escape" | "up" | "down" | "yes" | "no";
         /**
          * @description Answer of `POST /v1/tickets/{ticket}/runner/answer` when the person chose "Allow always":
          *     what was added to the project, or why nothing was.
@@ -4245,6 +4245,9 @@ export interface components {
         } | {
             /** @enum {string} */
             kind: "silent";
+        } | {
+            /** @enum {string} */
+            kind: "screen";
         };
         /**
          * @description The mark of a wildcard card: work found during the chain that waits for a person's approval

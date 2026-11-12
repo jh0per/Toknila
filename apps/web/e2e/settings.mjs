@@ -104,6 +104,9 @@ try {
   await expectText(t("trust-note"), "asks once to trust a project folder", "the trust step is one line");
   if (await t("trust-note").locator("details").evaluate((d) => d.open)) throw new Error("How to should start closed");
   console.log("PASS its How to starts closed");
+  // The How to names the project's ships folder, to trust once.
+  await expectText(t("trust-note").locator("details"), "ships folder", "the How to says to trust the project's ships folder");
+  console.log("PASS its How to says to trust the project's ships folder once");
 
   // The add form: a folder, and Details folded. No Browse outside the desktop app.
   await absent(t("browse-folder"), "a browser page has no Browse button");

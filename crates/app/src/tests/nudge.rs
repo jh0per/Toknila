@@ -35,27 +35,42 @@ fn reported() -> Reported {
     Reported {
         started: Timestamp(START),
         mcp: None,
-        hook: None,
+        hook: Some(Timestamp(START)),
+        screen_open: false,
     }
 }
 
 /// Moves the fake clock to `secs` after the start, then checks.
 fn check_at(mem: &mut Mem, secs: i64) -> Decision {
+    check_with(mem, secs, reported())
+}
+
+/// [`check_at`] with the host's facts given.
+fn check_with(mem: &mut Mem, secs: i64, reported: Reported) -> Decision {
     mem.now = Timestamp(START + secs * 1000);
     mem.runner.reach.set(RunnerState {
         quiet_ms: u64::try_from(secs * 1000).expect("positive"),
         ..mem.runner.reach.get()
     });
     let t = a(mem);
-    nudge::check(
-        mem,
-        mem.runner.state(t.id),
-        t.id,
-        &cfg(),
-        reported(),
-        mem.now,
-    )
-    .expect("check")
+    nudge::check(mem, mem.runner.state(t.id), t.id, &cfg(), reported, mem.now).expect("check")
+}
+
+#[test]
+fn a_run_without_a_sign_of_life_or_with_an_open_screen_question_is_never_nudged() {
+    let mut mem = quiet_run();
+    let no_life = Reported {
+        hook: None,
+        ..reported()
+    };
+    assert_eq!(check_with(&mut mem, 5000, no_life), Decision::Wait);
+    let open = Reported {
+        screen_open: true,
+        ..reported()
+    };
+    assert_eq!(check_with(&mut mem, 5000, open), Decision::Wait);
+    // Control: the same quiet run, alive and with no question, is nudged.
+    assert_eq!(check_with(&mut mem, 5000, reported()), Decision::Nudge);
 }
 
 fn apply(mem: &mut Mem, decision: Decision) {

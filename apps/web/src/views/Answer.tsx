@@ -5,6 +5,7 @@ import type { Intent } from "../store/msg";
 
 const ANSWER_LABEL: Record<AnswerKind, string> = {
   allow: "Allow", deny: "Deny", text: "Send", enter: "Enter", one: "1", two: "2", up: "↑", down: "↓", escape: "Esc",
+  yes: "Yes, I trust this folder", no: "No, exit",
 };
 
 /// What the agent asks, and the answers core offers for it: allow or deny a permission (a deny
@@ -53,9 +54,12 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
       {keys.length > 0 && (
         <div className="btns">
           {keys.map((k) => (
-            <button key={k} className="btn" data-testid={`answer-${k}`} onClick={() => send(k)}>{ANSWER_LABEL[k]}</button>
+            <button key={k} className={k === "yes" ? "btn primary" : "btn"} data-testid={`answer-${k}`} onClick={() => send(k)}>{ANSWER_LABEL[k]}</button>
           ))}
         </div>
+      )}
+      {reply === "screen" && (
+        <p className="muted" data-testid="answer-terminal-hint">Answer with the keys or text here, or in the card&apos;s Terminal tab.</p>
       )}
       {reply === "screen" ? (
         <form
