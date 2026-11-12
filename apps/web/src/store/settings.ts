@@ -111,7 +111,19 @@ const start = (s: State): SettingsState => ({
   ...s.settings, problems: [], branches: [], error: undefined, busy: true, saved: false, imported: undefined,
 });
 
-const checkOf = (f: AddForm): Effect => ({
+/// What an edit of `field` makes stale: the problem and the refusal about that field only; a new
+/// folder also takes the main-branch ones, the offered branches and the error without a field.
+function staleAfterEdit(s: SettingsState, field: DraftField): Pick<SettingsState, "problems" | "branches" | "error"> {
+  const folder = field === "repo_path";
+  const gone = (f: string | undefined) => f === field || (folder && f === "work_branch");
+  return {
+    problems: s.problems.filter((p) => !gone(p.field)),
+    branches: folder ? [] : s.branches,
+    error: s.error && (gone(s.error.field) || (folder && !s.error.field)) ? undefined : s.error,
+  };
+}
+
+const checkOf =(f: AddForm): Effect => ({
   type: "checkRepo", repo_path: f.draft.repo_path.trim(), work_branch: f.draft.work_branch.trim(),
 });
 
@@ -128,7 +140,7 @@ export function reduceSettings(s: State, msg: SettingsMsg): [State, Effect[]] {
       return [set({ checks: undefined }), [{ type: "loadChecks" }]];
     case "editDraft": {
       const add = editDraft(s.settings.add, msg.field, msg.value);
-      return [set({ add }), needsCheck(s.settings.add, msg.field, msg.value) ? [checkOf(add)] : []];
+      return [set({ add, ...staleAfterEdit(s.settings, msg.field) }), needsCheck(s.settings.add, msg.field, msg.value) ? [checkOf(add)] : []];
     }
     case "repoChecked": {
       const add = applyCheck(s.settings.add, msg.repo_path, msg.check);
