@@ -12,8 +12,11 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
     vec![
         tool(
             "show_plan",
-            "Read the whole plan of the project: every chain with its cards in dependency order (the order is the priority), each card's status, prompt, acceptance, subtasks, what it waits for, threads, review results and pull request state; and `designs`, the project's designs with the path of each file you may Read.",
-            json!({}),
+            "Read the plan of the project. Without arguments it answers the overview: every chain (name, goal, version, autostart, phase, done/total), every card of an unfinished chain as one short record (key, title, status, what it waits for, design_first, design names, counts of subtasks and threads, whether it waits for the owner), a finished chain as one record without cards, `designs` (with the path of each file you may Read) and `pins` with their answers. With `chain` it answers that chain with every card in full; with `card`, that one card in full (prompt, acceptance, subtasks, threads with their messages, review results, pull request state).",
+            json!({
+                "chain": text("Open this chain in full: its name or id"),
+                "card": text("Open this card in full: its key (DEMO-3), id or title"),
+            }),
             &[],
         ),
         tool(

@@ -55,6 +55,16 @@ pub struct PlannerPlan {
     pub designs: Vec<PlannerDesign>,
 }
 
+/// Answer of `GET /v1/planner/overview`: the plan in short records and the project's designs.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct PlannerOverview {
+    #[serde(flatten)]
+    pub overview: toknila_app::planner::PlanOverview,
+    /// Oldest first, each with the path of its file.
+    pub designs: Vec<PlannerDesign>,
+}
+
 /// Answer of `GET /v1/projects/{project}/designs`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
