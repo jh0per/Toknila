@@ -16,6 +16,17 @@
 .ask-actions-end { display: flex; gap: var(--sp2); align-items: center; }
 .ask-actions .btn.icon, .ask-actions .btn.send { height: var(--field-h); }
 .ask-actions .btn.icon { min-width: var(--field-h); }
+/* The microphone: a button in the end group, the muted interim words, the failure sentence. */
+.mic-btn.mic-listening { background: var(--primary); color: var(--on-primary); border-color: var(--primary); animation: mic-pulse 1.4s ease-out infinite; }
+.mic-btn.mic-error { color: var(--error); border-color: var(--error); }
+.mic-btn.mic-denied { opacity: 0.7; }
+@keyframes mic-pulse { 0% { box-shadow: 0 0 0 0 var(--primary-container); } 100% { box-shadow: 0 0 0 10px transparent; } }
+.mic-live, .mic-note { margin: 0; font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--on-surface-variant); }
+.mic-interim { opacity: 0.7; font-style: italic; }
+.mic-note.error { color: var(--error); }
+.mic-auto { display: flex; gap: var(--s2); align-items: center; font-size: var(--fs-label-m); color: var(--on-surface-variant); }
+.ask.compact .mic-live, .ask.compact .mic-note, .ask.compact .mic-auto { order: 5; }
+.ask.compact .ask-hint { order: 6; }
 .ask-hint { margin: 0; font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--on-surface-variant); }
 
 /* Attachments of a message: the attach button beside Send, the chips and the refusal under the field. */
@@ -103,7 +114,8 @@ button.inline-link { background: none; border: 0; padding: 0; font: inherit; cur
 .bubble-head { display: flex; gap: var(--s2); align-items: baseline; font-size: var(--fs-s); }
 .bubble-head .kind { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .bubble-head time { margin-left: auto; }
-.chat-box { display: flex; gap: var(--s2); align-items: flex-end; }
+.chat-box { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: flex-end; }
+.chat-box .mic-live, .chat-box .mic-note, .chat-box .mic-auto { flex: 1 0 100%; }
 .chat-box .prompt-field { flex: 1; min-height: 52px; }
 
 /* The Events tab: one line in words, the raw event behind a disclosure. */
