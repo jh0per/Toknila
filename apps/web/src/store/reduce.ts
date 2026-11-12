@@ -1,7 +1,8 @@
 // The page's state machine: reduce(state, msg) -> [state, effects]. Pure: no DOM, no network.
 
 import type { EventRecord } from "../api/types";
-import { conversationEvent, reduceConversation, reloadTalks } from "./conversation";
+import { beside, chipBack, reduceAssistant } from "./assistant";
+import { conversationEvent, reloadTalks } from "./conversation";
 import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
 import { reduceAttach } from "./attach";
@@ -102,7 +103,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "selectCard":
       return go(s, { name: "card", project: msg.project, chain: msg.chain, key: msg.key });
     case "urlChanged":
-      return [calm({ ...s, route: msg.route, opened: undefined, settingsFrom: nextSettingsFrom(s.route, msg.route, s.settingsFrom) }), enter(msg.route, s)];
+      return [calm({ ...s, route: msg.route, opened: undefined, assistant: chipBack(s.assistant), settingsFrom: nextSettingsFrom(s.route, msg.route, s.settingsFrom) }), enter(msg.route, s)];
     case "projectAdded": {
       const [added, fx] = reduceSettings(s, msg);
       const key = msg.project.key;
@@ -284,11 +285,11 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       return reduceUpdates(s, msg);
     case "askPlanner": {
       const [next, fx] = reducePlanner(s, msg);
-      // The conversation is on the assistant's screen: a message sent from elsewhere goes there.
-      const there = s.route.name === "planner" && s.route.project === msg.project;
+      // The conversation is on the assistant's screen or in the panel beside the work: a message
+      // sent from elsewhere goes to the screen.
+      const there = (s.route.name === "planner" && s.route.project === msg.project) || (s.assistant.open && beside(s.route));
       return fx.length && !there ? then(next, fx, { name: "planner", project: msg.project }) : [next, fx];
     }
-    case "discussCard":
     case "nudgeCard":
     case "nudgeChat":
     case "startPlanner":
@@ -319,8 +320,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "usageLoaded":
     case "usageFailed":
       return reduceUsage(s, msg);
-    default: // what is left is the conversation's (the type says so: a new Msg must be handled somewhere)
-      return reduceConversation(s, msg);
+    default: // what is left is the assistant's and the conversation's (the type says so: a new Msg must be handled somewhere)
+      return reduceAssistant(s, msg);
   }
 }
 
@@ -330,7 +331,7 @@ function go(s: State, route: Route): [State, Effect[]] {
   const plan = { ...s.plan, editing: undefined, moving: undefined };
   const settingsFrom = nextSettingsFrom(s.route, route, s.settingsFrom);
   // The person going anywhere ends the assistant's notice; `applyWindow` puts its own back.
-  return [{ ...calm({ ...s, route, plan, settingsFrom, opened: undefined }) }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
+  return [{ ...calm({ ...s, route, plan, settingsFrom, opened: undefined, assistant: chipBack(s.assistant) }) }, [{ type: "pushUrl", path: routePath(route) }, ...enter(route, s)]];
 }
 
 /// A settings section starts without the last section's "Saved" or refusal.

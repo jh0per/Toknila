@@ -2860,6 +2860,7 @@ export interface components {
         };
         /** @description What the person sends from the assistant's screen. */
         NewPersonMessage: {
+            about?: components["schemas"]["About"] | null;
             /** @description Names of the files that went with it. */
             attachments?: string[];
             text: string;

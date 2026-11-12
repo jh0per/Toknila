@@ -150,9 +150,18 @@ do in the terminal (reading, thinking, tool calls) is your own work and the owne
 in the chat; the chat shows each card and chain you add or edit, each thread you open and each \
 suggestion as a line of its own, so do not repeat those, say what the owner needs to know.
 
+## What the owner has open
+
+The assistant panel sits beside whatever the owner has open, and each message says which of three contexts it is about by how its line starts. Do what the context asks:
+
+- `About the roadmap:` the owner has the roadmap open. Plan the top level: epics (chains) and their versions; add, rename or reorder epics, and keep each epic's goal one clear sentence.
+- `About chain NAME:` the owner has the chain NAME open. Plan and reorder its cards: add cards, edit them, change their order and what they wait for. Answer with `say` and `about` set to the chain.
+- `Discussion on card KEY (thread N):` the owner has the card open. Refine that card and answer questions about it, as described below.
+- A line with none of these is about the project as a whole.
+
 ## Talking about a card
 
-The owner can talk to you from a card's page. A line that starts with `Discussion on card` names the card, the number of its discussion thread and what the owner said. Read the card with `show_plan` and its `card` (its prompt, acceptance, designs and threads), then answer in the discussion thread with `thread_message` (`card`, that thread number, `text`): the answer shows in the same box on the card's page. If the owner wants the card changed, call `edit_card` with the new `prompt` and/or `acceptance`: on a card with a discussion that does not change the card; the owner sees it as a diff and accepts or rejects it, and you say so in your answer. Send the whole new text of a field, not a fragment. `show_card` opens the card's designs for the owner; `suggest` pins a next step or a question. Do not open a design thread for a discussion.
+The owner can talk to you about a card from the panel. A line that starts with `Discussion on card` names the card, the number of its discussion thread and what the owner said. Read the card with `show_plan` and its `card` (its prompt, acceptance, designs and threads), then answer in the discussion thread with `thread_message` (`card`, that thread number, `text`): the answer shows in the panel beside the card. If the owner wants the card changed, call `edit_card` with the new `prompt` and/or `acceptance`: on a card with a discussion that does not change the card; the owner sees it as a diff and accepts or rejects it, and you say so in your answer. Send the whole new text of a field, not a fragment. `show_card` opens the card's designs for the owner; `suggest` pins a next step or a question. Do not open a design thread for a discussion.
 
 ## The next step
 
@@ -265,6 +274,17 @@ mod tests {
         let want =
             std::fs::read_to_string(&path).expect("missing snapshot; TOKNILA_UPDATE_SNAPSHOTS=1");
         assert_eq!(text, want.replace("\r\n", "\n"));
+    }
+
+    #[test]
+    fn the_file_names_the_three_contexts_and_what_to_do_in_each() {
+        let text = generate_planner(&facts());
+        assert!(text.contains("`About the roadmap:`"));
+        assert!(text.contains("Plan the top level: epics (chains) and their versions"));
+        assert!(text.contains("`About chain NAME:`"));
+        assert!(text.contains("Plan and reorder its cards"));
+        assert!(text.contains("`Discussion on card KEY (thread N):`"));
+        assert!(text.contains("Refine that card and answer questions about it"));
     }
 
     #[test]

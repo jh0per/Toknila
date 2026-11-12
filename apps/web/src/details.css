@@ -20,11 +20,7 @@
 .technical dl { margin: 0; }
 .details .facts code { overflow-wrap: anywhere; }
 
-/* Talk to the assistant: the discussion on a card, with the assistant's proposed edit as a diff. */
-.discuss { display: flex; flex-direction: column; gap: var(--sp2); padding: var(--sp3); border: 1px solid var(--outline-variant); border-radius: var(--shape-m); }
-.discuss h4 { margin: 0; }
-.discuss .bubble.proposal { max-width: 100%; align-self: stretch; }
-.discuss .row { display: flex; gap: var(--sp2); }
+/* The assistant's proposed edit to a card, as a diff in the panel's chat (assistantPanel.css). */
 .diff { display: flex; flex-direction: column; gap: var(--sp2); }
 .diff h5 { margin: 0 0 var(--sp1); font-size: var(--fs-title-m); line-height: var(--lh-title-m); font-weight: var(--fw-semibold); }
 .diff-lines { margin: 0; padding: var(--sp1) 0; font-family: var(--mono); font-size: var(--fs-body-m); white-space: pre-wrap; overflow-wrap: anywhere; }

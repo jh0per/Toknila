@@ -10,7 +10,7 @@ const press = (key: string, over: Partial<{ ctrlKey: boolean; metaKey: boolean; 
 describe("the shortcuts list", () => {
   it("names every key the window answers to", () => {
     const keys = SHORTCUTS.map((s) => s.keys.join(" "));
-    expect(keys).toEqual(["N", "S", "Enter", "Delete", "Esc", "Cmd/Ctrl ,", "?"]);
+    expect(keys).toEqual(["N", "S", "Enter", "Delete", "Esc", "Cmd/Ctrl ,", "Cmd/Ctrl .", "?"]);
     expect(SHORTCUTS.every((s) => s.what.length > 0)).toBe(true);
   });
 

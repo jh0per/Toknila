@@ -20,6 +20,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: ["Delete"], what: "Remove the dependency line you picked" },
   { keys: ["Esc"], what: "Close a menu or a dialog, or let go of what you picked" },
   { keys: ["Cmd/Ctrl", ","], what: "Open Settings" },
+  { keys: ["Cmd/Ctrl", "."], what: "Show or hide the assistant beside the roadmap, a chain or a card" },
   { keys: ["?"], what: "Show this list" },
 ];
 

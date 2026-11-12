@@ -4,8 +4,8 @@
 // the refusal of the last command, and what is typed to the assistant before it is sent.
 
 import type { PlannerState } from "../api/types";
+import { lineFor, panelChip } from "./assistant";
 import { type AskAttachMsg, clearAttached, placeOf, reduceAskAttach, withAttached } from "./askAttach";
-import { draftKey } from "./discussion";
 import type { Effect } from "./msg";
 import type { State } from "./state";
 
@@ -47,10 +47,6 @@ export type PlannerIntent =
   | { type: "editPlannerDraft"; where: string; text: string }
   /// Send the project's draft to the assistant: start it if it is not running, then type the text.
   | { type: "askPlanner"; project: string }
-  /// Send the card's draft (the Talk to the assistant box on its page): the daemon keeps it in the
-  /// card's discussion, then the planner is told the card and the words, through the same
-  /// terminal path as any message to it.
-  | { type: "discussCard"; project: string; key: string }
   /// Deliver the card's unanswered message to the planner again (`thread` is the discussion's
   /// number, `text` the message), through the planner's input; nothing is stored twice.
   | { type: "nudgeCard"; project: string; key: string; thread: number; text: string }
@@ -82,6 +78,8 @@ export type PlannerEffect = {
   text?: string;
   /// `ask`: the message as written, line breaks kept: it is stored in the conversation first.
   raw?: string;
+  /// `ask`: what the stored message is about (a chain), when the chip said so.
+  about?: { kind: "chain"; name: string };
   /// `ask`: the planner has to start first, so wait for its screen to settle before typing.
   wait?: boolean;
 };
@@ -99,22 +97,19 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
     case "askAttach":
       return reduceAskAttach(s, msg);
     case "askPlanner": {
+      // The panel's one composer holds the attachments of every context (its place is the project).
       const raw = withAttached(s.planner.drafts[msg.project] ?? "", placeOf(s, msg.project).chips);
       if (!raw || s.planner.sending || placeOf(s, msg.project).busy) return [s, []];
-      const running = plannerOf(s, msg.project)?.running ?? false;
-      return [
-        set({ error: "", sending: msg.project }),
-        [{ type: "plannerCall", project: msg.project, call: "ask", profile: s.planner.profile, text: oneLine(raw), raw, wait: !running }],
-      ];
-    }
-    case "discussCard": {
-      const draft = draftKey(msg.key);
-      const text = withAttached(s.planner.drafts[draft] ?? "", placeOf(s, draft).chips);
-      if (!text || s.planner.sending || placeOf(s, draft).busy) return [s, []];
-      return [
-        set({ error: "", sending: draft }),
-        [{ type: "plannerCall", project: msg.project, call: "discuss", card: msg.key, draft, text, profile: s.planner.profile }],
-      ];
+      const wait = !(plannerOf(s, msg.project)?.running ?? false);
+      const base = { type: "plannerCall", project: msg.project, profile: s.planner.profile, wait } as const;
+      const chip = panelChip(s);
+      // The chip says what the message is about: a card's goes to the card's discussion, a chain's
+      // is stored with the chain, the roadmap's is typed with its prefix.
+      const call: PlannerEffect =
+        chip?.kind === "card" ? { ...base, call: "discuss", card: chip.key, draft: msg.project, text: raw }
+        : chip ? { ...base, call: "ask", text: lineFor(chip, raw), raw, about: chip.kind === "chain" ? chip : undefined }
+        : { ...base, call: "ask", text: oneLine(raw), raw };
+      return [set({ error: "", sending: msg.project }), [call]];
     }
     case "nudgeCard":
       return [

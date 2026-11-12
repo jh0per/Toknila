@@ -138,18 +138,22 @@ try {
   console.log("PASS a refused file shows the library's sentence and keeps the text; taking a chip off keeps the design");
   await t("planner-ask-input").fill("");
 
-  // 4. A card's Talk to the assistant box: a pasted picture is named from the card's key and the
-  //    thread shows the name with the message.
+  // 4. The panel beside a card (the card's chip on): a pasted picture is a chip of the panel's box
+  //    and the card's discussion names it with the message.
   await page.goto(at("/projects/AT/chains/work/cards/AT-1"));
-  await t("discuss-input").waitFor({ timeout: 10_000 });
-  await paste("discuss-input", [{ name: "image.png", type: "image/png" }]);
-  await expectText(t("discuss-chip"), "AT-1-1.png", "a pasted picture is named from the card's key");
-  await t("discuss-input").fill("move the button as in the picture");
-  await t("discuss-send").click();
-  await expectText(t("discuss-items"), "Attached designs: AT-1-1.png", "the thread names the attachment with the message");
-  await expectText(t("discuss-items"), "move the button as in the picture", "and the message");
-  await heard("(thread 1): move the button as in the picture Attached designs: AT-1-1.png", "card message");
-  console.log("PASS in a card's discussion the thread names the attached picture with the message");
+  await t("assistant-toggle").click();
+  await expectText(t("context-chip"), "Card AT-1", "the panel's chip is the open card");
+  await t("planner-ask-input").waitFor({ timeout: 10_000 });
+  await paste("planner-ask-input", [{ name: "image.png", type: "image/png" }]);
+  await t("planner-ask-chip").waitFor({ timeout: 10_000 });
+  const pasted = (await t("planner-ask-chip").first().textContent()).match(/AT-\d+\.png/)?.[0];
+  if (!pasted) throw new Error("the pasted picture is not named from the project's key");
+  await t("planner-ask-input").fill("move the button as in the picture");
+  await t("planner-ask-send").click();
+  await expectText(t("chat-items"), `Attached designs: ${pasted}`, "the record names the attachment with the message");
+  await expectText(t("chat-items"), "move the button as in the picture", "and the message");
+  await heard(`(thread 1): move the button as in the picture Attached designs: ${pasted}`, "card message");
+  console.log("PASS with the card chip the panel's discussion names the attached picture with the message");
 
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
   console.log("web ask attach: PASS");

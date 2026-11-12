@@ -364,3 +364,34 @@ async fn deleting_the_project_takes_its_conversation_with_it() {
         .collect();
     assert_eq!(texts, ["stays"]);
 }
+
+#[tokio::test]
+async fn a_person_message_about_a_chain_is_stored_with_it_and_other_contexts_are_refused() {
+    let api = Api::new();
+    api.two_projects().await;
+    api.post("/v1/chains/plan/tickets", json!({ "title": "First" }))
+        .await;
+    let said = api
+        .post(
+            CONVERSATION,
+            json!({ "text": "reorder", "about": { "kind": "chain", "name": "plan" } }),
+        )
+        .await;
+    assert_eq!(said["about"], json!({ "kind": "chain", "name": "plan" }));
+    let (s, _) = api
+        .call(
+            Method::POST,
+            CONVERSATION,
+            Some(json!({ "text": "x", "about": { "kind": "chain", "name": "nope" } })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = api
+        .call(
+            Method::POST,
+            CONVERSATION,
+            Some(json!({ "text": "x", "about": { "kind": "card", "key": "DEMO-1" } })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}

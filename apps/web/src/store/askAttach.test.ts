@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { Design, PlannerState, Project } from "../api/types";
 import { attachedLine, canSend, placeOf, withAttached } from "./askAttach";
 import { uploadForAsk } from "./attachEffects";
-import { draftKey } from "./discussion";
 import type { Msg } from "./msg";
 import { reduce } from "./reduce";
 import { type State, initialState } from "./state";
@@ -58,13 +57,17 @@ describe("attachments to a message", () => {
     expect(placeOf(off, "DEMO").chips.map((c) => c.name)).toEqual(["b.png"]);
   });
 
-  it("a card's message carries the line and the chips of its own box", () => {
-    const where = draftKey("DEMO-1");
-    const s = apply(start(), { type: "editPlannerDraft", where, text: "move it" }, done(where, [design("D1", "DEMO-1-1.png")]));
-    const [, fx] = reduce(s, { type: "discussCard", project: "DEMO", key: "DEMO-1" });
-    expect(fx).toContainEqual(expect.objectContaining({ call: "discuss", card: "DEMO-1", text: "move it\nAttached designs: DEMO-1-1.png" }));
-    // The project's box is not touched.
-    expect(placeOf(s, "DEMO").chips).toEqual([]);
+  it("a message with a card chip carries the line and the chips of the panel's box", () => {
+    const open = apply(
+      { ...start(), route: { name: "card", project: "DEMO", chain: "plan", key: "DEMO-1" } },
+      { type: "toggleAssistant" },
+      { type: "editPlannerDraft", where: "DEMO", text: "move it" },
+      done("DEMO", [design("D1", "DEMO-1-1.png")]),
+    );
+    const [, fx] = reduce(open, { type: "askPlanner", project: "DEMO" });
+    expect(fx).toContainEqual(expect.objectContaining({
+      call: "discuss", card: "DEMO-1", draft: "DEMO", text: "move it\nAttached designs: DEMO-1-1.png",
+    }));
   });
 
   it("a refused file gives the library's sentence and the typed text stays", async () => {

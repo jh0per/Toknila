@@ -1,6 +1,9 @@
+import type { CSSProperties } from "react";
 import { token } from "../api/http";
+import { beside } from "../store/assistant";
 import { activeProjects, chainsOf, currentChain, currentProject } from "../store/state";
 import { useStore } from "../store/useStore";
+import { AssistantPanel } from "./AssistantPanel";
 import { ChainScreen } from "./ChainScreen";
 import { Dialogs } from "./Dialogs";
 import { EmptyChains } from "./EmptyChains";
@@ -15,6 +18,7 @@ import { Shortcuts } from "./Shortcuts";
 import { Sidebar } from "./Sidebar";
 import { UpdateBanner } from "./UpdateBanner";
 import { Usage } from "./Usage";
+import { useAssistantShortcut } from "./useAssistantShortcut";
 import { useSettingsShortcut } from "./useSettingsShortcut";
 import { useShortcutsKey } from "./useShortcutsKey";
 
@@ -22,6 +26,7 @@ export function App() {
   const [state, dispatch] = useStore();
   useSettingsShortcut(state, dispatch);
   useShortcutsKey(state, dispatch);
+  useAssistantShortcut(state, dispatch);
   if (!token()) {
     return <main><p className="error">Open the address that <code>tok open</code> prints; it carries the access token.</p></main>;
   }
@@ -36,8 +41,10 @@ export function App() {
   const showChain = !roadmap && (Boolean(chain) || planning) && state.loaded && r !== "inbox" && r !== "settings" && r !== "usage";
   // No project to show yet: the main area is the onboarding, with the add-a-project form on it.
   const onboarding = state.loaded && r !== "settings" && activeProjects(state).length === 0 && !project;
+  // The assistant panel sits beside the roadmap, a chain or a card, when it is open.
+  const aside = state.assistant.open && state.loaded && !onboarding && beside(state.route) && project !== undefined;
   return (
-    <div className="ide">
+    <div className={`ide${aside ? " with-assistant" : ""}`} style={aside ? ({ "--assistant-w": `${state.assistant.width}px` } as CSSProperties) : undefined}>
       {r === "settings" ? <SettingsSidebar state={state} dispatch={dispatch} /> : <Sidebar state={state} dispatch={dispatch} />}
       <main className={showChain ? "has-panel" : roadmap ? "roadmap-page" : "plain"}>
         {state.error && !showChain && <p className="error">{state.error}</p>}
@@ -66,6 +73,7 @@ export function App() {
         <UpdateBanner state={state} dispatch={dispatch} />
         <OpenedNotice state={state} dispatch={dispatch} />
       </main>
+      {aside && project && <AssistantPanel project={project} state={state} dispatch={dispatch} />}
       <Dialogs state={state} dispatch={dispatch} inline={onboarding} />
       <Shortcuts state={state} dispatch={dispatch} />
     </div>

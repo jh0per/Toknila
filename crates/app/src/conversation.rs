@@ -28,6 +28,10 @@ pub struct NewPersonMessage {
     /// Names of the files that went with it.
     #[serde(default)]
     pub attachments: Vec<String>,
+    /// The chain the message is about (the window's context chip); a card's words go to the
+    /// card's discussion instead.
+    #[serde(default)]
+    pub about: Option<About>,
 }
 
 /// What the assistant says with its `say` tool.
@@ -89,7 +93,21 @@ pub fn say_as_person<U: UnitOfWork + ?Sized>(
         .map(|a| a.trim().to_owned())
         .filter(|a| !a.is_empty())
         .collect();
-    store(uow, project.id, Author::Person, text, None, files)
+    let about = match input.about {
+        None => None,
+        Some(About::Chain { name }) => {
+            let c = planner::chain(&*uow, project.id, &name)
+                .map_err(|_| AppError::not_found(format!("chain {name}")))?;
+            Some(About::Chain { name: c.name })
+        }
+        Some(About::Card { .. }) => {
+            return Err(AppError::new(
+                ErrorKind::BadRequest,
+                "a message about a card goes to the card's discussion",
+            ));
+        }
+    };
+    store(uow, project.id, Author::Person, text, about, files)
 }
 
 /// What `about` names in the planner's project: a card, else a chain; a card or chain of another

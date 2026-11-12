@@ -1,12 +1,20 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Project } from "../api/types";
+import { type Context, aboutThis, contextKey, contextLabel, lineFor } from "../store/assistant";
 import { talkOf, unanswered, wakeWhenLate } from "../store/conversation";
 import { msUntilOverdue } from "../store/conversation";
 import type { Intent } from "../store/msg";
 import { plannerOf } from "../store/planner";
 import type { State } from "../store/state";
 import { AskBox } from "./AskBox";
+import { CardProposals } from "./CardProposals";
 import { ChatEntry } from "./ChatMessage";
+
+const placeholderFor = (c: Context | undefined): string =>
+  c?.kind === "card" ? "Ask about this card or say what to change; Enter sends"
+  : c?.kind === "chain" ? "Plan or reorder this chain's cards; Enter sends"
+  : c?.kind === "roadmap" ? "Plan epics and versions; Enter sends"
+  : "Tell the assistant what to change; Enter sends";
 
 /// How close to the top (in pixels) the scroll must be to ask for older messages, and how close
 /// to the bottom it must be for a new message to keep it there.
@@ -17,7 +25,11 @@ const BOTTOM_PX = 80;
 /// the bottom, what the assistant did as lines between the messages, and the box under it. The last
 /// 50 are loaded; scrolling to the top loads older ones. While the assistant is answering the box
 /// waits, and after 90 seconds it says so and offers a nudge.
-export function ChatPane({ project, state, dispatch }: { project: Project; state: State; dispatch: (i: Intent) => void }) {
+///
+/// This is the one chat of the assistant: the panel beside the work and the assistant's own screen
+/// draw it. `context` is what is open (the chip above the box, which the person can take off); the
+/// screen passes none.
+export function ChatPane({ project, state, dispatch, context }: { project: Project; state: State; dispatch: (i: Intent) => void; context?: Context }) {
   const key = project.key;
   useEffect(() => {
     dispatch({ type: "loadConversation", project: key });
@@ -25,6 +37,7 @@ export function ChatPane({ project, state, dispatch }: { project: Project; state
   }, [key]);
   const talk = talkOf(state, key);
   const messages = talk?.messages ?? [];
+  const shown = state.assistant.only && context ? aboutThis(messages, context) : messages;
   const running = plannerOf(state, key)?.running ?? false;
   const sending = state.planner.sending === key;
 
@@ -40,7 +53,7 @@ export function ChatPane({ project, state, dispatch }: { project: Project; state
     if (!owed) return;
     const about = owed.about;
     if (about?.kind === "card" && owed.thread) dispatch({ type: "nudgeCard", project: key, key: about.key, thread: owed.thread, text: owed.text });
-    else dispatch({ type: "nudgeChat", project: key, text: owed.text });
+    else dispatch({ type: "nudgeChat", project: key, text: about?.kind === "chain" ? lineFor(about, owed.text) : owed.text });
   };
 
   // The newest message stays in view; an older page joins above without moving what is read.
@@ -62,19 +75,31 @@ export function ChatPane({ project, state, dispatch }: { project: Project; state
     if (el.scrollTop < TOP_PX && talk?.more && !talk.older) dispatch({ type: "loadOlder", project: key });
   };
 
+  const only = state.assistant.only && context !== undefined;
   return (
     <div className="chat-pane" data-testid="chat-pane">
+      <label className="only-about muted" title={context ? undefined : "Open a roadmap, a chain or a card to filter by it"}>
+        <input
+          type="checkbox" data-testid="only-about" checked={only} disabled={!context}
+          onChange={(e) => dispatch({ type: "setOnlyAboutThis", only: e.target.checked })}
+        />{" "}
+        Only about this
+      </label>
       <div className="chat-log" ref={log} onScroll={onScroll} data-testid="chat-log" tabIndex={0} aria-label="Conversation with the assistant">
         {talk?.older && <p className="muted chat-note" data-testid="chat-older">Loading older messages…</p>}
         {talk && !talk.more && messages.length > 0 && <p className="muted chat-note" data-testid="chat-start">This is the start of the conversation.</p>}
+        {talk && only && shown.length === 0 && messages.length > 0 && (
+          <p className="muted chat-note" data-testid="chat-none-about">Nothing said about {contextLabel(context).toLowerCase()} yet.</p>
+        )}
         {talk && messages.length === 0 && (
           <p className="muted chat-note" data-testid="placeholder">
             Tell the assistant what you want to build or change. It reads your project and writes the plan as cards; you start the cards and accept the work.
           </p>
         )}
         <ol className="chat-items" data-testid="chat-items">
-          {messages.map((m) => <ChatEntry key={m.id} m={m} project={key} state={state} dispatch={dispatch} />)}
+          {shown.map((m) => <ChatEntry key={m.id} m={m} project={key} state={state} dispatch={dispatch} />)}
         </ol>
+        {context?.kind === "card" && <CardProposals state={state} card={context.key} dispatch={dispatch} />}
         {waiting && <p className="muted chat-note" data-testid="chat-waiting">The assistant is answering…</p>}
         {late && (
           <div className="row chat-note" data-testid="chat-late">
@@ -88,9 +113,19 @@ export function ChatPane({ project, state, dispatch }: { project: Project; state
           The assistant is not running. Sending a message starts it.
         </p>
       )}
+      {context && (
+        <div className="context-chip-row">
+          <span className="context-chip" data-testid="context-chip" data-context={contextKey(context)}>
+            {contextLabel(context)}
+            <button type="button" className="icon-btn" data-testid="context-chip-remove" aria-label={`Take off the context: ${contextLabel(context)}`} onClick={() => dispatch({ type: "removeChip" })}>
+              ×
+            </button>
+          </span>
+        </div>
+      )}
       <AskBox
         project={key} state={state} dispatch={dispatch} testId="planner-ask" compact waiting={waiting}
-        label="Message to the assistant" placeholder="Tell the assistant what to change; Enter sends" button="Send"
+        label="Message to the assistant" placeholder={placeholderFor(context)} button="Send"
       />
     </div>
   );

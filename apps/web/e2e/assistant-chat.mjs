@@ -152,8 +152,10 @@ try {
   await onCard.waitFor({ timeout: 10_000 });
   await expectText(onCard.locator("[data-testid=chat-chip]"), "WEB-1", "the card discussion's message has the card as its chip");
   await page.goto(at("/projects/WEB/chains/roadmap/cards/WEB-1"));
-  await expectText(t("discuss-items"), "Why this card first?", "the card's own page has the discussion");
-  if ((await t("discuss-say").filter({ hasText: "Why this card first?" }).count()) !== 1) throw new Error("the message is on the card more than once");
+  await t("assistant-toggle").click();
+  const inPanel = t("assistant-panel").locator("[data-testid=chat-message]").filter({ hasText: "Why this card first?" });
+  await expectText(inPanel, "Why this card first?", "the panel beside the card has the discussion");
+  if ((await inPanel.count()) !== 1) throw new Error("the message is in the panel more than once");
   const all = await (await fetch(`${origin}/v1/projects/WEB/conversation`, { headers: bearer })).json();
   const copies = all.messages.filter((m) => m.text === "Why this card first?");
   if (copies.length !== 1 || copies[0].about?.key !== "WEB-1") throw new Error(`the discussion in the conversation: ${JSON.stringify(copies)}`);

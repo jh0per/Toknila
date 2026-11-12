@@ -1,4 +1,4 @@
-// Browser test of "Talk to the assistant" on a card's page, against a real daemon and the
+// Browser test of talking to the assistant about a card, in the panel beside the card, against a real daemon and the
 // workspace's `fake-agent` (never a real agent). The fake planner plays what the planner's tools do
 // with its run token: it reads a line from its terminal, answers in the card's discussion thread
 // (`thread_message`) and proposes an edit (`edit_card`).
@@ -86,24 +86,28 @@ try {
   const open = () => page.goto(url.replace("/?", "/projects/DS/chains/work/cards/DS-1?"));
   const description = () => page.locator(".details .cols section").first().locator("pre.prompt");
 
-  // 1. The assistant is not running: the box offers to start it, and there is nothing to send to.
+  // 1. The card's page has no Discuss box of its own; the assistant is in the panel beside it,
+  //    opened from the top bar. Not running: the panel says sending a message starts it.
   await open();
-  await expectText(t("discuss-off"), "The assistant is not running", "the box says the assistant is not running");
-  await expectText(t("discuss-start"), "Start the assistant", "with a button to start it");
-  if ((await t("discuss-input").count()) !== 0) throw new Error("no message box while the assistant is not running");
-  console.log("PASS no message box while the assistant is not running");
+  if ((await t("discuss").count()) !== 0) throw new Error("the card's page still has a Discuss box");
+  console.log("PASS the card's page has no Discuss box of its own");
+  await t("assistant-toggle").click();
+  await expectText(t("assistant-state"), "not running", "the panel says the assistant is not running");
+  await expectText(t("planner-idle"), "Sending a message starts it", "and that sending a message starts it");
+  await expectText(t("context-chip"), "Card DS-1", "the panel's chip says which card is open");
 
-  // 2. Running (started with the fake planner profile), the box is there.
+  // 2. Running (started with the fake planner profile), the panel says so.
   tok("planner", "start", "DS", "--profile", "fake-planner");
   await open();
-  await t("discuss-input").waitFor({ timeout: 10_000 });
+  await expectText(t("assistant-state"), "running", "the panel says the assistant is running");
   await expectText(description(), "Old prompt", "the card has its prompt");
 
-  // 3. A message reaches the planner with the card as context; the answer shows in the same box.
-  await t("discuss-input").fill("make the acceptance stricter on errors");
-  await t("discuss-send").click();
-  await expectText(t("discuss-items"), "make the acceptance stricter on errors", "the message shows in the box");
-  await expectText(t("discuss-items"), "I would add the 4xx case", "the planner's answer shows in the same box");
+  // 3. A message with the card chip reaches the planner as the card's discussion; the answer shows
+  //    in the same panel.
+  await t("planner-ask-input").fill("make the acceptance stricter on errors");
+  await t("planner-ask-send").click();
+  await expectText(t("assistant-panel").locator("[data-testid=chat-text]"), "make the acceptance stricter on errors", "the message shows in the panel");
+  await expectText(t("assistant-panel").locator("[data-testid=chat-text]"), "I would add the 4xx case", "the planner's answer shows in the same panel");
   const terminalLine = await (async () => {
     const out = await fetch(new URL("/v1/projects/DS/planner/scrollback", new URL(url).origin), {
       headers: { authorization: `Bearer ${new URL(url).searchParams.get("token")}` },
@@ -130,9 +134,9 @@ try {
   console.log("PASS an accepted edit lands on the card");
 
   // 5. A second proposal is rejected: the card stays as it was.
-  await t("discuss-input").fill("and a shorter prompt");
-  await t("discuss-send").click();
-  await expectText(t("discuss-items"), "Here is a shorter prompt", "the second answer shows");
+  await t("planner-ask-input").fill("and a shorter prompt");
+  await t("planner-ask-send").click();
+  await expectText(t("assistant-panel").locator("[data-testid=chat-text]"), "Here is a shorter prompt", "the second answer shows");
   const second = t("discuss-edit").nth(1);
   await expectText(second.locator("[data-field=prompt]"), "+ A shorter prompt", "the second diff shows the new prompt");
   await t("edit-reject").click();

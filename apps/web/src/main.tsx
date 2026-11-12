@@ -15,6 +15,7 @@ import "./menu.css";
 import "./updates.css";
 import "./inbox.css";
 import "./details.css";
+import "./assistantPanel.css";
 import "./mockups.css";
 import "./board.css";
 import "./assistant.css";

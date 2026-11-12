@@ -8,7 +8,6 @@ import { CardPlan } from "./CardPlan";
 import { Comments } from "./Comments";
 import { DependsOn } from "./DependsOn";
 import { DetailsMeta, TechnicalDetails } from "./DetailsMeta";
-import { Discuss } from "./Discuss";
 import { ReviewBlock } from "./ReviewBlock";
 import { Rounds } from "./Rounds";
 import { StatusBlock } from "./StatusBlock";
@@ -65,7 +64,6 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
           )}
         </section>
       </div>
-      {currentProject(state) && <Discuss state={state} card={card} project={currentProject(state)?.key ?? ""} dispatch={dispatch} />}
       <DependsOn state={state} card={card} detail={detail} chain={chain} dispatch={dispatch} />
       <Rounds detail={detail} />
       <Comments key={card.key} card={card} detail={detail} dispatch={dispatch} />

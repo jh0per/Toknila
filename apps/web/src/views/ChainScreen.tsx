@@ -5,6 +5,7 @@ import type { Intent } from "../store/msg";
 import { type State, currentProject, slotsOf } from "../store/state";
 import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
 import { AskBox } from "./AskBox";
+import { AssistantButton } from "./AssistantButton";
 import { viewOf, withView } from "../store/route";
 import { Canvas } from "./Canvas";
 import { DesignBoard } from "./DesignBoard";
@@ -69,6 +70,7 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
           Start cards automatically
         </label>
         <ThemeButton theme={state.theme} dispatch={dispatch} />
+        <AssistantButton state={state} dispatch={dispatch} />
         <button
           type="button" className="btn" data-testid="new-card"
           onClick={() => dispatch({ type: "openDialog", dialog: { kind: "newCard", chain: chain.chain.id } })}
