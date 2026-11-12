@@ -33,6 +33,7 @@ export function reasonText(r: StatusReason | null | undefined): string {
   if (!r) return "";
   switch (r.status) {
     case "waiting":
+      if (r.kind === "screen") return "Claude Code asks on its screen";
       return r.kind === "silent" ? "agent went silent" : `${r.kind}: ${r.text}`;
     case "cancelled":
       return `cancelled: ${r.text}`;

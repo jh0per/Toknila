@@ -133,14 +133,16 @@ try {
   await expectText(row("QA-3").locator("[data-testid=screen]"), "got:yes", "the changed screen is listed again");
   console.log("PASS text typed from the inbox reached the agent's terminal");
 
-  // The trust dialog's options are not numbered: the arrow quick key and Enter choose "Yes". The
-  // fake agent reads the arrow from a Unix pty only (a Windows console line read never sees it).
+  // The trust dialog's row offers its two answers; "Yes, I trust this folder" makes the daemon
+  // type the arrow and Enter. The fake agent reads the arrow from a Unix pty only (a Windows
+  // console line read never sees it).
   await expectText(row("QA-4").locator("[data-testid=screen]"), "Yes, I trust this folder", "the trust dialog is shown");
+  await expectText(row("QA-4").locator("[data-testid=answer-yes]"), "Yes, I trust this folder", "Yes is offered");
+  await expectText(row("QA-4").locator("[data-testid=answer-no]"), "No, exit", "No is offered");
   if (process.platform !== "win32") {
-    await row("QA-4").locator("[data-testid=answer-down]").click();
-    await row("QA-4").locator("[data-testid=answer-enter]").click();
+    await row("QA-4").locator("[data-testid=answer-yes]").click();
     await until("the agent chose Yes", () => logs("QA-4").includes("trust=yes"));
-    console.log("PASS the arrow quick key and Enter answered the trust dialog");
+    console.log("PASS the Yes answer of the trust dialog reached the agent");
   }
 
   // A reviewer that ends its turns without a verdict: the card goes to the person.
@@ -169,7 +171,7 @@ try {
   const answered = (await res.json()).filter((e) => e.kind === "question_answered");
   const seen = answered.map((e) => `${e.actor}:${e.payload.key}:${e.payload.role}:${e.payload.answer}`).sort();
   const want = ["human:QA-1:worker:allow", "human:QA-2:worker:deny", "human:QA-3:worker:text"];
-  if (process.platform !== "win32") want.push("human:QA-4:worker:down", "human:QA-4:worker:enter");
+  if (process.platform !== "win32") want.push("human:QA-4:worker:yes");
   want.sort();
   if (JSON.stringify(seen) !== JSON.stringify(want)) throw new Error(`journal: ${JSON.stringify(seen)}`);
   console.log("PASS the journal records who answered, for which role");

@@ -15,6 +15,7 @@ const status = (v: unknown): string => str(v).replace(/_/g, " ");
 const ANSWER: Record<string, string> = {
   allow: "Allowed", deny: "Turned down", text: "Typed an answer on its screen", enter: "Pressed Enter",
   one: "Chose 1", two: "Chose 2", up: "Pressed the up arrow", down: "Pressed the down arrow", escape: "Pressed Esc",
+  yes: "yes", no: "no",
 };
 
 /// "an instruction", "a report", "a comment".
@@ -41,6 +42,7 @@ function becauseOf(reason: Fields | null | undefined): string {
   if (!reason) return "";
   switch (reason.status) {
     case "waiting":
+      if (reason.kind === "screen") return " (Claude Code asks on its screen)";
       return reason.kind === "silent" ? " (the agent went silent)" : reason.text ? ` (${str(reason.kind)}: ${str(reason.text)})` : "";
     case "cancelled":
       return reason.text ? ` (${str(reason.text)})` : "";
@@ -78,7 +80,7 @@ const TABLE: Record<string, Words> = {
   "ticket.runner_exited": (p) => `${RUN_ROLE[str(p.run?.role)] ?? "The agent"} stopped`,
   "ticket.question_raised": (p) =>
     p.kind === "permission" ? `${turn(p)} asks for permission`
-    : p.kind === "screen" ? `${turn(p)} waits for you on its screen`
+    : p.kind === "screen" ? (str(p.text) || `${turn(p)} waits for you on its screen`)
     : `${turn(p)} asks a question`,
   "ticket.question_cleared": (p) => `${turn(p)} went on without an answer`,
   "ticket.question_answered": (p) => `Answered: ${answerWords(p.answer)}`,

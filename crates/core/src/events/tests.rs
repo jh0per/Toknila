@@ -318,6 +318,7 @@ fn question_events_carry_the_ticket_the_role_and_what_was_asked_or_answered() {
         ticket,
         role: AgentRole::Reviewer,
         kind: QuestionKind::Permission,
+        text: None,
     };
     let cleared = DomainEvent::QuestionCleared {
         key: key.clone(),

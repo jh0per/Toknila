@@ -15,6 +15,9 @@ impl Ticket {
             Some(StatusReason::Waiting(WaitingReason::Silent)) => {
                 "you: the agent went quiet".to_owned()
             }
+            Some(StatusReason::Waiting(WaitingReason::Screen)) => {
+                "you: Claude Code asks on its screen".to_owned()
+            }
             _ => "a person".to_owned(),
         }
     }

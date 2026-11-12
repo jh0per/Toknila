@@ -21,7 +21,7 @@ mod private;
 mod prompts;
 mod pty;
 mod reviewer;
-mod screens;
+pub(crate) mod screens;
 mod scrollback;
 mod silence;
 mod stopping;

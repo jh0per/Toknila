@@ -213,7 +213,7 @@ pub async fn ticket_activity(
                     ask_person(tx, &t, role, text, detail)?;
                 }
                 if screen_gone || reviewer_gone {
-                    questions::cleared(tx, &t, role)?;
+                    questions::screen_cleared(tx, &t, role)?;
                 }
                 Ok(())
             })
