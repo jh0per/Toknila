@@ -3,9 +3,10 @@ import type { ChainDetail, Project } from "../api/types";
 import type { Intent } from "../store/msg";
 import type { Route } from "../store/route";
 import { type State, chainsOf, currentChain } from "../store/state";
-import { projectOpen, readProjectOpen, storeProjectOpen, waitingIn } from "../store/tree";
+import { agentsOf, projectOpen, readProjectOpen, storeProjectOpen, waitingIn } from "../store/tree";
 import { NavLink } from "./Link";
 import { SidebarChains } from "./SidebarChains";
+import { AgentsNode, InboxNode } from "./SidebarNodes";
 import { Chev, indent } from "./TreeRow";
 
 type Props = {
@@ -38,7 +39,7 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
   const chains = chainsOf(state, project);
   const chainRoute = route.name === "chain" || route.name === "projectChain" || route.name === "card";
   const selected = onScreen && chainRoute ? currentChain(state)?.chain.id : undefined;
-  const running = state.agents.find((a) => a.project === project.id)?.runs.length ?? 0;
+  const running = agentsOf(state, project).runs.length;
   const waiting = waitingIn(state, project);
   const leaf = (label: string, to: Route, sel: boolean, extra?: ReactNode, testId?: string) => (
     <li role="treeitem" aria-selected={sel} data-testid={testId?.replace("-link", "-entry")}>
@@ -80,6 +81,8 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
         <ul role="group">
           {leaf("Roadmap", { name: "project", project: key }, onScreen && route.name === "project", undefined, "roadmap-link")}
           {leaf("Assistant", { name: "planner", project: key }, onScreen && route.name === "planner", <span className="n" title="The project's main agent: it plans, you start the cards">✦</span>, "planner-link")}
+          <InboxNode project={project} state={state} dispatch={dispatch} onScreen={onScreen} />
+          <AgentsNode project={project} state={state} dispatch={dispatch} onScreen={onScreen} />
           <li role="treeitem" aria-expanded={chainsOpen} data-testid="chains" data-project-chains={key}>
             <div className="row" style={indent(1)}>
               <Chev open={chainsOpen} />
