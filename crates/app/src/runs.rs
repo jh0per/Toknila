@@ -117,6 +117,8 @@ fn start_with<U: UnitOfWork + ?Sized>(
                 designs: Vec::new(),
                 epic: Some((ctx.view.chain.name.clone(), ctx.view.chain.goal.clone())),
                 check: None,
+                threads: Vec::new(),
+                hand_in: None,
                 resume,
             },
         });

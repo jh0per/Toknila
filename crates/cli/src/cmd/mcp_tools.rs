@@ -57,7 +57,7 @@ fn review_verdict() -> Value {
                     "type": "object",
                     "properties": {
                         "item": { "type": "integer", "minimum": 1 },
-                        "outcome": { "type": "string", "enum": ["pass", "fail"] },
+                        "outcome": { "type": "string", "enum": ["pass", "fail", "person"], "description": "person: only a person can judge it (a picture, a look, a feeling, an approval the record does not hold); it does not count against the hand-in" },
                         "basis": {
                             "type": "string",
                             "enum": ["ran", "read", "not_run"],

@@ -8544,7 +8544,8 @@
         "description": "How one acceptance item stands, in the reviewer's eyes.",
         "enum": [
           "pass",
-          "fail"
+          "fail",
+          "person"
         ]
       },
       "ItemVerdict": {

@@ -51,9 +51,9 @@ export function awaitingText(review: ReviewView, now: number = Date.now()): stri
 }
 
 /// One acceptance item of a verdict: its judgement, and whether the reviewer ran what shows it or only read.
-export type ItemRow = { outcome: "PASS" | "FAIL"; item: number; text: string; basis: "ran" | "read" | "NOT_RUN" };
+export type ItemRow = { outcome: "PASS" | "FAIL" | "PERSON"; item: number; text: string; basis: "ran" | "read" | "NOT_RUN" };
 
-const ITEM = /^(PASS|FAIL) (\d+)\. (.*) \[(ran|read|NOT_RUN)\]$/;
+const ITEM = /^(PASS|FAIL|PERSON) (\d+)\. (.*) \[(ran|read|NOT_RUN)\]$/;
 
 /// The item lines of a round's remarks (the daemon writes `PASS 1. text - evidence [ran]`); other lines are left out.
 export function itemRows(comment: string): ItemRow[] {
