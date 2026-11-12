@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projectOpen, readProjectOpen, stepIndex, storeProjectOpen, treeMove, waitingIn } from "./tree";
+import { agentsOf, inboxOf, runRouteIn, projectOpen, readProjectOpen, stepIndex, storeProjectOpen, treeMove, waitingIn } from "./tree";
 
 const memory = () => {
   const data = new Map<string, string>();
@@ -53,6 +53,28 @@ describe("waitingIn", () => {
     expect(waitingIn(s, { id: "pa" })).toBe(1);
     expect(waitingIn(s, { id: "pb" })).toBe(2);
     expect(waitingIn(s, { id: "pc" })).toBe(0);
+  });
+});
+
+describe("inboxOf and agentsOf", () => {
+  const s = {
+    inbox: [{ kind: "question", project: "pa" }, { kind: "blocked", chain: "cb" }],
+    chains: { cb: { chain: { project_id: "pb", name: "cb" }, tickets: [{ id: "t1" }] } },
+    agents: [{ project: "pb", used: 1, limit: 3, runs: [{ card: { id: "t1", key: "B-1", title: "x" }, role: "worker" }, { card: null, role: "planner" }] }],
+  } as never;
+  it("lists the items of one project", () => {
+    expect(inboxOf(s, { id: "pb" }).map((i) => i.kind)).toEqual(["blocked"]);
+    expect(inboxOf(s, { id: "pa" }).map((i) => i.kind)).toEqual(["question"]);
+  });
+  it("reports runs, used and limit of a project; a project without a report runs nothing", () => {
+    expect(agentsOf(s, { id: "pb" })).toMatchObject({ used: 1, limit: 3 });
+    expect(agentsOf(s, { id: "pb" }).runs).toHaveLength(2);
+    expect(agentsOf(s, { id: "pa", max_parallel: 2 })).toEqual({ runs: [], used: 0, limit: 2 });
+  });
+  it("a run's route is its card in its own project, or the assistant", () => {
+    const [card, assistant] = agentsOf(s, { id: "pb" }).runs;
+    expect(runRouteIn(s, { key: "BBB" }, card)).toEqual({ name: "card", project: "BBB", chain: "cb", key: "B-1" });
+    expect(runRouteIn(s, { key: "BBB" }, assistant)).toEqual({ name: "planner", project: "BBB" });
   });
 });
 
