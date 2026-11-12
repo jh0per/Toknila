@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
@@ -43,6 +43,7 @@ try {
   const t = (id) => page.locator(`[data-testid=${id}]`);
   await page.goto(url);
   await t("onboarding").waitFor({ timeout: 10_000 });
+  await shoot(page, "onboarding");
 
   // A repository on develop: the Main branch says so before anything is sent, Details still folded.
   await t("repo-path").fill(develop);
@@ -55,6 +56,7 @@ try {
   await t("repo-path").fill(fresh);
   await expectText(t("error-repo_path"), "does not exist", "the missing folder shows before Add project is pressed");
   await expectText(t("fix-folder"), "Create the folder", "the problem has its button");
+  await shoot(page, "add-project", t("add-project"));
   await t("fix-folder").click();
   await expectText(t("error-repo_path"), "is not a git repository", "the next problem appears");
   if (!existsSync(fresh)) throw new Error("the folder was not made");

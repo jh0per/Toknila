@@ -69,6 +69,45 @@ try {
     console.log(`PASS ${what}`);
   };
 
+  // A sentinel no step expects: a copy that has not happened yet cannot pass on the previous text.
+  const STALE = "stale-clipboard-sentinel";
+  const clearClip = (page) => page.evaluate((s) => navigator.clipboard.writeText(s), STALE);
+  const clipNow = async (page, want) => {
+    for (const until = Date.now() + 8000; Date.now() < until; await page.waitForTimeout(100)) {
+      const got = await clip(page);
+      if (got === want || (want instanceof RegExp && want.test(got))) return true;
+    }
+    return false;
+  };
+  // Waits for the row holding `marker` to be drawn, then returns its box (null never escapes).
+  const rowBox = async (term, marker) => {
+    const row = term.getByText(marker).first();
+    await row.waitFor({ state: "visible", timeout: 10_000 });
+    for (const until = Date.now() + 10_000; Date.now() < until; await term.page().waitForTimeout(100)) {
+      const box = await row.boundingBox();
+      if (box) return box;
+    }
+    throw new Error(`the row "${marker}" has no box`);
+  };
+  // The terminal's selection is not in the DOM (the page has no handle on xterm), so what is
+  // asserted is its effect: select the marker's row, clear the clipboard, fire `copy`, and wait for
+  // the clipboard to hold exactly the marker. A selection or a copy that lagged is made again.
+  const selectAndCopy = async (page, term, marker, copy, what) => {
+    let got;
+    for (const until = Date.now() + 20_000; Date.now() < until; ) {
+      const box = await rowBox(term, marker);
+      await page.mouse.click(box.x + 5, box.y + box.height / 2, { clickCount: 3 });
+      await clearClip(page);
+      await copy();
+      if (await clipNow(page, marker)) {
+        console.log(`PASS ${what}`);
+        return;
+      }
+      got = await clip(page);
+    }
+    throw new Error(`${what}: expected the clipboard to hold ${marker}, got ${JSON.stringify(got).slice(0, 200)}`);
+  };
+
   const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"], viewport: { width: 1280, height: 720 } });
   const page = await open(context);
   const { expectText } = checks(page);
@@ -82,40 +121,48 @@ try {
 
   // A selection: a triple click on a line (the agent has not turned the mouse on).
   // (the mouse is used at the row's coordinates: xterm's overlay sits over the rows)
-  const selectAlpha = async () => {
-    const box = await term.getByText("marker alpha").first().boundingBox();
-    await page.mouse.click(box.x + 5, box.y + box.height / 2, { clickCount: 3 });
-  };
-  await selectAlpha();
-  await page.locator("[data-testid=term-copy]").click();
-  await expectClip(page, "marker alpha", "Copy copies the selection");
+  const copyButton = () => page.locator("[data-testid=term-copy]").click();
+  await selectAndCopy(page, term, "marker alpha", copyButton, "Copy copies the selection");
 
-  // It survives the window getting shorter and taller again.
+  // It survives the window getting shorter and taller again (no new selection is made).
   await page.setViewportSize({ width: 1280, height: 600 });
-  await page.waitForTimeout(500);
-  await page.locator("[data-testid=term-copy]").click();
-  await expectClip(page, "marker alpha", "the selection survives a resize");
+  await page.waitForFunction(() => window.innerHeight === 600);
+  const hostHeight = await term.evaluate((el) => el.getBoundingClientRect().height);
+  await page.waitForFunction(
+    ([sel, h]) => document.querySelector(sel).getBoundingClientRect().height < h,
+    ["[data-testid=term-host]", hostHeight + 1],
+  );
+  let survived = false;
+  for (const until = Date.now() + 10_000; !survived && Date.now() < until; ) {
+    await clearClip(page);
+    await copyButton();
+    survived = await clipNow(page, "marker alpha");
+  }
+  if (!survived) throw new Error(`the selection survives a resize: expected the clipboard to hold marker alpha, got ${JSON.stringify(await clip(page))}`);
+  console.log("PASS the selection survives a resize");
   await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForFunction(() => window.innerHeight === 720);
   await page.waitForTimeout(500); // the terminal refits before its rows are measured again
 
   // The copy key copies the selection: Cmd+C on a Mac, Ctrl+Shift+C elsewhere.
-  await page.evaluate(() => navigator.clipboard.writeText("before"));
   const mac = await page.evaluate(() => /mac/i.test(navigator.platform));
-  await selectAlpha();
-  await page.keyboard.press(mac ? "Meta+c" : "Control+Shift+c");
-  await expectClip(page, "marker alpha", "the copy key copies the selection");
+  await selectAndCopy(page, term, "marker alpha", () => page.keyboard.press(mac ? "Meta+c" : "Control+Shift+c"), "the copy key copies the selection");
 
   // Without a selection Copy takes the visible screen: the last lines, not the scrolled-out ones.
-  await term.click();
-  await page.evaluate(() => navigator.clipboard.writeText("before"));
-  await page.evaluate(() => document.getSelection()?.removeAllRanges());
-  await page.locator("[data-testid=term-copy]").click();
+  // A click drops the selection; if it lagged, the copy takes the old selection and is made again.
+  for (const until = Date.now() + 20_000; Date.now() < until; ) {
+    await term.click();
+    await clearClip(page);
+    await page.locator("[data-testid=term-copy]").click();
+    if (await clipNow(page, /marker omega$/)) break;
+  }
   await expectClip(page, /marker omega$/, "Copy without a selection copies the visible screen");
   const screen = await clip(page);
   if (screen.includes("scroll line 1\n")) throw new Error("the visible screen holds scrolled-out lines");
   console.log("PASS the visible screen leaves the scrollback out");
 
   // Copy all takes the scrollback too.
+  await clearClip(page);
   await page.locator("[data-testid=term-copy-more]").click();
   await page.locator("[data-testid=term-copy-all]").click();
   await expectClip(page, /^scroll line 1\n[\s\S]*scroll line 80\nmarker alpha\n+marker omega$/, "Copy all copies the whole scrollback");

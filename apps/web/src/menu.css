@@ -1,11 +1,11 @@
 /* The right-click menus: groups with separators, a title when the menu is about one thing, the
    shortcut of an entry at its right. At most one entry is red, and it is last. */
-.ctx-menu { position: fixed; z-index: 30; min-width: 220px; display: flex; flex-direction: column; padding: var(--sp1); background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); box-shadow: var(--e2); }
+.ctx-menu { position: fixed; z-index: 30; min-width: var(--w-menu); display: flex; flex-direction: column; padding: var(--sp1); background: var(--surface-container); border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); box-shadow: var(--e2); }
 .ctx-title { padding: var(--sp1) var(--sp2); margin-bottom: var(--sp1); border-bottom: 1px solid var(--outline-variant); font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); }
-.ctx-sep { height: 1px; background: var(--outline-variant); margin: var(--sp1) 2px; }
+.ctx-sep { height: 1px; background: var(--outline-variant); margin: var(--sp1) var(--sp-half); }
 .ctx-menu [role^=menuitem] { display: flex; align-items: center; gap: var(--sp3); width: 100%; min-height: var(--row-h); border: 0; background: none; text-align: left; padding: 0 var(--sp3); border-radius: var(--shape-xs); }
 .ctx-menu [role^=menuitem]:hover, .ctx-menu [role^=menuitem]:focus-visible { background: var(--primary-container); outline: none; }
 .ctx-menu [role^=menuitem].danger { color: var(--error); }
 .ctx-label { flex: 1; white-space: nowrap; }
 .ctx-check { width: var(--sp3); flex: none; color: var(--primary); }
-.ctx-menu kbd { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: 3px; padding: 0 var(--sp1); }
+.ctx-menu kbd { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); padding: 0 var(--sp1); }
