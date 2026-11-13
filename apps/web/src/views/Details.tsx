@@ -29,7 +29,7 @@ export function Details({ state, card, dispatch }: { state: State; card: Ticket;
       </div>
       <StatusBlock state={state} card={card} detail={detail} dispatch={dispatch} />
       {card.status === "review" && (
-        <ReviewBlock detail={detail}>
+        <ReviewBlock detail={detail} project={currentProject(state)?.key}>
           <ActionBar key={card.key} card={card} detail={detail} dispatch={dispatch} />
         </ReviewBlock>
       )}

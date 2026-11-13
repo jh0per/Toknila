@@ -13,6 +13,7 @@ use crate::server::{AppState, router};
 use crate::store::Store;
 
 mod agent_tokens;
+mod ask_story;
 mod card_chain;
 mod card_designs;
 mod chain_settings;
@@ -1053,6 +1054,7 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}",
             "/tickets/{ticket}/actions/{action}",
             "/tickets/{ticket}/activity",
+            "/tickets/{ticket}/ask",
             "/tickets/{ticket}/comments",
             "/tickets/{ticket}/designs/{index}/move",
             "/tickets/{ticket}/discussion",

@@ -2,8 +2,8 @@
 // Usage: node e2e/guide.mjs <path to tok binary>   (cargo xtask e2e-web runs it)
 //
 // /guide opens the Guide. The onboarding page (no project), a project's empty state and the
-// sidebar's foot each link to it. The page has the eight sections in order, each with a picture
-// that loaded and a Show me link: off, with a reason, without a project; with one, "Plan with the
+// sidebar's foot each link to it. The page has the nine sections in order, each with a picture
+// that loaded (but Accept or Return, which has none yet) and a Show me link: off, with a reason, without a project; with one, "Plan with the
 // assistant" opens that project's assistant screen. The page asks for nothing but the daemon.
 
 import { execFileSync } from "node:child_process";
@@ -19,7 +19,9 @@ if (!tokBin) {
 }
 const home = mkdtempSync(join(tmpdir(), "toknila-guide-"));
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
-const IDS = ["add-project", "designs", "plan", "start", "inbox", "review", "release", "where"];
+const IDS = ["add-project", "designs", "plan", "start", "inbox", "review", "accept-or-return", "release", "where"];
+/// "Review: Accept or Return" has no picture yet (retaking them is `cargo xtask guide-shots`).
+const PICTURES = IDS.length - 1;
 
 let browser;
 try {
@@ -47,18 +49,18 @@ try {
   await t("guide").waitFor({ timeout: 10_000 });
   const ids = await t("guide-section").evaluateAll((s) => s.map((x) => x.dataset.section));
   if (JSON.stringify(ids) !== JSON.stringify(IDS)) throw new Error(`the sections are ${ids}`);
-  console.log("PASS the Guide has the eight sections in order");
+  console.log("PASS the Guide has the nine sections in order");
   for (const id of IDS) {
     const link = t(`guide-show-${id}`);
     if ((await link.getAttribute("aria-disabled")) !== "true") throw new Error(`Show me of ${id} is not off without a project`);
     await expectText(t(`guide-show-${id}-why`), "Add a project first", `Show me of ${id} says why it is off`);
   }
   const loaded = await page.waitForFunction(
-    () => [...document.querySelectorAll("[data-testid^=guide-picture-]")].filter((i) => i.complete && i.naturalWidth > 0).length === 8,
-    null, { timeout: 10_000 },
+    (n) => [...document.querySelectorAll("[data-testid^=guide-picture-]")].filter((i) => i.complete && i.naturalWidth > 0).length === n,
+    PICTURES, { timeout: 10_000 },
   ).then(() => true, () => false);
   if (!loaded) throw new Error("not every section has a picture that loaded");
-  console.log("PASS every section has a picture that loaded");
+  console.log("PASS every section with a picture has one that loaded");
   await expectText(t("guide-toc"), "Release a finished epic", "the table of sections lists the last section");
 
   // A project: Show me opens its places; the empty state and the sidebar's foot link here.

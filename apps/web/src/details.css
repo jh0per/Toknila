@@ -17,6 +17,13 @@
 .hand-in .status { font-weight: var(--fw-semibold); font-family: var(--mono); font-size: var(--fs-body-m); }
 .hand-in li[data-status="FAIL"] .status, .hand-in li[data-status="BLOCKED"] .status { color: var(--error); }
 .review-block .actions { padding-top: var(--sp1); }
+.needs-you h5 { margin: 0 0 var(--sp1); font-size: var(--fs-title-m); line-height: var(--lh-title-m); font-weight: var(--fw-semibold); color: var(--on-surface); }
+.needs-you ul { margin: 0; padding-left: var(--sp4); }
+.needs-you p { margin: 0; }
+.review-hint { display: flex; flex-wrap: wrap; gap: var(--sp2); align-items: center; padding: var(--sp2) var(--sp3); border-radius: var(--shape-m); background: var(--surface-container-high); }
+.review-hint p { margin: 0; flex: 1 1 16rem; }
+.review-lines { list-style: none; margin: 0; padding: 0; }
+.ask-instead { background: none; border: 0; padding: 0; font: inherit; color: var(--primary); text-decoration: underline; cursor: pointer; }
 .technical dl { margin: 0; }
 .details .facts code { overflow-wrap: anywhere; }
 

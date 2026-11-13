@@ -125,7 +125,12 @@ pub async fn start_planner(
 pub async fn stop_planner(
     State(state): State<AppState>,
     Path(project): Path<String>,
+    // The request carries `{}`, which the route ignores but must still read: answering before
+    // the body arrives makes hyper close the connection, and the late bytes then reset it (macOS
+    // reports that to the client as `os error 22`).
+    request: axum::extract::Request,
 ) -> ApiResult<Json<PlannerState>> {
+    let _ = axum::body::to_bytes(request.into_body(), 4096).await;
     let p = project_of(&state, project).await?;
     // Ending the process tree waits for a grace period; not on an async worker.
     let (runners, target) = (state.runners.clone(), p.clone());

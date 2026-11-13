@@ -97,6 +97,22 @@ pub struct ActionInput {
     pub text: Option<String>,
 }
 
+/// `POST /v1/tickets/{ticket}/ask`: a question about the story for the project's assistant.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AskStory {
+    pub text: String,
+}
+
+/// The answer to `POST /v1/tickets/{ticket}/ask`: the question as kept in the story's chat, and
+/// the line to type into the assistant's terminal (the question with the story's record).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AskReply {
+    pub comment: Comment,
+    pub line: String,
+}
+
 /// `POST /v1/tickets/{ticket}/subtasks`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
