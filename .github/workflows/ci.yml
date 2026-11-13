@@ -26,8 +26,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    # A hung test must fail the job, not hold a runner for six hours.
-    timeout-minutes: 30
+    # A hung test must fail the job, not hold a runner for six hours. A slow Windows runner has
+    # taken 12 min for verify, 10 for e2e-web and 6+ for the release build (2026-11-13), so the
+    # limit leaves room above that; every wait inside the tests has its own deadline.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
