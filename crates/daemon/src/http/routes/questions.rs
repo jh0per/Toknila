@@ -12,19 +12,18 @@ use axum::response::{IntoResponse, Response};
 use toknila_api_types::{
     AnswerOutcome, NewAnswer, PermissionAsk, PermissionDecision, PermissionReply,
 };
-use toknila_app::{AppError, Reader, agent, projects, questions, resolve, runs};
-use toknila_core::agent::AgentEvent;
+use toknila_app::{AppError, Reader, projects, questions, resolve, runs};
 use toknila_core::command_policy::allow_always_for;
 use toknila_core::question::{self, AnswerKind, Decision, Delivery, QuestionKind};
 use toknila_core::{
-    Actor, AgentRole, StatusReason, Ticket, TicketId, TicketStatus, Timestamp, WaitingReason, hook,
+    Actor, AgentRole, StatusReason, Ticket, TicketId, Timestamp, WaitingReason, hook,
 };
 
 use super::ApiResult;
+use super::raise::{ask_person, forget};
 use crate::http::error::ErrorBody;
 use crate::runner::Runners;
 use crate::server::{AppState, Principal, now};
-use crate::store::WriteTx;
 
 /// The question the run of `role` has open for a person, if any.
 fn open_question(
@@ -74,6 +73,9 @@ pub async fn runner_answer(
     let role = body.role.unwrap_or(AgentRole::Worker);
     let at = now();
     let runners = state.runners.clone();
+    // A pressed choice is answered with its own text, whatever else the question turns out to be.
+    let mut body = body;
+    body.text = questions::answer_text(&t, body.choice, body.text.take())?;
     // A paused agent has no dialog or terminal: the answer starts it again.
     if role == AgentRole::Worker && t.agent_paused.is_some() {
         let (answer, text, card) = (body.answer, body.text.clone(), t.clone());
@@ -92,6 +94,16 @@ pub async fn runner_answer(
     };
     if !kind.accepts(body.answer) {
         return Err(AppError::from(question::AnswerError::NotOffered(body.answer)).into());
+    }
+    if kind == QuestionKind::Question {
+        let (text, card) = (body.text.clone(), t.clone());
+        state
+            .store
+            .write(Actor::Human, at, move |tx| {
+                questions::answer_question(tx, &card, text.as_deref())
+            })
+            .await?;
+        return Ok(StatusCode::NO_CONTENT.into_response());
     }
     // "Allow always": the Bash call the dialog is about, taken before the answer clears it.
     let remember = (body.always && body.answer == AnswerKind::Allow && role == AgentRole::Worker)
@@ -347,47 +359,6 @@ pub(super) async fn raise(
         .write(Actor::Agent, at, move |tx| -> ApiResult<()> {
             let t = resolve::ticket(&*tx, &t.key.to_string())?;
             ask_person(tx, &t, role, text, detail)
-        })
-        .await?;
-    Ok(())
-}
-
-/// The permission dialog of `role`'s agent, inside a command: a worker's card that is running
-/// goes to Waiting with the question; a reviewer's dialog is only journaled.
-pub(super) fn ask_person(
-    tx: &mut WriteTx<'_>,
-    t: &Ticket,
-    role: AgentRole,
-    text: String,
-    detail: Option<String>,
-) -> ApiResult<()> {
-    if role == AgentRole::Worker {
-        if t.status == TicketStatus::Running {
-            let event = AgentEvent::AskHuman {
-                text,
-                permission: true,
-                detail,
-            };
-            agent::ticket_event(tx, t, event)?;
-        }
-    } else {
-        questions::raised(tx, t, role, QuestionKind::Permission, None)?;
-    }
-    Ok(())
-}
-
-/// A question went away without an answer: journal it for the role.
-pub(super) async fn forget(
-    state: &AppState,
-    t: Ticket,
-    role: AgentRole,
-    at: Timestamp,
-) -> ApiResult<()> {
-    state
-        .store
-        .write(Actor::System, at, move |tx| -> ApiResult<()> {
-            let t = resolve::ticket(&*tx, &t.key.to_string())?;
-            Ok(questions::cleared(tx, &t, role)?)
         })
         .await?;
     Ok(())

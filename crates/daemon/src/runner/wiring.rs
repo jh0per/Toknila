@@ -21,8 +21,7 @@ const SERVER: &str = "toknila";
 
 /// What one run needs wired.
 pub(super) struct Context<'a> {
-    /// `runs/<ticket id>`: the folder of the ticket's runs; generated files go in a folder of the
-    /// role under it.
+    /// `runs/<ticket id>`: the ticket's runs; generated files go in a folder of the role under it.
     pub dir: &'a Path,
     pub key: &'a TicketKey,
     pub role: AgentRole,
@@ -195,6 +194,7 @@ fn brief_of_key<'a>(
         title: &cx.brief.title,
         prompt: &cx.brief.prompt,
         acceptance: &cx.brief.acceptance,
+        checklist: &cx.brief.checklist,
         check_command: cx.brief.check_command.as_deref(),
         setup_command: cx.brief.setup_command.as_deref(),
         earlier: &cx.brief.earlier,

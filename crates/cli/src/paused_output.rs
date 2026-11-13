@@ -47,6 +47,7 @@ mod tests {
         t.status_reason = Some(toknila_core::StatusReason::Waiting(
             toknila_core::WaitingReason::Question {
                 text: "which db?".to_owned(),
+                choices: Vec::new(),
             },
         ));
         t.agent_paused = Some(PausedAgent {

@@ -327,6 +327,7 @@ fn gate_chain_with_manual_release() {
     // A asks, gets an answer, finishes, is returned, finishes again, is accepted.
     let q = WaitingReason::Question {
         text: "який фреймворк?".to_owned(),
+        choices: Vec::new(),
     };
     event(&mut v, a, TicketEvent::AskHuman { reason: q });
     let s = v.summary(Timestamp(4_000));

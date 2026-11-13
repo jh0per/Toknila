@@ -139,6 +139,7 @@ fn a_nudge_handed_over_after_a_question_does_not_clear_it() {
         text: "which db?".to_owned(),
         permission: false,
         detail: None,
+        choices: Vec::new(),
     };
     crate::agent::ticket_event(&mut mem, &t, event).expect("ask_human");
     let t = a(&mem);
@@ -146,6 +147,7 @@ fn a_nudge_handed_over_after_a_question_does_not_clear_it() {
     assert_eq!(claimed.count, 1, "the nudge is handed over");
     let want = WaitingReason::Question {
         text: "which db?".to_owned(),
+        choices: Vec::new(),
     };
     let t = a(&mem);
     assert_eq!(

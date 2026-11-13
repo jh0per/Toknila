@@ -10,6 +10,7 @@
 //! - [`typed`] and [`for_hook`]: the text of that delivery.
 //! - [`terminal`]: the bounds of a terminal size.
 
+mod checklist;
 mod designs;
 mod gate;
 mod planner;
@@ -27,6 +28,7 @@ mod tests_record;
 mod tests_return;
 mod waiting;
 
+pub use checklist::BriefTask;
 pub use designs::BriefDesign;
 use designs::{design_section, designs_section};
 pub use planner::{Epic, ProjectFacts, generate_planner};
@@ -86,6 +88,9 @@ pub struct RunBrief<'a> {
     pub threads: &'a [BriefThread],
     /// The whole hand-in report under review (a reviewer only).
     pub hand_in: Option<&'a str>,
+    /// The story's checklist, with positions and done state (a worker's file lists it so that
+    /// `subtask_done` names a position it has read).
+    pub checklist: &'a [BriefTask],
 }
 
 /// The section that carries the discussion of the card with the assistant; empty when there is
@@ -264,6 +269,7 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
+    out.push_str(&checklist::section(brief));
     out.push_str(&epic_section(brief));
     out.push_str(&designs_section(brief));
     out.push_str(&design_section(brief));

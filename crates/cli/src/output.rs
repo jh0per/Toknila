@@ -390,6 +390,7 @@ mod tests {
     fn reasons() {
         let waiting = StatusReason::Waiting(WaitingReason::Question {
             text: "?".to_owned(),
+            choices: Vec::new(),
         });
         assert_eq!(reason(Some(&waiting)), "question: ?");
         let blocked = StatusReason::Blocked {

@@ -402,7 +402,10 @@ mod tests {
     #[test]
     fn every_sign_against_every_waiting_reason() {
         use Reaction::{Overtake, Resume, Stay};
-        let question = WaitingReason::Question { text: "q".into() };
+        let question = WaitingReason::Question {
+            text: "q".into(),
+            choices: Vec::new(),
+        };
         let permission = WaitingReason::Permission {
             text: "p".into(),
             detail: None,

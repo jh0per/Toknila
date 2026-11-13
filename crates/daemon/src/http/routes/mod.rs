@@ -14,6 +14,7 @@ pub mod plans;
 pub mod profiles;
 pub mod projects;
 pub mod questions;
+mod raise;
 pub mod releases;
 pub mod runner;
 pub mod strays;

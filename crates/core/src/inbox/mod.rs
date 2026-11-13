@@ -102,6 +102,10 @@ pub struct InboxItem {
     /// `ask_human` question, which a comment answers).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub answers: Vec<AnswerKind>,
+    /// The things the person can do about an `ask_human` question, the recommended one first
+    /// (`question` items; empty when the agent offered none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<String>,
     /// The last lines of the agent's screen, ANSI removed (`question` items of an agent that
     /// waits on its screen).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -233,6 +237,7 @@ fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxIte
         allowed_actions: TicketAction::allowed(t),
         role: None,
         answers: Vec::new(),
+        choices: Vec::new(),
         lines: Vec::new(),
         pin: None,
         allow_always: None,
@@ -249,7 +254,7 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
         (
             TicketStatus::Waiting,
             Some(StatusReason::Waiting(
-                WaitingReason::Question { text } | WaitingReason::Permission { text, .. },
+                WaitingReason::Question { text, .. } | WaitingReason::Permission { text, .. },
             )),
         ) => (InboxKind::Question, text.clone()),
         (TicketStatus::Blocked, reason) => (
@@ -309,6 +314,11 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
         {
             i.detail.clone_from(detail);
             set_allow_always(&mut i);
+        }
+        if let Some(StatusReason::Waiting(WaitingReason::Question { choices, .. })) =
+            &t.status_reason
+        {
+            i.choices.clone_from(choices);
         }
     }
     Some(i)

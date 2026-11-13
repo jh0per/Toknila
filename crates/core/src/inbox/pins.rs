@@ -51,6 +51,7 @@ fn cardless(p: &DesignPin) -> InboxItem {
         allowed_actions: Vec::new(),
         role: None,
         answers: Vec::new(),
+        choices: Vec::new(),
         lines: Vec::new(),
         pin: None,
         allow_always: None,

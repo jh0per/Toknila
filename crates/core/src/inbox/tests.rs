@@ -98,6 +98,7 @@ fn a_question_carries_its_text_and_a_permission_prompt_counts_too() {
         ticket(1, TicketStatus::Running, 5),
         WaitingReason::Question {
             text: "which framework?".to_owned(),
+            choices: Vec::new(),
         },
     );
     let p = waiting(

@@ -48,6 +48,10 @@ pub struct NewAnswer {
     /// The text of a `text` answer; the optional comment of a `deny`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
+    /// The 0-based index of the choice the person pressed, for an `ask_human` question that
+    /// offered choices; the agent is told the choice's text. Use with `answer: text`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub choice: Option<u32>,
     /// With `allow` on a worker's Bash prompt: also remember a rule for the command in the
     /// project ("Allow always"), so later runs and prompts of running agents it covers are allowed
     /// without asking. Ignored for any other answer or tool.

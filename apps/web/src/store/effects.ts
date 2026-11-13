@@ -52,7 +52,7 @@ function cardRequest(e: CardCommand): [string, unknown] {
     case "ticketAction": return [`/tickets/${ticket}/actions/${e.action}`, { text: e.text }];
     case "leftovers": return [`/tickets/${ticket}/leftovers/${e.action}`, {}];
     case "addComment": return [`/tickets/${ticket}/comments`, { kind: e.kind, text: e.text }];
-    case "answer": return [`/tickets/${ticket}/runner/answer`, { role: e.role, answer: e.answer, text: e.text, always: e.always }];
+    case "answer": return [`/tickets/${ticket}/runner/answer`, { role: e.role, answer: e.answer, text: e.text, choice: e.choice, always: e.always }];
   }
 }
 
@@ -172,7 +172,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
           .catch(failed);
         return;
       case "answer":
-        void post<{ note?: string } | undefined>(`/tickets/${encodeURIComponent(e.key)}/runner/answer`, { role: e.role, answer: e.answer, text: e.text, always: e.always })
+        void post<{ note?: string } | undefined>(`/tickets/${encodeURIComponent(e.key)}/runner/answer`, { role: e.role, answer: e.answer, text: e.text, choice: e.choice, always: e.always })
           .then((outcome) => {
             if (outcome?.note) dispatch({ type: "answerNoted", note: outcome.note });
             return loadInbox();
