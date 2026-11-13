@@ -38,6 +38,7 @@ fn project() -> Project {
         allowed_commands: Vec::new(),
         reviewer_web_domains: Vec::new(),
         archived: false,
+        hidden: false,
         simulated: false,
     }
 }
@@ -232,6 +233,28 @@ async fn the_out_of_order_mark_is_stored_and_old_rows_have_none() {
         .await
         .expect("read");
     assert_eq!(back, (Some(plain), Some(marked)));
+}
+
+#[tokio::test]
+async fn a_project_written_hidden_reads_back_hidden_and_updates_save_it() {
+    let (_dir, store) = open_temp();
+    let mut p = project();
+    p.hidden = true;
+    let (w, id) = (p.clone(), p.id);
+    store
+        .write(Actor::Human, NOW, move |tx| tx.repo().insert_project(&w))
+        .await
+        .expect("insert");
+    let back = store.read(move |repo| repo.project(id)).await;
+    assert_eq!(back.expect("read"), Some(p.clone()));
+    p.hidden = false;
+    let w = p.clone();
+    store
+        .write(Actor::Human, NOW, move |tx| tx.repo().update_project(&w))
+        .await
+        .expect("update");
+    let back = store.read(move |repo| repo.project(id)).await;
+    assert_eq!(back.expect("read"), Some(p));
 }
 
 #[tokio::test]

@@ -622,6 +622,11 @@ I/O.
   (hidden from the sidebar, data kept). Refused (409) while any agent of the project works:
   `toknila_app::projects::ensure_idle` asks the schedule (`plan_of(..).used > 0`, cards Running or
   Waiting and live runners), the same check deletion uses.
+- **Hiding.** `POST /v1/projects/{p}/hide` and `.../unhide` set `Project::hidden` (left out of
+  the sidebar's list; `toknila_app::projects::set_hidden`). Never refused, also while agents work,
+  because nothing but the list changes: scheduling, autostart, recovery, the inbox and releases
+  treat a hidden project like any other. Unlike archiving it does not call `ensure_idle`, and the
+  two flags are independent.
 - **Deletion.** `POST /v1/projects/{p}/delete` (`{"trash_folder": bool}`, `tok project rm KEY
   [--trash-folder] [--yes]`). One transaction (`toknila_app::removal::delete_project`, the port
   `UnitOfWork::delete_project`, SQL in `daemon/src/store/removal.rs`) deletes the project row

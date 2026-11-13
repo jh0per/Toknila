@@ -205,6 +205,51 @@ async fn archiving_is_refused_while_an_agent_of_the_project_works() {
 }
 
 #[tokio::test]
+async fn a_project_is_hidden_and_unhidden_and_the_list_says_so() {
+    let api = Api::new();
+    manual(&api, 1).await;
+    let p = api.post("/v1/projects/DEMO/hide", json!({})).await;
+    assert_eq!(p["hidden"], true);
+    assert!(p.get("archived").is_none(), "{p}");
+    assert_eq!(api.get("/v1/projects").await[0]["hidden"], true);
+    let again = api.post("/v1/projects/DEMO/hide", json!({})).await;
+    assert_eq!(again, p);
+    let p = api.post("/v1/projects/DEMO/unhide", json!({})).await;
+    assert!(p.get("hidden").is_none(), "{p}");
+    let again = api.post("/v1/projects/DEMO/unhide", json!({})).await;
+    assert_eq!(again, p);
+    assert!(api.get("/v1/projects").await[0].get("hidden").is_none());
+    for route in ["hide", "unhide"] {
+        let (s, e) = api
+            .call(
+                Method::POST,
+                &format!("/v1/projects/NOPE/{route}"),
+                Some(json!({})),
+            )
+            .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{route}: {e}");
+    }
+}
+
+#[tokio::test]
+async fn hiding_is_accepted_while_an_agent_of_the_project_works_and_changes_nothing_else() {
+    let api = Api::new();
+    manual(&api, 1).await;
+    api.post("/v1/tickets/DEMO-1/actions/start", json!({}))
+        .await;
+    let status = api.get("/v1/tickets/DEMO-1").await["ticket"]["status"].clone();
+    assert_eq!(status, "running");
+    let inbox = api.get("/v1/projects/DEMO/inbox").await;
+    let p = api.post("/v1/projects/DEMO/hide", json!({})).await;
+    assert_eq!(p["hidden"], true);
+    assert_eq!(
+        api.get("/v1/tickets/DEMO-1").await["ticket"]["status"],
+        status
+    );
+    assert_eq!(api.get("/v1/projects/DEMO/inbox").await, inbox);
+}
+
+#[tokio::test]
 async fn the_folder_check_suggests_a_key_and_a_name() {
     let api = Api::new();
     let dir = tempfile::tempdir().expect("tempdir");
