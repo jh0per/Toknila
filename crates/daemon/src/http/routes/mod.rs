@@ -137,7 +137,30 @@ fn load_ticket_detail(
             .is_some_and(|p| p.runs_simulated(&t)),
         None => false,
     };
+    let comments = repo.comments(t.id)?;
+    let waiting_for_agent = comments.iter().any(|c| {
+        c.kind == toknila_core::CommentKind::Instruction
+            && c.author == Actor::Human
+            && c.delivered_at.is_none()
+    });
+    let mut pending = None;
+    if waiting_for_agent
+        && !simulated
+        && let Some(c) = repo.chain(t.chain_id)?
+        && let Some(project) = repo.project(c.project_id)?
+    {
+        let plan = schedule::plan_of(repo, &project)?;
+        let alive = repo.live_runners()?.iter().any(|(id, _)| *id == t.id);
+        pending =
+            toknila_core::instructions::pending_reason(&t, plan.position(t.id).is_some(), alive)
+                .map(|reason| toknila_core::instructions::PendingView {
+                    reason,
+                    busy: plan.used,
+                    slots: plan.limit,
+                });
+    }
     Ok(TicketDetail {
+        pending,
         simulated,
         design_waiting,
         usage: figures(&rows, prices),
@@ -152,7 +175,7 @@ fn load_ticket_detail(
         can_move: t.status.can_move(),
         can_move_to_chain: toknila_core::card_move::may_leave(&t, ship.is_some()),
         subtasks: repo.subtasks(t.id)?,
-        comments: repo.comments(t.id)?,
+        comments,
         in_status_ms: at.millis_since(t.status_since),
         phase: toknila_core::thread::phase(&threads),
         queue_position: schedule::queue_positions(repo)?.get(&t.id).copied(),

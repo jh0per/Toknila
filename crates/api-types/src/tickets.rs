@@ -39,6 +39,10 @@ pub struct TicketDetail {
     pub can_move_to_chain: bool,
     /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
     pub queue_position: Option<u32>,
+    /// What the daemon does with the person's instruction that no agent has received yet;
+    /// absent when none is pending or the card's agent is alive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<toknila_core::instructions::PendingView>,
     /// Tokens the card's agents used and their estimated cost at API list prices; all zero
     /// before any run reported a transcript.
     #[serde(default)]

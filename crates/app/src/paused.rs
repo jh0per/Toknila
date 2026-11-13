@@ -7,7 +7,8 @@
 use toknila_core::machine::TicketEvent;
 use toknila_core::question::AnswerKind;
 use toknila_core::{
-    CommentBody, CommentKind, StatusReason, Ticket, TicketId, TicketStatus, WaitingReason,
+    BlockedReason, CommentBody, CommentKind, StatusReason, Ticket, TicketId, TicketStatus,
+    WaitingReason,
 };
 
 use crate::chain::tell_ticket;
@@ -23,6 +24,18 @@ pub fn pause<U: UnitOfWork + ?Sized>(
     tell_ticket(uow, ticket, TicketEvent::AgentPaused { session })
 }
 
+/// Whether the card is Blocked because its runner was lost twice.
+pub fn lost_blocked(t: &Ticket) -> bool {
+    t.status == TicketStatus::Blocked
+        && matches!(
+            &t.status_reason,
+            Some(StatusReason::Blocked {
+                reason: BlockedReason::RunnerLost { .. },
+                ..
+            })
+        )
+}
+
 /// A person answers a permission the paused agent asked for. Its dialog went with its process, so
 /// the answer is told to the agent as an instruction, which starts it again. `Ok(false)` when the
 /// card's agent is not paused (the live dialog takes the answer).
@@ -35,10 +48,18 @@ pub fn answer_permission<U: UnitOfWork + ?Sized>(
     let Some(t) = uow.ticket(ticket.id)? else {
         return Ok(false);
     };
-    if t.status != TicketStatus::Waiting || t.agent_paused.is_none() {
+    let waiting = match &t.status_reason {
+        Some(StatusReason::Blocked {
+            reason: BlockedReason::RunnerLost { .. },
+            waiting,
+            ..
+        }) => waiting.clone().map(StatusReason::Waiting),
+        other => other.clone(),
+    };
+    if !lost_blocked(&t) && (t.status != TicketStatus::Waiting || t.agent_paused.is_none()) {
         return Ok(false);
     }
-    let asked = match &t.status_reason {
+    let asked = match &waiting {
         Some(StatusReason::Waiting(WaitingReason::Permission { text, detail })) => {
             detail.clone().unwrap_or_else(|| text.clone())
         }

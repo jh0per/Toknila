@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Comment, EventRecord, TicketDetail } from "../api/types";
-import { canTalk, chatItems, whenText } from "./chat";
+import { canTalk, chatItems, composerPlaceholder, pendingText, whenText } from "./chat";
 
 const at = (h: number, m = 0) => new Date(2026, 10, 8, h, m).getTime();
 const comment = (id: string, kind: Comment["kind"], author: Comment["author"], gist: string, when: number, extra: object = {}): Comment =>
@@ -100,6 +100,27 @@ describe("whenText and canTalk", () => {
   it("shows the time today, and the day with it before", () => {
     expect(whenText(at(9, 5), now)).toBe("09:05");
     expect(whenText(new Date(2026, 10, 6, 23, 59).getTime(), now)).toBe("Nov 6, 23:59");
+  });
+  it("says in one sentence what the daemon does with a pending instruction", () => {
+    expect(pendingText({ reason: "starts_agent", busy: 1, slots: 2 })).toBe("Starting the agent; it gets this when it is up.");
+    expect(pendingText({ reason: "waits_for_slot", busy: 2, slots: 2 })).toBe(
+      "2 of 2 agents busy; the agent starts when a slot is free and gets this then.",
+    );
+    expect(pendingText({ reason: "at_start", busy: 0, slots: 2 })).toBe("The story has not started; the agent gets this when it does.");
+    expect(pendingText(undefined)).toBe("The agent gets this when it next stops.");
+  });
+  it("marks an instruction delivered once it has been", () => {
+    const sent = { ...comment("c1", "instruction", "human", "Wait", at(9)), delivered_at: at(9, 1) } as Comment;
+    const [item] = chatItems(detail([sent]), [], false);
+    expect([item.pending, item.delivered]).toEqual([false, true]);
+  });
+  it("words the composer by whether an agent is alive", () => {
+    const paused = { status: "waiting", agent_paused: { resume: false } } as never;
+    const lost = { status: "blocked", status_reason: { status: "blocked", reason: { kind: "runner_lost" } } } as never;
+    expect(composerPlaceholder(paused)).toBe("Answer here; it starts the agent");
+    expect(composerPlaceholder(lost)).toBe("Answer here; it starts the agent");
+    expect(composerPlaceholder({ status: "ready" } as never)).toBe("Leave a note; the agent gets it when the story starts");
+    expect(composerPlaceholder({ status: "running" } as never)).toBe("Tell the agent something; Enter sends");
   });
   it("lets nobody be told anything on a finished card", () => {
     expect(canTalk({ status: "running" })).toBe(true);

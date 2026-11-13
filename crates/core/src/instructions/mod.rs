@@ -13,6 +13,7 @@
 mod checklist;
 mod designs;
 mod gate;
+mod pending;
 mod planner;
 mod protocol;
 mod record;
@@ -31,6 +32,7 @@ mod waiting;
 pub use checklist::BriefTask;
 pub use designs::BriefDesign;
 use designs::{design_section, designs_section};
+pub use pending::{PendingReason, PendingView, pending_reason};
 pub use planner::{Epic, ProjectFacts, generate_planner};
 pub use record::BriefThread;
 pub use waiting::{Returned, Waiting, returned_by, short_commit, waiting};

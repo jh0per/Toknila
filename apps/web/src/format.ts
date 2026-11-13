@@ -47,6 +47,10 @@ export function durationText(ms: number): string {
   return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
 }
 
+/// What a card blocked by a double loss of its runner says (core's `RUNNER_LOST_TEXT`).
+export const RUNNER_LOST_TWICE =
+  "The app restarted twice while the agent worked. Unblock starts it once more; it gets your answer.";
+
 export function reasonText(r: StatusReason | null | undefined): string {
   if (!r) return "";
   switch (r.status) {
@@ -71,7 +75,7 @@ export function reasonText(r: StatusReason | null | undefined): string {
         case "merge_failed": return `merge failed: ${b.detail}`;
         case "ci_failed": return `checks failed: ${b.checks.join(", ")}`;
         case "pr_closed": return "the pull request was closed without merging";
-        case "runner_lost": return b.first && b.second ? "the agent was lost twice within ten minutes; unblock starts it again" : "the app restarted; the agent comes back";
+        case "runner_lost": return b.first && b.second ? RUNNER_LOST_TWICE : "the app restarted; the agent comes back";
         case "ship_failed": return `workspace failed: ${b.detail}`;
         case "setup_failed": return `setup failed: ${b.command}${b.output ? `\n${b.output}` : ""}`;
         case "base_behind": return `main branch ${b.base} is ${b.behind} ${b.behind === 1 ? "commit" : "commits"} behind ${b.upstream}${b.can_fast_forward ? "; fast-forward it and start, " : "; "}start anyway, or unblock to look again`;

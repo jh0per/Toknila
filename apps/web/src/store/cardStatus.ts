@@ -2,7 +2,7 @@
 // the reason, the review turn and the queue place all come from the daemon; this only words them.
 
 import type { Ticket, TicketDetail } from "../api/types";
-import { reasonText } from "../format";
+import { RUNNER_LOST_TWICE, reasonText } from "../format";
 import { checkText } from "./checkPhase";
 
 /// How the sentence is coloured: a person is needed (`needs`), things go on by themselves
@@ -51,6 +51,7 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
         ? { tone: "going", text: "Ready: starts when a slot is free" }
         : { tone: "needs", text: "Ready: start it when you want", next: "This epic does not start stories automatically; press Start." };
     case "running":
+      if (card.agent_paused) return pausedLine(card, pace.queue);
       return designLine(detail) ?? {
         tone: "going",
         text: "An agent is working on it",
@@ -64,6 +65,9 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
         next: waitingText(card),
       };
     case "blocked":
+      if (blockedText(card) === RUNNER_LOST_TWICE) {
+        return { tone: "needs", text: RUNNER_LOST_TWICE, next: can("unblock") ? "Answer in the chat or press Unblock." : undefined };
+      }
       return { tone: "needs", text: `Blocked: ${blockedText(card)}`, next: can("unblock") ? "Fix what it says, then Unblock." : undefined };
     case "review": {
       const turn = detail?.review.awaiting;
@@ -107,6 +111,15 @@ function designLine(detail: TicketDetail | undefined): StatusLine | undefined {
 function pausedLine(card: Ticket, queue: number | undefined): StatusLine {
   const r = card.status_reason;
   const asks = r?.status === "waiting" && r.kind !== "silent" && r.kind !== "screen" ? `: ${r.text}` : "";
+  if (card.agent_paused?.lost) {
+    return card.agent_paused.resume
+      ? { tone: "going", text: "The app restarted; the agent starts when a slot is free", next: "No agent is running now." }
+      : {
+          tone: "needs",
+          text: `The app restarted; the agent starts when you answer${asks}`,
+          next: "Answer below and it starts.",
+        };
+  }
   if (card.agent_paused?.resume) {
     const place = queue === undefined ? "" : queue === 1 ? " (next in line)" : ` (#${queue} in line)`;
     return {

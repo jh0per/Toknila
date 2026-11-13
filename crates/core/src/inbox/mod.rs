@@ -29,9 +29,9 @@ use serde::{Deserialize, Serialize};
 use crate::design::pin::DesignPin;
 use crate::question::{AnswerKind, PendingPermission, QuestionKind, RunFacts};
 use crate::{
-    AgentRole, ChainId, Comment, ProjectId, ReviewNote, ReviewTurn, StatusReason, Subtask, Thread,
-    ThreadMessage, ThreadVersion, Ticket, TicketKey, TicketStatus, Timestamp, WaitingReason,
-    machine::TicketAction, thread,
+    AgentRole, BlockedReason, ChainId, Comment, ProjectId, ReviewNote, ReviewTurn, StatusReason,
+    Subtask, Thread, ThreadMessage, ThreadVersion, Ticket, TicketKey, TicketStatus, Timestamp,
+    WaitingReason, machine::TicketAction, thread,
 };
 
 /// What kind of thing waits on the person; the order is the order clients group them in.
@@ -138,6 +138,9 @@ fn set_allow_always(i: &mut InboxItem) {
         None => {}
     }
 }
+
+/// The text of the `blocked` item for a card whose runner was lost twice.
+pub const RUNNER_LOST_TEXT: &str = "The app restarted twice while the agent worked. Unblock starts it once more; it gets your answer.";
 
 /// The text of the `review` item for a card whose reviewer gave no verdict.
 pub const NO_VERDICT_TEXT: &str = "The reviewer gave no verdict";
@@ -257,6 +260,17 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
                 WaitingReason::Question { text, .. } | WaitingReason::Permission { text, .. },
             )),
         ) => (InboxKind::Question, text.clone()),
+        (
+            TicketStatus::Blocked,
+            Some(StatusReason::Blocked {
+                reason:
+                    BlockedReason::RunnerLost {
+                        first: Some(_),
+                        second: Some(_),
+                    },
+                ..
+            }),
+        ) => (InboxKind::Blocked, RUNNER_LOST_TEXT.to_owned()),
         (TicketStatus::Blocked, reason) => (
             InboxKind::Blocked,
             reason.as_ref().map(ToString::to_string).unwrap_or_default(),

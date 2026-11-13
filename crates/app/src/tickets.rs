@@ -210,10 +210,17 @@ pub fn comment<U: UnitOfWork + ?Sized>(
         .ok_or_else(|| AppError::not_found("chain"))?;
     add_comment(uow, &view, t.id, Actor::Human, kind, body)?;
     // The answer to a card whose agent was paused wants it back: it starts when a slot is free.
-    let paused = kind == CommentKind::Instruction
-        && uow.ticket(t.id)?.is_some_and(|t| t.agent_paused.is_some());
+    let now = uow.ticket(t.id)?;
+    let instruction = kind == CommentKind::Instruction;
+    // A card blocked because its runner was lost twice: the answer unblocks it (which pauses its
+    // agent) and wants it back, so one Send answers and restarts.
+    let lost = instruction && now.as_ref().is_some_and(crate::paused::lost_blocked);
+    let paused = instruction && now.is_some_and(|t| t.agent_paused.is_some());
     with_chain(uow, t.chain_id, |ctx| {
-        if paused {
+        if lost {
+            ctx.ticket_event(t.id, TicketEvent::Unblock)?;
+        }
+        if paused || lost {
             ctx.ticket_event(t.id, TicketEvent::ResumeWanted)?;
         }
         Ok::<_, AppError>(())

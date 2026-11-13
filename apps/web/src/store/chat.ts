@@ -24,6 +24,32 @@ export interface ChatItem {
   more: string[];
   /// An instruction the agent has not received yet.
   pending: boolean;
+  /// An instruction the agent has received.
+  delivered: boolean;
+}
+
+type Pending = NonNullable<TicketDetail["pending"]>;
+
+/// What the daemon does with an instruction no agent has received yet, in one sentence.
+export function pendingText(p: Pending | undefined): string {
+  switch (p?.reason) {
+    case "starts_agent": return "Starting the agent; it gets this when it is up.";
+    case "waits_for_slot": return `${p.busy} of ${p.slots} agents busy; the agent starts when a slot is free and gets this then.`;
+    case "at_start": return "The story has not started; the agent gets this when it does.";
+    default: return "The agent gets this when it next stops.";
+  }
+}
+
+/// The composer's placeholder: an answer starts a card's missing agent; a note waits for a story
+/// that has not started.
+export function composerPlaceholder(card: Pick<Ticket, "status" | "agent_paused" | "status_reason">): string {
+  const r = card.status_reason;
+  const lost = card.status === "blocked" && r?.status === "blocked" && r.reason.kind === "runner_lost";
+  if (card.agent_paused || lost) return "Answer here; it starts the agent";
+  if (card.status === "backlog" || card.status === "ready" || card.status === "proposed") {
+    return "Leave a note; the agent gets it when the story starts";
+  }
+  return "Tell the agent something; Enter sends";
 }
 
 const SIDE: Record<Actor, ChatSide> = { human: "you", agent: "agent", system: "system" };
@@ -39,6 +65,7 @@ function commentItem(c: Comment): ChatItem {
   return {
     key: `c${c.id}`, at: c.created_at, side, who: WHO[side], kind: c.kind, text: b.gist, more,
     pending: c.kind === "instruction" && c.author === "human" && !c.delivered_at,
+    delivered: c.kind === "instruction" && c.author === "human" && Boolean(c.delivered_at),
   };
 }
 
@@ -48,7 +75,7 @@ type Fields = Record<string, any>;
 /// person answers.
 function eventItem(e: EventRecord): ChatItem | undefined {
   const p = (e.payload ?? {}) as Fields;
-  const base = { key: `e${e.seq}`, at: e.at, more: [], pending: false };
+  const base = { key: `e${e.seq}`, at: e.at, more: [], pending: false, delivered: false };
   const agent = (who: string, kind: ChatKind, text: string): ChatItem => ({ ...base, side: "agent", who, kind, text });
   const who = p.role === "reviewer" ? "Reviewer" : "Agent";
   if (e.entity !== "ticket") return undefined;
