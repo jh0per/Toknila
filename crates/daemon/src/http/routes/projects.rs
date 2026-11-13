@@ -135,6 +135,38 @@ pub async fn unarchive_project(
     set_archived(&state, project, false).await
 }
 
+async fn set_hidden(state: &AppState, project: String, hidden: bool) -> ApiResult<Json<Project>> {
+    let (p, _) = state
+        .store
+        .write(Actor::Human, now(), move |tx| -> ApiResult<Project> {
+            Ok(projects::set_hidden(tx, &project, hidden)?)
+        })
+        .await?;
+    Ok(Json(p))
+}
+
+#[utoipa::path(post, path = "/projects/{project}/hide", tag = "projects",
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Project), (status = 404, body = ErrorBody)))]
+/// Leaves the project out of the sidebar's list. It works as before; never refused.
+pub async fn hide_project(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+) -> ApiResult<Json<Project>> {
+    set_hidden(&state, project, true).await
+}
+
+#[utoipa::path(post, path = "/projects/{project}/unhide", tag = "projects",
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Project), (status = 404, body = ErrorBody)))]
+/// Puts a hidden project back in the sidebar's list.
+pub async fn unhide_project(
+    State(state): State<AppState>,
+    Path(project): Path<String>,
+) -> ApiResult<Json<Project>> {
+    set_hidden(&state, project, false).await
+}
+
 #[utoipa::path(post, path = "/projects/{project}/delete", tag = "projects", request_body = DeleteProject,
     params(("project" = String, Path, description = "Project id or key")),
     responses((status = 200, body = ProjectDeletion), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]

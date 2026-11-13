@@ -96,6 +96,7 @@ impl Mem {
             allowed_commands: Vec::new(),
             reviewer_web_domains: Vec::new(),
             archived: false,
+            hidden: false,
             simulated: true,
         };
         let chain = Chain {

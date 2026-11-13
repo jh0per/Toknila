@@ -37,6 +37,18 @@ impl Client {
         self.call("POST", &path, Some(&serde_json::json!({})))
     }
 
+    /// `POST /projects/{project}/hide`: left out of the sidebar's list; the project works as before.
+    pub fn hide_project(&self, project: &str) -> ClientResult<Project> {
+        let path = format!("/projects/{}/hide", enc(project));
+        self.call("POST", &path, Some(&serde_json::json!({})))
+    }
+
+    /// `POST /projects/{project}/unhide`.
+    pub fn unhide_project(&self, project: &str) -> ClientResult<Project> {
+        let path = format!("/projects/{}/unhide", enc(project));
+        self.call("POST", &path, Some(&serde_json::json!({})))
+    }
+
     /// `POST /projects/{project}/delete`: the records go; the answer says what became of the
     /// worktrees, run files and the repository folder.
     pub fn delete_project(

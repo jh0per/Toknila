@@ -83,6 +83,8 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(arrange_chain))
         .routes(routes!(archive_project))
         .routes(routes!(unarchive_project))
+        .routes(routes!(hide_project))
+        .routes(routes!(unhide_project))
         .routes(routes!(delete_project))
         .routes(routes!(list_strays))
         .routes(routes!(clean_strays))
