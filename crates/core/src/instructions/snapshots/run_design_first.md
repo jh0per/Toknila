@@ -37,6 +37,7 @@ Use the tools of the MCP server `toknila`; never change the ticket any other way
   - Give `choices`: two to four short sentences the person can act on, the recommended one first, each a thing the person does or decides ("Hand in now; you check on the phone at review", "Wait; I check on the phone first and tell you"). Never write the options as (a)/(b) prose for the person to retype. The person presses one and you get its text back.
   - No task ids, no checklist positions, no file paths unless the person must open the file.
   - Never ask whether to tick a task: tick what you did with `subtask_done`.
+  - A step the person must do by hand names the screen and the control as the window shows them (read the views, not only the engine), never a gesture the layout does not allow; when unsure, name the screen and let the person find the control.
 - `finished` (`summary`): the work is complete and every acceptance item holds. Not before. Commit your work on this branch first: `finished` with uncommitted changes is wrong, and Toknila merges or pushes only what is committed. After `finished`, stop: do not edit, run or verify anything more; the next thing you do is act on a person's Return or instruction.
 - `crashed` (`detail`): you cannot continue.
 - `propose` (`title`, `prompt`, `acceptance`): work you found that nobody planned. It becomes a story a person approves; do not do it yourself.

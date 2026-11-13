@@ -41,6 +41,9 @@ review\", \"Wait; I check on the phone first and tell you\"). Never write the op
 prose for the person to retype. The person presses one and you get its text back.
   - No task ids, no checklist positions, no file paths unless the person must open the file.
   - Never ask whether to tick a task: tick what you did with `subtask_done`.
+  - A step the person must do by hand names the screen and the control as the window shows \
+them (read the views, not only the engine), never a gesture the layout does not allow; when \
+unsure, name the screen and let the person find the control.
 - `finished` (`summary`): the work is complete and every acceptance item holds. Not before. \
 Commit your work on this branch first: `finished` with uncommitted changes is wrong, and Toknila \
 merges or pushes only what is committed. After `finished`, stop: do not edit, run or verify \

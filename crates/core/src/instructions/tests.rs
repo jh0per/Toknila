@@ -101,6 +101,7 @@ fn the_protocol_tells_the_agent_to_ask_in_the_persons_words_with_choices_as_acti
         "Never write the options as (a)/(b) prose",
         "No task ids, no checklist positions",
         "Never ask whether to tick a task",
+        "names the screen and the control as the window shows them (read the views, not only the engine), never a gesture the layout does not allow; when unsure, name the screen and let the person find the control",
     ] {
         assert!(p.contains(rule), "the protocol lacks: {rule}");
     }
