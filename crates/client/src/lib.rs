@@ -145,16 +145,31 @@ impl Client {
             Some(j) => req.send_json(j.clone()),
             None => req.call(),
         };
+        let what = format!("{method} {path}");
         match resp {
-            Ok(r) => {
-                body::text(r).map_err(|e| (ClientError::Decode(e.to_string()), body::lost(&e)))
+            Ok(r) => body::text(r).map_err(|e| {
+                let lost = body::lost(&e);
+                (operation_failed(&what, "read the answer's body", &e), lost)
+            }),
+            Err(ureq::Error::Transport(t)) => {
+                use ureq::ErrorKind::{ConnectionFailed, Dns};
+                let op = match t.kind() {
+                    Dns => "resolve the daemon's address",
+                    ConnectionFailed => "connect",
+                    _ => "send the request or read the answer's headers",
+                };
+                let lost = body::lost(&t);
+                Err((operation_failed(&what, op, &t), lost))
             }
-            Err(e) => {
-                let lost = matches!(&e, ureq::Error::Transport(t) if body::lost(t));
-                Err((transport_error(e), lost))
-            }
+            Err(e) => Err((transport_error(e), false)),
         }
     }
+}
+
+/// An OS-level failure of one step of a call, with the step and the call named: an `os error`
+/// alone says nothing about which socket operation it came from.
+fn operation_failed(what: &str, operation: &str, e: &dyn std::fmt::Display) -> ClientError {
+    ClientError::Transport(format!("{what}: could not {operation}: {e}"))
 }
 
 /// An HTTP agent whose limits are per operation, each set once on the socket. Never use ureq's
@@ -341,6 +356,81 @@ mod tests {
             .expect_err("no planner state in `[]`");
         let accepted = server.join().expect("server");
         assert_eq!(accepted, 1, "a POST is never repeated: {err}");
+    }
+
+    /// A fake daemon: each entry of `plan` is what one connection gets, in order: `true` reads
+    /// the request and closes without a word, `false` reads it and answers a stopped planner.
+    /// A connection that does not come within two seconds ends the server, so a missing retry
+    /// fails an assertion instead of hanging. Returns how many connections it accepted.
+    fn fake_daemon(plan: Vec<bool>) -> (String, std::thread::JoinHandle<usize>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        listener.set_nonblocking(true).expect("nonblocking");
+        let base = format!("http://{}", listener.local_addr().expect("addr"));
+        let server = std::thread::spawn(move || {
+            let mut accepted = 0;
+            for drop_it in plan {
+                let deadline = std::time::Instant::now() + Duration::from_secs(2);
+                let mut s = loop {
+                    match listener.accept() {
+                        Ok((s, _)) => break s,
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            if std::time::Instant::now() > deadline {
+                                return accepted;
+                            }
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                        Err(e) => panic!("accept: {e}"),
+                    }
+                };
+                accepted += 1;
+                s.set_nonblocking(false).expect("blocking");
+                // The whole request, so that the close is a plain FIN and not a reset.
+                s.set_read_timeout(Some(Duration::from_millis(300)))
+                    .expect("timeout");
+                while s.read(&mut [0u8; 4096]).is_ok_and(|n| n > 0) {}
+                if drop_it {
+                    continue;
+                }
+                let body = r#"{"running":false,"run":null,"profile":"fake"}"#;
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = s.write_all(reply.as_bytes());
+            }
+            accepted
+        });
+        (base, server)
+    }
+
+    /// A stop whose connection the daemon closed once is repeated on a new one and answers: the
+    /// stop route is idempotent by design.
+    #[test]
+    fn a_stop_whose_connection_was_dropped_once_is_repeated() {
+        let (base, server) = fake_daemon(vec![true, false]);
+        let got = Client::new(base, "t0k").stop_planner("DEMO");
+        let accepted = server.join().expect("server");
+        let state = got.expect("the second connection answers");
+        assert_eq!((state.running, state.profile.as_str()), (false, "fake"));
+        assert_eq!(accepted, 2);
+    }
+
+    /// A start is not idempotent: a connection dropped once fails it, naming the call and the
+    /// step, and no second connection is opened.
+    #[test]
+    fn a_start_whose_connection_was_dropped_is_not_repeated_and_names_the_step() {
+        let (base, server) = fake_daemon(vec![true, false]);
+        let err = Client::new(base, "t0k")
+            .start_planner("DEMO", None)
+            .expect_err("dropped");
+        let accepted = server.join().expect("server");
+        let text = err.to_string();
+        assert!(
+            text.contains("POST /projects/DEMO/planner/start: could not "),
+            "{text}"
+        );
+        assert_eq!(accepted, 1, "{text}");
     }
 
     #[test]
