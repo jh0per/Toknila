@@ -54,7 +54,13 @@ impl DaemonInfo {
     /// [`DaemonInfo::read`] that treats an incomplete file as "the daemon is starting": it is read
     /// again after each pause of [`READ_PAUSES`] before the error is returned.
     pub fn read_settled(path: &Path) -> std::io::Result<Option<DaemonInfo>> {
-        for pause in READ_PAUSES {
+        Self::read_settled_with(path, READ_PAUSES)
+    }
+
+    /// [`DaemonInfo::read_settled`] with the pauses given, so a test can set the window instead
+    /// of racing a writer thread against the two hundred milliseconds of the real one.
+    fn read_settled_with(path: &Path, pauses: &[Duration]) -> std::io::Result<Option<DaemonInfo>> {
+        for pause in pauses {
             match Self::read(path) {
                 Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
                     std::thread::sleep(*pause);
@@ -130,12 +136,14 @@ mod tests {
         let (p, i) = (path.clone(), info());
         let writer = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(100));
-            i.write(&p).expect("write");
+            i.write(&p)
         });
-        let read = DaemonInfo::read_settled(&path)
-            .expect("settles")
-            .expect("some");
-        writer.join().expect("writer");
+        // The real pauses are 200 ms each; a loaded Windows runner once took longer than that
+        // to schedule the writer, so the test owns the window: two pauses of two seconds,
+        // and the read returns the moment a pause ends with the file complete.
+        let read = DaemonInfo::read_settled_with(&path, &[Duration::from_secs(2); 2]);
+        writer.join().expect("writer thread").expect("write");
+        let read = read.expect("settles").expect("some");
         assert_eq!(read.port, 4100);
     }
 
