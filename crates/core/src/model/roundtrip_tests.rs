@@ -79,6 +79,7 @@ fn project_roundtrips() {
         allowed_commands: Vec::new(),
         reviewer_web_domains: Vec::new(),
         archived: false,
+        hidden: false,
         simulated: false,
     });
 }

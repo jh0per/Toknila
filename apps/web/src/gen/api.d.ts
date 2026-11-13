@@ -895,6 +895,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leaves the project out of the sidebar's list. It works as before; never refused. */
+        post: operations["hide_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/import": {
         parameters: {
             query?: never;
@@ -1166,6 +1183,23 @@ export interface paths {
         put?: never;
         /** Brings an archived project back to the sidebar. */
         post: operations["unarchive_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/unhide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Puts a hidden project back in the sidebar's list. */
+        post: operations["unhide_project"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3585,6 +3619,8 @@ export interface components {
              *     profile (`<worker>-reviewer`).
              */
             default_reviewer?: string | null;
+            /** @description Left out of the sidebar's list; the project works as before. */
+            hidden?: boolean;
             id: components["schemas"]["ProjectId"];
             key: components["schemas"]["ProjectKey"];
             /**
@@ -6969,6 +7005,36 @@ export interface operations {
             };
         };
     };
+    hide_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     import_chain: {
         parameters: {
             query?: never;
@@ -7508,6 +7574,36 @@ export interface operations {
         };
     };
     unarchive_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    unhide_project: {
         parameters: {
             query?: never;
             header?: never;
