@@ -44,6 +44,7 @@ impl From<Refusal> for AppError {
         let kind = match r {
             Refusal::OtherProject { .. }
             | Refusal::AutostartChain { .. }
+            | Refusal::RoadmapStory { .. }
             | Refusal::CardStarted { .. } => ErrorKind::Forbidden,
             Refusal::NoRepository(_) | Refusal::Archived(_) => ErrorKind::Conflict,
         };
