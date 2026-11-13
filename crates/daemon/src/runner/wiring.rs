@@ -21,8 +21,7 @@ const SERVER: &str = "toknila";
 
 /// What one run needs wired.
 pub(super) struct Context<'a> {
-    /// `runs/<ticket id>`: the folder of the ticket's runs; generated files go in a folder of the
-    /// role under it.
+    /// `runs/<ticket id>`: the ticket's runs; generated files go in a folder of the role under it.
     pub dir: &'a Path,
     pub key: &'a TicketKey,
     pub role: AgentRole,
