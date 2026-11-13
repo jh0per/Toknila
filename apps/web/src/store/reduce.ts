@@ -284,6 +284,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     }
     case "nudgeCard":
     case "nudgeChat":
+    case "askStory":
     case "startPlanner":
     case "stopPlanner":
     case "refreshPlanner":

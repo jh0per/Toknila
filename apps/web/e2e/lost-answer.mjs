@@ -104,7 +104,8 @@ try {
   const box = t("chat-input");
   await box.waitFor();
   const placeholder = await box.getAttribute("placeholder");
-  if (placeholder !== "Answer here; it starts the agent") throw new Error(`placeholder: ${placeholder}`);
+  // No agent is live, so Ask is the default (TOKNILA-120); Tell the agent is the button that answers.
+  if (placeholder !== "Ask what to do, or tell the agent for its next run") throw new Error(`placeholder: ${placeholder}`);
   console.log(`PASS the composer says: ${placeholder}`);
 
   // Every sentence the pending line shows, from the moment the answer is sent.
@@ -118,7 +119,7 @@ try {
     }).observe(document.body, { subtree: true, childList: true, characterData: true });
   });
   await box.fill("Recommended");
-  await page.keyboard.press("Enter");
+  await t("chat-send").click();
   await expectText(t("chat-items"), "Recommended", "the answer is a bubble of the person's");
   await t("bubble-delivered").waitFor({ timeout: 20_000 });
   const seen = await page.evaluate(() => window.__pending);

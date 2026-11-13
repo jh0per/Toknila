@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Comment, EventRecord, TicketDetail } from "../api/types";
-import { canTalk, chatItems, composerPlaceholder, pendingText, whenText } from "./chat";
+import { agentLive, canTalk, chatItems, composerPlaceholder, defaultMode, pendingText, whenText } from "./chat";
 
 const at = (h: number, m = 0) => new Date(2026, 10, 8, h, m).getTime();
 const comment = (id: string, kind: Comment["kind"], author: Comment["author"], gist: string, when: number, extra: object = {}): Comment =>
@@ -121,6 +121,39 @@ describe("whenText and canTalk", () => {
     expect(composerPlaceholder(lost)).toBe("Answer here; it starts the agent");
     expect(composerPlaceholder({ status: "ready" } as never)).toBe("Leave a note; the agent gets it when the story starts");
     expect(composerPlaceholder({ status: "running" } as never)).toBe("Tell the agent something; Enter sends");
+  });
+  it("makes Ask the composer's default when no agent is live, and Tell the agent when one is", () => {
+    const card = (status: string, extra: object = {}) => ({ status, ...extra }) as never;
+    const person = { review: { turn: { by: "person" } } };
+    expect(defaultMode(card("review", person))).toBe("ask");
+    expect(defaultMode(card("merged"))).toBe("ask");
+    expect(defaultMode(card("blocked"))).toBe("ask");
+    expect(defaultMode(card("waiting", { agent_paused: { resume: false } }))).toBe("ask");
+    expect(defaultMode(card("ready"))).toBe("ask");
+    expect(defaultMode(card("running"))).toBe("tell");
+    expect(defaultMode(card("waiting"))).toBe("tell");
+    expect(agentLive(card("running", { agent_paused: { resume: false } }))).toBe(false);
+  });
+  it("reads a Review card at the person's turn as an agent that handed in and is gone", () => {
+    const review = { status: "review", review: { turn: { by: "person" } } } as never;
+    expect(composerPlaceholder(review, "ask")).toBe("Ask what to do, or tell the agent for its next run");
+    expect(pendingText(undefined, review)).toBe(
+      "The agent handed in and is gone; it gets this if you Return the story. Ask instead?",
+    );
+    // A running agent keeps the old sentence and offers no link; a stopped one gets the link.
+    expect(pendingText(undefined, { status: "running" } as never)).toBe("The agent gets this when it next stops.");
+    expect(pendingText(undefined, { status: "blocked" } as never)).toBe("The agent gets this when it next stops. Ask instead?");
+  });
+  it("shows a question as the person's and the assistant's answer as its own bubble", () => {
+    const d = detail([
+      comment("c1", "question", "human", "шо треба зробити?", at(9)),
+      comment("c2", "report", "assistant", "Відкрийте на телефоні", at(9, 1)),
+    ]);
+    const items = chatItems(d, [], false);
+    expect(items.map((i) => [i.side, i.who, i.kind, i.text, i.pending])).toEqual([
+      ["you", "You", "ask", "шо треба зробити?", false],
+      ["assistant", "Assistant", "answer", "Відкрийте на телефоні", false],
+    ]);
   });
   it("lets nobody be told anything on a finished card", () => {
     expect(canTalk({ status: "running" })).toBe(true);

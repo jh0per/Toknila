@@ -4546,6 +4546,65 @@
         }
       }
     },
+    "/tickets/{ticket}/ask": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "A person asks the project's assistant a question about the story. The question is kept in the\nstory's chat (a comment that is never an instruction); the answer carries the line to type\ninto the assistant's terminal: the question with the story's record. The assistant answers\nwith `say` about the story; the answer lands in the same chat.",
+        "operationId": "ask_story",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskStory"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskReply"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/comments": {
       "post": {
         "tags": [
@@ -6185,7 +6244,8 @@
         "enum": [
           "human",
           "agent",
-          "system"
+          "system",
+          "assistant"
         ]
       },
       "AgentEvent": {
@@ -6614,6 +6674,35 @@
           "markdown",
           "html"
         ]
+      },
+      "AskReply": {
+        "type": "object",
+        "description": "The answer to `POST /v1/tickets/{ticket}/ask`: the question as kept in the story's chat, and\nthe line to type into the assistant's terminal (the question with the story's record).",
+        "required": [
+          "comment",
+          "line"
+        ],
+        "properties": {
+          "comment": {
+            "$ref": "#/components/schemas/Comment"
+          },
+          "line": {
+            "type": "string"
+          }
+        }
+      },
+      "AskStory": {
+        "type": "object",
+        "description": "`POST /v1/tickets/{ticket}/ask`: a question about the story for the project's assistant.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "Author": {
         "type": "string",
@@ -7734,7 +7823,8 @@
         "enum": [
           "instruction",
           "report",
-          "decision"
+          "decision",
+          "question"
         ]
       },
       "ConversationPage": {

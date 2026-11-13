@@ -47,6 +47,9 @@ export type PlannerIntent =
   | { type: "editPlannerDraft"; where: string; text: string }
   /// Send the project's draft to the assistant: start it if it is not running, then type the text.
   | { type: "askPlanner"; project: string }
+  /// A question asked in a story's chat: kept in the chat by the daemon, then typed to the
+  /// assistant with the story's record. Starts the assistant when it is not running.
+  | { type: "askStory"; project: string; key: string; text: string }
   /// Deliver the card's unanswered message to the planner again (`thread` is the discussion's
   /// number, `text` the message), through the planner's input; nothing is stored twice.
   | { type: "nudgeCard"; project: string; key: string; thread: number; text: string }
@@ -66,7 +69,7 @@ export type PlannerMsg = PlannerIntent | PlannerResult | AskAttachMsg;
 export type PlannerEffect = {
   type: "plannerCall";
   project: string;
-  call: "load" | "start" | "stop" | "ask" | "discuss" | "nudge";
+  call: "load" | "start" | "stop" | "ask" | "discuss" | "askStory" | "nudge";
   /// `nudge`: the discussion's number.
   thread?: number;
   /// The profile a start uses.
@@ -110,6 +113,15 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
         : chip ? { ...base, call: "ask", text: lineFor(chip, raw), raw, about: chip.kind === "chain" || chip.kind === "roadmap" ? chip : undefined }
         : { ...base, call: "ask", text: oneLine(raw), raw };
       return [set({ error: "", sending: msg.project }), [call]];
+    }
+    case "askStory": {
+      const text = msg.text.trim();
+      if (!text) return [s, []];
+      const wait = !(plannerOf(s, msg.project)?.running ?? false);
+      return [
+        set({ error: "" }),
+        [{ type: "plannerCall", project: msg.project, call: "askStory", card: msg.key, text, profile: s.planner.profile, wait }],
+      ];
     }
     case "nudgeCard":
       return [

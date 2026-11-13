@@ -54,7 +54,7 @@ impl Author {
     pub fn of_thread_author(actor: Actor) -> Self {
         match actor {
             Actor::Human => Self::Person,
-            Actor::Agent => Self::Assistant,
+            Actor::Agent | Actor::Assistant => Self::Assistant,
             Actor::System => Self::Toknila,
         }
     }
