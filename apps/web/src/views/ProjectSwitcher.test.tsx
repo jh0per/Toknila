@@ -56,3 +56,54 @@ describe("the project switcher", () => {
     expect(h).toContain('data-testid="switcher-add"');
   });
 });
+
+describe("hidden projects in the switcher", () => {
+  const withHidden = () => {
+    const s = world();
+    return {
+      ...s,
+      projects: [
+        { ...project("ph", "HID", "Hideaway"), hidden: true },
+        ...s.projects,
+        { ...project("pq", "QUI", "Quiet"), hidden: true },
+        { ...project("px", "ARC", "Old archive"), archived: true },
+        { ...project("py", "ARH", "Archived and hidden"), archived: true, hidden: true },
+      ] as Project[],
+      agents: [...(s.agents as never[]), { project: "ph", runs: [{}], used: 1, limit: 2 }] as never,
+      inbox: [...(s.inbox as never[]), { project: "ph" }] as never,
+    };
+  };
+  const at = (h: string, ids: string[]) => ids.map((id) => h.indexOf(`data-testid="${id}"`));
+
+  it("lists the listed projects first, then the hidden ones under a Hidden divider; archived stay out", () => {
+    const h = menu("", withHidden());
+    const order = at(h, [
+      "switcher-all", "switcher-item-BEA", "switcher-item-TOK", "switcher-item-LAB",
+      "switcher-hidden", "switcher-item-HID", "switcher-item-QUI", "switcher-add",
+    ]);
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(h.split('data-testid="switcher-hidden"')[1].split("</div>")[0]).toContain("Hidden");
+    expect(h).not.toContain("switcher-item-ARC");
+    expect(h).not.toContain("switcher-item-ARH");
+  });
+
+  it("shows a hidden project's running dot and waiting count", () => {
+    const row = menu("", withHidden()).split('data-testid="switcher-item-HID"')[1].split("</button>")[0];
+    expect(row).toContain('data-testid="switcher-running"');
+    expect(row).toContain('data-testid="switcher-waiting">1<');
+  });
+
+  it("finds a hidden project by name or key; the divider only shows while one matches", () => {
+    for (const typed of ["hid", "Hideaway"]) {
+      const h = menu(typed, withHidden());
+      expect(h).toContain('data-testid="switcher-item-HID"');
+      expect(h).toContain('data-testid="switcher-hidden"');
+      expect(h).not.toContain('data-testid="switcher-item-BEA"');
+    }
+    const listedOnly = menu("tok", withHidden());
+    expect(listedOnly).toContain('data-testid="switcher-item-TOK"');
+    expect(listedOnly).not.toContain("switcher-hidden");
+    expect(menu("old", withHidden())).not.toContain("switcher-item-ARC");
+  });
+});

@@ -17,6 +17,9 @@
 .switcher [role=menuitem].on { background: var(--primary-container); }
 .switcher-plus { width: var(--sp5); flex: none; text-align: center; color: var(--on-surface-variant); }
 .more-projects .item { color: var(--on-surface-variant); }
+/* The switcher's "Hidden" group: a labelled rule above the hidden projects. */
+.ctx-divider { display: flex; align-items: center; gap: var(--sp2); margin: var(--sp1) var(--sp-half); font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--on-surface-variant); }
+.ctx-divider::before, .ctx-divider::after { content: ""; flex: 1; height: 1px; background: var(--outline-variant); }
 .ctx-label { flex: 1; white-space: nowrap; }
 .ctx-check { width: var(--sp3); flex: none; color: var(--primary); }
 .ctx-menu kbd { font-family: var(--mono); font-size: var(--fs-label-m); color: var(--on-surface-variant); background: var(--surface-container-high); border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); padding: 0 var(--sp1); }

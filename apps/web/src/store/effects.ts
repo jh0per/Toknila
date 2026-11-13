@@ -207,6 +207,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "saveCard":
       case "moveCard":
       case "archiveProject":
+      case "hideProject":
       case "clearHash":
         runPlanEffect(e, dispatch);
         return;

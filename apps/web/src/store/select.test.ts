@@ -3,7 +3,8 @@ import type { ChainDetail, EventRecord, Project } from "../api/types";
 import { reduce } from "./reduce";
 import { parseRoute, routePath } from "./route";
 import {
-  type State, currentCard, currentChain, currentProject, initialState, queuePosition, slotsOf, ticketEvents,
+  type State, activeProjects, currentCard, currentChain, currentProject, hiddenProjects, initialState, listedProjects,
+  queuePosition, slotsOf, ticketEvents,
 } from "./state";
 
 const projects = [
@@ -90,6 +91,34 @@ describe("the chain shown without a pick", () => {
     });
     expect(currentProject(s)?.key).toBe("OTHER");
     expect(currentChain(s)).toBeUndefined();
+  });
+});
+
+describe("listed, hidden and archived projects", () => {
+  const p = (id: string, key: string, flags: { archived?: boolean; hidden?: boolean } = {}) =>
+    ({ id, key, name: key, ...flags }) as Project;
+  const all = [
+    p("h1", "HID", { hidden: true }), p("l1", "LIST"), p("a1", "ARC", { archived: true }),
+    p("b1", "BOTH", { archived: true, hidden: true }), p("l2", "MORE"), p("h2", "QUIET", { hidden: true }),
+  ];
+  const at = (projects: Project[]) => reduce(initialState({ name: "chains" }), { type: "loaded", projects, chains: [] })[0];
+  const keys = (ps: Project[]) => ps.map((x) => x.key);
+
+  it("lists what is neither archived nor hidden, and the hidden ones apart; archived and hidden counts as archived", () => {
+    const s = at(all);
+    expect(keys(listedProjects(s))).toEqual(["LIST", "MORE"]);
+    expect(keys(hiddenProjects(s))).toEqual(["HID", "QUIET"]);
+    // Not archived: what onboarding, the first-run checks and the Settings picker count.
+    expect(keys(activeProjects(s))).toEqual(["HID", "LIST", "MORE", "QUIET"]);
+  });
+
+  it("falls back to the first listed project, though a hidden one comes first", () => {
+    expect(currentProject(at(all))?.key).toBe("LIST");
+  });
+
+  it("falls back to the first hidden project when every project is hidden (or archived)", () => {
+    expect(currentProject(at(all.filter((x) => x.hidden || x.archived)))?.key).toBe("HID");
+    expect(currentProject(at(all.filter((x) => x.archived)))).toBeUndefined();
   });
 });
 

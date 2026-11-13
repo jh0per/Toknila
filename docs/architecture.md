@@ -592,7 +592,11 @@ The web shows what the daemon says and keeps no rule of its own.
   `ticket.moved`. The window offers it as the card menu's "Move to epic…" (`can_move_to_chain`)
   and as a drag onto an epic's row of the sidebar. Archived projects
   (`Project.archived`) leave the sidebar and come back through "Show archived"; archiving is
-  refused while the project's agents work, and the refusal shows inline.
+  refused while the project's agents work, and the refusal shows inline. Hidden projects
+  (`Project.hidden`, right click → "Hide from list") leave only the sidebar's list and its
+  "+ N more" (`listedProjects`; the inbox, onboarding and Settings still count them): they wait
+  under "Show hidden (N)", which sums what waits in them, in the switcher's "Hidden" group, and in
+  the list while one is on the screen.
 - **Plans and deletion from the window** (`store/imports.ts`, `store/removal.ts`,
   `store/importEffects.ts`). The Import dialog (from "No chains yet" and next to New chain in the
   sidebar) takes a path (`import-path`) or pasted TOML (`import`), shows what each import made,

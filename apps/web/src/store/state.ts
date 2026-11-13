@@ -153,14 +153,22 @@ function allChains(s: State): ChainDetail[] {
   return s.chainOrder.map((id) => s.chains[id]).filter((c): c is ChainDetail => !!c);
 }
 
-/// Projects the sidebar lists: every one that is not archived, in the daemon's order.
+/// Projects that are not archived, hidden ones included (onboarding, the first-run checks and the
+/// Settings picker count these), in the daemon's order.
 export const activeProjects = (s: State): Project[] => s.projects.filter((p) => !p.archived);
+
+/// Projects the sidebar lists: neither archived nor hidden, in the daemon's order.
+export const listedProjects = (s: State): Project[] => s.projects.filter((p) => !p.archived && !p.hidden);
+
+/// Hidden projects that are not archived (archived and hidden counts as archived): under "Show
+/// hidden (N)" and in the switcher's Hidden group. They work like any other.
+export const hiddenProjects = (s: State): Project[] => s.projects.filter((p) => !p.archived && p.hidden);
 
 /// Archived projects, listed only when the person asks to see them.
 export const archivedProjects = (s: State): Project[] => s.projects.filter((p) => p.archived);
 
-/// The project in focus: the one in the route, the chain's for the `/chains` paths, else the first one
-/// that is not archived.
+/// The project in focus: the one in the route, the chain's for the `/chains` paths, else the first
+/// listed one, else the first hidden one.
 export function currentProject(s: State): Project | undefined {
   const r = s.route;
   if ("project" in r && r.project) return s.projects.find((p) => p.key === r.project || p.id === r.project);
@@ -168,7 +176,7 @@ export function currentProject(s: State): Project | undefined {
     const c = allChains(s).find((x) => x.chain.name === r.chain);
     return s.projects.find((p) => p.id === c?.chain.project_id);
   }
-  return activeProjects(s)[0];
+  return listedProjects(s)[0] ?? hiddenProjects(s)[0];
 }
 
 /// Slots of the project in focus: agents working now and how many may.
