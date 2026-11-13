@@ -175,6 +175,9 @@ pub struct Project {
     /// Hidden from the sidebar; its data is kept and it can be brought back.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub archived: bool,
+    /// Left out of the sidebar's list; the project works as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden: bool,
     /// Marked for simulation: its cards may run under the `sim` profile, which starts no process.
     /// Only `tok project new --sim` and tests set it; a project without it refuses to start a card
     /// under `sim`.
@@ -376,6 +379,7 @@ mod tests {
             allowed_commands: Vec::new(),
             reviewer_web_domains: Vec::new(),
             archived: false,
+            hidden: false,
             simulated: false,
         };
         let mut t = Ticket::new_backlog(
