@@ -10,6 +10,8 @@ pub enum Actor {
     Human,
     Agent,
     System,
+    /// The project's assistant (the planner), answering a person's question about a story.
+    Assistant,
 }
 
 /// Comment type from the template; decisions later become ADRs.
@@ -20,6 +22,8 @@ pub enum CommentKind {
     Instruction,
     Report,
     Decision,
+    /// A person's question to the assistant about the story; never an instruction, never queued.
+    Question,
 }
 
 /// Template fields of a comment. Empty fields are `None` and are omitted when rendered.

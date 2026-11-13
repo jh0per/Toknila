@@ -46,6 +46,7 @@ export type Subtask = Schemas["Subtask"];
 export type TicketStatus = Schemas["TicketStatus"];
 export type TicketThreads = Schemas["TicketThreads"];
 export type ThreadDetail = Schemas["ThreadDetail"];
+export type AskReply = Schemas["AskReply"];
 export type ThreadVersion = Schemas["ThreadVersion"];
 export type ThreadMessage = Schemas["ThreadMessage"];
 export type OutOfOrder = Schemas["OutOfOrder"];

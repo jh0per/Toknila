@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use toknila_api_types::{ConversationPage, ConversationQuery, NewPersonMessage, Say};
 use toknila_app::{conversation, resolve};
 use toknila_core::Actor;
-use toknila_core::conversation::Message;
+use toknila_core::conversation::{About, Message};
 
 use super::{ApiResult, read};
 use crate::http::error::ErrorBody;
@@ -70,7 +70,13 @@ pub async fn planner_say(
     let (m, _) = state
         .store
         .write(Actor::Agent, now(), move |tx| -> ApiResult<Message> {
-            Ok(conversation::say_as_assistant(tx, project, input)?)
+            let m = conversation::say_as_assistant(tx, project, input)?;
+            // Words about a story also land in the story's own chat, as the assistant's bubble.
+            if let Some(About::Card { key }) = &m.about {
+                let t = resolve::ticket(&*tx, &key.to_string())?;
+                super::asks::record_answer(tx, &t, &m.text)?;
+            }
+            Ok(m)
         })
         .await?;
     Ok((StatusCode::CREATED, Json(m)))

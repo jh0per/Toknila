@@ -13,6 +13,7 @@ use crate::server::{AppState, router};
 use crate::store::Store;
 
 mod agent_tokens;
+mod ask_story;
 mod card_chain;
 mod card_designs;
 mod chain_settings;
@@ -1024,6 +1025,7 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/designs/{design}/file",
             "/projects/{project}/designs/{design}/thumb",
             "/projects/{project}/figma-token",
+            "/projects/{project}/hide",
             "/projects/{project}/import",
             "/projects/{project}/import-path",
             "/projects/{project}/inbox",
@@ -1039,6 +1041,7 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/strays/clean",
             "/projects/{project}/suggestion",
             "/projects/{project}/unarchive",
+            "/projects/{project}/unhide",
             "/releases/{release}/actions/{action}",
             "/releases/{release}/events",
             "/releases/{release}/run",
@@ -1052,6 +1055,7 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}",
             "/tickets/{ticket}/actions/{action}",
             "/tickets/{ticket}/activity",
+            "/tickets/{ticket}/ask",
             "/tickets/{ticket}/comments",
             "/tickets/{ticket}/designs/{index}/move",
             "/tickets/{ticket}/discussion",

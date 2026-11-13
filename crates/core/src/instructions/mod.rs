@@ -10,6 +10,7 @@
 //! - [`typed`] and [`for_hook`]: the text of that delivery.
 //! - [`terminal`]: the bounds of a terminal size.
 
+mod ask;
 mod checklist;
 mod designs;
 mod gate;
@@ -29,6 +30,7 @@ mod tests_record;
 mod tests_return;
 mod waiting;
 
+pub use ask::{COMMENTS_SHOWN, ask_line};
 pub use checklist::BriefTask;
 pub use designs::BriefDesign;
 use designs::{design_section, designs_section};

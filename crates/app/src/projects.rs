@@ -158,6 +158,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
         allowed_commands: Vec::new(),
         reviewer_web_domains: Vec::new(),
         archived: false,
+        hidden: false,
         simulated: draft.simulated.unwrap_or(false),
     };
     uow.insert_project(&p)?;
@@ -297,6 +298,23 @@ pub fn set_archived<U: UnitOfWork + ?Sized>(
         ensure_idle(uow, &p, "archiving")?;
     }
     p.archived = archived;
+    uow.update_project(&p)?;
+    uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;
+    Ok(p)
+}
+
+/// Leaves a project out of the sidebar's list, or puts it back. Nothing else changes and it is
+/// never refused: the project works as before, agents included. Independent of `archived`.
+pub fn set_hidden<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    project: &str,
+    hidden: bool,
+) -> AppResult<Project> {
+    let mut p = resolve::project(uow, project)?;
+    if p.hidden == hidden {
+        return Ok(p);
+    }
+    p.hidden = hidden;
     uow.update_project(&p)?;
     uow.emit(&DomainEvent::ProjectUpdated { project: p.clone() })?;
     Ok(p)

@@ -114,7 +114,7 @@ pub fn transcript(messages: &[ThreadMessage]) -> Vec<String> {
     for m in messages {
         let who = match m.author {
             Actor::Human => "person",
-            Actor::Agent => "assistant",
+            Actor::Agent | Actor::Assistant => "assistant",
             Actor::System => "toknila",
         };
         match m.kind {

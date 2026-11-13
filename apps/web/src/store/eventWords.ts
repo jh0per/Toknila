@@ -125,7 +125,7 @@ const TABLE: Record<string, Words> = {
 export const WORDED: readonly string[] = Object.keys(TABLE);
 
 /// Who did it, as a person would say it.
-export const WHO: Record<Actor, string> = { human: "You", agent: "The agent", system: "Toknila" };
+export const WHO: Record<Actor, string> = { human: "You", agent: "The agent", system: "Toknila", assistant: "The assistant" };
 
 /// One event as a sentence; an event this page has no words for reads "entity kind".
 export function eventWords(e: Pick<EventRecord, "entity" | "kind" | "payload"> & Partial<Pick<EventRecord, "at">>): string {

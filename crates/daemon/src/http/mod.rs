@@ -37,7 +37,7 @@ impl Modify for BearerAuth {
 /// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
-        agents::*, chains::*, conversation::*, designs::*, events::*, inbox::*, pins::*,
+        agents::*, asks::*, chains::*, conversation::*, designs::*, events::*, inbox::*, pins::*,
         planner::*, planner_run::*, plans::*, profiles::*, projects::*, questions::*, releases::*,
         runner::*, strays::*, system::*, threads::*, tickets::*, usage::*,
     };
@@ -83,6 +83,8 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(arrange_chain))
         .routes(routes!(archive_project))
         .routes(routes!(unarchive_project))
+        .routes(routes!(hide_project))
+        .routes(routes!(unhide_project))
         .routes(routes!(delete_project))
         .routes(routes!(list_strays))
         .routes(routes!(clean_strays))
@@ -107,6 +109,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(reject_edit))
         .routes(routes!(get_conversation, post_conversation))
         .routes(routes!(planner_say))
+        .routes(routes!(ask_story))
         .routes(routes!(get_planner))
         .routes(routes!(start_planner))
         .routes(routes!(stop_planner))

@@ -192,14 +192,17 @@ fn ten_start_stop_cycles_of_a_fake_planner_never_fail_a_stop() {
             true,
             "start {cycle}"
         );
+        // `text` fails with the command's stderr, which names the call and the step that failed.
         assert_eq!(
             tok.text(&["planner", "stop", "DEMO"]),
             "planner of DEMO stopped\n",
             "stop {cycle}"
         );
-        wait_for(&tok, "the planner to stop", || {
-            !tok.client().planner("DEMO").expect("state").running
-        });
+        // The stop answered after the process ended: not running at once, no waiting for it.
+        assert!(
+            !tok.client().planner("DEMO").expect("state").running,
+            "planner still running after the stop of cycle {cycle}"
+        );
     }
 }
 

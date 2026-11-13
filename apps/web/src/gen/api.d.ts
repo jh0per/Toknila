@@ -894,6 +894,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leaves the project out of the sidebar's list. It works as before; never refused. */
+        post: operations["hide_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/import": {
         parameters: {
             query?: never;
@@ -1171,6 +1188,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/unhide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Puts a hidden project back in the sidebar's list. */
+        post: operations["unhide_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/releases/{release}/actions/{action}": {
         parameters: {
             query?: never;
@@ -1397,6 +1431,28 @@ export interface paths {
          *     (the worker's card waits, a reviewer's dialog is listed in the inbox).
          */
         post: operations["ticket_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A person asks the project's assistant a question about the story. The question is kept in the
+         *     story's chat (a comment that is never an instruction); the answer carries the line to type
+         *     into the assistant's terminal: the question with the story's record. The assistant answers
+         *     with `say` about the story; the answer lands in the same chat.
+         */
+        post: operations["ask_story"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1882,7 +1938,7 @@ export interface components {
          * @description Who did something: a person, an agent, or the system (graph rules, autostart).
          * @enum {string}
          */
-        Actor: "human" | "agent" | "system";
+        Actor: "human" | "agent" | "system" | "assistant";
         /** @description One report from the agent working on a ticket. */
         AgentEvent: {
             /** @enum {string} */
@@ -2009,6 +2065,18 @@ export interface components {
          * @enum {string}
          */
         ArtifactFormat: "mermaid" | "markdown" | "html";
+        /**
+         * @description The answer to `POST /v1/tickets/{ticket}/ask`: the question as kept in the story's chat, and
+         *     the line to type into the assistant's terminal (the question with the story's record).
+         */
+        AskReply: {
+            comment: components["schemas"]["Comment"];
+            line: string;
+        };
+        /** @description `POST /v1/tickets/{ticket}/ask`: a question about the story for the project's assistant. */
+        AskStory: {
+            text: string;
+        };
         /**
          * @description Who wrote a message.
          * @enum {string}
@@ -2352,7 +2420,7 @@ export interface components {
          * @description Comment type from the template; decisions later become ADRs.
          * @enum {string}
          */
-        CommentKind: "instruction" | "report" | "decision";
+        CommentKind: "instruction" | "report" | "decision" | "question";
         /** @description A page of the conversation, oldest first. */
         ConversationPage: {
             messages: components["schemas"]["Message"][];
@@ -3550,6 +3618,8 @@ export interface components {
              *     profile (`<worker>-reviewer`).
              */
             default_reviewer?: string | null;
+            /** @description Left out of the sidebar's list; the project works as before. */
+            hidden?: boolean;
             id: components["schemas"]["ProjectId"];
             key: components["schemas"]["ProjectKey"];
             /**
@@ -6929,6 +6999,36 @@ export interface operations {
             };
         };
     };
+    hide_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     import_chain: {
         parameters: {
             query?: never;
@@ -7497,6 +7597,36 @@ export interface operations {
             };
         };
     };
+    unhide_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     release_action: {
         parameters: {
             query?: never;
@@ -7903,6 +8033,48 @@ export interface operations {
                 content?: never;
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    ask_story: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskStory"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskReply"];
+                };
+            };
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

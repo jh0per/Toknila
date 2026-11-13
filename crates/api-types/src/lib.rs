@@ -46,7 +46,10 @@ pub use runner::TerminalSize;
 pub use strays::{Strays, StraysCleaned};
 pub use system::{CliLink, Places, RepoCheckRequest, RepoPrepareRequest};
 pub use threads::{ThreadDetail, TicketThreads};
-pub use tickets::{ActionInput, NewSubtask, PatchSubtask, TicketDetail, TicketItem, TicketQuery};
+pub use tickets::{
+    ActionInput, AskReply, AskStory, NewSubtask, PatchSubtask, TicketDetail, TicketItem,
+    TicketQuery,
+};
 pub use toknila_app::chains::{ChainSettings, NewChain};
 pub use toknila_app::conversation::{ConversationPage, NewPersonMessage, Say};
 pub use toknila_app::pins::PinAnswer;
