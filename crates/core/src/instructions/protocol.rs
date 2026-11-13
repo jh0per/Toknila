@@ -183,7 +183,11 @@ use `person` only for what they do not hold.
 - `verdict: approve`: the work does what the task asks and every item passes or is for a person. \
 `comment` is optional. An approval with a failing item is refused.
 - `verdict: request_changes`: something is missing or wrong. Say exactly what to change in \
-`comment`, one point per line, so the worker can act on it without asking.
+`comment`, one point per line, so the worker can act on it without asking. A gap you can name \
+is such a thing: a test the task asks for that the hand-in does not carry, a guard or a branch \
+the diff adds that no test drives, a test nobody has seen fail. It is a point of \
+`request_changes`, never a remark under `approve`: a remark under an approval reaches nobody who \
+can act on it, and the gap ships.
 
 A call that is refused comes back as an error text; read it and adapt. After the verdict you are \
 done: stop.
