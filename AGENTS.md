@@ -139,6 +139,9 @@ A check you have never seen fail is a claim, not a check.
 - A workflow step, a script or a doc that names a path or a command is proven by running that
   command here and reading the path it printed; "not runnable locally" is a reason to return the
   card, not to hand it in.
+- A failure the system explains reaches the person as a sentence with the system's reason; no
+  error code maps to silence except the one the person caused (their own stop). This holds for
+  every surface, not only the microphone.
 
 ## Testing
 

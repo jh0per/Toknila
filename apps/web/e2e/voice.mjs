@@ -32,7 +32,7 @@ const git = (dir, ...args) =>
 const FAKE = `
   class FakeRecognizer {
     constructor() { window.__rec = this; this.started = false; }
-    start() { if (window.__recFail) { setTimeout(() => this.onerror && this.onerror({ error: window.__recFail }), 0); return; } this.started = true; }
+    start() { if (window.__recFail) { setTimeout(() => this.onerror && this.onerror({ error: window.__recFail, message: window.__recFailMessage }), 0); return; } this.started = true; }
     stop() { this.started = false; setTimeout(() => this.onend && this.onend(), 0); }
     say(parts) {
       this.onresult({ results: parts.map(([t, f]) => Object.assign([{ transcript: t }], { isFinal: f })) });
@@ -154,6 +154,20 @@ try {
   await mic.click();
   await page.waitForFunction(() => document.querySelector("[data-testid=planner-ask-mic]")?.getAttribute("data-mic") === "error");
   check((await t("planner-ask-mic-note").innerText()).includes("network"), "an error shows its sentence");
+  // 6b. macOS refuses because Dictation is off: the sentence names Dictation and System Settings.
+  await page.evaluate(() => { window.__recFail = "aborted"; window.__recFailMessage = "Siri and Dictation are disabled"; });
+  await mic.click();
+  await page.waitForFunction(() => document.querySelector("[data-testid=planner-ask-mic]")?.getAttribute("data-mic") === "error");
+  const off = await t("planner-ask-mic-note").innerText();
+  check(off.includes("Dictation") && off.includes("System Settings"), "a refused Dictation names Dictation and System Settings");
+  check((await mic.getAttribute("data-mic")) === "error", "the button shows the Dictation failure");
+
+  // 6c. An abort nobody explained (the person's own stop) stays silent and idle.
+  await page.evaluate(() => { window.__recFail = "aborted"; window.__recFailMessage = undefined; });
+  await mic.click();
+  await page.waitForFunction(() => document.querySelector("[data-testid=planner-ask-mic]")?.getAttribute("data-mic") === "idle");
+  check((await mic.getAttribute("data-mic")) === "idle", "an abort without a reason leaves the button idle");
+  check((await t("planner-ask-mic-note").count()) === 0, "an abort without a reason shows no note");
   await page.evaluate(() => { window.__recFail = ""; });
 
   // 7. "Send when I stop speaking": two seconds of silence send.

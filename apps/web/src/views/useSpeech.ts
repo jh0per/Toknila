@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  DICTATE, type Heard, type Mic, type Piece, fieldText, hear, micFailure, settledText, shouldAutoSend, speechLang, startHeard,
+  DICTATE, ENDED_AT_ONCE, FAST_END_MS, type Heard, type Mic, type Piece, fieldText, hear, micFailure, settledText, shouldAutoSend, speechLang, startHeard,
 } from "../store/speech";
 
 /// The part of the Web Speech recognizer this uses (the page's own, or the one a test injects).
@@ -9,7 +9,7 @@ interface Recognizer {
   continuous: boolean;
   interimResults: boolean;
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
+  onerror: ((e: { error: string; message?: string }) => void) | null;
   onend: (() => void) | null;
   start(): void;
   stop(): void;
@@ -56,6 +56,8 @@ export function useSpeech(text: string, setText: (t: string) => void, send: () =
   const rec = useRef<Recognizer | null>(null);
   const heard = useRef<Heard>(startHeard(""));
   const lastAt = useRef(0);
+  const startedAt = useRef(0);
+  const reported = useRef(false);
   const latest = useRef({ text, setText, send });
   latest.current = { text, setText, send };
 
@@ -84,18 +86,29 @@ export function useSpeech(text: string, setText: (t: string) => void, send: () =
     r.onresult = (e) => {
       const pieces: Piece[] = [];
       for (let i = 0; i < e.results.length; i++) pieces.push({ text: e.results[i][0].transcript, final: e.results[i].isFinal });
+      reported.current = true;
       heard.current = hear(heard.current, pieces);
       lastAt.current = Date.now();
       latest.current.setText(settledText(heard.current));
       setInterim(heard.current.interim);
     };
     r.onerror = (e) => {
-      const f = micFailure(e.error);
+      reported.current = true;
+      const f = micFailure(e.error, e.message);
       finish(true);
       setMic(f.mic);
       setMessage(f.message);
     };
-    r.onend = () => finish(true);
+    r.onend = () => {
+      const atOnce = !reported.current && Date.now() - startedAt.current < FAST_END_MS;
+      finish(true);
+      if (atOnce) {
+        setMic("error");
+        setMessage(ENDED_AT_ONCE);
+      }
+    };
+    startedAt.current = Date.now();
+    reported.current = false;
     rec.current = r;
     setMessage("");
     setMic("listening");
