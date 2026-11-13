@@ -116,7 +116,11 @@ impl ChainTx {
     /// Makes a planned end release wait for the cards nothing else waits for, so that the cards
     /// added since it was made are before it too.
     pub fn wire_end_release(&mut self, release: ReleaseId) -> Result<(), GraphError> {
-        for e in self.view.end_release_edges(release) {
+        let plan = self.view.end_release_wiring(release);
+        for e in plan.remove {
+            self.remove_edge(e.from, e.to);
+        }
+        for e in plan.add {
             self.add_edge(e)?;
         }
         Ok(())
@@ -289,6 +293,10 @@ where
     let project = view.chain.project_id;
     let mut ctx = ChainTx::new(view, uow.now());
     let out = f(&mut ctx)?;
+    // However the stories changed, the end release waits for the leaves (core's rule).
+    if let Some(end) = ctx.view.end_release().map(|r| r.id) {
+        ctx.wire_end_release(end).map_err(AppError::from)?;
+    }
     for _ in 0..MAX_ROUNDS {
         if !round(uow, &mut ctx)? {
             return Ok((out, project));
