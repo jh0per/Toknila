@@ -53,6 +53,7 @@ mod tests {
             session: None,
             since: Timestamp(0),
             resume,
+            lost: false,
         });
         t
     }

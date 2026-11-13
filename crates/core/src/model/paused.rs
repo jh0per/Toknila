@@ -36,4 +36,8 @@ pub struct PausedAgent {
     /// The answer arrived: the card starts again as soon as a slot is free.
     #[serde(default)]
     pub resume: bool,
+    /// The process was lost (the app restarted), not ended on purpose: the run that replaces it
+    /// is told so, and a second loss soon after blocks the card.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub lost: bool,
 }

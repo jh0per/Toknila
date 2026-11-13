@@ -20,6 +20,7 @@ mod pausing;
 mod private;
 mod prompts;
 mod pty;
+mod resumed;
 mod reviewer;
 pub(crate) mod screens;
 mod scrollback;

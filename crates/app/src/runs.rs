@@ -36,22 +36,25 @@ pub(crate) fn queue_resume<U: UnitOfWork + ?Sized>(
     ctx: &ChainTx,
     ticket: TicketId,
     session: Option<String>,
+    lost: bool,
 ) -> AppResult<()> {
-    start_with(uow, ctx, ticket, Some(session), None)
+    start_with(uow, ctx, ticket, Some((session, lost)), None)
 }
 
 /// What the person answered, as it would have been typed to the live agent: the instruction
 /// comments no run has seen, one line each, oldest first.
-fn answer_input(comments: &[toknila_core::Comment]) -> String {
+fn answer_input(comments: &[toknila_core::Comment], lost: bool) -> String {
     let typed: Vec<String> = comments
         .iter()
         .filter(|c| c.kind == toknila_core::CommentKind::Instruction && c.delivered_at.is_none())
         .map(toknila_core::instructions::typed)
         .collect();
-    if typed.is_empty() {
+    let restarted = lost.then(|| toknila_core::instructions::RESTARTED.to_owned());
+    let all: Vec<String> = restarted.into_iter().chain(typed).collect();
+    if all.is_empty() {
         "The person answered; carry on.".to_owned()
     } else {
-        typed.join(" ")
+        all.join(" ")
     }
 }
 
@@ -59,7 +62,7 @@ fn start_with<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     ctx: &ChainTx,
     ticket: TicketId,
-    resume: Option<Option<String>>,
+    resume: Option<(Option<String>, bool)>,
     answer: Option<String>,
 ) -> AppResult<()> {
     let Some(t) = ctx.view.tickets.iter().find(|t| t.id == ticket) else {
@@ -82,9 +85,10 @@ fn start_with<U: UnitOfWork + ?Sized>(
         let comments = uow.comments(ticket)?;
         let returned = toknila_core::instructions::Returned::of(&t.review);
         let waiting = toknila_core::instructions::waiting(&comments, returned.as_ref());
-        let resume = resume.map(|session| Resume {
+        let resume = resume.map(|(session, lost)| Resume {
             session,
-            input: answer_input(&comments),
+            input: answer_input(&comments, lost),
+            lost,
         });
         uow.defer(ExternalEffect::StartRunner {
             ticket,
@@ -132,7 +136,9 @@ pub(crate) fn queue_effect<U: UnitOfWork + ?Sized>(
 ) -> AppResult<bool> {
     match effect {
         Effect::EnsureRunner => queue_start(uow, ctx, ticket)?,
-        Effect::ResumeRunner { session } => queue_resume(uow, ctx, ticket, session.clone())?,
+        Effect::ResumeRunner { session, lost } => {
+            queue_resume(uow, ctx, ticket, session.clone(), *lost)?
+        }
         Effect::StopRunner => queue_stop(uow, ticket),
         Effect::StopWorker => queue_stop_worker(uow, ticket),
         _ => return Ok(false),

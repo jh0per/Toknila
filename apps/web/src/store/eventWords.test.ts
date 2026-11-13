@@ -28,6 +28,18 @@ describe("eventWords", () => {
     ).toBe("Moved from review to blocked (the merge conflicts: a.rs)");
   });
 
+  it("words a lost agent, its coming back and a second loss", () => {
+    const lost = { ticket: { agent_paused: { lost: true, resume: true } } };
+    expect(eventWords(e("ticket", "updated", lost))).toBe("The app restarted; the agent comes back");
+    expect(eventWords(e("ticket", "updated", { ticket: { lost_resume: 7 } }))).toBe("Story edited");
+    const back = { entity: "ticket", kind: "updated", payload: { ticket: { lost_resume: 7 } }, at: 7 } as never;
+    expect(eventWords(back)).toBe("The agent came back after the restart");
+    const twice = { status: "blocked", reason: { kind: "runner_lost", first: 1, second: 2 }, resume_to: "running" };
+    expect(eventWords(e("ticket", "status_changed", { from: "running", to: "blocked", reason: twice }))).toBe(
+      "Moved from running to blocked (the agent was lost twice within ten minutes; unblock starts it again)",
+    );
+  });
+
   it("words comments, subtasks and answers", () => {
     expect(eventWords(e("comment", "added", { comment: { kind: "report", body: { gist: "All done" } } }))).toBe("Wrote a report: All done");
     expect(eventWords(e("comment", "added", { comment: { kind: "instruction", body: { gist: "Use blue" } } }))).toBe("Wrote an instruction: Use blue");

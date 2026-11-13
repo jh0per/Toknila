@@ -248,6 +248,7 @@ fn paused(w: &mut World, c: usize, resume: bool) -> TicketId {
         session: Some("s-1".to_owned()),
         since: Timestamp(0),
         resume,
+        lost: false,
     });
     id
 }
