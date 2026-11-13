@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ConversationMessage } from "../api/types";
-import { aboutLabel, aboutRoute } from "../store/conversation";
+import { QUEUED_NOTE, aboutLabel, aboutRoute } from "../store/conversation";
 import { whenText } from "../store/chat";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
@@ -61,8 +61,21 @@ function DidLine({ m, project, state, dispatch }: { m: ConversationMessage; proj
 
 /// One entry of the conversation: the person's and the assistant's words are plain selectable
 /// text with a Copy control; what the assistant did is a line of Toknila's.
-export function ChatEntry({ m, project, state, dispatch }: { m: ConversationMessage; project: string; state: State; dispatch: (i: Intent) => void }) {
+export function ChatEntry({ m, project, state, dispatch, queued = false }: {
+  m: ConversationMessage; project: string; state: State; dispatch: (i: Intent) => void;
+  /// The person's message was sent while an answer was awaited: it waits for the next turn.
+  queued?: boolean;
+}) {
   if (m.author === "toknila") return <DidLine m={m} project={project} state={state} dispatch={dispatch} />;
+  // What the assistant said it was doing before a long read: a muted line, not an answer.
+  if (m.author === "progress") {
+    return (
+      <li className="did progress" data-testid="chat-progress-line" data-id={m.id}>
+        <span className="did-text">{m.text}</span>
+        <time className="muted" dateTime={new Date(m.at).toISOString()}>{whenText(m.at)}</time>
+      </li>
+    );
+  }
   const mine = m.author === "person";
   return (
     <li className={`bubble msg chat-bubble ${mine ? "you" : "agent"}`} data-testid="chat-message" data-author={m.author} data-id={m.id}>
@@ -78,6 +91,7 @@ export function ChatEntry({ m, project, state, dispatch }: { m: ConversationMess
           {(m.attachments ?? []).map((a) => <span key={a} className="chip">{a}</span>)}
         </div>
       )}
+      {queued && <p className="muted chat-queued" data-testid="chat-queued">{QUEUED_NOTE}</p>}
     </li>
   );
 }

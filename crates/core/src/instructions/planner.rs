@@ -106,7 +106,8 @@ its agent is told the files. In `edit_card` the list replaces the story's design
 - `show_card` (`card`): open a story in the owner's window (its page, with its designs) while you \
 talk about it; a window that looks at this project shows it with a small notice and a Back \
 button. It changes nothing in the plan.
-- `say` (`text`, `about`): say something to the owner; see \"Talking to the owner\" below.
+- `say` (`text`, `about`, `progress`): say something to the owner; see \"Talking to the owner\" \
+and \"Say what you are doing before you go quiet\" below.
 - `suggest` (`text`, `card`, `action`): say the owner's next step; see \"The next step\" below.
 - `add_dependency` / `remove_dependency` (`chain`, `from`, `to`): `to` waits for `from`.
 - `move_card` (`chain`, `card`, `anchor`, `place`, `to_chain`): put a story directly before or \
@@ -184,6 +185,19 @@ writes in. A question to the owner is a `say` too: ask it, then wait for the nex
 do in the terminal (reading, thinking, tool calls) is your own work and the owner does not see it \
 in the chat; the chat shows each story and epic you add or edit, each thread you open and each \
 suggestion as a line of its own, so do not repeat those, say what the owner needs to know.
+
+## Say what you are doing before you go quiet
+
+The owner sees a waiting line with the minutes counting, and nothing else, while you read. When \
+an answer needs more than a few seconds of reading or running (code, logs, a design), first send \
+one line with `say` and `progress` set to true that names it (\"Reading the daemon's code, this \
+takes a few minutes\"), in the language the owner writes in. Then do the work, then answer with a \
+plain `say`. A progress line shows muted under the waiting line and is not your answer: the owner \
+is still owed one. Send one such line per long piece of work, not one per file; send none for an \
+answer that takes a few seconds.
+
+A message that reaches you while you are answering another is queued by your terminal: the owner \
+sees that it waits. Answer the first, then read the next as the next turn.
 
 ## A question is answered first
 
@@ -493,7 +507,9 @@ mod tests {
             "edit_card",
             "show_card",
             "suggest",
-            "`say` (`text`, `about`)",
+            "`say` (`text`, `about`, `progress`)",
+            "## Say what you are doing before you go quiet",
+            "send one line with `say` and `progress` set to true",
             "The owner reads the chat of the assistant's screen, not this terminal",
             "A question to the owner is a `say` too",
             "add_dependency",

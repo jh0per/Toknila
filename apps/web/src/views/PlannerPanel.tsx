@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Project } from "../api/types";
 import type { Intent } from "../store/msg";
 import { DEFAULT_PLANNER_PROFILE, plannerOf } from "../store/planner";
@@ -13,7 +13,14 @@ type PlannerTab = "chat" | "terminal";
 /// conversation, with the record of what was said and done and the box to say more; Terminal is
 /// the planner's own screen with the Start, Stop and profile controls, for whoever wants it.
 export function PlannerPanel({ project, state, dispatch }: { project: Project; state: State; dispatch: (i: Intent) => void }) {
-  const [tab, setTab] = useState<PlannerTab>("chat");
+  const [tab, setTab] = useState<PlannerTab>(state.planner.terminalWanted ? "terminal" : "chat");
+  // A link in the chat ("Assistant → Terminal") opens the Terminal tab, also when this screen was
+  // not open yet.
+  useEffect(() => {
+    if (!state.planner.terminalWanted) return;
+    setTab("terminal");
+    dispatch({ type: "plannerTerminalShown" });
+  }, [state.planner.terminalWanted]);
   const planner = plannerOf(state, project.key);
   const running = planner?.running ?? false;
   // The profiles with the planner role; the built-in one is the default.

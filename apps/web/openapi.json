@@ -1930,7 +1930,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "The planner says something to the person: an answer, a question, a report. The person reads\nit in the chat of the assistant's screen; `about` names the card or chain it is about.",
+        "summary": "The planner says something to the person: an answer, a question, a report. The person reads\nit in the chat of the assistant's screen; `about` names the card or chain it is about. With\n`progress` it is a muted line about what the planner is doing, and the turn stays open.",
         "operationId": "planner_say",
         "requestBody": {
           "content": {
@@ -6710,7 +6710,8 @@
         "enum": [
           "person",
           "assistant",
-          "toknila"
+          "toknila",
+          "progress"
         ]
       },
       "BlockedReason": {
@@ -12385,6 +12386,10 @@
               "null"
             ],
             "description": "The card (key, id or title) or chain (name) the words are about, or `roadmap`."
+          },
+          "progress": {
+            "type": "boolean",
+            "description": "A line that tells what the assistant is doing before a long read or run. It shows muted\nand is not the answer: the person is still owed one."
           },
           "text": {
             "type": "string"

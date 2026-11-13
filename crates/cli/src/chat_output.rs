@@ -31,6 +31,9 @@ pub fn message_lines(m: &Message, offset: FixedOffset) -> Vec<String> {
     if m.author == Author::Toknila {
         return vec![format!("{time}  · {}{}", m.text, about(m))];
     }
+    if m.author == Author::Progress {
+        return vec![format!("{time}  … {}{}", m.text, about(m))];
+    }
     let who = if m.author == Author::Person {
         "You"
     } else {

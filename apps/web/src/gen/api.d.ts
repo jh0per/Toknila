@@ -528,7 +528,8 @@ export interface paths {
         put?: never;
         /**
          * The planner says something to the person: an answer, a question, a report. The person reads
-         *     it in the chat of the assistant's screen; `about` names the card or chain it is about.
+         *     it in the chat of the assistant's screen; `about` names the card or chain it is about. With
+         *     `progress` it is a muted line about what the planner is doing, and the turn stays open.
          */
         post: operations["planner_say"];
         delete?: never;
@@ -2047,7 +2048,7 @@ export interface components {
          * @description Who wrote a message.
          * @enum {string}
          */
-        Author: "person" | "assistant" | "toknila";
+        Author: "person" | "assistant" | "toknila" | "progress";
         /** @description Why a ticket is Blocked. */
         BlockedReason: {
             /** @enum {string} */
@@ -4032,6 +4033,11 @@ export interface components {
         Say: {
             /** @description The card (key, id or title) or chain (name) the words are about, or `roadmap`. */
             about?: string | null;
+            /**
+             * @description A line that tells what the assistant is doing before a long read or run. It shows muted
+             *     and is not the answer: the person is still owed one.
+             */
+            progress?: boolean;
             text: string;
         };
         /** @description The worktree and branch a ticket works in, once the shipyard has made them. */

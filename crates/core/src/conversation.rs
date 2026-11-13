@@ -38,6 +38,9 @@ pub enum Author {
     Assistant,
     /// The daemon, reporting what the assistant did.
     Toknila,
+    /// The assistant telling what it is doing before a long read or run. A muted line: it is not
+    /// the answer, so the person is still owed one.
+    Progress,
 }
 
 impl Author {
@@ -47,6 +50,7 @@ impl Author {
             Self::Person => "person",
             Self::Assistant => "assistant",
             Self::Toknila => "toknila",
+            Self::Progress => "progress",
         }
     }
 
@@ -64,10 +68,10 @@ impl std::str::FromStr for Author {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, String> {
-        [Self::Person, Self::Assistant, Self::Toknila]
+        [Self::Person, Self::Assistant, Self::Toknila, Self::Progress]
             .into_iter()
             .find(|a| a.as_str() == s)
-            .ok_or_else(|| format!("author {s:?}: use person, assistant or toknila"))
+            .ok_or_else(|| format!("author {s:?}: use person, assistant, toknila or progress"))
     }
 }
 
@@ -146,12 +150,14 @@ pub fn clean_text(text: &str) -> Result<String, Refusal> {
 /// (an agent) as the assistant. Toknila's own lines have no caller: only the daemon writes them.
 pub fn check_writer(actor: Actor, author: Author) -> Result<(), Refusal> {
     match (author, actor) {
-        (Author::Person, Actor::Human) | (Author::Assistant, Actor::Agent) => Ok(()),
+        (Author::Person, Actor::Human) | (Author::Assistant | Author::Progress, Actor::Agent) => {
+            Ok(())
+        }
         (Author::Person, _) => Err(Refusal::NotYours {
             author: "the person",
             needs: "a person",
         }),
-        (Author::Assistant, _) => Err(Refusal::NotYours {
+        (Author::Assistant | Author::Progress, _) => Err(Refusal::NotYours {
             author: "the assistant",
             needs: "the assistant",
         }),
@@ -160,6 +166,17 @@ pub fn check_writer(actor: Actor, author: Author) -> Result<(), Refusal> {
             needs: "the daemon itself",
         }),
     }
+}
+
+/// Whether the person is owed an answer: the newest word of the person or the assistant is the
+/// person's. Toknila's lines and the assistant's progress lines are not an answer, so they leave
+/// the turn open.
+pub fn awaits_answer(messages: &[Message]) -> bool {
+    messages
+        .iter()
+        .rev()
+        .find(|m| !matches!(m.author, Author::Toknila | Author::Progress))
+        .is_some_and(|m| m.author == Author::Person)
 }
 
 /// Number of messages to read for a page asked with `limit`: the default when unset, never more
@@ -229,6 +246,34 @@ mod tests {
                 "{actor:?} as {author:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_progress_line_is_the_planners_and_does_not_answer_the_person() {
+        assert!(check_writer(Actor::Agent, Author::Progress).is_ok());
+        for actor in [Actor::Human, Actor::System] {
+            assert!(check_writer(actor, Author::Progress).is_err());
+        }
+        assert_eq!("progress".parse(), Ok(Author::Progress));
+        let m = |author| Message {
+            id: next_id(),
+            author,
+            text: "t".into(),
+            about: None,
+            attachments: vec![],
+            thread: None,
+            at: Timestamp(1),
+        };
+        assert!(!awaits_answer(&[]));
+        let asked = [m(Author::Person)];
+        assert!(awaits_answer(&asked));
+        let working = [m(Author::Person), m(Author::Progress), m(Author::Toknila)];
+        assert!(
+            awaits_answer(&working),
+            "progress and Toknila leave it open"
+        );
+        let answered = [m(Author::Person), m(Author::Progress), m(Author::Assistant)];
+        assert!(!awaits_answer(&answered));
     }
 
     #[test]

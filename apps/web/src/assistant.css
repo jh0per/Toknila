@@ -93,6 +93,11 @@ button.inline-link { background: none; border: 0; padding: 0; font: inherit; cur
 .did .did-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .did a { color: var(--primary); }
 .did time { flex: none; white-space: nowrap; font-size: var(--fs-label-m); }
+/* What the assistant said it was doing (a progress line), and a message of the person that waits for the next turn. */
+.did.progress .did-text { font-style: italic; }
+.did.progress::before { content: "\2026"; }
+.chat-progress { margin: var(--sp1) 0 0; font-style: italic; overflow-wrap: anywhere; }
+.chat-queued { margin: var(--sp1) 0 0; font-size: var(--fs-label-m); line-height: var(--lh-label-m); }
 
 /* An empty chain asks what it should do, over its own (still working) canvas. */
 .canvas-empty { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; pointer-events: none; z-index: 1; padding: var(--s4); overflow: auto; }
