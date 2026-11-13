@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DENIED, PAUSE_MS, fieldText, hear, micFailure, settledText, shouldAutoSend, speechLang, startHeard,
+  DENIED, DICTATION_OFF, ENDED_AT_ONCE, PAUSE_MS, fieldText, hear, micFailure, settledText, shouldAutoSend, speechLang, startHeard,
 } from "./speech";
 
 describe("transcript merging", () => {
@@ -51,6 +51,28 @@ describe("language and failures", () => {
   it("names what to allow and where on a refusal", () => {
     expect(micFailure("not-allowed")).toEqual({ mic: "denied", message: DENIED });
     expect(DENIED).toContain("System Settings");
+  });
+  it("says Dictation is off when the system's reason names it", () => {
+    const f = micFailure("aborted", "Siri and Dictation are disabled");
+    expect(f.mic).toBe("error");
+    expect(f.message).toBe(DICTATION_OFF);
+    expect(f.message).toContain("System Settings");
+    expect(f.message).toContain("Dictation");
+  });
+  it("carries another reason of an abort in the sentence", () => {
+    const f = micFailure("aborted", "Audio engine broke.");
+    expect(f.mic).toBe("error");
+    expect(f.message).toContain("Could not listen: Audio engine broke. Try again, or press Fn twice");
+  });
+  it("keeps an abort without a reason silent", () => {
+    expect(micFailure("aborted")).toEqual({ mic: "idle", message: "" });
+  });
+  it("puts the reason of any other code in the sentence", () => {
+    expect(micFailure("network", "offline").message).toContain("Could not listen: offline.");
+  });
+  it("says what a recognizer that ended at once means", () => {
+    expect(ENDED_AT_ONCE).toContain("ended at once");
+    expect(ENDED_AT_ONCE).toContain("System Settings");
   });
   it("is quiet on silence and shows other errors", () => {
     expect(micFailure("no-speech").mic).toBe("idle");

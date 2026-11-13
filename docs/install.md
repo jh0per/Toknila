@@ -206,6 +206,9 @@ identity as the installed one, so keep the certificate (the `.p12`) and never sw
 The Open Anyway button in the Security section (Gatekeeper, an un-notarised build) is a different
 mechanism that a signing identity alone does not change; notarization is a later card.
 
+On macOS the microphone button also needs Dictation or Siri turned on in System Settings →
+Keyboard → Dictation; otherwise the button says so instead of listening.
+
 ### Testing the updater
 
 `scripts/smoke-update.sh` builds version 9.0.0 and 9.0.1 from temporary copies of the working
