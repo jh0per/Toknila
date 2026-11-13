@@ -77,7 +77,13 @@ impl TicketStatus {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum WaitingReason {
     /// The agent asked a question (`ask_human`).
-    Question { text: String },
+    Question {
+        text: String,
+        /// Two to four things the person can do, the recommended one first; empty when the
+        /// agent offered none.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        choices: Vec<String>,
+    },
     /// The agent wants permission for an action.
     Permission {
         text: String,
@@ -196,7 +202,7 @@ pub enum StatusReason {
 impl fmt::Display for WaitingReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Question { text } => write!(f, "question: {text}"),
+            Self::Question { text, .. } => write!(f, "question: {text}"),
             Self::Permission { text, .. } => write!(f, "permission: {text}"),
             Self::Silent => f.write_str("silent"),
             Self::Screen => f.write_str("Claude Code asks on its screen"),
@@ -321,6 +327,7 @@ mod tests {
             (
                 StatusReason::Waiting(WaitingReason::Question {
                     text: "which?".into(),
+                    choices: Vec::new(),
                 }),
                 "question: which?",
             ),

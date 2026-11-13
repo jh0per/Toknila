@@ -23,6 +23,7 @@ fn ask(mem: &mut Mem, text: &str, permission: bool) {
         text: text.to_owned(),
         permission,
         detail: None,
+        choices: Vec::new(),
     };
     agent::ticket_event(mem, &t, event).expect("ask_human");
 }
@@ -126,6 +127,7 @@ fn asking_again_while_waiting_keeps_it_waiting() {
         text: "second".to_owned(),
         permission: false,
         detail: None,
+        choices: Vec::new(),
     };
     // Still waiting; the second question is refused by the machine, not turned into a resume.
     assert!(agent::ticket_event(&mut mem, &t, event).is_err());
@@ -168,6 +170,7 @@ fn a_question_while_silent_replaces_the_silent_reason() {
     ask(&mut mem, "which db?", false);
     let want = WaitingReason::Question {
         text: "which db?".to_owned(),
+        choices: Vec::new(),
     };
     assert_eq!(a(&mem).status_reason, Some(StatusReason::Waiting(want)));
 }
@@ -181,6 +184,7 @@ fn a_silent_give_up_never_clears_an_open_question() {
     tickets::act(&mut mem, &t, TicketEvent::AskHuman { reason }).expect("kept");
     let want = WaitingReason::Question {
         text: "which db?".to_owned(),
+        choices: Vec::new(),
     };
     assert_eq!(a(&mem).status_reason, Some(StatusReason::Waiting(want)));
 }

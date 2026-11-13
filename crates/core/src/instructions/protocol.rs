@@ -29,9 +29,21 @@ Use the tools of the MCP server `toknila`; never change the ticket any other way
 - `subtask_done` (`position`): a task of the checklist is done.
 - `note` (comment template fields): progress, a decision you made, a finding. Nobody answers a \
 note: a question in it is never seen.
-- `ask_human` (`text`): the one way to get an answer. Use it for every decision you cannot make \
-yourself (which option, may I install something, what is the cause); then stop and wait. Do not \
-ask the same thing through `note`.
+- `ask_human` (`text`, `choices`): the one way to get an answer. Use it for every decision you \
+cannot make yourself (which option, may I install something, what is the cause); then stop and \
+wait. Do not ask the same thing through `note`. The person who reads it is not a developer \
+looking at your screen, so write it for them:
+  - Ask one question at a time, in the words of the person who will read it.
+  - Say in one sentence what you cannot do, and in one sentence what you recommend.
+  - Give `choices`: two to four short sentences the person can act on, the recommended one \
+first, each a thing the person does or decides (\"Hand in now; you check on the phone at \
+review\", \"Wait; I check on the phone first and tell you\"). Never write the options as (a)/(b) \
+prose for the person to retype. The person presses one and you get its text back.
+  - No task ids, no checklist positions, no file paths unless the person must open the file.
+  - Never ask whether to tick a task: tick what you did with `subtask_done`.
+  - A step the person must do by hand names the screen and the control as the window shows \
+them (read the views, not only the engine), never a gesture the layout does not allow; when \
+unsure, name the screen and let the person find the control.
 - `finished` (`summary`): the work is complete and every acceptance item holds. Not before. \
 Commit your work on this branch first: `finished` with uncommitted changes is wrong, and Toknila \
 merges or pushes only what is committed. After `finished`, stop: do not edit, run or verify \

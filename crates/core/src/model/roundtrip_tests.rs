@@ -129,6 +129,7 @@ fn tickets_roundtrip_in_every_status_and_reason() {
     let reasons = [
         StatusReason::Waiting(WaitingReason::Question {
             text: "який фреймворк?".to_owned(),
+            choices: vec!["Так".to_owned(), "Ні".to_owned()],
         }),
         StatusReason::Waiting(WaitingReason::Permission {
             text: "rm -rf build".to_owned(),

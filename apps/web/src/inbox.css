@@ -21,6 +21,8 @@
 .inbox .btns, .answer .btns { display: flex; gap: var(--sp2); flex-wrap: wrap; align-items: center; }
 .inbox .btn { flex: none; align-self: flex-start; }
 .inbox .compose, .answer .compose { width: 100%; }
+.inbox .choices, .answer .choices { display: flex; flex-direction: column; gap: var(--sp2); align-items: stretch; }
+.inbox .choices .btn, .answer .choices .btn { white-space: normal; text-align: start; height: auto; }
 .answer .detail { margin: var(--sp1) 0; font-size: var(--fs-body-m); }
 .answer .detail summary { cursor: pointer; color: var(--on-surface-variant); }
 .answer .detail pre { margin: var(--sp1) 0 0; padding: var(--sp2); background: var(--surface-container-high); border-radius: var(--shape-xs); overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); max-height: 40vh; overflow-y: auto; }

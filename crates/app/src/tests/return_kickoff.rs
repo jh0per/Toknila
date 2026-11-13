@@ -60,6 +60,30 @@ fn the_hand_in_commit_is_remembered_and_a_return_restarts_the_worker_with_it() {
 }
 
 #[test]
+fn the_run_is_told_the_checklist_with_positions_and_what_is_done() {
+    let mut mem = in_review();
+    let t = a(&mem);
+    crate::notes::add_subtask(&mut mem, &t, "Check on an iPhone").expect("add");
+    crate::notes::add_subtask(&mut mem, &t, "Run the gate").expect("add");
+    crate::notes::update_subtask(&mut mem, &t, 2, Some(true), None).expect("tick");
+    let comment = "Rename the flag".to_owned();
+    act(&mut mem, TicketEvent::Return { comment });
+    settle(&mut mem);
+    let tasks: Vec<(u32, String, bool)> = last_worker_brief(&mem)
+        .checklist
+        .into_iter()
+        .map(|t| (t.position, t.text, t.done))
+        .collect();
+    assert_eq!(
+        tasks,
+        [
+            (1, "Check on an iPhone".to_owned(), false),
+            (2, "Run the gate".to_owned(), true)
+        ]
+    );
+}
+
+#[test]
 fn the_pending_comments_go_into_the_new_run_and_are_delivered_once() {
     let mut mem = in_review();
     mem.runner.reach.set(crate::runner::RunnerState {

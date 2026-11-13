@@ -55,6 +55,8 @@ pub struct RunBrief {
     pub title: String,
     pub prompt: String,
     pub acceptance: Vec<String>,
+    /// The story's checklist with positions and done state, listed in the worker's file.
+    pub checklist: Vec<toknila_core::instructions::BriefTask>,
     /// The project's check command, named in the agent's instructions.
     pub check_command: Option<String>,
     /// The project's setup command: the host runs it once in a new ship before the agent starts,

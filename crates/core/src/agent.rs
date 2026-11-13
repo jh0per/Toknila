@@ -42,6 +42,9 @@ pub enum AgentEvent {
         /// The whole command a permission request is about, when `text` is only its summary.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         detail: Option<String>,
+        /// Two to four things the person can do, the recommended one first (a question only).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        choices: Vec<String>,
     },
     /// The agent ticked a checklist item (1-based position).
     SubtaskDone { position: u32 },
@@ -115,7 +118,12 @@ impl AgentEvent {
     pub const NOTE_ASKED: &'static str = "Your note asked a question, so Toknila put it in the inbox as a question and the story now waits. A note is a report and is never answered: to ask a person something, use ask_human.";
 
     /// The question as a Waiting reason, for `AskHuman`.
-    pub fn waiting_reason(text: &str, permission: bool, detail: Option<String>) -> WaitingReason {
+    pub fn waiting_reason(
+        text: &str,
+        permission: bool,
+        detail: Option<String>,
+        choices: Vec<String>,
+    ) -> WaitingReason {
         if permission {
             WaitingReason::Permission {
                 text: text.to_owned(),
@@ -124,6 +132,7 @@ impl AgentEvent {
         } else {
             WaitingReason::Question {
                 text: text.to_owned(),
+                choices,
             }
         }
     }
@@ -193,8 +202,18 @@ mod tests {
                     text: "який фреймворк?".into(),
                     permission: false,
                     detail: None,
+                    choices: Vec::new(),
                 },
                 r#"{"event":"ask_human","text":"який фреймворк?","permission":false}"#,
+            ),
+            (
+                AgentEvent::AskHuman {
+                    text: "Phone?".into(),
+                    permission: false,
+                    detail: None,
+                    choices: vec!["Hand in now".into(), "Wait".into()],
+                },
+                r#"{"event":"ask_human","text":"Phone?","permission":false,"choices":["Hand in now","Wait"]}"#,
             ),
             (
                 AgentEvent::SubtaskDone { position: 1 },
@@ -283,7 +302,8 @@ mod tests {
             AgentEvent::AskHuman {
                 text: "?".into(),
                 permission: false,
-                detail: None
+                detail: None,
+                choices: Vec::new(),
             },
             "permission defaults to false"
         );

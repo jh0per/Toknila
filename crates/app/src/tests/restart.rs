@@ -96,6 +96,7 @@ fn a_restart_leaves_a_waiting_card_with_its_question_and_the_answer_starts_its_a
         text: "which db?".to_owned(),
         permission: false,
         detail: None,
+        choices: Vec::new(),
     };
     agent::ticket_event(&mut mem, &t, ask).expect("ask");
     let waiting = a(&mem);
@@ -226,6 +227,7 @@ fn unblocking_a_lost_waiting_card_keeps_the_question_and_pauses_the_agent() {
         text: "which db?".to_owned(),
         permission: false,
         detail: None,
+        choices: Vec::new(),
     };
     agent::ticket_event(&mut mem, &t, ask).expect("ask");
     let reason = BlockedReason::RunnerLost {

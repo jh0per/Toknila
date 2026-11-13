@@ -77,6 +77,49 @@ pub fn cleared<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, role: AgentRole)
     })
 }
 
+/// The text of a person's answer: the open question's choice at the 0-based `choice` (what the
+/// agent is told is the choice's own text), else the free `text` given.
+pub fn answer_text(
+    t: &Ticket,
+    choice: Option<u32>,
+    text: Option<String>,
+) -> AppResult<Option<String>> {
+    let Some(index) = choice else {
+        return Ok(text);
+    };
+    let Some(StatusReason::Waiting(WaitingReason::Question { choices, .. })) = &t.status_reason
+    else {
+        return Err(AppError::conflict(format!(
+            "{} asks no question with choices",
+            t.key
+        )));
+    };
+    let index = usize::try_from(index).unwrap_or(usize::MAX);
+    toknila_core::question::choice_text(choices, index)
+        .map(Some)
+        .map_err(|e| AppError::bad_request(e.to_string()))
+}
+
+/// A person answers an `ask_human` question: the answer is told to the agent as an instruction
+/// comment, the way a comment answers it, and the journal says the question was answered.
+pub fn answer_question<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    t: &Ticket,
+    text: Option<&str>,
+) -> AppResult<()> {
+    person_only(uow.actor(), "answer an agent")?;
+    let text = text.map(str::trim).filter(|s| !s.is_empty());
+    let text = text.ok_or(toknila_core::question::AnswerError::EmptyText)?;
+    uow.emit(&DomainEvent::QuestionAnswered {
+        key: t.key.clone(),
+        ticket: t.id,
+        role: AgentRole::Worker,
+        answer: AnswerKind::Text,
+    })?;
+    let body = crate::notes::body_from_text(text);
+    crate::tickets::comment(uow, t, toknila_core::CommentKind::Instruction, body)
+}
+
 /// A person's answer reached the run of `role`. The journal says who answered and whose run it
 /// was; a worker that waits goes back to Running at once (machine event `Answered`) instead of
 /// when its next tool call ends.

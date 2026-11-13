@@ -86,6 +86,7 @@ fn the_permission_hook_waits_for_allow_from_the_window_and_the_card_resumes_at_o
                 role: None,
                 answer: AnswerKind::Allow,
                 text: None,
+                choice: None,
                 always: false,
             },
         )
@@ -139,6 +140,7 @@ fn an_agent_that_shows_nothing_is_listed_with_its_screen_and_answered_by_keys() 
                 role: None,
                 answer: AnswerKind::Text,
                 text: Some("yes".to_owned()),
+                choice: None,
                 always: false,
             },
         )
@@ -207,6 +209,38 @@ fn a_question_asked_after_the_silent_nudge_reaches_the_inbox_and_the_answer_reac
         questions(&client).is_empty(),
         "the answered question is gone"
     );
+    tok.run(&["cancel", "DEMO-1", "done"]);
+}
+
+#[test]
+fn tok_show_numbers_the_choices_of_a_question_and_tok_answer_picks_one_by_number() {
+    let dir = common::tempdir();
+    let tok = Tok::in_dir(dir.path());
+    tok.profile(
+        "chooser",
+        &[
+            "post",
+            "/tickets/{ticket}/events",
+            r#"{"event":"ask_human","text":"Check the phone?","choices":["Hand in now","Wait for the phone check"]}"#,
+            "echo",
+            "sleep",
+            "30000",
+        ],
+        "",
+    );
+    setup(&tok, dir.path(), "chooser");
+    let client = tok.client();
+    wait_until("the question", || !questions(&client).is_empty());
+    let shown = tok.text(&["show", "DEMO-1"]);
+    assert!(shown.contains("  1. Hand in now (recommended)"), "{shown}");
+    assert!(shown.contains("  2. Wait for the phone check"), "{shown}");
+    tok.run(&["answer", "DEMO-1", "2"]);
+    wait_until("the agent to get the choice", || {
+        tok.logs("DEMO-1").contains("Wait for the phone check")
+    });
+    wait_until("the card to run again", || {
+        tok.status("DEMO-1") == "running"
+    });
     tok.run(&["cancel", "DEMO-1", "done"]);
 }
 

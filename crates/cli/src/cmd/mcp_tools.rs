@@ -89,6 +89,8 @@ fn worker_tools() -> Vec<Value> {
             json!({
                 "text": text("The question, or the action you need permission for"),
                 "permission": { "type": "boolean", "description": "True when asking permission for an action rather than a question" },
+                "choices": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 4,
+                    "description": "Two to four short sentences the person can act on, the recommended one first; the person presses one and you get its text back" },
             }),
             &["text"],
         ),

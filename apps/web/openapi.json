@@ -6214,6 +6214,13 @@
               "event"
             ],
             "properties": {
+              "choices": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Two to four things the person can do, the recommended one first (a question only)."
+              },
               "detail": {
                 "type": [
                   "string",
@@ -8606,6 +8613,13 @@
               }
             ]
           },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The things the person can do about an `ask_human` question, the recommended one first\n(`question` items; empty when the agent offered none)."
+          },
           "design": {
             "type": [
               "string",
@@ -9068,6 +9082,15 @@
           },
           "answer": {
             "$ref": "#/components/schemas/AnswerKind"
+          },
+          "choice": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The 0-based index of the choice the person pressed, for an `ask_human` question that\noffered choices; the agent is told the choice's text. Use with `answer: text`.",
+            "minimum": 0
           },
           "role": {
             "oneOf": [
@@ -13825,6 +13848,13 @@
               "kind"
             ],
             "properties": {
+              "choices": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Two to four things the person can do, the recommended one first; empty when the\nagent offered none."
+              },
               "kind": {
                 "type": "string",
                 "enum": [

@@ -49,6 +49,7 @@ fn ask(mem: &mut Mem, permission: bool) {
         text: "Design v1 is in thread 1. Do you approve it?".to_owned(),
         permission,
         detail: None,
+        choices: Vec::new(),
     };
     agent::ticket_event(mem, &t, event).expect("ask_human");
     assert_eq!(a(mem).status, TicketStatus::Waiting);

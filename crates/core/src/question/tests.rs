@@ -216,3 +216,23 @@ fn a_worker_that_handed_in_is_refused_without_asking_and_only_then() {
     }
     assert_eq!(auto_decision(AgentRole::Reviewer, S::Review), None);
 }
+
+#[test]
+fn a_question_takes_two_to_four_choices_and_an_index_picks_one_as_text() {
+    let ok = |n: usize| (1..=n).map(|i| format!("Do thing {i}")).collect::<Vec<_>>();
+    assert_eq!(check_choices(ok(2)), Ok(ok(2)));
+    assert_eq!(check_choices(ok(4)), Ok(ok(4)));
+    assert_eq!(check_choices(Vec::new()), Ok(Vec::new()));
+    assert_eq!(check_choices(ok(1)), Err(ChoiceError::Count(1)));
+    assert_eq!(check_choices(ok(5)), Err(ChoiceError::Count(5)));
+    assert_eq!(
+        check_choices(vec!["a".into(), "  ".into()]),
+        Err(ChoiceError::Empty)
+    );
+    let chosen = ok(3);
+    assert_eq!(choice_text(&chosen, 0).as_deref(), Ok("Do thing 1"));
+    assert_eq!(choice_text(&chosen, 2).as_deref(), Ok("Do thing 3"));
+    assert_eq!(choice_text(&chosen, 3), Err(ChoiceError::Index(3, 3)));
+    assert_eq!(choice_text(&[], 0), Err(ChoiceError::Index(0, 0)));
+    assert!(QuestionKind::Question.accepts(AnswerKind::Text));
+}

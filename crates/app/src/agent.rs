@@ -102,11 +102,14 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
             text,
             permission,
             detail,
+            choices,
         } => {
             if text.trim().is_empty() {
                 return Err(AppError::bad_request("ask_human needs a text"));
             }
-            let reason = AgentEvent::waiting_reason(&text, permission, detail);
+            let choices = toknila_core::question::check_choices(choices)
+                .map_err(|e| AppError::bad_request(e.to_string()))?;
+            let reason = AgentEvent::waiting_reason(&text, permission, detail, choices);
             with_chain(uow, t.chain_id, |ctx| {
                 Ok::<_, AppError>(ctx.ticket_event(t.id, TicketEvent::AskHuman { reason })?)
             })?;
@@ -128,6 +131,7 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
                     text,
                     permission: false,
                     detail: None,
+                    choices: Vec::new(),
                 },
             )
             .map(|_| ()),
@@ -252,7 +256,7 @@ fn react<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, sign: &Sign<'_>) -> Ap
         return Ok(reaction);
     }
     if reaction == Reaction::Overtake
-        && let Some(WaitingReason::Question { text }) = waiting
+        && let Some(WaitingReason::Question { text, .. }) = waiting
     {
         let gist = "The question was overtaken by the hand-in".to_owned();
         let body = CommentBody {
