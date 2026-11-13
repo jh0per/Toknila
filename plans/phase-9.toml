@@ -141,3 +141,40 @@ acceptance = [
   "tok planner stop succeeds whether the planner is starting, running or gone; the ten-cycles test asserts that and passes fifty times in a row on macOS",
   "A client test of the once-dropped connection, seen red first; cargo xtask verify green",
 ]
+
+# Added during the run (tok ticket new, TOKNILA-124..126) from the owner's first use of the assistant
+# for a feature ("hide a project, not archive"): the assistant made the epic and told the owner to open
+# it and say "plan"; the answer to "Плануй" took 3.5 minutes with nothing on the screen; and the epic's
+# release node depended on none of the stories made after it. The full prompts are the session's files
+# toknila-124-prompt.md, toknila-125-prompt.md, toknila-126-prompt.md; in short:
+[[ticket]]
+id = "epic-with-stories-in-one-go"
+title = "The assistant builds the epic with its stories in one go"
+after = ["chat-answers-when-agent-gone"]
+prompt = "When the person asks for a feature and confirms, the assistant creates the epic and drafts its stories in the same turn and says what to press; never 'open the epic and say plan', never two permission questions for one request. The roadmap-level planner's tools may add stories to the epic made in the turn or one the person named (still refused for another epic); the context rule in planner.rs says so, snapshot updated. Daemon test of the tool rule, planner snapshot, a conversation test with the fake planner, red first."
+acceptance = [
+  "A request to build something, once confirmed, ends in one turn with an epic that has its stories in order and a line saying what to press; the assistant never asks the person to open the epic and say plan",
+  "The roadmap-level planner may add stories to the epic it made in the turn or one the person named, and is still refused for another epic; the context rule says so and the snapshot is updated",
+  "Covered by a daemon test of the tool rule, the planner snapshot and a conversation test with the fake planner, seen red first",
+]
+
+[[ticket]]
+id = "assistant-says-what-it-does"
+title = "The assistant says what it is doing while it works; the panel counts the minutes"
+after = ["chat-answers-when-agent-gone"]
+prompt = "Before a read or run that takes more than seconds the assistant sends one line naming it (a progress variant of its reply tool if one message per turn is the limit); the panel's waiting line counts the minutes, shows the last progress line, and after five minutes points to the assistant's terminal; a message sent while an answer is awaited is kept for the next turn and the panel says so. Web unit test, daemon test of the progress route, planner snapshot, e2e with the fake planner, red first."
+acceptance = [
+  "Before a long read or run the assistant sends one line naming it, in the person's language; the panel shows it under a waiting line that counts the minutes and, after five, points to the assistant's terminal",
+  "A message sent while an answer is awaited is kept and read with the next turn, and the panel says so",
+  "Covered by a web unit test, a daemon test of the progress route, the planner snapshot and an e2e with the fake planner, seen red first",
+]
+
+[[ticket]]
+id = "release-after-every-story"
+title = "A release waits for every story of its epic, including the ones added later"
+prompt = "The epic's release node depends on every story of the epic that no other story depends on (the leaves), recomputed in core's graph whenever the epic's stories change by any path (import, CLI, window, assistant, wildcard, move in or out). tok chain show and the diagram follow. Core graph tests per path, daemon and cli tests, red first."
+acceptance = [
+  "A story added to an epic by any path (import, CLI, window, assistant, wildcard, move in) goes before the epic's release node; one moved out leaves it; the rule lives once in core's graph",
+  "tok chain show and the epic diagram show the release after the leaves",
+  "Covered by core graph tests per path, daemon and cli tests, seen red first",
+]
