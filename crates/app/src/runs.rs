@@ -94,6 +94,7 @@ fn start_with<U: UnitOfWork + ?Sized>(
                 title: t.title.clone(),
                 prompt: t.prompt.clone(),
                 acceptance: t.acceptance.clone(),
+                checklist: toknila_core::instructions::BriefTask::of(&uow.subtasks(ticket)?),
                 check_command: project.check_command.clone(),
                 setup_command: project.setup_command.clone(),
                 earlier: toknila_core::instructions::earlier(&comments),

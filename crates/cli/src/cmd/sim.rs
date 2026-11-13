@@ -126,6 +126,7 @@ pub(super) fn run(c: &Client, target: &str, action: SimCmd, json_out: bool) -> R
             text,
             permission,
             detail: None,
+            choices: Vec::new(),
         },
         SimCmd::Subtask { position, .. } => AgentEvent::SubtaskDone { position },
         SimCmd::Note { text } => AgentEvent::Note {

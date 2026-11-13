@@ -23,6 +23,7 @@ fn ask(mem: &mut Mem) {
         text: "may I run rm?".to_owned(),
         permission: true,
         detail: None,
+        choices: Vec::new(),
     };
     agent::ticket_event(mem, &t, event).expect("ask_human");
     assert_eq!(
@@ -171,6 +172,7 @@ fn a_permission_request_leaves_no_comment_on_the_card_but_a_question_does() {
         text: "which database?".to_owned(),
         permission: false,
         detail: None,
+        choices: Vec::new(),
     };
     agent::ticket_event(&mut mem, &t, event).expect("ask_human");
     assert_eq!(mem.comments.len(), 1, "an ask_human question is kept");

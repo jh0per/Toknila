@@ -12,6 +12,14 @@ Done means every item holds, each with evidence:
 
 - [ ] The earlier instruction is in the file
 
+## Checklist
+
+The story's tasks, by position. Tick a task with `subtask_done` (its position) when you did it; never ask a person whether to tick one.
+
+1. [x] Write the failing test
+2. [x] Check on an iPhone (done by a person)
+3. [ ] Run the gate
+
 ## Instructions you were given earlier
 
 A person gave these to the run of this story before you. They were delivered, and they still apply: some may be done already in the commits on this branch, so look at what is there, then carry on and follow the rest. Oldest first:
@@ -35,7 +43,12 @@ Use the tools of the MCP server `toknila`; never change the ticket any other way
 - `started`: you begin working.
 - `subtask_done` (`position`): a task of the checklist is done.
 - `note` (comment template fields): progress, a decision you made, a finding. Nobody answers a note: a question in it is never seen.
-- `ask_human` (`text`): the one way to get an answer. Use it for every decision you cannot make yourself (which option, may I install something, what is the cause); then stop and wait. Do not ask the same thing through `note`.
+- `ask_human` (`text`, `choices`): the one way to get an answer. Use it for every decision you cannot make yourself (which option, may I install something, what is the cause); then stop and wait. Do not ask the same thing through `note`. The person who reads it is not a developer looking at your screen, so write it for them:
+  - Ask one question at a time, in the words of the person who will read it.
+  - Say in one sentence what you cannot do, and in one sentence what you recommend.
+  - Give `choices`: two to four short sentences the person can act on, the recommended one first, each a thing the person does or decides ("Hand in now; you check on the phone at review", "Wait; I check on the phone first and tell you"). Never write the options as (a)/(b) prose for the person to retype. The person presses one and you get its text back.
+  - No task ids, no checklist positions, no file paths unless the person must open the file.
+  - Never ask whether to tick a task: tick what you did with `subtask_done`.
 - `finished` (`summary`): the work is complete and every acceptance item holds. Not before. Commit your work on this branch first: `finished` with uncommitted changes is wrong, and Toknila merges or pushes only what is committed. After `finished`, stop: do not edit, run or verify anything more; the next thing you do is act on a person's Return or instruction.
 - `crashed` (`detail`): you cannot continue.
 - `propose` (`title`, `prompt`, `acceptance`): work you found that nobody planned. It becomes a story a person approves; do not do it yourself.

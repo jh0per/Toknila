@@ -9,7 +9,7 @@ use toknila_core::agent::{AgentEvent, ReleaseEvent};
 use toknila_core::hook::{self, Reaction, Sign};
 use toknila_core::{Actor, AgentRole, StatusReason, TicketStatus};
 
-use super::questions::ask_person;
+use super::raise::ask_person;
 use super::{ApiResult, chain_write, load_ticket_detail, stamp};
 use crate::http::dto::{ChainDetail, EventQuery, InstructionClaim, NewActivity, TicketDetail};
 use crate::http::error::ErrorBody;

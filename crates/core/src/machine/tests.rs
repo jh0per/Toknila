@@ -166,6 +166,7 @@ fn leaving_ready_clears_the_queued_flag() {
 fn running_to_waiting_on_ask_human() {
     let reason = WaitingReason::Question {
         text: "який фреймворк?".to_owned(),
+        choices: Vec::new(),
     };
     let tr = ok(
         TicketStatus::Running,
@@ -187,6 +188,7 @@ fn waiting_with(reason: WaitingReason) -> Ticket {
 fn a_question_replaces_the_silent_reason() {
     let reason = WaitingReason::Question {
         text: "which flow?".to_owned(),
+        choices: Vec::new(),
     };
     let event = TicketEvent::AskHuman {
         reason: reason.clone(),
@@ -200,6 +202,7 @@ fn a_question_replaces_the_silent_reason() {
 fn silence_never_replaces_an_open_question() {
     let open = WaitingReason::Question {
         text: "which flow?".to_owned(),
+        choices: Vec::new(),
     };
     let event = TicketEvent::AskHuman {
         reason: WaitingReason::Silent,
@@ -213,10 +216,12 @@ fn silence_never_replaces_an_open_question() {
 fn a_second_question_is_still_refused() {
     let open = WaitingReason::Question {
         text: "first".to_owned(),
+        choices: Vec::new(),
     };
     let event = TicketEvent::AskHuman {
         reason: WaitingReason::Question {
             text: "second".to_owned(),
+            choices: Vec::new(),
         },
     };
     assert!(apply(&waiting_with(open), &event, NOW).is_err());
@@ -240,7 +245,10 @@ fn waiting_to_running_when_the_agent_is_active_again() {
 #[test]
 fn waiting_to_running_at_once_when_a_person_answers() {
     for reason in [
-        WaitingReason::Question { text: "q".into() },
+        WaitingReason::Question {
+            text: "q".into(),
+            choices: Vec::new(),
+        },
         WaitingReason::Permission {
             text: "p".into(),
             detail: None,
@@ -397,6 +405,7 @@ fn unblock_returns_to_previous_status() {
 fn unblock_to_waiting_restores_the_open_question() {
     let question = WaitingReason::Question {
         text: "який фреймворк?".to_owned(),
+        choices: Vec::new(),
     };
     let waiting = ok(
         TicketStatus::Running,

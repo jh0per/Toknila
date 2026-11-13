@@ -51,6 +51,7 @@ fn a_workers_question_says_whose_it_is_and_what_answers_it_takes() {
         ticket(1, TicketStatus::Running, 5),
         WaitingReason::Question {
             text: "why?".into(),
+            choices: Vec::new(),
         },
     );
     let p = waiting(
@@ -181,7 +182,10 @@ fn a_reviewer_run_that_waits_on_its_screen_is_listed_as_the_reviewers() {
 fn no_screen_item_for_a_card_that_is_not_working_or_already_asks() {
     let waiting_card = waiting(
         ticket(1, TicketStatus::Running, 5),
-        WaitingReason::Question { text: "q".into() },
+        WaitingReason::Question {
+            text: "q".into(),
+            choices: Vec::new(),
+        },
     );
     let blocked_card = blocked(
         ticket(2, TicketStatus::Running, 5),

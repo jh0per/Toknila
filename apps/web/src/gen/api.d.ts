@@ -1888,6 +1888,8 @@ export interface components {
             /** @enum {string} */
             event: "started";
         } | {
+            /** @description Two to four things the person can do, the recommended one first (a question only). */
+            choices?: string[];
             /** @description The whole command a permission request is about, when `text` is only its summary. */
             detail?: string | null;
             /** @enum {string} */
@@ -2671,6 +2673,11 @@ export interface components {
              */
             answers?: components["schemas"]["AnswerKind"][];
             chain?: components["schemas"]["ChainId"] | null;
+            /**
+             * @description The things the person can do about an `ask_human` question, the recommended one first
+             *     (`question` items; empty when the agent offered none).
+             */
+            choices?: string[];
             /** @description The name of the design a pin is about (`design_question` items). */
             design?: string | null;
             /**
@@ -2867,6 +2874,12 @@ export interface components {
              */
             always?: boolean;
             answer: components["schemas"]["AnswerKind"];
+            /**
+             * Format: int32
+             * @description The 0-based index of the choice the person pressed, for an `ask_human` question that
+             *     offered choices; the agent is told the choice's text. Use with `answer: text`.
+             */
+            choice?: number | null;
             role?: components["schemas"]["AgentRole"] | null;
             /** @description The text of a `text` answer; the optional comment of a `deny`. */
             text?: string | null;
@@ -4527,6 +4540,11 @@ export interface components {
         };
         /** @description Why a ticket is Waiting. */
         WaitingReason: {
+            /**
+             * @description Two to four things the person can do, the recommended one first; empty when the
+             *     agent offered none.
+             */
+            choices?: string[];
             /** @enum {string} */
             kind: "question";
             text: string;

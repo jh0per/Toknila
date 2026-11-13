@@ -2,6 +2,7 @@
 //! JSON answer. One module per command group; no business rules here.
 
 mod agent;
+mod answer;
 mod card;
 mod chain;
 mod chain_rm;
@@ -87,6 +88,14 @@ pub enum Command {
         text: String,
         #[arg(long, value_parser = ["instruction", "report", "decision"], default_value = "instruction")]
         kind: String,
+    },
+    /// Answer what a story's agent asked: the number of one of its choices (as `tok show` numbers
+    /// them), or your own words.
+    Answer {
+        ticket: String,
+        /// A choice's number, or the words of your answer.
+        #[arg(required = true)]
+        answer: Vec<String>,
     },
     /// Start a Ready ticket by hand.
     Start { ticket: String },
@@ -279,6 +288,7 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
         Command::Comment { ticket, text, kind } => {
             ticket::comment(&c, &ticket, text, &kind, json_out)
         }
+        Command::Answer { ticket, answer } => answer::run(&c, &ticket, &answer, json_out),
         Command::Start { ticket } => ticket::act(&c, &ticket, "start", None, json_out),
         Command::Pause { ticket } => ticket::act(&c, &ticket, "pause", None, json_out),
         Command::Resume { ticket } => ticket::act(&c, &ticket, "resume", None, json_out),

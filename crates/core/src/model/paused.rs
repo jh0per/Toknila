@@ -6,7 +6,7 @@ impl Ticket {
     /// Words for what a Waiting card waits for, for the run log, `tok show` and the card.
     pub fn waiting_for(&self) -> String {
         match &self.status_reason {
-            Some(StatusReason::Waiting(WaitingReason::Question { text })) => {
+            Some(StatusReason::Waiting(WaitingReason::Question { text, .. })) => {
                 format!("your answer to: {text}")
             }
             Some(StatusReason::Waiting(WaitingReason::Permission { text, .. })) => {

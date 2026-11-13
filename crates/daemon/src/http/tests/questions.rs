@@ -454,3 +454,73 @@ async fn a_worker_that_handed_in_gets_a_denial_at_once_and_the_card_stays_in_rev
     let (_, reply) = permission(&api, &reviewer, "Bash: ls").await;
     assert_eq!(reply, json!({ "decision": "ask" }));
 }
+
+async fn ask_with_choices(api: &Api, token: &str, choices: Value) -> (StatusCode, Value) {
+    api.call_with(
+        token,
+        Method::POST,
+        "/v1/tickets/DEMO-1/events",
+        Some(json!({ "event": "ask_human", "text": "Check the phone now?", "choices": choices })),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn a_question_with_choices_is_answered_by_an_index_and_the_agent_gets_its_text() {
+    let (api, token) = setup().await;
+    // One choice, or five, is refused.
+    let (s, _) = ask_with_choices(&api, &token, json!(["Only one"])).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let choices = json!(["Hand in now; you check at review", "Wait; I check first"]);
+    let (s, v) = ask_with_choices(&api, &token, choices.clone()).await;
+    assert!(s.is_success(), "{v}");
+    let q = wait_for(&api, 1).await;
+    assert_eq!(
+        q[0]["choices"], choices,
+        "the inbox row carries the choices"
+    );
+    // An index past the end is refused and the question stays.
+    let (s, _) = answer(&api, json!({ "answer": "text", "choice": 2 })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(api.status("DEMO-1").await, "waiting");
+    // The second choice is pressed: the agent is told its text.
+    let (s, v) = answer(&api, json!({ "answer": "text", "choice": 1 })).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    let detail = api.get("/v1/tickets/DEMO-1").await;
+    let told: Vec<&Value> = detail["comments"]
+        .as_array()
+        .expect("comments")
+        .iter()
+        .filter(|c| c["kind"] == "instruction")
+        .collect();
+    assert_eq!(told.len(), 1, "{detail}");
+    assert_eq!(told[0]["body"]["gist"], "Wait; I check first");
+    let kinds: Vec<Value> = journal(&api)
+        .await
+        .iter()
+        .map(|e| e["kind"].clone())
+        .collect();
+    assert!(kinds.contains(&json!("question_answered")), "{kinds:?}");
+}
+
+#[tokio::test]
+async fn a_question_takes_free_text_as_its_answer_too() {
+    let (api, token) = setup().await;
+    ask_with_choices(&api, &token, json!(["Yes", "No"])).await;
+    wait_for(&api, 1).await;
+    let (s, _) = answer(&api, json!({ "answer": "text" })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "a text answer needs a text");
+    let (s, v) = answer(
+        &api,
+        json!({ "answer": "text", "text": "Neither: wait a day" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    let detail = api.get("/v1/tickets/DEMO-1").await;
+    let said = detail["comments"]
+        .as_array()
+        .expect("comments")
+        .iter()
+        .any(|c| c["kind"] == "instruction" && c["body"]["gist"] == "Neither: wait a day");
+    assert!(said, "{detail}");
+}

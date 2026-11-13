@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AnswerKind, InboxItem } from "../api/types";
 import { allowAlwaysLine, allowAlwaysRule } from "../store/commands";
 import type { Intent } from "../store/msg";
+import { Choices, choiceIntent } from "./Choices";
 
 const ANSWER_LABEL: Record<AnswerKind, string> = {
   allow: "Allow", deny: "Deny", text: "Send", enter: "Enter", one: "1", two: "2", up: "↑", down: "↓", escape: "Esc",
@@ -61,6 +62,9 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
       {reply === "screen" && (
         <p className="muted" data-testid="answer-terminal-hint">Answer with the keys or text here, or in the story&apos;s Terminal tab.</p>
       )}
+      {reply === "comment" && item.choices && item.choices.length > 0 && (
+        <Choices choices={item.choices} onPick={(i) => dispatch(choiceIntent(ticket, role, i))} />
+      )}
       {reply === "screen" ? (
         <form
           className="compose"
@@ -84,7 +88,7 @@ export function Answer({ item, dispatch }: { item: InboxItem; dispatch: (i: Inte
             setText("");
           }}
         >
-          <textarea aria-label={`Reply to ${ticket}`} placeholder="Answer the agent" value={text} onChange={(e) => setText(e.target.value)} />
+          <textarea aria-label={`Reply to ${ticket}`} placeholder={item.choices?.length ? "Or write another answer" : "Answer the agent"} value={text} onChange={(e) => setText(e.target.value)} />
           <button className="btn primary" type="submit" disabled={!text.trim()}>Reply</button>
         </form>
       ) : null}

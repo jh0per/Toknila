@@ -232,7 +232,8 @@ mod tests {
             [AgentEvent::AskHuman {
                 text: "which?".into(),
                 permission: true,
-                detail: None
+                detail: None,
+                choices: Vec::new(),
             }]
         );
         assert_eq!(answers[0]["id"], 7);

@@ -16,6 +16,24 @@ pub fn print_request(r: Option<&StatusReason>) {
     if let Some(line) = allow_always_line(r) {
         println!("{line}");
     }
+    choices_lines(r).iter().for_each(|line| println!("{line}"));
+}
+
+/// The choices of a waiting question, numbered from 1 for `tok answer <KEY> <n>`, the
+/// recommended first one marked.
+pub fn choices_lines(r: Option<&StatusReason>) -> Vec<String> {
+    let Some(StatusReason::Waiting(WaitingReason::Question { choices, .. })) = r else {
+        return Vec::new();
+    };
+    if choices.is_empty() {
+        return Vec::new();
+    }
+    let mut lines = vec!["answer with `tok answer <KEY> <number>`:".to_owned()];
+    for (i, choice) in choices.iter().enumerate() {
+        let mark = if i == 0 { " (recommended)" } else { "" };
+        lines.push(format!("  {}. {choice}{mark}", i + 1));
+    }
+    lines
 }
 
 /// What "Allow always" would do for a waiting permission question: the rule it adds, or why it
@@ -34,6 +52,27 @@ pub fn allow_always_line(r: Option<&StatusReason>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_question_with_choices_prints_them_numbered_with_the_first_recommended() {
+        let q = |choices: Vec<String>| {
+            StatusReason::Waiting(WaitingReason::Question {
+                text: "Phone?".into(),
+                choices,
+            })
+        };
+        let two = q(vec!["Hand in now".into(), "Wait".into()]);
+        assert_eq!(
+            choices_lines(Some(&two)),
+            [
+                "answer with `tok answer <KEY> <number>`:",
+                "  1. Hand in now (recommended)",
+                "  2. Wait"
+            ]
+        );
+        assert!(choices_lines(Some(&q(Vec::new()))).is_empty());
+        assert!(choices_lines(None).is_empty());
+    }
 
     #[test]
     fn a_waiting_permission_prints_the_rule_allow_always_adds_or_why_none() {
@@ -60,6 +99,7 @@ mod tests {
         assert_eq!(ask("Write: a.rs", None), None);
         let question = StatusReason::Waiting(WaitingReason::Question {
             text: "Bash: ls".into(),
+            choices: Vec::new(),
         });
         assert_eq!(allow_always_line(Some(&question)), None);
     }

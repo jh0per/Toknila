@@ -517,6 +517,7 @@ mod tests {
             check: None,
             threads: &[],
             hand_in: None,
+            checklist: &[],
         }
     }
 

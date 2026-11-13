@@ -195,6 +195,7 @@ fn brief_of_key<'a>(
         title: &cx.brief.title,
         prompt: &cx.brief.prompt,
         acceptance: &cx.brief.acceptance,
+        checklist: &cx.brief.checklist,
         check_command: cx.brief.check_command.as_deref(),
         setup_command: cx.brief.setup_command.as_deref(),
         earlier: &cx.brief.earlier,

@@ -521,6 +521,7 @@ async fn chain_view_saves_and_loads_without_loss() {
     b.status = TicketStatus::Waiting;
     b.status_reason = Some(StatusReason::Waiting(WaitingReason::Question {
         text: "?".into(),
+        choices: vec!["Yes".into(), "No".into()],
     }));
     b.tokens_used = 99;
     let r = Release {

@@ -22,6 +22,7 @@ fn brief_with<'a>(check: Option<&'a CheckOutcome>) -> RunBrief<'a> {
         check,
         threads: &[],
         hand_in: None,
+        checklist: &[],
     }
 }
 

@@ -9,6 +9,7 @@
 //! | `permission` | a permission dialog (hook or notification) | `allow`, `deny` |
 //! | `screen` | nothing for `startup_secs` after spawn | `enter`, `one`, `two`, `up`, `down`, `escape`, `text` (which may carry named keys like `{down}`) |
 
+mod choices;
 mod keys;
 mod screen;
 mod shell_edit;
@@ -18,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{AgentRole, TicketId, TicketStatus, Timestamp};
 
+pub use choices::{ChoiceError, MAX_CHOICES, MIN_CHOICES, check_choices, choice_text};
 pub use keys::{expand_keys, has_named_keys};
 pub use screen::{SCREEN_LINES, last_lines, screen_hash};
 pub use shell_edit::{SHELL_EDIT_DENIAL, shell_edit_denial};
@@ -105,6 +107,8 @@ impl QuestionKind {
     pub fn accepts(self, answer: AnswerKind) -> bool {
         self.answers().contains(&answer)
             || (self == Self::Screen && matches!(answer, AnswerKind::Yes | AnswerKind::No))
+            // An `ask_human` question is answered with free text (or one of its choices).
+            || (self == Self::Question && answer == AnswerKind::Text)
     }
 }
 

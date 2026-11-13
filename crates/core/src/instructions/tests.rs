@@ -37,7 +37,22 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         check: None,
         threads: &[],
         hand_in: None,
+        checklist: &[],
     }
+}
+
+fn pinned_tasks() -> Vec<BriefTask> {
+    let task = |position, text: &str, done, done_by| BriefTask {
+        position,
+        text: text.to_owned(),
+        done,
+        done_by,
+    };
+    vec![
+        task(1, "Write the failing test", true, Some(Actor::Agent)),
+        task(2, "Check on an iPhone", true, Some(Actor::Human)),
+        task(3, "Run the gate", false, None),
+    ]
 }
 
 fn assert_pinned(text: &str, name: &str) {
@@ -59,7 +74,36 @@ fn the_generated_file_is_pinned() {
         "The generated file is pinned by a snapshot test".to_owned(),
         "An instruction comment is delivered and marked delivered".to_owned(),
     ];
-    assert_pinned(&generate(&pinned_brief(&acceptance)), "run.md");
+    let tasks = pinned_tasks();
+    let brief = RunBrief {
+        checklist: &tasks,
+        ..pinned_brief(&acceptance)
+    };
+    let text = generate(&brief);
+    assert_pinned(&text, "run.md");
+    let (acceptance_at, checklist_at) = (text.find("## Acceptance"), text.find("## Checklist"));
+    assert!(
+        acceptance_at < checklist_at && checklist_at.is_some(),
+        "{text}"
+    );
+    assert!(text.contains("2. [x] Check on an iPhone (done by a person)"));
+    assert!(text.contains("3. [ ] Run the gate\n"));
+    assert!(!generate(&pinned_brief(&acceptance)).contains("## Checklist"));
+}
+
+#[test]
+fn the_protocol_tells_the_agent_to_ask_in_the_persons_words_with_choices_as_actions() {
+    let p = protocol();
+    for rule in [
+        "Ask one question at a time",
+        "Say in one sentence what you cannot do",
+        "Give `choices`: two to four short sentences the person can act on, the recommended one first",
+        "Never write the options as (a)/(b) prose",
+        "No task ids, no checklist positions",
+        "Never ask whether to tick a task",
+    ] {
+        assert!(p.contains(rule), "the protocol lacks: {rule}");
+    }
 }
 
 #[test]
@@ -142,6 +186,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         check: None,
         threads: &[],
         hand_in: None,
+        checklist: &[],
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -233,6 +278,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         check: None,
         threads: &[],
         hand_in: None,
+        checklist: &[],
     }
 }
 
@@ -331,10 +377,12 @@ fn only_the_newest_earlier_instructions_are_kept() {
 fn the_instructions_of_a_replacement_run_carry_the_earlier_ones_and_the_kickoff_says_so() {
     let acceptance = vec!["The earlier instruction is in the file".to_owned()];
     let texts = earlier(&[sent("use the Edit tool", 2, true)]);
+    let tasks = pinned_tasks();
     let brief = RunBrief {
         earlier: &texts,
         waiting: &[],
         returned: None,
+        checklist: &tasks,
         ..pinned_brief(&acceptance)
     };
     assert_pinned(&generate(&brief), "run_replacement.md");
