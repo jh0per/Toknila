@@ -17,6 +17,16 @@ pub fn reason(t: &Ticket, queue_position: Option<u32>, reason: &str) {
 /// `agent: paused, not running; waiting for ...`, or `None` while the agent is not paused.
 pub fn agent_line(t: &Ticket, queue_position: Option<u32>) -> Option<String> {
     let paused = t.agent_paused.as_ref()?;
+    if paused.lost {
+        let when = if paused.resume {
+            "a slot is free"
+        } else {
+            "you answer"
+        };
+        return Some(format!(
+            "agent: the app restarted; the agent starts when {when}"
+        ));
+    }
     let how = if !paused.resume {
         "answer it and the agent resumes".to_owned()
     } else {
@@ -75,6 +85,22 @@ mod tests {
         assert!(
             line.contains("resumes when a slot is free (#2 in line)"),
             "{line}"
+        );
+    }
+
+    #[test]
+    fn a_lost_agent_says_the_app_restarted_and_when_it_starts() {
+        let mut running = paused(true);
+        running.agent_paused.as_mut().expect("paused").lost = true;
+        assert_eq!(
+            agent_line(&running, None).as_deref(),
+            Some("agent: the app restarted; the agent starts when a slot is free")
+        );
+        let mut waiting = paused(false);
+        waiting.agent_paused.as_mut().expect("paused").lost = true;
+        assert_eq!(
+            agent_line(&waiting, None).as_deref(),
+            Some("agent: the app restarted; the agent starts when you answer")
         );
     }
 

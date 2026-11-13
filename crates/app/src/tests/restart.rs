@@ -188,6 +188,37 @@ fn unblocking_a_lost_runner_pauses_the_agent_and_never_leaves_a_bare_running_car
 }
 
 #[test]
+fn an_instruction_on_a_blocked_lost_card_unblocks_it_and_reaches_the_replacement_run() {
+    let mut mem = started();
+    mem.restart();
+    settle(&mut mem);
+    mem.runner.live.borrow_mut().clear();
+    mem.restart();
+    let blocked = a(&mem);
+    assert_eq!(blocked.status, TicketStatus::Blocked);
+    mem.runner.started.borrow_mut().clear();
+    let body = CommentBody {
+        gist: "Recommended".to_owned(),
+        ..CommentBody::default()
+    };
+    tickets::comment(&mut mem, &blocked, CommentKind::Instruction, body).expect("answer");
+    assert_ne!(a(&mem).status, TicketStatus::Blocked, "one Send restarts");
+    settle(&mut mem);
+    let runs = mem.resume_requests();
+    assert_eq!(runs.len(), 1, "{runs:?}");
+    let input = runs[0].brief.resume.clone().expect("resume").input;
+    assert!(input.contains("Recommended"), "{input}");
+    assert!(
+        mem.comments
+            .iter()
+            .filter(|c| c.kind == CommentKind::Instruction)
+            .all(|c| c.delivered_at.is_some()),
+        "{:?}",
+        mem.comments
+    );
+}
+
+#[test]
 fn unblocking_a_lost_waiting_card_keeps_the_question_and_pauses_the_agent() {
     let mut mem = started();
     let t = a(&mem);

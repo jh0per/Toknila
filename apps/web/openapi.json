@@ -10351,6 +10351,41 @@
           }
         }
       },
+      "PendingReason": {
+        "type": "string",
+        "description": "Why a person's instruction is still pending, in what the daemon does about it.",
+        "enum": [
+          "starts_agent",
+          "waits_for_slot",
+          "at_start"
+        ]
+      },
+      "PendingView": {
+        "type": "object",
+        "description": "The pending reason of a card, with the slots it may be waiting for.",
+        "required": [
+          "reason",
+          "busy",
+          "slots"
+        ],
+        "properties": {
+          "busy": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Slots held now.",
+            "minimum": 0
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PendingReason"
+          },
+          "slots": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The project's agent limit.",
+            "minimum": 0
+          }
+        }
+      },
       "PermissionAsk": {
         "type": "object",
         "description": "Body of `POST /v1/tickets/{ticket}/permission`: an agent's `PermissionRequest` hook, which\nwaits for the person's decision.",
@@ -13296,6 +13331,17 @@
             "format": "int64",
             "description": "Milliseconds in the current status.",
             "minimum": 0
+          },
+          "pending": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PendingView",
+                "description": "What the daemon does with the person's instruction that no agent has received yet;\nabsent when none is pending or the card's agent is alive."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "phase": {
             "$ref": "#/components/schemas/Phase",

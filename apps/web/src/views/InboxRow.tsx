@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { post } from "../api/http";
 import { type CardItem, type InboxItem, type InboxKind, type TicketDetail, isCardItem } from "../api/types";
+import { RUNNER_LOST_TWICE } from "../format";
 import { MAX_ANSWER, answerProblem } from "../store/pins";
 import { finishReport } from "../store/permissionReports";
 import { HandIn, InboxHandInBlocks } from "./HandIn";
@@ -27,7 +28,16 @@ const KIND_LINE: Record<InboxKind, string> = {
   pin: "The assistant asks about a design",
 };
 
-type Dispatch = (i: Intent) => void;
+/// The second line of a row: for a blocked card the reason's own sentence (a double loss of the
+/// runner says what to press), else what is asked of the person.
+export function kindLine(item: Pick<InboxItem, "kind" | "text">): string {
+  if (item.kind !== "blocked" || !item.text) return KIND_LINE[item.kind];
+  if (item.text === RUNNER_LOST_TWICE) return item.text;
+  const sentence = (item.text.split("\n")[0] ?? "").replace(/^[a-z_]+: /, "");
+  return sentence ? `Blocked: ${sentence}` : KIND_LINE.blocked;
+}
+
+type Dispatch =(i: Intent) => void;
 
 /// One thing that waits on a person: the card's title first, what is asked as a muted second
 /// line, the actions that settle it, and Open card.
@@ -54,7 +64,7 @@ export function InboxRow({ state, item, dispatch }: { state: State; item: InboxI
         <span className="t">{item.title}</span>
         {route ? <NavLink route={route} dispatch={dispatch} className="key">{item.ticket}</NavLink> : <span className="key">{item.ticket}</span>}
       </div>
-      <div className="row-kind muted" data-testid="inbox-kind">{KIND_LINE[item.kind]}</div>
+      <div className="row-kind muted" data-testid="inbox-kind">{kindLine(item)}</div>
       {state.chains[item.chain] && <div className="row-epic muted" data-testid="inbox-epic">{epicTitle(state.chains[item.chain])}</div>}
       <Body item={item} route={route} open={open} dispatch={dispatch} detail={state.details[item.ticket]} />
     </li>
@@ -70,7 +80,7 @@ function Body({ item, route, open, dispatch, detail }: BodyProps & { route: Rout
     case "blocked":
       return (
         <div className="row-body">
-          <span className="muted">{item.text}</span>
+          {item.text !== RUNNER_LOST_TWICE && <span className="muted">{item.text}</span>}
           <div className="btns">
             {item.allowed_actions.includes("unblock") && (
               <button className="btn primary" onClick={() => dispatch({ type: "ticketAction", key: item.ticket, action: "unblock" })}>Unblock</button>

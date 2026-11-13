@@ -75,7 +75,9 @@ pub async fn runner_answer(
     let at = now();
     let runners = state.runners.clone();
     // A paused agent has no dialog or terminal: the answer starts it again.
-    if role == AgentRole::Worker && t.agent_paused.is_some() {
+    if role == AgentRole::Worker
+        && (t.agent_paused.is_some() || toknila_app::paused::lost_blocked(&t))
+    {
         let (answer, text, card) = (body.answer, body.text.clone(), t.clone());
         let (resumed, _) = state
             .store

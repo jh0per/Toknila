@@ -3292,6 +3292,25 @@ export interface components {
             since: components["schemas"]["Timestamp"];
         };
         /**
+         * @description Why a person's instruction is still pending, in what the daemon does about it.
+         * @enum {string}
+         */
+        PendingReason: "starts_agent" | "waits_for_slot" | "at_start";
+        /** @description The pending reason of a card, with the slots it may be waiting for. */
+        PendingView: {
+            /**
+             * Format: int32
+             * @description Slots held now.
+             */
+            busy: number;
+            reason: components["schemas"]["PendingReason"];
+            /**
+             * Format: int32
+             * @description The project's agent limit.
+             */
+            slots: number;
+        };
+        /**
          * @description Body of `POST /v1/tickets/{ticket}/permission`: an agent's `PermissionRequest` hook, which
          *     waits for the person's decision.
          */
@@ -4339,6 +4358,7 @@ export interface components {
              * @description Milliseconds in the current status.
              */
             in_status_ms: number;
+            pending?: components["schemas"]["PendingView"] | null;
             /** @description Computed from the ticket's threads: design while any is open, implement otherwise. */
             phase: components["schemas"]["Phase"];
             /**

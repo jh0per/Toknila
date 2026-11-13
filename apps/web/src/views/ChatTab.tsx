@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { Ticket } from "../api/types";
-import { type ChatItem, canTalk, chatItems, whenText } from "../store/chat";
+import type { Ticket, TicketDetail } from "../api/types";
+import { type ChatItem, canTalk, chatItems, composerPlaceholder, pendingText, whenText } from "../store/chat";
 import type { Intent } from "../store/msg";
 import { type State, ticketEvents } from "../store/state";
 import { Answer } from "./Answer";
@@ -12,7 +12,7 @@ const KIND_LABEL: Record<ChatItem["kind"], string> = {
   instruction: "instruction", report: "report", decision: "decision", question: "question", answer: "answer", note: "",
 };
 
-function Bubble({ item }: { item: ChatItem }) {
+function Bubble({ item, pending }: { item: ChatItem; pending: TicketDetail["pending"] }) {
   return (
     <li className={`bubble ${item.side} k-${item.kind}`} data-testid="bubble" data-kind={item.kind} data-side={item.side}>
       <div className="bubble-head">
@@ -22,7 +22,8 @@ function Bubble({ item }: { item: ChatItem }) {
       </div>
       <p className="gist">{item.text}</p>
       {item.more.map((line, i) => <p key={i} className={i === 0 ? "" : "muted"}>{line}</p>)}
-      {item.pending && <span className="muted" data-testid="bubble-pending">not delivered yet</span>}
+      {item.pending && <span className="muted" data-testid="bubble-pending">{pendingText(pending ?? undefined)}</span>}
+      {item.delivered && <span className="muted" data-testid="bubble-delivered">delivered</span>}
     </li>
   );
 }
@@ -46,13 +47,12 @@ export function ChatTab({ state, card, dispatch }: { state: State; card: Ticket;
     setText("");
   };
   const speech = useSpeech(text, setText, send);
-  const started = card.status === "running" || card.status === "waiting" || card.status === "review";
   return (
     <div className="chat" data-testid="chat">
       {!detail ? <p className="muted">Loading…</p> : items.length === 0 && !asked ? (
         <p className="muted" data-testid="chat-empty">Nothing said yet. What you and the story's agent tell each other appears here.</p>
       ) : (
-        <ol className="bubbles" data-testid="chat-items">{items.map((i) => <Bubble key={i.key} item={i} />)}</ol>
+        <ol className="bubbles" data-testid="chat-items">{items.map((i) => <Bubble key={i.key} item={i} pending={detail.pending ?? undefined} />)}</ol>
       )}
       {asked && (
         <div className="bubble agent open-question" data-testid="chat-answer">
@@ -64,7 +64,7 @@ export function ChatTab({ state, card, dispatch }: { state: State; card: Ticket;
         <form className="chat-box" data-testid="chat-box" onSubmit={(e) => { e.preventDefault(); send(); }}>
           <PromptField
             value={text} onChange={(t) => { speech.stop(); setText(t); }} onSubmit={send} rows={2} label="Message to the agent" testId="chat-input"
-            placeholder={started ? "Tell the agent something; Enter sends" : "Leave a note for the agent; it gets it when it starts"}
+            placeholder={composerPlaceholder(card)}
           />
           <MicButton s={speech} testId="chat" disabled={false} />
           <button type="submit" className="btn primary" data-testid="chat-send" disabled={!text.trim()}>Send to the agent</button>

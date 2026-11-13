@@ -30,6 +30,25 @@ describe("the status sentence", () => {
     expect(line.text).toBe("Answered: the agent resumes when a slot is free (#2 in line)");
   });
 
+  it("says a lost agent starts when a slot is free, or when you answer", () => {
+    const reason = { status: "waiting", kind: "question", text: "Which database?" } as StatusReason;
+    const running = { since: 1, resume: true, lost: true } as Ticket["agent_paused"];
+    expect(statusLine(card("running", { agent_paused: running }), detail([]), pace()).text).toBe(
+      "The app restarted; the agent starts when a slot is free",
+    );
+    const waiting = { since: 1, resume: false, lost: true } as Ticket["agent_paused"];
+    expect(statusLine(card("waiting", { status_reason: reason, agent_paused: waiting }), detail([]), pace()).text).toBe(
+      "The app restarted; the agent starts when you answer: Which database?",
+    );
+  });
+
+  it("tells a double loss what to press", () => {
+    const reason = { status: "blocked", reason: { kind: "runner_lost", first: 1, second: 2 }, resume_to: "running" } as StatusReason;
+    expect(statusLine(card("blocked", { status_reason: reason }), detail(["unblock"]), pace()).text).toBe(
+      "The app restarted twice while the agent worked. Unblock starts it once more; it gets your answer.",
+    );
+  });
+
   it("says a card waits for you to approve its design, with a link to Threads", () => {
     const d = { ...detail([]), design_waiting: true, phase: "design" } as TicketDetail;
     const line = statusLine(card("running", { design_first: true }), d, pace());
