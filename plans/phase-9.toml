@@ -100,3 +100,30 @@ acceptance = [
   "The protocol tells the agent to ask in the person's words with choices as actions, no task ids or positions, and never to ask about ticking; the run file lists the checklist with positions and done state; both pinned in the snapshots",
   "Covered by core, daemon, web and e2e tests seen red first",
 ]
+
+# Added during the run (tok ticket new, TOKNILA-120), twenty minutes after the import: the owner
+# typed "шо треба зробити?" into the chat of a story at the person's turn and nothing answered.
+[[ticket]]
+id = "chat-answers-when-agent-gone"
+title = "A question in a story's chat gets an answer when the agent is gone"
+after = ["answer-reaches-agent", "question-a-person-can-answer"]
+prompt = """
+What happened. BEATSTER-7 was in Review at the person's turn (Accept and Return shown). The owner typed "шо треба зробити?" (what do I need to do?) into the story's chat and pressed Send to the agent. The bubble said "not delivered yet" and nothing answered: the worker's process ends at the hand-in and a Return starts a new run, so an instruction on a Review card waits for a Return the owner did not know to make. Ten minutes earlier the same owner had answered a question on the same card while its agent was lost, with the same silence (TOKNILA-118 covers that path). The chat looks like a chat and is used as one; the product treats it as a queue of instructions for the next run. Nothing in the window answers a person who asks what to do.
+
+Build this.
+
+1. Two ways to send, both named on the composer. The composer of a story's chat (apps/web/src/views/ChatTab.tsx) gets two buttons: "Ask" and "Tell the agent". "Tell the agent" is today's path (an instruction for the agent, with the pending sentence TOKNILA-118 adds). "Ask" sends the text to the project's assistant (the planner of TOKNILA-97 and TOKNILA-109: crates/core/src/instructions/planner.rs, the daemon's planner routes) with the story's record as its context: title, prompt, acceptance, checklist, the hand-in (What changed, Checks, Left), the review rounds with their verdicts and items, the last ten comments, the status and whose turn it is. The assistant answers in the same chat as its own bubble (author `assistant`), in the person's language (the language rules of TOKNILA-73 and TOKNILA-77 apply), and changes nothing on the story. When no agent is live (Review at the person's turn, Merged, Blocked, a paused agent) "Ask" is the default and what Enter does; when an agent is live, "Tell the agent" is. A pending "Tell the agent" bubble on a card with no live agent gains a link "Ask instead" that sends the same text as a question.
+
+2. On a Review card the assistant says what the person must do. A planner instruction for the story context (planner.rs, pinned in the snapshot): in a story's chat you answer the question asked, from the record; when the story waits for the person, list what they must do (the PERSON items of the hand-in and of the reviewer's verdict) as steps a person can follow, then say what Accept and Return will do; you never plan or change the story there.
+
+3. The Review card shows "Needs you" above the chat: the PERSON items of the hand-in and of the reviewer's verdict as a short list (the Review panel or apps/web/src/views/HandIn.tsx, wherever the hand-in blocks render), and under the buttons one line each: "Accept: the story merges" and "Return: the agent fixes what you found". A Review card with no PERSON item shows "Nothing to do by hand; Accept when the hand-in convinces you".
+
+4. Tests, red first and quoted in the hand-in: a daemon test of the ask route with the record in the assistant's context and the answer stored as an assistant comment on the story; the planner snapshot; a web unit test of the composer's default per status; an e2e with the fake planner: a Review card, the person asks, an answer bubble appears and no instruction is queued; a web unit test of the "Needs you" list from a hand-in with PERSON items. Run `cargo xtask web`, `cargo xtask e2e-web`, `cargo xtask verify`.
+
+Keep the change inside crates/core (planner instructions), crates/daemon (the ask route and the planner context), crates/api-types (then `cargo xtask gen`, never a hand edit of api.d.ts), apps/web (ChatTab, the Review panel, the store), and the tests.
+"""
+acceptance = [
+  "A story's chat has Ask and Tell the agent; Ask is answered by the assistant from the story's record, in the person's language, as a bubble that changes nothing; it is the default when no agent is live",
+  "On a Review card the assistant's answer and a Needs you block list what the person must do by hand and what Accept and Return do",
+  "Covered by a daemon test, the planner snapshot, web unit tests and an e2e with the fake planner, seen red first",
+]
