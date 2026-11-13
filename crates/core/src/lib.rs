@@ -5,6 +5,7 @@
 
 pub mod address;
 pub mod agent;
+pub mod card_move;
 pub mod conversation;
 pub mod dag;
 pub mod defaults;

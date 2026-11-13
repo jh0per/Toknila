@@ -121,7 +121,7 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
             </div>
             {chainsOpen && (
               <ul role="group">
-                <SidebarChains chains={chains} project={key} selected={selected} dispatch={dispatch} onMenu={onChainMenu} />
+                <SidebarChains chains={chains} project={key} selected={selected} dispatch={dispatch} onMenu={onChainMenu} drop={state.placement.dropEpic} />
               </ul>
             )}
           </li>

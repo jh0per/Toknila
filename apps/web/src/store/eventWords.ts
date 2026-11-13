@@ -66,6 +66,7 @@ const TABLE: Record<string, Words> = {
   "chain.edge_added": () => "A story now waits for another",
   "chain.edge_removed": () => "A story no longer waits for another",
   "chain.edge_moved": () => "A dependency moved to another story",
+  "ticket.moved": (p) => `Moved from ${str(p.from)} to ${str(p.to)}`,
   "ticket.design_moved": (p) => `A design reference moved here from ${str(p.from)}`,
   "ticket.created": () => "Story created",
   "ticket.status_changed": (p) => `Moved from ${status(p.from)} to ${status(p.to)}${becauseOf(p.reason)}`,

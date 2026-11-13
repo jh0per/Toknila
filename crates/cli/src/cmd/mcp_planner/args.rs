@@ -47,8 +47,12 @@ pub(super) struct Dependency {
 pub(super) struct Move {
     pub chain: String,
     pub card: String,
-    pub anchor: String,
-    pub place: Place,
+    #[serde(default)]
+    pub anchor: Option<String>,
+    #[serde(default)]
+    pub place: Option<Place>,
+    #[serde(default)]
+    pub to_chain: Option<String>,
 }
 
 #[derive(Deserialize)]

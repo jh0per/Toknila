@@ -15,6 +15,8 @@ export interface MenuEntry {
   sep?: boolean;
   /// For a choice among several: whether this one is the current choice (a check mark shows).
   checked?: boolean;
+  /// Greyed and not run when picked (the epic a card is in, in the "Move to epic" chooser).
+  disabled?: boolean;
 }
 
 /// The entries of `groups` in one list, with a separator between the groups; an empty group

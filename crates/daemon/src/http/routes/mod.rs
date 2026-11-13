@@ -108,6 +108,7 @@ fn load_ticket_detail(
         .ticket(ticket)?
         .ok_or_else(|| AppError::not_found(format!("ticket {ticket}")))?;
     let chain = repo.chain(t.chain_id)?.map(|c| c.name).unwrap_or_default();
+    let ship = repo.ship(t.id)?;
     let mut review = toknila_app::reviews::view(repo, &t)?;
     if review.awaiting == Some(toknila_core::ReviewTurn::Check) {
         review.check_queue = prices
@@ -148,12 +149,13 @@ fn load_ticket_detail(
         allowed_actions: toknila_core::machine::TicketAction::allowed(&t),
         can_edit: t.status.can_edit(),
         can_move: t.status.can_move(),
+        can_move_to_chain: toknila_core::card_move::may_leave(&t, ship.is_some()),
         subtasks: repo.subtasks(t.id)?,
         comments: repo.comments(t.id)?,
         in_status_ms: at.millis_since(t.status_since),
         phase: toknila_core::thread::phase(&threads),
         queue_position: schedule::queue_positions(repo)?.get(&t.id).copied(),
-        ship: repo.ship(t.id)?,
+        ship,
         size_clamped: None,
         chain,
         ticket: t,

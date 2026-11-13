@@ -2,7 +2,8 @@
 // call (`allowed_actions`, `can_edit`, `can_move` of its detail), worded by `specsFor`; nothing is
 // derived here. At most one entry is red, and it is last.
 
-import type { TicketAction, TicketDetail } from "../api/types";
+import type { ChainDetail, TicketAction, TicketDetail } from "../api/types";
+import { epicTitle } from "../store/title";
 import type { MenuEntry } from "./ContextMenu";
 import { specsFor } from "./actionLabels";
 import { menuGroups } from "./menuGroups";
@@ -25,6 +26,8 @@ export interface CardMenuHandlers {
   addBefore: () => void;
   /// Pick the card this one should wait for.
   addDependency: () => void;
+  /// Pick the epic of the project the card moves to: this opens the chooser.
+  moveToEpic: () => void;
   /// Cancelling asks first: this opens the question.
   askCancel: () => void;
 }
@@ -61,10 +64,24 @@ export function cardEntries(detail: TicketDetail | undefined, h: CardMenuHandler
   if (detail?.can_move) around.push({ label: "Add story before", testId: "menu-card-add-before", run: h.addBefore });
   around.push({ label: "Add story after", testId: "menu-card-add-after", run: h.addAfter });
   if (detail?.can_move) around.push({ label: "Add dependency…", testId: "menu-card-add-dependency", run: h.addDependency });
+  // Whether the card may leave its epic is core's call (`can_move_to_chain`).
+  if (detail?.can_move_to_chain) around.push({ label: "Move to epic…", testId: "menu-card-move-epic", run: h.moveToEpic });
 
   const cancel = specs.find((s) => s.action === "cancel");
   const last: MenuEntry[] = cancel ? [{ label: cancel.label, testId: "menu-card-cancel", danger: true, run: h.askCancel }] : [];
   return menuGroups(open, actions, around, last);
+}
+
+/// The chooser of "Move to epic…": the project's epics in roadmap order, the card's own greyed.
+/// Picking one runs `move` with the epic's id.
+export function epicChoices(epics: ChainDetail[], own: string, move: (chain: string) => void): MenuEntry[] {
+  return epics.map((c) => ({
+    label: epicTitle(c),
+    testId: `menu-move-to-${c.chain.name}`,
+    disabled: c.chain.id === own,
+    hint: c.chain.id === own ? "The story is in this epic" : undefined,
+    run: () => c.chain.id !== own && move(c.chain.id),
+  }));
 }
 
 export interface CanvasMenuHandlers {

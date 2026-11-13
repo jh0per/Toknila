@@ -27,5 +27,10 @@ export function runPlacementEffect(e: PlacementEffect, dispatch: (msg: Msg) => v
         .then((chain) => dispatch({ type: "chainArranged", chain }))
         .catch((err: unknown) => dispatch({ type: "edgeRefused", message: text(err) }));
       return;
+    case "moveToEpic":
+      post<TicketDetail>(`/tickets/${enc(e.key)}/move-to-chain`, e.place ? { chain: e.chain, place: e.place } : { chain: e.chain })
+        .then((detail) => dispatch({ type: "movedToEpic", from: e.from, detail }))
+        .catch((err: unknown) => dispatch({ type: "edgeRefused", message: text(err) }));
+      return;
   }
 }

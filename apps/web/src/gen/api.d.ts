@@ -411,7 +411,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Puts a card directly before or after another; the dependencies around it are rewired. */
+        /**
+         * Puts a card directly before or after another (the dependencies around it are rewired), or
+         *     moves it to another epic of the project (`to_chain`).
+         */
         post: operations["planner_move_card"];
         delete?: never;
         options?: never;
@@ -1501,6 +1504,23 @@ export interface paths {
         put?: never;
         /** A person's decision about the open subtasks left behind a card done out of order. */
         post: operations["resolve_leftovers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/{ticket}/move-to-chain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Moves a card that has not started to another epic of its project, to the end or next to a card. */
+        post: operations["move_to_chain"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2810,6 +2830,15 @@ export interface components {
             anchor: string;
             place: components["schemas"]["Place"];
         };
+        /**
+         * @description `POST /v1/tickets/{ticket}/move-to-chain`: a card that has not started goes to another epic
+         *     of its project: to the end, or next to a card of that epic.
+         */
+        MoveToChain: {
+            /** @description The epic (id or name) that receives the card. */
+            chain: string;
+            place?: components["schemas"]["MoveInput"] | null;
+        };
         /** @description Body of `POST /v1/tickets/{ticket}/activity`: a sign of life from an agent's hook. */
         NewActivity: {
             /**
@@ -3389,6 +3418,18 @@ export interface components {
              * @description Bytes of the kept file; zero without one.
              */
             size: number;
+        };
+        /**
+         * @description `POST /v1/planner/chains/{chain}/cards/{card}/move`: the planner puts a card next to another
+         *     of its epic, or moves it to another epic (`to_chain`: at the end unless `anchor` and `place`
+         *     say where).
+         */
+        PlannerMove: {
+            /** @description Ticket key of the card the moved card goes next to. */
+            anchor?: string | null;
+            place?: components["schemas"]["Place"] | null;
+            /** @description The epic the card moves to, when it leaves its own. */
+            to_chain?: string | null;
         };
         /** @description Answer of `GET /v1/planner/overview`: the plan in short records and the project's designs. */
         PlannerOverview: components["schemas"]["PlanOverview"] & {
@@ -4273,6 +4314,11 @@ export interface components {
             can_edit: boolean;
             /** @description Can the card still be moved in the chain? Decided by core from the status. */
             can_move: boolean;
+            /**
+             * @description Can the card go to another epic of its project? Decided by core: it has not started (or is
+             *     cancelled) and has no ship.
+             */
+            can_move_to_chain?: boolean;
             chain: string;
             comments: components["schemas"]["Comment"][];
             /**
@@ -5627,7 +5673,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MoveInput"];
+                "application/json": components["schemas"]["PlannerMove"];
             };
         };
         responses: {
@@ -5637,6 +5683,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             403: {
@@ -8072,6 +8126,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_to_chain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Ticket id or key */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveToChain"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {

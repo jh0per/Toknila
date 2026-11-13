@@ -6,6 +6,8 @@
 .ctx-menu [role^=menuitem] { display: flex; align-items: center; gap: var(--sp3); width: 100%; min-height: var(--row-h); border: 0; background: none; text-align: left; padding: 0 var(--sp3); border-radius: var(--shape-xs); }
 .ctx-menu [role^=menuitem]:hover, .ctx-menu [role^=menuitem]:focus-visible { background: var(--primary-container); outline: none; }
 .ctx-menu [role^=menuitem].danger { color: var(--error); }
+.ctx-menu [role^=menuitem][aria-disabled=true] { color: var(--on-surface-variant); opacity: .5; cursor: default; }
+.ctx-menu [role^=menuitem][aria-disabled=true]:hover { background: none; }
 /* The project switcher: the crumb's button and its menu (a .ctx-menu with a filter on top). */
 .switcher-btn { display: inline-flex; align-items: center; gap: var(--sp2); padding: 0 var(--sp2); min-height: var(--row-h); border: 1px solid var(--outline-variant); border-radius: var(--shape-xs); background: var(--surface-container); color: inherit; font: inherit; }
 .switcher-btn:hover, .switcher-btn[aria-expanded=true] { background: var(--primary-container); }

@@ -238,6 +238,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "placeCard":
       case "sizeCard":
       case "arrangeChain":
+      case "moveToEpic":
         runPlacementEffect(e, dispatch);
         return;
       case "setAutostart":

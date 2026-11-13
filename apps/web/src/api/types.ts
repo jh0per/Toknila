@@ -84,6 +84,7 @@ export type NewChain = Schemas["NewChain"];
 export type NewTicket = Schemas["NewTicket"];
 export type PatchTicket = Schemas["PatchTicket"];
 export type Place = Schemas["Place"];
+export type MoveInput = Schemas["MoveInput"];
 export type FoundPlan = Schemas["FoundPlan"];
 export type PlanScan = Schemas["PlanScan"];
 export type ImportPathResult = Schemas["ImportPathResult"];

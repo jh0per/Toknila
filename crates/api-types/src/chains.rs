@@ -120,3 +120,31 @@ pub struct MoveInput {
     pub anchor: String,
     pub place: toknila_core::graph::Place,
 }
+
+/// `POST /v1/tickets/{ticket}/move-to-chain`: a card that has not started goes to another epic
+/// of its project: to the end, or next to a card of that epic.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MoveToChain {
+    /// The epic (id or name) that receives the card.
+    pub chain: String,
+    /// Where it goes in that epic; left out, at the end.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<MoveInput>,
+}
+
+/// `POST /v1/planner/chains/{chain}/cards/{card}/move`: the planner puts a card next to another
+/// of its epic, or moves it to another epic (`to_chain`: at the end unless `anchor` and `place`
+/// say where).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct PlannerMove {
+    /// Ticket key of the card the moved card goes next to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<toknila_core::graph::Place>,
+    /// The epic the card moves to, when it leaves its own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_chain: Option<String>,
+}

@@ -6,8 +6,8 @@
 
 use serde_json::Value;
 use toknila_api_types::{
-    CardEdit, ChainDetail, EdgeInput, EditPlanChain, MoveInput, NewCard, NewDesignPin, NewMessage,
-    NewPlanChain, NewSuggestion, NewThread, NewVersion, Say, TicketDetail,
+    CardEdit, ChainDetail, EdgeInput, EditPlanChain, NewCard, NewDesignPin, NewMessage,
+    NewPlanChain, NewSuggestion, NewThread, NewVersion, PlannerMove, Say, TicketDetail,
 };
 use toknila_client::Client;
 use toknila_core::graph::Place;
@@ -71,8 +71,9 @@ pub(super) enum PlannerCall {
     MoveCard {
         chain: String,
         card: String,
-        anchor: String,
-        place: Place,
+        anchor: Option<String>,
+        place: Option<Place>,
+        to_chain: Option<String>,
     },
     OpenThread {
         card: String,
@@ -139,12 +140,14 @@ pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolErr
                 card,
                 anchor,
                 place,
+                to_chain,
             } = args(arguments)?;
             PlannerCall::MoveCard {
                 chain,
                 card,
                 anchor,
                 place,
+                to_chain,
             }
         }
         "open_thread" => {
@@ -299,10 +302,12 @@ fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
             card,
             anchor,
             place,
+            to_chain,
         } => {
-            let m = MoveInput {
+            let m = PlannerMove {
                 anchor: anchor.clone(),
                 place: *place,
+                to_chain: to_chain.clone(),
             };
             client
                 .planner_move_card(chain, card, &m)
@@ -539,9 +544,22 @@ mod tests {
                 json!({ "chain": "p", "card": "A-2", "anchor": "A-1", "place": "before" })
             ),
             PlannerCall::MoveCard {
-                place: Place::Before,
+                place: Some(Place::Before),
+                to_chain: None,
                 ..
             }
+        ));
+        assert!(matches!(
+            c(
+                "move_card",
+                json!({ "chain": "p", "card": "A-2", "to_chain": "q" })
+            ),
+            PlannerCall::MoveCard {
+                anchor: None,
+                place: None,
+                to_chain: Some(ref to),
+                ..
+            } if to == "q"
         ));
         assert!(matches!(
             c(

@@ -67,6 +67,7 @@ export function ContextMenu({ x, y, entries, title, onClose }: {
   }, [x, y, entries.length]);
 
   const pick = (m: MenuEntry) => {
+    if (m.disabled) return;
     onClose();
     m.run();
   };
@@ -108,7 +109,7 @@ export function ContextMenu({ x, y, entries, title, onClose }: {
           {m.sep && <div className="ctx-sep" role="separator" />}
           <button
             type="button" role={choice ? "menuitemradio" : "menuitem"} aria-checked={choice ? Boolean(m.checked) : undefined}
-            data-testid={m.testId} title={m.hint} className={m.danger ? "danger" : ""} onClick={() => pick(m)}
+            data-testid={m.testId} title={m.hint} className={m.danger ? "danger" : ""} aria-disabled={m.disabled || undefined} onClick={() => pick(m)}
           >
             {choice && <span className="ctx-check" aria-hidden="true">{m.checked ? "✓" : ""}</span>}
             <span className="ctx-label">{m.label}</span>

@@ -15,6 +15,31 @@ const render = (selected?: string) =>
     />,
   );
 
+describe("SidebarChains as drop targets", () => {
+  beforeEach(() => vi.stubGlobal("window", { location: { search: "" } }));
+  afterEach(() => vi.unstubAllGlobals());
+  const rows = (drop?: string) =>
+    renderToStaticMarkup(
+      <SidebarChains
+        chains={[chain("now", "active"), chain("next", "waiting")]} project="DEMO" selected={undefined}
+        dispatch={() => {}} onMenu={() => () => {}} drop={drop}
+      />,
+    );
+  it("tells every row's epic and project, so a drag can find where it is", () => {
+    const html = rows();
+    expect(html).toContain('data-chain-id="now"');
+    expect(html).toContain('data-chain-id="next"');
+    expect(html.match(/data-chain-project="DEMO"/g)).toHaveLength(2);
+    expect(html).not.toContain("data-drop");
+  });
+  it("marks only the row a dragged card is over", () => {
+    const html = rows("next");
+    expect(html.match(/data-drop="true"/g)).toHaveLength(1);
+    expect(html).toMatch(/<li[^>]*data-chain-id="next"[^>]*data-drop="true"/);
+    expect(html).not.toMatch(/<li[^>]*data-chain-id="now"[^>]*data-drop/);
+  });
+});
+
 describe("SidebarChains", () => {
   beforeEach(() => vi.stubGlobal("window", { location: { search: "" } }));
   afterEach(() => vi.unstubAllGlobals());

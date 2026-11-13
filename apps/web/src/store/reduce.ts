@@ -25,7 +25,7 @@ import { reduceSettings, setupLoads } from "./settings";
 import { nextSettingsFrom } from "./settingsNav";
 import { reduceUpdates } from "./updates";
 import { loadUsage, reduceUsage } from "./usage";
-import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, activeProjects, cardRoute, chainOfEvent, currentProject, ticketOfEvent } from "./state";
+import { FIRST_RETRY_MS, MAX_RETRY_MS, type State, activeProjects, cardRoute, chainOfEvent, chainOfTicket, currentProject, ticketOfEvent } from "./state";
 
 export function reduce(s: State, msg: Msg): [State, Effect[]] {
   switch (msg.type) {
@@ -238,13 +238,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "edgesChanged":
     case "edgeRefused":
       return reduceEdges(s, msg);
-    case "placeCard":
-    case "arrangeChain":
-    case "sizeCard":
-    case "cardPlaced":
-    case "cardSized":
-    case "cardPlaceRefused":
-    case "chainArranged":
+    case "placeCard": case "arrangeChain": case "sizeCard": case "cardPlaced": case "cardSized":
+    case "cardPlaceRefused": case "chainArranged": case "overEpic": case "moveToEpic": case "movedToEpic":
       return reducePlacement(s, msg);
     case "setAutostart":
     case "autostartSet":
@@ -378,6 +373,9 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (!chain) return [next, [{ type: "loadAll" }]];
   const fx: Effect[] = [{ type: "loadChain", id: chain }, { type: "loadInbox" }, { type: "loadAgents" }];
   const ticket = ticketOfEvent(e);
+  // A card that moved to another epic leaves its old diagram too (the event names the new chain).
+  const left = e.kind === "moved" && ticket ? chainOfTicket(s, ticket) : undefined;
+  if (left && left !== chain) fx.push({ type: "loadChain", id: left });
   const open = s.route.name === "card" ? s.details[s.route.key]?.ticket : undefined;
   if (open && ticket === open.id) fx.push({ type: "loadDetail", key: open.key });
   // A card the diagram shows more of (subtasks, proposal buttons) keeps its detail fresh too.

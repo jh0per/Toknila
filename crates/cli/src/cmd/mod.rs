@@ -2,6 +2,7 @@
 //! JSON answer. One module per command group; no business rules here.
 
 mod agent;
+mod card;
 mod chain;
 mod chain_rm;
 mod hook;
@@ -30,6 +31,7 @@ use serde::Serialize;
 use toknila_client::Client;
 use toknila_daemon::paths::Paths;
 
+pub use card::CardCmd;
 pub use chain::{ChainCmd, DepCmd};
 pub use planner::PlannerCmd;
 pub use profile::ProfileCmd;
@@ -67,6 +69,9 @@ pub enum Command {
     /// Create or show tickets.
     #[command(subcommand)]
     Ticket(TicketCmd),
+    /// Where a story stands in the plan: move it to another epic.
+    #[command(subcommand)]
+    Card(CardCmd),
     /// Dependencies between tickets and milestones.
     #[command(subcommand)]
     Dep(DepCmd),
@@ -268,6 +273,7 @@ fn run_on_home(cmd: Command, json_out: bool) -> Result<()> {
         Command::Ship(s) => ship::run(&c, s, json_out),
         Command::Dep(d) => chain::dep(&c, d, json_out),
         Command::Ticket(t) => ticket::run(&c, t, json_out),
+        Command::Card(k) => card::run(&c, k, json_out),
         Command::Subtask(s) => ticket::subtask(&c, s, json_out),
         Command::Thread(t) => thread::run(&c, t, json_out),
         Command::Comment { ticket, text, kind } => {

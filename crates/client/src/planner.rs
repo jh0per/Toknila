@@ -2,10 +2,10 @@
 //! itself (a client with its run token) reads and edits the plan.
 
 use toknila_api_types::{
-    CardEdit, ChainDetail, ConversationPage, DesignPin, EdgeInput, EditPlanChain, MoveInput,
-    NewCard, NewMessage, NewPlanChain, NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain,
-    PlannerDesign, PlannerOverview, PlannerPlan, PlannerState, Say, StartPlanner, TerminalSize,
-    ThreadDetail, TicketDetail,
+    CardEdit, ChainDetail, ConversationPage, DesignPin, EdgeInput, EditPlanChain, NewCard,
+    NewMessage, NewPlanChain, NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain,
+    PlannerDesign, PlannerMove, PlannerOverview, PlannerPlan, PlannerState, Say, StartPlanner,
+    TerminalSize, ThreadDetail, TicketDetail,
 };
 use toknila_core::RunId;
 use toknila_core::conversation::Message;
@@ -179,7 +179,7 @@ impl Client {
         &self,
         chain: &str,
         card: &str,
-        m: &MoveInput,
+        m: &PlannerMove,
     ) -> ClientResult<ChainDetail> {
         let path = format!("/planner/chains/{}/cards/{}/move", enc(chain), enc(card));
         self.call("POST", &path, Some(m))

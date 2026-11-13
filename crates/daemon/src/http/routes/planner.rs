@@ -18,11 +18,10 @@ use toknila_core::{Actor, ProjectId, ThreadId, Ticket};
 
 use super::{ApiResult, chain_write, load_thread_detail, load_ticket_detail, read, stamp};
 use crate::designs::Designs;
-use crate::http::dto::{ChainDetail, EdgeInput, MoveInput, ThreadDetail, TicketDetail};
+use crate::http::dto::{ChainDetail, EdgeInput, PlannerMove, ThreadDetail, TicketDetail};
 use crate::http::error::ErrorBody;
 use crate::server::{AppState, Principal, now};
 use crate::store::WriteTx;
-
 const CHAIN: &str = "Chain id or name";
 const CARD: &str = "Card id, key or title";
 const THREAD: &str = "Thread number on the card (1, 2, ...) or thread id";
@@ -273,21 +272,21 @@ pub async fn planner_remove_dependency(
     Ok(Json(detail))
 }
 
-#[utoipa::path(post, path = "/planner/chains/{chain}/cards/{card}/move", tag = "planner", request_body = MoveInput,
+#[utoipa::path(post, path = "/planner/chains/{chain}/cards/{card}/move", tag = "planner", request_body = PlannerMove,
     params(("chain" = String, Path, description = CHAIN), ("card" = String, Path, description = CARD)),
-    responses((status = 200, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
-/// Puts a card directly before or after another; the dependencies around it are rewired.
+    responses((status = 200, body = ChainDetail), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Puts a card directly before or after another (the dependencies around it are rewired), or
+/// moves it to another epic of the project (`to_chain`).
 pub async fn planner_move_card(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
     Path((chain, card)): Path<(String, String)>,
-    Json(m): Json<MoveInput>,
+    Json(m): Json<PlannerMove>,
 ) -> ApiResult<Json<ChainDetail>> {
     let project = principal.planner_project()?;
     let detail = chain_write(&state, Actor::Agent, move |tx| {
-        Ok(planner::move_card(
-            tx, project, &chain, &card, &m.anchor, m.place,
-        )?)
+        let to = (m.to_chain.as_deref(), m.anchor.as_deref(), m.place);
+        Ok(planner::move_card_by(tx, project, &chain, &card, to)?)
     })
     .await?;
     Ok(Json(detail))

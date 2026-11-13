@@ -58,6 +58,13 @@ pub enum DomainEvent {
         from: TicketKey,
         ticket: Ticket,
     },
+    /// A card moved to another epic of its project. `ticket` is the card as it is now; `from` and
+    /// `to` are the names of the epics.
+    TicketMoved {
+        from: String,
+        to: String,
+        ticket: Ticket,
+    },
     TicketCreated {
         ticket: Ticket,
     },
@@ -248,6 +255,7 @@ impl DomainEvent {
             | Self::EdgeRemoved { .. }
             | Self::EdgeMoved { .. } => "chain",
             Self::DesignMoved { .. }
+            | Self::TicketMoved { .. }
             | Self::TicketCreated { .. }
             | Self::TicketStatusChanged { .. }
             | Self::TicketUpdated { .. }
@@ -294,6 +302,7 @@ impl DomainEvent {
             | Self::EdgeRemoved { edge }
             | Self::EdgeMoved { edge, .. } => edge.chain_id.to_string(),
             Self::DesignMoved { ticket, .. }
+            | Self::TicketMoved { ticket, .. }
             | Self::TicketCreated { ticket }
             | Self::TicketStatusChanged { ticket, .. }
             | Self::TicketUpdated { ticket }
@@ -346,6 +355,7 @@ impl DomainEvent {
             Self::EdgeRemoved { .. } => "edge_removed",
             Self::EdgeMoved { .. } => "edge_moved",
             Self::DesignMoved { .. } => "design_moved",
+            Self::TicketMoved { .. } => "moved",
             Self::TicketStatusChanged { .. } => "status_changed",
             Self::TicketUpdated { .. }
             | Self::SubtaskUpdated { .. }
