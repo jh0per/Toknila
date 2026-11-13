@@ -32,7 +32,11 @@ const git = (dir, ...args) =>
 const FAKE = `
   class FakeRecognizer {
     constructor() { window.__rec = this; this.started = false; }
-    start() { if (window.__recFail) { setTimeout(() => this.onerror && this.onerror({ error: window.__recFail, message: window.__recFailMessage }), 0); return; } this.started = true; }
+    start() {
+      if (window.__recFail) { setTimeout(() => { window.__recErrored = true; this.onerror && this.onerror({ error: window.__recFail, message: window.__recFailMessage }); }, 0); return; }
+      if (window.__recEndAtOnce) { setTimeout(() => this.onend && this.onend(), 0); return; }
+      this.started = true;
+    }
     stop() { this.started = false; setTimeout(() => this.onend && this.onend(), 0); }
     say(parts) {
       this.onresult({ results: parts.map(([t, f]) => Object.assign([{ transcript: t }], { isFinal: f })) });
@@ -163,12 +167,20 @@ try {
   check((await mic.getAttribute("data-mic")) === "error", "the button shows the Dictation failure");
 
   // 6c. An abort nobody explained (the person's own stop) stays silent and idle.
-  await page.evaluate(() => { window.__recFail = "aborted"; window.__recFailMessage = undefined; });
+  await page.evaluate(() => { window.__recFail = "aborted"; window.__recFailMessage = undefined; window.__recErrored = false; });
   await mic.click();
-  await page.waitForFunction(() => document.querySelector("[data-testid=planner-ask-mic]")?.getAttribute("data-mic") === "idle");
+  await page.waitForFunction(() => window.__recErrored === true);
+  await page.waitForTimeout(200);
   check((await mic.getAttribute("data-mic")) === "idle", "an abort without a reason leaves the button idle");
   check((await t("planner-ask-mic-note").count()) === 0, "an abort without a reason shows no note");
   await page.evaluate(() => { window.__recFail = ""; });
+
+  // 6d. A recognizer that ends at once with no words and no error says so.
+  await page.evaluate(() => { window.__recEndAtOnce = true; });
+  await mic.click();
+  await page.waitForFunction(() => document.querySelector("[data-testid=planner-ask-mic]")?.getAttribute("data-mic") === "error");
+  check((await t("planner-ask-mic-note").innerText()).includes("ended at once"), "a recognizer that ends at once says so");
+  await page.evaluate(() => { window.__recEndAtOnce = false; });
 
   // 7. "Send when I stop speaking": two seconds of silence send.
   await t("planner-ask-mic-auto").check();

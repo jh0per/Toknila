@@ -176,9 +176,6 @@ ad-hoc signature (`codesign -dv` shows `Signature=adhoc`, `TeamIdentifier=not se
 identity for every build, so after each update the app is a new app and the grants are gone. The
 fix is one stable identity for every build.
 
-On macOS the microphone button also needs Dictation or Siri turned on in System Settings →
-Keyboard → Dictation; otherwise the button says so instead of listening.
-
 Make the certificate once, either way:
 
 - **Developer ID** (paid Apple Developer account): create a "Developer ID Application" certificate in
@@ -208,6 +205,9 @@ identity as the installed one, so keep the certificate (the `.p12`) and never sw
 
 The Open Anyway button in the Security section (Gatekeeper, an un-notarised build) is a different
 mechanism that a signing identity alone does not change; notarization is a later card.
+
+On macOS the microphone button also needs Dictation or Siri turned on in System Settings →
+Keyboard → Dictation; otherwise the button says so instead of listening.
 
 ### Testing the updater
 
