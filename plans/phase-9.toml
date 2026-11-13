@@ -1,0 +1,102 @@
+# Phase 9: an update does not stop a story. From the owner's second project on 0.3.1/0.3.2.
+# Import: tok chain import plans/phase-9.toml --project TOKNILA
+#
+# 2026-11-13, the owner's words, with a screenshot of BEATSTER-7: "тут нічого не відбувається, я не
+# зрозумів взагалі шо тікет хоче від мене, а також після моєї відповіді агенту там нічо не сталось"
+# and "о так це фігня шо після оновлення не працює". What the record shows: the app was updated
+# while the agent of BEATSTER-7 waited for an answer; the restart put the card in Blocked
+# (runner lost); the owner answered the question in the chat, the bubble said "not delivered yet",
+# and nothing happened because no agent existed to deliver it to. Unblock then put the card back in
+# Waiting with no agent either; the orchestrator had to pause, resume and start it by hand. The
+# question itself read like a developer's note (T021, checklist positions) and the agent said it
+# could not see the card's checklist.
+#
+# `after` names the cards whose files a card shares; a card without `after` may run at once.
+
+[chain]
+name = "phase-9"
+title = "An update does not stop a story"
+goal = "A restart of the app never leaves a story dead: a lost agent comes back by itself, a person's answer always reaches an agent, and a question reads like one a person can answer"
+autostart = true
+version = "0.3.3"
+
+[[ticket]]
+id = "lost-agent-comes-back"
+title = "An update does not stop a story: a lost agent comes back by itself"
+prompt = """
+What happens today. The daemon's startup recovery (crates/app/src/recovery.rs → crates/app/src/lost.rs `mark_lost`) puts every Running or Waiting card whose agent was a process into Blocked(`runner_lost`), and the same happens when a runner is found lost while the daemon runs (crates/daemon/src/server/lifecycle.rs). An update of the app restarts the daemon, so every update stops every running story and waits for a person. `tok unblock` on such a card goes back to `resume_to` (crates/core/src/machine/checks.rs `block`), that is Running or Waiting with no process behind it: the card looks alive and nobody is there. The owner hit both on BEATSTER-7 today.
+
+What already exists and is the model for the fix. A Waiting card whose agent's process was ended on purpose keeps `Ticket::agent_paused` (crates/app/src/paused.rs, crates/core/src/machine/pause.rs: `AgentPaused { session }`, `ResumeWanted`, `ResumeStart` with `Effect::ResumeRunner { session }`); an answer through the comment path marks it wanting its agent back and the schedule starts it when a slot is free (crates/app/src/runs.rs `queue_resume`, crates/core/src/graph/settle.rs). The replacement run's instructions carry the earlier instructions and the record (crates/core/src/instructions/mod.rs `earlier_section`, snapshot run_replacement.md).
+
+Build this.
+
+1. A lost runner is a paused agent, not a blocked card. In `mark_lost` and in the live-loss path: a Running card whose process is gone gets `AgentPaused { session }` (the resume id from the run record when there is one, else none) followed by `ResumeWanted`, so the schedule starts a replacement run as soon as a slot is free; a Waiting card (a question or a permission pending) gets `AgentPaused` only, so it stays Waiting with its question and the answer starts the agent as for any paused agent. Simulated projects stay as they are (nothing to lose). The recovery report keeps `lost` (now "lost and coming back") so `tok daemon status` and the log still tell what happened.
+
+2. Twice in a row is a loop, not a restart. If a card's runner is lost again within ten minutes of a resume that followed a loss, the card goes to Blocked(`runner_lost`) with the reason text naming both times and what Unblock does. Keep the count on the ticket (a small field in the paused/run record, whichever fits the store), not in memory.
+
+3. Unblock never leaves a card without an agent. Unblock of a `runner_lost` card goes through the paused path: `resume_to` Running → paused with `ResumeWanted`; `resume_to` Waiting → paused, question kept. No card ends Running or Waiting with no process and no `agent_paused`.
+
+4. The replacement run knows why it exists. When a run replaces one the restart lost, its kickoff carries one sentence before "Instructions you were given earlier": "The app restarted while the run before you worked; its commits are on this branch, read them before you continue." Pin it in the snapshot (TOKNILA_UPDATE_SNAPSHOTS=1).
+
+5. Words. The event word for `runner_lost` (apps/web/src/store/eventWords.ts) becomes "the app restarted; the agent comes back"; the Events tab shows the resume as its own line. The inbox gets no row for a single loss (nothing for the person to do); a double loss keeps the Blocked row.
+
+6. Tests, each red before green and quoted so in the hand-in: recovery with a Running card → paused, resume wanted, a replacement run started once a slot is free, its kickoff carries the sentence of item 4; recovery with a Waiting card → paused, still Waiting, an answer starts it and is delivered; a loss within ten minutes of a resume after a loss → Blocked with the reason text; unblock of a `runner_lost` card → paused with resume wanted, never bare Running; a simulated project untouched. A daemon http test for the live-loss path. Run `cargo xtask verify`.
+
+Keep the change inside crates/core (machine, graph), crates/app (lost, recovery, paused, runs), crates/daemon (lifecycle, the routes that unblock), the event words in apps/web, and the snapshot. Nothing in the desktop app.
+"""
+acceptance = [
+  "After a daemon restart, a Running card gets a replacement run by itself when a slot is free, with a kickoff sentence saying the app restarted; a Waiting card keeps its question and the first answer starts its agent",
+  "A runner lost twice within ten minutes goes to Blocked with a reason naming both losses; Unblock of a runner_lost card never leaves it Running or Waiting without an agent",
+  "Covered by core, app and daemon tests seen red first; the snapshot carries the restart sentence; the event words say the agent comes back",
+]
+
+[[ticket]]
+id = "answer-reaches-agent"
+title = "A person's answer always reaches an agent, and the window says what happens to it"
+after = ["lost-agent-comes-back"]
+prompt = """
+What happened. BEATSTER-7 was Blocked (runner lost) with the agent's question in the chat. The owner typed "Recommended" and pressed Send to the agent. The bubble said "not delivered yet" (apps/web/src/views/ChatTab.tsx, `bubble-pending`) and nothing else happened: the comment path (crates/app/src/tickets.rs `comment`) keeps an instruction pending for a card with no live agent and delivers it at the next start, but nothing started one. The composer's placeholder, "Leave a note for the agent; it gets it when it starts", and the inbox row, "Blocked: it cannot go on by itself" with "runner lost", told the owner nothing about what to do.
+
+Build this.
+
+1. An instruction to a card with no live agent starts one when it can. In the comment path, after the instruction is stored: a card with `agent_paused` → `ResumeWanted` (exists); a Blocked(`runner_lost`) card → the unblock of the card before this one (paused with resume wanted) in the same unit of work, so one Send both answers and restarts; a Ready, Backlog or Queued card → pending as today. An answer to a question or a permission and an approval of a thread go through the same path (they already call `comment`; make sure the Blocked case reaches it).
+
+2. The bubble says what the daemon will do, not "not delivered yet". The API's comment (or the card's detail) carries a `pending` reason: `starts_agent` (an agent is being started for it), `waits_for_slot` (every slot is busy; "2 of 2 agents busy"), `at_start` (the story has not started; delivered when it does). The chat bubble renders one short sentence per reason; "delivered" once `delivered_at` is set. The composer's placeholder for a card with no live agent reads "Answer here; it starts the agent" and for a card that has not started "Leave a note; the agent gets it when the story starts".
+
+3. The Blocked panel and the inbox row say what to press. For `runner_lost` (which after the card before this one happens only on a double loss) the panel's first line and the inbox row's text read: "The app restarted twice while the agent worked. Unblock starts it once more; it gets your answer." For every other Blocked reason the row keeps its text but gains the reason's own sentence where it has one (crates/core/src/model/status.rs Display of BlockedReason), so "Blocked: it cannot go on by itself" is never the whole story.
+
+4. Tests. A daemon test: an instruction on a Blocked(runner_lost) card → the card is paused with resume wanted and the instruction is delivered to the replacement run's kickoff. A web unit test of the three pending sentences. An e2e with the fake agent (`// needs: fake-agent`): a card whose runner is lost (the fake can die), the person answers in the chat, the bubble reads the starting sentence and then "delivered", and the agent runs. Red first, quoted. Run `cargo xtask web`, `cargo xtask e2e-web`, `cargo xtask verify`.
+
+Keep the change inside crates/app (tickets, paused), crates/daemon (routes that take comments and answers, the detail or comment type), crates/api-types if the pending reason needs a type (then `cargo xtask gen` for api.d.ts, never a hand edit), apps/web (ChatTab, InboxRow, the Blocked panel, the store), and the tests.
+"""
+acceptance = [
+  "Sending an instruction or an answer to a card whose agent is paused or lost starts the agent and delivers it; the bubble names what happens (starts the agent, waits for a slot, at start) and then reads delivered",
+  "The Blocked panel and the inbox row for a lost runner say that the app restarted and that Unblock starts the agent with the answer; other Blocked rows carry their reason's sentence",
+  "Covered by a daemon test, a web unit test and an e2e with the fake agent, seen red first",
+]
+
+[[ticket]]
+id = "question-a-person-can-answer"
+title = "A question a person can answer, with choices to press; the agent sees the checklist"
+prompt = """
+What the owner read on BEATSTER-7, in the agent's question: "T021, the last open task of this card, is a manual check on an iPhone ... Which do you want? (a) Recommended: I hand in now with T021 left open under Left; you check on the phone at review and Return with what you find. (b) You do the phone check first and tell me the result here; I fix what you find, then hand in. Also: I cannot see this card's checklist, so I ticked nothing. If you want items ticked, tell me which positions." The owner's words: "я не зрозумів взагалі шо тікет хоче від мене" (I did not understand at all what the ticket wants from me). Three things are wrong: the question is written for a developer (task ids, "under Left", "positions"), the choices are prose the person must retype, and the agent could not see the checklist although the protocol tells it to tick tasks with `subtask_done (position)` (the run file, crates/core/src/instructions/mod.rs and record.rs, never lists the checklist).
+
+Build this.
+
+1. `ask_human` takes choices. The tool (where it is defined: crates/core/src/question/mod.rs, crates/core/src/agent.rs, the daemon's MCP route and the hook) gains an optional `choices`: a list of two to four short sentences a person can act on, the recommended one first. The question record keeps them; the answer route accepts a chosen index or free text; a chosen choice is delivered to the agent as its text.
+
+2. The window shows the choices as buttons. On the Waiting card's panel (the question block at the top of Chat or Details, wherever the question lives today) and in the inbox row of kind `question`: one button per choice, the first marked "recommended", plus the text field for another answer. Pressing a button answers at once. `tok show` prints the choices numbered; `tok answer <KEY> <n>` (or the existing answer command with a number) picks one.
+
+3. The rule for the question, in the protocol (crates/core/src/instructions/protocol.rs, the `ask_human` bullet) and pinned in the snapshots: one question at a time, in the words of the person who will read it; say what you cannot do in one sentence and what you recommend; give the choices as things the person can do ("Hand in now; you check on the phone at review" / "Wait; I check on the phone first and tell you"), never as (a)/(b) prose; no task ids, no checklist positions, no file paths unless the person must open the file; never ask whether to tick a task: tick what you did.
+
+4. The run file lists the checklist. A "Checklist" section after Acceptance: each task with its position, text and whether it is done (and by whom, when a person did it), so `subtask_done (position)` names something the agent has read. Pinned in run.md and run_replacement.md (TOKNILA_UPDATE_SNAPSHOTS=1).
+
+5. Tests: a core test of a question with choices and an answer by index; a daemon http test for the answer route with an index; a web unit test of the buttons; an e2e with the fake agent (`// needs: fake-agent`) asking with choices, the person pressing the recommended one, the agent receiving its text; the snapshot tests. Red first, quoted. Run `cargo xtask web`, `cargo xtask e2e-web`, `cargo xtask verify`.
+
+Keep the change inside crates/core (question, agent, instructions), crates/daemon (MCP, routes), crates/cli (show, answer), crates/api-types (then `cargo xtask gen`), apps/web (the question block, InboxRow, the store), and the tests.
+"""
+acceptance = [
+  "An agent's question may carry two to four choices; the window shows them as buttons with the recommended one first, the inbox row too, and pressing one answers at once; tok show prints them numbered and the answer command takes a number",
+  "The protocol tells the agent to ask in the person's words with choices as actions, no task ids or positions, and never to ask about ticking; the run file lists the checklist with positions and done state; both pinned in the snapshots",
+  "Covered by core, daemon, web and e2e tests seen red first",
+]
