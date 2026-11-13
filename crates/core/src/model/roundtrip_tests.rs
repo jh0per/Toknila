@@ -35,6 +35,7 @@ fn ticket(status: TicketStatus, reason: Option<StatusReason>) -> Ticket {
         paused: false,
         queued: false,
         agent_paused: None,
+        lost_resume: None,
         profile: Some("sim".to_owned()),
         review_mode: Some(ReviewMode::Both),
         reviewer: None,
@@ -164,7 +165,10 @@ fn tickets_roundtrip_in_every_status_and_reason() {
             waiting: None,
         },
         StatusReason::Blocked {
-            reason: BlockedReason::RunnerLost,
+            reason: BlockedReason::RunnerLost {
+                first: None,
+                second: None,
+            },
             resume_to: TicketStatus::Running,
             waiting: None,
         },

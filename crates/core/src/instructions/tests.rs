@@ -27,6 +27,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         check_command: None,
         setup_command: None,
         earlier: &[],
+        restarted: false,
         waiting: &[],
         returned: None,
         design_first: false,
@@ -177,6 +178,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         check_command: None,
         setup_command: None,
         earlier: &[],
+        restarted: false,
         waiting: &[],
         returned: None,
         design_first: false,
@@ -269,6 +271,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         check_command: check,
         setup_command: None,
         earlier: &[],
+        restarted: false,
         waiting: &[],
         returned: None,
         design_first: false,
@@ -381,12 +384,27 @@ fn the_instructions_of_a_replacement_run_carry_the_earlier_ones_and_the_kickoff_
     let tasks = pinned_tasks();
     let brief = RunBrief {
         earlier: &texts,
+        restarted: true,
         waiting: &[],
         returned: None,
         checklist: &tasks,
         ..pinned_brief(&acceptance)
     };
-    assert_pinned(&generate(&brief), "run_replacement.md");
+    let text = generate(&brief);
+    let sentence = "The app restarted while the run before you worked; its commits are on this branch, read them before you continue.";
+    let (at, earlier_at) = (
+        text.find(sentence),
+        text.find("Instructions you were given earlier"),
+    );
+    assert!(at.is_some() && at < earlier_at, "{text}");
+    assert!(
+        !generate(&RunBrief {
+            restarted: false,
+            ..brief
+        })
+        .contains("app restarted")
+    );
+    assert_pinned(&text, "run_replacement.md");
     assert!(kickoff(crate::AgentRole::Worker, &brief).contains("given earlier"));
     assert!(!kickoff(crate::AgentRole::Worker, &pinned_brief(&acceptance)).contains("earlier"));
     assert!(!generate(&pinned_brief(&acceptance)).contains("given earlier"));

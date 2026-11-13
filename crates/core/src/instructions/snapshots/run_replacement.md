@@ -20,6 +20,8 @@ The story's tasks, by position. Tick a task with `subtask_done` (its position) w
 2. [x] Check on an iPhone (done by a person)
 3. [ ] Run the gate
 
+The app restarted while the run before you worked; its commits are on this branch, read them before you continue.
+
 ## Instructions you were given earlier
 
 A person gave these to the run of this story before you. They were delivered, and they still apply: some may be done already in the commits on this branch, so look at what is there, then carry on and follow the rest. Oldest first:

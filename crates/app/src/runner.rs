@@ -117,6 +117,8 @@ pub struct Resume {
     /// A run that cannot be resumed (no session, no resume form of the profile, a refused id)
     /// starts fresh and reads it in its kickoff as an instruction that waits.
     pub input: String,
+    /// The process was lost with the app's restart: the run is told why it exists.
+    pub lost: bool,
 }
 
 /// A runner now works for the ticket.

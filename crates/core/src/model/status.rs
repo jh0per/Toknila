@@ -132,8 +132,15 @@ pub enum BlockedReason {
     CiFailed { url: String, checks: Vec<String> },
     /// The pull request was closed on GitHub without merging.
     PrClosed { url: String },
-    /// The daemon restarted and the runner was gone.
-    RunnerLost,
+    /// The daemon restarted and the runner was gone. A card whose runner is lost comes back by
+    /// itself; it is Blocked only when it was lost twice in a row, and then `first` and `second`
+    /// are the two times.
+    RunnerLost {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        first: Option<super::Timestamp>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        second: Option<super::Timestamp>,
+    },
     /// The ship (worktree and branch) could not be prepared.
     ShipFailed { detail: String },
     /// The project's setup command failed in the new ship (non-zero exit, timeout), so no agent
@@ -240,7 +247,16 @@ impl fmt::Display for BlockedReason {
                 f,
                 "pr_closed: {url} was closed without merging; reopen it or unblock to open a new one"
             ),
-            Self::RunnerLost => f.write_str("runner lost"),
+            Self::RunnerLost {
+                first: Some(first),
+                second: Some(second),
+            } => write!(
+                f,
+                "runner_lost: the agent was lost at {} and again at {}, so it is not started a third time by itself; unblock starts it again",
+                first.utc_text(),
+                second.utc_text()
+            ),
+            Self::RunnerLost { .. } => f.write_str("runner lost"),
             Self::ShipFailed { detail } => write!(f, "ship_failed: {detail}"),
             Self::SetupFailed { command, output } => {
                 write!(f, "setup_failed: setup failed: {command}\n{output}")
@@ -386,7 +402,20 @@ mod tests {
                 }),
                 "base_behind: base branch main is 133 commits behind origin/main; fast-forward it and start, start anyway, or unblock to look again",
             ),
-            (blocked(BlockedReason::RunnerLost), "runner lost"),
+            (
+                blocked(BlockedReason::RunnerLost {
+                    first: None,
+                    second: None,
+                }),
+                "runner lost",
+            ),
+            (
+                blocked(BlockedReason::RunnerLost {
+                    first: Some(crate::Timestamp(0)),
+                    second: Some(crate::Timestamp(300_000)),
+                }),
+                "runner_lost: the agent was lost at 1970-01-01 00:00:00 UTC and again at 1970-01-01 00:05:00 UTC, so it is not started a third time by itself; unblock starts it again",
+            ),
             (
                 blocked(BlockedReason::ShipFailed {
                     detail: "git not found".into(),

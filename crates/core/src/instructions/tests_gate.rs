@@ -12,6 +12,7 @@ fn brief_with<'a>(check: Option<&'a CheckOutcome>) -> RunBrief<'a> {
         check_command: Some("cargo xtask verify"),
         setup_command: None,
         earlier: &[],
+        restarted: false,
         waiting: &[],
         returned: None,
         design_first: false,

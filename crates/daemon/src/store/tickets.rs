@@ -8,7 +8,7 @@ use super::codec::{Repo, enum_from, enum_str, from_json, json, opt_enum, opt_enu
 
 const TICKET_COLS: &str = "id, chain_id, key, title, prompt, acceptance_json, status, status_reason_json, \
      status_since, paused, profile, review_mode, branch, needs_secrets, tokens_used, wildcard_json, \
-     done_out_of_order_json, queued, review_json, reviewer, pr_json, pos_x, pos_y, design_first, size_w, size_h, designs_json, model, agent_paused_json";
+     done_out_of_order_json, queued, review_json, reviewer, pr_json, pos_x, pos_y, design_first, size_w, size_h, designs_json, model, agent_paused_json, lost_resume_at";
 impl Repo<'_> {
     /// All tickets, optionally of one chain, in key order.
     pub fn tickets(&self, chain: Option<ChainId>) -> Result<Vec<Ticket>, StoreError> {
@@ -47,7 +47,7 @@ impl Repo<'_> {
         self.log_turn_change(t);
         self.conn.execute(
             &format!(
-                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29) \
+                "INSERT INTO tickets ({TICKET_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30) \
                  ON CONFLICT(id) DO UPDATE SET chain_id = excluded.chain_id, title = excluded.title, prompt = excluded.prompt, \
                  acceptance_json = excluded.acceptance_json, status = excluded.status, \
                  status_reason_json = excluded.status_reason_json, status_since = excluded.status_since, \
@@ -58,7 +58,8 @@ impl Repo<'_> {
                  review_json = excluded.review_json, reviewer = excluded.reviewer, pr_json = excluded.pr_json, \
                  pos_x = excluded.pos_x, pos_y = excluded.pos_y, design_first = excluded.design_first, \
                  size_w = excluded.size_w, size_h = excluded.size_h, designs_json = excluded.designs_json, \
-                 model = excluded.model, agent_paused_json = excluded.agent_paused_json"
+                 model = excluded.model, agent_paused_json = excluded.agent_paused_json, \
+                 lost_resume_at = excluded.lost_resume_at"
             ),
             params![
                 t.id.to_string(),
@@ -90,6 +91,7 @@ impl Repo<'_> {
                 (!t.designs.is_empty()).then(|| json(&t.designs)).transpose()?,
                 t.model,
                 t.agent_paused.as_ref().map(json).transpose()?,
+                t.lost_resume.map(|at| at.0),
             ],
         )?;
         Ok(())
@@ -130,6 +132,7 @@ impl Repo<'_> {
             Option<String>,
             Option<String>,
             Option<String>,
+            Option<i64>,
         );
         let mut st = self
             .conn
@@ -165,6 +168,7 @@ impl Repo<'_> {
                 r.get(26)?,
                 r.get(27)?,
                 r.get(28)?,
+                r.get(29)?,
             ))
         })?;
         rows.map(|r| {
@@ -182,6 +186,7 @@ impl Repo<'_> {
                 paused: r.9,
                 queued: r.17,
                 agent_paused: r.28.as_deref().map(from_json).transpose()?,
+                lost_resume: r.29.map(Timestamp),
                 profile: r.10,
                 review_mode: opt_enum_from(r.11)?,
                 branch: r.12,

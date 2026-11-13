@@ -43,6 +43,9 @@ pub fn planner_protocol() -> &'static str {
     planner::PLANNER_PROTOCOL
 }
 
+/// What a run that replaces one the app's restart lost is told first.
+pub const RESTARTED: &str = "The app restarted while the run before you worked; its commits are on this branch, read them before you continue.";
+
 /// What the generated file says about one run.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RunBrief<'a> {
@@ -57,6 +60,10 @@ pub struct RunBrief<'a> {
     pub setup_command: Option<&'a str>,
     /// Instructions a person gave to an earlier run of this card ([`earlier`]), as quoted text.
     pub earlier: &'a [String],
+    /// This run replaces one the app's restart lost ([`Effect::ResumeRunner`] with `lost`).
+    ///
+    /// [`Effect::ResumeRunner`]: crate::machine::Effect::ResumeRunner
+    pub restarted: bool,
     /// Instructions no run has acted on yet ([`waiting`]), as quoted text: the run reads them
     /// first.
     pub waiting: &'a [String],
@@ -268,6 +275,9 @@ pub fn generate(brief: &RunBrief<'_>) -> String {
     out.push_str(&design_section(brief));
     out.push_str(&discussion_section(brief));
     out.push_str(&waiting::sections(brief.waiting, brief.returned));
+    if brief.restarted {
+        out.push_str(&format!("\n{RESTARTED}\n"));
+    }
     out.push_str(&earlier_section(brief));
     out.push_str(&setup::section(brief));
     out.push_str(&checks_section(

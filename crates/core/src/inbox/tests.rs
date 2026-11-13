@@ -30,6 +30,7 @@ pub(super) fn ticket(n: u32, status: TicketStatus, since: i64) -> Ticket {
         paused: false,
         queued: false,
         agent_paused: None,
+        lost_resume: None,
         profile: None,
         review_mode: None,
         reviewer: None,
@@ -205,7 +206,10 @@ fn an_item_carries_the_actions_the_machine_allows_the_person() {
     use crate::machine::TicketAction;
     let blocked = blocked(
         ticket(1, TicketStatus::Running, 5),
-        BlockedReason::RunnerLost,
+        BlockedReason::RunnerLost {
+            first: None,
+            second: None,
+        },
     );
     let got = items(vec![blocked.clone()]);
     assert_eq!(got[0].allowed_actions, TicketAction::allowed(&blocked));
@@ -321,7 +325,10 @@ fn a_thread_waiting_for_the_agent_or_approved_or_without_a_version_is_not_listed
 fn items_come_newest_first_and_ties_follow_the_key() {
     let a = blocked(
         ticket(1, TicketStatus::Running, 10),
-        BlockedReason::RunnerLost,
+        BlockedReason::RunnerLost {
+            first: None,
+            second: None,
+        },
     );
     let b = ticket(2, TicketStatus::Review, 30);
     let c = ticket(3, TicketStatus::Review, 30);

@@ -32,6 +32,7 @@ mod pins;
 mod planner;
 mod pull_requests;
 mod questions;
+mod restart;
 mod resume;
 mod return_kickoff;
 mod reviews;

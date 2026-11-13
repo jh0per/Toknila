@@ -97,10 +97,12 @@ pub fn apply(
             (S::Waiting, Some(StatusReason::Waiting(reason.clone())))
         }
         (S::Waiting, TicketEvent::AskHuman { reason }) => ask_again(ticket, reason, event)?,
-        (
-            S::Waiting,
-            TicketEvent::AgentPaused { .. } | TicketEvent::ResumeWanted | TicketEvent::ResumeStart,
-        ) => pause::step(ticket, event, &mut next, &mut effects, now).ok_or_else(refuse)?,
+        (S::Running | S::Waiting, e) if pause::is_pause(e) => {
+            pause::step(ticket, e, &mut next, &mut effects, now).ok_or_else(refuse)?
+        }
+        (S::Blocked, TicketEvent::Unblock) if pause::blocked_lost(ticket) => {
+            pause::unblock_lost(ticket, &mut next, now)
+        }
         (
             S::Waiting,
             TicketEvent::InstructionDelivered | TicketEvent::AgentActive | TicketEvent::Answered,
@@ -371,7 +373,7 @@ pub fn apply(
     if status != S::Ready {
         next.queued = false;
     }
-    if status != S::Waiting {
+    if !pause::keeps(ticket, status, event) {
         next.agent_paused = None;
     }
     next.status = status;

@@ -1,7 +1,7 @@
 //! The PTY runner through the real `tok` binary and daemon, with the workspace's
 //! `fake-agent` as the profile's command (no shell, no OS tools): a runner starts in its ship and
 //! streams over the WebSocket, takes input, stops on cancel, a crash blocks the ticket, and a
-//! daemon killed hard marks the tickets it was running `runner_lost` on restart.
+//! daemon killed hard loses the runner of a ticket it was running, which comes back on restart.
 
 mod common;
 
@@ -171,18 +171,14 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
     );
     assert!(tok.logs("DEMO-2").contains("boom"));
 
-    // Killing the daemon loses the runner of DEMO-3; the restart blocks it as runner_lost.
+    // Killing the daemon loses the runner of DEMO-3; the restart does not stop the story: the
+    // card is Running again and its agent starts again by itself.
     assert_eq!(tok.status("DEMO-3"), "running");
     let pid = info.pid;
     kill_hard(pid);
     wait_until(&tok, "the daemon to die", || !Client::healthy(&base));
     // Any command starts the daemon again; recovery runs before it answers.
-    assert_eq!(tok.status("DEMO-3"), "blocked");
-    assert!(
-        reason_of(&tok, "DEMO-3").contains("runner_lost"),
-        "{}",
-        reason_of(&tok, "DEMO-3")
-    );
+    assert_eq!(tok.status("DEMO-3"), "running");
     assert_eq!(tok.status("DEMO-1"), "cancelled", "nothing else moved");
 }
 
