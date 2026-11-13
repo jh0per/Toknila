@@ -91,7 +91,8 @@ async fn a_story_moved_in_goes_before_the_release_and_one_moved_out_leaves_it() 
         )
         .await;
     assert_eq!(s, axum::http::StatusCode::OK, "{v}");
-    assert_eq!(release_waits_for(&api).await, ["DEMO-1", "DEMO-2"]);
+    // A moved story joins at the tail (after DEMO-2), so it is the one leaf the release waits for.
+    assert_eq!(release_waits_for(&api).await, ["DEMO-1"]);
 
     let (s, v) = api
         .call(
