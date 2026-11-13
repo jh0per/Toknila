@@ -127,3 +127,17 @@ acceptance = [
   "On a Review card the assistant's answer and a Needs you block list what the person must do by hand and what Accept and Return do",
   "Covered by a daemon test, the planner snapshot, web unit tests and an e2e with the fake planner, seen red first",
 ]
+
+# Added during the run (tok ticket new, TOKNILA-121): the third red CI on main in two days from one
+# macOS-only test of `tok planner stop`; the prompt is the file toknila-121-prompt.md of the session, in short:
+[[ticket]]
+id = "planner-stop-never-einval"
+title = "tok planner stop never fails with an OS error: the ten-cycles test holds on macOS CI"
+prompt = """
+Three CI runs on main in two days were red on macOS only, each on crates/cli/tests/planner.rs `ten_start_stop_cycles_of_a_fake_planner_never_fail_a_stop` (43335077551, 43492659962, and one before 0.2.11): `tok planner stop DEMO` exits 1 with "unexpected answer from the daemon: Invalid argument (os error 22)" (EINVAL from a socket call) while the daemon stops a planner started a moment before; Ubuntu and Windows never fail it. Find where EINVAL comes from by reproducing under load and making the client name the failed operation in its error; make the stop answer the same whether the planner is starting, running or gone (and retry once an idempotent request whose connection the daemon dropped, if that is the cause; fix the cause, not only the symptom); the test asserts the invariant and prints the CLI's stderr; a client test with a fake server that closes once, seen red first; fifty runs in a row quoted; `cargo xtask verify`. Inside crates/client, crates/cli, crates/daemon (planner stop route) and the tests. Report what you could not reproduce as such.
+"""
+acceptance = [
+  "The cause of EINVAL on tok planner stop is named with evidence and fixed where it is; a client error names the operation that failed",
+  "tok planner stop succeeds whether the planner is starting, running or gone; the ten-cycles test asserts that and passes fifty times in a row on macOS",
+  "A client test of the once-dropped connection, seen red first; cargo xtask verify green",
+]
