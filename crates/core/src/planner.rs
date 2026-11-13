@@ -38,6 +38,14 @@ pub enum Refusal {
          what should change, or open a thread on the story"
     )]
     CardStarted { card: String, status: String },
+    /// On the roadmap the planner changes the top level; stories go only to an epic it made in
+    /// this turn or one the person named.
+    #[error(
+        "the person is on the roadmap, where you change epics; stories of epic {chain} are not \
+         yours to change now. Add stories only to the epic you made in this turn or one the \
+         person named, or ask them to open epic {chain}"
+    )]
+    RoadmapStory { chain: String },
     /// A planner reads the repository, so the project needs one.
     #[error("project {0} has no repository for the planner to read")]
     NoRepository(String),
@@ -72,6 +80,39 @@ pub fn ensure_graph_change(chain: &Chain) -> Result<(), Refusal> {
         })
     } else {
         Ok(())
+    }
+}
+
+/// Whether the planner may change the stories of `chain` in the turn `turn`: the conversation
+/// from the person's latest message on, oldest first. Only a turn that began with a message
+/// about the roadmap limits it, to an epic Toknila reported as added in the turn or one the
+/// message names (its name or title).
+pub fn ensure_story_target(
+    turn: &[crate::conversation::Message],
+    chain: &Chain,
+) -> Result<(), Refusal> {
+    use crate::conversation::{About, Author};
+    let Some(first) = turn.first() else {
+        return Ok(());
+    };
+    if first.author != Author::Person || first.about != Some(About::Roadmap) {
+        return Ok(());
+    }
+    let said = first.text.to_lowercase();
+    let named = [chain.name.clone(), chain.display_title()]
+        .iter()
+        .any(|n| !n.trim().is_empty() && said.contains(&n.trim().to_lowercase()));
+    let made = turn.iter().skip(1).any(|m| {
+        m.author == Author::Toknila
+            && m.about == Some(About::chain_of(chain))
+            && m.text.starts_with("added epic ")
+    });
+    if named || made {
+        Ok(())
+    } else {
+        Err(Refusal::RoadmapStory {
+            chain: chain.name.clone(),
+        })
     }
 }
 
@@ -123,6 +164,42 @@ mod tests {
             position: 0,
             version: None,
         }
+    }
+
+    fn said(
+        author: crate::conversation::Author,
+        about: Option<crate::conversation::About>,
+        text: &str,
+    ) -> crate::conversation::Message {
+        crate::conversation::Message {
+            id: "x".to_owned(),
+            author,
+            text: text.to_owned(),
+            about,
+            attachments: vec![],
+            thread: None,
+            at: crate::Timestamp(1),
+        }
+    }
+
+    #[test]
+    fn on_the_roadmap_stories_go_to_an_epic_made_in_the_turn_or_named_and_no_other() {
+        use crate::conversation::{About, Author};
+        let c = chain(false);
+        let roadmap = said(Author::Person, Some(About::Roadmap), "add hiding a project");
+        let made = said(
+            Author::Toknila,
+            Some(About::chain_of(&c)),
+            "added epic Plan v0.4.0",
+        );
+        let named = said(Author::Person, Some(About::Roadmap), "put it in plan");
+        let other = said(Author::Person, Some(About::chain_of(&c)), "here");
+        assert!(ensure_story_target(&[], &c).is_ok());
+        assert!(ensure_story_target(&[roadmap.clone(), made], &c).is_ok());
+        assert!(ensure_story_target(&[named], &c).is_ok());
+        assert!(ensure_story_target(&[other], &c).is_ok());
+        let e = ensure_story_target(&[roadmap], &c).expect_err("another epic");
+        assert!(matches!(e, Refusal::RoadmapStory { .. }), "{e}");
     }
 
     #[test]

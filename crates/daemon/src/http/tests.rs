@@ -31,6 +31,7 @@ mod moves;
 mod parallel;
 mod pins;
 mod planner;
+mod planner_roadmap;
 mod planning;
 mod plans;
 mod prepare;
