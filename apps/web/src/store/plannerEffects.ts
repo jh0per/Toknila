@@ -2,7 +2,7 @@
 // answer goes to the reducer.
 
 import { get, getBytes, post, postBytes } from "../api/http";
-import type { ConversationMessage, PlannerState, ThreadDetail } from "../api/types";
+import type { AskReply, ConversationMessage, PlannerState, ThreadDetail } from "../api/types";
 import { askLine } from "./discussion";
 import type { Msg } from "./msg";
 import type { PlannerEffect } from "./planner";
@@ -57,6 +57,20 @@ async function discuss(base: string, e: PlannerEffect, dispatch: Dispatch): Prom
   await ask(base, { ...e, text: askLine(card, said.thread.number, e.text ?? "") }, dispatch);
 }
 
+/// A question about a story: the daemon keeps it in the story's chat and answers with the line
+/// (the question with the story's record) to type to the assistant, which answers in that chat.
+async function askStory(base: string, e: PlannerEffect, dispatch: Dispatch): Promise<void> {
+  const card = encodeURIComponent(e.card ?? "");
+  const reply = await post<AskReply>(`/tickets/${card}/ask`, { text: e.text });
+  const state = await post<PlannerState>(`${base}/start`, { profile: e.profile });
+  dispatch({ type: "plannerLoaded", project: e.project, state });
+  if (e.wait) await settled(base);
+  const typing = new TextEncoder();
+  await postBytes(`${base}/input`, typing.encode(reply.line));
+  await sleep(150);
+  await postBytes(`${base}/input`, typing.encode("\r"));
+}
+
 /// Types the card's unanswered message into the live planner's terminal once more: the same
 /// input route and line as the first delivery. A planner that is not running is refused (409).
 async function nudge(base: string, e: PlannerEffect): Promise<void> {
@@ -78,6 +92,10 @@ export function runPlannerEffect(e: PlannerEffect, dispatch: Dispatch): void {
   }
   if (e.call === "nudge") {
     nudge(base, e).catch(failed);
+    return;
+  }
+  if (e.call === "askStory") {
+    askStory(base, e, dispatch).catch(failed);
     return;
   }
   if (e.call === "discuss") {

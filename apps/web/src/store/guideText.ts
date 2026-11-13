@@ -19,7 +19,7 @@ export interface GuideSection {
   showLabel: string;
 }
 
-export const GUIDE_INTRO = "From an empty folder to a release, in eight steps. The pictures are of the real window.";
+export const GUIDE_INTRO = "From an empty folder to a release, in nine steps. The pictures are of the real window.";
 
 /// Said beside a "Show me" that is off because the person has no project yet.
 export const NO_PROJECT_REASON = "Add a project first: there is nothing of yours to show yet.";
@@ -73,6 +73,14 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "The test command runs, then a reviewer agent reads the work, in rounds up to the project's limit; each round is listed under Review. " +
       "You then press Accept, or Return with what to change, and the agent hands in again. " +
       "Accept merges into the main branch, or opens a pull request when the project is set to.",
+  },
+  {
+    id: "accept-or-return", title: "Review: Accept or Return", show: "review", showLabel: "Open a story in review",
+    alt: "A story in review: the Needs you list, then Accept and Return with a line under each",
+    text:
+      "Accept merges the story. Return sends your words to the agent, which fixes and hands in again. " +
+      "Needs you lists what only you can judge, such as a look or a feeling; do those by hand first. " +
+      "For example, if Needs you says to check the login on a phone, open it on a phone: if it looks right press Accept, and if the button is cut off press Return and write that the button is cut off on a phone.",
   },
   {
     id: "release", title: "Release a finished epic", show: "release", showLabel: "Open a finished epic",

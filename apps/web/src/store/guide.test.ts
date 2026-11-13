@@ -41,8 +41,16 @@ describe("Show me", () => {
 });
 
 describe("the text of the guide", () => {
-  it("has the eight sections in order, two to four sentences each, and never names the reference", () => {
-    expect(GUIDE_SECTIONS.map((s) => s.id)).toEqual(["add-project", "designs", "plan", "start", "inbox", "review", "release", "where"]);
+  it("explains Accept or Return in its own section, with the phone-check example", () => {
+    const sec = GUIDE_SECTIONS.find((s) => s.id === "accept-or-return");
+    expect(sec?.title).toBe("Review: Accept or Return");
+    expect(sec?.text).toContain("Accept merges the story.");
+    expect(sec?.text).toContain("Return sends your words to the agent, which fixes and hands in again.");
+    expect(sec?.text).toContain("on a phone");
+  });
+
+  it("has the nine sections in order, two to four sentences each, and never names the reference", () => {
+    expect(GUIDE_SECTIONS.map((s) => s.id)).toEqual(["add-project", "designs", "plan", "start", "inbox", "review", "accept-or-return", "release", "where"]);
     for (const sec of GUIDE_SECTIONS) {
       const sentences = sec.text.split(/(?<=[.!?])\s+(?=[A-Z"])/).length;
       expect(sentences).toBeGreaterThanOrEqual(2);

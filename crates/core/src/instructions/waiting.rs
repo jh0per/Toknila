@@ -47,7 +47,7 @@ pub(super) fn reviewer_part(returned: Option<&Returned>) -> String {
 pub fn returned_by(who: Actor) -> &'static str {
     match who {
         Actor::Human => "the person",
-        Actor::Agent => "the reviewer",
+        Actor::Agent | Actor::Assistant => "the reviewer",
         Actor::System => "the project's check",
     }
 }

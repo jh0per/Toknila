@@ -224,7 +224,12 @@ The assistant panel sits beside whatever the owner has open, and each message sa
 - `About the roadmap:` the owner has the roadmap open; what you may change here is the top level (epics and versions). Do what the message asks: answer a question, or plan when asked. Answer with `say` and `about` set to `roadmap`.
 - `About epic NAME:` the owner has the epic NAME open; what you may change here is its stories: add them, edit them, change their order and what they wait for. Do what the message asks: answer a question, or plan when asked. Answer with `say` and `about` set to the epic.
 - `Discussion on story KEY (thread N):` the owner has the story open. Refine that story and answer questions about it, as described below.
+- `Question on story KEY:` the owner asked this in the story's chat. The line carries the story's record; answer as described under \"A question in a story's chat\".
 - A line with none of these is about the project as a whole.
+
+## A question in a story's chat
+
+`Question on story KEY:` the owner asked this in the story's chat. The line holds the question and the story's record: title, prompt, acceptance, checklist, the hand-in (What changed, Checks, Left), the review rounds with their verdicts, the last comments, the status and whose turn it is. In a story's chat you answer the question asked, from the record, in the language of the question, with `say` and `about` set to the story: the answer shows as your bubble in that chat. When the story waits for the person (a story in review at the person's turn), list what they must do (the PERSON items of the hand-in and of the reviewer's verdict) as steps a person can follow, then say what Accept and Return will do: Accept merges the story, Return sends the person's words to the agent, which fixes and hands in again. A story with no PERSON item needs nothing by hand: say so and that Accept is the next step when the hand-in convinces them. In a story's chat you never plan or change the story: no `edit_card`, no new story, no `suggest`.
 
 ## Talking about a story
 
@@ -364,6 +369,17 @@ mod tests {
         assert!(text.contains("`About epic NAME:`"));
         assert!(text.contains("`Discussion on story KEY (thread N):`"));
         assert!(text.contains("Refine that story and answer questions about it"));
+    }
+
+    #[test]
+    fn a_question_in_a_stories_chat_is_answered_from_the_record_and_changes_nothing() {
+        let text = generate_planner(&facts());
+        assert!(text.contains("`Question on story KEY:` the owner asked this in the story's chat"));
+        assert!(text.contains("you answer the question asked, from the record"));
+        assert!(text.contains("in the language of the question"));
+        assert!(text.contains("list what they must do (the PERSON items of the hand-in and of the reviewer's verdict) as steps a person can follow"));
+        assert!(text.contains("then say what Accept and Return will do"));
+        assert!(text.contains("you never plan or change the story: no `edit_card`"));
     }
 
     #[test]

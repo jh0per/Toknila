@@ -33,7 +33,7 @@ pub fn review(d: &TicketDetail) {
         let who = match round.reviewer {
             Actor::Human => "person",
             Actor::System => "Toknila",
-            Actor::Agent => "reviewer agent",
+            Actor::Agent | Actor::Assistant => "reviewer agent",
         };
         let said = if round.comment.is_empty() {
             String::new()
