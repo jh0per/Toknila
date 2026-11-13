@@ -1,0 +1,48 @@
+# Phase 8: what the first real use of 0.3.1 found. One card at a time, each released on its own.
+# Import: tok chain import plans/phase-8.toml --project TOKNILA
+#
+# 2026-11-13, the owner's words: "після відповіді в чаті кнопка мікрофона вже не натискається"
+# (after an answer in the chat the microphone button no longer presses). The system log of the
+# owner's Mac told the cause; the card below carries it.
+
+[chain]
+name = "phase-8"
+title = "Voice says why it refused"
+goal = "When macOS refuses to listen, the person reads why and where to turn it on; no failure of the recognizer ends in a button that looks dead"
+autostart = true
+version = "0.3.2"
+
+[[ticket]]
+id = "mic-says-why"
+title = "A refused microphone says why: the recognizer's reason reaches the person"
+prompt = """
+What happened in the real window (Toknila.app 0.3.1, macOS 26.5, the Tauri WKWebView). The owner pressed the microphone, said a sentence, pressed again, sent it, got the assistant's answer. From then on every press of the microphone did nothing visible: two system sounds close together and the button back as it was. The system log (`/usr/bin/log show`) shows, for every press, the WebKit GPU process starting the audio capture and stopping it within four milliseconds, and the on-device recognizer `localspeechrecognition` refusing with `Error Domain=kLSRErrorDomain Code=201 "Siri and Dictation are disabled"`. On the owner's Mac both Siri and Dictation are off. The first session worked because the on-device speech model was not installed yet: WebKit's recognizer (Source/WebCore/Modules/speech/cocoa/WebSpeechRecognizerTask.mm) sets `requiresOnDeviceRecognition` only when `supportsOnDeviceRecognition` is true, so the first session went to the server recognizer and the model got installed meanwhile; every later session was forced on-device and refused.
+
+Why the window showed nothing. WebKit maps every failure of the `SFSpeechRecognitionTask` to the Web Speech error code `aborted` and puts the task error's `localizedDescription` into the error event's `message` (same file, `didFinishSuccessfully:`). `useSpeech.ts` (apps/web/src/views/useSpeech.ts) reads only `e.error`, and `micFailure` in apps/web/src/store/speech.ts maps `aborted` to `idle` with an empty sentence, so the button fell back to idle as if nothing had been pressed. A failure the system explained was turned into silence.
+
+Build this.
+
+1. `useSpeech.ts`: the error event type gains `message?: string`; `onerror` passes both to `micFailure(e.error, e.message)`.
+
+2. `micFailure(code, detail?)` in store/speech.ts:
+   - `aborted` with no detail: as today, `idle` and no sentence (an abort nobody explained is the person's own stop or WebKit replacing a request).
+   - `aborted` with a detail that contains "Siri and Dictation" or "Dictation" (case-insensitive): `error`, sentence `DICTATION_OFF` = "macOS refused to listen: Siri and Dictation are off. Turn on Dictation in System Settings → Keyboard → Dictation (or turn on Siri), then press the button again."
+   - `aborted` with any other detail, and every other code that today reads `Could not listen (code)`: the sentence carries the detail when there is one: "Could not listen: <detail>. Try again, or <the dictation hint in lower case>".
+   - `no-speech` stays `idle` and silent; `not-allowed`/`service-not-allowed` keep `DENIED`.
+   - `DICTATE` (the hint when the window has no recognizer, and the tail of the failure sentences) becomes "Press Fn twice to dictate with the system's dictation (System Settings → Keyboard → Dictation turns it on)." because Fn twice does nothing while Dictation is off either.
+
+3. A guard for the recognizer that ends without a word of explanation: when `onend` fires within 1500 ms of `start()` with no result and no error reported, the state becomes `error` with "Listening ended at once, without words. Press again; if it repeats, <DICTATE in lower case>". Keep the implementation in the hook small (a timestamp and a flag set by `onresult`/`onerror`); the sentence lives in store/speech.ts with the others.
+
+4. Tests. apps/web/src/store/speech.test.ts: `micFailure` with the Dictation detail (error + the sentence names System Settings and Dictation), with another detail (the detail is in the sentence), with none (idle, empty). apps/web/e2e/voice.mjs: the fake recognizer's `start()` reports `onerror({ error: window.__recFail, message: window.__recFailMessage })`; add a case `__recFail = "aborted"`, `__recFailMessage = "Siri and Dictation are disabled"` that checks the note names Dictation and System Settings and `data-mic` is `error`; and a case `aborted` without a message that checks the button is idle and no note is shown. Run `cargo xtask web` and `cargo xtask e2e-web`.
+
+5. Words. docs/install.md, where the microphone is mentioned, gets one sentence: on macOS the microphone needs Dictation or Siri turned on in System Settings, otherwise the button says so. AGENTS.md, under "Verification discipline" or "Working on a ticket" (whichever fits the surrounding bullets), gets one bullet: a failure the system explains reaches the person as a sentence with the system's reason; no error code maps to silence except the one the person caused. This is the lesson of this card and it holds for every surface, not only the microphone.
+
+6. Who checks the real window. An agent cannot see the Tauri window, so the hand-in names the person's steps instead of claiming them: (a) with Siri and Dictation off, press the microphone: the sentence names Dictation and System Settings, the button shows the failure; (b) turn Dictation on in System Settings → Keyboard, press again: it listens and the words arrive; (c) the e2e covers the same two paths with the fake. Report the real-window items as PERSON, never as PASS.
+
+Keep the change inside apps/web (speech.ts, useSpeech.ts, MicButton.tsx only if a sentence needs room), the two docs, and the tests. Nothing in the daemon or the desktop app.
+"""
+acceptance = [
+  "With Siri and Dictation off on macOS, pressing the microphone shows a sentence that names the reason and where to turn Dictation on; the button shows the failure, not idle",
+  "Any other recognizer failure shows its reason in the sentence; an abort without a reason (the person's own stop) stays silent; a recognizer that ends at once without words says so",
+  "Covered by speech.test.ts and e2e/voice.mjs through the fake's message; docs/install.md names the Dictation requirement; AGENTS.md carries the rule that an explained failure never maps to silence; the hand-in lists the person's real-window steps as PERSON",
+]
