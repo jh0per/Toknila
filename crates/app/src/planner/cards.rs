@@ -54,6 +54,21 @@ pub struct DesignPick {
     pub region: Option<toknila_core::design::Region>,
 }
 
+/// Refuses a change of `chain`'s stories that the person's latest message does not allow.
+fn ensure_story_target<R: crate::Reader + ?Sized>(
+    r: &R,
+    project: ProjectId,
+    chain: &toknila_core::Chain,
+) -> AppResult<()> {
+    use toknila_core::conversation::Author;
+    let recent = r.conversation_page(project, None, 200)?;
+    let from = recent
+        .iter()
+        .rposition(|m| m.author == Author::Person)
+        .unwrap_or(recent.len());
+    Ok(planner::ensure_story_target(&recent[from..], chain)?)
+}
+
 /// Adds a card to a chain of the planner's project, without designs.
 pub fn add_card<U: UnitOfWork + ?Sized>(
     uow: &mut U,
@@ -75,6 +90,7 @@ pub fn add_card_with_designs<U: UnitOfWork + ?Sized>(
 ) -> AppResult<TicketId> {
     let c = chain(uow, project, chain_ref)?;
     planner::ensure_graph_change(&c)?;
+    ensure_story_target(&*uow, project, &c)?;
     let model = match input.model.as_deref() {
         Some(m) => Project::choose_model(m).map_err(AppError::bad_request)?,
         None => None,
@@ -152,6 +168,9 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
 ) -> AppResult<TicketId> {
     let t = card(uow, project, card_ref)?;
     planner::ensure_card_editable(&t)?;
+    if let Some(c) = uow.chain(t.chain_id)? {
+        ensure_story_target(&*uow, project, &c)?;
+    }
     if let Some(m) = edit.model.as_deref() {
         Project::choose_model(m).map_err(AppError::bad_request)?;
     }
