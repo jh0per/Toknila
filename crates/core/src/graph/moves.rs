@@ -48,7 +48,12 @@ impl ChainView {
         self.tickets
             .iter()
             .filter(open)
-            .filter(|t| !self.edges.iter().any(|e| e.from == NodeRef::Ticket(t.id)))
+            // A release waiting for a story does not make it less of a tail.
+            .filter(|t| {
+                !self.edges.iter().any(|e| {
+                    e.from == NodeRef::Ticket(t.id) && matches!(e.to, NodeRef::Ticket(_))
+                })
+            })
             .map(|t| t.id)
             .collect()
     }

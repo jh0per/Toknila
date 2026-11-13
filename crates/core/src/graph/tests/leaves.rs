@@ -82,3 +82,11 @@ fn a_cut_release_is_left_alone() {
     b.ticket();
     assert_eq!(rewired(&mut b.view, r), ["DEMO-2"]);
 }
+
+#[test]
+fn the_release_edge_does_not_stop_a_story_being_the_tail() {
+    // The window's New story with no `after` appends after the tail; the edge to the release
+    // must not hide the tail, or the second story would not follow the first on the canvas.
+    let (b, cards, _) = imported();
+    assert_eq!(b.view.tail_tickets(), [tid(cards[1])]);
+}
