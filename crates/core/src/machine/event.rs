@@ -25,6 +25,10 @@ pub enum TicketEvent {
     /// Host: a Waiting card's agent process was ended after the grace; the card holds no slot
     /// and keeps the agent's `session` for the profile's resume form.
     AgentPaused { session: Option<String> },
+    /// Host: the process of a Running or Waiting card's agent is gone and nobody ended it (the app
+    /// restarted). A Running card wants its agent back at once, a Waiting one keeps its question;
+    /// a second loss soon after a resume that followed a loss blocks the card.
+    RunnerLost { session: Option<String> },
     /// A person's answer arrived for a paused card: it starts again when a slot is free.
     ResumeWanted,
     /// The schedule gave a paused card with an answer a slot: its agent starts again.
@@ -166,6 +170,7 @@ impl TicketEvent {
             Self::Request => "start",
             Self::Start => "start",
             Self::AgentPaused { .. } => "agent_paused",
+            Self::RunnerLost { .. } => "runner_lost",
             Self::ResumeWanted => "resume_wanted",
             Self::ResumeStart => "resume_start",
             Self::AskHuman { .. } => "ask_human",
@@ -217,7 +222,12 @@ pub enum Effect {
     EnsureRunner,
     /// Start the paused card's agent again from its `session` (a fresh start when it is `None`
     /// or the profile has no resume form), with the answer as its first input.
-    ResumeRunner { session: Option<String> },
+    /// `lost` says the process was lost with the app, so the run is told why it exists.
+    ResumeRunner {
+        session: Option<String>,
+        #[serde(default)]
+        lost: bool,
+    },
     /// Make sure the ticket has its ship (worktree and branch); reuse it if it exists.
     PrepareShip,
     /// [`Effect::PrepareShip`] after a person decided what to do about a base branch that is

@@ -57,7 +57,7 @@ pub(super) fn block(
         reason,
         BlockedReason::Crashed { .. }
             | BlockedReason::Terminated { .. }
-            | BlockedReason::RunnerLost
+            | BlockedReason::RunnerLost { .. }
             | BlockedReason::ShipFailed { .. }
             | BlockedReason::SetupFailed { .. }
             | BlockedReason::BaseBehind { .. }

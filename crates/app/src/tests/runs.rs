@@ -445,36 +445,6 @@ fn an_exit_after_the_hand_in_changes_nothing() {
 }
 
 #[test]
-fn a_restart_blocks_working_process_tickets_as_runner_lost_and_leaves_sim_alone() {
-    let mut mem = with_agents();
-    mem.view.tickets[1].profile = Some("sim".to_owned());
-    recover(&mut mem).expect("first start");
-    settle(&mut mem);
-    // The daemon died here: A's process is gone, and nothing was told.
-    mem.runner.live.borrow_mut().clear();
-    mem.deferred.clear();
-    mem.events.clear();
-    let report = recover(&mut mem).expect("restart");
-    assert_eq!(report.lost, vec!["DEMO-1".to_owned()]);
-    let t = a(&mem);
-    assert_eq!(t.status, TicketStatus::Blocked);
-    assert_eq!(blocked_reason(&t), BlockedReason::RunnerLost);
-    assert!(
-        mem.kinds().contains(&"ticket.status_changed".to_owned()),
-        "journaled: {:?}",
-        mem.kinds()
-    );
-
-    // Sim tickets have no process to lose.
-    let mut mem = with_agents();
-    mem.project.default_profile = "sim".to_owned();
-    recover(&mut mem).expect("start");
-    let report = recover(&mut mem).expect("restart");
-    assert!(report.lost.is_empty());
-    assert_eq!(a(&mem).status, TicketStatus::Running);
-}
-
-#[test]
 fn only_a_person_writes_to_the_terminal_and_only_while_it_runs() {
     let mut mem = with_agents();
     recover(&mut mem).expect("settle");

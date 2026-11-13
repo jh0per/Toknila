@@ -2058,8 +2058,10 @@ export interface components {
             kind: "pr_closed";
             url: string;
         } | {
+            first?: components["schemas"]["Timestamp"] | null;
             /** @enum {string} */
             kind: "runner_lost";
+            second?: components["schemas"]["Timestamp"] | null;
         } | {
             detail: string;
             /** @enum {string} */
@@ -3277,6 +3279,11 @@ export interface components {
          *     it waits for a person. It keeps what the run needs to come back: Claude Code's session id.
          */
         PausedAgent: {
+            /**
+             * @description The process was lost (the app restarted), not ended on purpose: the run that replaces it
+             *     is told so, and a second loss soon after blocks the card.
+             */
+            lost?: boolean;
             /** @description The answer arrived: the card starts again as soon as a slot is free. */
             resume?: boolean;
             /** @description The agent's own session, for the profile's resume form; `None` when the run never said. */
@@ -4264,6 +4271,7 @@ export interface components {
             done_out_of_order?: components["schemas"]["OutOfOrder"] | null;
             id: components["schemas"]["TicketId"];
             key: components["schemas"]["TicketKey"];
+            lost_resume?: components["schemas"]["Timestamp"] | null;
             /**
              * @description The model of the card's own agent (an alias or a full name); `None` means the project's
              *     `worker_model`.

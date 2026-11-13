@@ -45,6 +45,7 @@ fn ticket_in(status: TicketStatus) -> Ticket {
         paused: false,
         queued: false,
         agent_paused: None,
+        lost_resume: None,
         profile: None,
         review_mode: None,
         reviewer: None,
@@ -840,7 +841,10 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         Just(BlockedReason::Terminated {
             detail: "t".to_owned()
         }),
-        Just(BlockedReason::RunnerLost),
+        Just(BlockedReason::RunnerLost {
+            first: None,
+            second: None
+        }),
         Just(BlockedReason::ShipFailed {
             detail: "s".to_owned()
         }),
@@ -1077,7 +1081,131 @@ fn a_paused_agent_keeps_its_session_and_comes_back_through_a_resume_start() {
         (started.ticket.status, started.ticket.agent_paused),
         (TicketStatus::Running, None)
     );
-    assert!(started.effects.contains(&Effect::ResumeRunner { session }));
+    assert!(started.effects.contains(&Effect::ResumeRunner {
+        session,
+        lost: false
+    }));
     // A card whose agent was never paused cannot be resumed.
     assert!(apply(&waiting, &TicketEvent::ResumeWanted, NOW).is_err());
+}
+
+impl std::ops::Add<i64> for Timestamp {
+    type Output = Timestamp;
+    fn add(self, ms: i64) -> Timestamp {
+        Timestamp(self.0 + ms)
+    }
+}
+
+fn lost_event() -> TicketEvent {
+    TicketEvent::RunnerLost {
+        session: Some("abc".to_owned()),
+    }
+}
+
+#[test]
+fn a_lost_runner_of_a_running_card_is_a_paused_agent_that_wants_to_come_back() {
+    let running = ticket_in(TicketStatus::Running);
+    let lost = apply(&running, &lost_event(), NOW).expect("lost").ticket;
+    assert_eq!(lost.status, TicketStatus::Running);
+    let held = lost.agent_paused.clone().expect("paused");
+    assert_eq!(
+        (held.session, held.resume, held.lost),
+        (Some("abc".to_owned()), true, true)
+    );
+    assert_eq!(check_invariants(&lost), Ok(()));
+    assert!(!crate::schedule::holds_slot(&lost));
+    let started = apply(&lost, &TicketEvent::ResumeStart, NOW + 1).expect("start");
+    assert_eq!(started.ticket.status, TicketStatus::Running);
+    assert_eq!(started.ticket.agent_paused, None);
+    assert_eq!(started.ticket.lost_resume, Some(NOW + 1));
+    assert!(started.effects.contains(&Effect::ResumeRunner {
+        session: Some("abc".to_owned()),
+        lost: true
+    }));
+}
+
+#[test]
+fn a_lost_runner_of_a_waiting_card_keeps_the_question_and_waits_for_the_answer() {
+    let waiting = ticket_in(TicketStatus::Waiting);
+    let lost = apply(&waiting, &lost_event(), NOW).expect("lost").ticket;
+    assert_eq!(lost.status, TicketStatus::Waiting);
+    assert_eq!(lost.status_reason, waiting.status_reason);
+    assert!(lost.agent_paused.as_ref().is_some_and(|p| !p.resume));
+}
+
+#[test]
+fn a_second_loss_within_ten_minutes_of_a_resume_after_a_loss_blocks_the_card() {
+    let running = ticket_in(TicketStatus::Running);
+    let lost = apply(&running, &lost_event(), NOW).expect("lost").ticket;
+    let back = apply(&lost, &TicketEvent::ResumeStart, NOW + 1_000)
+        .expect("start")
+        .ticket;
+    let again = apply(&back, &lost_event(), NOW + 60_000).expect("lost again");
+    assert_eq!(again.ticket.status, TicketStatus::Blocked);
+    let Some(StatusReason::Blocked { reason, .. }) = &again.ticket.status_reason else {
+        panic!("blocked with a reason");
+    };
+    assert_eq!(
+        reason,
+        &BlockedReason::RunnerLost {
+            first: Some(NOW + 1_000),
+            second: Some(NOW + 60_000)
+        }
+    );
+    let text = reason.to_string();
+    assert!(text.contains(&(NOW + 1_000).utc_text()), "{text}");
+    assert!(text.contains(&(NOW + 60_000).utc_text()), "{text}");
+    assert!(text.contains("unblock starts it again"), "{text}");
+    // Control: after ten minutes the same loss is a single loss again.
+    let later = apply(&back, &lost_event(), NOW + 1_000 + 10 * 60 * 1000).expect("later");
+    assert_eq!(later.ticket.status, TicketStatus::Running);
+    assert!(later.ticket.agent_paused.is_some());
+}
+
+#[test]
+fn unblocking_a_lost_runner_never_leaves_a_card_without_an_agent() {
+    let blocked_from = |status| {
+        let t = ticket_in(status);
+        let reason = BlockedReason::RunnerLost {
+            first: Some(NOW),
+            second: Some(NOW + 1),
+        };
+        apply(&t, &TicketEvent::Block { reason }, NOW + 2)
+            .expect("block")
+            .ticket
+    };
+    let running = apply(
+        &blocked_from(TicketStatus::Running),
+        &TicketEvent::Unblock,
+        NOW + 3,
+    )
+    .expect("unblock")
+    .ticket;
+    assert_eq!(running.status, TicketStatus::Running);
+    assert!(running.agent_paused.as_ref().is_some_and(|p| p.resume));
+    assert_eq!(check_invariants(&running), Ok(()));
+    let waiting_before = blocked_from(TicketStatus::Waiting);
+    let waiting = apply(&waiting_before, &TicketEvent::Unblock, NOW + 3)
+        .expect("unblock")
+        .ticket;
+    assert_eq!(waiting.status, TicketStatus::Waiting);
+    assert!(waiting.agent_paused.as_ref().is_some_and(|p| !p.resume));
+    assert_eq!(
+        waiting.status_reason,
+        ticket_in(TicketStatus::Waiting).status_reason
+    );
+    assert_eq!(check_invariants(&waiting), Ok(()));
+    // Control: another block reason still goes back with a runner to start.
+    let crashed = apply(
+        &ticket_in(TicketStatus::Running),
+        &TicketEvent::Block {
+            reason: BlockedReason::Crashed { detail: "x".into() },
+        },
+        NOW,
+    )
+    .expect("block")
+    .ticket;
+    let back = apply(&crashed, &TicketEvent::Unblock, NOW).expect("unblock");
+    assert!(back.effects.contains(&Effect::EnsureRunner));
+    assert_eq!(back.ticket.agent_paused, None);
 }

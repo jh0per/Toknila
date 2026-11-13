@@ -39,7 +39,12 @@ pub fn check_invariants(ticket: &Ticket) -> Result<(), String> {
     if ticket.paused && ticket.status != S::Backlog {
         return Err(format!("paused ticket in {:?}", ticket.status));
     }
-    if ticket.agent_paused.is_some() && ticket.status != S::Waiting {
+    // A Running card holds one only while its lost agent waits for a slot.
+    if ticket
+        .agent_paused
+        .as_ref()
+        .is_some_and(|p| ticket.status != S::Waiting && !(ticket.status == S::Running && p.lost))
+    {
         return Err(format!("paused agent in {:?}", ticket.status));
     }
     if ticket.queued && ticket.status != S::Ready {

@@ -33,6 +33,10 @@ pub struct Ticket {
     /// comes back when the answer arrives. Only a Waiting card has it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_paused: Option<super::PausedAgent>,
+    /// When the agent last came back after its runner was lost; a second loss within
+    /// ten minutes of it blocks the card instead of resuming it again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lost_resume: Option<Timestamp>,
     /// Agent profile name; `None` means the project default.
     pub profile: Option<String>,
     /// `None` means the chain's, then the project's review mode.
@@ -191,6 +195,7 @@ impl Ticket {
             paused: draft.paused,
             queued: false,
             agent_paused: None,
+            lost_resume: None,
             profile: draft.profile,
             review_mode: draft.review_mode,
             reviewer: draft.reviewer,

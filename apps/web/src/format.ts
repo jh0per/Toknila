@@ -71,7 +71,7 @@ export function reasonText(r: StatusReason | null | undefined): string {
         case "merge_failed": return `merge failed: ${b.detail}`;
         case "ci_failed": return `checks failed: ${b.checks.join(", ")}`;
         case "pr_closed": return "the pull request was closed without merging";
-        case "runner_lost": return "runner lost";
+        case "runner_lost": return b.first && b.second ? "the agent was lost twice within ten minutes; unblock starts it again" : "the app restarted; the agent comes back";
         case "ship_failed": return `workspace failed: ${b.detail}`;
         case "setup_failed": return `setup failed: ${b.command}${b.output ? `\n${b.output}` : ""}`;
         case "base_behind": return `main branch ${b.base} is ${b.behind} ${b.behind === 1 ? "commit" : "commits"} behind ${b.upstream}${b.can_fast_forward ? "; fast-forward it and start, " : "; "}start anyway, or unblock to look again`;

@@ -6,7 +6,7 @@ import type { Actor, EventRecord } from "../api/types";
 
 /// The journal's own names for what happened, as (entity, kind) pairs, with a sentence for each.
 /// The payload is read field by field and may lack any of them.
-type Words = (p: Fields) => string;
+type Words = (p: Fields, at?: number) => string;
 type Fields = Record<string, any>;
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -34,7 +34,7 @@ const turn = (p: Fields): string => (p.role === "reviewer" ? "The reviewer" : "T
 const BLOCKED: Record<string, string> = {
   manual: "blocked by hand", crashed: "crashed", terminated: "the agent was terminated from outside", dependency_reopened: "a story it depends on was reopened",
   merge_conflict: "the merge conflicts", merge_failed: "the merge failed", ci_failed: "the checks failed",
-  pr_closed: "the pull request was closed", runner_lost: "the agent was lost", ship_failed: "its workspace failed", setup_failed: "the setup of its workspace failed",
+  pr_closed: "the pull request was closed", runner_lost: "the app restarted; the agent comes back", ship_failed: "its workspace failed", setup_failed: "the setup of its workspace failed",
 };
 
 /// Why a card moved to its new status, when the journal says.
@@ -47,6 +47,10 @@ function becauseOf(reason: Fields | null | undefined): string {
     case "cancelled":
       return reason.text ? ` (${str(reason.text)})` : "";
     case "blocked": {
+      // Lost twice in a row: it does not come back by itself.
+      if (reason.reason?.kind === "runner_lost" && reason.reason.first && reason.reason.second) {
+        return " (the agent was lost twice within ten minutes; unblock starts it again)";
+      }
       const why = BLOCKED[str(reason.reason?.kind)];
       const text = str(reason.reason?.text) || str(reason.reason?.detail);
       return why ? ` (${why}${text ? `: ${text}` : ""})` : text ? ` (${text})` : "";
@@ -70,7 +74,15 @@ const TABLE: Record<string, Words> = {
   "ticket.design_moved": (p) => `A design reference moved here from ${str(p.from)}`,
   "ticket.created": () => "Story created",
   "ticket.status_changed": (p) => `Moved from ${status(p.from)} to ${status(p.to)}${becauseOf(p.reason)}`,
-  "ticket.updated": () => "Story edited",
+  "ticket.updated": (p, at) => {
+    const t = p.ticket ?? {};
+    // A lost agent and its coming back are lines of their own, not "Story edited".
+    if (t.agent_paused?.lost) {
+      return t.agent_paused.resume ? "The app restarted; the agent comes back" : "The app restarted; the agent comes back when you answer";
+    }
+    if (typeof at === "number" && t.lost_resume === at && !t.agent_paused) return "The agent came back after the restart";
+    return "Story edited";
+  },
   "ticket.proposed": () => "Proposed as a new story, waiting for approval",
   "ticket.approved": () => "Approved and added to the plan",
   "ticket.rejected": (p) => `Rejected${p.reason ? `: ${str(p.reason)}` : ""}`,
@@ -116,8 +128,8 @@ export const WORDED: readonly string[] = Object.keys(TABLE);
 export const WHO: Record<Actor, string> = { human: "You", agent: "The agent", system: "Toknila" };
 
 /// One event as a sentence; an event this page has no words for reads "entity kind".
-export function eventWords(e: Pick<EventRecord, "entity" | "kind" | "payload">): string {
+export function eventWords(e: Pick<EventRecord, "entity" | "kind" | "payload"> & Partial<Pick<EventRecord, "at">>): string {
   const words = TABLE[`${e.entity}.${e.kind}`];
   const p = (e.payload && typeof e.payload === "object" ? e.payload : {}) as Fields;
-  return words ? words(p).trim() : `${e.entity} ${e.kind.replace(/_/g, " ")}`;
+  return words ? words(p, typeof e.at === "number" ? e.at : undefined).trim() : `${e.entity} ${e.kind.replace(/_/g, " ")}`;
 }

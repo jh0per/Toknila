@@ -507,6 +507,7 @@ mod tests {
             check_command: None,
             setup_command: None,
             earlier: &[],
+            restarted: false,
             waiting: &[],
             returned: None,
             design_first: false,

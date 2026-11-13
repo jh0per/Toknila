@@ -54,8 +54,7 @@ pub fn check_limit(limit: u32) -> Result<u32, LimitError> {
 /// agent was paused (its process ended, `Ticket::agent_paused`) holds none until it resumes.
 pub fn holds_slot(ticket: &Ticket) -> bool {
     match ticket.status {
-        TicketStatus::Running => true,
-        TicketStatus::Waiting => ticket.agent_paused.is_none(),
+        TicketStatus::Running | TicketStatus::Waiting => ticket.agent_paused.is_none(),
         _ => false,
     }
 }

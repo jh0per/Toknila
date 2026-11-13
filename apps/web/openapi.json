@@ -6836,15 +6836,35 @@
           },
           {
             "type": "object",
-            "description": "The daemon restarted and the runner was gone.",
+            "description": "The daemon restarted and the runner was gone. A card whose runner is lost comes back by\nitself; it is Blocked only when it was lost twice in a row, and then `first` and `second`\nare the two times.",
             "required": [
               "kind"
             ],
             "properties": {
+              "first": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Timestamp"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "kind": {
                 "type": "string",
                 "enum": [
                   "runner_lost"
+                ]
+              },
+              "second": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Timestamp"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             }
@@ -10310,6 +10330,10 @@
           "since"
         ],
         "properties": {
+          "lost": {
+            "type": "boolean",
+            "description": "The process was lost (the app restarted), not ended on purpose: the run that replaces it\nis told so, and a second loss soon after blocks the card."
+          },
           "resume": {
             "type": "boolean",
             "description": "The answer arrived: the card starts again as soon as a slot is free."
@@ -13061,6 +13085,17 @@
           },
           "key": {
             "$ref": "#/components/schemas/TicketKey"
+          },
+          "lost_resume": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When the agent last came back after its runner was lost; a second loss within\nten minutes of it blocks the card instead of resuming it again."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "model": {
             "type": [

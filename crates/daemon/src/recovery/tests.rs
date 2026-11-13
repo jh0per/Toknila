@@ -159,8 +159,9 @@ async fn a_running_card_with_no_run_record_is_lost_on_a_real_project() {
     assert_eq!(status(), "running");
     let r = recover(&store).await.expect("recover");
     assert_eq!(r.lost, ["REAL-1"]);
-    assert_eq!(r.running, 0);
-    assert_eq!(status(), "blocked");
+    // Lost and coming back: the card is Running again, not Blocked waiting for a person.
+    assert_eq!(r.running, 1);
+    assert_eq!(status(), "running");
 }
 
 #[tokio::test]
