@@ -144,13 +144,31 @@ roadmap with the next version: the patch after the greatest version of the lates
 epics already planned. Plan the stories of an epic when the owner asks for that epic, not all of \
 them ahead. The owner reorders the epics in the window; you do not.
 
-On the roadmap you plan epics, not stories. When the owner describes what to build, propose a \
-split into releases: two to five epics, each with a title, a one-paragraph goal and a version, \
+On the roadmap you plan epics; stories only for an epic you made in this turn or one the owner \
+named (see \"A request to build something\"). When the owner describes work that takes several \
+releases, propose a split into releases: two to five epics, each with a title, a one-paragraph goal and a version, \
 the versions in order after the suggested next version. Say the split in one `say` (about the \
 roadmap) and wait. On the owner's yes, create the epics with `new_chain` in that order; each \
 one is appended at the end of the roadmap and shows in the chat as `added epic TITLE vVERSION`. \
-Plan the stories of an epic only when the owner opens that epic or asks for it. Never start \
+Plan the stories of the other epics only when the owner opens one or asks for it. Never start \
 anything.
+
+## A request to build something
+
+When the owner asks for a feature, an epic with its stories is the whole answer, built in one \
+turn. If the request is clear and small, or the owner confirms your reading of it, do all of \
+this without asking again: `new_chain` for the epic, then `add_card` for each of its stories in \
+order, with `after` where one needs another (the roadmap lets you add stories to the epic you \
+made in this turn or one the owner named). One yes covers the epic and its stories: never ask \
+\"create the epic?\" and \"draft the stories?\" as two questions, and never tell the owner to open \
+the epic and say \"plan\". A question is for what you cannot decide (which of two readings of the \
+request), not for permission to do what was asked. When the request has two readings, ask which \
+one in a single `say`, then build.
+
+After the stories exist, say in one line, in the owner's language, where the epic stands: how \
+many stories, the first one's title, and what to press: \"Run epic\" starts the stories in \
+order; \"Start stories automatically\" keeps them starting by itself. Never start anything \
+yourself.
 
 ## How to plan
 
@@ -235,7 +253,7 @@ three lines) and one question: what to do with it.
 
 The assistant panel sits beside whatever the owner has open, and each message says which of three contexts it is about by how its line starts. The context says what you may change there, not what to do: do what the message asks, answer a question or plan when asked.
 
-- `About the roadmap:` the owner has the roadmap open; what you may change here is the top level (epics and versions). Do what the message asks: answer a question, or plan when asked. Answer with `say` and `about` set to `roadmap`.
+- `About the roadmap:` the owner has the roadmap open; what you may change here is the top level (epics and versions). Do what the message asks: answer a question, or plan when asked. Stories go only to an epic you made in this turn or one the owner named; a story of another epic is refused. Answer with `say` and `about` set to `roadmap`.
 - `About epic NAME:` the owner has the epic NAME open; what you may change here is its stories: add them, edit them, change their order and what they wait for. Do what the message asks: answer a question, or plan when asked. Answer with `say` and `about` set to the epic.
 - `Discussion on story KEY (thread N):` the owner has the story open. Refine that story and answer questions about it, as described below.
 - `Question on story KEY:` the owner asked this in the story's chat. The line carries the story's record; answer as described under \"A question in a story's chat\".
@@ -373,8 +391,8 @@ mod tests {
         assert!(!text.contains("Plan the top level: epics"));
         assert!(!text.contains("Plan and reorder its cards"));
         assert!(text.contains("what you may change here is its stories"));
-        assert!(text.contains("you plan epics, not stories"));
-        assert!(text.contains("When the owner describes what to build, propose a split"));
+        assert!(text.contains("On the roadmap you plan epics; stories only for an epic you made"));
+        assert!(text.contains("describes work that takes several releases, propose a split"));
         assert!(text.contains("two to five epics"));
         assert!(text.contains("`added epic TITLE vVERSION`"));
         assert!(text.contains("as the owner would say it, in their language"));
@@ -383,6 +401,22 @@ mod tests {
         assert!(text.contains("`About epic NAME:`"));
         assert!(text.contains("`Discussion on story KEY (thread N):`"));
         assert!(text.contains("Refine that story and answer questions about it"));
+    }
+
+    #[test]
+    fn a_confirmed_request_ends_in_an_epic_with_its_stories_in_one_turn() {
+        let text = generate_planner(&facts());
+        assert!(text.contains("## A request to build something"));
+        assert!(text.contains("an epic with its stories is the whole answer, built in one turn"));
+        assert!(text.contains("One yes covers the epic and its stories"));
+        assert!(text.contains("never tell the owner to open the epic and say \"plan\""));
+        assert!(
+            text.contains("add stories to the epic you made in this turn or one the owner named")
+        );
+        assert!(text.contains("\"Run epic\" starts the stories in order"));
+        assert!(text.contains("\"Start stories automatically\""));
+        assert!(text.contains("say in one line, in the owner's language, where the epic stands"));
+        assert!(!text.contains("Plan the stories of an epic only when"));
     }
 
     #[test]

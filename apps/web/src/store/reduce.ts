@@ -261,8 +261,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "saveCard":
     case "pickPlace":
     case "moveCard":
-    case "archiveProject":
-    case "showArchived":
+    case "archiveProject": case "hideProject": case "projectHidden": // hiding is plan.ts's alone
+    case "showArchived": case "showHidden":
     case "cardSaved":
     case "cardMoved":
     case "planRejected":

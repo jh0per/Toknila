@@ -1,5 +1,6 @@
 // What the right-click menu of the sidebar's projects offers. On a project row: its settings,
-// adding a project, archiving (or bringing it back) and deleting; on the section: adding a project.
+// adding a project, hiding it from the list (or showing it there again), archiving (or bringing it
+// back) and deleting; on the section: adding a project.
 
 import type { Project } from "../api/types";
 import type { Intent } from "../store/msg";
@@ -19,8 +20,21 @@ const addProject: ProjectMenuEntry = {
   intent: { type: "openDialog", dialog: { kind: "addProject" } },
 };
 
+/// Hide from list, or Show in list on a hidden project. An archived project is off the list
+/// already (archived and hidden counts as archived), so it has neither.
+function hideEntry(project: Project): ProjectMenuEntry[] {
+  if (project.archived) return [];
+  const hidden = Boolean(project.hidden);
+  return [{
+    label: hidden ? "Show in list" : "Hide from list",
+    testId: hidden ? "menu-show-project" : "menu-hide-project",
+    intent: { type: "hideProject", project: project.key, hidden: !hidden },
+    group: 2,
+  }];
+}
+
 /// The entries for a right click on `project`'s row, or on the section when `project` is absent.
-/// Grouped: the project's page | adding | archiving | deleting, the one red entry, last.
+/// Grouped: the project's page | adding | hiding and archiving | deleting, the one red entry, last.
 export function projectMenu(project: Project | undefined): ProjectMenuEntry[] {
   if (!project) return [addProject];
   const archived = Boolean(project.archived);
@@ -31,6 +45,7 @@ export function projectMenu(project: Project | undefined): ProjectMenuEntry[] {
       intent: { type: "navigate", route: { name: "settings", project: project.key } },
     },
     { ...addProject, group: 1 },
+    ...hideEntry(project),
     archived
       ? {
         label: "Unarchive",

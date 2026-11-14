@@ -45,6 +45,11 @@ export function runPlanEffect(e: PlanEffect, dispatch: Dispatch): void {
         .then((project) => dispatch({ type: "projectArchived", project }))
         .catch(reject("archive"));
       return;
+    case "hideProject":
+      post<Project>(`/projects/${enc(e.project)}/${e.hidden ? "hide" : "unhide"}`, {})
+        .then((project) => dispatch({ type: "projectHidden", project }))
+        .catch(reject("hide"));
+      return;
     case "clearHash":
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
       return;

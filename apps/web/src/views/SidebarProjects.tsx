@@ -1,21 +1,22 @@
-import { type MouseEvent, useCallback, useState } from "react";
+import { type MouseEvent, type ReactNode, useCallback, useState } from "react";
 import type { Project } from "../api/types";
 import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
-import { type State, activeProjects, archivedProjects, currentProject } from "../store/state";
-import { sidebarOthers } from "../store/switcher";
+import { type State, archivedProjects, currentProject } from "../store/state";
+import { sidebarProjects } from "../store/switcher";
+import { agentsOf, waitingIn } from "../store/tree";
 import { useChainMenu } from "./ChainMenu";
 import { ContextMenu } from "./ContextMenu";
 import { menuGroups } from "./menuGroups";
 import { byGroup, projectMenu } from "./projectMenu";
-import { SidebarProject } from "./SidebarProject";
+import { HiddenProjectRow, SidebarProject, runningDot } from "./SidebarProject";
 import { useTree } from "./useTree";
 
 type Menu = { x: number; y: number; project: Project | undefined };
 
-/// The sidebar's tree: a "+" that adds a project, one node per project (see `SidebarProject`), a
-/// right-click menu (on the section, on each project and on each chain), and the archived projects
-/// when the person asks for them.
+/// The sidebar's tree: a "+" that adds a project, one node per listed project (see
+/// `SidebarProject`), a right-click menu (on the section, on each project and on each chain), and
+/// the hidden and the archived projects when the person asks for them.
 export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const [menu, setMenu] = useState<Menu>();
   const close = useCallback(() => setMenu(undefined), []);
@@ -24,11 +25,10 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
   // The inbox and the usage page are about every project, so none is on the screen there.
   const global = (state.route.name === "inbox" && !state.route.project) || state.route.name === "usage";
   const project = global ? undefined : currentProject(state);
-  // The open project's tree and the other projects as collapsed rows; past three others, the rest
-  // wait behind one "+ N more" row that opens the switcher. The daemon's order stays.
-  const active = activeProjects(state);
-  const { shown, more } = sidebarOthers(active.filter((p) => p.id !== project?.id));
-  const listed = active.filter((p) => p.id === project?.id || shown.includes(p));
+  // The open project's tree and the other listed projects as collapsed rows; past three others,
+  // the rest wait behind one "+ N more" row that opens the switcher. The daemon's order stays. A
+  // hidden project is in the list only while it is on the screen; the others wait under the list.
+  const { rows: listed, more, hidden } = sidebarProjects(state, project);
   const archived = archivedProjects(state);
   const show = state.plan.showArchived;
   const openMenu = (p: Project | undefined) => (e: MouseEvent) => {
@@ -42,8 +42,9 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
       onMenu={openMenu(p)} onChainMenu={chainMenu.open}
     />
   );
-  // On the settings page the refusal shows next to its button instead.
-  const refused = state.route.name === "settings" ? undefined : planError(state.plan, "archive");
+  // On the settings page Archive's refusal shows next to its button instead; Hide has no button
+  // there, so its refusal always shows here.
+  const refused = (state.route.name === "settings" ? undefined : planError(state.plan, "archive")) ?? planError(state.plan, "hide");
   return (
     <section className="sec" data-testid="projects" onContextMenu={openMenu(undefined)} {...tree}>
       <h2>
@@ -65,6 +66,10 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
           </li>
         )}
       </ul>
+      <HiddenProjects
+        hidden={hidden} state={state} dispatch={dispatch}
+        row={(p) => <HiddenProjectRow key={p.id} project={p} state={state} dispatch={dispatch} onMenu={openMenu(p)} />}
+      />
       {archived.length > 0 && (
         <button
           type="button" className="link-btn" data-testid="show-archived"
@@ -87,5 +92,35 @@ export function SidebarProjects({ state, dispatch }: { state: State; dispatch: (
         />
       )}
     </section>
+  );
+}
+
+/// "Show hidden (N)" under the list, and the hidden projects as rows once opened. Closed, the row
+/// says what waits in them and whether an agent of one runs, so a hidden project never hides a
+/// question; opened, each row says its own.
+function HiddenProjects({ hidden, state, dispatch, row }: {
+  hidden: Project[];
+  state: State;
+  dispatch: (i: Intent) => void;
+  row: (p: Project) => ReactNode;
+}) {
+  if (hidden.length === 0) return null;
+  const open = state.plan.showHidden;
+  const waiting = hidden.reduce((n, p) => n + waitingIn(state, p), 0);
+  const running = hidden.some((p) => agentsOf(state, p).runs.length > 0);
+  return (
+    <>
+      <button
+        type="button" className="link-btn hidden-toggle" data-testid="show-hidden" aria-expanded={open}
+        onClick={() => dispatch({ type: "showHidden", on: !open })}
+      >
+        <span>{open ? "Close hidden" : `Show hidden (${hidden.length})`}</span>
+        {!open && running && runningDot("An agent is running in a hidden project", "hidden-running")}
+        {!open && waiting > 0 && (
+          <span className="badge" title={`${waiting} waiting for you in hidden projects`} data-testid="hidden-waiting">{waiting}</span>
+        )}
+      </button>
+      {open && <ul role="tree" aria-label="Hidden projects" className="tree" data-testid="hidden-projects">{hidden.map(row)}</ul>}
+    </>
   );
 }
