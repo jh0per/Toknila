@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConversationMessage, EventRecord, Project } from "../api/types";
-import { aboutLabel, aboutRoute, mergeMessages, msUntilOverdue, unanswered, wakeWhenLate } from "./conversation";
+import { aboutLabel, aboutRoute, mergeMessages, minutesSince, msUntilOverdue, openTurn, unanswered, wakeWhenLate } from "./conversation";
 import { ANSWER_WAIT_MS } from "./discussion";
 import type { Msg } from "./msg";
 import { reduce } from "./reduce";
@@ -118,6 +118,34 @@ describe("the assistant answering", () => {
     expect(plain).toEqual([{ type: "plannerCall", project: "DEMO", call: "nudge", text: "a shop with a cart" }]);
     const [, card] = reduce(start(), { type: "nudgeCard", project: "DEMO", key: "DEMO-1", thread: 2, text: "why" });
     expect(card).toEqual([{ type: "plannerCall", project: "DEMO", call: "nudge", card: "DEMO-1", thread: 2, text: "why" }]);
+  });
+});
+
+describe("an open turn", () => {
+  it("a progress line is not the answer: the person is still owed one, and the line is the latest progress", () => {
+    const m = [msg("a", 1), msg("b", 2, "progress"), msg("c", 3, "toknila")];
+    expect(unanswered(m)?.id).toBe("a");
+    expect(openTurn(m)).toMatchObject({ asked: { id: "a" }, progress: { id: "b" }, queued: [] });
+    expect(openTurn([...m, msg("d", 4, "progress")]).progress?.id).toBe("d");
+    expect(unanswered([...m, msg("e", 5, "assistant")])).toBeUndefined();
+  });
+
+  it("a progress line of an answered turn is not shown under the next wait", () => {
+    const m = [msg("a", 1), msg("b", 2, "progress"), msg("c", 3, "assistant"), msg("d", 4)];
+    expect(openTurn(m)).toMatchObject({ asked: { id: "d" }, queued: [] });
+    expect(openTurn(m).progress).toBeUndefined();
+  });
+
+  it("a message sent while the first is answered is queued; the first is not", () => {
+    const m = [msg("a", 1), msg("b", 2, "progress"), msg("c", 3), msg("d", 4)];
+    expect(openTurn(m)).toMatchObject({ asked: { id: "a" }, queued: ["c", "d"] });
+    expect(openTurn([msg("a", 1), msg("b", 2, "assistant")])).toEqual({ queued: [] });
+  });
+
+  it("counts whole minutes since the message, never below zero", () => {
+    expect(minutesSince(1000, 1000 + 119_000)).toBe(1);
+    expect(minutesSince(1000, 1000 + 120_000)).toBe(2);
+    expect(minutesSince(5000, 1000)).toBe(0);
   });
 });
 

@@ -42,6 +42,10 @@ pub struct Say {
     /// The card (key, id or title) or chain (name) the words are about, or `roadmap`.
     #[serde(default)]
     pub about: Option<String>,
+    /// A line that tells what the assistant is doing before a long read or run. It shows muted
+    /// and is not the answer: the person is still owed one.
+    #[serde(default)]
+    pub progress: bool,
 }
 
 /// A page of the conversation, oldest first.
@@ -133,7 +137,12 @@ pub fn say_as_assistant<U: UnitOfWork + ?Sized>(
     project: ProjectId,
     input: Say,
 ) -> AppResult<Message> {
-    conversation::check_writer(uow.actor(), Author::Assistant)?;
+    let author = if input.progress {
+        Author::Progress
+    } else {
+        Author::Assistant
+    };
+    conversation::check_writer(uow.actor(), author)?;
     let text = conversation::clean_text(&input.text)?;
     let about = match input
         .about
@@ -144,7 +153,7 @@ pub fn say_as_assistant<U: UnitOfWork + ?Sized>(
         Some(r) => Some(about_of(&*uow, project, r)?),
         None => None,
     };
-    store(uow, project, Author::Assistant, text, about, Vec::new())
+    store(uow, project, author, text, about, Vec::new())
 }
 
 /// Toknila reports what the assistant did, as a line between the messages. Never refused: it

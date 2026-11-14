@@ -111,12 +111,49 @@ export function conversationEvent(s: State, e: EventRecord, gap: boolean): [Stat
 /// project's conversation, so they read their newest page again.
 export const reloadTalks = (s: State, e: EventRecord): Effect[] => (e.kind === "message_posted" ? reload(s) : []);
 
-/// The message the assistant owes an answer to: the person spoke last (Toknila's lines are the
-/// assistant at work, not a word to the person).
+/// Whether a message is the assistant at work (Toknila's line, or its own progress line) and so
+/// neither a word from the person nor an answer to them.
+const atWork = (m: ConversationMessage): boolean => m.author === "toknila" || m.author === "progress";
+
+/// The message the assistant owes an answer to: the person spoke last (Toknila's lines and the
+/// assistant's progress lines are the assistant at work, not a word to the person).
 export function unanswered(messages: ConversationMessage[]): ConversationMessage | undefined {
-  const last = [...messages].reverse().find((m) => m.author !== "toknila");
+  const last = [...messages].reverse().find((m) => !atWork(m));
   return last?.author === "person" ? last : undefined;
 }
+
+/// The turn the assistant is in, when the person is owed an answer: the message that started it
+/// (`asked`), the ids of the messages sent after it, which wait for the next turn (`queued`), and
+/// the assistant's latest progress line of this turn.
+export interface OpenTurn {
+  asked?: ConversationMessage;
+  queued: string[];
+  progress?: ConversationMessage;
+}
+
+export function openTurn(messages: ConversationMessage[]): OpenTurn {
+  const people: ConversationMessage[] = [];
+  let progress: ConversationMessage | undefined;
+  for (const m of [...messages].reverse()) {
+    if (m.author === "assistant") break;
+    if (m.author === "person") people.push(m);
+    else if (m.author === "progress" && !progress) progress = m;
+  }
+  const asked = people[people.length - 1];
+  if (!asked) return { queued: [] };
+  const queued = people.slice(0, -1).reverse().map((m) => m.id);
+  // A progress line from before the message that started this turn belongs to an older one.
+  return { asked, queued, progress: progress && order(asked, progress) < 0 ? progress : undefined };
+}
+
+/// Whole minutes from `at` to `now`, never below zero.
+export const minutesSince = (at: number, now: number): number => Math.max(0, Math.floor((now - at) / 60_000));
+
+/// How long the assistant may take before the waiting line stops counting and points to its terminal.
+export const STILL_WORKING_MIN = 5;
+
+/// What a queued message of the person says under it.
+export const QUEUED_NOTE = "sent, the assistant reads it after this answer";
 
 /// Milliseconds until the unanswered message is overdue (0 when it is); undefined when nothing waits.
 export function msUntilOverdue(messages: ConversationMessage[], now: number): number | undefined {

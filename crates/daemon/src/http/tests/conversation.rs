@@ -439,3 +439,50 @@ async fn a_person_message_about_a_chain_is_stored_with_it_and_other_contexts_are
         .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn a_progress_line_is_appended_and_the_turn_stays_open_until_the_assistant_answers() {
+    use toknila_core::conversation::{Message, awaits_answer};
+    let api = Api::new();
+    api.two_projects().await;
+    let planner = api.planner_token("DEMO").await;
+    api.post(CONVERSATION, json!({ "text": "Plan" })).await;
+
+    let (status, line) = api
+        .call_with(
+            &planner,
+            Method::POST,
+            "/v1/planner/say",
+            Some(json!({ "text": "Reading the daemon's code, a few minutes", "progress": true })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{line}");
+    assert_eq!(line["author"], "progress");
+
+    let all = messages(&api, "").await;
+    assert_eq!(
+        all.iter().map(gist).collect::<Vec<_>>(),
+        [
+            "person: Plan",
+            "progress: Reading the daemon's code, a few minutes"
+        ]
+    );
+    let read = |all: &[Value]| -> Vec<Message> {
+        all.iter()
+            .map(|m| serde_json::from_value(m.clone()).expect("message"))
+            .collect()
+    };
+    assert!(
+        awaits_answer(&read(&all)),
+        "the person is still owed an answer"
+    );
+
+    api.call_with(
+        &planner,
+        Method::POST,
+        "/v1/planner/say",
+        Some(json!({ "text": "Two stories." })),
+    )
+    .await;
+    assert!(!awaits_answer(&read(&messages(&api, "").await)));
+}

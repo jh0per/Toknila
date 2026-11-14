@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use toknila_api_types::{ConversationPage, ConversationQuery, NewPersonMessage, Say};
 use toknila_app::{conversation, resolve};
 use toknila_core::Actor;
-use toknila_core::conversation::{About, Message};
+use toknila_core::conversation::{About, Author, Message};
 
 use super::{ApiResult, read};
 use crate::http::error::ErrorBody;
@@ -60,7 +60,8 @@ pub async fn post_conversation(
 #[utoipa::path(post, path = "/planner/say", tag = "planner", request_body = Say,
     responses((status = 201, body = Message), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
 /// The planner says something to the person: an answer, a question, a report. The person reads
-/// it in the chat of the assistant's screen; `about` names the card or chain it is about.
+/// it in the chat of the assistant's screen; `about` names the card or chain it is about. With
+/// `progress` it is a muted line about what the planner is doing, and the turn stays open.
 pub async fn planner_say(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -72,7 +73,8 @@ pub async fn planner_say(
         .write(Actor::Agent, now(), move |tx| -> ApiResult<Message> {
             let m = conversation::say_as_assistant(tx, project, input)?;
             // Words about a story also land in the story's own chat, as the assistant's bubble.
-            if let Some(About::Card { key }) = &m.about {
+            // A progress line is not an answer, so it stays out of the story's chat.
+            if let (Author::Assistant, Some(About::Card { key })) = (m.author, &m.about) {
                 let t = resolve::ticket(&*tx, &key.to_string())?;
                 super::asks::record_answer(tx, &t, &m.text)?;
             }

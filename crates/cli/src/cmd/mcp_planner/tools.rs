@@ -104,10 +104,11 @@ pub(in crate::cmd) fn list() -> Vec<Value> {
         ),
         tool(
             "say",
-            "Say something to the owner. The owner reads the chat of the assistant's screen, not your terminal: every answer, question, report or heads-up for them goes through `say`, in the owner's own language. A question to the owner is a `say` too: ask it and wait for their next message. Give `about` (a card key, id or title, or a chain name) when the words are about one: the chat shows it as a chip on your message. Keep the terminal for your own work.",
+            "Say something to the owner. The owner reads the chat of the assistant's screen, not your terminal: every answer, question, report or heads-up for them goes through `say`, in the owner's own language. A question to the owner is a `say` too: ask it and wait for their next message. Give `about` (a card key, id or title, or a chain name) when the words are about one: the chat shows it as a chip on your message. Keep the terminal for your own work. Before a read or run that takes more than a few seconds, send one line with `progress` set to true that names it; it shows muted under the owner's waiting line, and your answer still comes after it as a plain `say`.",
             json!({
                 "text": text("What you say, in the owner's language"),
                 "about": { "type": "string", "description": "The card (key, id or title) or chain (name) the words are about" },
+                "progress": { "type": "boolean", "description": "True for a one-line note on what you are doing before a long read or run; it is not your answer and the owner is still owed one" },
             }),
             &["text"],
         ),

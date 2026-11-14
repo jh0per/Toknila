@@ -289,6 +289,8 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "stopPlanner":
     case "refreshPlanner":
     case "pickPlannerProfile":
+    case "wantPlannerTerminal":
+    case "plannerTerminalShown":
     case "editPlannerDraft":
     case "askAttach":
     case "plannerAsked":

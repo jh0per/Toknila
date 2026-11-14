@@ -30,10 +30,12 @@ export interface PlannerSlice {
   /// Projects whose planner this window has seen running: when it ends, its terminal stays on
   /// screen as the record of the session.
   seen: Record<string, boolean>;
+  /// A link asked for the assistant's Terminal tab; the screen opens it and says it did.
+  terminalWanted: boolean;
 }
 
 export const initialPlanner: PlannerSlice = {
-  byProject: {}, error: "", profile: DEFAULT_PLANNER_PROFILE, drafts: {}, sending: undefined, seen: {},
+  byProject: {}, error: "", profile: DEFAULT_PLANNER_PROFILE, drafts: {}, sending: undefined, seen: {}, terminalWanted: false,
 };
 
 /// What the person did.
@@ -43,6 +45,9 @@ export type PlannerIntent =
   /// The planner's terminal says its process ended: ask again whether it runs.
   | { type: "refreshPlanner"; project: string }
   | { type: "pickPlannerProfile"; profile: string }
+  /// A link to the assistant's Terminal tab was followed; `plannerTerminalShown` answers it.
+  | { type: "wantPlannerTerminal" }
+  | { type: "plannerTerminalShown" }
   /// Typing in one of the boxes that talk to the assistant.
   | { type: "editPlannerDraft"; where: string; text: string }
   /// Send the project's draft to the assistant: start it if it is not running, then type the text.
@@ -141,6 +146,10 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
       return [set({ error: "" }), [{ type: "plannerCall", project: msg.project, call: "stop" }]];
     case "pickPlannerProfile":
       return [set({ profile: msg.profile }), []];
+    case "wantPlannerTerminal":
+      return [set({ terminalWanted: true }), []];
+    case "plannerTerminalShown":
+      return [set({ terminalWanted: false }), []];
     case "refreshPlanner":
       return [s, [loadPlanner(msg.project)]];
     case "plannerLoaded": {

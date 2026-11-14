@@ -110,8 +110,11 @@ try {
   if ((await page.locator("[data-author=assistant]").count()) !== 0 || (await t("chat-did").count()) !== 0) {
     throw new Error("the planner's answer was there before the person's bubble was looked at");
   }
-  if (!(await t("planner-ask-input").isDisabled())) throw new Error("the box does not wait while the assistant answers");
-  console.log("PASS the person's bubble is there before the planner has answered, and the box waits");
+  // A second message while the first is answered is kept (see planner-progress.mjs), so the box stays open.
+  // (The box is shut only while the message is on its way to the planner's terminal.)
+  await t("planner-ask-input").and(page.locator(":enabled")).waitFor({ timeout: 10_000 });
+  if ((await t("chat-waiting").count()) !== 1) throw new Error("the box opened only after the answer; a second message must be possible while it answers");
+  console.log("PASS the person's bubble is there before the planner has answered, and the box stays open");
   await shoot(page, "assistant-chat-waiting");
 
   // 3. The planner's say is an assistant bubble with the card as its chip; what it did is lines.
