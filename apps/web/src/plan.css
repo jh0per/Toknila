@@ -47,6 +47,15 @@
 .pbadge { width: var(--sp5); height: var(--sp5); flex: none; display: grid; place-items: center; border-radius: var(--shape-xs); background: var(--primary-container); color: var(--on-primary-container); font-size: var(--fs-label-m); line-height: 1; font-weight: var(--fw-semibold); letter-spacing: 0; }
 .pbadge::before { content: attr(data-initials); }
 .tree li.archived .pbadge { opacity: var(--state-disabled); }
+/* A hidden project: the small "hidden" mark on its row while it is on the screen, Show in list
+   beside it, and the "Show hidden (N)" row with the dot and the count of what waits in them. */
+.pmark { flex: none; font-size: var(--fs-label-m); line-height: var(--lh-label-m); font-weight: var(--fw-regular); color: var(--on-surface-variant); border: 1px solid var(--outline-variant); border-radius: var(--shape-full); padding: 0 var(--sp1); }
+.tree .row.proj > .btn.mini { flex: none; }
+/* In the narrow sidebar the name keeps its room: Show in list wraps under it when both do not fit. */
+.tree li.hidden-here > .row.proj { flex-wrap: wrap; }
+.tree li.hidden-here > .row.proj > .item { flex: 1 1 auto; }
+.tree li.hidden-here > .row.proj > .btn.mini { margin: 0 var(--sp1) var(--sp1) auto; }
+.link-btn.hidden-toggle { display: flex; align-items: center; gap: var(--sp2); }
 .ico, .side-foot .ico { width: var(--sp4); height: var(--sp4); flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: var(--on-surface-variant); }
 .item.sel .ico { color: var(--primary); }
 .tree .row > .item { border-radius: var(--shape-s); }

@@ -1,5 +1,5 @@
 // Planning from the window: the dialogs (add a project, new chain, new card, import), editing and
-// moving a card, archiving a project. Core decides what a card allows (`TicketDetail.can_edit`,
+// moving a card, archiving or hiding a project. Core decides what a card allows (`TicketDetail.can_edit`,
 // `can_move`) and refuses the rest; this keeps what the daemon answered for the form it is about.
 
 import type { ChainDetail, NewChain, NewTicket, PatchTicket, Place, Project, TicketDetail } from "../api/types";
@@ -19,7 +19,7 @@ export type Dialog =
   | { kind: "release"; chain: string };
 
 /// The form a refusal belongs to.
-export type PlanForm = "chain" | "card" | "edit" | "move" | "archive";
+export type PlanForm = "chain" | "card" | "edit" | "move" | "archive" | "hide";
 
 export interface PlanState {
   dialog: Dialog | undefined;
@@ -32,10 +32,12 @@ export interface PlanState {
   error: { form: PlanForm; field: string | undefined; message: string } | undefined;
   /// The sidebar lists the archived projects too.
   showArchived: boolean;
+  /// The sidebar lists the hidden projects too, under its list.
+  showHidden: boolean;
 }
 
 export const initialPlan: PlanState = {
-  dialog: undefined, editing: undefined, moving: undefined, busy: false, error: undefined, showArchived: false,
+  dialog: undefined, editing: undefined, moving: undefined, busy: false, error: undefined, showArchived: false, showHidden: false,
 };
 
 /// The address hash the desktop menu sets to open the add-a-project form.
@@ -53,6 +55,8 @@ export type PlanIntent =
   | { type: "moveCard"; chain: string; key: string; anchor: string; place: Place }
   | { type: "archiveProject"; project: string; archived: boolean }
   | { type: "showArchived"; on: boolean }
+  | { type: "hideProject"; project: string; hidden: boolean }
+  | { type: "showHidden"; on: boolean }
   | { type: "hashChanged"; hash: string };
 
 /// What the daemon answered.
@@ -62,12 +66,13 @@ export type PlanResult =
   | { type: "cardSaved"; detail: TicketDetail }
   | { type: "cardMoved"; key: string; chain: ChainDetail }
   | { type: "projectArchived"; project: Project }
+  | { type: "projectHidden"; project: Project }
   | { type: "planRejected"; form: PlanForm; field: string | undefined; message: string };
 
 export type PlanMsg = PlanIntent | PlanResult;
 
 export type PlanEffect =
-  | Extract<PlanIntent, { type: "createChain" | "createCard" | "saveCard" | "moveCard" | "archiveProject" }>
+  | Extract<PlanIntent, { type: "createChain" | "createCard" | "saveCard" | "moveCard" | "archiveProject" | "hideProject" }>
   | { type: "clearHash" };
 
 /// The refusal of `form` (about `field`, or about no field when `field` is absent), as text.
@@ -107,11 +112,14 @@ export function reducePlan(s: State, msg: PlanMsg): [State, Effect[]] {
       return [set({ moving: msg.key, editing: undefined, error: undefined }), []];
     case "showArchived":
       return [set({ showArchived: msg.on }), []];
+    case "showHidden":
+      return [set({ showHidden: msg.on }), []];
     case "createChain":
     case "createCard":
     case "saveCard":
     case "moveCard":
     case "archiveProject":
+    case "hideProject":
       return [set({ busy: true, error: undefined }), [msg]];
     case "chainCreated":
       return [set({ ...done, dialog: undefined }, withChain(s, msg.chain)), []];
@@ -129,6 +137,9 @@ export function reducePlan(s: State, msg: PlanMsg): [State, Effect[]] {
       return [set({ ...done, moving: undefined }, withChain(s, msg.chain)), [{ type: "loadDetail", key: msg.key }]];
     case "projectArchived":
       return [set(done, { ...s, projects: upsert(s.projects, msg.project) }), [{ type: "loadAgents" }]];
+    case "projectHidden":
+      // Only the list changes: the page stays where it is, also on the project just hidden.
+      return [set(done, { ...s, projects: upsert(s.projects, msg.project) }), []];
     case "planRejected":
       return [set({ busy: false, error: { form: msg.form, field: msg.field, message: msg.message } }), []];
   }

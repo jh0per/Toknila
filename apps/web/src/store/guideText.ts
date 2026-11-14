@@ -95,6 +95,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     alt: "The sidebar: one tree per project, and Usage, Settings and Keyboard shortcuts at its foot",
     text:
       "The sidebar is one tree per project: Roadmap, Assistant (it plans epics on the roadmap, stories inside an epic), Inbox, Agents, Epics, Designs and Settings. " +
+      "Right click a project and Hide from list takes it off the list while it keeps working: it waits under Show hidden (N), which says when something in it waits for you, and in the switcher (Cmd/Ctrl+K). " +
       "Its foot holds Usage (tokens and estimated cost by model, workspace, project, epic and story), Settings (Cmd/Ctrl+,) and Keyboard shortcuts (?). " +
       "A project's settings hold its test command, agents and review.",
   },

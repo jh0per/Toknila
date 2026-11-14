@@ -1,9 +1,10 @@
 // The project switcher of the top bar: which route a chosen project opens, which projects the
-// typed filter keeps, and the key that opens it. Pure; the menu is `views/ProjectSwitcher.tsx`.
+// typed filter keeps, and the key that opens it; and which projects the sidebar lists. Pure; the
+// menu is `views/ProjectSwitcher.tsx`.
 
 import type { Project } from "../api/types";
 import { type Route, isProjectSection } from "./route";
-import type { State } from "./state";
+import { type State, activeProjects, hiddenProjects, listedProjects } from "./state";
 
 /// What the person did.
 export type SwitcherIntent = { type: "toggleSwitcher" } | { type: "closeSwitcher" };
@@ -47,4 +48,21 @@ export function asksForSwitcher(e: { key: string; ctrlKey: boolean; metaKey: boo
 export function sidebarOthers(others: Project[]): { shown: Project[]; more: number } {
   if (others.length <= SIDEBAR_OTHERS) return { shown: others, more: 0 };
   return { shown: others.slice(0, SIDEBAR_OTHERS), more: others.length - SIDEBAR_OTHERS };
+}
+
+/// The sidebar's projects while `onScreen` is on the screen: the list (the listed projects, and a
+/// hidden one only while it is on the screen, in the daemon's order), how many listed projects fold
+/// into "+ N more", and the hidden projects of "Show hidden (N)" (the one on the screen is in the
+/// list instead, never in both).
+export function sidebarProjects(s: State, onScreen: Project | undefined): { rows: Project[]; more: number; hidden: Project[] } {
+  const here = (p: Project) => p.id === onScreen?.id;
+  const { shown, more } = sidebarOthers(listedProjects(s).filter((p) => !here(p)));
+  const rows = activeProjects(s).filter((p) => here(p) || shown.includes(p));
+  return { rows, more, hidden: hiddenProjects(s).filter((p) => !here(p)) };
+}
+
+/// The switcher's projects that keep the typed text: the listed ones, then the hidden ones (its
+/// Hidden group). Archived projects stay out.
+export function switcherProjects(s: State, text: string): { listed: Project[]; hidden: Project[] } {
+  return { listed: filterProjects(listedProjects(s), text), hidden: filterProjects(hiddenProjects(s), text) };
 }

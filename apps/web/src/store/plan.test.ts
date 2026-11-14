@@ -3,7 +3,7 @@ import type { ChainDetail, Project, TicketDetail } from "../api/types";
 import type { Msg } from "./msg";
 import { planError } from "./plan";
 import { reduce } from "./reduce";
-import { type State, activeProjects, currentProject, initialState } from "./state";
+import { type State, activeProjects, currentProject, hiddenProjects, initialState, listedProjects } from "./state";
 
 const projects = [
   { id: "p1", key: "DEMO", name: "Demo" },
@@ -139,5 +139,52 @@ describe("archived projects", () => {
   it("an archived home counts as a first run for the checks", () => {
     const [, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: [archived], chains: [] });
     expect(fx).toContainEqual({ type: "loadChecks" });
+  });
+});
+
+describe("hidden projects", () => {
+  const hidden = (p: Project) => ({ ...p, hidden: true }) as Project;
+
+  it("hiding posts the request, then puts the answered project into the state", () => {
+    const [busy, fx] = reduce(loaded(), { type: "hideProject", project: "OTHER", hidden: true });
+    expect(fx).toEqual([{ type: "hideProject", project: "OTHER", hidden: true }]);
+    expect(busy.plan.busy).toBe(true);
+    const [s, more] = reduce(busy, { type: "projectHidden", project: hidden(projects[1]) });
+    expect(more).toEqual([]);
+    expect(s.plan.busy).toBe(false);
+    expect(listedProjects(s).map((p) => p.key)).toEqual(["DEMO"]);
+    expect(hiddenProjects(s).map((p) => p.key)).toEqual(["OTHER"]);
+    const back = run(s, { type: "projectHidden", project: projects[1] });
+    expect(listedProjects(back).map((p) => p.key)).toEqual(["DEMO", "OTHER"]);
+  });
+
+  it("hiding the project on the screen keeps the page where it is", () => {
+    const [s, fx] = reduce(loaded(), { type: "projectHidden", project: hidden(projects[0]) });
+    expect(s.route).toEqual({ name: "project", project: "DEMO" });
+    expect(currentProject(s)?.key).toBe("DEMO");
+    expect(fx).toEqual([]);
+  });
+
+  it("a failed request shows where Archive's refusal shows, for the hide form", () => {
+    const busy = run(loaded(), { type: "hideProject", project: "DEMO", hidden: true });
+    const s = run(busy, { type: "planRejected", form: "hide", field: undefined, message: "no project DEMO" });
+    expect(planError(s.plan, "hide")).toBe("no project DEMO");
+    expect(planError(s.plan, "archive")).toBeUndefined();
+    expect(s.plan.busy).toBe(false);
+  });
+
+  it("are listed under the list on request", () => {
+    expect(loaded().plan.showHidden).toBe(false);
+    expect(run(loaded(), { type: "showHidden", on: true }).plan.showHidden).toBe(true);
+  });
+
+  it("a person whose projects are all hidden is no first run: no checks, no onboarding", () => {
+    const all = [hidden(projects[0]), hidden(projects[1])];
+    const [s, fx] = reduce(initialState({ name: "chains" }), { type: "loaded", projects: all, chains: [] });
+    expect(fx).not.toContainEqual({ type: "loadChecks" });
+    // App.tsx shows onboarding only while no project is left that is not archived.
+    expect(activeProjects(s)).toHaveLength(2);
+    expect(listedProjects(s)).toHaveLength(0);
+    expect(currentProject(s)?.key).toBe("DEMO");
   });
 });

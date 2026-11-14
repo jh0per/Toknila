@@ -3,8 +3,9 @@ import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import type { State } from "../store/state";
 
-/// Archiving a project: out of the sidebar, its data kept, and back on request. The daemon refuses
-/// while the project's agents work; the refusal shows here. Deleting it opens its own dialog.
+/// Archiving a project: put away (out of the sidebar and the switcher), its data kept, and back on
+/// request. The daemon refuses while the project's agents work; the refusal shows here. The text
+/// sends a person who only wants it off the list to Hide. Deleting it opens its own dialog.
 export function ArchiveProject({ project, state, dispatch }: { project: Project; state: State; dispatch: (i: Intent) => void }) {
   const archived = Boolean(project.archived);
   const refused = planError(state.plan, "archive");
@@ -13,8 +14,9 @@ export function ArchiveProject({ project, state, dispatch }: { project: Project;
       <h2>{archived ? `${project.key} is archived` : "Archive"}</h2>
       <p className="muted">
         {archived
-          ? "It is hidden from the sidebar; its epics, stories and history are kept."
-          : `Hides ${project.key} from the sidebar and keeps its epics, stories and history. Not while its agents work.`}
+          ? "It is put away: out of the sidebar and the switcher; its epics, stories and history are kept."
+          : `Puts ${project.key} away: out of the sidebar and the switcher, its epics, stories and history kept. Not while its agents work. ` +
+            "To only take it off the sidebar's list while it keeps working, hide it (right click on its row)."}
       </p>
       <div className="row">
         <button
