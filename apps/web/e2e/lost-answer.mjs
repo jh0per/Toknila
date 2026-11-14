@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, processesWith } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -31,13 +31,9 @@ const git = (dir, ...args) =>
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const status = (key) => JSON.parse(tok("show", key, "--json")).ticket.status;
 
-/// The fake agents this script left running: their command line carries the marker.
-const leftovers = () =>
-  run("ps", ["-axo", "pid=,command="])
-    .split("\n")
-    .filter((l) => l.includes(marker))
-    .map((l) => Number(l.trim().split(/\s+/)[0]))
-    .filter((p) => p && p !== process.pid);
+/// The fake agents this script left running: their command line carries the marker (found the
+/// same way on every OS by the helper; `ps` does not exist on Windows).
+const leftovers = () => processesWith(marker);
 
 async function until(what, f) {
   for (const stop = Date.now() + 30_000; Date.now() < stop; await sleep(100)) {

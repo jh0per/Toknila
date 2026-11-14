@@ -1,5 +1,6 @@
 // What the browser e2e scripts share: the checks on a page, and launching the browser.
 
+import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 import { chromium } from "playwright";
@@ -70,6 +71,26 @@ const alive = (pid) => {
     return e.code === "EPERM";
   }
 };
+
+/// The ids of the processes whose command line carries `marker`, this process left out. On
+/// Windows there is no `ps`, so the list comes from PowerShell's Win32_Process (a second per
+/// call); elsewhere from `ps`.
+export function processesWith(marker) {
+  const out =
+    process.platform === "win32"
+      ? execFileSync(
+          "powershell",
+          ["-NoProfile", "-NonInteractive", "-Command",
+            `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*${marker}*' } | ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`],
+          { encoding: "utf8" },
+        )
+      : execFileSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" });
+  return out
+    .split("\n")
+    .filter((l) => l.includes(marker) && !l.includes("Win32_Process"))
+    .map((l) => Number(l.trim().split(/\s+/)[0]))
+    .filter((p) => p && p !== process.pid);
+}
 
 /// Waits up to `ms` for the process `pid` to be gone; returns whether it is.
 async function waitExit(pid, ms) {
