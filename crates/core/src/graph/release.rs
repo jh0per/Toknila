@@ -139,21 +139,54 @@ impl ChainView {
     /// The dependencies that make a planned end release wait for the cards nothing else waits
     /// for. Empty when the release is not planned or every card is already before it.
     pub fn end_release_edges(&self, release: ReleaseId) -> Vec<Edge> {
+        self.end_release_wiring(release).add
+    }
+
+    /// The one rule for a planned end release: it waits for the leaves, the planned cards no
+    /// other card of the epic waits for (the release itself not counted). `add` joins the leaves
+    /// that are not before it yet; `remove` drops the cards that stopped being leaves (another
+    /// card now waits for them). Empty when the release is not planned.
+    pub fn end_release_wiring(&self, release: ReleaseId) -> MovePlan {
+        let to = NodeRef::Release(release);
         if self
             .release(release)
             .is_none_or(|r| r.state != ReleaseState::Planned)
         {
-            return Vec::new();
+            return MovePlan::default();
         }
-        self.leaf_tickets()
-            .into_iter()
-            .map(|t| Edge {
-                chain_id: self.chain.id,
-                from: NodeRef::Ticket(t),
-                to: NodeRef::Release(release),
-                kind: EdgeKind::Normal,
+        let mut successors = self.successors();
+        for next in successors.values_mut() {
+            next.retain(|n| *n != to);
+        }
+        let leaf = |t: &Ticket| {
+            successors
+                .get(&NodeRef::Ticket(t.id))
+                .is_none_or(Vec::is_empty)
+        };
+        let edge = |t: TicketId| Edge {
+            chain_id: self.chain.id,
+            from: NodeRef::Ticket(t),
+            to,
+            kind: EdgeKind::Normal,
+        };
+        let add = self
+            .tickets
+            .iter()
+            .filter(|t| t.in_plan() && leaf(t))
+            .map(|t| edge(t.id))
+            .filter(|e| !self.edges.contains(e))
+            .collect();
+        let remove = self
+            .edges
+            .iter()
+            .filter(|e| e.to == to && e.kind == EdgeKind::Normal)
+            .filter(|e| match e.from {
+                NodeRef::Ticket(id) => self.ticket(id).is_some_and(|t| !leaf(t)),
+                NodeRef::Release(_) => false,
             })
-            .collect()
+            .copied()
+            .collect();
+        MovePlan { remove, add }
     }
 
     /// The cards no other card waits for: a new milestone for the whole chain waits for them.
