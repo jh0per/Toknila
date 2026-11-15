@@ -36,7 +36,7 @@ export function runReleaseEffect(e: ReleaseEffect, dispatch: Dispatch): void {
         .catch(refused(dispatch));
       return;
     case "startRelease":
-      post<ChainDetail>(`/chains/${encodeURIComponent(e.chain)}/release`, { version: e.version, resume: e.resume ?? false })
+      post<ChainDetail>(`/chains/${encodeURIComponent(e.chain)}/release`, { version: e.version, resume: e.resume ?? false, ...(e.push === undefined ? {} : { push: e.push }) })
         .then((chain) => {
           // The release that was just cut is the one whose steps are followed.
           const cut = [...chain.releases].reverse().find((r) => r.state === "cut");

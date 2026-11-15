@@ -185,7 +185,7 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     assert_eq!(s, StatusCode::CONFLICT, "{again}");
     let hint = again["error"].as_str().expect("error");
     assert!(
-        hint.contains("thread 1") && hint.contains("post a version"),
+        hint.contains("thread 1 (design) is open") && hint.contains("thread_version"),
         "{hint}"
     );
     let (s, said) = call(

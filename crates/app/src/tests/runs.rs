@@ -318,6 +318,22 @@ fn a_runner_that_cannot_start_blocks_the_ticket_as_crashed() {
 }
 
 #[test]
+fn a_computer_with_no_free_pty_blocks_the_ticket_with_a_sentence_a_person_can_act_on() {
+    let mut mem = with_agents();
+    *mem.runner.refuse.borrow_mut() = Some(RunnerError::NoPty("Unknown error: -6".to_owned()));
+    recover(&mut mem).expect("settle");
+    settle(&mut mem);
+    let BlockedReason::Manual { text } = blocked_reason(&a(&mem)) else {
+        panic!("not a plain blocked reason: {:?}", a(&mem).status_reason);
+    };
+    assert_eq!(
+        text,
+        "No free terminal on this computer (every pty is in use). Close some terminals or \
+         agents and press Unblock. (Unknown error: -6)"
+    );
+}
+
+#[test]
 fn the_hand_in_stops_the_worker_a_return_starts_a_new_run_and_cancel_stops_it() {
     let mut mem = with_agents();
     recover(&mut mem).expect("settle");

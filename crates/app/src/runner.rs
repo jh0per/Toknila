@@ -22,6 +22,12 @@ pub enum RunnerError {
     /// The process could not be started.
     #[error("cannot start the agent: {0}")]
     Spawn(String),
+    /// The computer has no terminal (pty) to give: a state of the machine, not a fault of the
+    /// agent. The text is what the system said.
+    #[error(
+        "No free terminal on this computer (every pty is in use). Close some terminals or agents and press Unblock. ({0})"
+    )]
+    NoPty(String),
     /// The ticket has no live runner.
     #[error("the ticket has no running agent")]
     NotRunning,
@@ -91,7 +97,7 @@ pub struct RunBrief {
     pub web_domains: Vec<String>,
     /// The toolchains the ship's repository holds (`cargo`, `npm`), which a reviewer may run the
     /// tests of; filled in by the host when the reviewer starts.
-    pub repo_tools: Vec<String>,
+    pub repo_tools: Vec<toknila_core::RepoTool>,
     /// What a planner is told about its project; `None` for a card's agent.
     pub project: Option<toknila_core::instructions::ProjectFacts>,
     /// The absolute paths of the design files a planner may read (a planner only).

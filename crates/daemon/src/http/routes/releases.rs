@@ -15,6 +15,7 @@ use crate::http::dto::{
 use crate::http::error::ErrorBody;
 use crate::releaser;
 use crate::server::{AppState, now};
+use crate::shipyard::remote::{Remote, has_upstream, remote_of};
 use crate::store::release_runs::Entry;
 use toknila_api_types::{RunState, StepState};
 
@@ -50,13 +51,26 @@ pub async fn release_action(
     Ok(Json(detail))
 }
 
-/// What the Release dialog needs: the version to suggest and the steps the project has.
-fn project_steps(p: &toknila_core::Project) -> Vec<toknila_core::release_run::ReleaseStep> {
-    toknila_core::release_run::steps(
-        p.check_command.as_deref(),
-        p.bump_command.as_deref(),
-        p.merge.mode == toknila_core::MergeMode::Github,
-    )
+/// The steps of a release of the project, with the push when the release asks for it.
+fn project_steps(
+    p: &toknila_core::Project,
+    push: bool,
+) -> Vec<toknila_core::release_run::ReleaseStep> {
+    toknila_core::release_run::steps(p.check_command.as_deref(), p.bump_command.as_deref(), push)
+}
+
+/// What the repository offers to push to, and whether the release pushes unless told otherwise:
+/// on in github mode and when the base branch has an upstream, and only with a remote.
+fn push_facts(p: &toknila_core::Project) -> (Option<Remote>, bool) {
+    let Some(repo) = p.repo_path.as_deref().filter(|r| !r.trim().is_empty()) else {
+        return (None, false);
+    };
+    let git = crate::git::Git::new("git");
+    let remote = remote_of(&git, repo);
+    let default = remote.is_some()
+        && (p.merge.mode == toknila_core::MergeMode::Github
+            || has_upstream(&git, repo, &p.work_branch));
+    (remote, default)
 }
 
 fn repo_of(p: &toknila_core::Project) -> Result<String, AppError> {
@@ -96,11 +110,19 @@ pub async fn release_offer(
             .unwrap_or_default(),
         None => Vec::new(),
     };
+    let (remote, push) = {
+        let p = project.clone();
+        tokio::task::spawn_blocking(move || push_facts(&p))
+            .await
+            .unwrap_or((None, false))
+    };
     Ok(Json(ReleaseOffer {
         releasable,
         version: own.unwrap_or_else(|| release_run::suggest_version(&tags)),
         last_tag: tags.first().cloned(),
-        steps: project_steps(&project),
+        steps: project_steps(&project, push),
+        remote: remote.map(|r| r.url),
+        push,
         base: project.work_branch.clone(),
         run,
     }))
@@ -123,11 +145,25 @@ pub async fn start_release(
         let (r, project) = releases::begin(tx, &chain, &input.version)?;
         let repo = repo_of(&project)?;
         let version = r.version.clone();
-        let steps = project_steps(&project);
         let last = tx.repo().release_run(r.id)?;
         if last.as_ref().is_some_and(|l| l.state == RunState::Running) {
             return Err(AppError::conflict("a release of this epic is already running").into());
         }
+        let (remote, default) = push_facts(&project);
+        let steps = match last.as_ref().filter(|_| input.resume) {
+            // A resumed run keeps the steps it began with, the push or not.
+            Some(run) => run.steps.iter().map(|s| s.step).collect(),
+            None => {
+                let push = input.push.unwrap_or(default);
+                if push && remote.is_none() {
+                    return Err(AppError::conflict(
+                        "the repository has no remote to push to: the tag stays local; release without the push",
+                    )
+                    .into());
+                }
+                project_steps(&project, push)
+            }
+        };
         let (todo, entry) = if input.resume {
             let run = last
                 .filter(|l| matches!(l.state, RunState::Interrupted | RunState::Failed))
@@ -159,7 +195,7 @@ pub async fn start_release(
             version,
             check: project.check_command.clone(),
             bump: project.bump_command.clone(),
-            push: project.merge.mode == toknila_core::MergeMode::Github,
+            remote,
             steps,
             todo,
             resuming: input.resume,

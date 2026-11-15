@@ -46,6 +46,28 @@ fn finish(mem: &mut Mem) -> crate::AppResult<toknila_core::TicketId> {
 }
 
 #[test]
+fn an_agents_second_thread_of_a_kind_is_refused_with_a_sentence_that_says_what_to_do() {
+    let mut mem = running_demo();
+    open_design(&mut mem);
+    let a = mem.ticket_by_title("A");
+    let event = AgentEvent::OpenThread {
+        kind: ThreadKind::Design,
+        title: "Again".to_owned(),
+    };
+    let err = agent::ticket_event(&mut mem, &a, event).expect_err("second design thread");
+    assert_eq!(
+        err.to_string(),
+        "thread 1 (design) is open on this story: post your new version there with \
+         thread_version; a second design thread is not the way"
+    );
+    assert_eq!(mem.threads.len(), 1, "the refused call left nothing behind");
+    // A person keeps the right to open a second one (the HTTP route).
+    mem.actor = Actor::Human;
+    threads::open(&mut mem, &a, ThreadKind::Design, "By a person").expect("person");
+    assert_eq!(mem.threads.len(), 2);
+}
+
+#[test]
 fn an_agent_opens_a_thread_and_numbers_come_per_ticket() {
     let mut mem = running_demo();
     let first = open_design(&mut mem);

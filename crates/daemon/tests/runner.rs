@@ -10,6 +10,8 @@ use toknila_app::runner::{RunEnded, RunRequest, Runner, RunnerError};
 use toknila_core::{AgentRole, TicketId};
 use toknila_daemon::runner::Runners;
 
+mod support;
+
 const AGENT: &str = env!("CARGO_BIN_EXE_fake-agent");
 const WAIT: Duration = Duration::from_secs(20);
 
@@ -18,10 +20,13 @@ struct Rig {
     runners: Arc<Runners>,
     ended: UnboundedReceiver<RunEnded>,
     ticket: TicketId,
+    /// One test at a time opens ptys on this computer; released last, when the rig is dropped.
+    _turn: support::PtyTurn,
 }
 
 impl Rig {
     fn new() -> Rig {
+        let turn = support::hold();
         let dir = tempfile::tempdir().expect("tempdir");
         std::fs::create_dir_all(dir.path().join("profiles")).expect("profiles");
         std::fs::create_dir_all(dir.path().join("ship")).expect("ship");
@@ -31,6 +36,7 @@ impl Rig {
             runners,
             ended,
             ticket: TicketId::new(),
+            _turn: turn,
         }
     }
 
@@ -109,6 +115,17 @@ impl Rig {
             std::thread::sleep(Duration::from_millis(25));
         }
     }
+}
+
+#[test]
+fn the_pty_lock_lets_one_holder_in_and_the_next_waits_for_it() {
+    let first = support::hold();
+    assert!(
+        support::hold_for(Duration::from_millis(150)).is_none(),
+        "a second holder got in while the first held it"
+    );
+    drop(first);
+    assert!(support::hold_for(Duration::from_secs(5)).is_some());
 }
 
 #[test]
