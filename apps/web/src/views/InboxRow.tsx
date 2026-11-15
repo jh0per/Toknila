@@ -214,6 +214,11 @@ function Question({ item, open, dispatch }: BodyProps) {
   );
 }
 
+/// "N steps for you": how many steps of the hand-in a person does by hand.
+function stepsForYou(n: number): string {
+  return `${n} ${n === 1 ? "step" : "steps"} for you`;
+}
+
 /// A card for the person to review: Accept, Return (with what to change), and, when the reviewer
 /// gave no verdict, the end of its screen and Run the reviewer again. The same actions as the card.
 function Review({ item, open, dispatch, detail }: BodyProps & { detail: TicketDetail | undefined }) {
@@ -228,6 +233,9 @@ function Review({ item, open, dispatch, detail }: BodyProps & { detail: TicketDe
       {(noVerdict || item.text) && <blockquote data-testid="question">{item.text}</blockquote>}
       {item.lines && item.lines.length > 0 && <pre className="screen" data-testid="screen">{item.lines.join("\n")}</pre>}
       {item.hand_in ? <InboxHandInBlocks handIn={item.hand_in} /> : report && <HandIn report={report} />}
+      {(item.hand_in?.person?.length ?? 0) > 0 && (
+        <p className="muted" data-testid="steps-for-you">{stepsForYou(item.hand_in?.person?.length ?? 0)}</p>
+      )}
       <div className="btns">
         {can("accept") && <button className="btn primary" data-testid="review-accept" onClick={() => act("accept")}>Accept</button>}
         {can("return") && (

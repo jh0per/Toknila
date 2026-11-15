@@ -53,3 +53,41 @@ fn inbox_prints_the_gist_and_the_checks_of_a_review_item() {
     assert_eq!(hand_in["checks"][1]["status"], "FAIL");
     assert_eq!(hand_in["checks"][1]["text"], "e2e: red");
 }
+
+#[test]
+fn inbox_and_show_print_the_for_you_steps_of_a_hand_in() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let tok = Tok::in_dir(dir.path());
+    let file = dir.path().join("demo.toml");
+    std::fs::write(&file, CHAIN).expect("write chain");
+    tok.run(&["project", "new", "DEMO", "--name", "Demo", "--sim"]);
+    tok.run(&[
+        "chain",
+        "import",
+        file.to_str().expect("utf-8 path"),
+        "--project",
+        "DEMO",
+    ]);
+    tok.run(&["review-mode", "human", "--project", "DEMO"]);
+    tok.run(&["start", "DEMO-1"]);
+    tok.run(&[
+        "sim",
+        "DEMO-1",
+        "finish",
+        "**What changed:** Alpha is built\n**Checks:**\n- PASS verify: test result: ok. 120 passed; 0 failed\n**Left:** docs\n**For you:**\n- On the iPhone, tap the 808 Long pad: you hear a long tone\n- Drag the 32-step bar: the steps follow",
+    ]);
+
+    let out = tok.text(&["inbox"]);
+    assert_eq!(
+        out,
+        "review  DEMO-1  Alpha\n  gist: Alpha is built\n  checks: PASS 1\n  for you:\n    - On the iPhone, tap the 808 Long pad: you hear a long tone\n    - Drag the 32-step bar: the steps follow\n"
+    );
+
+    let shown = tok.text(&["show", "DEMO-1"]);
+    assert!(
+        shown.contains(
+            "    for you:\n      - On the iPhone, tap the 808 Long pad: you hear a long tone\n      - Drag the 32-step bar: the steps follow\n"
+        ),
+        "tok show lacks the for-you block:\n{shown}"
+    );
+}
