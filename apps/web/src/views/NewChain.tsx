@@ -4,16 +4,23 @@ import type { Intent } from "../store/msg";
 import { planError } from "../store/plan";
 import type { State } from "../store/state";
 import { Field } from "./Field";
+import { chainInput, slugLine } from "./newChainForm";
 
 const MODES: ReviewMode[] = ["human", "agent", "both"];
 const REVIEW_WORDS: Record<ReviewMode, string> = {
   human: "I review every finished story", agent: "A reviewer agent reviews it", both: "A reviewer agent first, then me",
 };
 
-/// A new, empty chain in a project: its name, an optional goal, whether ready cards start by
-/// themselves, and who reviews. The daemon judges the input; its refusal shows here.
-export function NewChain({ project, state, dispatch }: { project: string; state: State; dispatch: (i: Intent) => void }) {
-  const [name, setName] = useState("");
+/// A new, empty epic in a project: its title (the slug is derived and shown, editable on request),
+/// an optional goal, whether ready stories start by themselves, and who reviews. The daemon judges
+/// the input; its refusal shows here. `initialTitle` only seeds the form (tests).
+export function NewChain({ project, state, dispatch, initialTitle = "" }: { project: string; state: State; dispatch: (i: Intent) => void; initialTitle?: string }) {
+  const [title, setTitle] = useState(initialTitle);
+  // The slug as the person typed it; none while it follows the title.
+  const [typedSlug, setTypedSlug] = useState<string | undefined>(undefined);
+  const [editing, setEditing] = useState(false);
+  const [empty, setEmpty] = useState(false);
+  const { slug } = slugLine({ title, typed: typedSlug });
   const [goal, setGoal] = useState("");
   // The version starts as the one the project suggests; what the person types wins.
   const [typed, setTyped] = useState<string | undefined>(undefined);
@@ -29,17 +36,32 @@ export function NewChain({ project, state, dispatch }: { project: string; state:
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        dispatch({
-          type: "createChain",
-          project,
-          input: { name: name.trim(), goal: goal.trim() || null, autostart, review_mode: mode || null, version: version.trim() || null },
-        });
+        if (!title.trim()) {
+          setEmpty(true);
+          return;
+        }
+        dispatch({ type: "createChain", project, input: chainInput({ title, slug, goal, autostart, mode, version }) });
       }}
     >
       <h2>New epic in {project}</h2>
-      <Field label="Name" name="chain-name" error={planError(p, "chain", "name")}>
-        <input data-testid="chain-name" value={name} placeholder="window-planning" spellCheck={false} autoFocus onChange={(e) => setName(e.target.value)} />
+      <Field
+        label="Title" name="chain-title"
+        error={empty && !title.trim() ? "An epic needs a title." : planError(p, "chain", "title")}
+      >
+        <input data-testid="chain-title" value={title} placeholder="MIDI controllers" autoFocus onChange={(e) => { setTitle(e.target.value); setEmpty(false); }} />
       </Field>
+      {editing ? (
+        <Field label="Slug" name="chain-name" error={planError(p, "chain", "name")} hint="Folders and branches use it. Lower-case letters, digits and hyphens.">
+          <input data-testid="chain-name" value={slug ?? ""} spellCheck={false} onChange={(e) => setTypedSlug(e.target.value)} />
+        </Field>
+      ) : (
+        <p className="field-hint" data-testid="chain-slug">
+          {slug ? <>becomes <code data-testid="chain-slug-value">{slug}</code>; folders and branches use it</> : "the slug is made from the title"}
+          {" "}
+          <button type="button" className="link" data-testid="chain-slug-change" onClick={() => { setTypedSlug(slug ?? ""); setEditing(true); }}>Change</button>
+          {planError(p, "chain", "name") && <span className="field-error" role="alert" data-testid="error-chain-name"> {planError(p, "chain", "name")}</span>}
+        </p>
+      )}
       <Field label="Goal (optional)" name="chain-goal" error={undefined}>
         <textarea data-testid="chain-goal" rows={2} value={goal} onChange={(e) => setGoal(e.target.value)} />
       </Field>

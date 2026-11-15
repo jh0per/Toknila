@@ -106,7 +106,7 @@ try {
     throw new Error("the dialog did not suggest 0.7.1");
   });
   console.log("PASS New epic opens the dialog with the suggested version 0.7.1");
-  await t("chain-name").fill("fresh");
+  await t("chain-title").fill("fresh");
   await t("create-chain").click();
   await t("chain-version-top").waitFor({ timeout: 10_000 });
   want(["first", "second", "later", "now", "last", "fresh"]);

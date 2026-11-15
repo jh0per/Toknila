@@ -3023,8 +3023,8 @@ export interface components {
             /** @description Defaults to true. */
             autostart?: boolean | null;
             goal?: string | null;
-            /** @description The identifier of folders and branches. */
-            name: string;
+            /** @description The identifier of folders and branches; none: the title's slug. */
+            name?: string | null;
             review_mode?: components["schemas"]["ReviewMode"] | null;
             /** @description Reviewer agent profile for the chain's tickets. */
             reviewer?: string | null;

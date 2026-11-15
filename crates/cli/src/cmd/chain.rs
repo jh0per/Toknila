@@ -13,8 +13,9 @@ use crate::output::{self, w};
 pub enum ChainCmd {
     /// Create an empty epic.
     New {
-        /// The identifier of folders and branches (`ship/<name>/...`).
-        name: String,
+        /// The identifier of folders and branches (`ship/<name>/...`); without one it is made
+        /// from `--title`.
+        name: Option<String>,
         /// The words a person reads, such as "MIDI controllers"; without one the window shows the
         /// name made readable.
         #[arg(long)]
@@ -148,6 +149,9 @@ pub(super) fn run(c: &Client, cmd: ChainCmd, json_out: bool) -> Result<()> {
             project,
         } => {
             let p = default_project(c, project)?;
+            if name.is_none() && title.is_none() {
+                bail!("give the epic a name, or a --title to make the name from");
+            }
             let input = NewChain {
                 name,
                 title,
