@@ -64,7 +64,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
         .with_shipyard(Arc::new(crate::shipyard::GitShipyard::new(paths.ships())))
         .with_merger(Arc::new(crate::github::Mergers::new()))
         .with_runner(runners.clone());
-    crate::runner::supervise(store.clone(), ended);
+    crate::runner::supervise(store.clone(), runners.clone(), ended);
     crate::runner::watch_silence(store.clone(), runners.clone());
     crate::pr_watch::watch(store.clone());
     let usage = Arc::new(crate::usage::Usage::new(&paths.home));

@@ -29,6 +29,7 @@ mod stopping;
 mod supervise;
 mod tokens;
 mod tree;
+mod turns;
 mod wiring;
 mod ws;
 
@@ -48,6 +49,7 @@ pub use prompts::Prompts;
 pub use silence::{tick as silence_tick, watch as watch_silence};
 pub use supervise::supervise;
 pub use tokens::{Activity, AgentTokens, Grant, SpawnFacts};
+pub use turns::{Turns, end_planner_turn};
 pub use ws::{planner_stream, stream};
 
 /// What a client sees of a ticket's output: the scrollback of its newest run.
@@ -79,6 +81,8 @@ pub struct Runners {
     tokens: Arc<AgentTokens>,
     /// The last tool of each run and the questions that wait for a person.
     prompts: Prompts,
+    /// The turn of each live planner run: whether it works on a message, and its step.
+    turns: Turns,
     /// How long a permission hook is held for an answer, in milliseconds.
     permission_wait_ms: AtomicU64,
     /// How long a card waits for a person before its agent's process is ended, in milliseconds.
@@ -104,6 +108,7 @@ impl Runners {
             ended,
             tokens: Arc::default(),
             prompts: Prompts::default(),
+            turns: Turns::default(),
             permission_wait_ms: AtomicU64::new(toknila_core::hook::PERMISSION_WAIT_SECS * 1000),
             pause_grace_ms: AtomicU64::new(pausing::GRACE.as_millis() as u64),
             url: OnceLock::new(),

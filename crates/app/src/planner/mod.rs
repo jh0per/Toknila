@@ -33,7 +33,7 @@ pub use overview::{OverviewCard, OverviewChain, OverviewSummary, PlanOverview, o
 pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, card_in_full, chain_in_full, plan};
 pub use relocate::{move_card_by, move_card_to_chain};
 pub use suggest::{NewSuggestion, suggest};
-pub use window::show_card;
+pub use window::{show_card, turn};
 pub use with_designs::{request_with, start_with};
 
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError, Started};
