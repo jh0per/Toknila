@@ -271,6 +271,13 @@ card, or a release of its chain made or moved) the store removes it and journals
 `suggestion_cleared` (`{"project","project_key"}`). A window reads it with
 `GET /v1/projects/{project}/suggestion` (`null` when none) and reloads on both events.
 
+The planner's turn journals the entity `planner` (id: the project's) with the kind `turn`
+(`{"project","working"}`): `working: true` when it took a message (`POST /v1/planner/activity`
+with `user_prompt_submit`, or the first tool of a turn), `false` when it stopped (`stop`), a
+person stopped it or its run ended. Two entries per message; the steps inside the turn are never
+journaled: a window reads the turn with `GET /v1/projects/{project}/planner` (`working`, `step`,
+`since`). `tok watch` prints it as `planner turn`.
+
 The planner's `design_question` tool (`POST /v1/planner/pins`) pins a question on a region of a
 design and journals `design_pin` kind `asked` (`{"pin"}`; the pin is `{"id","project","design",
 "design_name","number","region","text","card","answer","created_at","answered_at"}`, `card` and

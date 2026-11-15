@@ -14,7 +14,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use toknila_app::{AppError, AppResult, agent};
 use toknila_core::agent::AgentEvent;
-use toknila_core::{AgentRole, ProjectId, Ticket, planner};
+use toknila_core::{AgentRole, ProjectId, RunId, Ticket, planner};
 
 use super::{AppState, now};
 use crate::http::error::ErrorBody;
@@ -35,7 +35,8 @@ pub const AGENT_ROUTES: [&str; 6] = [
 /// The only routes a planner's token may call, as `(method, path)`. Each acts on the planner's own
 /// project, which the token names, so no path carries a project. Every route here runs a use case
 /// of `toknila_app::planner`, which checks the scope again.
-pub const PLANNER_ROUTES: [(&str, &str); 19] = [
+pub const PLANNER_ROUTES: [(&str, &str); 20] = [
+    ("POST", "/v1/planner/activity"),
     ("POST", "/v1/planner/say"),
     ("GET", "/v1/planner/plan"),
     ("GET", "/v1/planner/overview"),
@@ -84,6 +85,18 @@ impl Principal {
                 Ok(planner::project_of(grant.ticket))
             }
             _ => Err(AppError::forbidden(
+                "these routes are for a project's planner",
+            )),
+        }
+    }
+
+    /// The project and the run of a planner's token; anyone else is refused as in
+    /// [`Principal::planner_project`].
+    pub fn planner_run(&self) -> AppResult<(ProjectId, RunId)> {
+        let project = self.planner_project()?;
+        match self {
+            Principal::Agent(grant) => Ok((project, grant.run)),
+            Principal::Person => Err(AppError::forbidden(
                 "these routes are for a project's planner",
             )),
         }
