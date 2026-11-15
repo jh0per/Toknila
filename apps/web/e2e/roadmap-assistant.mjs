@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -22,7 +22,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-rmassist-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8" });
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 const git = (dir, ...args) =>
@@ -48,7 +48,7 @@ try {
     "post", "/planner/chains", JSON.stringify({ title: "MIDI controllers", goal: "Play it with a keyboard.", version: "0.7.0" }),
     "hold",
   ].map((x) => `'${x}'`).join(", ");
-  writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', ${steps}]\nstartup_secs = 0\n`);
+  writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps}]\nstartup_secs = 0\n`);
   tok("project", "new", "RA", "--repo", repo, "--base", "develop");
   tok("planner", "start", "RA", "--profile", "fake-planner");
   const { url } = JSON.parse(tok("open", "--json"));

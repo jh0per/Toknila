@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -22,7 +22,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-nodes-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8" });
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 const git = (dir, ...args) =>
@@ -41,9 +41,9 @@ try {
   const steps = (...s) => s.map((x) => `'${x}'`).join(", ");
   writeFileSync(
     join(home, "profiles", "ask.toml"),
-    `command = ['${fakeAgent}', ${steps("post", "/tickets/{ticket}/activity", JSON.stringify({ signal: "hook:pre_tool_use", tool: "Bash: cargo test" }), "post", "/tickets/{ticket}/permission", "{}", "hold")}]\n`,
+    `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("post", "/tickets/{ticket}/activity", JSON.stringify({ signal: "hook:pre_tool_use", tool: "Bash: cargo test" }), "post", "/tickets/{ticket}/permission", "{}", "hold")}]\n`,
   );
-  writeFileSync(join(home, "profiles", "plain.toml"), `command = ['${fakeAgent}', ${steps("print", "working", "hold")}]\n`);
+  writeFileSync(join(home, "profiles", "plain.toml"), `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "working", "hold")}]\n`);
 
   tok("project", "new", "NA", "--sim");
   tok("project", "new", "NB", "--repo", repo, "--base", "develop", "--profile", "plain");

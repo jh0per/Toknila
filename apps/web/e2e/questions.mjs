@@ -15,7 +15,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch, shipOf } from "./helpers.mjs";
+import { checks, cleanup, launch, shipOf, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -24,7 +24,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-q-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", ...opts });
 const tok = (...args) => run(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home } });
 const git = (dir, ...args) =>
@@ -58,22 +58,22 @@ try {
       "post", "/tickets/{ticket}/permission", "{}",
       "hold",
     );
-  writeFileSync(join(home, "profiles", "allow.toml"), `command = ['${fakeAgent}', ${ask("Bash: cargo test -p core")}]\n`);
-  writeFileSync(join(home, "profiles", "deny.toml"), `command = ['${fakeAgent}', ${ask("Bash: rm -rf build\nrm -rf dist")}]\n`);
+  writeFileSync(join(home, "profiles", "allow.toml"), `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${ask("Bash: cargo test -p core")}]\n`);
+  writeFileSync(join(home, "profiles", "deny.toml"), `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${ask("Bash: rm -rf build\nrm -rf dist")}]\n`);
   writeFileSync(
     join(home, "profiles", "screen.toml"),
-    `command = ['${fakeAgent}', ${steps("print", "Do you trust this folder?", "print", "1. Yes  2. No", "echo", "hold")}]\n` +
+    `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "Do you trust this folder?", "print", "1. Yes  2. No", "echo", "hold")}]\n` +
       "startup_secs = 1\n[hooks]\nenabled = true\n",
   );
   writeFileSync(
     join(home, "profiles", "trust.toml"),
-    `command = ['${fakeAgent}', ${steps("trust", "hold")}]\nstartup_secs = 1\n[hooks]\nenabled = true\n`,
+    `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("trust", "hold")}]\nstartup_secs = 1\n[hooks]\nenabled = true\n`,
   );
   // A worker that only holds, and a reviewer that ends two turns (the Stop hook) without a verdict.
-  writeFileSync(join(home, "profiles", "plain.toml"), `command = ['${fakeAgent}', ${steps("print", "working", "hold")}]\n`);
+  writeFileSync(join(home, "profiles", "plain.toml"), `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "working", "hold")}]\n`);
   writeFileSync(
     join(home, "profiles", "plain-reviewer.toml"),
-    `command = ['${fakeAgent}', ${steps("print", "I could not run the checks", "stop", "sleep", "300", "stop", "hold")}]\n`,
+    `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "I could not run the checks", "stop", "sleep", "300", "stop", "hold")}]\n`,
   );
   tok("project", "new", "QA", "--repo", repo, "--base", "develop", "--profile", "allow");
   tok("project", "set", "QA", "--parallel", "6");

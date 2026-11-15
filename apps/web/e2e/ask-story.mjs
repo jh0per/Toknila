@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch, shipOf } from "./helpers.mjs";
+import { checks, cleanup, launch, shipOf, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -23,7 +23,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-ask-story-"));
+const { home, marker: fakeMarker } = session();
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 const git = (dir, ...args) =>
   execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
@@ -50,7 +50,7 @@ try {
   const answer = "Open the login on a phone. Accept merges the story; Return sends your words to the agent.";
   writeFileSync(
     join(home, "profiles", "fake-planner.toml"),
-    `role = 'planner'\ncommand = ['${fakeAgent}', ${steps("print", "planner ready", "echo", "post", "/planner/say", JSON.stringify({ text: answer, about: "ASK-1" }), "hold")}]\nstartup_secs = 0\n`,
+    `role = 'planner'\ncommand = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "planner ready", "echo", "post", "/planner/say", JSON.stringify({ text: answer, about: "ASK-1" }), "hold")}]\nstartup_secs = 0\n`,
   );
   tok("project", "new", "ASK", "--repo", repo, "--base", "develop", "--sim");
   tok("review-mode", "human", "--project", "ASK");

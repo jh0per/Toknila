@@ -13,14 +13,14 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch, shoot } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot, session } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
   console.error("usage: node e2e/plans.mjs <tok binary>");
   process.exit(2);
 }
-const home = mkdtempSync(join(tmpdir(), "toknila-plans-"));
+const { home } = session();
 // Repositories live outside the data home: the daemon never trashes a folder inside it.
 const work = mkdtempSync(join(tmpdir(), "toknila-plans-work-"));
 const bin = mkdtempSync(join(tmpdir(), "toknila-plans-trash-"));
