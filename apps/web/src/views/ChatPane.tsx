@@ -9,7 +9,7 @@ import type { State } from "../store/state";
 import { titleByName } from "../store/title";
 import { AskBox } from "./AskBox";
 import { CardProposals } from "./CardProposals";
-import { ChatEntry } from "./ChatMessage";
+import { ChatEntry, stoppedIds } from "./ChatMessage";
 import { WaitingLine } from "./WaitingLine";
 
 /// How often the waiting line looks at the clock to count the minutes.
@@ -68,7 +68,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
   }, [waiting, turn.asked?.id]);
   const queued = new Set(running ? turn.queued : []);
   // Messages a stopped assistant will never read (not while one is being sent: it starts first).
-  const stopped = new Set(sending ? [] : turn.stopped);
+  const stopped = stoppedIds(turn, sending);
   // The latest progress line shows under the waiting line, so the log leaves it out meanwhile.
   const inLog = waiting && turn.progress ? shown.filter((m) => m.id !== turn.progress?.id) : shown;
   const nudge = () => {

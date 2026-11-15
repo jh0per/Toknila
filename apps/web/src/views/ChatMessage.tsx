@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ConversationMessage } from "../api/types";
-import { QUEUED_NOTE, STOPPED_NOTE, aboutLabel, aboutRoute } from "../store/conversation";
+import { type OpenTurn, QUEUED_NOTE, STOPPED_NOTE, aboutLabel, aboutRoute } from "../store/conversation";
 import { whenText } from "../store/chat";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
@@ -58,6 +58,9 @@ function DidLine({ m, project, state, dispatch }: { m: ConversationMessage; proj
     </li>
   );
 }
+
+/// The messages that show the stopped note: none while one is being sent (the planner starts first).
+export const stoppedIds = (turn: OpenTurn, sending: boolean): Set<string> => new Set(sending ? [] : turn.stopped);
 
 /// One entry of the conversation: the person's and the assistant's words are plain selectable
 /// text with a Copy control; what the assistant did is a line of Toknila's.
