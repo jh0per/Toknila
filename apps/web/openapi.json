@@ -9419,9 +9419,6 @@
       "NewChain": {
         "type": "object",
         "description": "`POST /v1/projects/{project}/chains`.",
-        "required": [
-          "name"
-        ],
         "properties": {
           "autostart": {
             "type": [
@@ -9437,8 +9434,11 @@
             ]
           },
           "name": {
-            "type": "string",
-            "description": "The identifier of folders and branches."
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The identifier of folders and branches; none: the title's slug."
           },
           "review_mode": {
             "oneOf": [

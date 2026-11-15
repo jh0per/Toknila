@@ -17,6 +17,7 @@ mod ask_story;
 mod card_chain;
 mod card_designs;
 mod chain_settings;
+mod chain_title;
 mod chain_version;
 mod commands;
 mod conversation;

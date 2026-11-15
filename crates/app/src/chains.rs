@@ -17,8 +17,9 @@ use crate::{AppError, AppResult, ChainTx, Reader, UnitOfWork, resolve, with_chai
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NewChain {
-    /// The identifier of folders and branches.
-    pub name: String,
+    /// The identifier of folders and branches; none: the title's slug.
+    #[serde(default)]
+    pub name: Option<String>,
     /// The words a person reads; none: the name made readable.
     #[serde(default)]
     pub title: Option<String>,
@@ -53,10 +54,12 @@ pub fn create<U: UnitOfWork + ?Sized>(
     project: &str,
     input: NewChain,
 ) -> AppResult<ChainId> {
-    let name = input.name.trim();
-    if name.is_empty() {
-        return Err(AppError::bad_request("epic name is empty"));
-    }
+    let title = crate::epic::clean_title(input.title.as_deref());
+    let typed = input
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty());
     let version = input
         .version
         .as_deref()
@@ -64,11 +67,16 @@ pub fn create<U: UnitOfWork + ?Sized>(
         .map(clean_version)
         .transpose()?;
     let p = resolve::project(uow, project)?;
+    let name = match (typed, &title) {
+        (Some(n), _) => n.to_owned(),
+        (None, Some(t)) => crate::epic::unique_name(uow, p.id, t)?,
+        (None, None) => return Err(AppError::bad_request("epic needs a title or a name")),
+    };
     let c = Chain {
         id: ChainId::new(),
         project_id: p.id,
-        name: name.to_owned(),
-        title: crate::epic::clean_title(input.title.as_deref()),
+        name,
+        title,
         goal: input.goal.unwrap_or_default(),
         autostart: input.autostart.unwrap_or(Chain::DEFAULT_AUTOSTART),
         review_mode: input.review_mode,

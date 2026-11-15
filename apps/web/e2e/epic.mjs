@@ -38,7 +38,7 @@ try {
     throw new Error("the dialog did not suggest 0.1.0");
   });
   console.log("PASS the New chain dialog suggests a version: 0.1.0");
-  await t("chain-name").fill("checkout");
+  await t("chain-title").fill("checkout");
   await t("chain-goal").fill("Let customers pay with saved cards.\n\n- wallets\n- the old flow behind a flag");
   await t("chain-version").fill("0.3.0");
   await t("chain-autostart").uncheck();
