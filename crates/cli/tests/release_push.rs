@@ -118,15 +118,19 @@ fn push_with_a_remote_lands_the_base_and_the_tag_there() {
 
     tok.run(&["release", "run", "phase", "0.1.0", "--push"]);
     let until = Instant::now() + Duration::from_secs(30);
-    while tags(&remote) != "v0.1.0" {
+    // The remote gets the tag before the run records the step as done: wait for the step's line.
+    let steps = loop {
+        let steps = tok.text(&["release", "steps", "0.1.0"]);
+        if steps.contains("Pushed ") {
+            break steps;
+        }
         assert!(
             Instant::now() < until,
-            "the tag did not reach the remote: {}",
-            tok.text(&["release", "steps", "0.1.0"])
+            "the push step did not finish: {steps}"
         );
         std::thread::sleep(Duration::from_millis(100));
-    }
-    let steps = tok.text(&["release", "steps", "0.1.0"]);
+    };
+    assert_eq!(tags(&remote), "v0.1.0", "the tag reached the remote");
     assert!(
         steps.contains("Pushed develop and v0.1.0 to origin"),
         "{steps}"
