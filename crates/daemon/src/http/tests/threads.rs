@@ -254,7 +254,7 @@ async fn a_second_thread_of_a_kind_is_refused_with_a_hint_naming_the_first() {
     assert_eq!(s, StatusCode::CONFLICT, "{err}");
     let hint = err["error"].as_str().expect("error");
     assert!(
-        hint.contains("thread 1") && hint.contains("post a version"),
+        hint.contains("thread 1 (design) is open") && hint.contains("thread_version"),
         "{hint}"
     );
     // Control: another kind is fine, and the refused call left no thread behind.

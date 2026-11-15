@@ -177,7 +177,15 @@ pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
     ticket: TicketId,
     error: &RunnerError,
 ) -> AppResult<()> {
-    failed(uow, ticket, error.to_string())
+    let detail = match error {
+        // A card in Review has no Unblock: the person runs the review again.
+        RunnerError::NoPty(why) => format!(
+            "No free terminal on this computer (every pty is in use). Close some terminals or \
+             agents, then run the review again. ({why})"
+        ),
+        other => other.to_string(),
+    };
+    failed(uow, ticket, detail)
 }
 
 /// After a daemon start: a card still waiting for a reviewer whose process is gone (`live`

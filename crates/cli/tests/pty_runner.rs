@@ -4,6 +4,9 @@
 //! daemon killed hard loses the runner of a ticket it was running, which comes back on restart.
 
 mod common;
+/// The one lock of the tests that open ptys, shared with the daemon's `runner.rs`.
+#[path = "../../daemon/tests/support/mod.rs"]
+mod pty_lock;
 
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -99,6 +102,7 @@ fn wait_line(rx: &mpsc::Receiver<String>, want: &str) {
 
 #[test]
 fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_daemon() {
+    let _turn = pty_lock::hold();
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
@@ -184,6 +188,7 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
 
 #[test]
 fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the_panel() {
+    let _turn = pty_lock::hold();
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
@@ -233,6 +238,7 @@ fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the
 
 #[test]
 fn a_return_goes_to_the_same_live_agent_session_and_is_delivered_once() {
+    let _turn = pty_lock::hold();
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
