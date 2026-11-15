@@ -158,6 +158,49 @@ fn a_project_without_a_repository_queues_nothing() {
 }
 
 #[test]
+fn recovery_retires_the_ship_an_old_daemon_left_with_a_merged_or_cancelled_card_once() {
+    for cancel in [false, true] {
+        let mut mem = with_repo();
+        recover(&mut mem).expect("settle");
+        settle_ships(&mut mem);
+        let planted = mem.ships.first().expect("A's ship").clone();
+        finish_a(&mut mem).expect("finished");
+        if cancel {
+            act_on_a(
+                &mut mem,
+                TicketEvent::Cancel {
+                    reason: "dup".to_owned(),
+                },
+            )
+            .expect("cancel");
+        } else {
+            act_on_a(&mut mem, TicketEvent::Accept { comment: None }).expect("accept");
+        }
+        settle_ships(&mut mem);
+        assert!(
+            mem.ships.iter().all(|s| s.ticket_id != planted.ticket_id),
+            "the daemon of today retires it"
+        );
+        // The old daemon never ran the removal: the record is there, the card is done.
+        mem.ships.push(planted.clone());
+        mem.deferred.clear();
+        mem.yard.retired.borrow_mut().clear();
+        let report = recover(&mut mem).expect("restart");
+        assert_eq!(report.ships_retired, ["DEMO-1"], "cancel={cancel}");
+        settle_ships(&mut mem);
+        assert!(
+            mem.ships.iter().all(|s| s.ticket_id != planted.ticket_id),
+            "the record is gone"
+        );
+        assert_eq!(mem.yard.retired.borrow().len(), 1, "retired once");
+        assert!(
+            recover(&mut mem).expect("again").ships_retired.is_empty(),
+            "logged once per ship"
+        );
+    }
+}
+
+#[test]
 fn merged_queues_the_removal_and_the_outcome_forgets_the_path_but_keeps_the_branch() {
     let mut mem = with_repo();
     recover(&mut mem).expect("settle");
@@ -167,7 +210,7 @@ fn merged_queues_the_removal_and_the_outcome_forgets_the_path_but_keeps_the_bran
     assert!(
         !mem.deferred
             .iter()
-            .any(|e| matches!(e, ExternalEffect::RemoveShip { .. })),
+            .any(|e| matches!(e, ExternalEffect::RetireShip { .. })),
         "the ship goes only after the merge landed"
     );
     settle_ships(&mut mem);

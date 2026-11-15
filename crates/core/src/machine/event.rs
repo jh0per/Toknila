@@ -250,10 +250,8 @@ pub enum Effect {
     /// Merge the ticket's ship branch into the project's base branch. The outcome comes back as
     /// `MergeDone` or as a block (`merge_conflict`, `base_checkout_dirty`, `merge_failed`).
     Merge,
-    /// Take the ticket's worktree away; the branch stays.
-    RemoveShip,
-    /// The ticket was cancelled: take its worktree away, delete its branch when it holds no
-    /// commits of its own, keep it (and say so on the card) when it does.
+    /// The ticket was cancelled or merged, by any path: take its worktree away, delete its
+    /// branch when it holds nothing the base lacks, keep it (and say so on the card) when it does.
     RetireShip,
     /// Stop the ticket's runners, worker and reviewer, if any.
     StopRunner,

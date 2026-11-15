@@ -4,6 +4,7 @@ import { ArchiveProject } from "./ArchiveProject";
 import type { FormProps } from "./ProjectSections";
 import { Strays } from "./Strays";
 import { TrustNote } from "./TrustNote";
+import { Workspaces } from "./Workspaces";
 import { trustFacts } from "../store/trustAsked";
 
 /// Where Toknila keeps its files on this machine.
@@ -38,6 +39,7 @@ export function AdvancedSection({ project, state, dispatch }: FormProps & { disp
       )}
       <Places state={state} />
       <TrustNote {...trustFacts(state.events, state.settings.places?.ships, project.key)} />
+      <Workspaces project={project.key} />
       <Strays project={project.key} />
       <details className="fold danger-fold" data-testid="danger-zone">
         <summary>Danger zone</summary>

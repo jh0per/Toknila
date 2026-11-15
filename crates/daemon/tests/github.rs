@@ -283,6 +283,7 @@ async fn green_checks_merge_the_pull_request_and_new_ships_start_from_origin() {
         "origin was fetched"
     );
     assert!(!ship.exists(), "the worktree is removed");
+    rig.nothing_left().await;
 
     // The next ship branches from origin/develop; the local develop never got the merge.
     rig.post("/v1/chains/auth/tickets", json!({ "title": "Next" }))
@@ -478,6 +479,7 @@ async fn a_pull_request_without_checks_raises_the_question_after_the_timeout_and
     assert_eq!(rig.merge_calls(), 1);
     assert!(rig.origin_has("develop", "login.txt"));
     assert!(rig.no_checks_question().await.is_none());
+    rig.nothing_left().await;
 }
 
 #[tokio::test]
@@ -634,4 +636,88 @@ async fn a_refused_merge_is_a_failure_unless_github_says_the_pull_request_confli
     rig.tick().await;
     let detail = blocked_detail(&rig.card("DEMO-1").await);
     assert!(detail.contains("pr merge"), "{detail}");
+}
+
+// --- TOKNILA-132: a merged card leaves nothing behind, whoever merged the pull request ---
+
+impl Rig {
+    /// What a person sees of a merged card's ship: the worktree, its registration, the card's
+    /// `ship` record and the local branch.
+    async fn leftovers(&self, ship: &Path) -> (bool, bool, bool, bool) {
+        let listed = git(&self.repo, &["worktree", "list", "--porcelain"]);
+        let record = self.card("DEMO-1").await["ship"].is_object();
+        let branch = !git(&self.repo, &["branch", "--list", BRANCH]).is_empty();
+        (
+            ship.exists(),
+            listed.contains(ship.to_string_lossy().as_ref()),
+            record,
+            branch,
+        )
+    }
+}
+
+#[tokio::test]
+async fn a_pull_request_merged_on_github_by_a_person_retires_the_ship_like_any_merge() {
+    let rig = Rig::new().await;
+    let ship = rig.accepted().await;
+    rig.tick().await;
+    // Someone merges it on GitHub: the pull request reads MERGED the next time it is looked at.
+    rig.gh_edit(|s| s["prs"][0]["state"] = json!("MERGED"));
+    rig.tick().await;
+    assert_eq!(rig.status().await, "merged");
+    let (dir, listed, record, _branch) = rig.leftovers(&ship).await;
+    assert_eq!(
+        (dir, listed, record),
+        (false, false, false),
+        "worktree, registration and record are gone"
+    );
+    rig.nothing_left().await;
+}
+
+/// What kept the owner's ships: the removal ran once, after the commit that made the card Merged.
+/// When that one run failed or was lost with the process (git refusing a locked worktree stands
+/// in for it here), nothing queued it again: the card stayed Merged with its record and worktree
+/// for good. The ticker now queues it again, so the ship goes within one round, no restart.
+#[tokio::test]
+async fn a_removal_that_failed_once_is_retried_by_the_next_round_of_the_ticker() {
+    let rig = Rig::new().await;
+    let ship = rig.accepted().await;
+    git(
+        &rig.repo,
+        &["worktree", "lock", &ship.to_string_lossy(), "--reason", "t"],
+    );
+    rig.tick().await;
+    rig.gh_edit(|s| s["prs"][0]["state"] = json!("MERGED"));
+    rig.tick().await;
+    assert_eq!(rig.status().await, "merged");
+    let (dir, _listed, record, _) = rig.leftovers(&ship).await;
+    assert!(
+        dir && record,
+        "the failed removal left the worktree and the record (the owner's state)"
+    );
+    // While git still refuses, a round tries again and the ship stays.
+    rig.tick().await;
+    assert!(rig.leftovers(&ship).await.2, "still there while locked");
+
+    git(&rig.repo, &["worktree", "unlock", &ship.to_string_lossy()]);
+    rig.tick().await;
+    rig.nothing_left().await;
+    assert!(!ship.exists(), "the worktree is gone after the next round");
+}
+
+impl Rig {
+    /// The merged card left no worktree and no record; its branch is gone, or kept with a line
+    /// on the card that says why.
+    async fn nothing_left(&self) {
+        let listed = git(&self.repo, &["worktree", "list", "--porcelain"]);
+        assert!(!listed.contains("ships"), "no ship is registered: {listed}");
+        let card = self.card("DEMO-1").await;
+        assert!(card["ship"].is_null(), "the record is gone: {card}");
+        if !git(&self.repo, &["branch", "--list", BRANCH]).is_empty() {
+            assert!(
+                card.to_string().contains("kept: it has"),
+                "a kept branch is explained on the card: {card}"
+            );
+        }
+    }
 }

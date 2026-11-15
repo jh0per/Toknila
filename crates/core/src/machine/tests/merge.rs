@@ -79,7 +79,7 @@ fn the_merge_outcome_merges_the_card_and_frees_the_ship_and_dependents() {
     assert_eq!(
         tr.effects,
         vec![
-            Effect::RemoveShip,
+            Effect::RetireShip,
             Effect::StopRunner,
             Effect::DependencySatisfied
         ]
@@ -114,7 +114,7 @@ fn every_merge_failure_blocks_the_card_and_unblock_tries_the_merge_again() {
         let blocked = step(&merging(), &TicketEvent::Block { reason });
         assert_eq!(blocked.ticket.status, TicketStatus::Blocked);
         assert_eq!(blocked.ticket.review.turn, None);
-        assert!(!blocked.effects.contains(&Effect::RemoveShip));
+        assert!(!blocked.effects.contains(&Effect::RetireShip));
         assert!(!blocked.effects.contains(&Effect::StopRunner));
         let back = step(&blocked.ticket, &TicketEvent::Unblock);
         assert_eq!(back.ticket.status, TicketStatus::Review);

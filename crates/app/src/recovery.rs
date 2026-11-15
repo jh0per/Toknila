@@ -31,6 +31,9 @@ pub struct Recovery {
     pub checks_resumed: Vec<String>,
     /// Keys of the cards whose merge was running; it is queued again.
     pub merges_resumed: Vec<String>,
+    /// Keys of the merged or cancelled cards whose ship record an older daemon left behind; the
+    /// ship is retired, once per ship.
+    pub ships_retired: Vec<String>,
     /// Entities whose stored state differs from their last journal snapshot. The database stays
     /// the source of truth; drift is reported, never "fixed" from the journal.
     pub drift: Vec<String>,
@@ -48,6 +51,11 @@ pub fn recover<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Recovery> {
     report.checks_resumed = checks.iter().map(ToString::to_string).collect();
     let resumed = merges::resume(uow)?;
     report.merges_resumed = resumed.iter().map(ToString::to_string).collect();
+    let retired = crate::finished_ships::retire_finished(uow, None)?;
+    report.ships_retired = crate::finished_ships::keys(&retired)
+        .iter()
+        .map(ToString::to_string)
+        .collect();
     let chains = uow.chains(None)?;
     report.chains = chains.len();
     for c in &chains {

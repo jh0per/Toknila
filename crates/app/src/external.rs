@@ -29,9 +29,8 @@ pub enum ExternalEffect {
         ticket: TicketId,
         spec: Option<MergeSpec>,
     },
-    /// Remove the ship's worktree from the repository at `repo`; the branch stays.
-    RemoveShip { repo: String, ship: Ship },
-    /// Remove a cancelled ship's worktree; delete its branch unless it has commits beyond `start`.
+    /// Remove a finished (merged or cancelled) ship's worktree; delete its branch unless it has
+    /// work beyond `start`.
     RetireShip {
         repo: String,
         ship: Ship,
@@ -93,9 +92,6 @@ pub enum ExternalOutcome {
     MergeFinished {
         ticket: TicketId,
         result: Result<MergeOutcome, MergeError>,
-    },
-    ShipRemoved {
-        ship: Ship,
     },
     ShipRemoveFailed {
         ship: Ship,
@@ -197,12 +193,6 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                     None => Ok(MergeOutcome::UpToDate),
                 };
                 outcomes.push(ExternalOutcome::MergeFinished { ticket, result });
-            }
-            ExternalEffect::RemoveShip { repo, ship } => {
-                outcomes.push(match host.yard.remove(&repo, &ship) {
-                    Ok(()) => ExternalOutcome::ShipRemoved { ship },
-                    Err(error) => ExternalOutcome::ShipRemoveFailed { ship, error },
-                });
             }
             ExternalEffect::RetireShip { repo, ship, start } => {
                 outcomes.push(match host.yard.retire(&repo, &ship, &start) {
@@ -340,7 +330,6 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
             ExternalOutcome::MergeFinished { ticket, result } => {
                 merges::finished(uow, ticket, result)?;
             }
-            ExternalOutcome::ShipRemoved { ship } => ships::removed(uow, ship)?,
             ExternalOutcome::ShipRetired { ship, fate } => ships::retired(uow, ship, fate)?,
             ExternalOutcome::ShipRemoveFailed { ship, error } => {
                 ships::remove_failed(uow, ship, &error)?;

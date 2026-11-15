@@ -30,7 +30,12 @@ pub fn watch(store: Store) -> JoinHandle<()> {
 pub async fn tick(store: &Store) -> usize {
     match store
         .write(Actor::System, now(), |tx| -> Result<_, AppError> {
-            merges::poll(tx)
+            let asked = merges::poll(tx)?;
+            // A retirement that failed or was lost with the process is queued again here: the
+            // record of a finished card is the only thing that says it is still owed. Removing
+            // twice is harmless, and a retired ship has no record left to find.
+            toknila_app::finished_ships::retire_finished(tx, None)?;
+            Ok(asked)
         })
         .await
     {

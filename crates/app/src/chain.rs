@@ -355,10 +355,6 @@ fn record_effects<U: UnitOfWork + ?Sized>(uow: &mut U, ctx: &mut ChainTx) -> Res
                 }
                 continue;
             }
-            Effect::RemoveShip => {
-                ships::queue_remove(uow, ctx, ticket)?;
-                continue;
-            }
             Effect::RetireShip => {
                 ships::queue_retire(uow, ctx, ticket)?;
                 continue;

@@ -121,7 +121,7 @@ fn accept_queues_the_merge_and_the_card_waits_in_review_for_the_outcome() {
     assert!(
         !mem.deferred
             .iter()
-            .any(|e| matches!(e, ExternalEffect::RemoveShip { .. })),
+            .any(|e| matches!(e, ExternalEffect::RetireShip { .. })),
         "the ship stays until the merge landed"
     );
 }
@@ -369,17 +369,30 @@ fn a_merged_card_in_local_mode_retires_its_ship_and_a_kept_branch_is_explained()
 }
 
 #[test]
-fn a_merged_card_in_pull_request_mode_leaves_its_branch_to_the_forge() {
-    let mut mem = in_review();
-    mem.project.merge.mode = toknila_core::MergeMode::Github;
-    *mem.yard.fate.borrow_mut() = crate::BranchFate::Deleted;
-    accept(&mut mem);
-    settle(&mut mem);
-    let a = mem.ticket_by_title("A");
-    assert_eq!(a.status, TicketStatus::Merged);
-    assert_eq!(mem.yard.removed.borrow().len(), 1, "the worktree goes");
-    assert!(
-        mem.yard.retired.borrow().is_empty(),
-        "no branch is looked at or deleted"
-    );
+fn a_merged_card_in_pull_request_mode_retires_its_ship_against_the_remote_base() {
+    for (fate, comments) in [
+        (crate::BranchFate::Deleted, 0),
+        (crate::BranchFate::Kept { ahead: 1 }, 1),
+    ] {
+        let mut mem = in_review();
+        mem.project.merge.mode = toknila_core::MergeMode::Github;
+        *mem.yard.fate.borrow_mut() = fate;
+        accept(&mut mem);
+        settle(&mut mem);
+        let a = mem.ticket_by_title("A");
+        assert_eq!(a.status, TicketStatus::Merged);
+        assert_eq!(mem.yard.removed.borrow().len(), 1, "the worktree goes");
+        assert_eq!(
+            *mem.yard.retired.borrow(),
+            ["origin/develop"],
+            "measured against the start point of the ship"
+        );
+        assert!(mem.ships.iter().all(|s| s.ticket_id != a.id), "record gone");
+        let notes = mem
+            .comments
+            .iter()
+            .filter(|c| c.ticket_id == a.id && c.author == toknila_core::Actor::System)
+            .count();
+        assert_eq!(notes, comments, "a kept branch says so on the card");
+    }
 }
