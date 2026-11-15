@@ -466,6 +466,28 @@ fn a_reviewer_that_cannot_start_hands_the_card_to_a_person() {
 }
 
 #[test]
+fn a_reviewer_that_finds_no_free_pty_says_so_in_the_notice_for_the_person() {
+    let mut mem = with_agents();
+    mem.project.default_review_mode = ReviewMode::Agent;
+    recover(&mut mem).expect("settle");
+    settle(&mut mem);
+    finish(&mut mem, "done".to_owned());
+    *mem.runner.refuse.borrow_mut() = Some(crate::RunnerError::NoPty("-6".to_owned()));
+    settle(&mut mem);
+    let t = a(&mem);
+    assert_eq!(t.review.turn, Some(ReviewTurn::Person));
+    let text = format!("{:?}", mem.events);
+    assert!(
+        text.contains("No free terminal on this computer (every pty is in use)"),
+        "{text}"
+    );
+    assert!(
+        text.contains("then run the review again") && !text.contains("press Unblock"),
+        "a card in Review has no Unblock: {text}"
+    );
+}
+
+#[test]
 fn a_restart_hands_a_card_whose_reviewer_was_lost_to_a_person() {
     let mut mem = process_review(ReviewMode::Agent);
     let live_reviewers = std::collections::HashSet::new();

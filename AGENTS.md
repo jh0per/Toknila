@@ -152,6 +152,10 @@ A check you have never seen fail is a claim, not a check.
   comment says which system and why (a reset that only macOS reports, say).
 - A test of a race asserts the invariant that holds whichever way the race goes (a GET answers
   with the list, a POST opens one connection), never that the race went one particular way.
+- A lock that tests share across processes (the pty turn in `crates/daemon/tests/support`) is
+  scoped to the run (`TOKNILA_TEST_ROOT`) or the checkout, never to the machine: several
+  checkouts run `cargo xtask verify` at once on one computer (the daemon's checks of the ships,
+  a gate), and a machine-wide lock makes them wait on each other until a deadline fails a test.
 - Wait for a condition (a poll with a deadline, an event), not for a fixed time. A fixed wait is
   only for "nothing happens in this window", and then it is as short as the setting it waits on:
   a test daemon reads `TOKNILA_TICK_MS` (its silence ticker) only under `TOKNILA_TEST_ROOT`,

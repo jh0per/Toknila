@@ -3,6 +3,7 @@
 
 use std::io::{Read, Write};
 use std::path::Path;
+use std::time::Duration;
 
 use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use toknila_app::RunnerError;
@@ -47,7 +48,7 @@ pub(super) fn spawn(
     let Some((program, args)) = wiring.command.split_first() else {
         return Err(RunnerError::NoCommand(profile.name.clone()));
     };
-    let pair = native_pty_system().openpty(SIZE).map_err(spawn_error)?;
+    let pair = open_with(|| native_pty_system().openpty(SIZE), OPEN_RETRY_WAIT)?;
     let mut cmd = CommandBuilder::new(program);
     cmd.args(args);
     cmd.args(&wiring.args);
@@ -73,6 +74,29 @@ pub(super) fn spawn(
         child,
         master: pair.master,
     })
+}
+
+/// How long to wait before the one retry of a pty that could not be opened.
+const OPEN_RETRY_WAIT: Duration = Duration::from_millis(300);
+
+/// A pty the operating system refused to open is a state of the machine (ENXIO on a loaded Mac,
+/// "Unknown error: -6"; no descriptor left elsewhere): `NoPty`, with what the system said.
+fn open_error<E: std::fmt::Display>(e: &E) -> RunnerError {
+    RunnerError::NoPty(format!("{e:#}"))
+}
+
+/// Opens a pty with `open`, once more after `wait` when it fails, then gives up with `NoPty`.
+fn open_with<T, E: std::fmt::Display>(
+    mut open: impl FnMut() -> Result<T, E>,
+    wait: Duration,
+) -> Result<T, RunnerError> {
+    match open() {
+        Ok(opened) => Ok(opened),
+        Err(_) => {
+            std::thread::sleep(wait);
+            open().map_err(|e| open_error(&e))
+        }
+    }
 }
 
 fn spawn_error<E: std::fmt::Display>(e: E) -> RunnerError {
@@ -109,6 +133,62 @@ pub(super) fn exit_of(status: &portable_pty::ExitStatus) -> ProcessExit {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_open_that_the_os_refuses_is_no_pty_whatever_it_says() {
+        // What portable-pty reports on a Mac with no free pty (ENXIO), and a Linux style one.
+        for text in [
+            "failed to openpty: Unknown error: -6",
+            "failed to openpty: Os { code: 6, kind: Uncategorized, message: \"Device not configured\" }",
+            "failed to openpty: Os { code: 24, kind: Uncategorized, message: \"Too many open files\" }",
+        ] {
+            let err = open_error(&std::io::Error::other(text.to_owned()));
+            assert!(
+                matches!(&err, RunnerError::NoPty(d) if d == text),
+                "{err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_open_is_tried_once_more_and_then_given_up() {
+        let mut calls = 0;
+        let got: Result<u8, RunnerError> = open_with(
+            || {
+                calls += 1;
+                Err(std::io::Error::other(
+                    "failed to openpty: Unknown error: -6",
+                ))
+            },
+            std::time::Duration::from_millis(1),
+        );
+        assert!(matches!(got, Err(RunnerError::NoPty(_))), "{got:?}");
+        assert_eq!(calls, 2, "one try and one retry");
+        let mut calls = 0;
+        let got = open_with(
+            || {
+                calls += 1;
+                if calls == 1 {
+                    Err(std::io::Error::other(
+                        "failed to openpty: Unknown error: -6",
+                    ))
+                } else {
+                    Ok(7u8)
+                }
+            },
+            std::time::Duration::from_millis(1),
+        );
+        assert_eq!((got.ok(), calls), (Some(7), 2), "the retry succeeds");
+        let mut calls = 0;
+        let got = open_with(
+            || {
+                calls += 1;
+                Ok::<u8, std::io::Error>(1)
+            },
+            std::time::Duration::from_millis(1),
+        );
+        assert_eq!((got.ok(), calls), (Some(1), 1), "no retry when it opens");
+    }
 
     #[test]
     fn the_cursor_query_is_found_anywhere_in_the_output() {
