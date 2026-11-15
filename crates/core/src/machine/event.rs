@@ -66,6 +66,15 @@ pub enum TicketEvent {
     CheckDone {
         passed: bool,
         output: String,
+        /// The main commit the ship was synced to, and the ship's HEAD, when the host could say.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        base: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        head: Option<String>,
+        /// One line per extra check that ran ("extra check apps/web/**: PASS cmd, 4 min"); a
+        /// passing round shows them under "The check passed."
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        lines: Vec<String>,
         #[serde(skip)]
         mode: ReviewMode,
         #[serde(skip)]
@@ -100,6 +109,10 @@ pub enum TicketEvent {
     Return { comment: String },
     /// `tok accept`, with remarks if the person has any.
     Accept { comment: Option<String> },
+    /// Host: at Accept, after the sync, main is at a commit the last passed check did not see.
+    /// The card goes back through the check turn; a pass merges by itself. `text` is the round's
+    /// comment ("main moved since the check: 3 commits").
+    MainMoved { text: String },
     /// Reviewer agent: its decision about the work. In agent mode it moves the card (approve
     /// merges, request-changes returns); in both mode the card then waits for a person.
     ReviewVerdict {
@@ -190,6 +203,7 @@ impl TicketEvent {
             Self::StartAnyway => "start_anyway",
             Self::Return { .. } => "return",
             Self::Accept { .. } => "accept",
+            Self::MainMoved { .. } => "main_moved",
             Self::ReviewVerdict { .. } => "review_verdict",
             Self::ReviewerFailed { .. } => "reviewer_failed",
             Self::ReviewerStopped { .. } => "reviewer_stopped",

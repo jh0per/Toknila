@@ -33,6 +33,8 @@ fn outcome(passed: bool) -> CheckOutcome {
         passed,
         output: "`cargo xtask verify` exited with code 0\ntest result: ok. 412 passed".to_owned(),
         at: Timestamp(1_700_000_000_000),
+        base: None,
+        head: None,
     }
 }
 
@@ -51,6 +53,23 @@ fn the_reviewer_kickoff_carries_the_command_the_verdict_and_the_output() {
     let fail = outcome(false);
     let text = kickoff(AgentRole::Reviewer, &brief_with(Some(&fail)));
     assert!(text.contains("with FAIL"), "{text}");
+}
+
+#[test]
+fn the_reviewer_gets_the_extra_checks_with_the_gate() {
+    let mut pass = outcome(true);
+    pass.output.push_str(
+        "\n\nextra check apps/web/**: PASS cargo xtask web && cargo xtask e2e-web, 4 min",
+    );
+    let text = kickoff(AgentRole::Reviewer, &brief_with(Some(&pass)));
+    assert!(
+        text.contains(
+            "extra check apps/web/**: PASS cargo xtask web && cargo xtask e2e-web, 4 min"
+        ),
+        "{text}"
+    );
+    let text = generate_review(&brief_with(Some(&pass)));
+    assert!(text.contains("extra check apps/web/**: PASS"), "{text}");
 }
 
 #[test]

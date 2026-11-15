@@ -24,7 +24,11 @@ pub async fn system_checks(State(state): State<AppState>) -> ApiResult<Json<Syst
             .projects()?
             .into_iter()
             .filter(|p| !p.archived)
-            .filter_map(|p| p.check_command)
+            // The extra commands run on the same machine: a missing program is reported too.
+            .flat_map(|p| {
+                let extra = p.extra_checks.into_iter().map(|c| c.command);
+                p.check_command.into_iter().chain(extra).collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>())
     })
     .await?;

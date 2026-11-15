@@ -2,7 +2,7 @@
 //! look that nothing conflicts (`merge-tree`, which touches nothing) and that no schema migration
 //! number is taken by both branches. A ship that would conflict is left exactly as it was.
 
-use toknila_app::{MergeError, SyncOutcome, SyncSpec};
+use toknila_app::{MergeError, Seen, SyncOutcome, SyncSpec};
 use toknila_core::migrations::{self, SCHEMA_FILE};
 
 use super::GitMerger;
@@ -19,6 +19,24 @@ impl GitMerger {
             .git
             .run(repo, &["diff", "-U0", fork, reference, "--", SCHEMA_FILE])?;
         Ok(migrations::added(&diff))
+    }
+
+    /// The commit `spec.base` names and the ship's HEAD, looked at from the ship's worktree; with
+    /// `since`, how many commits the base has beyond it. `None` when git cannot say.
+    pub(super) fn seen_ship(&self, spec: &SyncSpec, since: Option<&str>) -> Option<Seen> {
+        let dir = spec.path.as_str();
+        let base = self.git.run(dir, &["rev-parse", &spec.base]).ok()?;
+        let head = self.git.run(dir, &["rev-parse", "HEAD"]).ok()?;
+        let commits = since.and_then(|from| {
+            let range = format!("{from}..{base}");
+            let n = self.git.run(dir, &["rev-list", "--count", &range]).ok()?;
+            n.trim().parse().ok()
+        });
+        Some(Seen {
+            base,
+            head,
+            commits,
+        })
     }
 
     /// Merges `spec.base` into the ship at `spec.path` when the ship does not contain it yet.

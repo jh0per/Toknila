@@ -47,6 +47,7 @@ fn spec(f: &Fixture) -> MergeSpec {
             path: f.ship.to_string_lossy().into_owned(),
             start: "develop".to_owned(),
         },
+        recheck: None,
     }
 }
 

@@ -32,6 +32,7 @@ mod pins;
 mod planner;
 mod pull_requests;
 mod questions;
+mod recheck;
 mod restart;
 mod resume;
 mod return_kickoff;
@@ -95,6 +96,7 @@ impl Mem {
             command_policy: Default::default(),
             allowed_commands: Vec::new(),
             reviewer_web_domains: Vec::new(),
+            extra_checks: Vec::new(),
             archived: false,
             hidden: false,
             simulated: true,

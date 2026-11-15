@@ -35,6 +35,9 @@ fn check_done(passed: bool, mode: ReviewMode, max_rounds: u32) -> TicketEvent {
     TicketEvent::CheckDone {
         passed,
         output: "error: the thing failed".to_owned(),
+        base: None,
+        head: None,
+        lines: Vec::new(),
         mode,
         max_rounds,
     }

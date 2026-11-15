@@ -7689,9 +7689,23 @@
             "$ref": "#/components/schemas/Timestamp",
             "description": "When the check finished."
           },
+          "base": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The commit of main the ship was synced to when the check ran; `None` when the host could\nnot say (a check of an older version)."
+          },
           "command": {
             "type": "string",
             "description": "The command that ran; empty when the checker never said which."
+          },
+          "head": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The ship's HEAD the check ran on; `None` when the host could not say."
           },
           "output": {
             "type": "string",
@@ -8432,6 +8446,28 @@
             "format": "int64"
           }
         }
+      },
+      "ExtraCheck": {
+        "type": "object",
+        "description": "One extra check: `command` runs when a changed file matches one of `paths`.",
+        "required": [
+          "paths",
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The command, one line like the check command."
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Globs relative to the repository root: `*` is any run of characters inside a folder name,\n`**` any run including `/`, `?` one character."
+          }
+        },
+        "additionalProperties": false
       },
       "FigmaRef": {
         "type": "object",
@@ -10317,6 +10353,16 @@
             ],
             "description": "Profile of cards that name none; a name from `GET /v1/profiles`."
           },
+          "extra_checks": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ExtraCheck"
+            },
+            "description": "The extra checks (`apps/web/**` runs `cargo xtask web`) that run after the check command\nfor the files a card changed; the list replaces the old one, an empty list clears it."
+          },
           "max_parallel": {
             "type": [
               "integer",
@@ -11298,6 +11344,13 @@
             ],
             "description": "Reviewer agent profile for tickets that name none; `None` derives it from the worker's\nprofile (`<worker>-reviewer`)."
           },
+          "extra_checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtraCheck"
+            },
+            "description": "Commands that run after the check command, at every check turn, when the ship changed\nfiles that match their paths; in this order."
+          },
           "hidden": {
             "type": "boolean",
             "description": "Left out of the sidebar's list; the project works as before."
@@ -12206,6 +12259,10 @@
             "type": "boolean",
             "description": "The reviewer was already nudged for a verdict in this round of review."
           },
+          "recheck": {
+            "type": "boolean",
+            "description": "The check of this turn is the one Accept asked for because main moved since the last\ncheck; a pass merges by itself."
+          },
           "rounds": {
             "type": "array",
             "items": {
@@ -12466,6 +12523,10 @@
           "mode": {
             "$ref": "#/components/schemas/ReviewMode",
             "description": "The review mode that applies: the ticket's, the chain's or the project's."
+          },
+          "rechecking": {
+            "type": "boolean",
+            "description": "The check that runs is the second one of this hand-in: Accept found main at a commit the\nlast check did not see, and a pass merges by itself."
           },
           "reviewer": {
             "type": "string",

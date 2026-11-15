@@ -56,7 +56,7 @@ pub use merges::{MergeError, MergeOutcome, Merger};
 pub use ports::{Reader, UnitOfWork};
 pub use runner::{Runner, RunnerError};
 pub use ships::{BranchFate, ShipError, Shipyard};
-pub use sync::{SyncOutcome, SyncSpec};
+pub use sync::{Seen, SyncOutcome, SyncSpec};
 
 #[cfg(test)]
 mod tests;

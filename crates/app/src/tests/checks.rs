@@ -41,7 +41,7 @@ impl Checker for FakeChecker {
     }
 }
 
-fn fails(output: &str) -> Result<CheckResult, CheckError> {
+pub(super) fn fails(output: &str) -> Result<CheckResult, CheckError> {
     Ok(CheckResult {
         success: false,
         code: Some(101),
@@ -50,12 +50,15 @@ fn fails(output: &str) -> Result<CheckResult, CheckError> {
     })
 }
 
-fn answer(mem: &Mem, answers: impl IntoIterator<Item = Result<CheckResult, CheckError>>) {
+pub(super) fn answer(
+    mem: &Mem,
+    answers: impl IntoIterator<Item = Result<CheckResult, CheckError>>,
+) {
     mem.checker.answers.borrow_mut().extend(answers);
 }
 
 /// A project with a check command and process agents, card A running on its ship.
-fn running(mode: ReviewMode, rounds: u32) -> Mem {
+pub(super) fn running(mode: ReviewMode, rounds: u32) -> Mem {
     let mut mem = with_agents();
     mem.project.check_command = Some("cargo xtask verify".to_owned());
     mem.project.default_review_mode = mode;
