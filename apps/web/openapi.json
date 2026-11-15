@@ -11984,6 +11984,7 @@
           "releasable",
           "version",
           "steps",
+          "push",
           "base"
         ],
         "properties": {
@@ -11998,9 +11999,20 @@
             ],
             "description": "The last tag of the repository, if it has one."
           },
+          "push": {
+            "type": "boolean",
+            "description": "The dialog's default for pushing the base branch and the tag: on in github mode and when\nthe base branch has an upstream, and only when there is a remote."
+          },
           "releasable": {
             "type": "boolean",
             "description": "Every card is merged: the end node offers Release."
+          },
+          "remote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The url of the repository's remote (`origin`, else its only remote), when the daemon can\nread one; `None` means the tag can only stay local."
           },
           "run": {
             "oneOf": [
@@ -12018,7 +12030,7 @@
             "items": {
               "$ref": "#/components/schemas/ReleaseStep"
             },
-            "description": "The steps the run will take, in order."
+            "description": "The steps the run will take, in order, with the push when `push` is on."
           },
           "version": {
             "type": "string",
@@ -12879,6 +12891,13 @@
           "version"
         ],
         "properties": {
+          "push": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Push the base branch and the tag to the remote; left out, the offer's default. Asking for\nit with no remote is refused. A resumed run keeps the steps it began with."
+          },
           "resume": {
             "type": "boolean",
             "description": "Run an interrupted release again from the step it stopped at; what passed is not redone."

@@ -15,8 +15,14 @@ pub struct ReleaseOffer {
     pub version: String,
     /// The last tag of the repository, if it has one.
     pub last_tag: Option<String>,
-    /// The steps the run will take, in order.
+    /// The steps the run will take, in order, with the push when `push` is on.
     pub steps: Vec<ReleaseStep>,
+    /// The url of the repository's remote (`origin`, else its only remote), when the daemon can
+    /// read one; `None` means the tag can only stay local.
+    pub remote: Option<String>,
+    /// The dialog's default for pushing the base branch and the tag: on in github mode and when
+    /// the base branch has an upstream, and only when there is a remote.
+    pub push: bool,
     /// The branch the release is made on.
     pub base: String,
     /// The last run of the chain's own release, read from the journal; `None` before the first.
@@ -33,6 +39,10 @@ pub struct StartRelease {
     /// Run an interrupted release again from the step it stopped at; what passed is not redone.
     #[serde(default)]
     pub resume: bool,
+    /// Push the base branch and the tag to the remote; left out, the offer's default. Asking for
+    /// it with no remote is refused. A resumed run keeps the steps it began with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub push: Option<bool>,
 }
 
 /// Where one step of a release run is.

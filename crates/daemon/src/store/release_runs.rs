@@ -176,7 +176,16 @@ fn apply(r: &mut ReleaseRun, entry: &Entry) {
             }
         }
         Entry::StepStarted { step } => set(r, *step, StepState::Running, None),
-        Entry::StepPassed { step, output } => set(r, *step, StepState::Done, Some(output)),
+        Entry::StepPassed { step, output } => {
+            set(r, *step, StepState::Done, Some(output));
+            // A passed push reads as what it did: "Pushed main and v0.3.4 to origin".
+            if *step == ReleaseStep::Push
+                && let Some(s) = r.steps.iter_mut().find(|s| s.step == *step)
+                && let Some(first) = output.lines().next().filter(|l| l.starts_with("Pushed "))
+            {
+                s.label = first.to_owned();
+            }
+        }
         Entry::StepFailed { step, output } => {
             set(r, *step, StepState::Failed, Some(output));
             r.state = RunState::Failed;
