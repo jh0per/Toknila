@@ -77,7 +77,9 @@ passes alone is a load problem: report it in the hand-in, do not fix it.
 - Stop only processes you started, by pid. Never stop processes by name or pattern (`pkill -f`, \
 `killall`): that has killed other agents' work.
 - Do not install browsers, system packages or tools, and do not download anything, without \
-asking with `ask_human`; use what the repository's docs name.
+asking with `ask_human`; use what the repository's docs name. Never run `npx playwright install` \
+yourself or with another Playwright version: it removes the browsers other versions need; \
+`cargo xtask e2e-web` installs what it needs.
 - Run the project's check command exactly as given. When it fails, fix the cause or report it; \
 do not work around the command. When it fails about the environment (command not found, exit \
 127, a tool refused), say so in the hand-in and stop: do not fix the environment, do not add an \
