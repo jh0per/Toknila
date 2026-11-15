@@ -20,11 +20,28 @@ impl GitShipyard {
             return Ok(BranchFate::Deleted);
         }
         let ahead = self.commits_beyond(repo, start, &branch_ref)?;
-        if ahead > 0 {
+        if ahead > 0 && !self.taken_by(repo, start, &branch_ref)? {
             return Ok(BranchFate::Kept { ahead });
         }
         self.git(repo, ["branch", "-D", &ship.branch])?;
         Ok(BranchFate::Deleted)
+    }
+
+    /// Whether `start` already holds everything the branch changed: a squash or rebase merge
+    /// leaves the branch's commits out of `start`'s history but its files in it. False when the
+    /// branch changed nothing, or any file it changed differs from `start` now.
+    fn taken_by(&self, repo: &str, start: &str, branch_ref: &str) -> Result<bool, ShipError> {
+        let Ok(base) = self.git(repo, ["merge-base", start, branch_ref]) else {
+            return Ok(false);
+        };
+        let names = self.git(repo, ["diff", "--name-only", "-z", &base, branch_ref, "--"])?;
+        let files: Vec<&str> = names.split('\0').filter(|f| !f.is_empty()).collect();
+        if files.is_empty() {
+            return Ok(false);
+        }
+        let mut args = vec!["diff", "--quiet", start, branch_ref, "--"];
+        args.extend(files);
+        self.succeeds(repo, args)
     }
 
     /// How many commits `branch_ref` has that `start` has not.
@@ -110,6 +127,43 @@ mod tests {
             git(Path::new(&repo), &["branch", "--list", &spec.branch]).contains(&spec.branch),
             "the branch with work survives"
         );
+    }
+
+    fn commit(dir: &Path, file: &str, text: &str) {
+        std::fs::write(dir.join(file), text).expect("write");
+        git(dir, &["add", file]);
+        git(
+            dir,
+            &[
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "-m",
+                "work",
+            ],
+        );
+    }
+
+    #[test]
+    fn a_branch_whose_work_the_base_took_as_a_squash_goes_and_a_changed_one_stays() {
+        for (base_text, fate) in [
+            ("x", BranchFate::Deleted),
+            ("changed on the base later", BranchFate::Kept { ahead: 1 }),
+        ] {
+            let tmp = tempfile::tempdir().expect("tmp");
+            let repo = repo(tmp.path());
+            let spec = spec(&repo);
+            let yard = yard(tmp.path());
+            let path = yard.prepare(&spec).expect("prepare");
+            commit(Path::new(&path), "work.txt", "x");
+            // The pull request was squashed: the base has the work as a commit of its own.
+            commit(Path::new(&repo), "work.txt", base_text);
+            let ship = ship_for(&spec, path.clone());
+            assert_eq!(yard.retire(&repo, &ship, "develop").expect("retire"), fate);
+            assert!(!Path::new(&path).exists());
+        }
     }
 
     #[test]

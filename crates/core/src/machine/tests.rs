@@ -522,7 +522,6 @@ fn cancel_retires_the_ship() {
             },
         );
         assert!(tr.effects.contains(&Effect::RetireShip), "{from:?}");
-        assert!(!tr.effects.contains(&Effect::RemoveShip), "{from:?}");
         assert!(!tr.effects.contains(&Effect::PrepareShip), "{from:?}");
     }
 }

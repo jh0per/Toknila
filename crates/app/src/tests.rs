@@ -441,6 +441,7 @@ fn recovery_settles_and_reports_drift_without_a_journal() {
             reviews_lost: vec![],
             checks_resumed: vec![],
             merges_resumed: vec![],
+            ships_retired: vec![],
             drift: vec!["DEMO-1".to_owned(), "DEMO-2".to_owned()],
         }
     );

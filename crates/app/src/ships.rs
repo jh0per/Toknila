@@ -1,5 +1,5 @@
 //! Ships: the worktree and branch a ticket works in. Core decides when one is needed (the
-//! `PrepareShip` and `RemoveShip` effects) and what it is called ([`ShipSpec`]); a [`Shipyard`]
+//! `PrepareShip` and `RetireShip` effects) and what it is called ([`ShipSpec`]); a [`Shipyard`]
 //! port makes and removes them after the command committed ([`crate::external`]); this module
 //! queues that work and records what came of it.
 
@@ -8,8 +8,8 @@ use toknila_core::guard::{self, ShipCommit, ShipProblem, ShipState};
 use toknila_core::machine::TicketEvent;
 use toknila_core::strays::Stray;
 use toknila_core::{
-    Actor, BaseBehind, BlockedReason, Chain, CommentBody, CommentKind, MergeMode, PlannerSite,
-    PlannerSpec, Ship, ShipLook, ShipSpec, StalePolicy, Ticket, TicketId, TicketStatus,
+    Actor, BaseBehind, BlockedReason, Chain, CommentBody, CommentKind, PlannerSite, PlannerSpec,
+    Ship, ShipLook, ShipSpec, StalePolicy, Ticket, TicketId, TicketStatus,
 };
 
 use crate::external::ExternalEffect;
@@ -247,38 +247,9 @@ pub(crate) fn queue_prepare<U: UnitOfWork + ?Sized>(
     Ok(())
 }
 
-/// `RemoveShip`: queue taking a merged card's worktree away for after the commit; a ticket
-/// without a ship is left alone. In local merge mode the branch goes with it (it is in the base;
-/// one that is not, by a race, is kept and explained); in pull-request mode it is left to the forge.
-pub(crate) fn queue_remove<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    ctx: &ChainTx,
-    ticket: TicketId,
-) -> AppResult<()> {
-    let (Some(ship), Some(spec)) = (uow.ship(ticket)?, spec_for(uow, ctx, ticket)?) else {
-        return Ok(());
-    };
-    let local = uow
-        .project(ctx.view.chain.project_id)?
-        .is_some_and(|p| p.merge.mode == MergeMode::Local);
-    uow.defer(if local {
-        // The merged branch is measured against the base it was merged into.
-        ExternalEffect::RetireShip {
-            start: spec.base.clone(),
-            repo: spec.repo,
-            ship,
-        }
-    } else {
-        ExternalEffect::RemoveShip {
-            repo: spec.repo,
-            ship,
-        }
-    });
-    Ok(())
-}
-
-/// `RetireShip`: queue taking a cancelled ticket's worktree away (and its branch, if empty) for
-/// after the commit; a ticket without a ship is left alone.
+/// `RetireShip`: queue taking a merged or cancelled ticket's worktree away (and its branch, when
+/// it holds nothing the start point lacks) for after the commit; a ticket without a ship is left
+/// alone. The start point is the one the ship was made from: `origin/<base>` in pull-request mode.
 pub(crate) fn queue_retire<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     ctx: &ChainTx,
