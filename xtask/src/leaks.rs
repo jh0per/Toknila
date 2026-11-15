@@ -275,6 +275,7 @@ fn split_line(line: &str) -> Option<(u32, u64, &str)> {
 }
 
 /// `pid etime command` of one `ps` line, for a `daemon run` command only.
+#[cfg(test)]
 pub fn parse_line(line: &str) -> Option<(u32, u64, &str)> {
     split_line(line).filter(|(_, _, command)| is_daemon_run(command))
 }
