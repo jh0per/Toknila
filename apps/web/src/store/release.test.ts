@@ -11,7 +11,7 @@ const chain = (releasable: boolean): ChainDetail =>
     summary: { status: "idle", phase: "idle", finished_at: null, total: 1, done: 1, released: 0, releasable },
   }) as unknown as ChainDetail;
 
-const offer: ReleaseOffer = { releasable: true, version: "1.4.3", last_tag: "v1.4.2", steps: ["check", "tag"], base: "develop" };
+const offer: ReleaseOffer = { releasable: true, version: "1.4.3", last_tag: "v1.4.2", steps: ["check", "tag"], base: "develop", remote: null, push: false };
 
 describe("releasing a finished chain", () => {
   it("offers Release only to a chain whose cards are all merged", () => {

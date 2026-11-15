@@ -5,6 +5,7 @@ use clap::Subcommand;
 use toknila_api_types::{NewRelease, ReleaseRun, RunState, StepState};
 use toknila_client::Client;
 use toknila_core::StartMode;
+use toknila_core::release_run::ReleaseStep;
 use toknila_core::wire::from_wire_name;
 
 use super::emit;
@@ -37,6 +38,13 @@ pub enum ReleaseCmd {
         /// Run an interrupted or failed release again from its step; passed steps are not redone.
         #[arg(long)]
         resume: bool,
+        /// Push the base branch and the tag to the remote (the default when the base has an
+        /// upstream or the project merges by pull request).
+        #[arg(long, conflicts_with = "no_push")]
+        push: bool,
+        /// Keep the tag local: push nothing.
+        #[arg(long)]
+        no_push: bool,
     },
     /// Show the steps of a release's last run, as the journal has them (also after a restart).
     Steps { release: String },
@@ -54,6 +62,12 @@ fn steps(run: &ReleaseRun) {
             StepState::Interrupted => "INTERRUPTED",
         };
         println!("  {mark:<11} {}", s.label);
+        // What a passed push says besides the sentence: the tag's page.
+        if s.step == ReleaseStep::Push && s.state == StepState::Done {
+            for line in s.output.lines().skip(1) {
+                println!("  {:<11} {line}", "");
+            }
+        }
     }
     if let Some(e) = &run.error {
         println!("{e}");
@@ -64,6 +78,15 @@ fn steps(run: &ReleaseRun) {
             step.label(),
             run.version
         );
+    }
+}
+
+/// `--push` is `Some(true)`, `--no-push` is `Some(false)`, neither leaves the choice to the daemon.
+fn push_choice(push: bool, no_push: bool) -> Option<bool> {
+    match (push, no_push) {
+        (true, _) => Some(true),
+        (_, true) => Some(false),
+        _ => None,
     }
 }
 
@@ -86,7 +109,9 @@ pub(super) fn run(c: &Client, cmd: ReleaseCmd, json_out: bool) -> Result<()> {
             chain,
             version,
             resume,
-        } => c.start_release(&chain, &version, resume)?,
+            push,
+            no_push,
+        } => c.start_release(&chain, &version, resume, push_choice(push, no_push))?,
         ReleaseCmd::New {
             chain,
             version,
