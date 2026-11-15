@@ -194,7 +194,7 @@
           "config_flag": "--mcp-config"
         },
         "hooks": {
-          "enabled": false,
+          "enabled": true,
           "settings_flag": "--settings"
         },
         "permissions": {
