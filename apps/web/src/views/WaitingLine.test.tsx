@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { WaitingLine } from "./WaitingLine";
+import { EndedLine, WaitingLine } from "./WaitingLine";
 
 beforeAll(() => { vi.stubGlobal("window", { location: { search: "" } }); });
 
@@ -43,5 +43,56 @@ describe("the waiting line", () => {
 
   it("shows no progress line when the assistant has said none", () => {
     for (const minutes of [0, 2, 5]) expect(html(minutes)).not.toContain("chat-progress");
+  });
+});
+
+const STEP = "Reading apps/web/src/views/ChatPane.tsx";
+const stepped = (minutes: number, progress?: string, testId?: string) =>
+  renderToStaticMarkup(
+    <WaitingLine
+      project="DEMO" since={since} now={since + minutes * MIN + 5_000} dispatch={() => {}} step={STEP} testId={testId}
+      progress={progress === undefined ? undefined : { id: "p1", author: "progress", text: progress, at: since + 1 }}
+    />,
+  );
+/// What the live region says: the text of the element with role="status".
+const announced = (markup: string) => text(/<[^>]*role="status"[^>]*>(.*?)<\/span>/.exec(markup)?.[1] ?? "");
+
+describe("the waiting line with the daemon's step", () => {
+  it("shows the step beside the minutes", () => {
+    expect(text(stepped(0))).toBe(`The assistant is answering… · ${STEP}`);
+    expect(text(stepped(2))).toBe(`The assistant is answering… 2 min · ${STEP}`);
+    expect(stepped(2)).toMatch(new RegExp(`data-testid="chat-step"[^>]*title="${STEP}"`));
+  });
+
+  it("keeps the assistant's own progress line under it", () => {
+    const out = stepped(2, "Reading the code of the daemon, a few minutes");
+    expect(text(out)).toBe(`The assistant is answering… 2 min · ${STEP}Reading the code of the daemon, a few minutes`);
+    expect(out.indexOf("chat-progress")).toBeGreaterThan(out.indexOf("chat-step"));
+  });
+
+  it("past five minutes the step follows the line that points to the terminal", () => {
+    expect(text(stepped(6))).toBe(`The assistant is still working (6 min); its terminal is under Assistant → Terminal · ${STEP}`);
+  });
+
+  it("announces the count to a screen reader, never the step", () => {
+    const out = stepped(2);
+    expect(announced(out)).toBe("The assistant is answering… 2 min");
+    expect(announced(out)).not.toContain("Reading");
+    expect(out.match(/role="status"/g)).toHaveLength(1);
+  });
+
+  it("carries the box's own test ids in an ask box", () => {
+    const out = stepped(2, "Reading", "chain-ask");
+    for (const id of ["chain-ask-waiting", "chain-ask-waiting-text", "chain-ask-step", "chain-ask-progress"]) expect(out).toContain(`data-testid="${id}"`);
+    expect(out).not.toContain('data-testid="chat-');
+  });
+});
+
+describe("the line of a turn that ended without an answer", () => {
+  it("says the assistant stopped without answering and offers Nudge", () => {
+    const out = renderToStaticMarkup(<EndedLine onNudge={() => {}} />);
+    expect(text(out)).toBe("The assistant stopped without answering.Nudge sends your message to the assistant again.Nudge");
+    expect(out).toMatch(/data-testid="chat-ended"[^>]*role="status"|role="status"[^>]*data-testid="chat-ended"/);
+    expect(out).toMatch(/<button[^>]*data-testid="chat-nudge"[^>]*>Nudge<\/button>/);
   });
 });

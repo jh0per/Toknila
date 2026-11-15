@@ -15,7 +15,7 @@ import type { ImportEffect, ImportIntent, ImportResult } from "./imports";
 import type { PlanEffect, PlanIntent, PlanResult } from "./plan";
 import type { ConversationEffect, ConversationIntent, ConversationResult } from "./conversation";
 import type { QuickIntent } from "./quick";
-import type { PlannerEffect, PlannerIntent, PlannerResult } from "./planner";
+import type { PlannerEffect, PlannerIntent, PlannerPoll, PlannerResult } from "./planner";
 import type { ReleaseEffect, ReleaseIntent, ReleaseResult } from "./release";
 import type { RemovalEffect, RemovalIntent, RemovalResult } from "./removal";
 import type { RoadmapEffect, RoadmapIntent, RoadmapResult } from "./roadmap";
@@ -129,6 +129,7 @@ export type Effect =
   | SettingsEffect
   | PlanEffect
   | PlannerEffect
+  | PlannerPoll
   | ConversationEffect
   | ImportEffect
   | RemovalEffect

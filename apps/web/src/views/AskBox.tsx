@@ -57,10 +57,12 @@ export function PromptField({ value, onChange, onSubmit, placeholder, rows = 3, 
 
 /// The box that talks to a project's assistant (its planner): what is typed is kept in the store,
 /// Enter or the button starts the assistant if it is not running and sends it the text. While the
-/// text is on its way the box waits.
-export function AskBox({ project, state, dispatch, placeholder, button, label, rows, testId, compact = false, waiting = false, focus = false }: {
+/// text is on its way the box waits. A box outside the chat is `AskBoxOutside` (`AskSent.tsx`).
+export function AskBox({ project, state, dispatch, placeholder, button, label, rows, testId, compact = false, waiting = false, focus = false, place }: {
   /// The box takes the focus when it appears (a starter points at it).
   focus?: boolean;
+  /// Where the box is, outside the chat (`chain:<name>`, `roadmap`): its sends are remembered so.
+  place?: string;
   project: string;
   state: State;
   dispatch: (i: Intent) => void;
@@ -76,7 +78,7 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
 }) {
   const text = draftOf(state, project);
   const sending = state.planner.sending === project || waiting;
-  const send = () => dispatch({ type: "askPlanner", project });
+  const send = () => dispatch({ type: "askPlanner", project, from: place });
   const a = useAskAttach(state, dispatch, { project, where: project, prefix: project });
   const setText = (t: string) => dispatch({ type: "editPlannerDraft", where: project, text: t });
   const speech = useSpeech(text, setText, send);
@@ -105,3 +107,5 @@ export function AskBox({ project, state, dispatch, placeholder, button, label, r
     </DropFrame>
   );
 }
+
+export type AskBoxProps = Parameters<typeof AskBox>[0];

@@ -2,7 +2,7 @@ import type { Project } from "../api/types";
 import { ROADMAP_STARTER } from "../store/assistant";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
-import { AskBox } from "./AskBox";
+import { AskBoxOutside } from "./AskSent";
 import { FoundPlans } from "./FoundPlans";
 import { NavLink } from "./Link";
 
@@ -18,8 +18,8 @@ export function EmptyChains({ project, state, dispatch }: { project: Project; st
         Tell the assistant in a sentence or two. It reads {project.name || project.key}, drafts the plan as an epic of stories, and
         you start the stories when you are happy with it.
       </p>
-      <AskBox
-        project={project.key} state={state} dispatch={dispatch} testId="empty-ask" label="What do you want to build?"
+      <AskBoxOutside
+        project={project.key} state={state} dispatch={dispatch} testId="empty-ask" place="roadmap" label="What do you want to build?"
         placeholder="For example: a sign-in page with email and password" button="Plan it with the assistant" focus
       />
       <p className="secondary-links">
