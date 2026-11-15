@@ -4,6 +4,10 @@
 //! hook holds the agent's dialog until the person decides in the window. What each means is
 //! core's (`toknila_core::hook`).
 //!
+//! In a project's planner run (`TOKNILA_ROLE=planner`) a hook is a signal of the planner's turn
+//! and nothing else: it posts `POST /v1/planner/activity` within [`PLANNER_DEADLINE`], prints
+//! nothing, claims no instructions, holds no dialog and asks no pre-tool decision.
+//!
 //! A hook must never get in the agent's way: whatever goes wrong here is a line on stderr and
 //! exit code 0 (Claude Code treats exit code 2 as "block this action").
 
@@ -13,10 +17,56 @@ use std::time::Duration;
 use anyhow::{Result, bail};
 use toknila_api_types::{
     InstructionClaim, NewActivity, PermissionAsk, PermissionDecision, PermissionReply,
+    PlannerActivity,
 };
+use toknila_core::AgentRole;
 use toknila_core::hook::{self, HookInput};
+use toknila_core::planner::turn::Signal;
 
 use super::agent::AgentEnv;
+
+/// How long a planner's hook waits for the daemon: the assistant waits on its hooks, so a slow
+/// daemon costs it this and no more.
+const PLANNER_DEADLINE: Duration = Duration::from_secs(2);
+
+/// What a planner's hook `name` reports: its turn signal, with the tool's name and the summary of
+/// the call for a `PreToolUse`. `None` for a hook a planner does not subscribe to.
+fn planner_activity(name: &str, stdin: &str) -> Option<PlannerActivity> {
+    let signal = hook::planner_signal(name)?;
+    // A payload this version does not understand is still the signal.
+    let input: HookInput = serde_json::from_str(stdin).unwrap_or_default();
+    let step = signal == Signal::PreToolUse;
+    Some(PlannerActivity {
+        signal,
+        tool_name: input
+            .tool_name
+            .clone()
+            .filter(|n| step && !n.trim().is_empty()),
+        tool: step.then(|| hook::tool_text(&input)).flatten(),
+    })
+}
+
+/// A planner's hook: posts its signal on a thread of its own and waits [`PLANNER_DEADLINE`] at
+/// most (the thread ends with the process). A failure is one line on stderr; stdout stays empty.
+fn planner(name: &str, agent: AgentEnv, stdin: &str) {
+    let Some(activity) = planner_activity(name, stdin) else {
+        return;
+    };
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(agent.client.planner_activity(&activity));
+    });
+    let failure = match rx.recv_timeout(PLANNER_DEADLINE) {
+        Ok(Ok(())) => return,
+        Ok(Err(e)) => e.to_string(),
+        Err(_) => format!(
+            "the daemon did not answer within {} s",
+            PLANNER_DEADLINE.as_secs()
+        ),
+    };
+    let line = failure.split_whitespace().collect::<Vec<_>>().join(" ");
+    eprintln!("toknila hook {name}: {line}");
+}
 
 /// What a hook says, from its name and its stdin: the activity to record, with the session it fired
 /// in (for the usage), the tool summary of a `PreToolUse`, and the message of a permission prompt.
@@ -89,6 +139,10 @@ pub(super) fn run(name: &str) -> Result<()> {
     };
     let mut stdin = String::new();
     let _ = std::io::stdin().take(1 << 20).read_to_string(&mut stdin);
+    if agent.role == AgentRole::Planner {
+        planner(name, agent, &stdin);
+        return Ok(());
+    }
     let activity = signals(name, &stdin);
     if let Err(e) = agent.client.activity(&agent.ticket, &activity) {
         eprintln!("toknila hook {name}: {e}");
@@ -257,6 +311,47 @@ mod tests {
             pre_tool_output(&reply(PermissionDecision::Allow, None)),
             None
         );
+    }
+
+    #[test]
+    fn a_planners_pre_tool_use_is_its_step_with_the_tool_and_the_summary() {
+        let json = r#"{"hook_event_name":"PreToolUse","session_id":"s","tool_name":"Read","tool_input":{"file_path":"/r/src/main.rs"}}"#;
+        let a = planner_activity("pre_tool_use", json).expect("a planner signal");
+        assert_eq!(
+            serde_json::to_string(&a).expect("json"),
+            r#"{"signal":"pre_tool_use","tool_name":"Read","tool":"Read: /r/src/main.rs"}"#
+        );
+        // A payload it does not understand is still the step's signal.
+        let bare = planner_activity("pre_tool_use", "not json").expect("signal");
+        assert_eq!(
+            serde_json::to_string(&bare).expect("json"),
+            r#"{"signal":"pre_tool_use"}"#
+        );
+    }
+
+    #[test]
+    fn a_planners_prompt_and_stop_are_bare_signals_and_other_hooks_none() {
+        let start = planner_activity(
+            "user_prompt_submit",
+            r#"{"prompt":"plan","tool_name":"Read"}"#,
+        );
+        assert_eq!(
+            serde_json::to_string(&start).expect("json"),
+            r#"{"signal":"user_prompt_submit"}"#
+        );
+        let stop = planner_activity("stop", r#"{"stop_hook_active":false}"#);
+        assert_eq!(
+            serde_json::to_string(&stop).expect("json"),
+            r#"{"signal":"stop"}"#
+        );
+        for other in [
+            "permission_request",
+            "notification",
+            "post_tool_use",
+            "subagent_stop",
+        ] {
+            assert_eq!(planner_activity(other, "{}"), None, "{other}");
+        }
     }
 
     #[test]

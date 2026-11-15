@@ -585,6 +585,7 @@ mod tests {
             threads: &[],
             hand_in: None,
             checklist: &[],
+            review_commands: &[],
         }
     }
 

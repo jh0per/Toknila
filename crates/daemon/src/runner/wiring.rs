@@ -13,8 +13,7 @@ use serde_json::{Value, json};
 use toknila_api_types::runner::agent_env;
 use toknila_app::RunnerError;
 use toknila_app::runner::RunBrief;
-use toknila_core::hook::HOOKS;
-use toknila_core::{AgentProfile, AgentRole, RunId, TicketKey, instructions};
+use toknila_core::{AgentProfile, AgentRole, RunId, TicketKey, hook, instructions};
 
 /// Name of the MCP server in the agent's config.
 const SERVER: &str = "toknila";
@@ -110,11 +109,14 @@ const AUTO_MEMORY_OFF: (&str, &str) = ("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1");
 /// The settings file of every role: auto memory off (a ship is a worktree of the person's own
 /// repository, whose personal notes were written for another session), the tools of [`DENIED_TOOLS`] denied,
 /// Read, Grep, Glob and Bash denied on the person's private folders (`toknila_core::private`),
-/// the hooks and the status line of [`hook_settings`], and the profile's allow rules, when it has
-/// any for this project, are what the agent may do without asking.
-fn settings(bin: &Path, hooks: bool, rules: &[String], private: &[String]) -> Value {
+/// the hooks (and status line) of [`hook_settings`] when `hooks` names the run's role, and the
+/// profile's allow rules, when it has any for this project, are what the agent may do without
+/// asking.
+fn settings(bin: &Path, hooks: Option<AgentRole>, rules: &[String], private: &[String]) -> Value {
     let mut out = serde_json::Map::new();
-    if hooks && let Value::Object(h) = hook_settings(bin) {
+    if let Some(role) = hooks
+        && let Value::Object(h) = hook_settings(bin, role)
+    {
         out.extend(h);
     }
     out.insert("autoMemoryEnabled".to_owned(), json!(false));
@@ -131,13 +133,15 @@ fn settings(bin: &Path, hooks: bool, rules: &[String], private: &[String]) -> Va
     Value::Object(out)
 }
 
-/// The hook settings: every subscribed hook runs `toknila hook <name>`, and the status line runs
+/// The hook settings of a run in `role`: every hook the role subscribes to
+/// (`toknila_core::hook::subscribed`: the three turn signals of a planner, all of them for a
+/// card's agent) runs `toknila hook <name>`. A card's agent also gets the status line,
 /// `toknila statusline`, which passes on the plan limits Claude Code documents there (they feed
-/// the Usage page; the line itself stays empty). Forward slashes, so the command reads the same
-/// under a Unix shell and Git Bash on Windows.
-fn hook_settings(bin: &Path) -> Value {
+/// the Usage page; the line itself stays empty); a planner has no card to report them on.
+/// Forward slashes, so the command reads the same under a Unix shell and Git Bash on Windows.
+fn hook_settings(bin: &Path, role: AgentRole) -> Value {
     let program = bin.display().to_string().replace('\\', "/");
-    let hooks: serde_json::Map<String, Value> = HOOKS
+    let hooks: serde_json::Map<String, Value> = hook::subscribed(role)
         .iter()
         .map(|(claude, ours)| {
             let command = format!("\"{program}\" hook {ours}");
@@ -150,6 +154,9 @@ fn hook_settings(bin: &Path) -> Value {
             ((*claude).to_owned(), entry)
         })
         .collect();
+    if role == AgentRole::Planner {
+        return json!({ "hooks": hooks });
+    }
     let status_line = json!({ "type": "command", "command": format!("\"{program}\" statusline") });
     json!({ "hooks": hooks, "statusLine": status_line })
 }
@@ -187,9 +194,11 @@ fn brief_of_key<'a>(
     cx: &'a Context<'_>,
     key: &'a str,
     designs: &'a [instructions::BriefDesign],
+    review_commands: &'a [String],
 ) -> instructions::RunBrief<'a> {
     instructions::RunBrief {
         designs,
+        review_commands,
         key,
         title: &cx.brief.title,
         prompt: &cx.brief.prompt,
@@ -215,25 +224,8 @@ fn brief_of_key<'a>(
     }
 }
 
-/// The toolchains the repository in `dir` holds, by the first word of their commands: `cargo` for
-/// a `Cargo.toml`, `npm`, `pnpm` or `yarn` for a `package.json` (by its lock file).
-pub(super) fn repo_tools(dir: &Path) -> Vec<String> {
-    let mut tools = Vec::new();
-    if dir.join("Cargo.toml").exists() {
-        tools.push("cargo".to_owned());
-    }
-    if dir.join("package.json").exists() {
-        let manager = if dir.join("pnpm-lock.yaml").exists() {
-            "pnpm"
-        } else if dir.join("yarn.lock").exists() {
-            "yarn"
-        } else {
-            "npm"
-        };
-        tools.push(manager.to_owned());
-    }
-    tools
-}
+mod repo_tools;
+pub(super) use repo_tools::repo_tools;
 
 pub(super) use super::resumed::{briefed, resumed_argv};
 
@@ -259,15 +251,19 @@ pub(super) fn prepare_with(
     // The domains the project lets a reviewer read go into the reviewer's allow rules.
     let profile = &profile.with_reviewer_domains(&cx.brief.web_domains);
     // The tests and checks the hand-in names: the check command's toolchain and the repository's.
-    let profile =
-        &profile.with_reviewer_checks(cx.brief.check_command.as_deref(), &cx.brief.repo_tools);
+    let tool_names: Vec<String> = cx.brief.repo_tools.iter().map(|t| t.tool.clone()).collect();
+    let profile = &profile.with_reviewer_checks(cx.brief.check_command.as_deref(), &tool_names);
+    let review_commands = match cx.role {
+        AgentRole::Reviewer => toknila_core::reviewer_commands(&cx.brief.repo_tools),
+        _ => Vec::new(),
+    };
     // A planner run is labelled by its project's key; there is no card.
     let key = match cx.role {
         AgentRole::Planner => cx.key.project().to_string(),
         _ => cx.key.to_string(),
     };
     let (design_briefs, worker_files) = worker_designs(cx);
-    let brief = brief_of_key(cx, &key, &design_briefs);
+    let brief = brief_of_key(cx, &key, &design_briefs, &review_commands);
     let command = resumed_argv(profile, cx.brief)
         .unwrap_or_else(|| profile.argv(&instructions::kickoff(cx.role, &brief)));
     let mut wiring = Wiring {
@@ -346,7 +342,7 @@ pub(super) fn prepare_with(
             "settings.json",
             settings(
                 cx.bin,
-                profile.hooks.enabled,
+                profile.hooks.enabled.then_some(cx.role),
                 &rules,
                 &super::private::deny_rules(cx.dir, design_files),
             ),

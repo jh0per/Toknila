@@ -392,5 +392,9 @@ fn a_second_thread_of_a_kind_names_the_first_unless_it_was_withdrawn() {
         kind: ThreadKind::Design,
         number: 1,
     };
-    assert!(err.to_string().contains("post a version"), "{err}");
+    assert!(
+        err.to_string()
+            .contains("post your new version there with thread_version"),
+        "{err}"
+    );
 }
