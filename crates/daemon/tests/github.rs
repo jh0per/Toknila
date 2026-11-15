@@ -674,12 +674,12 @@ async fn a_pull_request_merged_on_github_by_a_person_retires_the_ship_like_any_m
     rig.nothing_left().await;
 }
 
-/// The cause of the owner's leftover ships: the removal runs once, after the commit that made the
-/// card Merged. When it fails (here git refuses a locked worktree) or is lost with the process,
-/// nothing queues it again: the card stays Merged with its record and worktree for good, the
-/// journal holding the only trace. Only a start of the daemon now retires them.
+/// What kept the owner's ships: the removal ran once, after the commit that made the card Merged.
+/// When that one run failed or was lost with the process (git refusing a locked worktree stands
+/// in for it here), nothing queued it again: the card stayed Merged with its record and worktree
+/// for good. The ticker now queues it again, so the ship goes within one round, no restart.
 #[tokio::test]
-async fn a_removal_that_failed_once_is_not_lost_the_next_start_retires_the_ship() {
+async fn a_removal_that_failed_once_is_retried_by_the_next_round_of_the_ticker() {
     let rig = Rig::new().await;
     let ship = rig.accepted().await;
     git(
@@ -695,18 +695,14 @@ async fn a_removal_that_failed_once_is_not_lost_the_next_start_retires_the_ship(
         dir && record,
         "the failed removal left the worktree and the record (the owner's state)"
     );
-    // A later look finds nothing to do: the effect is not queued again.
+    // While git still refuses, a round tries again and the ship stays.
     rig.tick().await;
-    assert!(rig.leftovers(&ship).await.2, "still there without a start");
+    assert!(rig.leftovers(&ship).await.2, "still there while locked");
 
     git(&rig.repo, &["worktree", "unlock", &ship.to_string_lossy()]);
-    let report = toknila_daemon::recovery::recover(&rig.store)
-        .await
-        .expect("start recovery");
-    rig.store.settled().await;
-    assert_eq!(report.ships_retired, ["DEMO-1"]);
+    rig.tick().await;
     rig.nothing_left().await;
-    assert!(!ship.exists(), "the worktree is gone after the start");
+    assert!(!ship.exists(), "the worktree is gone after the next round");
 }
 
 impl Rig {

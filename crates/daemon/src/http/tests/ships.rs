@@ -136,6 +136,28 @@ async fn a_project_without_a_repository_starts_tickets_without_ships() {
     assert!(!tmp.path().join("ships").exists());
 }
 
+/// The no-merge path: a project with no repository has nothing to merge, a person's Accept merges
+/// the card at once, and no worktree, branch or record exists afterwards.
+#[tokio::test]
+async fn a_person_accepting_in_a_project_with_no_merge_leaves_no_ship_behind() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let api = Api::with_yard(Some(Arc::new(GitShipyard::new(tmp.path().join("ships")))));
+    api.demo().await;
+    api.post("/v1/chains/demo/tickets", json!({ "title": "A" }))
+        .await;
+    api.post(
+        "/v1/tickets/DEMO-1/events",
+        json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
+    )
+    .await;
+    api.post("/v1/tickets/DEMO-1/actions/accept", json!({}))
+        .await;
+    let d = api.get("/v1/tickets/DEMO-1").await;
+    assert_eq!(d["ticket"]["status"], "merged");
+    assert_eq!(d["ship"], Value::Null, "no record");
+    assert!(!tmp.path().join("ships").exists(), "no worktree folder");
+}
+
 /// A git shipyard that notes which thread each call ran on.
 #[derive(Debug)]
 struct ThreadSpy {
