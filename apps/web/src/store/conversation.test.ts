@@ -139,7 +139,51 @@ describe("an open turn", () => {
   it("a message sent while the first is answered is queued; the first is not", () => {
     const m = [msg("a", 1), msg("b", 2, "progress"), msg("c", 3), msg("d", 4)];
     expect(openTurn(m)).toMatchObject({ asked: { id: "a" }, queued: ["c", "d"] });
-    expect(openTurn([msg("a", 1), msg("b", 2, "assistant")])).toEqual({ queued: [] });
+    expect(openTurn([msg("a", 1), msg("b", 2, "assistant")])).toEqual({ queued: [], stopped: [] });
+  });
+
+  it("two messages and one answer: the second becomes the asked one, counted from that answer", () => {
+    const m = [msg("a", 1), msg("b", 2), msg("c", 3, "assistant")];
+    expect(openTurn(m)).toMatchObject({ asked: { id: "b" }, queued: [], since: 3 });
+  });
+
+  it("three messages and two answers: the third is asked; with one answer the third stays queued", () => {
+    const m = [msg("a", 1), msg("b", 2), msg("c", 3), msg("d", 4, "assistant"), msg("e", 5, "assistant")];
+    expect(openTurn(m)).toMatchObject({ asked: { id: "c" }, queued: [], since: 5 });
+    expect(openTurn(m.slice(0, 4))).toMatchObject({ asked: { id: "b" }, queued: ["c"], since: 4 });
+  });
+
+  it("a progress line of the first turn is not the second turn's", () => {
+    const m = [msg("a", 1), msg("b", 2), msg("p", 3, "progress"), msg("c", 4, "assistant")];
+    expect(openTurn(m).progress).toBeUndefined();
+    expect(openTurn([...m, msg("q", 5, "progress")]).progress?.id).toBe("q");
+  });
+
+  it("a stopped planner leaves every unread message stopped; a running or unknown one none", () => {
+    const m = [msg("a", 1), msg("b", 2), msg("c", 3, "assistant"), msg("d", 4)];
+    const planner = (running: boolean, extra = {}) => ({ running, run: null, profile: "p", ...extra });
+    expect(openTurn(m, planner(false)).stopped).toEqual(["b", "d"]);
+    expect(openTurn(m, planner(true)).stopped).toEqual([]);
+    expect(openTurn(m).stopped).toEqual([]);
+  });
+
+  it("while the turn is on an answer of that turn does not yet answer its message", () => {
+    const m = [msg("a", 1), msg("b", 2), msg("c", 50, "assistant")];
+    const planner = { running: true, run: null, profile: "p", working: true, since: 40 };
+    expect(openTurn(m, planner)).toMatchObject({ asked: { id: "a" }, queued: ["b"] });
+    expect(openTurn(m, { ...planner, working: false, since: null })).toMatchObject({ asked: { id: "b" }, queued: [] });
+  });
+
+  it("Send again posts the same text, and the old message stops counting as unread", () => {
+    const old = msg("a", 1, "person", { text: "a shop\nwith a cart" });
+    const [s, fx] = reduce(start(), { type: "sendAgain", project: "DEMO", message: old });
+    expect(fx).toMatchObject([{ type: "plannerCall", call: "ask", text: "a shop with a cart", raw: "a shop\nwith a cart", wait: true }]);
+    expect(openTurn([old], undefined, s.planner.resent)).toEqual({ queued: [], stopped: [] });
+  });
+
+  it("a planner turn in the journal asks for the planner's state again", () => {
+    const [, fx] = reduce(start(), { type: "event", event: event(6, "planner", "turn", { project: "P1", working: false }) } as Msg);
+    expect(fx).toContainEqual({ type: "plannerCall", project: "DEMO", call: "load" });
   });
 
   it("counts whole minutes since the message, never below zero", () => {

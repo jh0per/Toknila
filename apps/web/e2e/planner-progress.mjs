@@ -46,6 +46,7 @@ try {
     "sleep", "7000",
     "post", "/planner/say", JSON.stringify({ text: "Two stories." }),
     "echo",
+    "post", "/planner/say", JSON.stringify({ text: "Tests too." }),
     "print", "planner done",
     "hold",
   ];
@@ -86,6 +87,7 @@ try {
   console.log("PASS a second message is kept and marked as waiting for the next turn");
 
   // 3. The answer replaces the waiting line; the progress line stays in the record, muted.
+  // (The second message is answered too, so the waiting line goes after the second answer.)
   await t("chat-waiting").waitFor({ state: "detached", timeout: 30_000 });
   await expectText(page.locator("[data-author=assistant]"), "Two stories.", "the answer is an assistant bubble");
   await expectText(t("chat-progress-line"), PROGRESS, "the progress line stays in the record as a muted line");

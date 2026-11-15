@@ -6,7 +6,8 @@ import { NavLink } from "./Link";
 /// The line under the chat while the assistant answers: how long it has taken, counting the
 /// minutes, and the last thing the assistant said it was doing. After five minutes it says the
 /// assistant is still working and links to the assistant's terminal, and stays so until the answer
-/// comes. `since` is when the person's message was sent (`now` when it is still on its way).
+/// comes. `since` is when this wait began: the send, or the answer to the message before it
+/// (`now` when the message is still on its way).
 export function WaitingLine({ project, since, now, progress, dispatch }: {
   project: string;
   since: number;
