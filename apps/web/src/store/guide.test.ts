@@ -49,6 +49,12 @@ describe("the text of the guide", () => {
     expect(sec?.text).toContain("on a phone");
   });
 
+  it("tells in the review section that Accept checks again when other stories merged first and that a project can name extra checks", () => {
+    const text = GUIDE_SECTIONS.find((s) => s.id === "review")?.text ?? "";
+    expect(text).toContain("checks again when other stories merged first");
+    expect(text).toContain("extra checks for parts of the code");
+  });
+
   it("has the nine sections in order, two to four sentences each, and never names the reference", () => {
     expect(GUIDE_SECTIONS.map((s) => s.id)).toEqual(["add-project", "designs", "plan", "start", "inbox", "review", "accept-or-return", "release", "where"]);
     for (const sec of GUIDE_SECTIONS) {

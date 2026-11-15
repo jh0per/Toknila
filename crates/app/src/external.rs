@@ -5,9 +5,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use toknila_core::instructions::{self, Route};
 use toknila_core::{
-    AgentRole, Comment, CommentId, MergeSpec, Run, Ship, ShipSpec, TicketId, TicketKey,
+    AgentRole, Comment, CommentId, ExtraCheck, MergeSpec, Run, Ship, ShipSpec, TicketId, TicketKey,
 };
 
 use crate::checks::{self, CheckError, CheckResult, CheckSpec, Checker};
@@ -72,6 +71,9 @@ pub enum ExternalEffect {
     RunCheck {
         ticket: TicketId,
         spec: Option<CheckSpec>,
+        /// The project's extra checks, in order; those whose paths match the ship's changes run
+        /// after the command.
+        extras: Vec<ExtraCheck>,
         sync: Option<SyncSpec>,
     },
 }
@@ -133,6 +135,8 @@ pub enum ExternalOutcome {
         ticket: TicketId,
         spec: Option<CheckSpec>,
         result: Result<CheckResult, CheckError>,
+        /// The main commit and ship HEAD it ran on, and the extra checks that ran.
+        ran: checks::Ran,
     },
     /// The daemon merged the base into the ship, making this commit (not unhanded-in work).
     Synced {
@@ -299,8 +303,14 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
                 type_line(host.runner, ticket, AgentRole::Reviewer, &message);
             }
             ExternalEffect::DeliverInstruction { .. } => {}
-            ExternalEffect::RunCheck { ticket, spec, sync } => {
-                checks::run_on_host(&host, ticket, spec, sync.as_ref(), &mut outcomes);
+            ExternalEffect::RunCheck {
+                ticket,
+                spec,
+                extras,
+                sync,
+            } => {
+                let plan = (spec, extras.as_slice());
+                checks::run_on_host(&host, ticket, plan, sync.as_ref(), &mut outcomes);
             }
         }
     }
@@ -318,35 +328,8 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
     outcomes
 }
 
-/// Pause between the typed text and Enter.
-const ENTER_DELAY: std::time::Duration = std::time::Duration::from_millis(200);
-
-/// Types the instruction into the agent's terminal when that is the way in. Returns whether it
-/// was typed. An agent that works with hooks takes it at its next Stop instead, and a ticket
-/// without a live runner keeps it pending; neither is an error.
-fn deliver(runner: &dyn Runner, ticket: TicketId, comment: &Comment) -> bool {
-    let Some(state) = runner.state(ticket) else {
-        return false;
-    };
-    if instructions::route(state.hooks, state.idle) != Route::Type {
-        return false;
-    }
-    type_line(
-        runner,
-        ticket,
-        AgentRole::Worker,
-        &instructions::typed(comment),
-    )
-}
-
-/// The text, then Enter as a separate keystroke: a terminal application takes a newline that
-/// arrives with the text as part of a paste. Returns whether both were written.
-fn type_line(runner: &dyn Runner, ticket: TicketId, role: AgentRole, line: &str) -> bool {
-    runner.write(ticket, role, line.as_bytes()).is_ok() && {
-        std::thread::sleep(ENTER_DELAY);
-        runner.write(ticket, role, b"\r").is_ok()
-    }
-}
+mod typing;
+use typing::{ENTER_DELAY, deliver, type_line};
 
 /// Records the outcomes: state and journal, with ticket changes going through the machine.
 pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>) -> AppResult<()> {
@@ -384,11 +367,13 @@ pub fn apply<U: UnitOfWork + ?Sized>(uow: &mut U, outcomes: Vec<ExternalOutcome>
                 ticket,
                 spec,
                 result,
+                ran,
             } => checks::finished(
                 uow,
                 ticket,
                 spec.as_ref().map(|s| s.command.as_str()),
                 result,
+                ran,
             )?,
         }
     }

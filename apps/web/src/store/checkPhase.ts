@@ -22,9 +22,10 @@ function queued(place: number): string {
   return place === 1 ? "queued, next in line" : `queued, #${place} in line`;
 }
 
-/// "Being checked: cargo xtask verify, 3 min".
+/// "Being checked: cargo xtask verify, 3 min"; "Being checked again: ..." when Accept asked for
+/// the check because main moved since the last one.
 export function checkText(review: ReviewView, now: number): string {
-  return `Being checked: ${checkWhat(review, now)}`;
+  return `Being checked${review.rechecking ? " again" : ""}: ${checkWhat(review, now)}`;
 }
 
 /// What a round of the daemon's own pass says in the round list: the check's verdict, or, for a

@@ -44,8 +44,27 @@ describe("the project form", () => {
       setup_command: "npm ci --prefix apps/web", bump_command: "npm version {version}",
       worker_model: "sonnet", reviewer_model: "", planner_model: "opus", review_mode: "human", max_review_rounds: 3, reviewer: "",
       merge_mode: "local", pr_title: "{key}: {title}", merge_method: "merge", no_checks_timeout_secs: 600,
-      command_policy: "ask", allowed_commands: [], reviewer_web_domains: [],
+      command_policy: "ask", allowed_commands: [], reviewer_web_domains: [], extra_checks: [],
     });
+  });
+
+  it("keeps the extra checks as rows: paths as one comma list, saved as lists, blank rows dropped", () => {
+    const set = {
+      ...project,
+      extra_checks: [{ paths: ["docs/**", "*.md"], command: "make docs" }],
+    } as Project;
+    const f = formOf(set);
+    expect(f.extra_checks).toEqual([{ paths: "docs/**, *.md", command: "make docs" }]);
+    expect(isDirty(f, set)).toBe(false);
+    expect(formOf(project).extra_checks).toEqual([]);
+    const edited = { ...f, extra_checks: [...f.extra_checks, { paths: " apps/web/** , ", command: " cargo xtask web " }, { paths: " ", command: "" }] };
+    expect(isDirty(edited, set)).toBe(true);
+    expect(patchOf(edited).extra_checks).toEqual([
+      { paths: ["docs/**", "*.md"], command: "make docs" },
+      { paths: ["apps/web/**"], command: "cargo xtask web" },
+    ]);
+    expect(patchOf({ ...f, extra_checks: [] }).extra_checks).toEqual([]);
+    expect(sectionOfField("extra_checks")).toBe("agents");
   });
 
   it("shows the no-checks timeout in minutes (default 10) and sends seconds", () => {

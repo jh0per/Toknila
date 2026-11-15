@@ -4,6 +4,7 @@ import { SIM, listProfile, profileLabel, simLast } from "../store/profiles";
 import { fieldError } from "../store/settings";
 import type { State } from "../store/state";
 import { Field } from "./Field";
+import { ExtraChecksField } from "./ExtraChecks";
 import { ModelsFields } from "./ProjectModels";
 import { CommandsFields, SetupCommandField } from "./ProjectCommands";
 
@@ -81,6 +82,7 @@ export function AgentsSection({ state, form, set }: FormProps) {
       <Field label="Test command (optional)" name="check_command" error={fieldError(s, "check_command")} hint="Agents run it before they hand in.">
         <input data-testid="check-command" value={form.check_command} spellCheck={false} onChange={(e) => set("check_command", e.target.value)} />
       </Field>
+      <ExtraChecksField form={form} set={set} error={fieldError(s, "extra_checks")} />
       <SetupCommandField state={state} form={form} set={set} />
       <Field label="Version bump command (optional)" name="bump_command" error={fieldError(s, "bump_command")} hint="A release runs it to put the new version into your files; {version} is the version. What it changes is committed.">
         <input data-testid="bump-command" value={form.bump_command} spellCheck={false} onChange={(e) => set("bump_command", e.target.value)} />

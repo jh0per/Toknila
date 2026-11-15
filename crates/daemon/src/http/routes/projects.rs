@@ -239,6 +239,13 @@ pub async fn patch_project(
             e,
         ));
     }
+    if let Some(Err(e)) = patch
+        .extra_checks
+        .clone()
+        .map(toknila_core::ExtraCheck::clean_all)
+    {
+        return Err(FormError::field("extra_checks", "extra_check_invalid", e));
+    }
     for (field, text) in [
         ("worker_model", &patch.worker_model),
         ("reviewer_model", &patch.reviewer_model),

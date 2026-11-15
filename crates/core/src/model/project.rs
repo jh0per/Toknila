@@ -143,6 +143,10 @@ pub struct Project {
     /// told to use it, and may run it without asking. `None`: the project names none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_command: Option<String>,
+    /// Commands that run after the check command, at every check turn, when the ship changed
+    /// files that match their paths; in this order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extra_checks: Vec<super::ExtraCheck>,
     /// The command the shipyard runs once in every new ship before the card's agent starts
     /// (`npm ci --prefix apps/web`). `None`: no setup.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -370,6 +374,7 @@ mod tests {
             max_review_rounds: Project::DEFAULT_REVIEW_ROUNDS,
             merge: Default::default(),
             check_command: None,
+            extra_checks: Vec::new(),
             setup_command: None,
             bump_command: None,
             worker_model: None,

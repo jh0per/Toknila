@@ -17,7 +17,7 @@
 //! with [`MergeError::BaseMoved`]; unblocking the card tries again. The ship's branch only has to
 //! exist: where the ship's worktree is, and what is in it, does not matter.
 
-use toknila_app::{MergeError, MergeOutcome, Merger, SyncOutcome, SyncSpec};
+use toknila_app::{MergeError, MergeOutcome, Merger, Seen, SyncOutcome, SyncSpec};
 use toknila_core::MergeSpec;
 use toknila_core::system::{MIN_GIT, git_version};
 
@@ -263,6 +263,10 @@ impl Merger for GitMerger {
 
     fn sync(&self, spec: &SyncSpec) -> Result<SyncOutcome, MergeError> {
         self.sync_ship(spec)
+    }
+
+    fn seen(&self, spec: &SyncSpec, since: Option<&str>) -> Option<Seen> {
+        self.seen_ship(spec, since)
     }
 }
 

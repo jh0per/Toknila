@@ -5,11 +5,19 @@
 import type { CommandPolicy, MergeMethod, MergeMode, PatchProject, Project, ReviewMode } from "../api/types";
 import type { ProjectSection } from "./route";
 
+/// One extra check as the person types it: the paths as one comma-separated text, and the command.
+export interface ExtraCheckRow {
+  paths: string;
+  command: string;
+}
+
 export interface ProjectForm {
   work_branch: string;
   default_profile: string;
   max_parallel: string;
   check_command: string;
+  /// Commands that run after the test command for the files a story changed, in this order.
+  extra_checks: ExtraCheckRow[];
   /// The command run once in every new workspace before the agent starts.
   setup_command: string;
   /// The command a release runs to bump the version (`{version}` is the version).
@@ -43,6 +51,7 @@ export function formOf(p: Project): ProjectForm {
     default_profile: p.default_profile,
     max_parallel: String(p.max_parallel),
     check_command: p.check_command ?? "",
+    extra_checks: (p.extra_checks ?? []).map((e) => ({ paths: e.paths.join(", "), command: e.command })),
     setup_command: p.setup_command ?? "",
     bump_command: p.bump_command ?? "",
     worker_model: p.worker_model ?? "",
@@ -68,7 +77,15 @@ export function tidy(f: ProjectForm): ProjectForm {
   const out = { ...f };
   for (const k of TEXT) out[k] = f[k].trim();
   out.reviewer_web_domains = domainsOf(f.reviewer_web_domains).join("\n");
+  out.extra_checks = f.extra_checks
+    .map((r) => ({ paths: pathsOf(r.paths).join(", "), command: r.command.trim() }))
+    .filter((r) => r.paths !== "" || r.command !== "");
   return out;
+}
+
+/// The globs of a comma-separated text of paths.
+export function pathsOf(text: string): string[] {
+  return text.split(",").map((p) => p.trim()).filter((p) => p !== "");
 }
 
 /// What Save sends: every field of the form (the daemon keeps the ones that did not change).
@@ -79,6 +96,7 @@ export function patchOf(f: ProjectForm): PatchProject {
     default_profile: t.default_profile,
     max_parallel: Number(t.max_parallel),
     check_command: t.check_command,
+    extra_checks: t.extra_checks.map((r) => ({ paths: pathsOf(r.paths), command: r.command })),
     setup_command: t.setup_command,
     bump_command: t.bump_command,
     worker_model: t.worker_model,
@@ -110,6 +128,7 @@ export function sectionOfField(field: string): ProjectSection {
     case "default_profile":
     case "max_parallel":
     case "check_command":
+    case "extra_checks":
     case "setup_command":
     case "bump_command":
     case "command_policy":

@@ -78,6 +78,7 @@ fn project_roundtrips() {
         command_policy: Default::default(),
         allowed_commands: Vec::new(),
         reviewer_web_domains: Vec::new(),
+        extra_checks: Vec::new(),
         archived: false,
         hidden: false,
         simulated: false,
