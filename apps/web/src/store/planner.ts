@@ -6,7 +6,7 @@
 // once, and while it is on and shown the window asks for the step (`syncPoll`, the timer in
 // `plannerEffects.ts`); what the chat and the boxes make of it is `plannerTurn.ts`.
 
-import type { PlannerState } from "../api/types";
+import type { ConversationMessage, PlannerState } from "../api/types";
 import { lineFor, panelChip } from "./assistant";
 import { type AskAttachMsg, clearAttached, placeOf, reduceAskAttach, withAttached } from "./askAttach";
 import type { Effect } from "./msg";
@@ -35,6 +35,9 @@ export interface PlannerSlice {
   seen: Record<string, boolean>;
   /// A link asked for the assistant's Terminal tab; the screen opens it and says it did.
   terminalWanted: boolean;
+  /// Ids of messages the person sent again after the assistant stopped: the copy is the one
+  /// awaited, so these no longer count as unread (this window's memory, not the daemon's).
+  resent: string[];
   /// How many chats and ask boxes of each project are on the screen: while one is and the
   /// project's turn is on, the window asks for the assistant's step.
   shown: Record<string, number>;
@@ -46,7 +49,7 @@ export interface PlannerSlice {
 }
 
 export const initialPlanner: PlannerSlice = {
-  byProject: {}, error: "", profile: DEFAULT_PLANNER_PROFILE, drafts: {}, sending: undefined, seen: {}, terminalWanted: false,
+  byProject: {}, error: "", profile: DEFAULT_PLANNER_PROFILE, drafts: {}, sending: undefined, seen: {}, terminalWanted: false, resent: [],
   shown: {}, polling: [], from: {},
 };
 
@@ -77,7 +80,10 @@ export type PlannerIntent =
   /// number, `text` the message), through the planner's input; nothing is stored twice.
   | { type: "nudgeCard"; project: string; key: string; thread: number; text: string }
   /// The same for a message of the chat that is about no card: its text is typed again.
-  | { type: "nudgeChat"; project: string; text: string };
+  | { type: "nudgeChat"; project: string; text: string }
+  /// A message the assistant stopped before reading: post the same text again (starting the
+  /// assistant) and stop counting the old one as unread.
+  | { type: "sendAgain"; project: string; message: ConversationMessage };
 
 /// What the daemon answered.
 export type PlannerResult =
@@ -162,6 +168,17 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
       ];
     case "nudgeChat":
       return [set({ error: "" }), [{ type: "plannerCall", project: msg.project, call: "nudge", text: oneLine(msg.text) }]];
+    case "sendAgain": {
+      const { message: m } = msg;
+      const about = m.about;
+      // The draft place is its own, so what the person is typing now is not wiped by the send.
+      const base = { type: "plannerCall", project: msg.project, profile: s.planner.profile, wait: !(plannerOf(s, msg.project)?.running ?? false), draft: `${msg.project}:again` } as const;
+      const call: PlannerEffect =
+        about?.kind === "card" ? { ...base, call: "discuss", card: about.key, text: m.text }
+        : about ? { ...base, call: "ask", text: lineFor(about, m.text), raw: m.text, about }
+        : { ...base, call: "ask", text: oneLine(m.text), raw: m.text };
+      return [set({ error: "", resent: [...s.planner.resent, m.id] }), [call]];
+    }
     case "plannerAsked":
       return [{ ...clearAttached(s, msg.draft ?? msg.project), planner: { ...s.planner, sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } } }, []];
     case "startPlanner":
@@ -193,14 +210,16 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
 }
 
 /// The assistant's turn started (`working`) or ended at `at`, as a `planner.turn` journal entry
-/// says. A project whose assistant the window has not loaded is asked for.
+/// says: the window follows it at once, and asks the daemon for the planner's state again (which
+/// answers close their messages depends on the turn, see `openTurn`).
 export function applyTurn(s: State, project: string, working: boolean, at: number): [State, Effect[]] {
   const was = plannerOf(s, project);
   if (!was) return [s, [loadPlanner(project)]];
   const now: PlannerState = working
     ? { ...was, running: true, working: true, since: was.working ? was.since : at }
     : { ...was, working: false, step: null, since: null };
-  return syncPoll({ ...s, planner: { ...s.planner, byProject: { ...s.planner.byProject, [project]: now } } });
+  const [next, poll] = syncPoll({ ...s, planner: { ...s.planner, byProject: { ...s.planner.byProject, [project]: now } } });
+  return [next, [loadPlanner(project), ...poll]];
 }
 
 /// Polls the step of each project whose turn is on while a chat or an ask box of it is on the

@@ -8,6 +8,9 @@
 //! - NOT_RUN e2e-web: no browser on this machine
 //!
 //! **Left:** what is left or not covered
+//!
+//! **For you:**
+//! - a step a person does by hand, in their words
 //! ```
 //!
 //! [`check`] refuses a summary without the checks section, under [`MIN_CHARS`], or with a PASS
@@ -26,7 +29,9 @@ pub const STATUSES: [&str; 4] = ["PASS", "FAIL", "NOT_RUN", "BLOCKED"];
 pub const TEMPLATE: &str = "**What changed:** a few lines
 **Checks:**
 - PASS|FAIL|NOT_RUN|BLOCKED <check>: <one line of evidence>
-**Left:** what is left or not covered";
+**Left:** what is left or not covered
+**For you:** (only when a person must do a step by hand)
+- one step per line, in the person's words: the screen and control, the device, what they should see";
 
 /// Why a summary is not a hand-in.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -76,6 +81,8 @@ pub struct Sections {
     pub checks: String,
     /// What is left or not covered.
     pub left: String,
+    /// The steps a person does by hand (the "For you" block), one per line, bullets removed.
+    pub person: Vec<String>,
     /// Whether the checks label was there.
     pub has_checks: bool,
 }
@@ -85,6 +92,7 @@ enum Block {
     Changed,
     Checks,
     Left,
+    Person,
 }
 
 /// `**Label:** rest` → (block, rest); labels are case-insensitive.
@@ -95,6 +103,7 @@ fn label_line(line: &str) -> Option<(Block, &str)> {
         "what changed" | "changed" => Block::Changed,
         "checks" => Block::Checks,
         "left" | "left / not covered" | "what is left" | "not covered" => Block::Left,
+        "for you" | "you" | "for the person" => Block::Person,
         _ => return None,
     };
     Some((block, rest.trim()))
@@ -117,6 +126,13 @@ pub fn sections(summary: &str) -> Sections {
             Block::Changed => &mut out.changed,
             Block::Checks => &mut out.checks,
             Block::Left => &mut out.left,
+            Block::Person => {
+                let step = text.trim().trim_start_matches(['-', '*']).trim();
+                if !step.is_empty() {
+                    out.person.push(step.to_owned());
+                }
+                continue;
+            }
         };
         if !text.trim().is_empty() {
             if !slot.is_empty() {
@@ -206,6 +222,7 @@ pub fn to_body(summary: &str) -> Option<CommentBody> {
         what: some(rest.join("\n")),
         how_to_verify: some(parts.checks),
         consequences: some(parts.left),
+        person: parts.person,
         ..CommentBody::default()
     })
 }
@@ -220,10 +237,18 @@ pub fn from_body(body: &CommentBody) -> Option<String> {
         changed.push_str(more.trim_end());
     }
     let left = body.consequences.as_deref().unwrap_or("").trim();
-    Some(format!(
+    let mut out = format!(
         "**What changed:** {changed}\n**Checks:**\n{}\n**Left:** {left}",
         checks.trim_end()
-    ))
+    );
+    if !body.person.is_empty() {
+        out.push_str("\n**For you:**");
+        for step in &body.person {
+            out.push_str("\n- ");
+            out.push_str(step);
+        }
+    }
+    Some(out)
 }
 
 #[cfg(test)]
@@ -295,6 +320,50 @@ mod tests {
         );
         assert_eq!(body.consequences.as_deref(), Some("nothing"));
         assert_eq!(to_body("just text"), None);
+    }
+
+    const WITH_PERSON: &str = "**What changed:** pads\n**Checks:**\n- PASS cargo xtask verify: test result: ok. 412 passed\n**Left:** nothing\n**For you:**\n- On the iPhone, open the editor and tap the 808 Long pad: you hear a long tone\n- Drag the 32-step bar: the steps follow";
+
+    #[test]
+    fn the_for_you_block_is_parsed_and_refuses_nothing_old() {
+        let parts = sections(WITH_PERSON);
+        assert_eq!(
+            parts.person,
+            vec![
+                "On the iPhone, open the editor and tap the 808 Long pad: you hear a long tone",
+                "Drag the 32-step bar: the steps follow"
+            ]
+        );
+        assert_eq!(parts.left, "nothing");
+        assert_eq!(check(WITH_PERSON), Ok(()));
+        assert!(sections(GOOD).person.is_empty());
+        assert_eq!(check(GOOD), Ok(()));
+        let old = "**What changed:** x\n**Checks:**\n- NOT_RUN iphone: not here\n**Left:** check the pads on an iPhone";
+        assert_eq!(check(old), Ok(()));
+        assert!(sections(old).person.is_empty());
+    }
+
+    #[test]
+    fn the_typed_steps_survive_a_stored_comment() {
+        let body = to_body(WITH_PERSON).expect("body");
+        assert_eq!(body.person.len(), 2);
+        let json = serde_json::to_string(&body).expect("json");
+        let back: CommentBody = serde_json::from_str(&json).expect("back");
+        assert_eq!(back.person, body.person);
+        let old: CommentBody = serde_json::from_str(r#"{"gist":"g"}"#).expect("old row");
+        assert!(old.person.is_empty());
+        assert!(
+            !serde_json::to_string(&old)
+                .expect("json")
+                .contains("person")
+        );
+        let text = from_body(&back).expect("hand-in");
+        assert_eq!(sections(&text), sections(WITH_PERSON));
+    }
+
+    #[test]
+    fn the_template_shows_the_for_you_block() {
+        assert!(TEMPLATE.contains("**For you:**"));
     }
 
     #[test]

@@ -120,16 +120,16 @@ try {
   await t("chain-ask-input").fill("and the tests");
   await t("chain-ask-send").click();
   await expectText(t("chain-ask-sent-text"), "and the tests", "the box shows the second message");
-  await panel("chat-stopped").waitFor({ timeout: 30_000 }).catch(() => { throw new Error("the chat never said the assistant stopped without answering"); });
-  if (Date.now() - sent >= NUDGE_AFTER_MS) throw new Error("the stopped line came only after the 90 seconds of a lost message");
-  await expectText(panel("chat-stopped"), "The assistant stopped without answering.", "the chat says the turn ended without an answer");
+  await panel("chat-ended").waitFor({ timeout: 30_000 }).catch(() => { throw new Error("the chat never said the assistant stopped without answering"); });
+  if (Date.now() - sent >= NUDGE_AFTER_MS) throw new Error("the line of the ended turn came only after the 90 seconds of a lost message");
+  await expectText(panel("chat-ended"), "The assistant stopped without answering.", "the chat says the turn ended without an answer");
   await panel("chat-nudge").waitFor({ timeout: 5_000 });
-  await expectText(t("chain-ask-stopped"), "The assistant stopped without answering.", "the box says it too");
+  await expectText(t("chain-ask-ended"), "The assistant stopped without answering.", "the box says it too");
   await t("chain-ask-nudge").waitFor({ timeout: 5_000 });
   await t("chain-ask-input").waitFor({ timeout: 5_000 });
   if ((await panel("chat-waiting").count()) !== 0) throw new Error("the chat still shows the waiting line after the turn ended");
   console.log(`PASS a turn that ended without an answer is said at once (${Math.round((Date.now() - sent) / 1000)} s), with Nudge`);
-  await shoot(page, "assistant-working-stopped");
+  await shoot(page, "assistant-working-ended");
 
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
   console.log("web assistant working: PASS");

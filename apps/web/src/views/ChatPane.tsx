@@ -9,9 +9,9 @@ import type { State } from "../store/state";
 import { titleByName } from "../store/title";
 import { AskBox } from "./AskBox";
 import { CardProposals } from "./CardProposals";
-import { ChatEntry } from "./ChatMessage";
+import { ChatEntry, stoppedIds } from "./ChatMessage";
 import { usePlannerShown, useTurn } from "./useTurn";
-import { StoppedLine, WaitingLine } from "./WaitingLine";
+import { EndedLine, WaitingLine } from "./WaitingLine";
 
 const placeholderFor = (c: Context | undefined): string =>
   c?.kind === "card" ? "Ask about this story or say what to change; Enter sends"
@@ -45,14 +45,19 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
   const messages = talk?.messages ?? [];
   const shown = state.assistant.only && context ? aboutThis(messages, context) : messages;
   const label = context && contextLabel(context, context.kind === "chain" ? titleByName(state, context.name) : undefined);
-  const running = plannerOf(state, key)?.running ?? false;
+  const planner = plannerOf(state, key);
+  const running = planner?.running ?? false;
+  const sending = state.planner.sending === key;
 
+  // Waiting, ended without an answer, or late: the one rule of `plannerTurn.ts`.
   const view = useTurn(state, key);
-  const { waiting, late, stopped, owed } = view;
-  // The waiting line counts minutes from the message that started the turn; a message sent while
-  // it is answered waits for the next turn.
-  const turn = openTurn(messages);
+  const { waiting, late, ended, owed } = view;
+  // A turn is a message and its answer: the waiting line is for the oldest message without one,
+  // counted from the answer before it; the messages behind it wait for their own turns.
+  const turn = openTurn(messages, planner, state.planner.resent);
   const queued = new Set(running ? turn.queued : []);
+  // Messages a stopped assistant will never read (not while one is being sent: it starts first).
+  const stopped = stoppedIds(turn, sending);
   // The latest progress line shows under the waiting line, so the log leaves it out meanwhile.
   const inLog = waiting && turn.progress ? shown.filter((m) => m.id !== turn.progress?.id) : shown;
   const nudge = () => owed && dispatch(nudgeFor(key, owed));
@@ -68,7 +73,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
     if (was.first !== undefined && first !== was.first && last === was.last) el.scrollTop += el.scrollHeight - was.height;
     else if (last !== was.last && (was.stick || was.last === undefined || messages[messages.length - 1]?.author === "person")) el.scrollTop = el.scrollHeight;
     seen.current = { first, last, height: el.scrollHeight, stick: was.stick };
-  }, [messages, waiting, late, stopped]);
+  }, [messages, waiting, late, ended]);
   const onScroll = () => {
     const el = log.current;
     if (!el) return;
@@ -102,11 +107,11 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
           </p>
         )}
         <ol className="chat-items" data-testid="chat-items">
-          {inLog.map((m) => <ChatEntry key={m.id} m={m} project={key} state={state} dispatch={dispatch} queued={queued.has(m.id)} />)}
+          {inLog.map((m) => <ChatEntry key={m.id} m={m} project={key} state={state} dispatch={dispatch} queued={queued.has(m.id)} stopped={stopped.has(m.id)} />)}
         </ol>
         {context?.kind === "card" && <CardProposals state={state} card={context.key} dispatch={dispatch} />}
         {waiting && <WaitingLine project={key} since={view.since} now={view.now} step={view.step} progress={turn.progress} dispatch={dispatch} />}
-        {stopped && <StoppedLine onNudge={nudge} />}
+        {ended && <EndedLine onNudge={nudge} />}
         {late && !turn.progress && (
           <div className="row chat-note" data-testid="chat-late">
             <p className="muted">Nudge sends your message to the assistant again.</p>

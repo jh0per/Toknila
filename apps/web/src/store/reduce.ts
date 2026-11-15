@@ -279,13 +279,13 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "updateWarned":
     case "updateFailed":
       return reduceUpdates(s, msg);
-    case "askPlanner": {
-      // A message sent from a box with the panel shut opens the panel (on the roadmap if need be).
+    case "askPlanner": { // from a box with the panel shut: opens the panel (on the roadmap if need be)
       const [shown, more, to] = showChat(s, ...reducePlanner(s, msg), msg.project);
       return to ? then(shown, more, to) : [shown, more];
     }
     case "nudgeCard":
     case "nudgeChat":
+    case "sendAgain":
     case "askStory":
     case "startPlanner":
     case "stopPlanner":

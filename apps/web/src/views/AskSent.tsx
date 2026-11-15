@@ -6,7 +6,7 @@ import { nudgeFor } from "../store/plannerTurn";
 import type { State } from "../store/state";
 import { AskBox, type AskBoxProps } from "./AskBox";
 import { usePlannerShown, useTurn } from "./useTurn";
-import { StoppedLine, WaitingLine } from "./WaitingLine";
+import { EndedLine, WaitingLine } from "./WaitingLine";
 
 /// An ask box outside the chat (an empty epic's, an empty roadmap's). After a send it shows what
 /// was sent from it and the chat's waiting line instead of the text box, until the assistant
@@ -27,7 +27,7 @@ export function AskBoxOutside(props: AskBoxProps & { place: string }) {
   if (shown && (sending || turn.waiting)) return shown;
   return (
     <>
-      {turn.stopped && shown}
+      {turn.ended && shown}
       <AskBox {...props} />
     </>
   );
@@ -55,8 +55,8 @@ export function AskSent({ project, text, turn, state, dispatch, testId }: {
     <div className="ask-sent" data-testid={`${testId}-sent`}>
       <p className="ask-sent-label">Sent to the assistant</p>
       <p className="ask-sent-text" data-testid={`${testId}-sent-text`}>{text}</p>
-      {turn.stopped && owed ? (
-        <StoppedLine testId={testId} onNudge={() => dispatch(nudgeFor(project, owed))}>{open}</StoppedLine>
+      {turn.ended && owed ? (
+        <EndedLine testId={testId} onNudge={() => dispatch(nudgeFor(project, owed))}>{open}</EndedLine>
       ) : (
         <>
           <WaitingLine

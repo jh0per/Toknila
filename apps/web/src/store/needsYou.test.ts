@@ -26,6 +26,19 @@ describe("needsYou", () => {
     ]);
   });
 
+  it("lists the typed For-you steps first, then the verdict's PERSON items, and not the free-text scan", () => {
+    const handIn = report({
+      person: ["On the iPhone, tap the 808 Long pad: you hear a long tone", "Drag the 32-step bar"],
+      how_to_verify: "- PERSON a line the typed block replaces",
+    });
+    const verdict = round(1, "agent", "PERSON 1. Check the pedals - on a playing loop [read]");
+    expect(needsYou(handIn, view([verdict]))).toEqual([
+      "On the iPhone, tap the 808 Long pad: you hear a long tone",
+      "Drag the 32-step bar",
+      "Check the pedals - on a playing loop",
+    ]);
+  });
+
   it("is empty when nothing is for a person, and ignores a PASS or FAIL line", () => {
     const handIn = report({ how_to_verify: "- PASS a: ok\n- FAIL b: no" });
     expect(needsYou(handIn, view([round(1, "agent", "FAIL 1. x - y [read]")]))).toEqual([]);

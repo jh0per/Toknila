@@ -4,7 +4,7 @@ import { ANSWER_WAIT_MS } from "./discussion";
 import type { Effect, Msg } from "./msg";
 import { STEP_POLL_MS, plannerOf } from "./planner";
 import { runPlannerPoll } from "./plannerEffects";
-import { turnEndedAt, turnView, workingTitle } from "./plannerTurn";
+import { lastTurnEnded, turnView, workingTitle } from "./plannerTurn";
 import { reduce } from "./reduce";
 import { type State, initialState } from "./state";
 
@@ -31,10 +31,13 @@ describe("the planner slice follows the assistant's turn", () => {
     // A poll's answer names the step.
     [s] = run(s, loaded({ working: true, step: "Reading README.md", since: 5_000 }));
     expect(plannerOf(s, "WEB")?.step).toBe("Reading README.md");
-    expect(turnEndedAt(s, "WEB")).toBeUndefined();
-    [s] = run(s, turn(12, false, 9_000));
+    expect(lastTurnEnded(s, "WEB")).toBeUndefined();
+    let fx: Effect[];
+    [s, fx] = run(s, turn(12, false, 9_000));
     expect(plannerOf(s, "WEB")).toMatchObject({ working: false, step: null, since: null, running: true });
-    expect(turnEndedAt(s, "WEB")).toBe(9_000);
+    expect(lastTurnEnded(s, "WEB")).toEqual({ start: 5_000, end: 9_000 });
+    // The daemon is asked as well: which answers close their messages depends on the turn.
+    expect(fx).toContainEqual({ type: "plannerCall", project: "WEB", call: "load" });
   });
 
   it("an entry for a project whose assistant the window has not loaded asks the daemon for it", () => {
@@ -136,27 +139,33 @@ describe("what the chat says about the turn", () => {
   it("a turn on past 90 seconds: the waiting line with the step, and no Nudge however long", () => {
     for (const after of [ANSWER_WAIT_MS + 1, 4 * MIN, 30 * MIN]) {
       const v = turnView([plan], planner({ working: true, step: "Reading README.md", since: SENT + 500 }), undefined, false, SENT + after);
-      expect(v).toMatchObject({ waiting: true, step: "Reading README.md", stopped: false, late: false, since: SENT });
+      expect(v).toMatchObject({ waiting: true, step: "Reading README.md", ended: false, late: false, since: SENT });
     }
   });
 
   it("a turn that ended without an answer says so at once and offers Nudge, with no waiting line", () => {
-    const v = turnView([plan], planner(), SENT + 3_000, false, SENT + 3_100);
-    expect(v).toMatchObject({ waiting: false, stopped: true, late: false });
+    const v = turnView([plan], planner(), { start: SENT + 400, end: SENT + 3_000 }, false, SENT + 3_100);
+    expect(v).toMatchObject({ waiting: false, ended: true, late: false });
     expect(v.owed?.id).toBe("m1");
   });
 
   it("a message no turn started for: the waiting line, and Nudge only after 90 seconds", () => {
     // A turn that ended before the message was sent is not its turn.
-    const before = turnView([plan], planner(), SENT - 5_000, false, SENT + ANSWER_WAIT_MS - 1);
-    expect(before).toMatchObject({ waiting: true, stopped: false, late: false });
-    const after = turnView([plan], planner(), SENT - 5_000, false, SENT + ANSWER_WAIT_MS);
-    expect(after).toMatchObject({ waiting: true, stopped: false, late: true });
+    const last = { start: SENT - 9_000, end: SENT - 5_000 };
+    const before = turnView([plan], planner(), last, false, SENT + ANSWER_WAIT_MS - 1);
+    expect(before).toMatchObject({ waiting: true, ended: false, late: false });
+    const after = turnView([plan], planner(), last, false, SENT + ANSWER_WAIT_MS);
+    expect(after).toMatchObject({ waiting: true, ended: false, late: true });
   });
 
-  it("an answered message: nothing waits, nothing stopped", () => {
+  it("a message sent while another turn was on: that turn ending is not its own, so it still waits", () => {
+    const v = turnView([plan], planner(), { start: SENT - 2_000, end: SENT + 3_000 }, false, SENT + 3_100);
+    expect(v).toMatchObject({ waiting: true, ended: false, late: false });
+  });
+
+  it("an answered message: nothing waits, nothing ended", () => {
     const answer: ConversationMessage = { id: "m2", author: "assistant", text: "Two stories.", at: SENT + 2_000 };
-    expect(turnView([plan, answer], planner(), SENT + 2_500, false, SENT + 3_000)).toMatchObject({ waiting: false, stopped: false, late: false });
+    expect(turnView([plan, answer], planner(), { start: SENT + 400, end: SENT + 2_500 }, false, SENT + 3_000)).toMatchObject({ waiting: false, ended: false, late: false });
   });
 
   it("a turn on with no message of the person's counts from the turn's start", () => {
@@ -166,10 +175,11 @@ describe("what the chat says about the turn", () => {
   });
 
   it("a message on its way waits, whatever the last turn did", () => {
-    expect(turnView([plan], planner(), SENT + 3_000, true, SENT + 3_100)).toMatchObject({ waiting: true, stopped: false, late: false });
+    expect(turnView([plan], planner(), { start: SENT + 400, end: SENT + 3_000 }, true, SENT + 3_100)).toMatchObject({ waiting: true, ended: false, late: false });
   });
 
-  it("an assistant that is not running neither waits nor stopped (the chat says it is not running)", () => {
-    expect(turnView([plan], planner({ running: false }), SENT + 3_000, false, SENT + 4 * MIN)).toMatchObject({ waiting: false, stopped: false, late: false });
+  it("an assistant that is not running neither waits nor ended (the chat says it is not running)", () => {
+    const v = turnView([plan], planner({ running: false }), { start: SENT + 400, end: SENT + 3_000 }, false, SENT + 4 * MIN);
+    expect(v).toMatchObject({ waiting: false, ended: false, late: false });
   });
 });

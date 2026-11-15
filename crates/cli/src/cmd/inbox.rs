@@ -34,6 +34,12 @@ fn lines(i: &InboxItem) -> String {
         if !checks.is_empty() {
             out.push_str(&format!("  checks: {checks}\n"));
         }
+        if !h.person.is_empty() {
+            out.push_str("  for you:\n");
+            for step in &h.person {
+                out.push_str(&format!("    - {step}\n"));
+            }
+        }
     } else if !i.text.is_empty() {
         out.push_str(&format!("  {}\n", i.text));
     }

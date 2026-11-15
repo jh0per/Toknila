@@ -82,11 +82,15 @@ The `finished` summary is the hand-in template. The daemon refuses a summary tha
 **Checks:**
 - PASS|FAIL|NOT_RUN|BLOCKED <check>: <one line of evidence>
 **Left:** what is left or not covered
+**For you:**
+- a step the person does by hand, in their words
 ```
+
+A check you cannot run yourself (a device you do not have, a window you cannot see, a sound) goes under "For you" as a step the person can follow, one per line: the screen and the control as the window shows them, the device if it is not this computer, and what they should see. No task ids, no file paths unless the person must open the file. It is never buried in Left and never a question in `ask_human` at the hand-in. Leave the block out when nothing is for the person.
 
 Before the hand-in, merge the project's work branch into the ship and resolve the conflicts, keeping every existing entry of a shared list. A Checks line quotes the gate's own result line word for word; the daemon refuses a PASS whose evidence is under 20 characters.
 
-A person sees the three blocks apart on the Review story, above Accept and Return. Do not run the checks again after handing in.
+A person sees the blocks apart on the Review story, above Accept and Return. Do not run the checks again after handing in.
 
 ## After a Return
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { talkOf, unanswered, wakeWhenLate } from "../store/conversation";
 import type { Intent } from "../store/msg";
 import { plannerOf } from "../store/planner";
-import { type TurnView, turnEndedAt, turnView } from "../store/plannerTurn";
+import { type TurnView, lastTurnEnded, turnView } from "../store/plannerTurn";
 import type { State } from "../store/state";
 
 /// How often the waiting line looks at the clock to count the minutes.
@@ -19,13 +19,13 @@ export function useTurn(state: State, project: string): TurnView & { now: number
     setNow(Date.now());
     return wakeWhenLate(messages, Date.now(), () => setNow(Date.now()));
   }, [owed?.id]);
-  const view = turnView(messages, plannerOf(state, project), turnEndedAt(state, project), state.planner.sending === project, now);
+  const view = turnView(messages, plannerOf(state, project), lastTurnEnded(state, project), state.planner.sending === project, now, state.planner.resent);
   useEffect(() => {
     if (!view.waiting) return;
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(id);
-  }, [view.waiting]);
+  }, [view.waiting, view.since]);
   return { ...view, now };
 }
 

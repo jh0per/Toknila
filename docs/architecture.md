@@ -858,10 +858,10 @@ the cards; the owner starts cards and accepts work.
   (`applyTurn` in `store/planner.ts`); while a turn is on and a chat or an ask box of that project
   is on the screen, the window asks `GET .../planner` every two seconds for the step and stops
   when the turn ends or nothing shows it (`syncPoll`, the timer in `store/plannerEffects.ts`).
-  One rule says what every place shows (`store/plannerTurn.ts`): a turn on is the chat's waiting
-  line with the step beside the minutes and no Nudge; a turn that ended after the person's last
-  message, which has no answer, is "stopped without answering" with Nudge at once; a message no
-  turn started for keeps the 90-second Nudge. The empty epic's and the empty roadmap's box show
+  One rule says what every place shows (`store/plannerTurn.ts`, over `openTurn`'s awaited
+  message): a turn on is the chat's waiting line with the step beside the minutes and no Nudge; a
+  turn that started after the awaited message was sent and ended without answering it is "stopped
+  without answering" with Nudge at once; a message no turn started for keeps the 90-second Nudge. The empty epic's and the empty roadmap's box show
   what was sent from them and the same line until the answer, the first story or epic, or the
   turn's end (`views/AskSent.tsx`), and the Assistant button and the sidebar's Assistant row
   pulse while the turn is on, their title saying the step.

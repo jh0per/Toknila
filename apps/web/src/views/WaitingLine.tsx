@@ -8,8 +8,9 @@ import { NavLink } from "./Link";
 /// minutes, what the assistant does now as the daemon says (`step`, beside the minutes), and the
 /// last thing the assistant said it was doing (under it). After five minutes it says the assistant
 /// is still working and links to the assistant's terminal, and stays so until the answer comes.
-/// `since` is when the person's message was sent (`now` when it is still on its way). Only the
-/// count is a live region: a new step is not announced. `testId` names an ask box's copy.
+/// `since` is when this wait began: the send, or the answer to the message before it (`now` when
+/// the message is still on its way). Only the count is a live region: a new step is not announced.
+/// `testId` names an ask box's copy.
 export function WaitingLine({ project, since, now, progress, step, dispatch, testId = "chat" }: {
   project: string;
   since: number;
@@ -47,13 +48,13 @@ export function WaitingLine({ project, since, now, progress, step, dispatch, tes
   );
 }
 
-/// The line of a turn that ended while the person's last message had no answer: said at once,
-/// with Nudge. `children` sit beside the button (an ask box's link to the chat).
-export function StoppedLine({ onNudge, testId = "chat", children }: { onNudge: () => void; testId?: string; children?: ReactNode }) {
+/// The line of a turn that ended without answering the awaited message: said at once, with Nudge.
+/// `children` sit beside the button (an ask box's link to the chat).
+export function EndedLine({ onNudge, testId = "chat", children }: { onNudge: () => void; testId?: string; children?: ReactNode }) {
   return (
-    <div className="chat-note chat-stopped" data-testid={`${testId}-stopped`} role="status">
+    <div className="chat-note chat-ended" data-testid={`${testId}-ended`} role="status">
       <p className="muted"><b>The assistant stopped without answering.</b></p>
-      <div className="row chat-stopped-row">
+      <div className="row chat-ended-row">
         <p className="muted">Nudge sends your message to the assistant again.</p>
         <button type="button" className="btn" data-testid={`${testId}-nudge`} onClick={onNudge}>Nudge</button>
         {children}

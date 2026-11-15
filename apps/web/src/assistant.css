@@ -102,8 +102,8 @@ button.inline-link { background: none; border: 0; padding: 0; font: inherit; cur
 .chat-waiting { margin: 0; }
 .chat-step { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 /* A turn that ended without an answer: the words, then the hint, Nudge (and a box's link to the chat). */
-.chat-stopped p { margin: 0; }
-.chat-stopped-row { justify-content: center; flex-wrap: wrap; gap: var(--sp2); margin-top: var(--sp1); }
+.chat-ended p { margin: 0; }
+.chat-ended-row { justify-content: center; flex-wrap: wrap; gap: var(--sp2); margin-top: var(--sp1); }
 /* The Assistant button pulses while the assistant's turn is on. */
 .btn > .dot.pulse { margin-right: var(--sp2); }
 /* An ask box outside the chat after a send: what was sent, the waiting line under it, a link to the chat. */
@@ -112,7 +112,7 @@ button.inline-link { background: none; border: 0; padding: 0; font: inherit; cur
 .ask-sent-text { margin: 0; padding: var(--sp2) var(--sp3); border-left: 3px solid var(--primary); border-radius: var(--shape-xs); background: var(--surface-container-high); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ask-sent-open { margin: 0; }
 .ask-sent .chat-note { text-align: start; }
-.ask-sent .chat-stopped-row { justify-content: flex-start; }
+.ask-sent .chat-ended-row { justify-content: flex-start; }
 .ask-sent + .ask { margin-top: var(--sp3); }
 .chat-queued { margin: var(--sp1) 0 0; font-size: var(--fs-label-m); line-height: var(--lh-label-m); }
 

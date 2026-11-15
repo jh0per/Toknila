@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { StoppedLine, WaitingLine } from "./WaitingLine";
+import { EndedLine, WaitingLine } from "./WaitingLine";
 
 beforeAll(() => { vi.stubGlobal("window", { location: { search: "" } }); });
 
@@ -90,9 +90,9 @@ describe("the waiting line with the daemon's step", () => {
 
 describe("the line of a turn that ended without an answer", () => {
   it("says the assistant stopped without answering and offers Nudge", () => {
-    const out = renderToStaticMarkup(<StoppedLine onNudge={() => {}} />);
+    const out = renderToStaticMarkup(<EndedLine onNudge={() => {}} />);
     expect(text(out)).toBe("The assistant stopped without answering.Nudge sends your message to the assistant again.Nudge");
-    expect(out).toMatch(/data-testid="chat-stopped"[^>]*role="status"|role="status"[^>]*data-testid="chat-stopped"/);
+    expect(out).toMatch(/data-testid="chat-ended"[^>]*role="status"|role="status"[^>]*data-testid="chat-ended"/);
     expect(out).toMatch(/<button[^>]*data-testid="chat-nudge"[^>]*>Nudge<\/button>/);
   });
 });

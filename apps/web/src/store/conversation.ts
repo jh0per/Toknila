@@ -3,7 +3,7 @@
 // (`conversation.message`, and a card discussion's `thread.message_posted`). Pure: the requests
 // are the effects in `conversationEffects.ts`.
 
-import type { ConversationAbout, ConversationMessage, ConversationPage, EventRecord } from "../api/types";
+import type { ConversationAbout, ConversationMessage, ConversationPage, EventRecord, PlannerState } from "../api/types";
 import { ANSWER_WAIT_MS } from "./discussion";
 import type { Effect } from "./msg";
 import type { Route } from "./route";
@@ -102,6 +102,7 @@ const reload = (s: State): Effect[] => Object.keys(s.conversation).map((project)
 export function conversationEvent(s: State, e: EventRecord, gap: boolean): [State, Effect[]] {
   const p = (e.payload ?? {}) as { project?: string; message?: ConversationMessage };
   const key = s.projects.find((x) => x.id === p.project)?.key;
+  // (A planner's turn is `assistantEvent`'s, in `plannerTurn.ts`: it follows the turn and reloads the planner.)
   if (gap) return [s, reload(s)];
   if (!key || !p.message) return [s, []];
   return reduceConversation(s, { type: "conversationMessage", project: key, message: p.message });
@@ -129,21 +130,42 @@ export interface OpenTurn {
   asked?: ConversationMessage;
   queued: string[];
   progress?: ConversationMessage;
+  /// When the asked message's wait began: its send, or the answer before it, whichever is later.
+  since?: number;
+  /// The unread messages (the asked one and the queued ones) of a planner that has stopped.
+  stopped: string[];
 }
 
-export function openTurn(messages: ConversationMessage[]): OpenTurn {
-  const people: ConversationMessage[] = [];
+/// The one place that decides which messages are answered. It uses these facts only:
+/// 1. the order of the record: the n-th answer of the assistant answers the n-th message of the
+///    person (the planner answers one message per turn, which `say` enforces);
+/// 2. `planner.working` and `planner.since` (TOKNILA-127), when the planner says its turn is on:
+///    an answer posted since that turn began does not answer its message yet, a message is
+///    answered only when the turn that followed it ended;
+/// 3. `planner.running`: a planner that stopped will read none of the messages still unread.
+/// Without a planner state (not loaded) only the first fact is used. `resent` are messages the
+/// person sent again after a stop: their copy is the one awaited, so they are left out.
+export function openTurn(messages: ConversationMessage[], planner?: PlannerState, resent: string[] = []): OpenTurn {
+  const unread: ConversationMessage[] = [];
+  let since: number | undefined;
   let progress: ConversationMessage | undefined;
-  for (const m of [...messages].reverse()) {
-    if (m.author === "assistant") break;
-    if (m.author === "person") people.push(m);
-    else if (m.author === "progress" && !progress) progress = m;
+  const turnOn = planner?.running && planner.working && planner.since != null ? planner.since : undefined;
+  for (const m of messages) {
+    if (m.author === "person") {
+      if (!resent.includes(m.id)) unread.push(m);
+    }
+    else if (m.author === "assistant") {
+      if (turnOn !== undefined && m.at >= turnOn) continue;
+      if (unread.shift()) since = m.at;
+    } else if (m.author === "progress") progress = m;
   }
-  const asked = people[people.length - 1];
-  if (!asked) return { queued: [] };
-  const queued = people.slice(0, -1).reverse().map((m) => m.id);
-  // A progress line from before the message that started this turn belongs to an older one.
-  return { asked, queued, progress: progress && order(asked, progress) < 0 ? progress : undefined };
+  const asked = unread[0];
+  if (!asked) return { queued: [], stopped: [] };
+  const from = Math.max(asked.at, since ?? asked.at);
+  // A progress line from before the wait began belongs to an older turn.
+  const mine = progress && progress.at >= from && order(asked, progress) < 0 ? progress : undefined;
+  const stopped = planner && !planner.running ? unread.map((m) => m.id) : [];
+  return { asked, queued: unread.slice(1).map((m) => m.id), progress: mine, since: from, stopped };
 }
 
 /// Whole minutes from `at` to `now`, never below zero.
@@ -154,6 +176,9 @@ export const STILL_WORKING_MIN = 5;
 
 /// What a queued message of the person says under it.
 export const QUEUED_NOTE = "sent, the assistant reads it after this answer";
+
+/// What a message says when the assistant stopped before reading it.
+export const STOPPED_NOTE = "the assistant stopped before reading this; send it again";
 
 /// Milliseconds until the unanswered message is overdue (0 when it is); undefined when nothing waits.
 export function msUntilOverdue(messages: ConversationMessage[], now: number): number | undefined {

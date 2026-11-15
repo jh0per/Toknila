@@ -66,13 +66,13 @@ describe("the chat's note about the turn", () => {
     const out = chat(world({ messages: [plan], planner: { working: true, step: STEP, since: SENT + 400 }, events: [turnEntry(1, true, SENT + 400)] }));
     expect(text(out)).toContain(`The assistant is answering… 2 min · ${STEP}`);
     expect(out).not.toContain("chat-nudge");
-    expect(out).not.toContain("chat-stopped");
+    expect(out).not.toContain("chat-ended");
   });
 
   it("a turn that ended without an answer: says so at once and offers Nudge", () => {
     clockAt(SENT + 3_000);
     const out = chat(world({ messages: [plan], events: [turnEntry(1, true, SENT + 400), turnEntry(2, false, SENT + 2_500)] }));
-    expect(text(out)).toContain("The assistant stopped without answering.");
+    expect(out).toMatch(/data-testid="chat-ended"[^>]*>[\s\S]*The assistant stopped without answering\./);
     expect(out).toMatch(/data-testid="chat-nudge"/);
     expect(out).not.toContain("chat-waiting");
   });
@@ -88,7 +88,7 @@ describe("the chat's note about the turn", () => {
     const late = chat(world({ messages: [plan], events }));
     expect(late).toContain("chat-waiting");
     expect(late).toMatch(/data-testid="chat-late"[\s\S]*data-testid="chat-nudge"/);
-    expect(late).not.toContain("chat-stopped");
+    expect(late).not.toContain("chat-ended");
   });
 });
 
@@ -138,7 +138,7 @@ describe("an empty epic's box after a send", () => {
     clockAt(SENT + 3_000);
     const out = box(world({ from: "chain:hide", messages: [plan], events: [turnEntry(1, true, SENT + 400), turnEntry(2, false, SENT + 2_500)] }));
     expect(out).toMatch(/data-testid="chain-ask-sent-text"[^>]*>plan</);
-    expect(text(out)).toContain("The assistant stopped without answering.");
+    expect(out).toMatch(/data-testid="chain-ask-ended"[^>]*>[\s\S]*The assistant stopped without answering\./);
     expect(out).toContain('data-testid="chain-ask-nudge"');
     expect(out).toContain('data-testid="chain-ask-open-chat"');
     expect(out).toContain('data-testid="chain-ask-input"');
