@@ -16,6 +16,7 @@ use crate::git::Git;
 mod base;
 mod inspect;
 mod planner;
+pub(crate) mod remote;
 mod retire;
 mod setup;
 mod strays;
