@@ -57,7 +57,7 @@ try {
   // A chain that waits for the person to start its cards, so a card stays editable.
   await page.goto(at("/projects/DEMO"));
   await t("empty-new-chain").click();
-  await t("chain-name").fill("plan");
+  await t("chain-title").fill("plan");
   await t("chain-autostart").uncheck();
   await t("create-chain").click();
   await expectPath("/projects/DEMO/chains/plan", "the chain opens");

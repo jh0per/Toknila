@@ -77,7 +77,7 @@ fn a_cut_release_keeps_its_version_and_a_bad_one_is_refused() {
 fn a_new_chain_with_a_version_is_made_with_its_end_release() {
     let mut mem = Mem::demo();
     let input = NewChain {
-        name: "epic".to_owned(),
+        name: Some("epic".to_owned()),
         title: None,
         goal: None,
         autostart: None,

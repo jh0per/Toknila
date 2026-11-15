@@ -4,7 +4,7 @@ import type { ConversationMessage } from "../api/types";
 import { readFileSync } from "node:fs";
 import { DEFAULT_WIDTH, MIN_WIDTH } from "../store/assistant";
 import { initialState } from "../store/state";
-import { ChatEntry } from "./ChatMessage";
+import { ChatEntry, stoppedIds } from "./ChatMessage";
 
 beforeAll(() => { vi.stubGlobal("window", { location: { search: "" } }); });
 
@@ -21,6 +21,46 @@ const state = initialState({ name: "project", project: "DEMO" } as never);
 const say = (author: "person" | "assistant" | "toknila", text: string): ConversationMessage =>
   ({ id: `m-${author}`, author, text, at: 1 }) as ConversationMessage;
 const html = (m: ConversationMessage) => renderToStaticMarkup(<ul><ChatEntry m={m} project="DEMO" state={state} dispatch={() => {}} /></ul>);
+
+/// The first element of a rendered tree (ChatEntry has no hooks, so it can be called) with `testid`.
+type Node = { props?: { [k: string]: unknown; children?: unknown } } | string | null | undefined | false | Node[];
+const find = (n: Node, testid: string): { props: { onClick?: () => void } } | undefined => {
+  if (Array.isArray(n)) { for (const c of n) { const f = find(c, testid); if (f) return f; } return undefined; }
+  if (!n || typeof n === "string" || !n.props) return undefined;
+  if (n.props["data-testid"] === testid) return n as { props: { onClick?: () => void } };
+  return find(n.props.children as Node, testid);
+};
+
+describe("a message the assistant stopped before reading", () => {
+  const m = say("person", "second");
+  it("says so and offers Send again, which dispatches sendAgain with the message", () => {
+    const out = html2(m, { stopped: true });
+    expect(out).toContain('data-testid="chat-stopped"');
+    expect(out).toContain("the assistant stopped before reading this; send it again");
+    expect(out).toContain('data-testid="chat-send-again"');
+    expect(out).not.toContain('data-testid="chat-queued"');
+    const sent: unknown[] = [];
+    const tree = ChatEntry({ m, project: "DEMO", state, dispatch: (i) => sent.push(i), stopped: true }) as unknown as Node;
+    find(tree, "chat-send-again")?.props.onClick?.();
+    expect(sent).toEqual([{ type: "sendAgain", project: "DEMO", message: m }]);
+  });
+
+  it("shows the queued note, not the stopped one, for a message that merely waits", () => {
+    const out = html2(m, { queued: true });
+    expect(out).toContain('data-testid="chat-queued"');
+    expect(out).not.toContain("chat-stopped");
+    expect(out).not.toContain("chat-send-again");
+  });
+
+  it("marks nothing stopped while a message is being sent", () => {
+    const turn = { queued: ["b"], stopped: ["a", "b"] };
+    expect([...stoppedIds(turn, false)]).toEqual(["a", "b"]);
+    expect([...stoppedIds(turn, true)]).toEqual([]);
+  });
+});
+
+const html2 = (m: ConversationMessage, p: { queued?: boolean; stopped?: boolean }) =>
+  renderToStaticMarkup(<ul><ChatEntry m={m} project="DEMO" state={state} dispatch={() => {}} {...p} /></ul>);
 
 describe("the chat's rows", () => {
   const sheet = assistantCss;

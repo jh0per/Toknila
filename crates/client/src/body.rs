@@ -36,6 +36,10 @@ pub(crate) fn bytes(resp: ureq::Response) -> std::io::Result<Vec<u8>> {
 
 /// Whether `e`, or an error it wraps, says the peer closed the connection: a reset, a broken
 /// pipe, an end of stream or the `EINVAL` of a socket option set on a closed socket.
+///
+/// This is the one place that decides "closed by the peer": the retry of an idempotent call and
+/// the wording of the error both ask it. It looks through every wrapper (an `io::Error` around
+/// another one, a `source` chain) instead of stopping at the first `io::Error` it meets.
 pub(crate) fn lost(e: &(dyn std::error::Error + 'static)) -> bool {
     let mut cur = Some(e);
     while let Some(err) = cur {
@@ -43,15 +47,24 @@ pub(crate) fn lost(e: &(dyn std::error::Error + 'static)) -> bool {
             use std::io::ErrorKind::{
                 BrokenPipe, ConnectionAborted, ConnectionReset, UnexpectedEof,
             };
-            return matches!(
+            if matches!(
                 io.kind(),
                 ConnectionReset | ConnectionAborted | BrokenPipe | UnexpectedEof
-            ) || is_invalid_argument(io);
+            ) || is_invalid_argument(io)
+            {
+                return true;
+            }
+            if io.get_ref().is_some_and(|inner| lost(inner)) {
+                return true;
+            }
         }
         cur = err.source();
     }
     false
 }
+
+/// What the person reads for a connection the daemon closed: the cause, never the OS text.
+pub(crate) const CLOSED: &str = "the daemon closed the connection before answering";
 
 /// Whether `e` is the `EINVAL` of a socket option set on a closed socket.
 fn is_invalid_argument(e: &std::io::Error) -> bool {

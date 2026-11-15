@@ -141,6 +141,10 @@ fn file_step(verb: &str, path: Option<&str>, root: Option<&Path>) -> String {
     let Some(path) = path.map(Path::new) else {
         return format!("{verb} a file");
     };
+    // The run's folder itself: its own name reads like a file in a person's project.
+    if verb == "Reading" && root.is_some_and(|r| r.components().eq(path.components())) {
+        return "Reading the repository".to_owned();
+    }
     let relative = |p: &Path| matches!(p.components().next(), Some(Component::Normal(_)));
     let inside = root
         .and_then(|r| path.strip_prefix(r).ok())
@@ -297,6 +301,39 @@ mod tests {
             None,
             "a turn that ended has no step"
         );
+    }
+
+    #[test]
+    fn a_read_of_the_runs_folder_itself_says_the_repository() {
+        for text in ["Read: /w/repo", "Read: /w/repo/"] {
+            assert_eq!(
+                tool("Read", Some(text)).as_deref(),
+                Some("Reading the repository"),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_read_of_a_folder_inside_keeps_its_relative_path() {
+        for (text, want) in [
+            ("Read: /w/repo/crates", "Reading crates"),
+            ("Read: /w/repo/crates/", "Reading crates"),
+            ("Read: /w/repo/crates/core/src", "Reading crates/core/src"),
+        ] {
+            assert_eq!(tool("Read", Some(text)).as_deref(), Some(want), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_read_of_a_folder_outside_keeps_its_name_only() {
+        for (text, want) in [
+            ("Read: /w/other", "Reading other"),
+            ("Read: /w/repository", "Reading repository"),
+            ("Read: /w", "Reading w"),
+        ] {
+            assert_eq!(tool("Read", Some(text)).as_deref(), Some(want), "{text}");
+        }
     }
 
     #[test]

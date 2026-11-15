@@ -3,7 +3,7 @@
 // diagram follows the journal like any other change; this slice keeps the Start and Stop state,
 // the refusal of the last command, and what is typed to the assistant before it is sent.
 
-import type { PlannerState } from "../api/types";
+import type { ConversationMessage, PlannerState } from "../api/types";
 import { lineFor, panelChip } from "./assistant";
 import { type AskAttachMsg, clearAttached, placeOf, reduceAskAttach, withAttached } from "./askAttach";
 import type { Effect } from "./msg";
@@ -32,10 +32,13 @@ export interface PlannerSlice {
   seen: Record<string, boolean>;
   /// A link asked for the assistant's Terminal tab; the screen opens it and says it did.
   terminalWanted: boolean;
+  /// Ids of messages the person sent again after the assistant stopped: the copy is the one
+  /// awaited, so these no longer count as unread (this window's memory, not the daemon's).
+  resent: string[];
 }
 
 export const initialPlanner: PlannerSlice = {
-  byProject: {}, error: "", profile: DEFAULT_PLANNER_PROFILE, drafts: {}, sending: undefined, seen: {}, terminalWanted: false,
+  byProject: {}, error: "", profile: DEFAULT_PLANNER_PROFILE, drafts: {}, sending: undefined, seen: {}, terminalWanted: false, resent: [],
 };
 
 /// What the person did.
@@ -59,7 +62,10 @@ export type PlannerIntent =
   /// number, `text` the message), through the planner's input; nothing is stored twice.
   | { type: "nudgeCard"; project: string; key: string; thread: number; text: string }
   /// The same for a message of the chat that is about no card: its text is typed again.
-  | { type: "nudgeChat"; project: string; text: string };
+  | { type: "nudgeChat"; project: string; text: string }
+  /// A message the assistant stopped before reading: post the same text again (starting the
+  /// assistant) and stop counting the old one as unread.
+  | { type: "sendAgain"; project: string; message: ConversationMessage };
 
 /// What the daemon answered.
 export type PlannerResult =
@@ -135,6 +141,17 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
       ];
     case "nudgeChat":
       return [set({ error: "" }), [{ type: "plannerCall", project: msg.project, call: "nudge", text: oneLine(msg.text) }]];
+    case "sendAgain": {
+      const { message: m } = msg;
+      const about = m.about;
+      // The draft place is its own, so what the person is typing now is not wiped by the send.
+      const base = { type: "plannerCall", project: msg.project, profile: s.planner.profile, wait: !(plannerOf(s, msg.project)?.running ?? false), draft: `${msg.project}:again` } as const;
+      const call: PlannerEffect =
+        about?.kind === "card" ? { ...base, call: "discuss", card: about.key, text: m.text }
+        : about ? { ...base, call: "ask", text: lineFor(about, m.text), raw: m.text, about }
+        : { ...base, call: "ask", text: oneLine(m.text), raw: m.text };
+      return [set({ error: "", resent: [...s.planner.resent, m.id] }), [call]];
+    }
     case "plannerAsked":
       return [{ ...clearAttached(s, msg.draft ?? msg.project), planner: { ...s.planner, sending: undefined, drafts: { ...s.planner.drafts, [msg.draft ?? msg.project]: "" } } }, []];
     case "startPlanner":

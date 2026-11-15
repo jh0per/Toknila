@@ -8015,6 +8015,13 @@
               "null"
             ]
           },
+          "person": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The steps a person does by hand (a hand-in's \"For you\" block), one per entry."
+          },
           "what": {
             "type": [
               "string",
@@ -8870,6 +8877,13 @@
             ],
             "description": "What is left or not covered."
           },
+          "person": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The steps a person does by hand: the \"For you\" block, or for a hand-in made before it\nthe lines that start with PERSON."
+          },
           "since_return": {
             "oneOf": [
               {
@@ -9499,9 +9513,6 @@
       "NewChain": {
         "type": "object",
         "description": "`POST /v1/projects/{project}/chains`.",
-        "required": [
-          "name"
-        ],
         "properties": {
           "autostart": {
             "type": [
@@ -9517,8 +9528,11 @@
             ]
           },
           "name": {
-            "type": "string",
-            "description": "The identifier of folders and branches."
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The identifier of folders and branches; none: the title's slug."
           },
           "review_mode": {
             "oneOf": [
