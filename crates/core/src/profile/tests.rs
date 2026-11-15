@@ -191,7 +191,10 @@ fn the_built_in_planner_reads_and_plans_and_nothing_else() {
         ["claude", "--permission-mode", "dontAsk", "{kickoff}"]
     );
     assert!(p.mcp.enabled, "the planner tools are the MCP server");
-    assert!(!p.hooks.enabled, "no card hooks for a planner");
+    assert!(
+        p.hooks.enabled,
+        "its hooks report its turn (the role picks which: hook::subscribed)"
+    );
     assert_eq!(p.hooks.settings_flag.as_deref(), Some("--settings"));
     let allow = p.permissions.rules(None);
     for want in ["Read", "Grep", "Glob", "Bash(git diff *)", "mcp__toknila"] {
