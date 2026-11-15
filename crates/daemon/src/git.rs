@@ -140,10 +140,15 @@ impl Git {
         if status.success() {
             Ok(text(&stdout))
         } else {
-            Err(GitError::Failed {
-                command,
-                detail: text(&stderr),
-            })
+            // What git printed on stdout (a `--porcelain` push names the refused ref there) follows
+            // its stderr.
+            let (err, out) = (text(&stderr), text(&stdout));
+            let detail = if out.is_empty() {
+                err
+            } else {
+                format!("{err}\n{out}")
+            };
+            Err(GitError::Failed { command, detail })
         }
     }
 
