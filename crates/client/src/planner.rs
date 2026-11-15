@@ -4,8 +4,8 @@
 use toknila_api_types::{
     CardEdit, ChainDetail, ConversationPage, DesignPin, EdgeInput, EditPlanChain, NewCard,
     NewMessage, NewPlanChain, NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain,
-    PlannerDesign, PlannerMove, PlannerOverview, PlannerPlan, PlannerState, Say, StartPlanner,
-    TerminalSize, ThreadDetail, TicketDetail,
+    PlannerActivity, PlannerDesign, PlannerMove, PlannerOverview, PlannerPlan, PlannerState, Say,
+    StartPlanner, TerminalSize, ThreadDetail, TicketDetail,
 };
 use toknila_core::RunId;
 use toknila_core::conversation::Message;
@@ -199,6 +199,11 @@ impl Client {
     /// `POST /planner/say`: the planner says something to the person.
     pub fn planner_say(&self, s: &Say) -> ClientResult<Message> {
         self.call("POST", "/planner/say", Some(s))
+    }
+
+    /// `POST /planner/activity`: the planner's process reports its turn (a hook fired).
+    pub fn planner_activity(&self, a: &PlannerActivity) -> ClientResult<()> {
+        self.call("POST", "/planner/activity", Some(a))
     }
 
     /// `GET /projects/{project}/conversation`: a page of the project's conversation with its

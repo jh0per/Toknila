@@ -831,8 +831,25 @@ the cards; the owner starts cards and accepts work.
   `add_card`, `edit_card`, `show_card`, `add_dependency`, `remove_dependency`, `move_card`,
   `open_thread`, `thread_message` and `thread_version` (`cmd/mcp_planner`), each a call to
   `/v1/planner/...` (`PLANNER_ROUTES`; `http/routes/planner.rs`) with the run's token. A planner
-  token reaches those eleven routes and no other (`403`); nothing in them starts, accepts or
-  merges.
+  token reaches those routes and its turn's (below) and no other (`403`); nothing in them starts,
+  accepts or merges.
+- **Turn and step.** A turn is on from the moment the planner takes a message until it stops; a
+  step is one line a person can read about what it does now ("Reading the plan", "Reading
+  apps/web/src/main.tsx", "Adding a story"). The planner's process reports them with its own
+  token: `POST /v1/planner/activity` (`http/routes/planner_activity.rs`, planner only, strict
+  body `{signal, tool_name?, tool?}`, `signal` one of the hook names `user_prompt_submit`,
+  `pre_tool_use`, `stop`). Core owns the words and the rule (`toknila_core::planner::turn`):
+  `step` turns a signal into the line (at most 120 characters; a path relative to the run's
+  folder, a file's name only outside it; never a command's text or a file's content; an unknown
+  tool is "Working"), and `Turn::after` says when a turn starts or ends. The daemon keeps each
+  live planner run's turn in memory beside the run (`runner::Turns`), never in the database, so a
+  run that ended, the next run and a daemon that starts have no turn on, and a signal of a run
+  that is not the live one changes nothing. `GET /v1/projects/{project}/planner` answers
+  `working`, `step` and `since`; a planner that is not running is never working. Only the turn's
+  start and its end are journaled (`planner` kind `turn`, `{"project","working"}`, through
+  `toknila_app::planner::turn`), two per message, so every open window learns of them from the
+  stream; a step is no journal entry (a turn makes dozens). Stopping the planner, or its run
+  ending (`runner::supervise`), ends a turn that was on and journals the end.
 - **Opening a card.** `show_card` (`POST /v1/planner/cards/{card}/show`,
   `toknila_app::planner::show_card`) changes nothing in the plan: it journals one `window`
   event, kind `show_card` (see `events.md`). The web app follows it in the reducer

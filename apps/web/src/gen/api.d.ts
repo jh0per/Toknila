@@ -258,6 +258,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planner/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What the planner does now: `user_prompt_submit` starts its turn, `pre_tool_use` names its
+         *     step, `stop` ends the turn. `GET /projects/{project}/planner` answers the turn.
+         */
+        post: operations["planner_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/cards/{card}": {
         parameters: {
             query?: never;
@@ -3532,6 +3552,21 @@ export interface components {
             pins?: components["schemas"]["DesignPin"][];
             project: components["schemas"]["Project"];
         };
+        /** @description `POST /v1/planner/activity`: what the planner's process reports about its turn, from a hook. */
+        PlannerActivity: {
+            /**
+             * @description The hook that fired: `user_prompt_submit` starts the turn, `pre_tool_use` names its step,
+             *     `stop` ends it.
+             */
+            signal: components["schemas"]["PlannerSignal"];
+            /**
+             * @description A `pre_tool_use`: the summary of the call (`Read: /repo/src/main.rs`), as
+             *     `toknila_core::hook::tool_text` writes it.
+             */
+            tool?: string | null;
+            /** @description A `pre_tool_use`: the tool about to run (`Read`, `mcp__toknila__add_card`). */
+            tool_name?: string | null;
+        };
         /** @description A design as the planner sees it: its metadata and where its file is on this machine. */
         PlannerDesign: {
             /** @description Why a link has no file yet, when known. */
@@ -3571,6 +3606,11 @@ export interface components {
             /** @description Oldest first. */
             designs: components["schemas"]["PlannerDesign"][];
         };
+        /**
+         * @description What the planner's process reports, named as its hook is (`tok hook <name>`).
+         * @enum {string}
+         */
+        PlannerSignal: "user_prompt_submit" | "pre_tool_use" | "stop";
         /** @description `GET /v1/projects/{project}/planner`: the project's planner. */
         PlannerState: {
             /** @description The profile it runs with (or, when it is not running, would start with). */
@@ -3578,6 +3618,11 @@ export interface components {
             run?: components["schemas"]["RunId"] | null;
             /** @description Its process is alive. */
             running: boolean;
+            since?: components["schemas"]["Timestamp"] | null;
+            /** @description One line about what it does now ("Reading the plan"); `null` outside a turn. */
+            step?: string | null;
+            /** @description Its turn is on: it took a message and has not stopped. Never true when it is not running. */
+            working?: boolean;
         };
         /** @description A place on a chain's canvas, in whole canvas pixels. */
         Pos: {
@@ -5381,6 +5426,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventRecord"][];
+                };
+            };
+        };
+    };
+    planner_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlannerActivity"];
+            };
+        };
+        responses: {
+            /** @description Recorded; a signal of a run that is not the project's live planner changes nothing */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
         };

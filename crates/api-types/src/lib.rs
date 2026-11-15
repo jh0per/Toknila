@@ -34,7 +34,7 @@ pub use designs::{
     PlannerPlan, RenameDesign,
 };
 pub use events::{ErrorBody, EventQuery, EventRecord, InstructionClaim, NewActivity};
-pub use planner::{PlannerState, StartPlanner};
+pub use planner::{PlannerActivity, PlannerState, StartPlanner};
 pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedChain};
 pub use profiles::ProfileList;
 pub use questions::{AnswerOutcome, NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
@@ -67,6 +67,7 @@ pub use toknila_app::wildcards::NewWildcard;
 pub use toknila_core::TicketPatch as PatchTicket;
 pub use toknila_core::agent::{AgentEvent, Proposal, ReleaseEvent};
 pub use toknila_core::design::pin::DesignPin;
+pub use toknila_core::planner::turn::Signal as PlannerSignal;
 pub use toknila_core::plans::{FoundPlan, PlanKind, PlanScan, WorkingCopyBehind};
 pub use toknila_core::removal::FolderFate;
 pub use toknila_core::usage::RunTime;

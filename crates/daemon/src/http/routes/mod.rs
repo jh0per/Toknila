@@ -10,6 +10,7 @@ pub mod events;
 pub mod inbox;
 pub mod pins;
 pub mod planner;
+pub mod planner_activity;
 pub mod planner_run;
 pub mod plans;
 pub mod profiles;

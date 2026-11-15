@@ -115,7 +115,7 @@ impl Rig {
             .with_runner(runners.clone())
             .with_shipyard(Arc::new(GitShipyard::new(tmp.path().join("ships"))))
             .with_merger(Arc::new(toknila_daemon::github::Mergers::new()));
-        supervise(store.clone(), ended);
+        supervise(store.clone(), runners.clone(), ended);
         let app = router(AppState {
             store: store.clone(),
             token: TOKEN.into(),

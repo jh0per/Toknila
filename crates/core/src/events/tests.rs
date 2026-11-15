@@ -482,3 +482,21 @@ fn a_conversation_message_is_an_event_of_the_project_pinned_on_the_wire() {
                              "text": "Done", "at": 9 } })
     );
 }
+
+#[test]
+fn a_planner_turn_is_an_event_of_the_project_pinned_on_the_wire() {
+    let project = "01JBQ7ZJ0000000000000000P1"
+        .parse::<ProjectId>()
+        .expect("id");
+    for working in [true, false] {
+        let e = DomainEvent::PlannerTurn { project, working };
+        assert_eq!(
+            (e.entity(), e.kind(), e.entity_id().as_str()),
+            ("planner", "turn", "01JBQ7ZJ0000000000000000P1")
+        );
+        assert_eq!(
+            payload(&e),
+            json!({ "project": "01JBQ7ZJ0000000000000000P1", "working": working })
+        );
+    }
+}

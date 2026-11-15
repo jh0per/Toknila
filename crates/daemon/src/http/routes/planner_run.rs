@@ -1,7 +1,7 @@
 //! `/projects/{project}/planner/...`: a person starts and stops the project's planner and uses its
 //! terminal. The live output is the WebSocket `/projects/{project}/planner/stream`
 //! (`crate::runner::planner_stream`). Every route here runs as a person; the planner's own routes
-//! are `/planner/...` (`planner.rs`).
+//! are `/planner/...` (`planner.rs`, `planner_activity.rs`).
 
 use crate::http::body::Json;
 use axum::body::Bytes;
@@ -17,6 +17,7 @@ use toknila_core::{Actor, AgentProfile, AgentRole, PlannerSpec, Project, planner
 use super::{ApiResult, scrollback_response};
 use crate::designs::Designs;
 use crate::http::error::ErrorBody;
+use crate::runner::end_planner_turn;
 use crate::server::AppState;
 use toknila_app::AppError;
 
@@ -30,9 +31,13 @@ async fn project_of(state: &AppState, reference: String) -> ApiResult<Project> {
 }
 
 fn state_of(state: &AppState, project: &Project) -> PlannerState {
-    let live = state
-        .runners
-        .live_run(rules::run_key(project.id), AgentRole::Planner);
+    let key = rules::run_key(project.id);
+    let live = state.runners.live_run(key, AgentRole::Planner);
+    // Only the live run has a turn: a planner that is not running is never working.
+    let turn = live
+        .as_ref()
+        .map(|r| state.runners.turns().of(key, r.id))
+        .unwrap_or_default();
     PlannerState {
         running: live.is_some(),
         profile: live.as_ref().map_or_else(
@@ -40,6 +45,9 @@ fn state_of(state: &AppState, project: &Project) -> PlannerState {
             |r| r.profile.clone(),
         ),
         run: live.map(|r| r.id),
+        working: turn.working,
+        step: turn.step,
+        since: turn.since,
     }
 }
 
@@ -135,6 +143,8 @@ pub async fn stop_planner(
     // Ending the process tree waits for a grace period; not on an async worker.
     let (runners, target) = (state.runners.clone(), p.clone());
     tokio::task::spawn_blocking(move || planner::stop(&*runners, Actor::Human, &target)).await??;
+    // A turn that was on ends with the run, and every open window learns of it.
+    end_planner_turn(&state.store, &state.runners, p.id, None, Actor::Human).await?;
     Ok(Json(state_of(&state, &p)))
 }
 

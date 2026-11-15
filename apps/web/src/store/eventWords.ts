@@ -119,6 +119,7 @@ const TABLE: Record<string, Words> = {
     const who = ({ person: "You", assistant: "The assistant", toknila: "Toknila" } as Record<string, string>)[str(p.message?.author)] ?? "Someone";
     return `${who} in the assistant's chat: ${str(p.message?.text)}`;
   },
+  "planner.turn": (p) => (p.working ? "The assistant took a message" : "The assistant finished"),
 };
 
 /// Every (entity, kind) the journal has words for.
