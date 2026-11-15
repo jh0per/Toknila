@@ -53,7 +53,10 @@ impl Rules {
     fn of_reviewer(check: &str) -> Rules {
         let mut rig = Rig::new();
         rig.brief.check_command = Some(check.to_owned());
-        rig.brief.repo_tools = vec!["cargo".to_owned()];
+        rig.brief.repo_tools = vec![toknila_core::RepoTool {
+            tool: "cargo".to_owned(),
+            dir: String::new(),
+        }];
         // A data home with entries beside the run's own folder, as a real one has.
         for d in ["db", "tokens", "logs", "runs/t2"] {
             std::fs::create_dir_all(rig.dir.path().join(d)).expect("mkdir");

@@ -39,6 +39,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         threads: &[],
         hand_in: None,
         checklist: &[],
+        review_commands: &[],
     }
 }
 
@@ -190,6 +191,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         threads: &[],
         hand_in: None,
         checklist: &[],
+        review_commands: &[],
     });
     assert!(!text.contains("## Acceptance"));
     assert!(text.contains("## Task\n\np\n"));
@@ -283,6 +285,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         threads: &[],
         hand_in: None,
         checklist: &[],
+        review_commands: &[],
     }
 }
 
@@ -321,6 +324,27 @@ fn the_worker_is_told_the_setup_command_ran_and_not_to_run_it_again() {
     let without = generate(&brief(None));
     assert!(!without.contains("Workspace setup"), "{without}");
     assert!(!kickoff(crate::AgentRole::Reviewer, &with).contains("already ran"));
+}
+
+#[test]
+fn the_reviewer_is_told_which_commands_it_may_run_and_from_where() {
+    let commands = vec![
+        "npm test --prefix apps/web".to_owned(),
+        "npm run --prefix apps/web <script>".to_owned(),
+    ];
+    let with = RunBrief {
+        review_commands: &commands,
+        ..brief(None)
+    };
+    let text = kickoff(crate::AgentRole::Reviewer, &with);
+    assert!(
+        text.contains("`npm run --prefix apps/web <script>`")
+            && text.contains("`npm test --prefix apps/web`"),
+        "{text}"
+    );
+    let plain = kickoff(crate::AgentRole::Reviewer, &brief(None));
+    assert!(!plain.contains("may run"), "{plain}");
+    assert!(!kickoff(crate::AgentRole::Worker, &with).contains("--prefix apps/web <script>"));
 }
 
 #[test]
