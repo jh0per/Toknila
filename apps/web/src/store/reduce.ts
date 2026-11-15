@@ -284,6 +284,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     }
     case "nudgeCard":
     case "nudgeChat":
+    case "sendAgain":
     case "askStory":
     case "startPlanner":
     case "stopPlanner":
@@ -360,7 +361,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq <= s.lastSeq) return [s, []];
   const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
   if (e.entity === "window") return applyWindow(next, e, e.seq !== s.lastSeq + 1);
-  if (e.entity === "conversation") return conversationEvent(next, e, e.seq !== s.lastSeq + 1);
+  if (e.entity === "conversation" || e.entity === "planner") return conversationEvent(next, e, e.seq !== s.lastSeq + 1);
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
   if (e.kind === "deleted" && (e.entity === "chain" || e.entity === "project")) {
     // A deleted project or chain is dropped; a page that showed it goes home.

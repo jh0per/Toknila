@@ -45,7 +45,8 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
   const messages = talk?.messages ?? [];
   const shown = state.assistant.only && context ? aboutThis(messages, context) : messages;
   const label = context && contextLabel(context, context.kind === "chain" ? titleByName(state, context.name) : undefined);
-  const running = plannerOf(state, key)?.running ?? false;
+  const planner = plannerOf(state, key);
+  const running = planner?.running ?? false;
   const sending = state.planner.sending === key;
 
   const [now, setNow] = useState(() => Date.now());
@@ -55,17 +56,19 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
     return wakeWhenLate(messages, Date.now(), () => setNow(Date.now()));
   }, [owed?.id]);
   const late = running && !sending && msUntilOverdue(messages, now) === 0;
-  const waiting = running && (sending || owed !== undefined);
-  // The waiting line counts minutes from the message that started the turn; a message sent while
-  // it is answered waits for the next turn.
-  const turn = openTurn(messages);
+  // A turn is a message and its answer: the waiting line is for the oldest message without one,
+  // counted from the answer before it; the messages behind it wait for their own turns.
+  const turn = openTurn(messages, planner, state.planner.resent);
+  const waiting = running && (sending || turn.asked !== undefined);
   useEffect(() => {
     if (!waiting) return;
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(id);
-  }, [waiting]);
+  }, [waiting, turn.asked?.id]);
   const queued = new Set(running ? turn.queued : []);
+  // Messages a stopped assistant will never read (not while one is being sent: it starts first).
+  const stopped = new Set(sending ? [] : turn.stopped);
   // The latest progress line shows under the waiting line, so the log leaves it out meanwhile.
   const inLog = waiting && turn.progress ? shown.filter((m) => m.id !== turn.progress?.id) : shown;
   const nudge = () => {
@@ -120,10 +123,10 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
           </p>
         )}
         <ol className="chat-items" data-testid="chat-items">
-          {inLog.map((m) => <ChatEntry key={m.id} m={m} project={key} state={state} dispatch={dispatch} queued={queued.has(m.id)} />)}
+          {inLog.map((m) => <ChatEntry key={m.id} m={m} project={key} state={state} dispatch={dispatch} queued={queued.has(m.id)} stopped={stopped.has(m.id)} />)}
         </ol>
         {context?.kind === "card" && <CardProposals state={state} card={context.key} dispatch={dispatch} />}
-        {waiting && <WaitingLine project={key} since={turn.asked?.at ?? now} now={now} progress={turn.progress} dispatch={dispatch} />}
+        {waiting && <WaitingLine project={key} since={turn.since ?? now} now={now} progress={turn.progress} dispatch={dispatch} />}
         {late && !turn.progress && (
           <div className="row chat-note" data-testid="chat-late">
             <p className="muted">Nudge sends your message to the assistant again.</p>
