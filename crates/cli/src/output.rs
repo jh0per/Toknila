@@ -310,6 +310,12 @@ pub fn ticket(d: &TicketDetail) {
                 c.body.gist,
                 author_word(c.author)
             );
+            if !c.body.person.is_empty() {
+                println!("    for you:");
+                for step in &c.body.person {
+                    println!("      - {step}");
+                }
+            }
         }
     }
 }

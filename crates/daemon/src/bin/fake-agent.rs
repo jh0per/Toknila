@@ -14,6 +14,12 @@
 //! - `patch <path> <json>`: the same with PATCH (the planner's `edit_card`).
 //! - `stop`: post the `hook:stop` activity, as an agent's Stop hook does when a turn ends (a
 //!   reviewer that ends a turn without a verdict).
+//! - `activity <signal>`: post a planner's turn signal to `/planner/activity`, as its hooks do, and
+//!   print `post=<status> <body>`. `user_prompt_submit` starts the turn and `stop` ends it;
+//!   `pre_tool_use` takes two more arguments, the tool's name and the summary of the call
+//!   (`activity pre_tool_use Read 'Read: src/main.rs'`), and names the step. A script of a turn:
+//!   `activity user_prompt_submit`, `activity pre_tool_use ...`, `post /planner/say <json>` (the
+//!   answer), `activity stop`.
 //! - `trust`: show a folder trust dialog whose options are not numbered, with "No" preselected, and
 //!   read one line of keys: a Down arrow before Enter prints `trust=yes`, anything else
 //!   `trust=no`.
@@ -192,6 +198,15 @@ fn main() {
                 "/tickets/{ticket}/activity",
                 r#"{"signal":"hook:stop"}"#,
             )),
+            "activity" => {
+                let signal = args.next().unwrap_or_default();
+                let mut body = serde_json::json!({ "signal": signal });
+                if signal == "pre_tool_use" {
+                    body["tool_name"] = args.next().unwrap_or_default().into();
+                    body["tool"] = args.next().unwrap_or_default().into();
+                }
+                say(&post("/planner/activity", &body.to_string()));
+            }
             "argv" => say(&format!(
                 "argv={}",
                 std::env::args().skip(1).collect::<Vec<_>>().join(" ")

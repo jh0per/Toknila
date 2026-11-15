@@ -13,8 +13,7 @@ use serde_json::{Value, json};
 use toknila_api_types::runner::agent_env;
 use toknila_app::RunnerError;
 use toknila_app::runner::RunBrief;
-use toknila_core::hook::HOOKS;
-use toknila_core::{AgentProfile, AgentRole, RunId, TicketKey, instructions};
+use toknila_core::{AgentProfile, AgentRole, RunId, TicketKey, hook, instructions};
 
 /// Name of the MCP server in the agent's config.
 const SERVER: &str = "toknila";
@@ -110,11 +109,14 @@ const AUTO_MEMORY_OFF: (&str, &str) = ("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1");
 /// The settings file of every role: auto memory off (a ship is a worktree of the person's own
 /// repository, whose personal notes were written for another session), the tools of [`DENIED_TOOLS`] denied,
 /// Read, Grep, Glob and Bash denied on the person's private folders (`toknila_core::private`),
-/// the hooks and the status line of [`hook_settings`], and the profile's allow rules, when it has
-/// any for this project, are what the agent may do without asking.
-fn settings(bin: &Path, hooks: bool, rules: &[String], private: &[String]) -> Value {
+/// the hooks (and status line) of [`hook_settings`] when `hooks` names the run's role, and the
+/// profile's allow rules, when it has any for this project, are what the agent may do without
+/// asking.
+fn settings(bin: &Path, hooks: Option<AgentRole>, rules: &[String], private: &[String]) -> Value {
     let mut out = serde_json::Map::new();
-    if hooks && let Value::Object(h) = hook_settings(bin) {
+    if let Some(role) = hooks
+        && let Value::Object(h) = hook_settings(bin, role)
+    {
         out.extend(h);
     }
     out.insert("autoMemoryEnabled".to_owned(), json!(false));
@@ -131,13 +133,15 @@ fn settings(bin: &Path, hooks: bool, rules: &[String], private: &[String]) -> Va
     Value::Object(out)
 }
 
-/// The hook settings: every subscribed hook runs `toknila hook <name>`, and the status line runs
+/// The hook settings of a run in `role`: every hook the role subscribes to
+/// (`toknila_core::hook::subscribed`: the three turn signals of a planner, all of them for a
+/// card's agent) runs `toknila hook <name>`. A card's agent also gets the status line,
 /// `toknila statusline`, which passes on the plan limits Claude Code documents there (they feed
-/// the Usage page; the line itself stays empty). Forward slashes, so the command reads the same
-/// under a Unix shell and Git Bash on Windows.
-fn hook_settings(bin: &Path) -> Value {
+/// the Usage page; the line itself stays empty); a planner has no card to report them on.
+/// Forward slashes, so the command reads the same under a Unix shell and Git Bash on Windows.
+fn hook_settings(bin: &Path, role: AgentRole) -> Value {
     let program = bin.display().to_string().replace('\\', "/");
-    let hooks: serde_json::Map<String, Value> = HOOKS
+    let hooks: serde_json::Map<String, Value> = hook::subscribed(role)
         .iter()
         .map(|(claude, ours)| {
             let command = format!("\"{program}\" hook {ours}");
@@ -150,6 +154,9 @@ fn hook_settings(bin: &Path) -> Value {
             ((*claude).to_owned(), entry)
         })
         .collect();
+    if role == AgentRole::Planner {
+        return json!({ "hooks": hooks });
+    }
     let status_line = json!({ "type": "command", "command": format!("\"{program}\" statusline") });
     json!({ "hooks": hooks, "statusLine": status_line })
 }
@@ -335,7 +342,7 @@ pub(super) fn prepare_with(
             "settings.json",
             settings(
                 cx.bin,
-                profile.hooks.enabled,
+                profile.hooks.enabled.then_some(cx.role),
                 &rules,
                 &super::private::deny_rules(cx.dir, design_files),
             ),

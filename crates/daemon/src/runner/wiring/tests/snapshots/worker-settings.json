@@ -1,0 +1,101 @@
+{
+  "autoMemoryEnabled": false,
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "command": "\"/opt/toknila/bin/toknila\" hook notification",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "command": "\"/opt/toknila/bin/toknila\" hook permission_request",
+            "timeout": 600,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "\"/opt/toknila/bin/toknila\" hook post_tool_use",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "\"/opt/toknila/bin/toknila\" hook pre_tool_use",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "\"/opt/toknila/bin/toknila\" hook stop",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "command": "\"/opt/toknila/bin/toknila\" hook subagent_stop",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "\"/opt/toknila/bin/toknila\" hook user_prompt_submit",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "mcp__toknila",
+      "Read(//w/ships/demo-1/**)"
+    ],
+    "deny": [
+      "Agent",
+      "Workflow",
+      "EnterWorktree",
+      "CronCreate",
+      "CronDelete",
+      "RemoteTrigger",
+      "<deny rules for the private folders of the home>"
+    ]
+  },
+  "statusLine": {
+    "command": "\"/opt/toknila/bin/toknila\" statusline",
+    "type": "command"
+  }
+}

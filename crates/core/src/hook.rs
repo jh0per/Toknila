@@ -9,13 +9,18 @@
 //! agent is about to ask the person and may answer for them; Toknila holds it until the person
 //! answers in the window.
 //!
+//! A project's planner is not a card's agent: it subscribes to [`PLANNER_HOOKS`] only, and each
+//! of them is a signal of its turn ([`planner_signal`]) and nothing more.
+//!
 //! Pure: the CLI reads the hook's JSON from stdin and the daemon records what comes of it.
 
 use serde::Deserialize;
 
-use crate::{TicketStatus, WaitingReason};
+use crate::planner::turn::Signal;
+use crate::{AgentRole, TicketStatus, WaitingReason};
 
-/// The hooks Toknila subscribes to: Claude Code's name, and the name `tok hook <name>` takes.
+/// The hooks Toknila knows and a card's agent subscribes to: Claude Code's name, and the name
+/// `tok hook <name>` takes.
 pub const HOOKS: [(&str, &str); 7] = [
     ("Notification", "notification"),
     ("Stop", "stop"),
@@ -25,6 +30,35 @@ pub const HOOKS: [(&str, &str); 7] = [
     ("PreToolUse", "pre_tool_use"),
     ("PermissionRequest", "permission_request"),
 ];
+
+/// The hooks a project's planner subscribes to: the signals of its turn and nothing else
+/// (`crate::planner::turn`). It holds no permission dialog and reads no notification: its own
+/// permission rules decide what it may do, and nothing is handed in or nudged.
+pub const PLANNER_HOOKS: [(&str, &str); 3] = [
+    ("UserPromptSubmit", "user_prompt_submit"),
+    ("PreToolUse", "pre_tool_use"),
+    ("Stop", "stop"),
+];
+
+/// The hooks an agent in `role` subscribes to: a planner's turn signals, every hook for a card's
+/// agent.
+pub fn subscribed(role: AgentRole) -> &'static [(&'static str, &'static str)] {
+    match role {
+        AgentRole::Planner => &PLANNER_HOOKS,
+        AgentRole::Worker | AgentRole::Reviewer | AgentRole::Release => &HOOKS,
+    }
+}
+
+/// The turn signal a planner's hook `name` (`tok hook <name>`) reports; `None` for a hook a
+/// planner does not subscribe to.
+pub fn planner_signal(name: &str) -> Option<Signal> {
+    match name {
+        "user_prompt_submit" => Some(Signal::UserPromptSubmit),
+        "pre_tool_use" => Some(Signal::PreToolUse),
+        "stop" => Some(Signal::Stop),
+        _ => None,
+    }
+}
 
 /// The timeout, in seconds, written into the settings of the permission hook: how long Claude
 /// Code lets it wait for the person.
@@ -545,5 +579,48 @@ mod tests {
         let huge = "y".repeat(DETAIL_MAX * 2);
         let detail = summary_and_detail(&huge).1.expect("detail");
         assert_eq!(detail.chars().count(), DETAIL_MAX);
+    }
+
+    #[test]
+    fn a_planner_subscribes_to_the_three_hooks_of_its_turn_and_a_card_to_all() {
+        assert_eq!(
+            PLANNER_HOOKS,
+            [
+                ("UserPromptSubmit", "user_prompt_submit"),
+                ("PreToolUse", "pre_tool_use"),
+                ("Stop", "stop"),
+            ]
+        );
+        // Each is one of the hooks Toknila knows, under the same names.
+        for hook in PLANNER_HOOKS {
+            assert!(HOOKS.contains(&hook), "{hook:?}");
+        }
+        assert_eq!(subscribed(AgentRole::Planner), PLANNER_HOOKS.as_slice());
+        for card in [AgentRole::Worker, AgentRole::Reviewer, AgentRole::Release] {
+            assert_eq!(subscribed(card), HOOKS.as_slice(), "{card:?}");
+        }
+    }
+
+    #[test]
+    fn each_planner_hook_is_its_turn_signal_and_no_other_hook_is_one() {
+        use crate::planner::turn::Signal;
+        assert_eq!(
+            planner_signal("user_prompt_submit"),
+            Some(Signal::UserPromptSubmit)
+        );
+        assert_eq!(planner_signal("pre_tool_use"), Some(Signal::PreToolUse));
+        assert_eq!(planner_signal("stop"), Some(Signal::Stop));
+        for (_, ours) in PLANNER_HOOKS {
+            assert!(planner_signal(ours).is_some(), "{ours}");
+        }
+        for other in [
+            "permission_request",
+            "notification",
+            "post_tool_use",
+            "subagent_stop",
+            "finished",
+        ] {
+            assert_eq!(planner_signal(other), None, "{other}");
+        }
     }
 }
