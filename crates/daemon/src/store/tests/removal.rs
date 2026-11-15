@@ -322,3 +322,32 @@ async fn a_deleted_project_takes_its_design_pins_and_their_journal_entries() {
     assert_eq!(count(&store, "design_pins").await, 0);
     assert_eq!(count(&store, "events").await, 0);
 }
+
+#[tokio::test]
+async fn a_deleted_project_takes_its_planners_turn_entries() {
+    let (_dir, store) = open_temp();
+    let (p, mut other) = (project(), project());
+    other.key = "KEPT".parse().expect("key");
+    let (id, kept) = (p.id, other.id);
+    store
+        .write(Actor::Human, NOW, move |tx| {
+            tx.repo().insert_project(&p)?;
+            tx.repo().insert_project(&other)?;
+            for (project, working) in [(id, true), (id, false), (kept, true)] {
+                tx.emit(&DomainEvent::PlannerTurn { project, working })?;
+            }
+            Ok::<_, StoreError>(())
+        })
+        .await
+        .expect("fill");
+    assert_eq!(count(&store, "events").await, 3);
+    store
+        .write(Actor::Human, NOW, move |tx| tx.repo().delete_project(id))
+        .await
+        .expect("delete");
+    assert_eq!(
+        count(&store, "events").await,
+        1,
+        "the other project's turn stays"
+    );
+}

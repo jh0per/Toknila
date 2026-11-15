@@ -944,6 +944,48 @@
         }
       }
     },
+    "/planner/activity": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "What the planner does now: `user_prompt_submit` starts its turn, `pre_tool_use` names its\nstep, `stop` ends the turn. `GET /projects/{project}/planner` answers the turn.",
+        "operationId": "planner_activity",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlannerActivity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded; a signal of a run that is not the project's live planner changes nothing"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/planner/cards/{card}": {
       "get": {
         "tags": [
@@ -10879,6 +10921,34 @@
           }
         }
       },
+      "PlannerActivity": {
+        "type": "object",
+        "description": "`POST /v1/planner/activity`: what the planner's process reports about its turn, from a hook.",
+        "required": [
+          "signal"
+        ],
+        "properties": {
+          "signal": {
+            "$ref": "#/components/schemas/PlannerSignal",
+            "description": "The hook that fired: `user_prompt_submit` starts the turn, `pre_tool_use` names its step,\n`stop` ends it."
+          },
+          "tool": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A `pre_tool_use`: the summary of the call (`Read: /repo/src/main.rs`), as\n`toknila_core::hook::tool_text` writes it."
+          },
+          "tool_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A `pre_tool_use`: the tool about to run (`Read`, `mcp__toknila__add_card`)."
+          }
+        },
+        "additionalProperties": false
+      },
       "PlannerDesign": {
         "type": "object",
         "description": "A design as the planner sees it: its metadata and where its file is on this machine.",
@@ -11004,6 +11074,15 @@
         ],
         "description": "Answer of `GET /v1/planner/plan`: the plan and the project's designs."
       },
+      "PlannerSignal": {
+        "type": "string",
+        "description": "What the planner's process reports, named as its hook is (`tok hook <name>`).",
+        "enum": [
+          "user_prompt_submit",
+          "pre_tool_use",
+          "stop"
+        ]
+      },
       "PlannerState": {
         "type": "object",
         "description": "`GET /v1/projects/{project}/planner`: the project's planner.",
@@ -11030,6 +11109,28 @@
           "running": {
             "type": "boolean",
             "description": "Its process is alive."
+          },
+          "since": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp",
+                "description": "When its turn started; `null` outside a turn."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "step": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One line about what it does now (\"Reading the plan\"); `null` outside a turn."
+          },
+          "working": {
+            "type": "boolean",
+            "description": "Its turn is on: it took a message and has not stopped. Never true when it is not running."
           }
         }
       },
