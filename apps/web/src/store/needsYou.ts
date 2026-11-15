@@ -18,6 +18,9 @@ const PERSON_LINE = /^[-*]?\s*PERSON\b[\s:.\-–—]*(.+)$/;
 function handInItems(report: Comment | undefined): string[] {
   const b = report?.body;
   if (!b) return [];
+  // The typed For-you block first; the PERSON-line scan is the fallback for older hand-ins.
+  const typed = (b.person ?? []).map((s) => s.trim()).filter(Boolean);
+  if (typed.length > 0) return typed;
   const text = [b.gist, b.what, b.how_to_verify, b.consequences].filter(Boolean).join("\n");
   const items: string[] = [];
   for (const line of text.split("\n")) {
