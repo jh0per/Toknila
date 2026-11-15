@@ -674,6 +674,41 @@ async fn a_pull_request_merged_on_github_by_a_person_retires_the_ship_like_any_m
     rig.nothing_left().await;
 }
 
+/// The cause of the owner's leftover ships: the removal runs once, after the commit that made the
+/// card Merged. When it fails (here git refuses a locked worktree) or is lost with the process,
+/// nothing queues it again: the card stays Merged with its record and worktree for good, the
+/// journal holding the only trace. Only a start of the daemon now retires them.
+#[tokio::test]
+async fn a_removal_that_failed_once_is_not_lost_the_next_start_retires_the_ship() {
+    let rig = Rig::new().await;
+    let ship = rig.accepted().await;
+    git(
+        &rig.repo,
+        &["worktree", "lock", &ship.to_string_lossy(), "--reason", "t"],
+    );
+    rig.tick().await;
+    rig.gh_edit(|s| s["prs"][0]["state"] = json!("MERGED"));
+    rig.tick().await;
+    assert_eq!(rig.status().await, "merged");
+    let (dir, _listed, record, _) = rig.leftovers(&ship).await;
+    assert!(
+        dir && record,
+        "the failed removal left the worktree and the record (the owner's state)"
+    );
+    // A later look finds nothing to do: the effect is not queued again.
+    rig.tick().await;
+    assert!(rig.leftovers(&ship).await.2, "still there without a start");
+
+    git(&rig.repo, &["worktree", "unlock", &ship.to_string_lossy()]);
+    let report = toknila_daemon::recovery::recover(&rig.store)
+        .await
+        .expect("start recovery");
+    rig.store.settled().await;
+    assert_eq!(report.ships_retired, ["DEMO-1"]);
+    rig.nothing_left().await;
+    assert!(!ship.exists(), "the worktree is gone after the start");
+}
+
 impl Rig {
     /// The merged card left no worktree and no record; its branch is gone, or kept with a line
     /// on the card that says why.

@@ -117,3 +117,65 @@ mod tests {
         assert_eq!(unknown_folders(root, &records, &live), vec![stray]);
     }
 }
+
+#[cfg(test)]
+mod log_tests {
+    use std::io::Write;
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+
+    /// A log writer that keeps what is written.
+    #[derive(Clone)]
+    struct Sink(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for Sink {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().expect("lock").extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn start_logs_each_retired_ship_and_each_unknown_folder_once_and_deletes_nothing() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let root = tmp.path().join("ships");
+        let stray = root.join("demo/auth/demo-9-stray");
+        let planner = root.join("demo/_planner");
+        for d in [&stray, &planner] {
+            std::fs::create_dir_all(d).expect("mkdir");
+        }
+        std::fs::write(stray.join("keep.txt"), "mine").expect("file");
+        let store = Store::open(&tmp.path().join("t.db")).expect("store");
+        let buf = Arc::new(Mutex::new(Vec::new()));
+        let sink = buf.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || Sink(sink.clone()))
+            .with_ansi(false)
+            .finish();
+        let guard = tracing::subscriber::set_default(subscriber);
+        let retired = vec!["DEMO-1".to_owned(), "DEMO-2".to_owned()];
+        log_ships(&store, &root, &retired).await;
+        drop(guard);
+        let log = String::from_utf8(buf.lock().expect("lock").clone()).expect("utf8");
+        for key in ["DEMO-1", "DEMO-2"] {
+            let n = log.lines().filter(|l| l.contains(key)).count();
+            assert_eq!(n, 1, "{key} is logged once: {log}");
+        }
+        let stray_name = stray.display().to_string();
+        let n = log.lines().filter(|l| l.contains(&stray_name)).count();
+        assert_eq!(n, 1, "the unknown folder is listed once: {log}");
+        assert!(
+            !log.contains("_planner"),
+            "the planner copy is no leftover: {log}"
+        );
+        assert!(
+            stray.join("keep.txt").is_file(),
+            "the folder is never deleted"
+        );
+        assert!(planner.is_dir());
+    }
+}
