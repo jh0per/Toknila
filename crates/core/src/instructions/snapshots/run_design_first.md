@@ -58,7 +58,7 @@ Other agents and the person work on this machine at the same time.
 - Before you propose a fix or a wildcard story for a failing test, run it alone once. A test that passes alone is a load problem: report it in the hand-in, do not fix it.
 - Never edit a generated file by hand (`apps/web/src/gen/api.d.ts`, `openapi.json`): run `npm run gen` and let `gen:check` prove it.
 - Stop only processes you started, by pid. Never stop processes by name or pattern (`pkill -f`, `killall`): that has killed other agents' work.
-- Do not install browsers, system packages or tools, and do not download anything, without asking with `ask_human`; use what the repository's docs name.
+- Do not install browsers, system packages or tools, and do not download anything, without asking with `ask_human`; use what the repository's docs name. Never run `npx playwright install` yourself or with another Playwright version: it removes the browsers other versions need; `cargo xtask e2e-web` installs what it needs.
 - Run the project's check command exactly as given. When it fails, fix the cause or report it; do not work around the command. When it fails about the environment (command not found, exit 127, a tool refused), say so in the hand-in and stop: do not fix the environment, do not add an empty commit. Run it once, not in a loop: only one check runs on this machine at a time, and the daemon runs it again on your hand-in.
 - Clean up what you started: test daemons and servers, temporary folders, placeholder files.
 

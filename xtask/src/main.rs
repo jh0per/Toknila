@@ -8,7 +8,8 @@
 //! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
 //!   Runs every `apps/web/e2e/*.mjs` spec, rebuilds the bundle when it is stale, and fails on
 //!   a daemon or a fake agent of its own run that is still alive afterwards (see [`leaks`]).
-//!   With `CI` set it first installs Chromium; locally it uses an installed one.
+//!   With `CI` set it first installs Chromium; locally it installs it only when Playwright's
+//!   copy is missing (see [`browser`]), and not at all when `PW_CHROMIUM` names a browser.
 //! - `guide-shots`: retake the pictures of the Guide page from the real window (see [`shots`]).
 //! - `dist <target>`: release archive for one target triple in `dist/` (web page embedded).
 //! - `app [--target <triple>]`: the macOS `Toknila.app`, `.dmg` and the signed update archive
@@ -22,6 +23,7 @@ use std::process::{Command, ExitCode};
 use std::time::Duration;
 
 mod app;
+mod browser;
 mod bump;
 mod css_guard;
 mod e2e;
@@ -146,11 +148,10 @@ fn e2e_web() -> Result<(), String> {
         .unwrap_or_else(|| root.join("target"));
     if std::env::var_os("CI").is_some() {
         let npx = if cfg!(windows) { "npx.cmd" } else { "npx" };
-        let mut args = vec!["playwright", "install", "chromium"];
-        if cfg!(target_os = "linux") {
-            args.push("--with-deps");
-        }
-        run(npx, &args, &web)?;
+        run(npx, &browser::install_args(), &web)?;
+    } else if std::env::var_os("PW_CHROMIUM").is_none() {
+        // PW_CHROMIUM names another browser; Playwright's own copy is not used then.
+        browser::ensure_chromium(&web)?;
     }
     let exe = |name: &str| {
         let file = format!("{name}{}", std::env::consts::EXE_SUFFIX);

@@ -65,8 +65,10 @@ scripts; add new checks to `xtask` so local and CI cannot drift.
 Running the gates on a developer Mac:
 
 - `cargo xtask e2e-web` uses the browser that is already installed: set
-  `PW_CHROMIUM="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`. Never run
-  `playwright install`; nothing is downloaded for a gate.
+  `PW_CHROMIUM="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`. Without it the
+  gate uses Playwright's own Chromium and installs it itself when it is missing (it prints one
+  line). Never run `npx playwright install` by hand or with another Playwright version: it
+  prunes the browsers other versions need; `cargo xtask e2e-web` installs what it needs.
 - A new browser spec is a new file in `apps/web/e2e` and nothing else: `e2e-web` runs every
   `*.mjs` there (`smoke` first, the rest alphabetical; `helpers.mjs` is a shared module). Put
   `// needs: fake-agent` on one of its first 15 lines when it drives a fake agent. `e2e-web`
