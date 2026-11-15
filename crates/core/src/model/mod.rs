@@ -49,7 +49,7 @@ pub use review::{
     ReviewTurn, Verdict, check_items, effective_verdict, render_items, request_is_unfounded,
     resolve_mode as resolve_review_mode, resolve_reviewer, reviewer_profile,
 };
-pub use reviewer_rules::reviewer_check_rules;
+pub use reviewer_rules::{RepoTool, reviewer_check_rules, reviewer_commands};
 pub use run::{ProcessExit, Run};
 pub use ship::{MergeSpec, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec, slugify};
 pub use since::SinceReturn;

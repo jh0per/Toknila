@@ -673,7 +673,13 @@ fn the_reviewer_may_fetch_the_listed_domains_and_no_others() {
 fn reviewer_allow_for(check: Option<&str>, repo_tools: &[&str]) -> Vec<String> {
     let mut rig = Rig::new();
     rig.brief.check_command = check.map(str::to_owned);
-    rig.brief.repo_tools = repo_tools.iter().map(|t| (*t).to_owned()).collect();
+    rig.brief.repo_tools = repo_tools
+        .iter()
+        .map(|t| toknila_core::RepoTool {
+            tool: (*t).to_owned(),
+            dir: String::new(),
+        })
+        .collect();
     rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
     let (_, text) = rig.file_of("reviewer", "settings.json");
     let v: Value = serde_json::from_str(&text).expect("json");
@@ -736,11 +742,86 @@ fn a_reviewer_without_a_check_command_still_runs_the_tests_the_repository_has() 
 #[test]
 fn the_repository_tools_come_from_the_files_of_the_ship() {
     let dir = tempfile::tempdir().expect("tempdir");
-    assert!(repo_tools(dir.path()).is_empty());
+    assert!(repo_tools(dir.path(), None).is_empty());
     std::fs::write(dir.path().join("Cargo.toml"), "").expect("write");
     std::fs::write(dir.path().join("package.json"), "{}").expect("write");
     std::fs::write(dir.path().join("pnpm-lock.yaml"), "").expect("write");
-    assert_eq!(repo_tools(dir.path()), ["cargo", "pnpm"]);
+    assert_eq!(
+        pairs(&repo_tools(dir.path(), None)),
+        [("cargo", ""), ("pnpm", "")]
+    );
+}
+
+fn pairs(tools: &[toknila_core::RepoTool]) -> Vec<(&str, &str)> {
+    tools
+        .iter()
+        .map(|t| (t.tool.as_str(), t.dir.as_str()))
+        .collect()
+}
+
+fn write_in(root: &Path, rel: &str, text: &str) {
+    let path = root.join(rel);
+    std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+    std::fs::write(path, text).expect("write");
+}
+
+#[test]
+fn a_package_json_one_level_down_is_found_in_the_usual_folders() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    write_in(dir.path(), "Cargo.toml", "");
+    write_in(dir.path(), "apps/web/package.json", "{}");
+    write_in(dir.path(), "apps/web/pnpm-lock.yaml", "");
+    write_in(dir.path(), "packages/ui/package.json", "{}");
+    write_in(dir.path(), "web/site/package.json", "{}");
+    write_in(dir.path(), "docs/package.json", "{}");
+    assert_eq!(
+        pairs(&repo_tools(dir.path(), None)),
+        [
+            ("cargo", ""),
+            ("pnpm", "apps/web"),
+            ("npm", "packages/ui"),
+            ("npm", "web/site"),
+        ]
+    );
+}
+
+#[test]
+fn a_folder_the_check_command_names_is_looked_into() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    write_in(dir.path(), "docs/package.json", "{}");
+    write_in(dir.path(), "tools/package.json", "{}");
+    let found = repo_tools(
+        dir.path(),
+        Some("cd docs && npm test; npm run --prefix \"tools\" lint"),
+    );
+    assert_eq!(pairs(&found), [("npm", "docs"), ("npm", "tools")]);
+}
+
+#[test]
+fn a_reviewer_of_a_repository_with_apps_web_gets_npm_rules_and_the_commands() {
+    let repo = tempfile::tempdir().expect("tempdir");
+    write_in(repo.path(), "Cargo.toml", "");
+    write_in(repo.path(), "apps/web/package.json", "{}");
+    let mut rig = Rig::new();
+    rig.brief.check_command = Some("cargo xtask verify".to_owned());
+    rig.brief.repo_tools = repo_tools(repo.path(), Some("cargo xtask verify"));
+    let w = rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    let (_, text) = rig.file_of("reviewer", "settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    let allow: Vec<&str> = v["permissions"]["allow"]
+        .as_array()
+        .expect("allow")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    for want in ["Bash(npm test *)", "Bash(npm run *)"] {
+        assert!(allow.contains(&want), "{want}: {allow:?}");
+    }
+    let argv = w.command.join(" ");
+    assert!(
+        argv.contains("npm run --prefix apps/web <script>"),
+        "{argv}"
+    );
 }
 
 #[test]
