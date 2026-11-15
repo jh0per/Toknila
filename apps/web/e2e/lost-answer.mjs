@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { checks, cleanup, launch, processesWith } from "./helpers.mjs";
+import { checks, cleanup, launch, processesWith, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -22,8 +22,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-lost-"));
-const marker = `lost-${basename(home)}`;
+const { home, marker } = session();
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", ...opts });
 const tok = (...args) => run(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home } });
 const git = (dir, ...args) =>

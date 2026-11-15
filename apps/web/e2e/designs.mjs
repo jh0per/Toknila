@@ -10,14 +10,14 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch, shoot } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot, session } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
   console.error("usage: node e2e/designs.mjs <tok binary>");
   process.exit(2);
 }
-const home = mkdtempSync(join(tmpdir(), "toknila-designs-"));
+const { home } = session();
 const tok = (...args) =>
   execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 

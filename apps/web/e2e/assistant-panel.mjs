@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -23,7 +23,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-panel-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8" });
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 const git = (dir, ...args) =>
@@ -42,7 +42,7 @@ try {
   // Each line typed is echoed and answered with a `say`, so the box is free for the next message.
   const answer = ["echo", "post", "/planner/say", JSON.stringify({ text: "Done." })];
   const steps = ["print", "planner ready", ...answer, ...answer, ...answer, "hold"].map((x) => `'${x}'`).join(", ");
-  writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', ${steps}]\nstartup_secs = 0\n`);
+  writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps}]\nstartup_secs = 0\n`);
   tok("project", "new", "PN", "--repo", repo, "--base", "develop");
   tok("chain", "new", "work", "--project", "PN", "--no-autostart");
   tok("ticket", "new", "work", "Login screen");

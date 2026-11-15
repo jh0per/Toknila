@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -23,7 +23,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-askattach-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8" });
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 const git = (dir, ...args) =>
@@ -48,7 +48,7 @@ try {
   const reply = ["post", "/planner/cards/AT-1/threads/1/messages", JSON.stringify({ text: "Looked at it" })];
   writeFileSync(
     join(home, "profiles", "fake-planner.toml"),
-    `role = 'planner'\ncommand = ['${fakeAgent}', ${steps("print", "planner ready", "echo", ...say, "echo", ...say, "echo", ...say, "echo", ...reply, "hold")}]\nstartup_secs = 0\n`,
+    `role = 'planner'\ncommand = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "planner ready", "echo", ...say, "echo", ...say, "echo", ...say, "echo", ...reply, "hold")}]\nstartup_secs = 0\n`,
   );
   tok("project", "new", "AT", "--repo", repo, "--base", "develop");
   tok("chain", "new", "work", "--project", "AT", "--no-autostart");

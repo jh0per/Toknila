@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { cleanup, launch, shipOf } from "./helpers.mjs";
+import { cleanup, launch, shipOf, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -18,7 +18,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-screens-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8" });
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 const git = (dir, ...args) =>
@@ -47,14 +47,14 @@ try {
   const post = (json) => ["post", "/tickets/{ticket}/events", JSON.stringify(json)];
   writeFileSync(
     join(home, "profiles", "designer.toml"),
-    `command = ['${fakeAgent}', ${steps(
+    `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps(
       "print", "ready",
       ...post({ event: "open_thread", kind: "design", title: "Login screen" }),
       ...post({ event: "thread_version", thread: "1", format: "mermaid", body: "graph TD; Form --> Home" }),
       "hold",
     )}]\n`,
   );
-  writeFileSync(join(home, "profiles", "plain.toml"), `command = ['${fakeAgent}', ${steps("print", "working", "hold")}]\n`);
+  writeFileSync(join(home, "profiles", "plain.toml"), `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "working", "hold")}]\n`);
   tok("project", "new", "DS", "--repo", repo, "--base", "develop", "--profile", "plain");
   tok("project", "set", "DS", "--parallel", "6");
   tok("chain", "new", "work", "--project", "DS", "--no-autostart");

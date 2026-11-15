@@ -1,8 +1,9 @@
 // What the browser e2e scripts share: the checks on a page, and launching the browser.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join, resolve } from "node:path";
 import { chromium } from "playwright";
 
 /// Launches the browser. With `E2E_ARTIFACTS` set (CI), every page is traced, and when the script
@@ -92,18 +93,61 @@ export function processesWith(marker) {
     .filter((p) => p && p !== process.pid);
 }
 
+/// A blocking pause: cleanup also runs from `process.on("exit")`, where nothing async can finish.
+const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
 /// Waits up to `ms` for the process `pid` to be gone; returns whether it is.
-async function waitExit(pid, ms) {
-  for (const until = Date.now() + ms; alive(pid); await sleep(50)) {
+function waitExit(pid, ms) {
+  for (const until = Date.now() + ms; alive(pid); pause(50)) {
     if (Date.now() > until) return false;
   }
   return true;
 }
 
+/// The ids of every descendant of `pids` (children, grandchildren...), from `ps`. Empty on Windows,
+/// where `taskkill /T` ends the tree itself.
+function descendants(pids) {
+  if (process.platform === "win32" || pids.length === 0) return [];
+  let rows;
+  try {
+    rows = execFileSync("ps", ["-axo", "pid=,ppid="], { encoding: "utf8" })
+      .split("\n")
+      .map((l) => l.trim().split(/\s+/).map(Number));
+  } catch {
+    return [];
+  }
+  const found = new Set();
+  for (let frontier = pids; frontier.length; ) {
+    frontier = rows.filter(([pid, ppid]) => !found.has(pid) && frontier.includes(ppid)).map(([pid]) => pid);
+    for (const p of frontier) found.add(p);
+  }
+  return [...found];
+}
+
+/// Ends the process `pid` and everything it started: `taskkill /T /F` on Windows (a plain kill
+/// leaves the children), the children first and then the process itself elsewhere.
+function killTree(pid) {
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/T", "/F", "/PID", String(pid)], { stdio: "ignore" });
+    } catch {
+      /* gone meanwhile */
+    }
+    return;
+  }
+  for (const p of [...descendants([pid]), pid]) {
+    try {
+      process.kill(p, "SIGKILL");
+    } catch {
+      /* gone meanwhile */
+    }
+  }
+}
+
 /// Stops the daemon of `home` and waits for its process to exit, not just for it to stop answering:
 /// after `daemon stop` it may still be closing files (the database, run logs, ships), and removing
-/// the folder under it fails with ENOTEMPTY on macOS.
-export async function stopDaemon(tok, home) {
+/// the folder under it fails with ENOTEMPTY on macOS. A daemon that is still there after 15 s is killed.
+function stopDaemonSync(tokBin, home) {
   let pid;
   try {
     pid = JSON.parse(readFileSync(join(home, "daemon.json"), "utf8")).pid;
@@ -111,19 +155,95 @@ export async function stopDaemon(tok, home) {
     /* no daemon was started */
   }
   try {
-    tok("daemon", "stop");
+    execFileSync(tokBin, ["daemon", "stop"], {
+      env: { ...process.env, TOKNILA_HOME: home },
+      stdio: "ignore",
+      timeout: 20_000,
+    });
   } catch {
     /* already stopped */
   }
-  if (pid && !(await waitExit(pid, 15_000))) {
+  if (pid && !waitExit(pid, 15_000)) {
     console.warn(`warning: daemon ${pid} did not exit after stop; killing it`);
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      /* gone meanwhile */
-    }
-    await waitExit(pid, 5_000);
+    killTree(pid);
+    waitExit(pid, 5_000);
   }
+}
+
+const sessions = new Set();
+let hooked = false;
+
+/// Ends every session still open. Safe to call twice: a session ends once.
+function endAll() {
+  for (const s of [...sessions]) s.endSync();
+}
+
+function hookProcess() {
+  if (hooked) return;
+  hooked = true;
+  process.on("exit", endAll);
+  for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) {
+    process.on(signal, () => {
+      endAll();
+      process.exit(code);
+    });
+  }
+  process.on("uncaughtException", (e) => {
+    console.error(`FAIL uncaught: ${e?.stack ?? e}`);
+    endAll();
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (e) => {
+    console.error(`FAIL unhandled rejection: ${e?.stack ?? e}`);
+    endAll();
+    process.exit(1);
+  });
+}
+
+/// The one owner of what a spec starts. Makes the temp home (`<tmp>/toknila-e2e-<run id>-<spec>-<random>`),
+/// knows the marker of its fake agents (`toknila-fa-<run id>-<spec>-<random>`, the run id from
+/// `TOKNILA_E2E_RUN`; a profile puts it in the agent's arguments as `'sleep', '<marker>'`, a step
+/// that waits for nothing) and registers one cleanup that runs on `cleanup()` in `finally`, on
+/// process exit, on SIGINT and SIGTERM and on an uncaught error: stops the daemon (killed after a
+/// wait), kills every process whose command line carries the marker with its children, removes the
+/// home. A spec starts no process outside it; a second daemon is registered with `session.track(home)`.
+/// `opts.tok` is the `tok` binary (default: the spec's first argument), `opts.name` the spec's name.
+export function session(opts = {}) {
+  const name = opts.name ?? basename(process.argv[1] ?? "e2e", ".mjs");
+  const tokBin = resolve(opts.tok ?? process.argv[2] ?? "tok");
+  const runId = process.env.TOKNILA_E2E_RUN ?? "manual";
+  const prefix = `toknila-e2e-${runId}-${name}-`;
+  const home = mkdtempSync(join(tmpdir(), prefix));
+  const suffix = basename(home).slice(prefix.length);
+  const marker = `toknila-fa-${runId}-${name}-${suffix}`;
+  const homes = [home];
+  let ended = false;
+  const s = {
+    home,
+    marker,
+    /// Registers the home of another daemon this spec starts; it is stopped and removed with the rest.
+    track(other) {
+      homes.push(other);
+      return other;
+    },
+    endSync() {
+      if (ended) return;
+      ended = true;
+      sessions.delete(s);
+      for (const h of homes) stopDaemonSync(tokBin, h);
+      for (const pid of processesWith(marker)) killTree(pid);
+      for (const h of homes) {
+        try {
+          rmSync(h, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+        } catch (e) {
+          console.warn(`warning: cannot remove ${h}: ${e.message}`);
+        }
+      }
+    },
+  };
+  sessions.add(s);
+  hookProcess();
+  return s;
 }
 
 /// The workspace folder of a card. The daemon makes it after the command that started the card
@@ -138,15 +258,12 @@ export function shipOf(tok, key) {
   }
 }
 
-/// Final cleanup of a script: stops the daemon, waits for it, removes the temp home. A folder that
-/// cannot be removed is a warning only: the checks have already decided the exit code.
-export async function cleanup(tok, home) {
-  await stopDaemon(tok, home);
-  try {
-    rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch (e) {
-    console.warn(`warning: cannot remove ${home}: ${e.message}`);
-  }
+/// Final cleanup of a script (its `finally`): ends the session that made `home` (see `session`).
+/// A folder that cannot be removed is a warning only: the checks have already decided the exit code.
+export async function cleanup(_tok, home) {
+  const s = [...sessions].find((x) => x.home === home);
+  if (s) s.endSync();
+  else if (existsSync(home)) throw new Error(`cleanup: ${home} is not the home of a session`);
 }
 
 /// With `SCREENSHOT_DIR` set: a screenshot of the page (or of `target`, a locator) in light and

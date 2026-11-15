@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -22,7 +22,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-copy-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", ...opts });
 const tok = (...args) => run(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home } });
 const git = (dir, ...args) =>
@@ -42,7 +42,7 @@ try {
   const lines = [];
   for (let i = 1; i <= 80; i++) lines.push("print", `scroll line ${i}`);
   const steps = [...lines, "print", "marker alpha", "osc52", fromAgent, "print", "marker omega", "hold"];
-  writeFileSync(join(home, "profiles", "fake.toml"), `command = [${[fakeAgent, ...steps].map((s) => `'${s}'`).join(", ")}]\n`);
+  writeFileSync(join(home, "profiles", "fake.toml"), `command = [${[fakeAgent, "sleep", fakeMarker, ...steps].map((s) => `'${s}'`).join(", ")}]\n`);
   tok("project", "new", "WEB", "--repo", repo, "--base", "develop", "--profile", "fake");
   tok("chain", "new", "work", "--project", "WEB", "--no-autostart");
   tok("ticket", "new", "work", "Copy task", "--prompt", "Say hello.");
