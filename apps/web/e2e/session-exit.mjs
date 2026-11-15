@@ -77,7 +77,11 @@ if (role === "victim") {
   const { home } = session();
   let failed = false;
   try {
-    for (const mode of ["throw", "exit", "sigterm"]) {
+    // On Windows a killed process gets no signal (TerminateProcess ends it at once, no handler
+    // runs), so the SIGTERM way cannot be shown there; the CI step that lists leftovers and the
+    // daemon's own kill-after-stop cover that platform.
+    const modes = process.platform === "win32" ? ["throw", "exit"] : ["throw", "exit", "sigterm"];
+    for (const mode of modes) {
       const child = spawn(process.execPath, [process.argv[1], tokBin, fakeAgent, "victim", mode], {
         env: { ...process.env, TOKNILA_E2E_RUN: process.env.TOKNILA_E2E_RUN ?? "manual" },
         stdio: ["ignore", "pipe", "ignore"], // the victim's own "uncaught" report is expected
