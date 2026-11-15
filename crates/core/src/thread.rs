@@ -53,7 +53,8 @@ pub enum ThreadError {
     #[error("thread is already approved")]
     AlreadyApproved,
     #[error(
-        "this story already has {kind:?} thread {number}; post a version on thread {number} with thread_version instead of opening another"
+        "thread {number} ({word}) is open on this story: post your new version there with thread_version; a second {word} thread is not the way",
+        word = format!("{kind:?}").to_lowercase()
     )]
     DuplicateKind { kind: ThreadKind, number: u32 },
     #[error("only the agent that opened a thread can withdraw it")]

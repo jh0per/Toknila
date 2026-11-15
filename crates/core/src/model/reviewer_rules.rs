@@ -40,6 +40,48 @@ pub fn reviewer_check_rules(check_command: Option<&str>, repo_tools: &[String]) 
     out
 }
 
+/// A toolchain the repository holds and the folder it sits in, relative to the ship (empty for
+/// the root).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepoTool {
+    /// The first word of its commands (`cargo`, `npm`, `pnpm`, `yarn`).
+    pub tool: String,
+    /// The folder of its manifest (`apps/web`); empty at the repository root.
+    pub dir: String,
+}
+
+/// The commands a reviewer may run, as the reviewer should type them: a folder's toolchain takes
+/// its folder as a flag, because the reviewer runs each command plain, with no `cd`.
+pub fn reviewer_commands(tools: &[RepoTool]) -> Vec<String> {
+    let mut out = Vec::new();
+    for t in tools {
+        let (test, run) = match (t.tool.as_str(), t.dir.as_str()) {
+            ("cargo", _) => (Some("cargo test".to_owned()), None),
+            ("npm", "") => (
+                Some("npm test".to_owned()),
+                Some("npm run <script>".to_owned()),
+            ),
+            ("npm", d) => (
+                Some(format!("npm test --prefix {d}")),
+                Some(format!("npm run --prefix {d} <script>")),
+            ),
+            (m @ ("pnpm" | "yarn"), "") => {
+                (Some(format!("{m} test")), Some(format!("{m} run <script>")))
+            }
+            (m @ ("pnpm" | "yarn"), d) => {
+                let flag = if m == "pnpm" { "--dir" } else { "--cwd" };
+                (
+                    Some(format!("{m} {flag} {d} test")),
+                    Some(format!("{m} {flag} {d} run <script>")),
+                )
+            }
+            _ => (None, None),
+        };
+        out.extend(test.into_iter().chain(run));
+    }
+    out
+}
+
 impl super::AgentProfile {
     /// The profile as a card's reviewer runs it: the tests and checks of the project's toolchain
     /// are allowed. Only a reviewer that runs Claude Code is changed.
@@ -123,6 +165,50 @@ mod tests {
                 assert!(!rule.contains(never), "{never} in {rule}");
             }
         }
+    }
+
+    fn tool(t: &str, d: &str) -> RepoTool {
+        RepoTool {
+            tool: t.to_owned(),
+            dir: d.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_toolchain_in_a_folder_is_run_with_its_folder_as_a_flag() {
+        let got = reviewer_commands(&[
+            tool("cargo", ""),
+            tool("npm", "apps/web"),
+            tool("pnpm", "packages/ui"),
+            tool("yarn", "web/app"),
+        ]);
+        assert_eq!(
+            got,
+            [
+                "cargo test",
+                "npm test --prefix apps/web",
+                "npm run --prefix apps/web <script>",
+                "pnpm --dir packages/ui test",
+                "pnpm --dir packages/ui run <script>",
+                "yarn --cwd web/app test",
+                "yarn --cwd web/app run <script>",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_root_toolchain_needs_no_flag() {
+        assert_eq!(
+            reviewer_commands(&[tool("npm", "")]),
+            ["npm test", "npm run <script>"]
+        );
+    }
+
+    #[test]
+    fn the_rules_of_a_folder_toolchain_match_its_commands() {
+        let names = tools(&["npm"]);
+        let rules = reviewer_check_rules(None, &names);
+        assert!(rules.contains(&"Bash(npm run *)".to_owned()));
     }
 
     #[test]

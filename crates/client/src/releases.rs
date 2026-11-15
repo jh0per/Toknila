@@ -41,10 +41,12 @@ impl Client {
         chain: &str,
         version: &str,
         resume: bool,
+        push: Option<bool>,
     ) -> ClientResult<ChainDetail> {
         let body = toknila_api_types::StartRelease {
             version: version.to_owned(),
             resume,
+            push,
         };
         self.call(
             "POST",

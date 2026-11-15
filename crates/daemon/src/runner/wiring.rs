@@ -194,9 +194,11 @@ fn brief_of_key<'a>(
     cx: &'a Context<'_>,
     key: &'a str,
     designs: &'a [instructions::BriefDesign],
+    review_commands: &'a [String],
 ) -> instructions::RunBrief<'a> {
     instructions::RunBrief {
         designs,
+        review_commands,
         key,
         title: &cx.brief.title,
         prompt: &cx.brief.prompt,
@@ -222,25 +224,8 @@ fn brief_of_key<'a>(
     }
 }
 
-/// The toolchains the repository in `dir` holds, by the first word of their commands: `cargo` for
-/// a `Cargo.toml`, `npm`, `pnpm` or `yarn` for a `package.json` (by its lock file).
-pub(super) fn repo_tools(dir: &Path) -> Vec<String> {
-    let mut tools = Vec::new();
-    if dir.join("Cargo.toml").exists() {
-        tools.push("cargo".to_owned());
-    }
-    if dir.join("package.json").exists() {
-        let manager = if dir.join("pnpm-lock.yaml").exists() {
-            "pnpm"
-        } else if dir.join("yarn.lock").exists() {
-            "yarn"
-        } else {
-            "npm"
-        };
-        tools.push(manager.to_owned());
-    }
-    tools
-}
+mod repo_tools;
+pub(super) use repo_tools::repo_tools;
 
 pub(super) use super::resumed::{briefed, resumed_argv};
 
@@ -266,15 +251,19 @@ pub(super) fn prepare_with(
     // The domains the project lets a reviewer read go into the reviewer's allow rules.
     let profile = &profile.with_reviewer_domains(&cx.brief.web_domains);
     // The tests and checks the hand-in names: the check command's toolchain and the repository's.
-    let profile =
-        &profile.with_reviewer_checks(cx.brief.check_command.as_deref(), &cx.brief.repo_tools);
+    let tool_names: Vec<String> = cx.brief.repo_tools.iter().map(|t| t.tool.clone()).collect();
+    let profile = &profile.with_reviewer_checks(cx.brief.check_command.as_deref(), &tool_names);
+    let review_commands = match cx.role {
+        AgentRole::Reviewer => toknila_core::reviewer_commands(&cx.brief.repo_tools),
+        _ => Vec::new(),
+    };
     // A planner run is labelled by its project's key; there is no card.
     let key = match cx.role {
         AgentRole::Planner => cx.key.project().to_string(),
         _ => cx.key.to_string(),
     };
     let (design_briefs, worker_files) = worker_designs(cx);
-    let brief = brief_of_key(cx, &key, &design_briefs);
+    let brief = brief_of_key(cx, &key, &design_briefs, &review_commands);
     let command = resumed_argv(profile, cx.brief)
         .unwrap_or_else(|| profile.argv(&instructions::kickoff(cx.role, &brief)));
     let mut wiring = Wiring {

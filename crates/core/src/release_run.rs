@@ -15,7 +15,7 @@ pub enum ReleaseStep {
     Bump,
     /// An annotated tag on the release commit.
     Tag,
-    /// The base branch and the tag to `origin`; only for projects that merge by pull request.
+    /// The base branch and the tag to the repository's remote; a choice of the release.
     Push,
 }
 
@@ -32,7 +32,7 @@ impl ReleaseStep {
 }
 
 /// The steps a release of a project runs: the check and the bump only when the project names
-/// them, the tag always, the push only when the project merges by pull request.
+/// them, the tag always, the push only when the release asks for it.
 pub fn steps(check: Option<&str>, bump: Option<&str>, push: bool) -> Vec<ReleaseStep> {
     let mut steps = Vec::new();
     if check.is_some_and(|c| !c.trim().is_empty()) {
@@ -115,6 +115,57 @@ pub fn suggest_version<S: AsRef<str>>(tags: &[S]) -> String {
     "0.1.0".to_owned()
 }
 
+/// The page of a tag on GitHub (`<url>/releases/tag/v0.3.4`) when `remote_url` is a GitHub
+/// remote, in any of its spellings (https, `git@github.com:o/r.git`, `ssh://`).
+pub fn tag_page(remote_url: &str, tag: &str) -> Option<String> {
+    let url = remote_url.trim();
+    let rest = ["https://", "http://", "ssh://", "git://"]
+        .iter()
+        .find_map(|p| url.strip_prefix(p))
+        .map(|r| r.rsplit_once('@').map_or(r, |(_, host)| host))
+        .map(|r| r.replacen(':', "/", 1))
+        .or_else(|| url.split_once('@').map(|(_, r)| r.replacen(':', "/", 1)))?;
+    let path = rest.strip_prefix("github.com/")?;
+    let path = path.trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    let (owner, repo) = path.split_once('/')?;
+    if owner.is_empty() || repo.is_empty() || repo.contains('/') {
+        return None;
+    }
+    Some(format!(
+        "https://github.com/{owner}/{repo}/releases/tag/{tag}"
+    ))
+}
+
+/// What the Push step says when it passed: `Pushed main and v0.3.4 to origin`, then the tag's
+/// page on its own line when the remote is on GitHub.
+pub fn pushed_text(base: &str, tag: &str, remote: &str, remote_url: &str) -> String {
+    let line = format!("Pushed {base} and {tag} to {remote}");
+    match tag_page(remote_url, tag) {
+        Some(page) => format!("{line}\n{page}"),
+        None => line,
+    }
+}
+
+/// The line a person reads when a push failed: git's own reason for a refused ref
+/// (`rejected: non-fast-forward; pull first`), else git's last line as it is.
+pub fn push_failure_line(git_output: &str) -> String {
+    for line in git_output.lines() {
+        if line.contains("[rejected]")
+            && let Some(reason) = line.rsplit_once('(').and_then(|(_, r)| r.strip_suffix(')'))
+        {
+            return format!("rejected: {reason}; pull first");
+        }
+    }
+    git_output
+        .lines()
+        .rev()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("git printed nothing")
+        .trim()
+        .to_owned()
+}
+
 /// The bump command with the version put in (`{version}`).
 pub fn bump_command(template: &str, version: &str) -> String {
     template.replace("{version}", version)
@@ -134,6 +185,67 @@ mod tests {
             [Check, Bump, Tag, Push]
         );
         assert_eq!(steps(Some("  "), Some(""), true), [Tag, Push]);
+    }
+
+    #[test]
+    fn push_is_a_step_of_a_local_mode_release_when_asked_for() {
+        use ReleaseStep::*;
+        // The merge mode is not an input: only the choice of the release is.
+        assert_eq!(
+            steps(Some("make"), Some("./bump"), true),
+            [Check, Bump, Tag, Push]
+        );
+        assert_eq!(
+            steps(Some("make"), Some("./bump"), false),
+            [Check, Bump, Tag]
+        );
+    }
+
+    #[test]
+    fn the_tag_page_is_a_link_for_every_spelling_of_a_github_remote() {
+        let page = Some("https://github.com/acme/toknila/releases/tag/v0.3.4".to_owned());
+        for url in [
+            "https://github.com/acme/toknila.git",
+            "https://github.com/acme/toknila",
+            "git@github.com:acme/toknila.git",
+            "ssh://git@github.com/acme/toknila.git",
+            "https://user:token@github.com/acme/toknila.git",
+        ] {
+            assert_eq!(tag_page(url, "v0.3.4"), page, "{url}");
+        }
+        for url in [
+            "/tmp/remote.git",
+            "https://gitlab.com/acme/toknila.git",
+            "https://github.com/acme",
+        ] {
+            assert_eq!(tag_page(url, "v0.3.4"), None, "{url}");
+        }
+    }
+
+    #[test]
+    fn the_push_says_what_it_pushed_and_what_git_refused() {
+        assert_eq!(
+            pushed_text(
+                "main",
+                "v0.3.4",
+                "origin",
+                "git@github.com:acme/toknila.git"
+            ),
+            "Pushed main and v0.3.4 to origin\nhttps://github.com/acme/toknila/releases/tag/v0.3.4"
+        );
+        assert_eq!(
+            pushed_text("main", "v0.3.4", "origin", "/srv/r.git"),
+            "Pushed main and v0.3.4 to origin"
+        );
+        let refused = "To /srv/r.git\n!\trefs/heads/main:refs/heads/main\t[rejected] (non-fast-forward)\nDone\nerror: failed to push some refs";
+        assert_eq!(
+            push_failure_line(refused),
+            "rejected: non-fast-forward; pull first"
+        );
+        assert_eq!(
+            push_failure_line("fatal: unable to access 'x': Could not resolve host\n"),
+            "fatal: unable to access 'x': Could not resolve host"
+        );
     }
 
     #[test]
