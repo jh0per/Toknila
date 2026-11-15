@@ -2439,6 +2439,8 @@ export interface components {
             /** @description One-line gist, the heading of the comment. */
             gist: string;
             how_to_verify?: string | null;
+            /** @description The steps a person does by hand (a hand-in's "For you" block), one per entry. */
+            person?: string[];
             what?: string | null;
             why?: string | null;
         };
@@ -2754,6 +2756,11 @@ export interface components {
             gist: string;
             /** @description What is left or not covered. */
             left?: string | null;
+            /**
+             * @description The steps a person does by hand: the "For you" block, or for a hand-in made before it
+             *     the lines that start with PERSON.
+             */
+            person?: string[];
             since_return?: components["schemas"]["SinceReturn"] | null;
             /** @description The lines under "What changed", when the agent wrote any. */
             what?: string | null;

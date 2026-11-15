@@ -387,3 +387,41 @@ async fn a_reviewer_that_stops_twice_without_a_verdict_becomes_a_review_item_to_
     let inbox = api.get("/v1/projects/DEMO/inbox").await;
     assert!(inbox.as_array().expect("inbox").is_empty(), "{inbox}");
 }
+
+#[tokio::test]
+async fn a_hand_in_with_a_for_you_block_reaches_the_card_typed_and_the_inbox_row() {
+    let api = Api::new();
+    api.demo_with(&["A"]).await;
+    api.call(
+        Method::PATCH,
+        "/v1/projects/DEMO",
+        Some(json!({ "review_mode": "human" })),
+    )
+    .await;
+    api.post(
+        "/v1/tickets/DEMO-1/events",
+        json!({ "event": "finished", "summary": "**What changed:** pads\n**Checks:**\n- NOT_RUN iphone: no phone here\n**Left:** nothing\n**For you:**\n- On the iPhone, tap the 808 Long pad in the editor: you hear a long tone\n- Drag the 32-step bar: the steps follow" }),
+    )
+    .await;
+    let steps = json!([
+        "On the iPhone, tap the 808 Long pad in the editor: you hear a long tone",
+        "Drag the 32-step bar: the steps follow"
+    ]);
+    let t = api.get("/v1/tickets/DEMO-1").await;
+    let report = t["comments"]
+        .as_array()
+        .expect("comments")
+        .iter()
+        .find(|c| c["body"]["person"].is_array())
+        .unwrap_or_else(|| panic!("a report with typed steps: {}", t["comments"]));
+    assert_eq!(report["body"]["person"], steps);
+    assert_eq!(report["body"]["consequences"], "nothing");
+    let inbox = api.get("/v1/projects/DEMO/inbox").await;
+    let row = inbox
+        .as_array()
+        .expect("inbox")
+        .iter()
+        .find(|i| i["ticket"] == "DEMO-1")
+        .expect("the card waits in the inbox");
+    assert_eq!(row["hand_in"]["person"], steps);
+}

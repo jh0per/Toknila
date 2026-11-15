@@ -42,6 +42,9 @@ pub struct CommentBody {
     pub alternatives: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consequences: Option<String>,
+    /// The steps a person does by hand (a hand-in's "For you" block), one per entry.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub person: Vec<String>,
 }
 
 /// A permanent record in a ticket: an instruction from a person, an agent's report, or a decision.
