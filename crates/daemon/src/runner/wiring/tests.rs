@@ -10,6 +10,7 @@ use super::*;
 mod planner;
 mod reads;
 mod reviewer_rules;
+mod settings_pins;
 
 const TOKEN: &str = "secret-run-token-0123456789abcdef";
 
@@ -799,7 +800,7 @@ fn every_hook_command_runs_under_the_hook_shell_with_a_path_that_has_a_space() {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     }
-    let settings = hook_settings(&bin);
+    let settings = hook_settings(&bin, AgentRole::Worker);
     let mut commands: Vec<String> = settings["hooks"]
         .as_object()
         .expect("hooks")

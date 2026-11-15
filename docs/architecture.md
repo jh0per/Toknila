@@ -725,7 +725,10 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
   (never the worktree, never the user's own Claude settings) and appends `--mcp-config <file>` and
   `--settings <file>` to the command. Neither file holds a token; both name environment variables.
   The files run the `toknila` binary of the daemon (`current_exe`) as `toknila mcp` and
-  `toknila hook <name>`; the settings file also names `toknila statusline` as the status line (see "Usage").
+  `toknila hook <name>` for each hook the role subscribes to (`toknila_core::hook::subscribed`:
+  all seven for a card's agent, three for a planner); a card agent's settings file also names
+  `toknila statusline` as the status line (see "Usage"). The settings file of each role is
+  pinned (`runner/wiring/tests/snapshots/<role>-settings.json`).
 - **Instructions file.** For a profile with `instructions_flag` (the built-in `claude-code` has
   `--append-system-prompt-file`) the runner also writes `runs/<ticket id>/<role>/instructions.md` and
   passes it by that flag. It holds the ticket's title, task and acceptance, the comment template,
@@ -792,8 +795,9 @@ starts nothing. Planner, card agents and owner divide the work: the planner plan
 the cards; the owner starts cards and accepts work.
 
 - **Role and profile.** `AgentRole::Planner`; built-in profile `claude-code-planner`
-  (`--permission-mode dontAsk`, allow `Read`, `Grep`, `Glob`, read-only `git`, `mcp__toknila`; no
-  hooks, so no nudges and no hand-in). Documented mechanisms only: `--permission-mode dontAsk`
+  (`--permission-mode dontAsk`, allow `Read`, `Grep`, `Glob`, read-only `git`, `mcp__toknila`;
+  hooks only for the signals of its turn, see "The planner's hooks" below, so no nudges and no
+  hand-in). Documented mechanisms only: `--permission-mode dontAsk`
   and `permissions.allow` ([permissions](https://code.claude.com/docs/en/permissions),
   [permission modes](https://code.claude.com/docs/en/permission-modes)), `--settings`
   ([settings](https://code.claude.com/docs/en/settings)), `--mcp-config`
@@ -806,7 +810,7 @@ the cards; the owner starts cards and accepts work.
   `Runner` port starts it. It is keyed by the project's id read as a card id
   (`toknila_core::planner::run_key`) and labelled `<KEY>-0`; its files are in
   `runs/<project id>/planner/` (`mcp.json` without a ticket variable, `settings.json` with the
-  allow rules, `instructions.md` from `toknila_core::instructions::generate_planner`), its log and
+  allow rules and the three hooks of its turn, `instructions.md` from `toknila_core::instructions::generate_planner`), its log and
   scrollback like any run's. The journal does not record its start or end. One per project; a
   start keeps the live one.
 - **Terminal.** `GET /v1/projects/{project}/planner` (running or not), `/planner/scrollback`, the
@@ -850,6 +854,21 @@ the cards; the owner starts cards and accepts work.
   `toknila_app::planner::turn`), two per message, so every open window learns of them from the
   stream; a step is no journal entry (a turn makes dozens). Stopping the planner, or its run
   ending (`runner::supervise`), ends a turn that was on and journals the end.
+- **The planner's hooks.** They are the signals of its turn and nothing else. Core lists the
+  three a planner subscribes to beside a card's seven (`toknila_core::hook::PLANNER_HOOKS`:
+  `UserPromptSubmit`, `PreToolUse`, `Stop`), and the role picks the list
+  (`hook::subscribed(role)`; the built-in planner profile has `hooks.enabled`, and no flag of
+  `HookWiring` says which list). `runner/wiring.rs` writes exactly those three into the
+  planner's `settings.json`, with no status line, no `PermissionRequest` and no `Notification`
+  hook: its permission rules decide what it may do. `tok hook <name>` learns it runs for a
+  planner from `TOKNILA_ROLE=planner` (as `tok mcp` does) and then only posts the signal
+  (`hook::planner_signal`; for a `PreToolUse` also the tool's name and `hook::tool_text`'s
+  summary) to `POST /v1/planner/activity` with the run's token, on a thread it waits two seconds
+  for at most. It prints nothing on stdout, claims no instructions, holds no dialog, asks no
+  pre-tool decision, and exits 0 whatever happens (exit 2 would block the tool call); a failure
+  is one line on stderr. The planner's instructions say nothing of it. The fake agent's
+  `activity <signal>` plays these hooks in tests (`activity pre_tool_use <tool> <summary>` names
+  a step).
 - **Opening a card.** `show_card` (`POST /v1/planner/cards/{card}/show`,
   `toknila_app::planner::show_card`) changes nothing in the plan: it journals one `window`
   event, kind `show_card` (see `events.md`). The web app follows it in the reducer
