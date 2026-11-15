@@ -12,7 +12,7 @@ use super::runs::settle;
 use crate::GitError;
 use crate::external::ExternalEffect;
 use crate::recovery::recover;
-use crate::{MergeError, MergeOutcome, Merger, SyncOutcome, SyncSpec, agent, tickets};
+use crate::{MergeError, MergeOutcome, Merger, Seen, SyncOutcome, SyncSpec, agent, tickets};
 
 /// A merger that remembers what it was asked and answers what it was told to.
 #[derive(Debug)]
@@ -22,11 +22,14 @@ pub(super) struct FakeMerger {
     /// What bringing a ship up to its base was asked, and what it answers.
     pub(super) synced: RefCell<Vec<SyncSpec>>,
     pub(super) sync_answer: RefCell<Result<SyncOutcome, MergeError>>,
+    /// What main and the ship's HEAD are at; `None` is a merger that cannot say.
+    pub(super) seen_answer: RefCell<Option<Seen>>,
 }
 
 impl Default for FakeMerger {
     fn default() -> Self {
         Self {
+            seen_answer: RefCell::default(),
             asked: RefCell::default(),
             synced: RefCell::default(),
             sync_answer: RefCell::new(Ok(SyncOutcome::UpToDate)),
@@ -46,6 +49,10 @@ impl Merger for FakeMerger {
     fn sync(&self, spec: &SyncSpec) -> Result<SyncOutcome, MergeError> {
         self.synced.borrow_mut().push(spec.clone());
         self.sync_answer.borrow().clone()
+    }
+
+    fn seen(&self, _spec: &SyncSpec, _since: Option<&str>) -> Option<Seen> {
+        self.seen_answer.borrow().clone()
     }
 }
 

@@ -46,6 +46,10 @@ pub struct ReviewView {
     /// `running` the check command with its start time. Absent before the checker reports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check: Option<CheckPhase>,
+    /// The check that runs is the second one of this hand-in: Accept found main at a commit the
+    /// last check did not see, and a pass merges by itself.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rechecking: bool,
 }
 
 fn context<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<(Chain, Project)> {
@@ -76,6 +80,7 @@ pub fn view<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<ReviewView> {
         rounds: t.review.rounds.clone(),
         check_queue: None,
         check: t.review.check.clone(),
+        rechecking: t.review.recheck,
     })
 }
 

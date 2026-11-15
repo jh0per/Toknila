@@ -393,6 +393,107 @@ async fn the_check_command_is_saved_cleared_refused_at_its_field_and_survives_a_
 }
 
 #[tokio::test]
+async fn extra_checks_are_saved_replaced_cleared_refused_at_their_field_and_survive_a_restart() {
+    let api = Api::new();
+    api.post("/v1/projects", json!({ "key": "DEMO" })).await;
+    assert!(
+        api.get("/v1/projects/DEMO")
+            .await
+            .get("extra_checks")
+            .is_none()
+    );
+    let patch = |body: Value| api.call(Method::PATCH, "/v1/projects/DEMO", Some(body));
+
+    let web = json!({ "paths": [" apps/web/** "], "command": " cargo xtask web && cargo xtask e2e-web " });
+    let docs = json!({ "paths": ["docs/**", "*.md"], "command": "make docs" });
+    let (s, p) = patch(json!({ "extra_checks": [web, docs] })).await;
+    assert_eq!(s, StatusCode::OK, "{p}");
+    assert_eq!(
+        p["extra_checks"],
+        json!([
+            { "paths": ["apps/web/**"], "command": "cargo xtask web && cargo xtask e2e-web" },
+            { "paths": ["docs/**", "*.md"], "command": "make docs" },
+        ]),
+        "trimmed, in the order given"
+    );
+
+    for bad in [
+        json!({ "paths": [], "command": "make" }),
+        json!({ "paths": ["a/**"], "command": "" }),
+        json!({ "paths": ["a/**"], "command": "make (all)" }),
+    ] {
+        let (s, e) = patch(json!({ "extra_checks": [bad] })).await;
+        assert_eq!(
+            (s, e["field"].as_str(), e["code"].as_str()),
+            (
+                StatusCode::BAD_REQUEST,
+                Some("extra_checks"),
+                Some("extra_check_invalid")
+            ),
+            "{e}"
+        );
+    }
+    assert_eq!(
+        api.get("/v1/projects/DEMO").await["extra_checks"]
+            .as_array()
+            .map(Vec::len),
+        Some(2),
+        "a refused list changes nothing"
+    );
+
+    let api = api.restart();
+    assert_eq!(
+        api.get("/v1/projects/DEMO").await["extra_checks"][0]["command"],
+        "cargo xtask web && cargo xtask e2e-web"
+    );
+    let (s, p) = api
+        .call(
+            Method::PATCH,
+            "/v1/projects/DEMO",
+            Some(json!({ "extra_checks": [] })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(
+        p.get("extra_checks").is_none(),
+        "an empty list clears it: {p}"
+    );
+}
+
+#[tokio::test]
+async fn the_system_check_reports_an_extra_command_that_is_missing() {
+    let tools = FakeTools::default().with("git --version", ran(0, "git version 2.43.0\n"));
+    let api = Api::with_tools(Arc::new(tools));
+    api.post("/v1/projects", json!({ "key": "DEMO" })).await;
+    let before = api.get("/v1/system/checks").await;
+    assert!(
+        before["checks"]
+            .as_array()
+            .is_some_and(|all| all.iter().all(|c| c["tool"] != "check_command")),
+        "no command, no line: {before}"
+    );
+    let (s, _) = api
+        .call(
+            Method::PATCH,
+            "/v1/projects/DEMO",
+            Some(json!({ "extra_checks": [
+                { "paths": ["apps/web/**"], "command": "no-such-extra-tool-130 --go" }
+            ] })),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK);
+    let body = api.get("/v1/system/checks").await;
+    let line = check(&body, "check_command");
+    assert_eq!(line["status"], "missing", "{line}");
+    assert!(
+        line["detail"]
+            .as_str()
+            .is_some_and(|d| d.contains("no-such-extra-tool-130")),
+        "{line}"
+    );
+}
+
+#[tokio::test]
 async fn the_setup_command_is_saved_cleared_refused_at_its_field_and_survives_a_restart() {
     let api = Api::new();
     api.post("/v1/projects", json!({ "key": "DEMO" })).await;

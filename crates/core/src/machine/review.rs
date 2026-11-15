@@ -41,6 +41,7 @@ pub(super) fn leave(next: &mut Ticket, effects: &mut Vec<Effect>) {
     }
     next.review.turn = None;
     next.review.check = None;
+    next.review.recheck = false;
     next.review.nudged = false;
     next.review.note = None;
 }
@@ -62,17 +63,35 @@ pub(super) fn person_decides(
 /// Where a card goes after a verdict, as a status and its reason.
 pub(super) type Outcome = (TicketStatus, Option<StatusReason>);
 
+/// What a finished check says: how it ended, and the main commit and ship HEAD it ran on.
+pub(super) struct Checked<'a> {
+    pub passed: bool,
+    pub output: &'a str,
+    pub base: Option<&'a str>,
+    pub head: Option<&'a str>,
+    /// The extra checks' lines; a pass shows them in its round.
+    pub lines: &'a [String],
+}
+
 /// The check ran. A pass goes on to whoever the review mode says (the reviewer agent, or the
-/// person, who then sees a card that already passes). A failure sends the card back to the
-/// worker with the output, a round of the loop, until the project's round limit is used: then
-/// the card waits for the person with every round in its history.
+/// person, who then sees a card that already passes); the check Accept asked for because main
+/// moved merges at once. A failure sends the card back to the worker with the output, a round
+/// of the loop, until the project's round limit is used: then the card waits for the person
+/// with every round in its history.
 pub(super) fn check_done(
     next: &mut Ticket,
-    (passed, output): (bool, &str),
+    seen: Checked<'_>,
     (mode, max_rounds): (ReviewMode, u32),
     now: Timestamp,
     effects: &mut Vec<Effect>,
 ) -> Result<Outcome, TransitionError> {
+    let Checked {
+        passed,
+        output,
+        base,
+        head,
+        lines,
+    } = seen;
     if next.review.turn != Some(ReviewTurn::Check) {
         return Err(TransitionError::NotAllowed {
             event: "check_done",
@@ -89,11 +108,22 @@ pub(super) fn check_done(
         passed,
         output: output.to_owned(),
         at: now,
+        base: base.map(str::to_owned),
+        head: head.map(str::to_owned),
     });
+    let again = std::mem::take(&mut next.review.recheck);
     if passed {
+        let comment = std::iter::once("The check passed.")
+            .chain(lines.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join("\n");
         next.review
-            .record(Actor::System, Verdict::Approve, "The check passed.", now);
-        enter(next, mode, effects);
+            .record(Actor::System, Verdict::Approve, &comment, now);
+        if again && next.review.accepted {
+            start_merge(next, effects);
+        } else {
+            enter(next, mode, effects);
+        }
         return Ok((TicketStatus::Review, None));
     }
     next.review

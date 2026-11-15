@@ -90,6 +90,9 @@ pub struct MergeSpec {
     pub pr: Option<PrSpec>,
     /// Where the ship's work is looked at before it is pushed or merged (`guard`).
     pub look: ShipLook,
+    /// Set when the project has a check command: what the last check saw of main, so Accept can
+    /// tell whether main moved since.
+    pub recheck: Option<super::Recheck>,
 }
 
 /// Where to look at a ship's work: its worktree, and what the branch is counted against.
@@ -138,6 +141,7 @@ impl ShipSpec {
                 path: ship_path.to_owned(),
                 start: self.start_point(),
             },
+            recheck: None,
         }
     }
 
@@ -193,6 +197,7 @@ mod tests {
             max_review_rounds: 3,
             merge: Default::default(),
             check_command: None,
+            extra_checks: Vec::new(),
             setup_command: None,
             bump_command: None,
             worker_model: None,

@@ -29,6 +29,8 @@ pub(super) struct FakeYard {
     /// What `inspect` finds: a clean ship with one commit unless a test says otherwise.
     pub(super) found: RefCell<Result<ShipState, ShipError>>,
     pub(super) looked: RefCell<Vec<ShipLook>>,
+    /// The files `changes_between` lists as changed against main.
+    pub(super) changed_files: RefCell<Vec<String>>,
 }
 
 impl Default for FakeYard {
@@ -46,11 +48,21 @@ impl Default for FakeYard {
                 head: None,
             })),
             looked: RefCell::default(),
+            changed_files: RefCell::default(),
         }
     }
 }
 
 impl Shipyard for FakeYard {
+    fn changes_between(
+        &self,
+        _look: &ShipLook,
+        _from: &str,
+        _to: &str,
+    ) -> Result<(Vec<String>, Vec<String>), ShipError> {
+        Ok((Vec::new(), self.changed_files.borrow().clone()))
+    }
+
     fn prepare(&self, spec: &ShipSpec) -> Result<String, ShipError> {
         if let Some(e) = self.fail_prepare.borrow().clone() {
             return Err(e);

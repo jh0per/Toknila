@@ -14,6 +14,14 @@ describe("the check phase words", () => {
     expect(checkText(running, 10_000 + 45_000)).toBe("Being checked: cargo xtask verify, 45 s");
   });
 
+  it("says being checked again while the check is the one Accept asked for because main moved", () => {
+    const again = { ...view({ phase: "syncing" }), rechecking: true } as ReviewView;
+    expect(checkText(again, 0)).toBe("Being checked again: syncing with main");
+    const running = { ...view({ phase: "running", command: "cargo xtask verify", since: 10_000 }), rechecking: true } as ReviewView;
+    expect(checkText(running, 10_000 + 45_000)).toBe("Being checked again: cargo xtask verify, 45 s");
+    expect(checkText({ ...view(), rechecking: false } as ReviewView, 0)).toBe("Being checked: starting");
+  });
+
   it("says starting until the checker reports, and never a negative time", () => {
     expect(checkText(view(), 0)).toBe("Being checked: starting");
     expect(elapsedText(5_000, 1_000)).toBe("0 s");

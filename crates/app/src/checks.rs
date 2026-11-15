@@ -5,12 +5,17 @@
 //! outcome into an event for the ticket: `CheckDone`, or `CheckLost` when it could not run.
 
 use toknila_core::machine::TicketEvent;
-use toknila_core::{ReviewTurn, ShipSpec, Ticket, TicketId, TicketKey, TicketStatus, toolpath};
+use toknila_core::{
+    ExtraCheck, ReviewTurn, ShipSpec, Ticket, TicketId, TicketKey, TicketStatus, toolpath,
+};
 
 use crate::chain::tell_ticket;
 use crate::external::{ExternalEffect, ExternalOutcome, Host};
 use crate::sync::{SyncOutcome, SyncSpec};
 use crate::{AppResult, ChainTx, Reader, UnitOfWork, projects, reviews};
+
+mod extra;
+pub use extra::{ExtraRun, Ran};
 
 /// The most characters of a check's output a round and the worker's instruction keep (the end of
 /// it, where the failure is).
@@ -111,10 +116,11 @@ impl CheckProgress for NoProgress {
 pub(crate) fn run_on_host(
     host: &Host<'_>,
     ticket: TicketId,
-    spec: Option<CheckSpec>,
+    (spec, extras): (Option<CheckSpec>, &[ExtraCheck]),
     sync: Option<&SyncSpec>,
     outcomes: &mut Vec<ExternalOutcome>,
 ) {
+    let mut ran = Ran::default();
     // One check at a time on the machine: wait for the turn, hold it until done.
     let _turn = host.gate.enter(ticket);
     let synced = match sync {
@@ -136,7 +142,13 @@ pub(crate) fn run_on_host(
         (Some(spec), Ok(_)) => {
             let command = spec.command.clone();
             host.progress.stage(ticket, CheckStage::Running { command });
-            host.checker.run(spec)
+            ran.seen = sync.and_then(|s| host.merger.seen(s, None));
+            let result = host.checker.run(spec);
+            if result.as_ref().is_ok_and(|r| r.success) {
+                let seen = (sync, ran.seen.as_ref());
+                ran.extras = extra::run_all(host, ticket, spec, seen, extras);
+            }
+            result
         }
         (None, Ok(_)) => Err(CheckError::NothingToRun),
     };
@@ -144,6 +156,7 @@ pub(crate) fn run_on_host(
         ticket,
         spec,
         result,
+        ran,
     });
 }
 
@@ -203,6 +216,7 @@ fn queue_for<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket) -> AppResult<()> {
             .check_command
             .zip(dir)
             .map(|(command, dir)| CheckSpec { command, dir }),
+        extras: project.extra_checks,
         sync,
     });
     Ok(())
@@ -241,6 +255,9 @@ pub(crate) fn sync_conflict<U: UnitOfWork + ?Sized>(
     let event = TicketEvent::CheckDone {
         passed: false,
         output: text,
+        base: None,
+        head: None,
+        lines: Vec::new(),
         mode: reviews::mode_of(uow, &t)?,
         max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
     };
@@ -278,6 +295,7 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
     ticket: TicketId,
     command: Option<&str>,
     result: Result<CheckResult, CheckError>,
+    ran: Ran,
 ) -> AppResult<()> {
     let Some(t) = uow.ticket(ticket)? else {
         return Ok(());
@@ -301,12 +319,21 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
                 command: command.unwrap_or_default().to_owned(),
             }
         }
-        Ok(r) => TicketEvent::CheckDone {
-            passed: r.success,
-            output: report(command.unwrap_or_default(), &r),
-            mode: reviews::mode_of(uow, &t)?,
-            max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
-        },
+        Ok(r) => {
+            let sum = extra::summarize(command.unwrap_or_default(), &r, &ran.extras);
+            match sum.missing {
+                Some(command) => TicketEvent::CheckCannotRun { command },
+                None => TicketEvent::CheckDone {
+                    passed: sum.passed,
+                    output: sum.output,
+                    base: ran.seen.as_ref().map(|s| s.base.clone()),
+                    head: ran.seen.as_ref().map(|s| s.head.clone()),
+                    lines: sum.lines,
+                    mode: reviews::mode_of(uow, &t)?,
+                    max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
+                },
+            }
+        }
         Err(e) => TicketEvent::CheckLost {
             detail: e.to_string(),
         },
