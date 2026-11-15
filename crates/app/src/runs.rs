@@ -172,6 +172,10 @@ pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
 ) -> AppResult<()> {
     let reason = match error {
         RunnerError::NoWorkingDir => BlockedReason::NoWorkingDir,
+        // A state of the machine, not a crash: the window shows the sentence as it is.
+        RunnerError::NoPty(_) => BlockedReason::Manual {
+            text: error.to_string(),
+        },
         other => BlockedReason::Crashed {
             detail: other.to_string(),
         },

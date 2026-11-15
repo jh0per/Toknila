@@ -95,6 +95,9 @@ pub struct RunBrief<'a> {
     /// The story's checklist, with positions and done state (a worker's file lists it so that
     /// `subtask_done` names a position it has read).
     pub checklist: &'a [BriefTask],
+    /// The commands the reviewer may run, each as typed from the ship ([`crate::reviewer_commands`]);
+    /// a reviewer only.
+    pub review_commands: &'a [String],
 }
 
 /// The section that carries the discussion of the card with the assistant; empty when there is
@@ -220,9 +223,10 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
              branch, run the single tests the hand-in names and whatever the diff makes you doubt \
              and quote their result lines (each command plain, one per call, no `cd` or `&&`), \
              mark NOT_RUN what you could not run (never FAIL it), then call `review_verdict` \
-             once. You do not change the code. Do not run the whole gate again.{since}\n\n\
+             once. You do not change the code. Do not run the whole gate again.{since}{commands}\n\n\
              {gate}",
             key = brief.key,
+            commands = review_commands_text(brief.review_commands),
             since = waiting::reviewer_part(brief.returned),
             gate = gate::text(brief.check),
         ),
@@ -233,6 +237,19 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
             key = brief.key
         ),
     }
+}
+
+/// The sentence that tells a reviewer which commands it may run and from where; empty for none.
+fn review_commands_text(commands: &[String]) -> String {
+    if commands.is_empty() {
+        return String::new();
+    }
+    let list: Vec<String> = commands.iter().map(|c| format!("`{c}`")).collect();
+    format!(
+        " You may run, from the ship's root and with the folder as the flag shown (never `cd`): {}. \
+         Run those instead of writing NOT_RUN.",
+        list.join(", ")
+    )
 }
 
 /// The section that names the project's check command, if it has one.

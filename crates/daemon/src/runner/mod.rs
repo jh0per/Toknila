@@ -242,7 +242,8 @@ impl Runners {
         let bin = self.agent_bin();
         let mut brief = req.brief.clone();
         if req.role == AgentRole::Reviewer {
-            brief.repo_tools = wiring::repo_tools(Path::new(&req.dir));
+            brief.repo_tools =
+                wiring::repo_tools(Path::new(&req.dir), brief.check_command.as_deref());
         }
         let cx = wiring::Context {
             dir: &dir,
