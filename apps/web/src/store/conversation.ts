@@ -102,8 +102,7 @@ const reload = (s: State): Effect[] => Object.keys(s.conversation).map((project)
 export function conversationEvent(s: State, e: EventRecord, gap: boolean): [State, Effect[]] {
   const p = (e.payload ?? {}) as { project?: string; message?: ConversationMessage };
   const key = s.projects.find((x) => x.id === p.project)?.key;
-  // A planner's turn started or ended: which answers close their messages depends on it.
-  if (e.entity === "planner") return [s, key ? [{ type: "plannerCall", project: key, call: "load" }] : []];
+  // (A planner's turn is `assistantEvent`'s, in `plannerTurn.ts`: it follows the turn and reloads the planner.)
   if (gap) return [s, reload(s)];
   if (!key || !p.message) return [s, []];
   return reduceConversation(s, { type: "conversationMessage", project: key, message: p.message });

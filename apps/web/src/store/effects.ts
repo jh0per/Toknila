@@ -14,7 +14,7 @@ import { runRoadmapEffect } from "./roadmapEffects";
 import { runPlacementEffect } from "./placementEffects";
 import { runImportEffect } from "./importEffects";
 import { runPlanEffect } from "./planEffects";
-import { runPlannerEffect } from "./plannerEffects";
+import { runPlannerEffect, runPlannerPoll } from "./plannerEffects";
 import { runReleaseEffect } from "./releaseEffects";
 import { runSettingsEffect } from "./settingsEffects";
 import { saveAssistant } from "./assistantEffects";
@@ -219,6 +219,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "plannerCall":
         runPlannerEffect(e, dispatch);
+        return;
+      case "plannerPoll":
+        runPlannerPoll(e, dispatch);
         return;
       case "fetchConversation":
         runConversationEffect(e, dispatch);

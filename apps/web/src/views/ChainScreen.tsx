@@ -5,7 +5,7 @@ import type { Intent } from "../store/msg";
 import { type State, currentProject, slotsOf } from "../store/state";
 import { epicTitle } from "../store/title";
 import { AUTOSTART_HINT, RUN_CHAIN_HINT } from "../store/autostart";
-import { AskBox } from "./AskBox";
+import { AskBoxOutside } from "./AskSent";
 import { AssistantButton } from "./AssistantButton";
 import { viewOf, withView } from "../store/route";
 import { Canvas } from "./Canvas";
@@ -100,8 +100,8 @@ export function ChainScreen({ chain, state, dispatch }: { chain: ChainDetail; st
             <p className="muted">
               This epic has no stories yet. Tell the assistant what it is for and it drafts the stories, or add the first story yourself.
             </p>
-            <AskBox
-              project={project.key} state={state} dispatch={dispatch} testId="chain-ask" label="What should this epic do?"
+            <AskBoxOutside
+              project={project.key} state={state} dispatch={dispatch} testId="chain-ask" place={`chain:${chain.chain.name}`} label="What should this epic do?"
               placeholder={`For example: the stories for ${epicTitle(chain)}`} button="Plan it with the assistant"
             />
             <p className="secondary-links">

@@ -97,6 +97,23 @@ button.inline-link { background: none; border: 0; padding: 0; font: inherit; cur
 .did.progress .did-text { font-style: italic; }
 .did.progress::before { content: "\2026"; }
 .chat-progress { margin: var(--sp1) 0 0; font-style: italic; overflow-wrap: anywhere; }
+/* The daemon's step beside the minutes: it drops to its own line when it does not fit, and ends in
+   an ellipsis there (the whole step is its title). */
+.chat-waiting { margin: 0; }
+.chat-step { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+/* A turn that ended without an answer: the words, then the hint, Nudge (and a box's link to the chat). */
+.chat-ended p { margin: 0; }
+.chat-ended-row { justify-content: center; flex-wrap: wrap; gap: var(--sp2); margin-top: var(--sp1); }
+/* The Assistant button pulses while the assistant's turn is on. */
+.btn > .dot.pulse { margin-right: var(--sp2); }
+/* An ask box outside the chat after a send: what was sent, the waiting line under it, a link to the chat. */
+.ask-sent { max-width: 520px; display: flex; flex-direction: column; gap: var(--sp2); }
+.ask-sent-label { margin: 0; font-size: var(--fs-label-m); line-height: var(--lh-label-m); letter-spacing: 0.06em; text-transform: uppercase; color: var(--on-surface-variant); }
+.ask-sent-text { margin: 0; padding: var(--sp2) var(--sp3); border-left: 3px solid var(--primary); border-radius: var(--shape-xs); background: var(--surface-container-high); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ask-sent-open { margin: 0; }
+.ask-sent .chat-note { text-align: start; }
+.ask-sent .chat-ended-row { justify-content: flex-start; }
+.ask-sent + .ask { margin-top: var(--sp3); }
 .chat-queued { margin: var(--sp1) 0 0; font-size: var(--fs-label-m); line-height: var(--lh-label-m); }
 
 /* An empty chain asks what it should do, over its own (still working) canvas. */

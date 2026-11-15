@@ -47,7 +47,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     text:
       "The assistant is a smart helper for the process: it creates epics and their stories, steers the process, answers your questions, and turns a screenshot into a design story. " +
       "There is one assistant, at two levels: open Assistant under your project and the roadmap opens with it beside, where it plans epics (an epic holds stories and ends in a release); inside an epic the same panel (Cmd/Ctrl+.) talks about that epic's stories, and its chip says what is open, which you can take off. " +
-      "The expand button of the panel opens the chat at full width, with the assistant's terminal.",
+      "The expand button of the panel opens the chat at full width, with the assistant's terminal. " +
+      "While it works, the chat and the box you sent from show how long it has taken and what it does now (\"Reading the plan\"), the Assistant button pulses, and a turn that ends without an answer is said at once, with Nudge.",
   },
   {
     id: "start", title: "Start a story", show: "chain", showLabel: "Open an epic",

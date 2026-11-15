@@ -1,7 +1,10 @@
 // A project's planner (the assistant): whether its process is alive, as the daemon answered, and
 // the messages the person sends it. The planner edits the plan through its own tools, so the
 // diagram follows the journal like any other change; this slice keeps the Start and Stop state,
-// the refusal of the last command, and what is typed to the assistant before it is sent.
+// the refusal of the last command, and what is typed to the assistant before it is sent. Its turn
+// (`working`, `step`, `since`) is the daemon's: a `planner.turn` journal entry starts or ends it at
+// once, and while it is on and shown the window asks for the step (`syncPoll`, the timer in
+// `plannerEffects.ts`); what the chat and the boxes make of it is `plannerTurn.ts`.
 
 import type { ConversationMessage, PlannerState } from "../api/types";
 import { lineFor, panelChip } from "./assistant";
@@ -35,11 +38,23 @@ export interface PlannerSlice {
   /// Ids of messages the person sent again after the assistant stopped: the copy is the one
   /// awaited, so these no longer count as unread (this window's memory, not the daemon's).
   resent: string[];
+  /// How many chats and ask boxes of each project are on the screen: while one is and the
+  /// project's turn is on, the window asks for the assistant's step.
+  shown: Record<string, number>;
+  /// The projects whose step the window asks for now, every `STEP_POLL_MS` (the effect's timers).
+  polling: string[];
+  /// The ask box each project's last message was sent from (`chain:<name>`, `roadmap`); none when
+  /// it was sent from the chat. That box shows what was sent until the assistant answers.
+  from: Record<string, string>;
 }
 
 export const initialPlanner: PlannerSlice = {
   byProject: {}, error: "", profile: DEFAULT_PLANNER_PROFILE, drafts: {}, sending: undefined, seen: {}, terminalWanted: false, resent: [],
+  shown: {}, polling: [], from: {},
 };
+
+/// How often the window asks the daemon for the assistant's step while its turn is on and on the screen.
+export const STEP_POLL_MS = 2_000;
 
 /// What the person did.
 export type PlannerIntent =
@@ -54,7 +69,10 @@ export type PlannerIntent =
   /// Typing in one of the boxes that talk to the assistant.
   | { type: "editPlannerDraft"; where: string; text: string }
   /// Send the project's draft to the assistant: start it if it is not running, then type the text.
-  | { type: "askPlanner"; project: string }
+  /// `from` is the ask box it was sent from (none for the chat).
+  | { type: "askPlanner"; project: string; from?: string }
+  /// A chat or an ask box of the project came on the screen (`on`) or left it.
+  | { type: "plannerShown"; project: string; on: boolean }
   /// A question asked in a story's chat: kept in the chat by the daemon, then typed to the
   /// assistant with the story's record. Starts the assistant when it is not running.
   | { type: "askStory"; project: string; key: string; text: string }
@@ -98,6 +116,9 @@ export type PlannerEffect = {
   wait?: boolean;
 };
 
+/// Start (`on`) or stop asking the daemon for the project's step every `STEP_POLL_MS`.
+export type PlannerPoll = { type: "plannerPoll"; project: string; on: boolean };
+
 export const loadPlanner = (project: string): Effect => ({ type: "plannerCall", project, call: "load" });
 
 /// A message as the terminal takes it: one line, since a line break would submit it half-way.
@@ -123,7 +144,13 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
         chip?.kind === "card" ? { ...base, call: "discuss", card: chip.key, draft: msg.project, text: raw }
         : chip ? { ...base, call: "ask", text: lineFor(chip, raw), raw, about: chip.kind === "chain" || chip.kind === "roadmap" ? chip : undefined }
         : { ...base, call: "ask", text: oneLine(raw), raw };
-      return [set({ error: "", sending: msg.project }), [call]];
+      const { [msg.project]: _was, ...others } = s.planner.from;
+      return [set({ error: "", sending: msg.project, from: msg.from ? { ...others, [msg.project]: msg.from } : others }), [call]];
+    }
+    case "plannerShown": {
+      const n = (s.planner.shown[msg.project] ?? 0) + (msg.on ? 1 : -1);
+      const { [msg.project]: _was, ...others } = s.planner.shown;
+      return syncPoll(set({ shown: n > 0 ? { ...others, [msg.project]: n } : others }));
     }
     case "askStory": {
       const text = msg.text.trim();
@@ -174,11 +201,42 @@ export function reducePlanner(s: State, msg: PlannerMsg): [State, Effect[]] {
       // The assistant starting or stopping changes what runs in the project.
       const changed = (plannerOf(s, msg.project)?.running ?? false) !== msg.state.running;
       const fx: Effect[] = changed ? [{ type: "loadAgents" }] : [];
-      return [set({ byProject: { ...s.planner.byProject, [msg.project]: msg.state }, seen }), fx];
+      const [next, poll] = syncPoll(set({ byProject: { ...s.planner.byProject, [msg.project]: msg.state }, seen }));
+      return [next, [...fx, ...poll]];
     }
     case "plannerFailed":
       return [set({ error: msg.error, sending: undefined }), []];
   }
+}
+
+/// The assistant's turn started (`working`) or ended at `at`, as a `planner.turn` journal entry
+/// says: the window follows it at once, and asks the daemon for the planner's state again (which
+/// answers close their messages depends on the turn, see `openTurn`).
+export function applyTurn(s: State, project: string, working: boolean, at: number): [State, Effect[]] {
+  const was = plannerOf(s, project);
+  if (!was) return [s, [loadPlanner(project)]];
+  const now: PlannerState = working
+    ? { ...was, running: true, working: true, since: was.working ? was.since : at }
+    : { ...was, working: false, step: null, since: null };
+  const [next, poll] = syncPoll({ ...s, planner: { ...s.planner, byProject: { ...s.planner.byProject, [project]: now } } });
+  return [next, [loadPlanner(project), ...poll]];
+}
+
+/// Polls the step of each project whose turn is on while a chat or an ask box of it is on the
+/// screen, and stops polling the rest. A turn still on that nothing shows any more drops its
+/// step, since nobody follows it: the window never shows a step it has stopped asking for.
+export function syncPoll(s: State): [State, Effect[]] {
+  const { shown, polling, byProject } = s.planner;
+  const want = Object.keys(shown).filter((p) => (shown[p] ?? 0) > 0 && byProject[p]?.working);
+  const on = want.filter((p) => !polling.includes(p));
+  const off = polling.filter((p) => !want.includes(p));
+  if (on.length === 0 && off.length === 0) return [s, []];
+  const dropped = Object.fromEntries(off.filter((p) => byProject[p]?.working).map((p) => [p, { ...byProject[p], step: null }]));
+  const fx: Effect[] = [
+    ...on.map((project): Effect => ({ type: "plannerPoll", project, on: true })),
+    ...off.map((project): Effect => ({ type: "plannerPoll", project, on: false })),
+  ];
+  return [{ ...s, planner: { ...s.planner, polling: [...polling.filter((p) => !off.includes(p)), ...on], byProject: { ...byProject, ...dropped } } }, fx];
 }
 
 /// The planner of a project as last answered; not running until the daemon says so.

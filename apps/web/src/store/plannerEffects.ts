@@ -5,7 +5,7 @@ import { get, getBytes, post, postBytes } from "../api/http";
 import type { AskReply, ConversationMessage, PlannerState, ThreadDetail } from "../api/types";
 import { askLine } from "./discussion";
 import type { Msg } from "./msg";
-import type { PlannerEffect } from "./planner";
+import { type PlannerEffect, type PlannerPoll, STEP_POLL_MS } from "./planner";
 
 type Dispatch = (msg: Msg) => void;
 
@@ -79,6 +79,26 @@ async function nudge(base: string, e: PlannerEffect): Promise<void> {
   await postBytes(`${base}/input`, typing.encode(line));
   await sleep(150);
   await postBytes(`${base}/input`, typing.encode("\r"));
+}
+
+/// The poll of each project's step: one timer per project.
+const polls = new Map<string, ReturnType<typeof setInterval>>();
+
+/// Starts or stops asking the daemon for the project's step every `STEP_POLL_MS`. A poll that fails
+/// says nothing (the next one asks again): the turn's start and end come from the stream anyway.
+export function runPlannerPoll(e: PlannerPoll, dispatch: Dispatch): void {
+  const timer = polls.get(e.project);
+  if (!e.on) {
+    if (timer !== undefined) clearInterval(timer);
+    polls.delete(e.project);
+    return;
+  }
+  if (timer !== undefined) return;
+  const ask = () =>
+    get<PlannerState>(`/projects/${encodeURIComponent(e.project)}/planner`)
+      .then((state) => dispatch({ type: "plannerLoaded", project: e.project, state }))
+      .catch(() => {});
+  polls.set(e.project, setInterval(ask, STEP_POLL_MS));
 }
 
 /// Runs one effect of the planner.
