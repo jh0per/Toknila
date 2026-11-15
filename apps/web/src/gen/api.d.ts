@@ -3837,10 +3837,20 @@ export interface components {
             base: string;
             /** @description The last tag of the repository, if it has one. */
             last_tag?: string | null;
+            /**
+             * @description The dialog's default for pushing the base branch and the tag: on in github mode and when
+             *     the base branch has an upstream, and only when there is a remote.
+             */
+            push: boolean;
             /** @description Every card is merged: the end node offers Release. */
             releasable: boolean;
+            /**
+             * @description The url of the repository's remote (`origin`, else its only remote), when the daemon can
+             *     read one; `None` means the tag can only stay local.
+             */
+            remote?: string | null;
             run?: components["schemas"]["ReleaseRun"] | null;
-            /** @description The steps the run will take, in order. */
+            /** @description The steps the run will take, in order, with the push when `push` is on. */
             steps: components["schemas"]["ReleaseStep"][];
             /**
              * @description The version to suggest: the chain's own release when it has one, else the next patch of
@@ -4154,6 +4164,11 @@ export interface components {
         };
         /** @description Body of `POST /v1/chains/{chain}/release`: the person's click on Release. */
         StartRelease: {
+            /**
+             * @description Push the base branch and the tag to the remote; left out, the offer's default. Asking for
+             *     it with no remote is refused. A resumed run keeps the steps it began with.
+             */
+            push?: boolean | null;
             /** @description Run an interrupted release again from the step it stopped at; what passed is not redone. */
             resume?: boolean;
             /** @description The version, such as `1.4.0`; it becomes the tag `v1.4.0`. */

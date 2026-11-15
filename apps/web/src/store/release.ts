@@ -2,7 +2,7 @@
 // daemon offers a version (suggested from the last tag) and the steps the project has, and runs
 // them only after the person's click; this keeps its offer, and the run's steps as they go.
 
-import type { ChainDetail, ReleaseOffer, ReleaseRun } from "../api/types";
+import type { ChainDetail, ReleaseOffer, ReleaseRun, ReleaseStep } from "../api/types";
 import type { Effect } from "./msg";
 import { withChain } from "./plan";
 import type { State } from "./state";
@@ -18,16 +18,33 @@ export interface ReleaseUi {
   error: string | undefined;
   /// The last run of the release, as the daemon reports it.
   run: ReleaseRun | undefined;
+  /// The person's choice of the checkbox; `undefined` until they touch it (the offer's default).
+  push: boolean | undefined;
 }
 
-export const initialRelease: ReleaseUi = { offer: undefined, version: "", busy: false, error: undefined, run: undefined };
+export const initialRelease: ReleaseUi = { offer: undefined, version: "", busy: false, error: undefined, run: undefined, push: undefined };
+
+/// Whether the release pushes the base and the tag: the person's choice, else the offer's default,
+/// and never when the repository has no remote (there is no checkbox then).
+export function releasePush(r: ReleaseUi): boolean {
+  if (!r.offer?.remote) return false;
+  return r.push ?? r.offer.push;
+}
+
+/// The steps the dialog lists before the click: the offer's, with the push as the box says.
+export function plannedSteps(r: ReleaseUi): ReleaseStep[] {
+  const steps = (r.offer?.steps ?? []).filter((s) => s !== "push");
+  return releasePush(r) ? [...steps, "push"] : steps;
+}
 
 /// What the person did.
 export type ReleaseIntent =
   | { type: "openRelease"; chain: string }
   | { type: "setReleaseVersion"; version: string }
+  | { type: "setReleasePush"; push: boolean }
   /// `resume`: run an interrupted release again from its step; what passed is not redone.
-  | { type: "startRelease"; chain: string; version: string; resume?: boolean };
+  /// `push`: the checkbox; left out, the daemon's default.
+  | { type: "startRelease"; chain: string; version: string; resume?: boolean; push?: boolean };
 
 /// What the daemon answered.
 export type ReleaseResult =
@@ -63,6 +80,8 @@ export function reduceRelease(s: State, msg: ReleaseMsg): [State, Effect[]] {
       ];
     case "setReleaseVersion":
       return [set({ version: msg.version }), []];
+    case "setReleasePush":
+      return [set({ push: msg.push }), []];
     case "startRelease":
       return [set({ busy: true, error: undefined, run: undefined }), [msg]];
     case "releaseStarted":

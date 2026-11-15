@@ -205,6 +205,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     }
     case "openRelease":
     case "setReleaseVersion":
+    case "setReleasePush":
     case "startRelease":
     case "releaseOffered":
     case "releaseStarted":

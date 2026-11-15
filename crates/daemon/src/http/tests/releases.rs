@@ -336,6 +336,12 @@ async fn a_failing_push_is_the_step_that_is_named() {
         )
         .await;
     assert_eq!(s, StatusCode::OK);
+    // A remote that is not there: the url reads, the push fails.
+    let gone = e._tmp.path().join("gone.git");
+    git(
+        &e.repo,
+        &["remote", "add", "origin", &gone.to_string_lossy()],
+    );
     e.api
         .post("/v1/chains/auth/release", json!({ "version": "2.0.0" }))
         .await;
@@ -514,18 +520,18 @@ async fn running_again_after_a_failed_push_does_not_redo_the_tag() {
         )
         .await;
     assert_eq!(s, StatusCode::OK);
+    let remote = e._tmp.path().join("remote.git");
+    git(
+        &e.repo,
+        &["remote", "add", "origin", &remote.to_string_lossy()],
+    );
     e.api
         .post("/v1/chains/auth/release", json!({ "version": "2.0.0" }))
         .await;
     let failed = finished_run(&e.api, "2.0.0").await;
     assert_eq!(states(&failed), ["tag:done", "push:failed"], "{failed}");
 
-    let remote = e._tmp.path().join("remote.git");
     git(e._tmp.path(), &["init", "--quiet", "--bare", "remote.git"]);
-    git(
-        &e.repo,
-        &["remote", "add", "origin", &remote.to_string_lossy()],
-    );
     e.api
         .post(
             "/v1/chains/auth/release",

@@ -82,12 +82,30 @@ try {
   if (git(repo, "tag", "--list") !== "") throw new Error("a tag was made before the click");
   console.log("PASS nothing is tagged before the click");
 
+  // No remote yet: no checkbox, one line says the tag stays local.
+  await expectText(t("release-no-remote"), "no remote: the tag stays local", "a repository without a remote says so");
+  if ((await t("release-push").count()) !== 0) throw new Error("the push checkbox shows without a remote");
+  console.log("PASS no remote: no checkbox");
+  // A remote appears; the dialog reads it again. The base has no upstream: off by default.
+  git(home, "init", "--quiet", "--bare", "remote.git");
+  git(repo, "remote", "add", "origin", join(home, "remote.git"));
+  await t("release-close").click();
+  await t("release-button").first().click();
+  await t("release-push").waitFor({ timeout: 10_000 });
+  if (await t("release-push").isChecked()) throw new Error("the push checkbox is on without an upstream");
+  if ((await t("release-steps").locator("[data-step=push]").count()) !== 0) throw new Error("the push step is listed while the box is off");
+  await t("release-push").check();
+  await t("release-steps").locator("[data-step=push]").waitFor({ timeout: 5_000 });
+  console.log("PASS the checkbox is off by default and adds the Push step when ticked");
+
   await t("release-confirm").click();
   await t("release-done").waitFor({ timeout: 60_000 });
   await expectText(t("release-done"), "v0.1.0", "the dialog reads released with the tag");
   await expectText(t("release-steps").locator("[data-step=check]"), "release-checked", "the check's output is shown");
+  await expectText(t("release-steps").locator("[data-step=push]"), "Pushed develop and v0.1.0 to origin", "the push says what it pushed");
   if (git(repo, "tag", "--list") !== "v0.1.0") throw new Error(`the repository's tags are: ${git(repo, "tag", "--list")}`);
-  console.log("PASS the repository has the tag v0.1.0");
+  if (git(join(home, "remote.git"), "tag", "--list") !== "v0.1.0") throw new Error("the tag did not reach the remote");
+  console.log("PASS the repository and its remote have the tag v0.1.0");
   mkdirSync(dirname(shot), { recursive: true });
   await page.screenshot({ path: shot });
 

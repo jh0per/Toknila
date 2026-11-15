@@ -9,11 +9,12 @@ use std::time::Duration;
 
 use toknila_app::{CheckSpec, Checker};
 use toknila_core::ReleaseId;
-use toknila_core::release_run::{ReleaseStep, bump_command};
+use toknila_core::release_run::{ReleaseStep, bump_command, push_failure_line, pushed_text};
 
 use crate::checker::ShellChecker;
-use crate::git::Git;
+use crate::git::{Git, GitError};
 use crate::merger::GitMerger;
+use crate::shipyard::remote::Remote;
 use crate::store::release_runs::{Entry, tail};
 
 /// How long a push may take.
@@ -33,7 +34,8 @@ pub struct Plan {
     pub tag: String,
     pub check: Option<String>,
     pub bump: Option<String>,
-    pub push: bool,
+    /// Where the Push step sends the base and the tag, as the shipyard read it.
+    pub remote: Option<Remote>,
     /// Every step the project's release has.
     pub steps: Vec<ReleaseStep>,
     /// The steps this run takes: all of them, or what is left after an interruption.
@@ -287,16 +289,30 @@ impl Ctx<'_> {
 
     fn push(&self) -> Result<String, String> {
         let plan = self.plan;
+        let Some(remote) = &plan.remote else {
+            return Err("the repository has no remote to push to".to_owned());
+        };
         let args = [
             "push",
             "--porcelain",
-            "origin",
+            remote.name.as_str(),
             &format!("refs/heads/{}", plan.base),
             &format!("refs/tags/{}", plan.tag),
         ];
-        self.git
-            .run_within(&plan.repo, &args, PUSH_LIMIT)
-            .map(|out| format!("$ git push origin {} {}\n{out}", plan.base, plan.tag))
-            .map_err(|e| e.to_string())
+        match self.git.run_within(&plan.repo, &args, PUSH_LIMIT) {
+            Ok(_) => Ok(pushed_text(
+                &plan.base,
+                &plan.tag,
+                &remote.name,
+                &remote.url,
+            )),
+            // The detail holds git's stderr and the porcelain report (the refused ref); the last
+            // line is the one a person reads.
+            Err(GitError::Failed { command, detail }) => {
+                let line = push_failure_line(&detail);
+                Err(format!("$ git {command}\n{detail}\n{line}"))
+            }
+            Err(e) => Err(e.to_string()),
+        }
     }
 }

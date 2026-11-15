@@ -22,15 +22,17 @@ impl GitShipyard {
     /// The planner's place for `spec`; every failure falls back to the repository as it is.
     pub(super) fn site_for(&self, spec: &PlannerSpec) -> PlannerSite {
         let repo = spec.repo.as_str();
-        let fetch: &[&str] = if spec.remote {
-            &["--quiet", "origin"]
+        let remote = super::remote::remote_of(&self.git, repo)
+            .map_or_else(|| "origin".to_owned(), |r| r.name);
+        let fetch: Vec<&str> = if spec.remote {
+            vec!["--quiet", &remote]
         } else {
-            &["--quiet"]
+            vec!["--quiet"]
         };
-        let _ = self.git.fetch(repo, fetch);
+        let _ = self.git.fetch(repo, &fetch);
         if spec.remote {
             let dir = self
-                .fresh_checkout(spec)
+                .fresh_checkout(spec, &remote)
                 .unwrap_or_else(|_| repo.to_owned());
             return PlannerSite { dir, behind: None };
         }
@@ -41,9 +43,9 @@ impl GitShipyard {
     }
 
     /// The planner's checkout, made or moved to the fetched base.
-    fn fresh_checkout(&self, spec: &PlannerSpec) -> Result<String, ShipError> {
+    fn fresh_checkout(&self, spec: &PlannerSpec, remote: &str) -> Result<String, ShipError> {
         let repo = spec.repo.as_str();
-        let start = format!("origin/{}", spec.base);
+        let start = format!("{remote}/{}", spec.base);
         let commit = format!("{start}^{{commit}}");
         let found = !start.starts_with('-')
             && self.succeeds(repo, ["rev-parse", "--verify", "--quiet", &commit])?;
