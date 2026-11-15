@@ -21,6 +21,7 @@ mod system;
 mod threads;
 mod tickets;
 mod usage;
+mod workspaces;
 
 pub use agents::{ProjectAgents, QueuedCard};
 pub use card_size::{CARD_MAX_H, CARD_MAX_W, CARD_MIN_W, SizeLimits, clamp_size};
@@ -73,3 +74,4 @@ pub use toknila_core::removal::FolderFate;
 pub use toknila_core::usage::RunTime;
 pub use toknila_core::usage::UsageFigures;
 pub use usage::{PriceInfo, QuotaReport, TodayUsage, UsageSettings, UsageView};
+pub use workspaces::{Workspace, WorkspaceKind, Workspaces, WorkspacesRetired};

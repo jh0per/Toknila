@@ -18,7 +18,7 @@
 //! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
 //! | Review | Review (merging) | `Accept`; an approving `ReviewVerdict` that decides does the same |
 //! | Review (merging) | Review (checking) | `MainMoved` (at Accept, main is at a commit the last check did not see; a pass merges by itself) |
-//! | Review (merging) | Merged | `MergeDone` (removes the ship's worktree, keeps its branch) |
+//! | Review (merging) | Merged | `MergeDone` (retires the ship: worktree, branch unless it holds unmerged work, record) |
 //! | Review (merging) | Running | `MergeConflicted` (the base conflicts with the ship: back to the worker as a round; the Accept is remembered) |
 //! | Review (merging) | Blocked | `Block` with a merge reason (`merge_conflict`, `ci_failed`, `pr_closed`, ...); `Unblock` merges again |
 //! | Review (merging) | same | `PrUpdated` (pull-request mode: the card's pull request and its checks) |

@@ -77,6 +77,7 @@ pub async fn run(paths: Paths) -> Result<(), RunError> {
     } else {
         tracing::warn!(?recovery, "stored state differs from the journal");
     }
+    crate::recovery::unknown::log_ships(&store, &paths.ships(), &recovery.ships_retired).await;
     // A restart keeps the address and token when it can, so an open page reconnects by itself.
     let token: Arc<str> = match reuse.as_ref().filter(|i| i.token.len() >= 32) {
         Some(i) => i.token.clone().into(),

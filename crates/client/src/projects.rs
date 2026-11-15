@@ -74,6 +74,20 @@ impl Client {
         )
     }
 
+    /// `GET /projects/{project}/ships`: the workspaces of the project's stories, with status.
+    pub fn workspaces(&self, project: &str) -> ClientResult<toknila_api_types::Workspaces> {
+        self.call("GET", &format!("/projects/{}/ships", enc(project)), NO_BODY)
+    }
+
+    /// `POST /projects/{project}/ships/retire-finished`: retire the workspaces of finished stories.
+    pub fn retire_finished(
+        &self,
+        project: &str,
+    ) -> ClientResult<toknila_api_types::WorkspacesRetired> {
+        let path = format!("/projects/{}/ships/retire-finished", enc(project));
+        self.call("POST", &path, Some(&serde_json::json!({})))
+    }
+
     /// `POST /projects/{project}/strays/clean`: delete them.
     pub fn clean_strays(&self, project: &str) -> ClientResult<toknila_api_types::StraysCleaned> {
         let path = format!("/projects/{}/strays/clean", enc(project));

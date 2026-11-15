@@ -24,6 +24,7 @@ pub mod system;
 pub mod threads;
 pub mod tickets;
 pub mod usage;
+pub mod workspaces;
 
 use crate::http::body::Json;
 use axum::http::{HeaderMap, HeaderName, HeaderValue};

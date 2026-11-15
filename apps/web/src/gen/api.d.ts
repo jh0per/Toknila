@@ -1134,6 +1134,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/ships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the workspaces of the project's stories with each story's status, and the assistant's
+         *     reading copy (`_planner`) named as such. The copy is not counted; `finished` counts the
+         *     workspaces of merged, released and cancelled stories.
+         */
+        get: operations["list_workspaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/ships/retire-finished": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retires the workspace of every merged, released or cancelled story of the project: the
+         *     worktree goes, the branch goes unless it holds work the base lacks (the story says so), and
+         *     the record goes. Only the person's token may call it.
+         */
+        post: operations["retire_finished_workspaces"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project}/strays": {
         parameters: {
             query?: never;
@@ -4773,6 +4815,42 @@ export interface components {
             /** @description `origin/main`. */
             upstream: string;
         };
+        /** @description One workspace of a project. */
+        Workspace: {
+            branch?: string | null;
+            /** @description The story is merged, released or cancelled: Clean up retires this workspace. */
+            finished: boolean;
+            kind: components["schemas"]["WorkspaceKind"];
+            path: string;
+            status?: components["schemas"]["TicketStatus"] | null;
+            /** @description The story's key; none for the assistant's copy. */
+            story?: string | null;
+        };
+        /**
+         * @description What a workspace folder is.
+         * @enum {string}
+         */
+        WorkspaceKind: "story" | "planner";
+        /** @description Answer of `GET /v1/projects/{project}/ships`. */
+        Workspaces: {
+            /**
+             * Format: int32
+             * @description The stories' workspaces; the assistant's copy is not counted.
+             */
+            count: number;
+            /**
+             * Format: int32
+             * @description Of `count`, those that belong to finished stories.
+             */
+            finished: number;
+            /** @description The assistant's copy (when it exists) first, then the stories' ships. */
+            items: components["schemas"]["Workspace"][];
+        };
+        /** @description Answer of `POST /v1/projects/{project}/ships/retire-finished`. */
+        WorkspacesRetired: {
+            /** @description Keys of the stories whose workspace is being retired. */
+            retired: string[];
+        };
     };
     responses: never;
     parameters: never;
@@ -7575,6 +7653,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanScan"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_workspaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workspaces"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    retire_finished_workspaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id or key */
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspacesRetired"];
                 };
             };
             404: {
