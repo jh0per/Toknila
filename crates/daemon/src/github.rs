@@ -9,7 +9,7 @@
 //! enough is core's decision ([`toknila_core::pr::judge`]); this file only reads what `gh` says.
 
 use serde::Deserialize;
-use toknila_app::{MergeError, MergeOutcome, Merger, SyncOutcome, SyncSpec};
+use toknila_app::{MergeError, MergeOutcome, Merger, Seen, SyncOutcome, SyncSpec};
 use toknila_core::pr::{ChecksVerdict, PrSpec, judge};
 use toknila_core::{CheckRun, CheckState, MergeSpec, PullRequest};
 
@@ -288,5 +288,9 @@ impl Merger for Mergers {
 
     fn sync(&self, spec: &SyncSpec) -> Result<SyncOutcome, MergeError> {
         self.local.sync(spec)
+    }
+
+    fn seen(&self, spec: &SyncSpec, since: Option<&str>) -> Option<Seen> {
+        self.local.seen(spec, since)
     }
 }

@@ -275,6 +275,10 @@ pub struct Review {
     /// next hand-in that passes the check and the reviewer merges without a second Accept.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub accepted: bool,
+    /// The check of this turn is the one Accept asked for because main moved since the last
+    /// check; a pass merges by itself.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub recheck: bool,
 }
 
 impl Review {
@@ -282,6 +286,7 @@ impl Review {
     pub fn is_empty(&self) -> bool {
         self.turn.is_none()
             && !self.accepted
+            && !self.recheck
             && self.check.is_none()
             && self.rounds.is_empty()
             && !self.nudged
@@ -437,6 +442,7 @@ mod tests {
             command_policy: Default::default(),
             allowed_commands: Vec::new(),
             reviewer_web_domains: Vec::new(),
+            extra_checks: Vec::new(),
             archived: false,
             hidden: false,
             simulated: false,

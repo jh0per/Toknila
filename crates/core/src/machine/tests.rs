@@ -906,6 +906,9 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
         any::<bool>().prop_map(|passed| TicketEvent::CheckDone {
             passed,
             output: "out".to_owned(),
+            base: None,
+            head: None,
+            lines: Vec::new(),
             mode: crate::ReviewMode::Both,
             max_rounds: 1,
         }),
@@ -992,6 +995,7 @@ mod design;
 mod merge;
 mod no_checks;
 mod out_of_order;
+mod recheck;
 mod review;
 
 fn base_behind(can_fast_forward: bool) -> TicketEvent {

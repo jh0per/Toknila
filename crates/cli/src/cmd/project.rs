@@ -1,15 +1,16 @@
 //! `tok project`.
 
-use std::io::{BufRead, IsTerminal};
+use std::io::IsTerminal;
 
 use anyhow::{Result, anyhow, bail};
 use clap::Subcommand;
-use toknila_api_types::{DeleteProject, NewProject, PatchProject, ProjectDeletion};
+use toknila_api_types::{DeleteProject, NewProject, PatchProject};
 use toknila_client::Client;
-use toknila_core::removal::FolderFate;
+use toknila_core::ExtraCheck;
 use toknila_core::wire::from_wire_name;
 
 use super::emit;
+use super::project_rm::{confirm, deleted};
 use crate::output;
 
 #[derive(Debug, Subcommand)]
@@ -86,6 +87,15 @@ pub enum ProjectCmd {
         /// and may without asking. An empty text clears it.
         #[arg(long)]
         check_command: Option<String>,
+        /// An extra check that runs after the test command when a story changed files that match
+        /// its paths, as `paths=command` (e.g. `'apps/web/**=cargo xtask web && cargo xtask
+        /// e2e-web'`; several paths are separated by commas). One flag per check, in the order
+        /// they run; the flags replace the project's list.
+        #[arg(long = "extra-check", value_name = "PATHS=COMMAND")]
+        extra_check: Vec<String>,
+        /// Remove every extra check.
+        #[arg(long, conflicts_with = "extra_check")]
+        clear_extra_checks: bool,
         /// The command run once in every new workspace before the agent starts (e.g. `npm ci
         /// --prefix apps/web`). An empty text clears it.
         #[arg(long)]
@@ -199,12 +209,26 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             merge_method,
             no_checks_timeout,
             check_command,
+            extra_check,
+            clear_extra_checks,
             setup_command,
             bump_command,
             worker_model,
             reviewer_model,
             planner_model,
         } => {
+            let extra_checks = if clear_extra_checks {
+                Some(Vec::new())
+            } else if extra_check.is_empty() {
+                None
+            } else {
+                let parsed = extra_check.iter().map(|e| ExtraCheck::parse(e));
+                Some(
+                    parsed
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|e| anyhow!(e))?,
+                )
+            };
             let allowed_commands = if forget_command.is_empty() {
                 None
             } else {
@@ -233,6 +257,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                     .transpose()?,
                 no_checks_timeout_secs: no_checks_timeout,
                 check_command,
+                extra_checks,
                 setup_command,
                 bump_command,
                 worker_model,
@@ -252,6 +277,9 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 );
                 if let Some(c) = &p.check_command {
                     println!("test command: {c}");
+                }
+                for e in &p.extra_checks {
+                    println!("extra check {}: {}", e.label(), e.command);
                 }
                 if let Some(c) = &p.setup_command {
                     println!("setup command: {c}");
@@ -331,75 +359,5 @@ fn print_commands(p: &toknila_core::Project) {
     }
     if !p.reviewer_web_domains.is_empty() {
         println!("reviewer reads: {}", p.reviewer_web_domains.join(", "));
-    }
-}
-
-/// Asks the person to type the project's key before its folder goes to the Trash. Refuses when
-/// nobody can answer (stdin is not a terminal) and when the answer is not the key.
-fn confirm(input: &mut impl BufRead, terminal: bool, key: &str, folder: &str) -> Result<()> {
-    if !terminal {
-        bail!(
-            "not deleting {key}: moving {folder} to the Trash needs a confirmation and stdin is not a terminal; pass --yes"
-        );
-    }
-    eprintln!("This deletes project {key} and moves {folder} to the Trash.");
-    eprint!("Type the project key ({key}) to go on: ");
-    let mut line = String::new();
-    input.read_line(&mut line)?;
-    if line.trim() != key {
-        bail!("{:?} is not {key}; nothing was deleted", line.trim());
-    }
-    Ok(())
-}
-
-/// What a deletion did, for a person: what went, where the folder is, and what stayed behind.
-fn deleted(d: &ProjectDeletion) {
-    println!(
-        "project {} deleted: {} {} {:?}, {} {}",
-        d.project.key,
-        d.chains.len(),
-        if d.chains.len() == 1 { "epic" } else { "epics" },
-        d.chains,
-        d.tickets,
-        if d.tickets == 1 { "story" } else { "stories" }
-    );
-    for w in &d.worktrees_removed {
-        println!("removed workspace {w}");
-    }
-    let folder = d.project.repo_path.as_deref().unwrap_or_default();
-    match d.folder {
-        FolderFate::Kept => println!("folder kept: {folder}"),
-        FolderFate::Trashed => println!("folder moved to the Trash: {folder}"),
-        FolderFate::None => println!("no folder"),
-    }
-    if let Some(e) = &d.folder_error {
-        println!("the folder stayed where it was: {e}");
-    }
-    for w in &d.warnings {
-        println!("warning: {w}");
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_trash_needs_the_key_typed_at_a_terminal() {
-        let typed = |text: &str, terminal: bool| {
-            confirm(&mut text.as_bytes(), terminal, "DEMO", "/w/demo").map_err(|e| e.to_string())
-        };
-        assert_eq!(typed("DEMO\n", true), Ok(()));
-        assert_eq!(typed("  DEMO  \n", true), Ok(()));
-        assert_eq!(
-            typed("demo\n", true),
-            Err("\"demo\" is not DEMO; nothing was deleted".to_owned())
-        );
-        assert_eq!(
-            typed("", true),
-            Err("\"\" is not DEMO; nothing was deleted".to_owned())
-        );
-        let e = typed("DEMO\n", false).expect_err("no terminal");
-        assert!(e.contains("stdin is not a terminal; pass --yes"), "{e}");
     }
 }

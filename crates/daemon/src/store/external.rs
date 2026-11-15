@@ -144,7 +144,10 @@ impl Store {
 
     async fn log_checks_starting(&self, queued: &[ExternalEffect]) {
         for e in queued {
-            if let ExternalEffect::RunCheck { ticket, spec, sync } = e {
+            if let ExternalEffect::RunCheck {
+                ticket, spec, sync, ..
+            } = e
+            {
                 let key = self.key_of(*ticket).await;
                 match spec {
                     Some(s) => {
