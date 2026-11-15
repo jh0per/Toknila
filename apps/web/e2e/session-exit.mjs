@@ -67,7 +67,8 @@ if (role === "victim") {
   await until("the fake agent to run", () => processesWith(marker).length > 0);
   const daemon = JSON.parse(readFileSync(join(home, "daemon.json"), "utf8")).pid;
   const agents = processesWith(marker);
-  await until("the fake agent's child to run", () => kidsOf(agents).length > 0);
+  // `kidsOf` is empty on Windows by design (no `ps`): waiting for a child there never ends.
+  if (process.platform !== "win32") await until("the fake agent's child to run", () => kidsOf(agents).length > 0);
   console.log(`READY ${JSON.stringify({ marker, home, daemon, agents, kids: kidsOf(agents) })}`);
   if (mode === "throw") setTimeout(() => { throw new Error("boom before finally"); }, 100);
   else if (mode === "exit") setTimeout(() => process.exit(3), 100);
