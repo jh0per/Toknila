@@ -237,6 +237,7 @@ fn comments_roundtrip_full_and_sparse() {
         how_to_verify: Some("cargo test".to_owned()),
         alternatives: Some("sqlx".to_owned()),
         consequences: Some("No DATABASE_URL".to_owned()),
+        person: vec!["Open the editor on the iPhone".to_owned()],
     };
     let sparse = CommentBody {
         gist: "Solid".to_owned(),

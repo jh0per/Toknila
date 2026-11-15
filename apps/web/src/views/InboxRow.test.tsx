@@ -35,6 +35,15 @@ describe("InboxRow", () => {
     expect(html).toContain('data-testid="review-accept"');
   });
 
+  it("says how many steps are for the person, only when there are any", () => {
+    const base = { gist: "g", checks: [{ status: "PASS", text: "verify: green" }] } as InboxItem["hand_in"];
+    const two = render(item({ hand_in: { ...base!, person: ["Tap the 808 Long pad on the iPhone", "Drag the 32-step bar"] } }));
+    expect(two).toMatch(/data-testid="steps-for-you"[^>]*>2 steps for you/);
+    const one = render(item({ hand_in: { ...base!, person: ["Tap the pad"] } }));
+    expect(one).toMatch(/data-testid="steps-for-you"[^>]*>1 step for you</);
+    expect(render(item({ hand_in: base }))).not.toContain("steps-for-you");
+  });
+
   it("shows a question's text and a pin's design name from the item", () => {
     expect(render(item({ kind: "question", text: "Which flag?", answers: [], allowed_actions: [] }))).toContain("Which flag?");
     const pin = render(item({ kind: "design_question", text: "home.png: Is the logo fixed?", design: "home.png", pin: "p1", allowed_actions: [] }));

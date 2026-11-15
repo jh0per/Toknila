@@ -7935,6 +7935,13 @@
               "null"
             ]
           },
+          "person": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The steps a person does by hand (a hand-in's \"For you\" block), one per entry."
+          },
           "what": {
             "type": [
               "string",
@@ -8789,6 +8796,13 @@
               "null"
             ],
             "description": "What is left or not covered."
+          },
+          "person": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The steps a person does by hand: the \"For you\" block, or for a hand-in made before it\nthe lines that start with PERSON."
           },
           "since_return": {
             "oneOf": [

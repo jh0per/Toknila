@@ -60,6 +60,37 @@ pub struct InboxHandIn {
     /// What changed since the Return this hand-in answers, when it answers one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub since_return: Option<SinceReturn>,
+    /// The steps a person does by hand: the "For you" block, or for a hand-in made before it
+    /// the lines that start with PERSON.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub person: Vec<String>,
+}
+
+/// The lines of a hand-in's free text that start with PERSON, without the word.
+fn person_lines(body: &crate::CommentBody) -> Vec<String> {
+    [
+        Some(&body.gist),
+        body.what.as_ref(),
+        body.how_to_verify.as_ref(),
+        body.consequences.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    .flat_map(|t| t.lines())
+    .filter_map(|l| {
+        let l = l.trim().trim_start_matches(['-', '*']).trim_start();
+        let rest = l.strip_prefix("PERSON")?;
+        if rest
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphanumeric() || c == '_')
+        {
+            return None;
+        }
+        let rest = rest.trim_start_matches(|c: char| c.is_whitespace() || ":.-–—".contains(c));
+        (!rest.is_empty()).then(|| rest.to_owned())
+    })
+    .collect()
 }
 
 /// One line of a checks block as a status and its evidence.
@@ -118,6 +149,11 @@ pub fn of_card(card: &Ticket, comments: &[Comment]) -> Option<InboxHandIn> {
         checks,
         left: c.body.consequences.clone(),
         since_return: card.review.since_return.clone(),
+        person: if c.body.person.is_empty() {
+            person_lines(&c.body)
+        } else {
+            c.body.person.clone()
+        },
     })
 }
 
