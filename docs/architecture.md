@@ -854,6 +854,17 @@ the cards; the owner starts cards and accepts work.
   `toknila_app::planner::turn`), two per message, so every open window learns of them from the
   stream; a step is no journal entry (a turn makes dozens). Stopping the planner, or its run
   ending (`runner::supervise`), ends a turn that was on and journals the end.
+- **The turn in the window.** A `planner.turn` entry sets the planner slice's `working` at once
+  (`applyTurn` in `store/planner.ts`); while a turn is on and a chat or an ask box of that project
+  is on the screen, the window asks `GET .../planner` every two seconds for the step and stops
+  when the turn ends or nothing shows it (`syncPoll`, the timer in `store/plannerEffects.ts`).
+  One rule says what every place shows (`store/plannerTurn.ts`): a turn on is the chat's waiting
+  line with the step beside the minutes and no Nudge; a turn that ended after the person's last
+  message, which has no answer, is "stopped without answering" with Nudge at once; a message no
+  turn started for keeps the 90-second Nudge. The empty epic's and the empty roadmap's box show
+  what was sent from them and the same line until the answer, the first story or epic, or the
+  turn's end (`views/AskSent.tsx`), and the Assistant button and the sidebar's Assistant row
+  pulse while the turn is on, their title saying the step.
 - **The planner's hooks.** They are the signals of its turn and nothing else. Core lists the
   three a planner subscribes to beside a card's seven (`toknila_core::hook::PLANNER_HOOKS`:
   `UserPromptSubmit`, `PreToolUse`, `Stop`), and the role picks the list

@@ -1,19 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { Project } from "../api/types";
-import { ROADMAP_STARTER, type Context, aboutThis, contextKey, contextLabel, lineFor } from "../store/assistant";
-import { openTurn, talkOf, unanswered, wakeWhenLate } from "../store/conversation";
-import { msUntilOverdue } from "../store/conversation";
+import { ROADMAP_STARTER, type Context, aboutThis, contextKey, contextLabel } from "../store/assistant";
+import { openTurn, talkOf } from "../store/conversation";
 import type { Intent } from "../store/msg";
 import { plannerOf } from "../store/planner";
+import { nudgeFor } from "../store/plannerTurn";
 import type { State } from "../store/state";
 import { titleByName } from "../store/title";
 import { AskBox } from "./AskBox";
 import { CardProposals } from "./CardProposals";
 import { ChatEntry } from "./ChatMessage";
-import { WaitingLine } from "./WaitingLine";
-
-/// How often the waiting line looks at the clock to count the minutes.
-const TICK_MS = 10_000;
+import { usePlannerShown, useTurn } from "./useTurn";
+import { StoppedLine, WaitingLine } from "./WaitingLine";
 
 const placeholderFor = (c: Context | undefined): string =>
   c?.kind === "card" ? "Ask about this story or say what to change; Enter sends"
@@ -29,8 +27,10 @@ const BOTTOM_PX = 80;
 /// The chat of the assistant's screen: the project's conversation oldest first with the newest at
 /// the bottom, what the assistant did as lines between the messages, and the box under it. The last
 /// 50 are loaded; scrolling to the top loads older ones. While the assistant is answering a waiting
-/// line counts the minutes and shows what the assistant said it is doing; a message sent meanwhile
-/// is kept and read with the next turn; after 90 seconds without a word a nudge is offered.
+/// line counts the minutes and shows the step the daemon reports and what the assistant said it is
+/// doing; a message sent meanwhile is kept and read with the next turn. A turn that ends without an
+/// answer is said at once, with Nudge; a message no turn started for gets Nudge after 90 seconds
+/// (`plannerTurn.ts`).
 ///
 /// This is the one chat of the assistant: the panel beside the work and the assistant's own screen
 /// draw it. `context` is what is open (the chip above the box, which the person can take off); the
@@ -39,41 +39,23 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
   const key = project.key;
   useEffect(() => {
     dispatch({ type: "loadConversation", project: key });
-    dispatch({ type: "refreshPlanner", project: key });
   }, [key]);
+  usePlannerShown(key, dispatch);
   const talk = talkOf(state, key);
   const messages = talk?.messages ?? [];
   const shown = state.assistant.only && context ? aboutThis(messages, context) : messages;
   const label = context && contextLabel(context, context.kind === "chain" ? titleByName(state, context.name) : undefined);
   const running = plannerOf(state, key)?.running ?? false;
-  const sending = state.planner.sending === key;
 
-  const [now, setNow] = useState(() => Date.now());
-  const owed = unanswered(messages);
-  useEffect(() => {
-    setNow(Date.now());
-    return wakeWhenLate(messages, Date.now(), () => setNow(Date.now()));
-  }, [owed?.id]);
-  const late = running && !sending && msUntilOverdue(messages, now) === 0;
-  const waiting = running && (sending || owed !== undefined);
+  const view = useTurn(state, key);
+  const { waiting, late, stopped, owed } = view;
   // The waiting line counts minutes from the message that started the turn; a message sent while
   // it is answered waits for the next turn.
   const turn = openTurn(messages);
-  useEffect(() => {
-    if (!waiting) return;
-    setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(id);
-  }, [waiting]);
   const queued = new Set(running ? turn.queued : []);
   // The latest progress line shows under the waiting line, so the log leaves it out meanwhile.
   const inLog = waiting && turn.progress ? shown.filter((m) => m.id !== turn.progress?.id) : shown;
-  const nudge = () => {
-    if (!owed) return;
-    const about = owed.about;
-    if (about?.kind === "card" && owed.thread) dispatch({ type: "nudgeCard", project: key, key: about.key, thread: owed.thread, text: owed.text });
-    else dispatch({ type: "nudgeChat", project: key, text: about?.kind === "chain" || about?.kind === "roadmap" ? lineFor(about, owed.text) : owed.text });
-  };
+  const nudge = () => owed && dispatch(nudgeFor(key, owed));
 
   // The newest message stays in view; an older page joins above without moving what is read.
   const log = useRef<HTMLDivElement>(null);
@@ -86,7 +68,7 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
     if (was.first !== undefined && first !== was.first && last === was.last) el.scrollTop += el.scrollHeight - was.height;
     else if (last !== was.last && (was.stick || was.last === undefined || messages[messages.length - 1]?.author === "person")) el.scrollTop = el.scrollHeight;
     seen.current = { first, last, height: el.scrollHeight, stick: was.stick };
-  }, [messages, waiting, late]);
+  }, [messages, waiting, late, stopped]);
   const onScroll = () => {
     const el = log.current;
     if (!el) return;
@@ -123,7 +105,8 @@ export function ChatPane({ project, state, dispatch, context }: { project: Proje
           {inLog.map((m) => <ChatEntry key={m.id} m={m} project={key} state={state} dispatch={dispatch} queued={queued.has(m.id)} />)}
         </ol>
         {context?.kind === "card" && <CardProposals state={state} card={context.key} dispatch={dispatch} />}
-        {waiting && <WaitingLine project={key} since={turn.asked?.at ?? now} now={now} progress={turn.progress} dispatch={dispatch} />}
+        {waiting && <WaitingLine project={key} since={view.since} now={view.now} step={view.step} progress={turn.progress} dispatch={dispatch} />}
+        {stopped && <StoppedLine onNudge={nudge} />}
         {late && !turn.progress && (
           <div className="row chat-note" data-testid="chat-late">
             <p className="muted">Nudge sends your message to the assistant again.</p>

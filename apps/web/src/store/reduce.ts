@@ -2,7 +2,8 @@
 
 import type { EventRecord } from "../api/types";
 import { chipBack, reduceAssistant, showChat, withPanelOpen } from "./assistant";
-import { conversationEvent, reloadTalks } from "./conversation";
+import { reloadTalks } from "./conversation";
+import { assistantEvent } from "./plannerTurn";
 import { firstImported, initialImports, reduceImports } from "./imports";
 import type { Effect, Msg } from "./msg";
 import { reduceAttach } from "./attach";
@@ -295,8 +296,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "editPlannerDraft":
     case "askAttach":
     case "plannerAsked":
-    case "plannerLoaded":
-    case "plannerFailed":
+    case "plannerLoaded": case "plannerFailed": case "plannerShown":
       return reducePlanner(s, msg);
     case "toggleShortcuts": case "closeShortcuts": case "toggleSwitcher": case "closeSwitcher": // the keyboard's two popups
       return [reduceShortcuts(s, msg), []];
@@ -361,7 +361,7 @@ function applyEvent(s: State, e: EventRecord): [State, Effect[]] {
   if (e.seq <= s.lastSeq) return [s, []];
   const next = { ...s, lastSeq: e.seq, events: [...s.events, e] };
   if (e.entity === "window") return applyWindow(next, e, e.seq !== s.lastSeq + 1);
-  if (e.entity === "conversation") return conversationEvent(next, e, e.seq !== s.lastSeq + 1);
+  if (e.entity === "conversation" || e.entity === "planner") return assistantEvent(next, e, e.seq !== s.lastSeq + 1);
   if (e.seq !== s.lastSeq + 1) return [next, [{ type: "loadAll" }]];
   if (e.kind === "deleted" && (e.entity === "chain" || e.entity === "project")) {
     // A deleted project or chain is dropped; a page that showed it goes home.

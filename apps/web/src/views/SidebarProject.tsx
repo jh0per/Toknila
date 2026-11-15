@@ -1,6 +1,8 @@
 import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
 import type { ChainDetail, Project } from "../api/types";
 import type { Intent } from "../store/msg";
+import { plannerOf } from "../store/planner";
+import { workingTitle } from "../store/plannerTurn";
 import type { Route } from "../store/route";
 import { type State, chainsOf, currentChain } from "../store/state";
 import { agentsOf, projectOpen, readProjectOpen, storeProjectOpen, waitingIn } from "../store/tree";
@@ -99,6 +101,9 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
   const waiting = waitingIn(state, project);
   // In the list only while it is on the screen (archived and hidden counts as archived).
   const hidden = Boolean(project.hidden) && !project.archived;
+  // The Assistant row pulses while its turn is on; the dot's label says the step.
+  const working = workingTitle(plannerOf(state, key));
+  const assistantMark = <>{working && runningDot(working, "planner-working")}<span className="n" aria-hidden="true">✦</span></>;
   const leaf = (label: string, icon: IconName, to: Route, sel: boolean, extra?: ReactNode, testId?: string, hint?: string, also?: Intent) => (
     <li role="treeitem" aria-selected={sel} data-testid={testId?.replace("-link", "-entry")}>
       <div className="row" style={indent(1)}>
@@ -142,7 +147,7 @@ export function SidebarProject({ project, state, dispatch, onScreen, onMenu, onC
       {open && (
         <ul role="group">
           {leaf("Roadmap", "roadmap", { name: "project", project: key }, onScreen && route.name === "project", undefined, "roadmap-link")}
-          {leaf("Assistant", "assistant", { name: "project", project: key }, onScreen && route.name === "planner", <span className="n" aria-hidden="true">✦</span>, "planner-link", ASSISTANT_HINT, { type: "openAssistant" })}
+          {leaf("Assistant", "assistant", { name: "project", project: key }, onScreen && route.name === "planner", assistantMark, "planner-link", ASSISTANT_HINT, { type: "openAssistant" })}
           <InboxNode project={project} state={state} dispatch={dispatch} onScreen={onScreen} />
           <AgentsNode project={project} state={state} dispatch={dispatch} onScreen={onScreen} />
           <li role="treeitem" aria-expanded={chainsOpen} data-testid="chains" data-project-chains={key}>
