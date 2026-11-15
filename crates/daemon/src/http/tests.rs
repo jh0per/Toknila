@@ -53,6 +53,7 @@ mod strays;
 mod threads;
 mod unknown_fields;
 mod usage;
+mod workspaces;
 
 const TOKEN: &str = "test-token";
 
@@ -1041,6 +1042,8 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/planner/start",
             "/projects/{project}/planner/stop",
             "/projects/{project}/plans",
+            "/projects/{project}/ships",
+            "/projects/{project}/ships/retire-finished",
             "/projects/{project}/strays",
             "/projects/{project}/strays/clean",
             "/projects/{project}/suggestion",

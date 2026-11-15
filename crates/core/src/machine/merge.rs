@@ -14,7 +14,7 @@ pub(super) fn done(next: &mut Ticket, effects: &mut Vec<Effect>) -> Option<Outco
     next.review.turn = None;
     next.review.note = None;
     next.review.accepted = false;
-    effects.push(Effect::RemoveShip);
+    effects.push(Effect::RetireShip);
     effects.push(Effect::StopRunner);
     effects.push(Effect::DependencySatisfied);
     Some((TicketStatus::Merged, None))

@@ -3880,6 +3880,86 @@
         }
       }
     },
+    "/projects/{project}/ships": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Lists the workspaces of the project's stories with each story's status, and the assistant's\nreading copy (`_planner`) named as such. The copy is not counted; `finished` counts the\nworkspaces of merged, released and cancelled stories.",
+        "operationId": "list_workspaces",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workspaces"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/ships/retire-finished": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Retires the workspace of every merged, released or cancelled story of the project: the\nworktree goes, the branch goes unless it holds work the base lacks (the story says so), and\nthe record goes. Only the person's token may call it.",
+        "operationId": "retire_finished_workspaces",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspacesRetired"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}/strays": {
       "get": {
         "tags": [
@@ -14364,6 +14444,105 @@
           "upstream": {
             "type": "string",
             "description": "`origin/main`."
+          }
+        }
+      },
+      "Workspace": {
+        "type": "object",
+        "description": "One workspace of a project.",
+        "required": [
+          "kind",
+          "path",
+          "finished"
+        ],
+        "properties": {
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished": {
+            "type": "boolean",
+            "description": "The story is merged, released or cancelled: Clean up retires this workspace."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/WorkspaceKind"
+          },
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TicketStatus",
+                "description": "The story's status; none for the assistant's copy."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "story": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The story's key; none for the assistant's copy."
+          }
+        }
+      },
+      "WorkspaceKind": {
+        "type": "string",
+        "description": "What a workspace folder is.",
+        "enum": [
+          "story",
+          "planner"
+        ]
+      },
+      "Workspaces": {
+        "type": "object",
+        "description": "Answer of `GET /v1/projects/{project}/ships`.",
+        "required": [
+          "items",
+          "count",
+          "finished"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The stories' workspaces; the assistant's copy is not counted.",
+            "minimum": 0
+          },
+          "finished": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of `count`, those that belong to finished stories.",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Workspace"
+            },
+            "description": "The assistant's copy (when it exists) first, then the stories' ships."
+          }
+        }
+      },
+      "WorkspacesRetired": {
+        "type": "object",
+        "description": "Answer of `POST /v1/projects/{project}/ships/retire-finished`.",
+        "required": [
+          "retired"
+        ],
+        "properties": {
+          "retired": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Keys of the stories whose workspace is being retired."
           }
         }
       }
