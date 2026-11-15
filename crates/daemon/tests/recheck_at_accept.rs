@@ -1,7 +1,8 @@
 //! Accept checks again when main moved, and the extra checks of a project, through the full
-//! router with a real git ship and the real shell checker. The check command appends a line to a
-//! counter file outside the repository, then needs `ok.txt` to be tracked: so a run is counted
-//! and a main that removed `ok.txt` fails the check. The test plays the agent's git and its
+//! router with a real git ship and the real shell checker. The check command adds one entry to
+//! the repository's git config (`toknila.checks`, shared by every worktree; no shell redirect, so
+//! the same words work in `sh` and in `cmd.exe`), then needs `ok.txt` to be tracked: so a run is
+//! counted and a main that removed `ok.txt` fails the check. The test plays the agent's git and its
 //! `finished`; the agent process is the workspace's `fake-agent`.
 
 use std::path::{Path, PathBuf};
@@ -49,9 +50,15 @@ fn commit_file(dir: &Path, name: &str, content: &str) {
     git(dir, &["commit", "--quiet", "-m", name]);
 }
 
-/// How many lines a counter file has: the runs of the command that appends to it.
-fn runs(counter: &Path) -> usize {
-    std::fs::read_to_string(counter).map_or(0, |t| t.lines().count())
+/// How many times the command that adds `toknila.<key>` to the repository's config has run.
+fn runs(repo: &Path, key: &str) -> usize {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["config", "--get-all", &format!("toknila.{key}")])
+        .output()
+        .expect("git runs");
+    String::from_utf8_lossy(&out.stdout).lines().count()
 }
 
 struct Rig {
@@ -62,10 +69,6 @@ struct Rig {
     _ended: tokio::sync::mpsc::UnboundedReceiver<toknila_app::runner::RunEnded>,
     repo: PathBuf,
     ship: PathBuf,
-    /// One line per run of the check command.
-    checks: PathBuf,
-    /// One line per run of the extra check.
-    extras: PathBuf,
     ticket: toknila_core::TicketId,
 }
 
@@ -106,8 +109,6 @@ impl Rig {
             trash: Arc::new(toknila_daemon::trash::NoTrash),
             pdf_renderer: Arc::new(toknila_daemon::designs::thumb::NoRenderer),
         });
-        let checks = tmp.path().join("checks.txt");
-        let extras = tmp.path().join("extras.txt");
         let mut rig = Rig {
             _tmp: tmp,
             app,
@@ -116,15 +117,10 @@ impl Rig {
             _ended: ended,
             repo: repo.clone(),
             ship: PathBuf::new(),
-            checks: checks.clone(),
-            extras: extras.clone(),
             ticket: toknila_core::TicketId::new(),
         };
-        // The same words on every platform's shell: append a line, then require `ok.txt`.
-        let command = format!(
-            "echo x>>\"{}\" && git ls-files --error-unmatch ok.txt",
-            checks.display()
-        );
+        // The same words on every platform's shell: count the run, then require `ok.txt`.
+        let command = "git config --add toknila.checks 1 && git ls-files --error-unmatch ok.txt";
         rig.call(
             Method::POST,
             "/v1/projects",
@@ -137,7 +133,7 @@ impl Rig {
             Method::PATCH,
             "/v1/projects/DEMO",
             json!({ "extra_checks": [
-                { "paths": ["apps/web/**"], "command": format!("echo x>>\"{}\"", extras.display()) }
+                { "paths": ["apps/web/**"], "command": "git config --add toknila.extras 1" }
             ] }),
         )
         .await;
@@ -272,14 +268,14 @@ async fn the_check_records_the_main_commit_and_the_ship_head_it_ran_on() {
         Some(git(&rig.ship, &["rev-parse", "HEAD"]).as_str()),
         "{kept}"
     );
-    assert_eq!(runs(&rig.checks), 1);
+    assert_eq!(runs(&rig.repo, "checks"), 1);
 }
 
 #[tokio::test]
 async fn accept_after_main_moved_runs_the_check_once_and_merges_with_no_further_action() {
     let rig = Rig::new().await;
     rig.handed_in_with("feature.txt").await;
-    assert_eq!(runs(&rig.checks), 1);
+    assert_eq!(runs(&rig.repo, "checks"), 1);
 
     // Main takes a commit of another card; then the person accepts, once.
     commit_file(&rig.repo, "other.txt", "other\n");
@@ -288,7 +284,11 @@ async fn accept_after_main_moved_runs_the_check_once_and_merges_with_no_further_
 
     let card = rig.card().await;
     assert_eq!(card["ticket"]["status"], "merged", "{card}");
-    assert_eq!(runs(&rig.checks), 2, "the check ran once more, not more");
+    assert_eq!(
+        runs(&rig.repo, "checks"),
+        2,
+        "the check ran once more, not more"
+    );
     let rounds = rig.rounds().await;
     assert!(
         rounds
@@ -311,7 +311,7 @@ async fn accept_with_main_where_the_check_saw_it_merges_at_once() {
     rig.handed_in_with("feature.txt").await;
     rig.accept().await;
     assert_eq!(rig.card().await["ticket"]["status"], "merged");
-    assert_eq!(runs(&rig.checks), 1, "the check is not run again");
+    assert_eq!(runs(&rig.repo, "checks"), 1, "the check is not run again");
 }
 
 #[tokio::test]
@@ -328,7 +328,7 @@ async fn a_failing_check_after_main_moved_returns_the_card_to_the_agent_as_a_rou
 
     let card = rig.card().await;
     assert_eq!(card["ticket"]["status"], "running", "{card}");
-    assert_eq!(runs(&rig.checks), 2);
+    assert_eq!(runs(&rig.repo, "checks"), 2);
     assert_eq!(rig.develop(), main, "nothing was merged");
     assert_ne!(before, main);
     let rounds = rig.rounds().await;
@@ -350,19 +350,25 @@ async fn a_failing_check_after_main_moved_returns_the_card_to_the_agent_as_a_rou
 async fn an_extra_check_runs_only_when_a_matching_file_changed_and_its_line_is_in_the_round() {
     let rig = Rig::new().await;
     rig.handed_in_with("feature.txt").await;
-    assert_eq!(runs(&rig.extras), 0, "no file under apps/web changed");
+    assert_eq!(
+        runs(&rig.repo, "extras"),
+        0,
+        "no file under apps/web changed"
+    );
     let rounds = rig.rounds().await;
     assert_eq!(rounds.last().map(String::as_str), Some("The check passed."));
 
     // Hand in again with a web file: the extra check runs after the command.
     let other = Rig::new().await;
     other.handed_in_with("apps/web/a.txt").await;
-    assert_eq!(runs(&other.extras), 1);
-    assert_eq!(runs(&other.checks), 1);
+    assert_eq!(runs(&other.repo, "extras"), 1);
+    assert_eq!(runs(&other.repo, "checks"), 1);
     let rounds = other.rounds().await;
     let last = rounds.last().expect("a round");
     assert!(
-        last.starts_with("The check passed.\nextra check apps/web/**: PASS echo x>>"),
+        last.starts_with(
+            "The check passed.\nextra check apps/web/**: PASS git config --add toknila.extras 1"
+        ),
         "{last}"
     );
     assert!(last.contains(", 0 s"), "{last}");

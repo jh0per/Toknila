@@ -44,13 +44,16 @@ function Chip({ m, project, state, dispatch }: { m: ConversationMessage; project
 function DidLine({ m, project, state, dispatch }: { m: ConversationMessage; project: string; state: State; dispatch: (i: Intent) => void }) {
   const route = aboutRoute(state, project, m.about);
   const label = m.about ? (m.about.kind === "chain" ? titleByName(state, m.about.name) : m.about.kind === "card" ? m.about.key : "") : "";
-  const at = route && label ? m.text.indexOf(label) : -1;
+  // The label is looked for without regard to case: until the store knows the epic, the label is
+  // its name ("roadmap") while the daemon's line already reads it made readable ("Roadmap"), and
+  // the line must not end with " · roadmap" for that moment (seen on a slow CI runner).
+  const at = route && label ? m.text.toLowerCase().indexOf(label.toLowerCase()) : -1;
   const link = (text: string): ReactNode =>
     route ? <NavLink route={route} dispatch={dispatch} testId="chat-did-link">{text}</NavLink> : text;
   return (
     <li className="did" data-testid="chat-did" data-id={m.id}>
       {at >= 0 ? (
-        <span className="did-text">{m.text.slice(0, at)}{link(label)}{m.text.slice(at + label.length)}</span>
+        <span className="did-text">{m.text.slice(0, at)}{link(m.text.slice(at, at + label.length))}{m.text.slice(at + label.length)}</span>
       ) : (
         <span className="did-text">{m.text}{route && <> · {link(label)}</>}</span>
       )}

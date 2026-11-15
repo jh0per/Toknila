@@ -20,6 +20,9 @@ pub fn unknown_folders(
     records: &HashSet<PathBuf>,
     live: &HashSet<(String, String, String)>,
 ) -> Vec<PathBuf> {
+    // Paths are compared in their normal form: a record may spell a path with `/` where the
+    // folder walk spells it with `\` (Windows), and both name the same folder.
+    let records: HashSet<PathBuf> = records.iter().map(|p| normal(p)).collect();
     let mut out = Vec::new();
     for project in dirs_of(root) {
         let Some(p) = name_of(&project).filter(|p| p != PLANNER) else {
@@ -29,7 +32,7 @@ pub fn unknown_folders(
             let Some(c) = name_of(&chain) else { continue };
             for ship in dirs_of(&chain) {
                 let Some(s) = name_of(&ship) else { continue };
-                if !records.contains(&ship) && !live.contains(&(p.clone(), c.clone(), s)) {
+                if !records.contains(&normal(&ship)) && !live.contains(&(p.clone(), c.clone(), s)) {
                     out.push(ship);
                 }
             }
@@ -37,6 +40,12 @@ pub fn unknown_folders(
     }
     out.sort();
     out
+}
+
+/// The path with each component joined the native way, so two spellings of one folder compare
+/// equal.
+fn normal(path: &Path) -> PathBuf {
+    path.components().collect()
 }
 
 fn name_of(path: &Path) -> Option<String> {
@@ -103,8 +112,11 @@ mod tests {
     fn only_a_folder_nothing_names_is_unknown_and_the_planner_copy_is_skipped() {
         let tmp = tempfile::tempdir().expect("tmp");
         let root = tmp.path();
+        // Joined one component at a time, so the paths read like the folder walk's on Windows.
         let mk = |p: &str| {
-            let d = root.join(p);
+            let d = p
+                .split('/')
+                .fold(root.to_path_buf(), |d, part| d.join(part));
             std::fs::create_dir_all(&d).expect("mkdir");
             d
         };
@@ -143,8 +155,8 @@ mod log_tests {
     async fn start_logs_each_retired_ship_and_each_unknown_folder_once_and_deletes_nothing() {
         let tmp = tempfile::tempdir().expect("tmp");
         let root = tmp.path().join("ships");
-        let stray = root.join("demo/auth/demo-9-stray");
-        let planner = root.join("demo/_planner");
+        let stray = root.join("demo").join("auth").join("demo-9-stray");
+        let planner = root.join("demo").join("_planner");
         for d in [&stray, &planner] {
             std::fs::create_dir_all(d).expect("mkdir");
         }

@@ -49,9 +49,25 @@ fn prune_lists_and_deletes_the_branch_a_finished_card_left() {
     tok.run(&["cancel", "DEMO-1", "not needed"]);
     assert!(branches(&repo).contains("demo-1-login"), "the work is kept");
 
-    let listed = tok.run(&["ship", "prune", "--dry-run"]);
-    assert_eq!(listed["items"][0]["card"], "DEMO-1", "{listed}");
-    assert_eq!(listed["items"][0]["kind"], "branch");
+    // The cancel retires the ship after it commits: the worktree goes, the branch stays with its
+    // extra commit. Wait for the worktree to be gone (on Windows it takes a moment), then the
+    // branch is the one item left, whatever order the listing has.
+    let mut listed = serde_json::Value::Null;
+    for _ in 0..100 {
+        listed = tok.run(&["ship", "prune", "--dry-run"]);
+        let worktrees = listed["items"].as_array().map_or(0, |items| {
+            items.iter().filter(|i| i["kind"] == "worktree").count()
+        });
+        if worktrees == 0 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    let branch = listed["items"]
+        .as_array()
+        .and_then(|items| items.iter().find(|i| i["kind"] == "branch"))
+        .unwrap_or_else(|| panic!("a branch item: {listed}"));
+    assert_eq!(branch["card"], "DEMO-1", "{listed}");
     assert!(
         branches(&repo).contains("demo-1-login"),
         "dry run deletes nothing"
