@@ -16,14 +16,14 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
   console.error("usage: node e2e/settings.mjs <tok binary>");
   process.exit(2);
 }
-const home = mkdtempSync(join(tmpdir(), "toknila-settings-"));
+const { home } = session();
 const demo = resolve(import.meta.dirname, "../../../examples/demo.toml");
 const tok = (...args) =>
   execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
@@ -194,7 +194,7 @@ try {
   }
   console.log("PASS Where things live and the Danger zone start folded");
   await t("places").locator("summary").click();
-  await expectText(t("place-home"), "toknila-settings-", "Where things live says where the data lives");
+  await expectText(t("place-home"), "-settings-", "Where things live says where the data lives");
   await expectText(t("place-ships"), "ships", "and where the workspaces are");
   await t("settings-nav-agents").click();
   await t("worker-model").selectOption("sonnet");

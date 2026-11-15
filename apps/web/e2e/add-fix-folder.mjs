@@ -10,14 +10,14 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch, shoot } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot, session } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
   console.error("usage: node e2e/add-fix-folder.mjs <tok binary>");
   process.exit(2);
 }
-const home = mkdtempSync(join(tmpdir(), "toknila-addfix-"));
+const { home } = session();
 // The first commit needs an identity in git's configuration (the daemon asks `git config`); this
 // one is a global config of its own, so the script does not depend on the machine's.
 const gitconfig = join(home, "gitconfig");

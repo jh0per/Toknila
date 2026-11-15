@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -21,7 +21,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-qc-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", ...opts });
 const tok = (...args) => run(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home } });
 const git = (dir, ...args) =>
@@ -53,7 +53,7 @@ try {
   const question = JSON.stringify({ event: "ask_human", text: "Can you check the page on your phone now?", choices: [FIRST, SECOND] });
   writeFileSync(
     join(home, "profiles", "chooser.toml"),
-    `command = ['${fakeAgent}', ${steps("post", "/tickets/{ticket}/events", question, "echo", "hold")}]\n`,
+    `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("post", "/tickets/{ticket}/events", question, "echo", "hold")}]\n`,
   );
   tok("project", "new", "QC", "--repo", repo, "--base", "develop", "--profile", "chooser");
   tok("chain", "new", "work", "--project", "QC");

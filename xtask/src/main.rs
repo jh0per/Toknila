@@ -6,7 +6,8 @@
 //!   and build it (needs Node), so the daemon embeds it.
 //!   Run it before `verify` or a release build; CI does.
 //! - `e2e-web`: browser smoke test of the page against the real `tok` binary (Playwright).
-//!   Runs every `apps/web/e2e/*.mjs` spec, rebuilds the bundle when it is stale.
+//!   Runs every `apps/web/e2e/*.mjs` spec, rebuilds the bundle when it is stale, and fails on
+//!   a daemon or a fake agent of its own run that is still alive afterwards (see [`leaks`]).
 //!   With `CI` set it first installs Chromium; locally it uses an installed one.
 //! - `guide-shots`: retake the pictures of the Guide page from the real window (see [`shots`]).
 //! - `dist <target>`: release archive for one target triple in `dist/` (web page embedded).
@@ -23,6 +24,7 @@ use std::time::Duration;
 mod app;
 mod bump;
 mod css_guard;
+mod e2e;
 mod guards;
 mod leaks;
 mod shots;
@@ -125,7 +127,7 @@ fn web_build(dir: &std::path::Path) -> Result<(), String> {
 fn e2e_web() -> Result<(), String> {
     let root = app::root()?;
     let web = root.join("apps/web");
-    let specs = e2e_specs(&web.join("e2e"))?;
+    let specs = e2e::specs(&web.join("e2e"))?;
     let names: Vec<&str> = specs.iter().map(|(name, _)| name.as_str()).collect();
     eprintln!("xtask e2e-web: specs: {}", names.join(" "));
     // Before the cargo builds: the daemon embeds `dist` when it is compiled.
@@ -158,52 +160,27 @@ fn e2e_web() -> Result<(), String> {
             .to_string_lossy()
             .into_owned()
     };
-    for (name, needs_agent) in &specs {
+    // The run id reaches the specs; their homes and fake agents carry it, so the check after them
+    // finds what this run left and nothing of another run's.
+    let run_id = leaks::e2e_run_id();
+    let ran = specs.iter().try_for_each(|(name, needs_agent)| {
         let script = format!("e2e/{name}.mjs");
-        let tok = exe("tok");
+        let (tok, agent) = (exe("tok"), exe("fake-agent"));
+        let mut args = vec![script.as_str(), tok.as_str()];
         if *needs_agent {
-            run("node", &[&script, &tok, &exe("fake-agent")], &web)?;
-        } else {
-            run("node", &[&script, &tok], &web)?;
+            args.push(agent.as_str());
         }
-    }
-    eprintln!("xtask e2e-web: PASS");
-    Ok(())
-}
-
-/// The specs in `dir` as (name without extension, needs the fake agent): `smoke` first, the rest
-/// alphabetical. `helpers.mjs` is a shared module, not a spec. A spec declares the fake agent
-/// with `// needs: fake-agent` within its first 15 lines.
-fn e2e_specs(dir: &std::path::Path) -> Result<Vec<(String, bool)>, String> {
-    let entries =
-        std::fs::read_dir(dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
-    let mut specs = Vec::new();
-    for entry in entries {
-        let path = entry
-            .map_err(|e| format!("cannot read {}: {e}", dir.display()))?
-            .path();
-        if path.extension().and_then(|e| e.to_str()) != Some("mjs") {
-            continue;
+        run_env("node", &args, &web, &[(leaks::E2E_RUN_VAR, &run_id)])
+    });
+    let left = leaks::check_e2e(&run_id, Duration::from_secs(5));
+    match (ran, left) {
+        (Ok(()), Ok(())) => {
+            eprintln!("xtask e2e-web: PASS");
+            Ok(())
         }
-        let Some(name) = path.file_stem().and_then(|s| s.to_str()) else {
-            continue;
-        };
-        if name == "helpers" {
-            continue;
-        }
-        let text = std::fs::read_to_string(&path)
-            .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-        let needs_agent = text
-            .lines()
-            .take(15)
-            .any(|line| line.trim() == "// needs: fake-agent");
-        specs.push((name.to_owned(), needs_agent));
+        (Err(a), Err(b)) => Err(format!("{a}; {b}")),
+        (Err(e), Ok(())) | (Ok(()), Err(e)) => Err(e),
     }
-    if specs.is_empty() {
-        return Err(format!("no e2e spec (*.mjs) found in {}", dir.display()));
-    }
-    specs.sort_by(|a, b| (a.0 != "smoke", &a.0).cmp(&(b.0 != "smoke", &b.0)));
-    Ok(specs)
 }
 
 /// Latest modification time of a file under `path` (a file or a folder walked recursively).
@@ -343,9 +320,19 @@ fn desktop() -> Result<(), String> {
 }
 
 fn run(program: &str, args: &[&str], dir: &std::path::Path) -> Result<(), String> {
+    run_env(program, args, dir, &[])
+}
+
+fn run_env(
+    program: &str,
+    args: &[&str],
+    dir: &std::path::Path,
+    envs: &[(&str, &str)],
+) -> Result<(), String> {
     eprintln!("$ {program} {}", args.join(" "));
     let status = Command::new(program)
         .args(args)
+        .envs(envs.iter().copied())
         .current_dir(dir)
         .status()
         .map_err(|e| format!("cannot run {program}: {e}"))?;

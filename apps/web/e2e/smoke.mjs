@@ -10,14 +10,14 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
   console.error("usage: node e2e/smoke.mjs <tok binary>");
   process.exit(2);
 }
-const home = mkdtempSync(join(tmpdir(), "toknila-web-"));
+const { home } = session();
 const demo = resolve(import.meta.dirname, "../../../examples/demo.toml");
 // Screenshots of the main screens, kept as run artifacts (never committed): SHOTS_DIR, default
 // apps/web/e2e-artifacts/<SHOTS_LABEL>; light and dark, for the chain, the card and the threads.

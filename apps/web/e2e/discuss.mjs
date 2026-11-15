@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
 if (!tokArg || !agentArg) {
@@ -25,7 +25,7 @@ if (!tokArg || !agentArg) {
 }
 const tokBin = resolve(tokArg);
 const fakeAgent = resolve(agentArg);
-const home = mkdtempSync(join(tmpdir(), "toknila-discuss-"));
+const { home, marker: fakeMarker } = session();
 const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8" });
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 const git = (dir, ...args) =>
@@ -61,7 +61,7 @@ try {
   const edit = (change) => ["patch", "/planner/cards/DS-1", JSON.stringify(change)];
   writeFileSync(
     join(home, "profiles", "fake-planner.toml"),
-    `role = 'planner'\ncommand = ['${fakeAgent}', ${steps(
+    `role = 'planner'\ncommand = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps(
       "print", "planner ready",
       "echo", ...answer("I would add the 4xx case"), ...edit({ acceptance: ["Errors are shown", "A 4xx keeps the form filled"] }),
       "echo", ...answer("Here is a shorter prompt"), ...edit({ prompt: "A shorter prompt" }),
@@ -70,7 +70,7 @@ try {
   );
   writeFileSync(
     join(home, "profiles", "reader.toml"),
-    `command = ['${fakeAgent}', ${steps("print", "ready", "flagfile", "--instr", "hold")}]\ninstructions_flag = "--instr"\n`,
+    `command = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "ready", "flagfile", "--instr", "hold")}]\ninstructions_flag = "--instr"\n`,
   );
   tok("project", "new", "DS", "--repo", repo, "--base", "develop", "--profile", "reader");
   tok("chain", "new", "work", "--project", "DS", "--no-autostart");

@@ -10,14 +10,14 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checks, cleanup, launch } from "./helpers.mjs";
+import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
   console.error("usage: node e2e/guide.mjs <tok binary>");
   process.exit(2);
 }
-const home = mkdtempSync(join(tmpdir(), "toknila-guide-"));
+const { home } = session();
 const tok = (...args) => execFileSync(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home }, encoding: "utf8" });
 const IDS = ["add-project", "designs", "plan", "start", "inbox", "review", "accept-or-return", "release", "where"];
 /// "Review: Accept or Return" has no picture yet (retaking them is `cargo xtask guide-shots`).

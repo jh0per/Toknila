@@ -71,6 +71,14 @@ Running the gates on a developer Mac:
   `*.mjs` there (`smoke` first, the rest alphabetical; `helpers.mjs` is a shared module). Put
   `// needs: fake-agent` on one of its first 15 lines when it drives a fake agent. `e2e-web`
   rebuilds the web bundle itself when `apps/web/dist` is older than the sources.
+- A spec never starts a process outside `session()` (`apps/web/e2e/helpers.mjs`): it makes the
+  temp home (`toknila-e2e-<run id>-<spec>-…`) and the marker of the spec's fake agents, and ends the
+  daemon, every process whose command line carries the marker (with its children) and the home on
+  `finally`, exit, SIGINT, SIGTERM and an uncaught error. A fake agent's profile carries the marker
+  in its arguments: `command = ['<fake-agent>', 'sleep', '<marker>', ...steps]`. A second daemon is
+  registered with `session.track(home)`. `cargo xtask e2e-web` then fails, naming pid, command and
+  spec, on a daemon or fake agent of its own run still alive; `cargo xtask verify` only warns
+  about ones older than an hour that another run left, and never kills them.
 - When `apps/web/node_modules` is missing, run `npm ci --no-audit --no-fund` in `apps/web` first.
   Do not link or copy `node_modules` from another checkout.
 - macOS has no `timeout` command; do not wrap commands in it.

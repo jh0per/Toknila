@@ -11,14 +11,14 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { checks, cleanup, launch, shoot } from "./helpers.mjs";
+import { checks, cleanup, launch, shoot, session } from "./helpers.mjs";
 
 const tokBin = process.argv[2];
 if (!tokBin) {
   console.error("usage: node e2e/usage.mjs <tok binary>");
   process.exit(2);
 }
-const home = mkdtempSync(join(tmpdir(), "toknila-usage-"));
+const { home } = session();
 const claude = mkdtempSync(join(tmpdir(), "toknila-claude-"));
 const demo = resolve(import.meta.dirname, "../../../examples/demo.toml");
 const env = { ...process.env, TOKNILA_HOME: home, CLAUDE_CONFIG_DIR: claude };

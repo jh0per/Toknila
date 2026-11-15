@@ -80,6 +80,21 @@ jobs:
           E2E_ARTIFACTS: ${{ github.workspace }}/apps/web/e2e-artifacts
           SHOTS_DIR: ${{ github.workspace }}/apps/web/e2e-artifacts/smoke
 
+      # Windows has no `ps`, so xtask's leak check is skipped there: list what the e2e run left
+      # before the smoke test and fail with the command lines (a fake agent that outlived its spec
+      # was killed by the runner at the end of the job, run 43470886692).
+      - name: No daemon or fake agent left after e2e (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $left = @(Get-CimInstance Win32_Process |
+            Where-Object { $_.Name -match '^(tok|toknila|fake-agent)(\.exe)?$' })
+          if ($left.Count -gt 0) {
+            $left | ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" } | Write-Host
+            throw "$($left.Count) tok, toknila or fake-agent process(es) left after e2e-web"
+          }
+          Write-Host 'no tok, toknila or fake-agent process left'
+
       # On failure, and on main (the smoke screenshots), so a UI test can be seen without a rerun.
       - name: Upload e2e screenshots and traces
         if: always()
