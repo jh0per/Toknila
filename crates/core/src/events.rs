@@ -238,111 +238,17 @@ pub enum DomainEvent {
         project: ProjectId,
         message: crate::conversation::Message,
     },
+    /// The project's assistant took a message (`working`) or its turn ended (it stopped, or a
+    /// person stopped it). What it does inside the turn is never journaled.
+    PlannerTurn {
+        project: ProjectId,
+        working: bool,
+    },
 }
 
+// `kind` stays in this file: the web app's test reads its arms to check that every kind has
+// words (`apps/web/src/store/eventWords.test.ts`). `entity` and `entity_id` are in `names`.
 impl DomainEvent {
-    /// Kind of entity the event is about: `project`, `chain`, `ticket`, `release`, `comment`,
-    /// `subtask`, `thread`. Edge events belong to their chain.
-    pub fn entity(&self) -> &'static str {
-        match self {
-            Self::ProjectCreated { .. }
-            | Self::ProjectUpdated { .. }
-            | Self::ProjectDeleted { .. } => "project",
-            Self::ChainCreated { .. }
-            | Self::ChainUpdated { .. }
-            | Self::ChainDeleted { .. }
-            | Self::EdgeAdded { .. }
-            | Self::EdgeRemoved { .. }
-            | Self::EdgeMoved { .. } => "chain",
-            Self::DesignMoved { .. }
-            | Self::TicketMoved { .. }
-            | Self::TicketCreated { .. }
-            | Self::TicketStatusChanged { .. }
-            | Self::TicketUpdated { .. }
-            | Self::TicketProposed { .. }
-            | Self::TicketApproved { .. }
-            | Self::TicketRejected { .. }
-            | Self::ShipCreated { .. }
-            | Self::ShipRemoved { .. }
-            | Self::ShipRemoveFailed { .. }
-            | Self::RunnerStarted { .. }
-            | Self::RunnerExited { .. }
-            | Self::QuestionRaised { .. }
-            | Self::QuestionCleared { .. }
-            | Self::QuestionAnswered { .. } => "ticket",
-            Self::ReleaseCreated { .. } | Self::ReleaseStateChanged { .. } => "release",
-            Self::CommentAdded { .. } | Self::CommentDelivered { .. } => "comment",
-            Self::SubtaskAdded { .. } | Self::SubtaskUpdated { .. } => "subtask",
-            Self::ThreadOpened { .. }
-            | Self::ThreadMessagePosted { .. }
-            | Self::ThreadVersionPosted { .. }
-            | Self::ThreadApproved { .. }
-            | Self::ThreadReopened { .. }
-            | Self::ThreadWithdrawn { .. } => "thread",
-            Self::DesignPinAsked { .. }
-            | Self::DesignPinAnswered { .. }
-            | Self::DesignPinRemoved { .. } => "design_pin",
-            Self::WindowShowCard { .. }
-            | Self::WindowSuggest { .. }
-            | Self::WindowSuggestionCleared { .. } => "window",
-            Self::ConversationMessage { .. } => "conversation",
-        }
-    }
-
-    /// Id of the entity the event is about.
-    pub fn entity_id(&self) -> String {
-        match self {
-            Self::ProjectCreated { project }
-            | Self::ProjectUpdated { project }
-            | Self::ProjectDeleted { project } => project.id.to_string(),
-            Self::ChainCreated { chain }
-            | Self::ChainUpdated { chain }
-            | Self::ChainDeleted { chain } => chain.id.to_string(),
-            Self::EdgeAdded { edge }
-            | Self::EdgeRemoved { edge }
-            | Self::EdgeMoved { edge, .. } => edge.chain_id.to_string(),
-            Self::DesignMoved { ticket, .. }
-            | Self::TicketMoved { ticket, .. }
-            | Self::TicketCreated { ticket }
-            | Self::TicketStatusChanged { ticket, .. }
-            | Self::TicketUpdated { ticket }
-            | Self::TicketProposed { ticket }
-            | Self::TicketApproved { ticket, .. }
-            | Self::TicketRejected { ticket, .. } => ticket.id.to_string(),
-            Self::ShipCreated { ship }
-            | Self::ShipRemoved { ship }
-            | Self::ShipRemoveFailed { ship, .. } => ship.ticket_id.to_string(),
-            Self::RunnerStarted { run } | Self::RunnerExited { run, .. } => {
-                run.ticket_id.to_string()
-            }
-            Self::QuestionRaised { ticket, .. }
-            | Self::QuestionCleared { ticket, .. }
-            | Self::QuestionAnswered { ticket, .. } => ticket.to_string(),
-            Self::ReleaseCreated { release } | Self::ReleaseStateChanged { release, .. } => {
-                release.id.to_string()
-            }
-            Self::CommentAdded { comment, .. } | Self::CommentDelivered { comment, .. } => {
-                comment.id.to_string()
-            }
-            Self::SubtaskAdded { subtask, .. } | Self::SubtaskUpdated { subtask, .. } => {
-                subtask.id.to_string()
-            }
-            Self::ThreadOpened { thread, .. }
-            | Self::ThreadApproved { thread, .. }
-            | Self::ThreadReopened { thread, .. }
-            | Self::ThreadWithdrawn { thread, .. } => thread.id.to_string(),
-            Self::ThreadMessagePosted { message, .. } => message.thread_id.to_string(),
-            Self::ThreadVersionPosted { thread, .. } => thread.to_string(),
-            Self::DesignPinAsked { pin }
-            | Self::DesignPinAnswered { pin }
-            | Self::DesignPinRemoved { pin } => pin.id.to_string(),
-            Self::WindowShowCard { project, .. }
-            | Self::WindowSuggest { project, .. }
-            | Self::WindowSuggestionCleared { project, .. }
-            | Self::ConversationMessage { project, .. } => project.to_string(),
-        }
-    }
-
     /// What happened to the entity.
     pub fn kind(&self) -> &'static str {
         match self {
@@ -388,11 +294,13 @@ impl DomainEvent {
             Self::WindowSuggest { .. } => "suggest",
             Self::WindowSuggestionCleared { .. } => "suggestion_cleared",
             Self::ConversationMessage { .. } => "message",
+            Self::PlannerTurn { .. } => "turn",
         }
     }
 }
 
 mod constructors;
+mod names;
 
 #[cfg(test)]
 mod tests;

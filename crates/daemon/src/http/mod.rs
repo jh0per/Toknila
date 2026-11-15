@@ -38,8 +38,9 @@ impl Modify for BearerAuth {
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
         agents::*, asks::*, chains::*, conversation::*, designs::*, events::*, inbox::*, pins::*,
-        planner::*, planner_run::*, plans::*, profiles::*, projects::*, questions::*, releases::*,
-        runner::*, strays::*, system::*, threads::*, tickets::*, usage::*,
+        planner::*, planner_activity::*, planner_run::*, plans::*, profiles::*, projects::*,
+        questions::*, releases::*, runner::*, strays::*, system::*, threads::*, tickets::*,
+        usage::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -109,6 +110,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(reject_edit))
         .routes(routes!(get_conversation, post_conversation))
         .routes(routes!(planner_say))
+        .routes(routes!(planner_activity))
         .routes(routes!(ask_story))
         .routes(routes!(get_planner))
         .routes(routes!(start_planner))
