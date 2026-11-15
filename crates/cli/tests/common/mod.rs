@@ -31,6 +31,8 @@ pub fn tempdir() -> tempfile::TempDir {
 /// The `tok` binary of this build, run against one data folder.
 pub struct Tok {
     pub home: PathBuf,
+    /// The projects made here with `--sim` or a `--profile`: the only ones whose cards may start.
+    fake: Mutex<Vec<String>>,
 }
 
 impl Tok {
@@ -38,11 +40,15 @@ impl Tok {
     pub fn in_dir(dir: &Path) -> Self {
         let home = dir.join("home");
         track(&home);
-        Self { home }
+        Self {
+            home,
+            fake: Mutex::new(Vec::new()),
+        }
     }
 
     /// `tok <args>` against this data folder, not yet run.
     fn command(&self, args: &[&str]) -> Command {
+        self.refuse_a_real_agent(args);
         // The daemon of a test is started with a lifeline, so it dies with this process.
         if args.first() != Some(&"daemon") && !daemon_healthy(&self.home) {
             start_daemon(&self.home);
@@ -51,6 +57,31 @@ impl Tok {
         c.args(args).env("TOKNILA_HOME", &self.home);
         isolate(&mut c, &self.home);
         c
+    }
+
+    /// A cli test never starts a real agent. A project made with `--sim` or a `--profile` is
+    /// remembered; `tok start <KEY>` on a card of any other project is refused here, before the
+    /// daemon launches the default `claude` profile: Blocked on CI (no `claude`), and a real
+    /// Claude Code in every test run on a developer's machine (TOKNILA-132's test, run 12). A
+    /// chain that autostarts is not caught; AGENTS.md (Testing) carries the rule for it.
+    fn refuse_a_real_agent(&self, args: &[&str]) {
+        let mut fake = self.fake.lock().unwrap_or_else(PoisonError::into_inner);
+        if args.starts_with(&["project", "new"])
+            && args.iter().any(|a| *a == "--sim" || *a == "--profile")
+            && let Some(key) = args.get(2)
+        {
+            fake.push((*key).to_owned());
+        }
+        if args.first() == Some(&"start")
+            && let Some(card) = args.get(1)
+            && let Some((project, _)) = card.rsplit_once('-')
+            && !fake.iter().any(|k| k == project)
+        {
+            panic!(
+                "tok {args:?}: the project {project} was made without --sim or a fake --profile, \
+                 so this would start a real agent (AGENTS.md, Testing)"
+            );
+        }
     }
 
     /// Runs `tok <args>` and returns the whole outcome, whether it succeeded or not.

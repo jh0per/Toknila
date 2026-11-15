@@ -21,7 +21,7 @@ fn prune_lists_and_deletes_the_branch_a_finished_card_left() {
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
     let path = repo.to_str().expect("utf-8 path");
-    tok.run(&["project", "new", "DEMO", "--repo", path]);
+    tok.run(&["project", "new", "DEMO", "--repo", path, "--sim"]);
     tok.run(&[
         "chain",
         "new",

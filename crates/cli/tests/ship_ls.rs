@@ -11,7 +11,7 @@ fn ls_lists_a_story_workspace_with_its_status_and_none_once_it_is_cancelled() {
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
     let path = repo.to_str().expect("utf-8 path");
-    tok.run(&["project", "new", "DEMO", "--repo", path]);
+    tok.run(&["project", "new", "DEMO", "--repo", path, "--sim"]);
     tok.run(&[
         "chain",
         "new",

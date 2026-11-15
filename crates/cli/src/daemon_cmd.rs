@@ -118,16 +118,35 @@ fn run_foreground(paths: Paths, exit_with_parent: bool) -> Result<()> {
     if exit_with_parent {
         toknila_daemon::server::exit_with_parent();
     }
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    let result = rt.block_on(toknila_daemon::server::run(paths));
-    // Dropping the runtime would wait for every blocking task (a transcript scan, a git call) to
-    // finish, so a stopped daemon would linger; give them a moment, then leave.
-    rt.shutdown_timeout(std::time::Duration::from_secs(1));
-    result?;
-    Ok(())
+    // The server runs on its own thread with a generous stack: `run` is one large future that
+    // startup recovery, the ship retirement and the watchers grow, and Windows gives the main
+    // thread one megabyte (the daemon died at startup there with STATUS_STACK_OVERFLOW,
+    // 0xc00000fd, on 2026-11-15 while Linux and macOS with their eight were fine). The future
+    // itself is boxed, so its state is on the heap whatever its size.
+    let server = std::thread::Builder::new()
+        .name("daemon".to_owned())
+        .stack_size(SERVER_STACK)
+        .spawn(move || -> Result<()> {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(WORKER_STACK)
+                .build()?;
+            let result = rt.block_on(Box::pin(toknila_daemon::server::run(paths)));
+            // Dropping the runtime would wait for every blocking task (a transcript scan, a git
+            // call) to finish, so a stopped daemon would linger; give them a moment, then leave.
+            rt.shutdown_timeout(std::time::Duration::from_secs(1));
+            result?;
+            Ok(())
+        })?;
+    server
+        .join()
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
 }
+
+/// The stack of the thread that polls the server's future.
+const SERVER_STACK: usize = 16 * 1024 * 1024;
+/// The stack of each runtime worker thread (tokio's default is two megabytes).
+const WORKER_STACK: usize = 8 * 1024 * 1024;
 
 /// The running daemon's info, or `None` if no daemon answers `/healthz`.
 pub fn running(paths: &Paths) -> Result<Option<DaemonInfo>> {
