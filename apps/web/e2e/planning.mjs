@@ -91,8 +91,8 @@ try {
   // 3. A new chain: a refusal shows inline, then the chain is created and opens.
   await t("empty-new-chain").click();
   await t("create-chain").click();
-  await expectText(t("chain-error"), "epic name is empty", "an empty epic name is refused inline");
-  await t("chain-name").fill("plan");
+  await expectText(t("error-chain-title"), "An epic needs a title.", "an empty epic title is refused inline");
+  await t("chain-title").fill("plan");
   await t("chain-goal").fill("Plan from the window");
   await t("chain-autostart").uncheck();
   await t("create-chain").click();

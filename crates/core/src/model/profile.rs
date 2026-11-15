@@ -293,9 +293,9 @@ impl AgentProfile {
     ///
     /// It runs in `dontAsk` mode: what it may do is the allow-list and nothing else, so it can
     /// read the code (Read, Grep, Glob, read-only git) and use the Toknila planner tools, and
-    /// it cannot edit or write a file or run anything that changes the repository. Hooks are off
-    /// (a planner is not a card's agent: nothing is nudged, nothing is handed in); the settings
-    /// file carries the allow rules only.
+    /// it cannot edit or write a file or run anything that changes the repository. Its hooks are
+    /// on, and its role picks which (`crate::hook::subscribed`): a planner is not a card's agent,
+    /// so they report its turn and nothing else (nothing is nudged, handed in or asked).
     pub fn claude_code_planner() -> Self {
         let mut allow: Vec<String> = ["Read", "Grep", "Glob"].map(str::to_owned).to_vec();
         allow.extend(
@@ -318,10 +318,6 @@ impl AgentProfile {
             command: ["claude", "--permission-mode", "dontAsk", Self::KICKOFF]
                 .map(str::to_owned)
                 .to_vec(),
-            hooks: HookWiring {
-                enabled: false,
-                settings_flag: Some("--settings".to_owned()),
-            },
             permissions: Permissions { allow },
             // The person talks to it; no screen-wait rule applies.
             startup_secs: 0,

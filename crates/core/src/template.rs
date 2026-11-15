@@ -109,6 +109,12 @@ pub fn normalize(body: &CommentBody) -> CommentBody {
     let gist = body.gist.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut out = CommentBody {
         gist,
+        person: body
+            .person
+            .iter()
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect(),
         ..CommentBody::default()
     };
     for field in Field::ALL {
@@ -245,6 +251,7 @@ mod tests {
             how_to_verify: Some("cargo test -p toknila-daemon".to_owned()),
             alternatives: Some("sqlx: needs DATABASE_URL at build time".to_owned()),
             consequences: Some("All writes go through one queue".to_owned()),
+            person: Vec::new(),
         }
     }
 
@@ -337,6 +344,7 @@ mod tests {
         ) {
             let body = CommentBody {
                 gist, what, why, how_to_verify: how, alternatives: alt, consequences: cons,
+                person: Vec::new(),
             };
             prop_assume!(!normalize(&body).gist.is_empty());
             let md = render(kind, &body);

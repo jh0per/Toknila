@@ -84,15 +84,47 @@ fn the_planner_reads_its_instructions_from_its_own_folder() {
 }
 
 #[test]
-fn the_planner_settings_allow_reading_and_its_tools_and_name_no_hooks() {
+fn the_planner_settings_subscribe_its_three_turn_hooks_and_are_pinned() {
     let rig = planner_rig();
     rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);
     let (_, text) = rig.file_of("planner", "settings.json");
     let v: Value = serde_json::from_str(&text).expect("json");
-    assert!(
-        v.get("hooks").is_none(),
-        "a planner is not a card's agent: {text}"
-    );
+    let hooks = v["hooks"].as_object().expect("hooks");
+    let mut names: Vec<&str> = hooks.keys().map(String::as_str).collect();
+    names.sort_unstable();
+    assert_eq!(names, ["PreToolUse", "Stop", "UserPromptSubmit"], "{text}");
+    for (claude, ours) in [
+        ("UserPromptSubmit", "user_prompt_submit"),
+        ("PreToolUse", "pre_tool_use"),
+        ("Stop", "stop"),
+    ] {
+        assert_eq!(
+            hooks[claude],
+            serde_json::json!([{ "hooks": [{
+                "type": "command",
+                "command": format!("\"/opt/toknila/bin/toknila\" hook {ours}"),
+            }]}]),
+            "{text}"
+        );
+    }
+    super::settings_pins::assert_settings_pinned(&text, "planner-settings.json");
+}
+
+#[test]
+fn the_planner_settings_allow_reading_and_its_tools_and_ask_nothing_of_a_card() {
+    let rig = planner_rig();
+    rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);
+    let (_, text) = rig.file_of("planner", "settings.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    // Its hooks are signals of its turn: no permission dialog is held, no notification read.
+    for card_only in [
+        "PermissionRequest",
+        "Notification",
+        "PostToolUse",
+        "SubagentStop",
+    ] {
+        assert!(v["hooks"].get(card_only).is_none(), "{card_only}: {text}");
+    }
     assert!(v.get("statusLine").is_none());
     // A planner is a normal role: it gets what every role gets (auto memory off, no subagents, no tool that leaves the ship).
     assert_eq!(v["autoMemoryEnabled"], false);

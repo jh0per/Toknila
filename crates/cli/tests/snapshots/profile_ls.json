@@ -196,7 +196,7 @@
         ],
         "env": {},
         "hooks": {
-          "enabled": false,
+          "enabled": true,
           "settings_flag": "--settings"
         },
         "instructions_file": "CLAUDE.md",

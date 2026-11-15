@@ -132,7 +132,7 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
         },
     };
     let input = chains::NewChain {
-        name,
+        name: Some(name),
         title,
         goal: input.goal,
         autostart: Some(planner::NEW_CHAIN_AUTOSTART),
