@@ -15,6 +15,7 @@ mod mcp_tools;
 mod planner;
 mod profile;
 mod project;
+mod project_rm;
 mod release;
 mod review;
 mod ship;

@@ -17,6 +17,7 @@
 //! | Blocked | previous status | `Unblock` |
 //! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
 //! | Review | Review (merging) | `Accept`; an approving `ReviewVerdict` that decides does the same |
+//! | Review (merging) | Review (checking) | `MainMoved` (at Accept, main is at a commit the last check did not see; a pass merges by itself) |
 //! | Review (merging) | Merged | `MergeDone` (removes the ship's worktree, keeps its branch) |
 //! | Review (merging) | Running | `MergeConflicted` (the base conflicts with the ship: back to the worker as a round; the Accept is remembered) |
 //! | Review (merging) | Blocked | `Block` with a merge reason (`merge_conflict`, `ci_failed`, `pr_closed`, ...); `Unblock` merges again |
@@ -39,8 +40,7 @@
 //! (dependents becoming Ready, Blocked or Backlog) come back as [`Effect`]s for the chain graph.
 
 use crate::{
-    CheckPhase, OutOfOrder, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp, Verdict,
-    WaitingReason,
+    OutOfOrder, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp, Verdict, WaitingReason,
 };
 
 mod action;
@@ -131,38 +131,9 @@ pub fn apply(
             }
             (S::Review, None)
         }
-        (
-            S::Review,
-            TicketEvent::CheckDone {
-                passed,
-                output,
-                mode,
-                max_rounds,
-            },
-        ) => review::check_done(
-            &mut next,
-            (*passed, output),
-            (*mode, *max_rounds),
-            now,
-            &mut effects,
-        )?,
-        (S::Review, TicketEvent::CheckCannotRun { command }) => {
-            check_phase::check_cannot_run(&mut next, command, &mut effects)?
+        (S::Review, e) if check_phase::handles(e) => {
+            check_phase::step(&mut next, e, now, &mut effects)?
         }
-        (S::Review, TicketEvent::CheckLost { detail }) => {
-            check_phase::check_lost(&mut next, detail, &mut effects)?
-        }
-        (S::Review, TicketEvent::CheckSkipped { mode }) => {
-            check_phase::skipped(&mut next, *mode, now, &mut effects)?
-        }
-        (S::Review, TicketEvent::CheckSyncing) => {
-            check_phase::progress(&mut next, "check_syncing", CheckPhase::Syncing)?
-        }
-        (S::Review, TicketEvent::CheckRunning { command }) => check_phase::progress(
-            &mut next,
-            "check_running",
-            check_phase::running(command, now),
-        )?,
         (S::Running | S::Waiting, TicketEvent::Block { reason }) => {
             block(reason, ticket, &mut effects)?
         }

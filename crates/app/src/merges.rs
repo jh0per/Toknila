@@ -7,14 +7,14 @@ use toknila_core::guard::ShipProblem;
 use toknila_core::machine::TicketEvent;
 use toknila_core::pr::PrSpec;
 use toknila_core::{
-    BlockedReason, Chain, MergeMode, MergeSettings, MergeSpec, PullRequest, ReviewTurn, ShipSpec,
-    Ticket, TicketId, TicketKey, TicketStatus,
+    BlockedReason, Chain, MergeMode, MergeSettings, MergeSpec, PullRequest, Recheck, ReviewTurn,
+    ShipSpec, Ticket, TicketId, TicketKey, TicketStatus,
 };
 
 use crate::chain::tell_ticket;
 use crate::external::{ExternalEffect, Host};
 use crate::ships::{self, GuardError};
-use crate::sync::{self, SyncOutcome, SyncSpec};
+use crate::sync::{self, Seen, SyncOutcome, SyncSpec};
 use crate::{AppResult, GitError, UnitOfWork};
 
 /// How a merge ended when nothing went wrong on the host.
@@ -47,6 +47,9 @@ pub enum MergeOutcome {
     PrConflict { url: String },
     /// Pull-request mode: the pull request merged on GitHub and the base was fetched.
     PrMerged { pr: PullRequest },
+    /// After the sync main is at a commit the last passed check did not see: nothing was merged;
+    /// the card goes back through the check. `commits` is how many main took since, when known.
+    MainMoved { commits: Option<u32> },
 }
 
 /// Why a merge could not run or finish. The text lands in the ticket's blocked reason.
@@ -103,6 +106,12 @@ pub trait Merger: std::fmt::Debug {
             "this merger cannot bring a ship up to its base".to_owned(),
         ))
     }
+
+    /// The commit of main the synced ship sees and the ship's HEAD; with `since`, how many
+    /// commits main has beyond it. `None` when the host cannot say.
+    fn seen(&self, _spec: &SyncSpec, _since: Option<&str>) -> Option<Seen> {
+        None
+    }
 }
 
 /// Runs one step of a merge on the host. When the step would push or merge the ship's work (a
@@ -133,8 +142,23 @@ pub(crate) fn run(host: &Host<'_>, spec: &MergeSpec) -> Result<MergeOutcome, Mer
             }
             SyncOutcome::UpToDate | SyncOutcome::Merged { .. } => {}
         }
+        if let Some(moved) = main_moved(host, spec) {
+            return Ok(moved);
+        }
     }
     host.merger.merge(spec)
+}
+
+/// Whether main, as the ship now sees it, is a commit the last passed check did not see (and the
+/// project has a check command to run again).
+fn main_moved(host: &Host<'_>, spec: &MergeSpec) -> Option<MergeOutcome> {
+    let recheck = spec.recheck.as_ref()?;
+    let Seen { base, commits, .. } = host
+        .merger
+        .seen(&SyncSpec::of(spec), recheck.base.as_deref())?;
+    recheck
+        .due(&base)
+        .then_some(MergeOutcome::MainMoved { commits })
 }
 
 /// `Merge`: queue the merge for after the commit. A card without a ship (its project has no
@@ -163,6 +187,11 @@ pub(crate) fn queue_merge<U: UnitOfWork + ?Sized>(
             if project.merge.mode == MergeMode::Github {
                 merge.pr = Some(PrSpec::for_ticket(&project, ticket));
             }
+            // What the last check saw of main: Accept checks again when main is elsewhere now.
+            merge.recheck = project
+                .check_command
+                .is_some()
+                .then(|| Recheck::of(ticket.review.last_check.as_ref()));
             Some(merge)
         }
         _ => None,
@@ -220,6 +249,13 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
             TicketEvent::MergeDone
         }
         Ok(MergeOutcome::PrOpen { pr }) => return record_pr(uow, ticket, pr),
+        Ok(MergeOutcome::MainMoved { commits }) => TicketEvent::MainMoved {
+            text: match commits {
+                Some(1) => "main moved since the check: 1 commit".to_owned(),
+                Some(n) => format!("main moved since the check: {n} commits"),
+                None => "main moved since the check".to_owned(),
+            },
+        },
         Ok(MergeOutcome::CiFailed { pr, failed }) => {
             let url = pr.url.clone();
             record_pr(uow, ticket, pr)?;

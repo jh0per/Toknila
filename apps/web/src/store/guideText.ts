@@ -71,8 +71,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     text:
       "When an agent is done it hands in: what changed, each check as PASS, FAIL, NOT_RUN or BLOCKED, and what is left. " +
       "The test command runs, then a reviewer agent reads the work, in rounds up to the project's limit; each round is listed under Review. " +
-      "You then press Accept, or Return with what to change, and the agent hands in again. " +
-      "Accept merges into the main branch, or opens a pull request when the project is set to.",
+      "You then press Accept, which merges into the main branch (or opens a pull request when the project is set to) and checks again when other stories merged first, or Return with what to change, and the agent hands in again. " +
+      "A project can also name extra checks for parts of the code, which run with the test command for the files a story changed.",
   },
   {
     id: "accept-or-return", title: "Review: Accept or Return", show: "review", showLabel: "Open a story in review",

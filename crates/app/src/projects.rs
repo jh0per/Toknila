@@ -91,6 +91,9 @@ pub struct PatchProject {
     /// The domains the project's reviewers may read on the web (`docs.rs`); the list replaces the
     /// old one, an empty list denies the web again.
     pub reviewer_web_domains: Option<Vec<String>>,
+    /// The extra checks (`apps/web/**` runs `cargo xtask web`) that run after the check command
+    /// for the files a card changed; the list replaces the old one, an empty list clears it.
+    pub extra_checks: Option<Vec<toknila_core::ExtraCheck>>,
 }
 
 /// Creates a project; its key must be valid and unused.
@@ -157,6 +160,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
         command_policy: draft.command_policy.unwrap_or(CommandPolicy::NEW_PROJECT),
         allowed_commands: Vec::new(),
         reviewer_web_domains: Vec::new(),
+        extra_checks: Vec::new(),
         archived: false,
         hidden: false,
         simulated: draft.simulated.unwrap_or(false),
@@ -207,6 +211,10 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     }
     if let Some(c) = patch.check_command {
         p.check_command = Project::clean_check_command(&c).map_err(AppError::bad_request)?;
+    }
+    if let Some(list) = patch.extra_checks {
+        p.extra_checks =
+            toknila_core::ExtraCheck::clean_all(list).map_err(AppError::bad_request)?;
     }
     if let Some(c) = patch.setup_command {
         p.setup_command = Project::clean_setup_command(&c).map_err(AppError::bad_request)?;

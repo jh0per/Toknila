@@ -48,6 +48,18 @@ pub enum SyncOutcome {
     },
 }
 
+/// What a ship was brought up to: the commit of main and the ship's own HEAD.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Seen {
+    /// The commit `SyncSpec::base` names now.
+    pub base: String,
+    /// The ship's HEAD.
+    pub head: String,
+    /// How many commits main has beyond the `since` commit that was asked about; `None` when
+    /// none was asked or it is not known to the repository.
+    pub commits: Option<u32>,
+}
+
 /// The outcome that records a base-sync merge commit the daemon made, if `synced` made one.
 pub(crate) fn recorded(
     ticket: toknila_core::TicketId,

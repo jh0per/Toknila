@@ -2352,8 +2352,15 @@ export interface components {
         CheckOutcome: {
             /** @description When the check finished. */
             at: components["schemas"]["Timestamp"];
+            /**
+             * @description The commit of main the ship was synced to when the check ran; `None` when the host could
+             *     not say (a check of an older version).
+             */
+            base?: string | null;
             /** @description The command that ran; empty when the checker never said which. */
             command?: string;
+            /** @description The ship's HEAD the check ran on; `None` when the host could not say. */
+            head?: string | null;
             /** @description The command and the end of its output, as the worker reads it. */
             output: string;
             passed: boolean;
@@ -2607,6 +2614,16 @@ export interface components {
             payload: Record<string, never>;
             /** Format: int64 */
             seq: number;
+        };
+        /** @description One extra check: `command` runs when a changed file matches one of `paths`. */
+        ExtraCheck: {
+            /** @description The command, one line like the check command. */
+            command: string;
+            /**
+             * @description Globs relative to the repository root: `*` is any run of characters inside a folder name,
+             *     `**` any run including `/`, `?` one character.
+             */
+            paths: string[];
         };
         /** @description The frame a Figma link points at. */
         FigmaRef: {
@@ -3304,6 +3321,11 @@ export interface components {
             /** @description Profile of cards that name none; a name from `GET /v1/profiles`. */
             default_profile?: string | null;
             /**
+             * @description The extra checks (`apps/web/**` runs `cargo xtask web`) that run after the check command
+             *     for the files a card changed; the list replaces the old one, an empty list clears it.
+             */
+            extra_checks?: components["schemas"]["ExtraCheck"][] | null;
+            /**
              * Format: int32
              * @description Most agents working at once (1 to 64).
              */
@@ -3664,6 +3686,11 @@ export interface components {
              *     profile (`<worker>-reviewer`).
              */
             default_reviewer?: string | null;
+            /**
+             * @description Commands that run after the check command, at every check turn, when the ship changed
+             *     files that match their paths; in this order.
+             */
+            extra_checks?: components["schemas"]["ExtraCheck"][];
             /** @description Left out of the sidebar's list; the project works as before. */
             hidden?: boolean;
             id: components["schemas"]["ProjectId"];
@@ -3997,6 +4024,11 @@ export interface components {
             note?: components["schemas"]["ReviewNote"] | null;
             /** @description The reviewer was already nudged for a verdict in this round of review. */
             nudged?: boolean;
+            /**
+             * @description The check of this turn is the one Accept asked for because main moved since the last
+             *     check; a pass merges by itself.
+             */
+            recheck?: boolean;
             /** @description Oldest first. */
             rounds?: components["schemas"]["ReviewRound"][];
             since_return?: components["schemas"]["SinceReturn"] | null;
@@ -4073,6 +4105,11 @@ export interface components {
             max_rounds: number;
             /** @description The review mode that applies: the ticket's, the chain's or the project's. */
             mode: components["schemas"]["ReviewMode"];
+            /**
+             * @description The check that runs is the second one of this hand-in: Accept found main at a commit the
+             *     last check did not see, and a pass merges by itself.
+             */
+            rechecking?: boolean;
             /** @description The reviewer agent profile that applies. */
             reviewer: string;
             /** @description Every verdict so far, oldest first. */

@@ -2,8 +2,8 @@
 //! (syncing with main, running the command), and the ways the check ends without a verdict
 //! (it could not run, or its program was not found).
 
-use super::review::Outcome;
-use super::{Effect, TransitionError};
+use super::review::{self, Outcome};
+use super::{Effect, TicketEvent, TransitionError};
 use crate::{
     Actor, CheckPhase, ReviewMode, ReviewNote, ReviewTurn, Ticket, TicketStatus, Timestamp, Verdict,
 };
@@ -16,6 +16,83 @@ pub(super) fn enter_check(next: &mut Ticket, effects: &mut Vec<Effect>) {
     next.review.last_check = None;
     next.review.nudged = false;
     next.review.note = None;
+}
+
+/// Whether `event` belongs to the check turn of a card in Review.
+pub(super) fn handles(event: &TicketEvent) -> bool {
+    use TicketEvent as E;
+    matches!(
+        event,
+        E::CheckDone { .. }
+            | E::CheckLost { .. }
+            | E::CheckSkipped { .. }
+            | E::CheckSyncing
+            | E::CheckRunning { .. }
+            | E::CheckCannotRun { .. }
+            | E::MainMoved { .. }
+    )
+}
+
+/// One event of the check turn ([`handles`] said yes).
+pub(super) fn step(
+    next: &mut Ticket,
+    event: &TicketEvent,
+    now: Timestamp,
+    effects: &mut Vec<Effect>,
+) -> Result<Outcome, TransitionError> {
+    use TicketEvent as E;
+    match event {
+        E::CheckDone {
+            passed,
+            output,
+            base,
+            head,
+            lines,
+            mode,
+            max_rounds,
+        } => {
+            let seen = review::Checked {
+                passed: *passed,
+                output,
+                base: base.as_deref(),
+                head: head.as_deref(),
+                lines,
+            };
+            review::check_done(next, seen, (*mode, *max_rounds), now, effects)
+        }
+        E::CheckCannotRun { command } => check_cannot_run(next, command, effects),
+        E::CheckLost { detail } => check_lost(next, detail, effects),
+        E::CheckSkipped { mode } => skipped(next, *mode, now, effects),
+        E::CheckSyncing => progress(next, "check_syncing", CheckPhase::Syncing),
+        E::CheckRunning { command } => progress(next, "check_running", running(command, now)),
+        E::MainMoved { text } => main_moved(next, text, now, effects),
+        other => Err(TransitionError::NotAllowed {
+            event: other.name(),
+            from: next.status,
+        }),
+    }
+}
+
+/// At Accept the host found main at a commit the last passed check did not see: the card goes
+/// back through the check turn, and a pass merges without a second Accept. The round says why.
+fn main_moved(
+    next: &mut Ticket,
+    text: &str,
+    now: Timestamp,
+    effects: &mut Vec<Effect>,
+) -> Result<Outcome, TransitionError> {
+    if next.review.turn != Some(ReviewTurn::Merging) {
+        return Err(TransitionError::NotAllowed {
+            event: "main_moved",
+            from: next.status,
+        });
+    }
+    enter_check(next, effects);
+    next.review.accepted = true;
+    next.review.recheck = true;
+    next.review
+        .record(Actor::System, Verdict::Approve, text, now);
+    Ok((TicketStatus::Review, None))
 }
 
 /// The checker reports where the check is. A card that is not in the check turn takes no phase.
@@ -52,6 +129,7 @@ pub(super) fn skipped(
         });
     }
     next.review.check = None;
+    next.review.recheck = false;
     next.review
         .record(Actor::System, Verdict::Approve, NO_CHECK_COMMENT, now);
     super::review::enter(next, mode, effects);
@@ -80,6 +158,8 @@ pub(super) fn check_lost(
     }
     next.review.turn = Some(ReviewTurn::Person);
     next.review.check = None;
+    next.review.recheck = false;
+    next.review.accepted = false;
     effects.push(Effect::RecordNotice {
         summary: format!("The check could not run ({detail}); it is for a person to decide."),
     });
@@ -102,6 +182,8 @@ pub(super) fn check_cannot_run(
     }
     next.review.turn = Some(ReviewTurn::Person);
     next.review.check = None;
+    next.review.recheck = false;
+    next.review.accepted = false;
     next.review.note = Some(ReviewNote::CheckCannotRun {
         command: command.to_owned(),
     });
