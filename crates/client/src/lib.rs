@@ -86,12 +86,7 @@ impl Client {
         path: &str,
         body: Option<&impl Serialize>,
     ) -> ClientResult<T> {
-        self.call_as(
-            method,
-            path,
-            body,
-            matches!(method, "GET" | "PUT" | "DELETE"),
-        )
+        self.call_as(method, path, body, is_idempotent(method))
     }
 
     /// Like [`Client::call`] for a route whose repeat is harmless whatever its method (the
@@ -116,15 +111,7 @@ impl Client {
             .map(serde_json::to_value)
             .transpose()
             .map_err(|e| ClientError::Decode(e.to_string()))?;
-        let mut tries = if repeatable { 2 } else { 1 };
-        let text = loop {
-            tries -= 1;
-            match self.once(method, path, json.as_ref()) {
-                Ok(text) => break text,
-                Err((_, true)) if tries > 0 => {}
-                Err((e, _)) => return Err(e),
-            }
-        };
+        let text = retrying(repeatable, || self.once(method, path, json.as_ref()))?;
         // An empty answer (202 Accepted) reads as JSON null.
         let text = if text.is_empty() { "null" } else { &text };
         serde_json::from_str(text).map_err(|e| ClientError::Decode(e.to_string()))
@@ -149,27 +136,69 @@ impl Client {
         match resp {
             Ok(r) => body::text(r).map_err(|e| {
                 let lost = body::lost(&e);
-                (operation_failed(&what, "read the answer's body", &e), lost)
+                (
+                    operation_failed(&what, "read the answer's body", &e, lost),
+                    lost,
+                )
             }),
-            Err(ureq::Error::Transport(t)) => {
-                use ureq::ErrorKind::{ConnectionFailed, Dns};
-                let op = match t.kind() {
-                    Dns => "resolve the daemon's address",
-                    ConnectionFailed => "connect",
-                    _ => "send the request or read the answer's headers",
-                };
-                let lost = body::lost(&t);
-                Err((operation_failed(&what, op, &t), lost))
-            }
+            Err(ureq::Error::Transport(t)) => Err(transport_failure(&what, &t)),
             Err(e) => Err((transport_error(e), false)),
         }
     }
 }
 
+/// Whether a request of `method` is harmless to send twice.
+fn is_idempotent(method: &str) -> bool {
+    matches!(method, "GET" | "PUT" | "DELETE")
+}
+
+/// Runs `attempt`; when it reports a lost connection and `repeatable`, runs it once more (the
+/// second try is the fresh connection). Any other error, or a second loss, is the answer.
+fn retrying(
+    repeatable: bool,
+    mut attempt: impl FnMut() -> Result<String, (ClientError, bool)>,
+) -> ClientResult<String> {
+    let mut tries = if repeatable { 2 } else { 1 };
+    loop {
+        tries -= 1;
+        match attempt() {
+            Ok(text) => return Ok(text),
+            Err((_, true)) if tries > 0 => {}
+            Err((e, _)) => return Err(e),
+        }
+    }
+}
+
+/// A transport failure of the call `what` as the error to show and whether the connection was
+/// lost (the daemon closed it), which is what makes an idempotent call repeat.
+fn transport_failure(what: &str, t: &ureq::Transport) -> (ClientError, bool) {
+    use ureq::ErrorKind::{ConnectionFailed, Dns};
+    let op = match t.kind() {
+        Dns => "resolve the daemon's address",
+        ConnectionFailed => "connect",
+        _ => "send the request or read the answer's headers",
+    };
+    let lost = body::lost(t);
+    (operation_failed(what, op, t, lost), lost)
+}
+
 /// An OS-level failure of one step of a call, with the step and the call named: an `os error`
 /// alone says nothing about which socket operation it came from.
-fn operation_failed(what: &str, operation: &str, e: &dyn std::fmt::Display) -> ClientError {
-    ClientError::Transport(format!("{what}: could not {operation}: {e}"))
+///
+/// A `lost` connection (see [`body::lost`]) is reported as the daemon closing it, never with the
+/// OS text (`Invalid argument (os error 22)` is macOS's word for a reset socket).
+fn operation_failed(
+    what: &str,
+    operation: &str,
+    e: &dyn std::fmt::Display,
+    lost: bool,
+) -> ClientError {
+    let reason = if lost {
+        body::CLOSED.to_string()
+    } else {
+        e.to_string()
+    };
+    ClientError::Transport(format!("{what}: could not {operation}: {reason}"))
 }
 
 /// An HTTP agent whose limits are per operation, each set once on the socket. Never use ureq's
@@ -260,20 +289,115 @@ mod tests {
     #[test]
     fn a_peer_that_closed_mid_headers_is_not_an_invalid_argument() {
         use std::io::Write;
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-        let base = format!("http://{}", listener.local_addr().expect("addr"));
-        let server = std::thread::spawn(move || {
-            let (mut s, _) = listener.accept().expect("accept");
-            // Let the request arrive, never read it: closing with unread data resets the socket.
-            std::thread::sleep(Duration::from_millis(200));
-            s.write_all(b"HTTP/1.1 200 OK\r\n").expect("write");
-            drop(s);
-        });
-        let err = Client::new(base, "t0k").projects().expect_err("cut");
-        server.join().expect("server");
-        let text = err.to_string();
-        assert!(!text.contains("os error 22"), "{text}");
-        assert!(!text.contains("Invalid argument"), "{text}");
+        // `TOKNILA_CLIENT_REPEAT=50` repeats the case (the check of TOKNILA-139 runs it beside a
+        // build); a plain run does it once.
+        let rounds: usize = std::env::var("TOKNILA_CLIENT_REPEAT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1);
+        for round in 0..rounds {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+            listener.set_nonblocking(true).expect("nonblocking");
+            let base = format!("http://{}", listener.local_addr().expect("addr"));
+            // Every connection (the GET is repeated once) gets the same cut; one that does not
+            // come within two seconds ends the server, so nothing here can hang.
+            let server = std::thread::spawn(move || {
+                for _ in 0..2 {
+                    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+                    let mut s = loop {
+                        match listener.accept() {
+                            Ok((s, _)) => break s,
+                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                if std::time::Instant::now() > deadline {
+                                    return;
+                                }
+                                std::thread::sleep(Duration::from_millis(5));
+                            }
+                            Err(e) => panic!("accept: {e}"),
+                        }
+                    };
+                    // Let the request arrive, never read it: closing with unread data resets
+                    // the socket.
+                    std::thread::sleep(Duration::from_millis(200));
+                    let _ = s.write_all(b"HTTP/1.1 200 OK\r\n");
+                }
+            });
+            let err = Client::new(base, "t0k").projects().expect_err("cut");
+            server.join().expect("server");
+            let text = err.to_string();
+            assert!(!text.contains("os error 22"), "round {round}: {text}");
+            assert!(!text.contains("Invalid argument"), "round {round}: {text}");
+            assert!(text.contains(body::CLOSED), "round {round}: {text}");
+        }
+    }
+
+    /// The `EINVAL` of a socket the daemon reset, as ureq reports it: bare, and wrapped in
+    /// another `io::Error` (ureq's header reader wraps what it reads).
+    fn einval_failures() -> Vec<ureq::Transport> {
+        let bare = std::io::Error::from_raw_os_error(22);
+        let wrapped = std::io::Error::other(std::io::Error::from_raw_os_error(22));
+        let kind_only = std::io::Error::from(std::io::ErrorKind::InvalidInput);
+        [bare, wrapped, kind_only]
+            .into_iter()
+            .map(|e| {
+                ureq::Error::from(e)
+                    .into_transport()
+                    .expect("an io error is a transport error")
+            })
+            .collect()
+    }
+
+    /// An `EINVAL` from a reset socket is the daemon closing the connection, in the words of the
+    /// person and never in the OS's.
+    #[test]
+    fn an_einval_is_reported_as_a_closed_connection() {
+        for t in einval_failures() {
+            let (err, lost) = transport_failure("GET /projects", &t);
+            let text = err.to_string();
+            assert!(lost, "{text}");
+            assert!(text.contains(body::CLOSED), "{text}");
+            assert!(!text.contains("os error 22"), "{text}");
+            assert!(!text.contains("Invalid argument"), "{text}");
+        }
+        // Control: an error that is not a closed connection keeps its own text.
+        let other = ureq::Error::from(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+            .into_transport()
+            .expect("transport");
+        let (err, lost) = transport_failure("GET /projects", &other);
+        assert!(!lost);
+        assert!(!err.to_string().contains(body::CLOSED), "{err}");
+    }
+
+    /// A call that meets the closed connection is tried once more when it is idempotent (`GET`),
+    /// and never when it is not (`POST`).
+    #[test]
+    fn a_closed_connection_is_met_again_once_for_a_get_and_never_for_a_post() {
+        for shape in 0..einval_failures().len() {
+            for (method, expected) in [("GET", 2), ("PUT", 2), ("DELETE", 2), ("POST", 1)] {
+                let mut calls = 0;
+                let got = retrying(is_idempotent(method), || {
+                    calls += 1;
+                    let t = einval_failures().remove(shape);
+                    Err(transport_failure(&format!("{method} /x"), &t))
+                });
+                assert!(got.is_err(), "{method}");
+                assert_eq!(calls, expected, "{method}, shape {shape}");
+            }
+            // The repeat is the fresh connection: it answers.
+            let mut calls = 0;
+            let got = retrying(true, || {
+                calls += 1;
+                if calls == 1 {
+                    Err(transport_failure(
+                        "GET /x",
+                        &einval_failures().remove(shape),
+                    ))
+                } else {
+                    Ok("[]".to_string())
+                }
+            });
+            assert_eq!((got.expect("answers"), calls), ("[]".to_string(), 2));
+        }
     }
 
     /// A daemon that answers completely and closes at once (a reset, as the unread request is
