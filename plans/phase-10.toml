@@ -1,0 +1,233 @@
+# Phase 10: the backlog, closed. What the last four phases left as candidates in the orchestrator's
+# notes, triaged on 2026-11-15 against v0.3.3; the owner asked how much is left and said to go on.
+# Import: tok chain import plans/phase-10.toml --project TOKNILA
+#
+# Left out on purpose: the Windows terminal losing the first lines of an agent's output (ConPTY;
+# needs a person with Windows), and the planner routes folded into the card routes (no user value).
+# The owner's own epic "Асистент показує, що робить" (TOKNILA-127..129, v0.3.5) runs beside this one.
+#
+# `after` names the cards whose files a card shares; a card without `after` may run at once.
+
+[chain]
+name = "phase-10"
+title = "The backlog, closed"
+goal = "Accept and Release need no hand work from the orchestrator, a hand-in says what a person must do, the window names epics the way people do, and a test run leaves nothing behind"
+autostart = true
+version = "0.3.4"
+
+[[ticket]]
+id = "accept-reruns-the-check"
+title = "Accept checks again when main moved, and runs the checks the changed files ask for"
+prompt = """
+What happens today. At the hand-in the daemon syncs the ship with main and runs the project's check command (TOKNILA-29; `Effect::RunCheck` in crates/core/src/machine/event.rs, `checks::queue_for` and `checks::run_on_host` in crates/app/src/checks.rs). At Accept, `merges::run` (crates/app/src/merges.rs) does `ships::guard`, then `host.merger.sync` (main merged into the ship once more), then `host.merger.merge`: the check is not run again, so a card checked against a main that has since taken three other cards merges on a stale result. `CheckOutcome` (crates/core/src/model/check_outcome.rs: command, passed, output, at) does not record which main commit the check saw; `Review.handed_in` is the ship's HEAD, not main's. And the project has one check command: Toknila's `cargo xtask verify` does not build the web bundle or run the browser specs, so every card that touches apps/web gets `cargo xtask web` and `cargo xtask e2e-web` from the orchestrator by hand before Accept. `Shipyard::changes_between` (crates/daemon/src/shipyard/inspect.rs, used only for `SinceReturn.files`) already lists the files a range changed.
+
+Build this.
+
+1. The check knows what it checked. `CheckOutcome` gains the main commit the ship was synced to (`base` or the name that fits) and the ship HEAD it ran on; `review::check_done` records them. `tok show` prints "checked against main at <short>" in the round.
+
+2. Accept re-checks when main moved. In the Accept path, after the sync: if main's commit differs from the one the last passed check recorded (or no check recorded one), the card goes back through the check turn (the same `RunCheck` effect and round kind as at the hand-in; the round's comment says "main moved since the check: <n> commits"), and the merge follows a pass by itself, with no second Accept. A failing re-check is a round for the agent, as a hand-in check is (TOKNILA-102 already returns a conflict at Accept the same way). The Review card shows "being checked again" while it runs (the turn words of TOKNILA-53). If main did not move, the merge is immediate as today.
+
+3. Checks for the files that changed. The project gains `extra_checks`: a list of `{ paths, command }` (paths as globs such as `apps/web/**`), set with `tok project set --extra-check 'apps/web/**=cargo xtask web && cargo xtask e2e-web'` (one flag per entry; `--clear-extra-checks`), shown and edited in the project Settings page under the check command, and in the API (crates/api-types; then `npm run gen`). At every check turn (hand-in, Return, re-check at Accept) the daemon lists the files the ship changed against the synced main (`changes_between`) and runs, after the check command, every extra check whose glob matches a changed file, in order, in the ship, each as its own line of the round ("extra check apps/web/**: PASS cargo xtask web && cargo xtask e2e-web, 4 min"); a failure is the round's failure with that output. The system check (TOKNILA-28's "check command OK") covers the extra commands too. The reviewer gets their results with the gate's (TOKNILA-82).
+
+4. Words for people. docs/guide (the window's Guide section on Review, TOKNILA-80) gains two sentences: Accept checks again when other stories merged first; the project can name extra checks for parts of the code.
+
+5. Tests, red first and quoted in the hand-in: core: `check_done` records base and head; the Accept transition goes to the check turn when the recorded base differs and merges when it is equal. App or daemon http tests with a temp repo and a fake check command: Accept after main moved runs the check once and then merges with no further action; a failing re-check returns the card to the agent as a round; an extra check runs only when a matching file changed, in the order given, and its line is in the round; the system check reports a missing extra command. CLI test of the `--extra-check` flag; a web unit test of the Settings rows. Run `cargo xtask web` and `cargo xtask verify`.
+
+Keep the change inside crates/core (machine review and check phase, model check_outcome and project), crates/app (checks, merges, projects), crates/daemon (routes projects and tickets, shipyard inspect if a range helper is missing), crates/cli (project set, show), crates/api-types, apps/web (Settings project page, the turn words), docs, and the tests. A production file stays at or under 400 lines; `merges.rs` and `checks.rs` are near it, split before you add.
+"""
+acceptance = [
+  "Accept of a card whose last check saw an older main runs the check again after the sync and merges on a pass by itself; a failure is a round for the agent; the round records the main commit it checked against",
+  "A project can name extra checks per path glob in the CLI, the Settings page and the API; they run at every check turn for the files the ship changed and appear as lines of the round; the system check covers them",
+  "Covered by core, app or daemon, cli and web tests seen red first",
+]
+
+[[ticket]]
+id = "release-pushes-in-local-mode"
+title = "A release in local mode can push main and the tag; the orchestrator pushes nothing by hand"
+prompt = """
+What happens today. The release run (crates/core/src/release_run.rs `ReleaseStep`: Check, Bump, Tag, Push; crates/daemon/src/releaser.rs) has a Push step that runs `git push --porcelain origin refs/heads/<base> refs/tags/<tag>`, but `project_steps` and `Plan.push` in crates/daemon/src/http/routes/releases.rs turn it on only when `merge.mode == MergeMode::Github`. Toknila itself is a local-mode project with a GitHub remote: every release since 0.2.12 ended with "Check, Bump, Tag ok" and the orchestrator pushing main and the tag by hand so that the Release workflow publishes. Neither the project nor the repo stores a remote name; `origin` is hard-coded in five places (github.rs, releaser.rs, shipyard.rs, shipyard/planner.rs, `ShipSpec::start_point`).
+
+Build this.
+
+1. Push is a choice of the release, not of the merge mode. The release request (the Release dialog of the Finish node, TOKNILA-32; `POST /chains/{chain}/release`; `tok release run`) carries `push: bool`. The dialog shows "Push main and the tag to origin" as a checkbox when the repository has a remote named origin whose URL the daemon can read (`git remote get-url origin` in the shipyard; the chain's detail or the project's detail carries `remote: Option<String>` for the window), on by default in github mode and when the base branch has an upstream, off when there is no remote (then the checkbox is absent and one line says "no remote: the tag stays local"). `tok release run <CHAIN> <VERSION> --push|--no-push`, default as the dialog.
+
+2. The push step speaks. In the step list (`tok release steps`, the dialog's steps) Push reads "Pushed main and v0.3.4 to origin" with the remote's URL made into a link when it is GitHub (the tag page, `<url>/releases/tag/v0.3.4`), or the failure's git line verbatim ("rejected: non-fast-forward; pull first" is what a person reads most). A failed push leaves the run resumable at Push (TOKNILA-59's `resume_steps`), with a "Push again" control; Tag is not redone.
+
+3. The remote is read, not assumed. One function in the shipyard answers the remote's name and URL for a project (origin when it exists, else the single remote, else none); the five hard-coded `origin`s of the release path (releaser.rs and the planner's fetch) use it; github.rs and the ship start point keep theirs unless the change is a one-liner (say in the hand-in which you changed).
+
+4. Tests, red first and quoted: core: `steps(check, bump, push)` with push in local mode; daemon tests with a temp repo and a bare remote: a release with push lands main and the tag in the remote; without push nothing leaves; a rejected push (the remote moved) fails the step with git's line and resumes at Push; a repository with no remote gets no checkbox (`remote: null`) and refuses `--push` with a sentence; cli test of `--push`; a web unit test of the dialog's checkbox states; the existing release e2e extended by the checkbox. Run `cargo xtask web`, `cargo xtask e2e-web`, `cargo xtask verify`.
+
+Keep the change inside crates/core (release_run, model release), crates/daemon (releaser, routes releases, shipyard remote), crates/cli (release run, steps), crates/api-types (then `npm run gen`), apps/web (the Release dialog and its steps), and the tests.
+"""
+acceptance = [
+  "A release in local mode offers Push main and the tag to origin when a remote exists, on by default when the base has an upstream; tok release run takes --push/--no-push",
+  "The Push step says what it pushed with a link, or git's failure line, and a failed push resumes at Push without redoing Tag; a project without a remote says so instead of a checkbox",
+  "Covered by core, daemon with a bare remote, cli, web and e2e tests seen red first",
+]
+
+[[ticket]]
+id = "merged-through-github-retires-the-ship"
+title = "A card merged by any path retires its ship; ships of merged cards are listed and cleaned"
+after = ["accept-reruns-the-check"]
+prompt = """
+What happened. On 2026-11-15, 13 of the 15 merged cards of the owner's second project (github merge mode) still had their ship worktrees under `~/.toknila-ships/<project>/<epic>/` (registered in `git worktree list`), and `tok show BEATSTER-10 --json` still carried `ship` with branch and path; two cards (one merged with `tok merge-now`) were clean. TOKNILA-62 made a merged card leave nothing behind, through `merge::done` (crates/core/src/machine/merge.rs) → `Effect::RemoveShip` → `ships::queue_remove` (crates/app/src/ships.rs): in local mode it defers `ExternalEffect::RetireShip` (`GitShipyard::retire_ship`, crates/daemon/src/shipyard/retire.rs: worktree removed, `branch -D` unless the branch has commits beyond the base, then `ships::retired` deletes the record). In github mode `pr_watch::tick` → `merges::poll` → `GithubMerger::step` sees MERGED → `landed` fetches and `merges::finished` sends `MergeDone` → `queue_remove` defers `ExternalEffect::RemoveShip` instead, which removes the worktree and the record but keeps the local branch; and on the owner's machine not even that happened: records and worktrees stayed. Find out why on a copy of the path (the fake GitHub of the tests), then make every path the same.
+
+Build this.
+
+1. One retirement for every path. A card that becomes Merged by any path (the daemon's local merge, a pull request seen merged, `tok merge-now`, a person's Accept in a project with no merge at all) runs `RetireShip` with the start point the ship was made from (`ShipSpec::start_point`, `origin/<base>` in github mode): worktree, local branch (kept only when it has commits beyond what merged, with a journal line saying so), record. `RemoveShip` keeps its other uses (cancel) or goes if it has none. The reason the owner's ships stayed is named in the hand-in with the test that reproduces it.
+
+2. Recovery cleans up after an old daemon. At daemon start (crates/app/src/recovery.rs) a ship record whose card is Merged or Cancelled is retired as in item 1, logged once per ship; a worktree folder under the project's ships root that no record names and no running card owns is listed in the log as unknown, never deleted.
+
+3. People can see them. `tok ship ls` (crates/cli, the `ship` command) gains the card's status and marks ships of merged cards; Settings → the project's page (or the Agents node's workspace table of TOKNILA-113) lists "Workspaces: N, of which M belong to finished stories" with a "Clean up" control that retires them (`POST /projects/{project}/ships/retire-finished`, person only). The `_planner` folder (the assistant's reading copy) is named as such in the list and never counted as a leftover.
+
+4. Tests, red first and quoted: an app or daemon test per path (local merge, github merge through the fake GitHub, merge-now, no-merge Accept) asserting worktree gone, branch gone or kept with the journal line, record gone; recovery with a planted record of a merged card; the route and the CLI; a web unit test of the Settings line. Run `cargo xtask web` and `cargo xtask verify`.
+
+Keep the change inside crates/core (machine merge if an effect changes), crates/app (ships, merges, recovery, projects), crates/daemon (shipyard retire, routes), crates/cli (ship ls), crates/api-types (then `npm run gen`), apps/web (the Settings or Agents table), and the tests.
+"""
+acceptance = [
+  "A card merged by any path (local merge, pull request merged on GitHub, merge-now, no-merge Accept) ends with its worktree, branch and record gone, or the branch kept with a journal line naming why; the cause of the leftover ships is named with a reproducing test",
+  "Daemon start retires ships of merged and cancelled cards; tok ship ls and the project's Settings show workspaces of finished stories with a Clean up control",
+  "Covered by app or daemon tests per path, a recovery test, cli and web tests seen red first",
+]
+
+[[ticket]]
+id = "three-loose-ends-of-reviewer-threads-pty"
+title = "Three loose ends: the reviewer's npm rules, a second thread's refusal, and a pty that is not there"
+prompt = """
+Three small things found in runs, each with its place in the code.
+
+1. The reviewer may run the web gates of a repository whose package.json is not at the root. `reviewer_check_rules` and `AgentProfile::with_reviewer_checks` (crates/core/src/model/reviewer_rules.rs) add `Bash(npm test *)` and `Bash(npm run *)` only when `repo_tools(dir)` finds package.json at the repository root; Toknila's is apps/web/package.json, so the reviewer of every web card wrote NOT_RUN for `npm run gen:check` (TOKNILA-85's reviewer, and others). Make `repo_tools` look one level down into the folders the check command names and into `apps/*`, `packages/*`, `web/*` (list the folders it found), and tell the reviewer in its kickoff which commands it may run and from where ("npm run --prefix apps/web gen:check"). Test with a temp repo whose package.json sits in apps/web.
+
+2. A refused second thread names the first. `threads::open` (crates/app/src/threads.rs) refuses an agent's second thread of the same kind with `DuplicateKind` (TOKNILA-48 opened an empty duplicate before this guard existed). The tool's error text the agent reads should say what to do: "thread 2 (design) is open on this story: post your new version there with thread_version; a second design thread is not the way". Check the text the MCP tool returns (crates/cli/src/cmd/mcp_tools.rs → `AgentEvent::OpenThread` in crates/app/src/agent.rs) and pin it in a test. The HTTP route (a person) keeps accepting a second thread.
+
+3. A pty that cannot be opened is a machine state, not a crash. `spawn` in crates/daemon/src/runner/pty.rs calls `native_pty_system().openpty(SIZE)`; on a loaded Mac it failed once with "failed to openpty: Unknown error: -6" (ENXIO, no free pty) and the card was Blocked as Crashed with that line (`runs::start_failed`, crates/app/src/runs.rs). Make the error typed (`RunnerError::NoPty`), retry the open once after a short wait (under a second) before giving up, and when it still fails block the card with a reason a person can act on: "No free terminal on this computer (every pty is in use). Close some terminals or agents and press Unblock." The reviewer's start takes the same path (`reviews::start_failed`). Tests: a unit test of the mapping from the OS error to `NoPty` and of the one retry (inject the pty system or the open function); a daemon test that a `NoPty` failure blocks with that reason. Also: the tests that open ptys (crates/daemon/tests/runner.rs, crates/cli/tests/pty_runner.rs) share one lock (a `static Mutex` in a small test-support module, or `--test-threads` for those files in xtask verify, whichever the current test layout allows without a new crate) so that a loaded machine does not run them all at once; say in the hand-in how many ptys the suite opens at its peak before and after.
+
+Every test red first and quoted. Run `cargo xtask verify`. Keep the change inside crates/core (reviewer_rules), crates/daemon (runner pty, wiring, the reviewer kickoff), crates/app (threads, agent, runs, reviews), crates/cli (mcp_tools if the text lives there), and the tests.
+"""
+acceptance = [
+  "The reviewer of a repository with apps/web/package.json gets npm rules and is told the commands it may run from where; a reviewer's NOT_RUN for gen:check is gone in the fixture test",
+  "An agent's second thread of a kind is refused with a sentence naming the open thread and thread_version; a pty that cannot be opened is retried once and then blocks the card with a sentence a person can act on, never as a crash",
+  "Covered by core, app and daemon tests seen red first; the pty tests share a lock and the hand-in says the peak number of ptys",
+]
+
+[[ticket]]
+id = "needs-you-reads-the-hand-in"
+title = "A step a person must do by hand is a typed part of the hand-in, and Needs you shows it"
+prompt = """
+What happened. BEATSTER-7's hand-in left one step to the person: a check on an iPhone (the 808 Long and Crash pads in the editor, the 32-step drag, the pedals on a playing loop). The Review card's "Needs you" block (apps/web/src/views/NeedsYou.tsx, from TOKNILA-120) read "Nothing to do by hand; Accept when the hand-in convinces you", because `needsYou` (apps/web/src/store/needsYou.ts) keeps only lines that start with the word PERSON, and the agent wrote its step in plain words under Left. PERSON is a typed outcome on the reviewer's side (`ItemOutcome::Person` in crates/core/src/model/review.rs) and nothing at all on the worker's side: the hand-in is parsed as text in crates/core/src/handin.rs (`Sections`: changed, checks, left; `to_body` stores gist, what, how_to_verify, consequences) and the worker protocol (crates/core/src/instructions/protocol.rs) never tells the agent to mark a step for a person. The window promises a list it cannot fill.
+
+Build this.
+
+1. The hand-in has a fourth block: "For you" (or the name the hand-in template uses for the person; keep it one word in the template), after Left: each line one step a person does by hand, written for the person who will read it (the screen and the control as the window shows them, the device if it is not this computer, what they should see), no task ids, no file paths unless the person must open the file. `handin.rs` parses it into `Sections` and `to_body` stores it typed (a new field of the hand-in body, or `person: Vec<String>`, whatever the stored `CommentBody` can gain without `deny_unknown_fields`; see the stored-types rule in AGENTS.md). A hand-in whose Left or Checks block names a check on a device or screen a person must do, in the old free form, is still accepted; the block is where such steps belong from now on.
+
+2. The protocol says so. In protocol.rs the hand-in bullet gains the rule: a check you cannot run yourself (a device you do not have, a window you cannot see, a sound) goes under "For you" as a step the person can follow, one per line; it is never buried in Left and never a question in `ask_human` at the hand-in. The hand-in template in handin.rs shows the block. Snapshots run.md, run_design_first.md and run_replacement.md updated with TOKNILA_UPDATE_SNAPSHOTS=1 and the diff read.
+
+3. The window reads the typed field first. `needsYou` lists the typed steps of the hand-in, then the reviewer's PERSON items; the PERSON-line scan of the free text stays as the fallback for hand-ins made before this story. The inbox row of a Review card says "N steps for you" when the list is not empty. `tok inbox` and `tok show` print the block.
+
+4. The assistant knows the block. planner.rs ("PERSON items of the hand-in", the story-chat rule of TOKNILA-120) names the For-you block as the source of what the person must do; snapshot planner.md updated.
+
+5. Tests, red first and quoted in the hand-in: handin.rs parses the block and refuses nothing old; `to_body` round-trips the typed field through a stored comment; the snapshots; a web unit test of `needsYou` with a typed block, with a verdict's PERSON items, and with an old free-text hand-in; a daemon http test that a hand-in with the block reaches the card's detail typed. Run `cargo xtask web` and `cargo xtask verify`.
+
+Keep the change inside crates/core (handin, model, instructions and snapshots), crates/daemon (the detail if it needs the field), crates/cli (inbox, show), crates/api-types (then `npm run gen`, never a hand edit of api.d.ts), apps/web (needsYou, NeedsYou, InboxRow), and the tests.
+"""
+acceptance = [
+  "A hand-in carries a typed For-you block of steps a person does by hand; the protocol tells the agent to put device and screen checks there in the person's words; the snapshots pin it",
+  "Needs you on the Review card, the inbox row, tok inbox and tok show list those steps, then the reviewer's PERSON items; an old free-text hand-in still shows its PERSON lines",
+  "Covered by core, daemon and web tests seen red first",
+]
+
+[[ticket]]
+id = "queued-message-keeps-its-note"
+title = "A second message to the assistant keeps its note until the assistant reaches it"
+prompt = """
+What happens today (from TOKNILA-125). While the assistant answers, a second message typed by the person shows "sent, the assistant reads it after this answer" (`QUEUED_NOTE`, apps/web/src/views/ChatMessage.tsx, testid `chat-queued`). The queued set is not stored: `openTurn()` in apps/web/src/store/conversation.ts walks back from the newest message to the last `assistant` message, so the moment the first answer arrives the second message is behind an answer, the note goes, `unanswered()` is empty, and the waiting line of apps/web/src/views/WaitingLine.tsx disappears, although the second message has had no answer yet. Nothing on the server knows about a queue: `post_conversation` (crates/daemon/src/http/routes/conversation.rs) stores the message and `ask()` in apps/web/src/store/plannerEffects.ts types it into the planner's terminal, where Claude Code's own input queue holds it.
+
+Build this.
+
+1. A turn is a message and the answer that follows it, not "everything after the last answer". In conversation.ts, pair person messages with assistant answers in order (the n-th answer after a message answers the n-th unanswered message; the planner answers one message per turn, which `say` enforces); `openTurn()` returns the oldest person message without an answer as `asked` and the later ones as `queued`. When one answer arrives, the next queued message becomes `asked`: its note changes to the waiting line ("The assistant is answering…" with its minutes counted from that answer, not from the send), and the ones behind it keep their note.
+
+2. When the assistant's turn is on (TOKNILA-127 adds `working` and `since` to `PlannerState`; if it is on main when this story runs, use it: a message is answered only when the turn that followed it ended; if it is not on main, the pairing of item 1 alone, and say so in the hand-in). Never both heuristics at once: one function decides, with a comment saying which facts it uses.
+
+3. A message the assistant will never reach says so. If the planner stops (its run ends, `running: false`) while messages are queued, their note reads "the assistant stopped before reading this; send it again" with a Send-again control that posts the same text; the stop of a planner is already in the store (plannerEffects.ts).
+
+4. Tests, red first and quoted: web unit tests of `openTurn()` with two messages and one answer (the second becomes asked), with three messages and two answers, with a stopped planner; an e2e with the fake planner (`// needs: fake-agent`) that sends two messages while the first answer is slow and checks the second's note survives the first answer and then clears with the second answer. Run `cargo xtask web`, `cargo xtask e2e-web`.
+
+Keep the change inside apps/web (conversation store, ChatMessage, WaitingLine, plannerEffects) and the e2e. No daemon change unless item 2 needs a field that is not there; then say so.
+"""
+acceptance = [
+  "A second message sent while the assistant answers keeps its note after the first answer and becomes the awaited one, with the waiting line counting from that answer; a third stays queued",
+  "When the assistant stops with messages unread, each says so and offers Send again",
+  "Covered by web unit tests and an e2e with the fake planner seen red first",
+]
+
+[[ticket]]
+id = "new-epic-has-a-title"
+title = "The New epic dialog asks for a title a person reads; the slug is derived"
+prompt = """
+What happens today. TOKNILA-111 gave an epic a title and a slug (`slug_from_title` in crates/core/src/model/chain_title.rs: lower-case ASCII with Cyrillic transliterated; `epic::unique_name` adds -2, -3 on a clash), but only the assistant uses it (`planner::new_chain`, crates/app/src/planner/mod.rs). The window's New epic dialog (apps/web/src/views/NewChain.tsx, opened from Roadmap, EmptyChains, Canvas and Dialogs.tsx) still asks for a Name, Goal, Version, autostart and reviewer and sends `{name, goal, autostart, review_mode, version}` to `POST /projects/{p}/chains` (apps/web/src/store/planEffects.ts); the body type `NewChain` (crates/app/src/chains.rs) already allows `title`. So an epic made in the window has no title and its folder-style name is what the person sees, and the person must invent a slug by hand. The owner said names like `010-midi-controllers` are hard to read.
+
+Build this.
+
+1. The dialog asks for a Title first ("MIDI controllers", "Сховати проект зі списку"), required; under it a small line shows the slug the title gives ("becomes midi-controllers; folders and branches use it") that updates as the person types, with a "Change" control that opens the slug for editing (then it stays as typed, validated as a slug). Goal, Version, autostart and reviewer stay. The request sends `title` and `name` (the slug). `chains::create` derives the slug itself when `name` is missing and `title` is present (through `slug_from_title` and `unique_name`, the same as the planner), so the CLI and the API need no change for a caller that sends a title only; `tok chain new` gains `--title`.
+
+2. Everywhere the window shows an epic it shows the title when there is one (TOKNILA-111 did most of this; check the New epic path, the roadmap row, the breadcrumb, the sidebar, the release node's rows, the Finish node, and fix what still shows the slug).
+
+3. Tests, red first and quoted: a web unit test of the slug line following the title and of the request body with title and slug; a daemon http test that `POST /chains` with a title and no name makes an epic with the derived slug, and that two such titles do not clash; a cli test of `--title`; an e2e that makes an epic through the dialog and sees its title on the roadmap and in the sidebar. Run `cargo xtask web`, `cargo xtask e2e-web`, `cargo xtask verify`.
+
+Keep the change inside apps/web (NewChain, planEffects, the places of item 2), crates/app (chains), crates/cli (chain new), and the tests.
+"""
+acceptance = [
+  "The New epic dialog asks for a title; the slug is derived and shown, editable on request; the request carries both, and the API derives the slug when only a title comes",
+  "An epic made in the window shows its title everywhere an epic is named; tok chain new takes --title",
+  "Covered by web, daemon, cli and e2e tests seen red first",
+]
+
+[[ticket]]
+id = "e2e-leaves-nothing-behind"
+after = ["new-epic-has-a-title", "queued-message-keeps-its-note"]
+title = "An e2e run leaves no daemon and no fake agent behind, on every exit path and every OS"
+prompt = """
+What happened. A `tok` test daemon and its `fake-agent` from the e2e run of a phase-7 ship lived a day under launchd after the card merged (found 2026-11-13); on Windows CI the runner killed an orphan `fake-agent` at the end of the verify job (run 43470886692). The reasons are in the code: of the nineteen specs in apps/web/e2e that declare `// needs: fake-agent`, only lost-answer.mjs kills the fake agents it started (`processesWith(marker)` in `lose()` and in `finally`); the other eighteen (ask-story, ask-attach, assistant-panel, assistant-chat, discuss, commands, design-pins, design, planner, planner-progress, roadmap-assistant, terminal-copy, questions, question-choices, sidebar-nodes, screens, terminal, voice) call only `cleanup()` in apps/web/e2e/helpers.mjs, which stops the daemon and removes the home; a fake agent the daemon did not end before dying stays. `cargo xtask verify` ends with `leaks::check` (xtask/src/leaks.rs: daemons whose TOKNILA_HOME is under the run root TOKNILA_TEST_ROOT), but `cargo xtask e2e-web` has no leak check at all, and a spec that dies on a signal or a thrown error before `finally` leaves its daemon.
+
+Build this.
+
+1. One place owns the cleanup. helpers.mjs gives every spec a `session()` (or the name that fits) that makes the temp home, knows the fake agent's marker for that home, and registers one cleanup that runs on `finally`, on `process.on("exit")`, on SIGINT and SIGTERM, and on an uncaught error: stop the daemon (as `stopDaemon` does today, kill after the wait), then kill every process whose command line carries the marker (`processesWith`, both OSes), then remove the home. Every spec uses it; the profile each spec writes for the fake agent carries the marker in its arguments so `processesWith` finds it (lost-answer.mjs shows the pattern). A spec that starts a second daemon (anywhere) registers it the same way.
+
+2. e2e-web checks for leftovers itself. After the specs, `e2e_web()` in xtask/src/main.rs runs the same leak check as verify, extended: daemons whose TOKNILA_HOME is under the e2e temp homes (the specs make them under the OS temp dir with a known prefix; use one prefix, say `toknila-e2e-`, for every spec) and every `fake-agent` process whose command line carries one of this run's markers (the run passes a run id to the specs through an environment variable; the marker contains it). A leftover fails the run with its pid, command line and the spec it belongs to.
+
+3. Verify tells about older leaks without failing. `leaks::check` lists daemons and fake agents of the same data home older than an hour that are not under this run's root, naming their TOKNILA_HOME and age, as a warning: "a daemon from <home>, alive for 26 h; another run left it". Never kill what this run did not start.
+
+4. On Windows the job lists what is left before the smoke test. In .github/workflows/ci.yml, a step after e2e-web lists `tok`, `toknila` and `fake-agent` processes (PowerShell `Get-CimInstance Win32_Process`) and fails with their command lines when any exists. The helper's kill on Windows uses `taskkill /T /F` or `process.kill` on the pid; check it ends the fake agent's children too.
+
+5. Tests, red first and quoted: a node test (or a tiny spec) that starts a daemon and a fake agent through `session()`, throws before `finally`, and a second process checks nothing of that marker is alive; the xtask leak check with a fake leftover (a `fake-agent print <marker>` started by the test and left) fails naming it; `cargo xtask e2e-web` green with no leftovers on this Mac, quoted; verify's warning path with a planted old daemon.
+
+Keep the change inside apps/web/e2e (helpers and every spec's cleanup lines, nothing else in the specs), xtask (main, leaks), .github/workflows/ci.yml, and docs (AGENTS.md's e2e paragraph: a spec never starts a process outside `session()`).
+"""
+acceptance = [
+  "Every e2e spec gets its daemon, home and fake agents from one helper that ends all of them on finally, exit, signals and uncaught errors; e2e-web fails on a leftover of its own run naming pid, command and spec",
+  "verify warns about daemons and fake agents of the data home older than an hour that another run left, without killing them; the Windows job fails on leftover processes before the smoke test",
+  "Covered by a node test of the helper's exit path, an xtask test with a planted leftover, and a green e2e-web quoted"
+]
+
+[[ticket]]
+id = "e2e-web-ensures-the-browser"
+title = "cargo xtask e2e-web makes sure Playwright's browser is there, and never prunes another version's"
+after = ["e2e-leaves-nothing-behind", "needs-you-reads-the-hand-in"]
+prompt = """
+What happened (2026-11-13). `cargo xtask e2e-web` on main failed with "Executable doesn't exist at ~/Library/Caches/ms-playwright/chromium_headless_shell-1243/..." although apps/web/package.json pins playwright 1.63.0 and the same command had run green an hour before: ~/Library/Caches/ms-playwright held only ffmpeg and webkit. Playwright removes browser builds that no installed Playwright version needs when `npx playwright install` runs for another version, so an agent in a ship (or another project on the machine) pruned ours. `e2e_web()` in xtask/src/main.rs runs `npx playwright install chromium` only when `CI` is set (line ~147); locally a missing browser is a red gate with a confusing message.
+
+Build this.
+
+1. Before the specs, `e2e_web()` asks Playwright where its Chromium is and whether it exists: `npx playwright install --dry-run chromium` prints the install location per browser (or read it from the `playwright-core` package's `browsers.json` and the registry path), and when the executable is missing it runs `npx playwright install chromium` (with `--with-deps` on Linux as today) and prints one line saying it did. When present, nothing is printed. `CI` keeps today's behaviour. The check costs under a second.
+
+2. Pruning is a mistake we name. The worker protocol (crates/core/src/instructions/protocol.rs, the tools or machine section) gains one sentence: never run `npx playwright install` yourself or with another Playwright version; `cargo xtask e2e-web` installs what it needs. Snapshots updated. AGENTS.md's e2e paragraph says the same for people.
+
+3. Tests: an xtask unit test of the function that reads the location and decides (fed a dry-run output with and without the browser, and a path that exists or not); the snapshot test; a run of `cargo xtask e2e-web` after moving the browser folder aside (quote the "installing" line) and a second run that prints nothing extra. Red first.
+
+Keep the change inside xtask, crates/core instructions and snapshots, AGENTS.md.
+"""
+acceptance = [
+  "cargo xtask e2e-web finds Playwright's Chromium missing and installs it before the specs, saying so in one line; a present browser costs nothing visible",
+  "The worker protocol and AGENTS.md say never to run npx playwright install by hand or with another version",
+  "Covered by an xtask unit test, the snapshot test and two quoted runs"
+]
