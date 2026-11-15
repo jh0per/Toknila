@@ -92,3 +92,48 @@ fn push_without_a_remote_is_refused_with_a_sentence_and_no_push_tags_locally() {
     let steps = tok.text(&["release", "steps", "0.1.0"]);
     assert!(steps.contains("Tag") && !steps.contains("Push"), "{steps}");
 }
+
+fn develop_head(repo: &Path) -> String {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["rev-parse", "refs/heads/develop"])
+        .output()
+        .expect("git");
+    String::from_utf8_lossy(&out.stdout).trim().to_owned()
+}
+
+#[test]
+fn push_with_a_remote_lands_the_base_and_the_tag_there() {
+    let dir = common::tempdir();
+    let tok = Tok::in_dir(dir.path());
+    let repo = finished_epic(&tok, dir.path());
+    let remote = dir.path().join("remote.git");
+    std::fs::create_dir_all(&remote).expect("mkdir");
+    common::git(&remote, &["init", "--quiet", "--bare"]);
+    common::git(
+        &repo,
+        &["remote", "add", "origin", &remote.to_string_lossy()],
+    );
+
+    tok.run(&["release", "run", "phase", "0.1.0", "--push"]);
+    let until = Instant::now() + Duration::from_secs(30);
+    while tags(&remote) != "v0.1.0" {
+        assert!(
+            Instant::now() < until,
+            "the tag did not reach the remote: {}",
+            tok.text(&["release", "steps", "0.1.0"])
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let steps = tok.text(&["release", "steps", "0.1.0"]);
+    assert!(
+        steps.contains("Pushed develop and v0.1.0 to origin"),
+        "{steps}"
+    );
+    assert_eq!(
+        develop_head(&repo),
+        develop_head(&remote),
+        "develop reached the remote"
+    );
+}

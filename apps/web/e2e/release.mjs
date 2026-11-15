@@ -97,6 +97,15 @@ try {
   await t("release-push").check();
   await t("release-steps").locator("[data-step=push]").waitFor({ timeout: 5_000 });
   console.log("PASS the checkbox is off by default and adds the Push step when ticked");
+  // The base gets an upstream; the dialog reads it again and the box is on by default.
+  git(repo, "push", "--quiet", "origin", "develop");
+  git(repo, "branch", "--set-upstream-to=origin/develop", "develop");
+  await t("release-close").click();
+  await t("release-button").first().click();
+  await t("release-push").waitFor({ timeout: 10_000 });
+  if (!(await t("release-push").isChecked())) throw new Error("the push checkbox is off although the base has an upstream");
+  await t("release-steps").locator("[data-step=push]").waitFor({ timeout: 5_000 });
+  console.log("PASS the checkbox is on by default when the base has an upstream");
 
   await t("release-confirm").click();
   await t("release-done").waitFor({ timeout: 60_000 });
