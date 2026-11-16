@@ -6,7 +6,7 @@ import type { Route } from "./route";
 import type { State } from "./state";
 
 /// Display order of the groups, the order of the kinds in core.
-export const KIND_ORDER: InboxKind[] = ["proposal", "question", "blocked", "review", "thread", "leftovers", "design_question", "pin", "flaky"];
+export const KIND_ORDER: InboxKind[] = ["proposal", "question", "blocked", "review", "thread", "leftovers", "design_question", "pin", "flaky", "answered"];
 
 export const KIND_TITLE: Record<InboxKind, string> = {
   proposal: "Awaiting approval",
@@ -18,6 +18,7 @@ export const KIND_TITLE: Record<InboxKind, string> = {
   design_question: "Questions of the assistant",
   pin: "Questions of the assistant about a design",
   flaky: "Flaky tests",
+  answered: "Answered, waiting for a slot",
 };
 
 export interface InboxGroup {
@@ -31,6 +32,10 @@ export function groupInbox(items: InboxItem[]): InboxGroup[] {
   return KIND_ORDER.map((kind) => ({ kind, title: KIND_TITLE[kind], items: items.filter((i) => i.kind === kind) }))
     .filter((g) => g.items.length > 0);
 }
+
+/// Whether the item waits on a person; only an informational row (an answer waiting for a slot)
+/// says it does not, so an item from an older daemon still counts.
+export const needsPerson = (i: Pick<InboxItem, "needs_human">): boolean => i.needs_human !== false;
 
 /// A key that tells two items apart (a card may have several threads).
 export function itemKey(i: InboxItem): string {
