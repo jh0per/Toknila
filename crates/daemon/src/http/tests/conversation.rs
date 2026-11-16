@@ -164,25 +164,25 @@ async fn what_the_assistant_did_is_a_line_of_toknilas_that_links_to_it() {
     };
     call(
         Method::POST,
-        "/v1/planner/chains/plan/cards",
-        json!({ "title": "Second" }),
+        "/v1/chains/plan/tickets",
+        json!({ "title": "Second", "at_end": true }),
     )
     .await;
     call(
         Method::PATCH,
-        "/v1/planner/cards/DEMO-2",
+        "/v1/tickets/DEMO-2",
         json!({ "prompt": "Do it" }),
     )
     .await;
     call(
         Method::POST,
-        "/v1/planner/cards/DEMO-2/threads",
+        "/v1/tickets/DEMO-2/threads",
         json!({ "kind": "design", "title": "Look" }),
     )
     .await;
     call(
-        Method::POST,
-        "/v1/planner/suggestion",
+        Method::PUT,
+        "/v1/projects/DEMO/suggestion",
         json!({ "text": "Start DEMO-1", "card": "DEMO-1", "action": "start" }),
     )
     .await;
@@ -227,7 +227,7 @@ async fn a_card_discussion_is_in_the_conversation_with_its_card_and_is_stored_on
         .call_with(
             &planner,
             Method::POST,
-            "/v1/planner/cards/DEMO-1/threads/1/messages",
+            "/v1/tickets/DEMO-1/threads/1/messages",
             Some(json!({ "text": "Because." })),
         )
         .await;
@@ -295,7 +295,7 @@ async fn messages_with_one_timestamp_keep_the_order_they_were_said_in() {
         .call_with(
             &planner,
             Method::POST,
-            "/v1/planner/cards/DEMO-1/threads/1/messages",
+            "/v1/tickets/DEMO-1/threads/1/messages",
             Some(json!({ "text": "four" })),
         )
         .await;

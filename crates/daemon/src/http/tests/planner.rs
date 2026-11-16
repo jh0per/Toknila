@@ -99,7 +99,7 @@ async fn a_planner_token_is_refused_with_403_on_every_route_but_its_own_twelve()
     }
     // The control: its own routes are open to it.
     let (status, plan) = api
-        .call_with(&token, Method::GET, "/v1/planner/plan", None)
+        .call_with(&token, Method::GET, "/v1/projects/DEMO/plan", None)
         .await;
     assert_eq!(status, StatusCode::OK, "{plan}");
     assert_eq!(
@@ -113,17 +113,26 @@ async fn a_planner_token_is_refused_with_403_on_every_route_but_its_own_twelve()
 }
 
 #[tokio::test]
-async fn the_planner_routes_refuse_a_person_and_a_cards_agent() {
+async fn the_plan_route_refuses_a_cards_agent_and_a_planner_of_another_project() {
     let api = Api::new();
     api.two_projects().await;
     api.post("/v1/chains/plan/tickets", json!({ "title": "A" }))
         .await;
     let (worker, _) = api.agent_token("DEMO-1").await;
-    for (who, token) in [("worker", worker.as_str()), ("person", super::TOKEN)] {
+    let other = api.planner_token("OTHER").await;
+    for (who, token) in [("worker", worker.as_str()), ("other", other.as_str())] {
         let (status, body) = api
-            .call_with(token, Method::GET, "/v1/planner/plan", None)
+            .call_with(token, Method::GET, "/v1/projects/DEMO/plan", None)
             .await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{who}: {body}");
+    }
+    // The control: the planner of the project and the person read it.
+    let own = api.planner_token("DEMO").await;
+    for token in [own.as_str(), super::TOKEN] {
+        let (status, body) = api
+            .call_with(token, Method::GET, "/v1/projects/DEMO/plan", None)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
     }
 }
 
@@ -139,7 +148,7 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
 
     let (s, chain) = call(
         Method::POST,
-        "/v1/planner/chains",
+        "/v1/projects/DEMO/chains",
         Some(json!({ "name": "made", "goal": "by the planner" })),
     )
     .await;
@@ -147,22 +156,22 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     assert_eq!(chain["chain"]["autostart"], false);
     let (s, card) = call(
         Method::POST,
-        "/v1/planner/chains/made/cards",
-        Some(json!({ "title": "One", "prompt": "p", "acceptance": ["a"], "subtasks": ["s"] })),
+        "/v1/chains/made/tickets",
+        Some(json!({ "title": "One", "prompt": "p", "acceptance": ["a"], "subtasks": ["s"], "at_end": true })),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{card}");
     assert_eq!(card["ticket"]["key"], "DEMO-1");
     let (s, two) = call(
         Method::POST,
-        "/v1/planner/chains/made/cards",
+        "/v1/chains/made/tickets",
         Some(json!({ "title": "Two", "after": ["DEMO-1"] })),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{two}");
     let (s, edited) = call(
         Method::PATCH,
-        "/v1/planner/cards/DEMO-2",
+        "/v1/tickets/DEMO-2",
         Some(json!({ "title": "Two!", "add_subtasks": ["x"] })),
     )
     .await;
@@ -170,7 +179,7 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     assert_eq!(edited["ticket"]["title"], "Two!");
     let (s, thread) = call(
         Method::POST,
-        "/v1/planner/cards/DEMO-1/threads",
+        "/v1/tickets/DEMO-1/threads",
         Some(json!({ "kind": "design", "title": "Order" })),
     )
     .await;
@@ -178,7 +187,7 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     assert_eq!(thread["thread"]["opened_by"], "agent");
     let (s, again) = call(
         Method::POST,
-        "/v1/planner/cards/DEMO-1/threads",
+        "/v1/tickets/DEMO-1/threads",
         Some(json!({ "kind": "design", "title": "Order again" })),
     )
     .await;
@@ -190,7 +199,7 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     );
     let (s, said) = call(
         Method::POST,
-        "/v1/planner/cards/DEMO-1/threads/1/messages",
+        "/v1/tickets/DEMO-1/threads/1/messages",
         Some(json!({ "text": "Which first?" })),
     )
     .await;
@@ -198,7 +207,7 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     assert_eq!(said["messages"][0]["author"], "agent");
 
     // The plan shows this project only.
-    let (_, plan) = call(Method::GET, "/v1/planner/plan", None).await;
+    let (_, plan) = call(Method::GET, "/v1/projects/DEMO/plan", None).await;
     assert_eq!(plan["project"]["key"], "DEMO");
     let names: Vec<&str> = plan["chains"]
         .as_array()
@@ -213,27 +222,27 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     let foreign: Vec<(Method, &str, Option<Value>)> = vec![
         (
             Method::POST,
-            "/v1/planner/chains/theirs/cards",
-            Some(json!({ "title": "Sneak" })),
+            "/v1/chains/theirs/tickets",
+            Some(json!({ "title": "Sneak", "at_end": true })),
         ),
         (
             Method::PATCH,
-            "/v1/planner/cards/OTHER-1",
+            "/v1/tickets/OTHER-1",
             Some(json!({ "title": "Mine now" })),
         ),
         (
             Method::POST,
-            "/v1/planner/cards/OTHER-1/threads",
+            "/v1/tickets/OTHER-1/threads",
             Some(json!({ "kind": "design", "title": "x" })),
         ),
         (
             Method::POST,
-            "/v1/planner/chains/theirs/edges",
+            "/v1/chains/theirs/edges",
             Some(json!({ "from": "OTHER-1", "to": "OTHER-1" })),
         ),
         (
             Method::POST,
-            "/v1/planner/chains/theirs/cards/OTHER-1/move",
+            "/v1/chains/theirs/tickets/OTHER-1/move",
             Some(json!({ "anchor": "OTHER-1", "place": "before" })),
         ),
     ];
@@ -252,7 +261,7 @@ async fn a_planner_plans_its_own_project_and_cannot_touch_another() {
     assert_eq!(theirs["ticket"]["title"], "Not yours", "untouched");
     let (s, _) = call(
         Method::PATCH,
-        "/v1/planner/cards/DEMO-1",
+        "/v1/tickets/DEMO-1",
         Some(json!({ "title": "One!" })),
     )
     .await;
@@ -270,17 +279,17 @@ async fn the_overview_a_chain_and_a_card_are_read_in_the_planners_project_only()
         let (api, token) = (&api, token.clone());
         async move { api.call_with(&token, Method::GET, uri, None).await }
     };
-    let (s, _) = get("/v1/planner/overview").await;
+    let (s, _) = get("/v1/projects/DEMO/plan/overview").await;
     assert_eq!(s, StatusCode::OK);
     // Own chain and card: the control.
-    let (s, chain) = get("/v1/planner/chains/plan").await;
+    let (s, chain) = get("/v1/chains/plan/plan").await;
     assert_eq!(s, StatusCode::OK, "{chain}");
     assert_eq!(chain["cards"][0]["ticket"]["title"], "Mine");
-    let (s, card) = get("/v1/planner/cards/DEMO-1").await;
+    let (s, card) = get("/v1/tickets/DEMO-1/plan").await;
     assert_eq!(s, StatusCode::OK, "{card}");
     assert_eq!(card["ticket"]["key"], "DEMO-1");
     // Another project's: refused. One that does not exist: not found.
-    for uri in ["/v1/planner/chains/theirs", "/v1/planner/cards/OTHER-1"] {
+    for uri in ["/v1/chains/theirs/plan", "/v1/tickets/OTHER-1/plan"] {
         let (s, e) = get(uri).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{uri}: {e}");
         assert!(
@@ -290,7 +299,7 @@ async fn the_overview_a_chain_and_a_card_are_read_in_the_planners_project_only()
                 .contains("another project")
         );
     }
-    for uri in ["/v1/planner/chains/nope", "/v1/planner/cards/DEMO-99"] {
+    for uri in ["/v1/chains/nope/plan", "/v1/tickets/DEMO-99/plan"] {
         let (s, e) = get(uri).await;
         assert_eq!(s, StatusCode::NOT_FOUND, "{uri}: {e}");
     }
@@ -316,18 +325,18 @@ async fn show_card_journals_one_window_event_for_a_card_of_its_own_project_only(
 
     // Another project's card: refused, and nothing is journaled.
     let (s, e) = api
-        .call_with(&token, Method::POST, "/v1/planner/cards/OTHER-1/show", None)
+        .call_with(&token, Method::POST, "/v1/tickets/OTHER-1/show", None)
         .await;
     assert_eq!(s, StatusCode::FORBIDDEN, "{e}");
     assert!(window_events(api.get("/v1/events?since=0").await).is_empty());
     let (s, e) = api
-        .call_with(&token, Method::POST, "/v1/planner/cards/DEMO-9/show", None)
+        .call_with(&token, Method::POST, "/v1/tickets/DEMO-9/show", None)
         .await;
     assert_eq!(s, StatusCode::NOT_FOUND, "{e}");
 
     // Its own card: answered with the card, and one event in the stream.
     let (s, card) = api
-        .call_with(&token, Method::POST, "/v1/planner/cards/DEMO-1/show", None)
+        .call_with(&token, Method::POST, "/v1/tickets/DEMO-1/show", None)
         .await;
     assert_eq!(s, StatusCode::OK, "{card}");
     assert_eq!(card["ticket"]["key"], "DEMO-1");
@@ -355,8 +364,8 @@ async fn nothing_a_planner_does_starts_a_card_even_in_a_project_with_agents() {
             .call_with(
                 &token,
                 Method::POST,
-                "/v1/planner/chains/plan/cards",
-                Some(json!({ "title": title })),
+                "/v1/chains/plan/tickets",
+                Some(json!({ "title": title, "at_end": true })),
             )
             .await;
         assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -392,8 +401,8 @@ async fn nothing_a_planner_does_starts_a_card_even_in_a_project_with_agents() {
         .call_with(
             &token,
             Method::POST,
-            "/v1/planner/chains/auto/cards",
-            Some(json!({ "title": "C" })),
+            "/v1/chains/auto/tickets",
+            Some(json!({ "title": "C", "at_end": true })),
         )
         .await;
     assert_eq!(s, StatusCode::FORBIDDEN, "{e}");
@@ -419,8 +428,14 @@ async fn a_suggestion_is_kept_per_project_replaced_and_cleared_when_its_card_mov
             .await;
     }
     let token = api.planner_token("DEMO").await;
-    let put =
-        |body: Value| api.call_with(&token, Method::POST, "/v1/planner/suggestion", Some(body));
+    let put = |body: Value| {
+        api.call_with(
+            &token,
+            Method::PUT,
+            "/v1/projects/DEMO/suggestion",
+            Some(body),
+        )
+    };
     let window = || async {
         api.get("/v1/events?since=0")
             .await
@@ -543,7 +558,7 @@ async fn show_plan_lists_the_designs_with_paths_and_show_design_answers_one() {
     let token = api.planner_token("DEMO").await;
 
     let (s, plan) = api
-        .call_with(&token, Method::GET, "/v1/planner/plan", None)
+        .call_with(&token, Method::GET, "/v1/projects/DEMO/plan", None)
         .await;
     assert_eq!(s, StatusCode::OK, "{plan}");
     assert!(plan["chains"].is_array(), "the plan is still there: {plan}");
@@ -572,7 +587,7 @@ async fn show_plan_lists_the_designs_with_paths_and_show_design_answers_one() {
             .call_with(
                 &token,
                 Method::GET,
-                &format!("/v1/planner/designs/{reference}"),
+                &format!("/v1/projects/DEMO/designs/{reference}"),
                 None,
             )
             .await;
@@ -581,16 +596,23 @@ async fn show_plan_lists_the_designs_with_paths_and_show_design_answers_one() {
         assert_eq!(one["path"], file.display().to_string());
         assert_eq!(one["size"], PNG.len());
     }
-    // Another project's design is not found, and a person's token is refused.
+    // Another project's design is not found, and the planner of another project is refused its
+    // designs.
     let (s, e) = api
-        .call_with(&token, Method::GET, "/v1/planner/designs/theirs.png", None)
+        .call_with(
+            &token,
+            Method::GET,
+            "/v1/projects/DEMO/designs/theirs.png",
+            None,
+        )
         .await;
     assert_eq!(s, StatusCode::NOT_FOUND, "{e}");
+    let other = api.planner_token("OTHER").await;
     let (s, _) = api
         .call_with(
-            super::TOKEN,
+            &other,
             Method::GET,
-            "/v1/planner/designs/home.png",
+            "/v1/projects/DEMO/designs/home.png",
             None,
         )
         .await;

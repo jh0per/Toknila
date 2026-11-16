@@ -142,19 +142,3 @@ pub struct MoveFrom {
     #[serde(default)]
     pub from: Option<String>,
 }
-
-/// `POST /v1/planner/chains/{chain}/cards/{card}/move`: the planner puts a card next to another
-/// of its epic, or moves it to another epic (`to_chain`: at the end unless `anchor` and `place`
-/// say where).
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct PlannerMove {
-    /// Ticket key of the card the moved card goes next to.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub anchor: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub place: Option<toknila_core::graph::Place>,
-    /// The epic the card moves to, when it leaves its own.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub to_chain: Option<String>,
-}

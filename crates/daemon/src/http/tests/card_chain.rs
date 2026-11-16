@@ -205,17 +205,18 @@ async fn the_planner_moves_a_card_to_another_epic_of_its_project_only() {
             api.call_with(
                 &token,
                 Method::POST,
-                &format!("/v1/planner/chains/{chain}/cards/{card}/move"),
+                &format!("/v1/tickets/{card}/move-to-chain?from={chain}"),
                 Some(body),
             )
             .await
         }
     };
-    let (s, v) = post("src", "DEMO-5", json!({ "to_chain": "dst" })).await;
+    let (s, v) = post("src", "DEMO-5", json!({ "chain": "dst" })).await;
     assert_eq!(s, StatusCode::OK, "{v}");
+    let dst = api.get("/v1/chains/dst").await["chain"]["id"].clone();
     assert_eq!(
-        v["chain"]["name"], "dst",
-        "the answer is the receiving epic"
+        v["ticket"]["chain_id"], dst,
+        "the answer is the card, now in the receiving epic"
     );
     assert_eq!(order(&api, "dst").await, ["DEMO-3", "DEMO-4", "DEMO-5"]);
 
@@ -224,7 +225,7 @@ async fn the_planner_moves_a_card_to_another_epic_of_its_project_only() {
     let (s, v) = post(
         "src",
         "DEMO-6",
-        json!({ "to_chain": "dst", "anchor": "DEMO-3", "place": "before" }),
+        json!({ "chain": "dst", "place": { "anchor": "DEMO-3", "place": "before" } }),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -239,29 +240,29 @@ async fn the_planner_moves_a_card_to_another_epic_of_its_project_only() {
         (
             "src",
             "DEMO-7",
-            json!({ "to_chain": "away" }),
+            json!({ "chain": "away" }),
             403,
             "another project",
         ),
         (
             "src",
             "DEMO-7",
-            json!({ "to_chain": "auto" }),
+            json!({ "chain": "auto" }),
             403,
             "autostart",
         ),
         (
             "src",
             "DEMO-7",
-            json!({ "to_chain": "dst", "anchor": "DEMO-3" }),
+            json!({ "chain": "dst", "place": { "anchor": "DEMO-3" } }),
             400,
-            "both",
+            "place",
         ),
-        ("src", "DEMO-7", json!({}), 400, "to_chain"),
+        ("src", "DEMO-7", json!({}), 400, "chain"),
         (
             "dst",
             "DEMO-7",
-            json!({ "to_chain": "src" }),
+            json!({ "chain": "src" }),
             400,
             "not in epic",
         ),

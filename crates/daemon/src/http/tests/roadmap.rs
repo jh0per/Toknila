@@ -134,7 +134,7 @@ async fn the_planner_makes_an_epic_with_a_version_and_edits_it_in_its_own_projec
         .call_with(
             &token,
             Method::POST,
-            "/v1/planner/chains",
+            "/v1/projects/DEMO/chains",
             Some(json!({ "name": "phase-2", "goal": "g", "version": "v0.2.0" })),
         )
         .await;
@@ -146,7 +146,7 @@ async fn the_planner_makes_an_epic_with_a_version_and_edits_it_in_its_own_projec
         .call_with(
             &token,
             Method::PATCH,
-            "/v1/planner/chains/phase-2",
+            "/v1/chains/phase-2",
             Some(json!({ "name": "phase-two", "goal": "new goal", "version": "0.3.0" })),
         )
         .await;
@@ -164,7 +164,7 @@ async fn the_planner_makes_an_epic_with_a_version_and_edits_it_in_its_own_projec
         .call_with(
             &token,
             Method::PATCH,
-            "/v1/planner/chains/theirs",
+            "/v1/chains/theirs",
             Some(json!({ "goal": "mine now" })),
         )
         .await;

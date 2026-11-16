@@ -45,7 +45,7 @@ try {
   mkdirSync(join(home, "profiles"), { recursive: true });
   const steps = (...s) => s.map((x) => `'${x}'`).join(", ");
   const say = ["post", "/planner/say", JSON.stringify({ text: "Seen." })];
-  const reply = ["post", "/planner/cards/AT-1/threads/1/messages", JSON.stringify({ text: "Looked at it" })];
+  const reply = ["post", "/tickets/AT-1/threads/1/messages", JSON.stringify({ text: "Looked at it" })];
   writeFileSync(
     join(home, "profiles", "fake-planner.toml"),
     `role = 'planner'\ncommand = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps("print", "planner ready", "echo", ...say, "echo", ...say, "echo", ...say, "echo", ...reply, "hold")}]\nstartup_secs = 0\n`,

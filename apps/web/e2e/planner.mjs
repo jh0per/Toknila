@@ -42,11 +42,11 @@ try {
   git(repo, "commit", "--quiet", "-m", "init");
   mkdirSync(join(home, "profiles"), { recursive: true });
   const steps = [
-    "post", "/planner/chains", JSON.stringify({ name: "roadmap", goal: "planned by the fake planner" }),
-    "post", "/planner/chains/roadmap/cards", JSON.stringify({ title: "Design the list", prompt: "p", acceptance: ["a"] }),
-    "post", "/planner/chains/roadmap/cards", JSON.stringify({ title: "Build the list", prompt: "p" }),
+    "post", "/projects/WEB/chains", JSON.stringify({ name: "roadmap", goal: "planned by the fake planner" }),
+    "post", "/chains/roadmap/tickets", JSON.stringify({ title: "Design the list", prompt: "p", acceptance: ["a"], at_end: true }),
+    "post", "/chains/roadmap/tickets", JSON.stringify({ title: "Build the list", prompt: "p", at_end: true }),
     "post", "/tickets/WEB-1/actions/start", "{}",
-    "post", "/planner/suggestion", JSON.stringify({ text: "Start the design card", card: "WEB-1", action: "start" }),
+    "put", "/projects/WEB/suggestion", JSON.stringify({ text: "Start the design card", card: "WEB-1", action: "start" }),
     // The replies are long and scroll; the line the page waits for comes last.
     "print", "planner ready",
     // The planner says its next step before it is greeted, replaces it after the second line, and
@@ -55,9 +55,9 @@ try {
     "echo",
     "post", "/planner/say", JSON.stringify({ text: "Planned two cards", about: "WEB-1" }),
     "echo",
-    "post", "/planner/suggestion", JSON.stringify({ text: "Nothing waits for you" }),
+    "put", "/projects/WEB/suggestion", JSON.stringify({ text: "Nothing waits for you" }),
     "echo",
-    "post", "/planner/cards/WEB-1/show", "{}",
+    "post", "/tickets/WEB-1/show", "{}",
     "print", "planner done",
     "hold",
   ];

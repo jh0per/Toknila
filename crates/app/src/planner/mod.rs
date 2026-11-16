@@ -10,7 +10,6 @@
 mod cards;
 mod overview;
 mod plan;
-mod relocate;
 mod suggest;
 mod window;
 mod with_designs;
@@ -32,7 +31,6 @@ pub use cards::{
 };
 pub use overview::{OverviewCard, OverviewChain, OverviewSummary, PlanOverview, overview};
 pub use plan::{PlanCard, PlanChain, PlanThread, PlanView, card_in_full, chain_in_full, plan};
-pub use relocate::{move_card_by, move_card_to_chain};
 pub use suggest::{NewSuggestion, suggest};
 pub use window::{show_card, turn};
 pub use with_designs::{request_with, start_with};

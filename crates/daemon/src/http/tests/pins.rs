@@ -42,7 +42,7 @@ async fn the_planner_pins_a_question_and_the_person_answers_it_into_the_prompt()
         .call_with(
             &token,
             Method::POST,
-            "/v1/planner/pins",
+            "/v1/projects/DEMO/design-pins",
             Some(question(json!("DEMO-1"))),
         )
         .await;
@@ -64,7 +64,7 @@ async fn the_planner_pins_a_question_and_the_person_answers_it_into_the_prompt()
     assert_eq!(item["pin"], pin["id"]);
     assert_eq!(item["text"], "home.png: Show the tax separately?");
     let (_, plan) = api
-        .call_with(&token, Method::GET, "/v1/planner/plan", None)
+        .call_with(&token, Method::GET, "/v1/projects/DEMO/plan", None)
         .await;
     assert_eq!(plan["pins"][0]["text"], "Show the tax separately?");
     assert_eq!(plan["pins"][0]["answer"], Value::Null);
@@ -93,7 +93,7 @@ async fn the_planner_pins_a_question_and_the_person_answers_it_into_the_prompt()
         "an answered pin leaves the inbox: {inbox}"
     );
     let (_, plan) = api
-        .call_with(&token, Method::GET, "/v1/planner/plan", None)
+        .call_with(&token, Method::GET, "/v1/projects/DEMO/plan", None)
         .await;
     assert_eq!(plan["pins"][0]["answer"], "Yes, on its own line.");
 }
@@ -101,7 +101,14 @@ async fn the_planner_pins_a_question_and_the_person_answers_it_into_the_prompt()
 #[tokio::test]
 async fn bad_pins_and_foreign_answers_are_refused() {
     let (api, token) = setup().await;
-    let pin = |body: Value| api.call_with(&token, Method::POST, "/v1/planner/pins", Some(body));
+    let pin = |body: Value| {
+        api.call_with(
+            &token,
+            Method::POST,
+            "/v1/projects/DEMO/design-pins",
+            Some(body),
+        )
+    };
     let mut zero = question(json!("DEMO-1"));
     zero["region"]["w"] = json!(0);
     assert_eq!(pin(zero).await.0, StatusCode::BAD_REQUEST);
@@ -113,16 +120,20 @@ async fn bad_pins_and_foreign_answers_are_refused() {
         pin(question(json!("OTHER-1"))).await.0,
         StatusCode::FORBIDDEN
     );
-    // A person's token is not the planner's.
-    let (s, _) = api
-        .call_with(
-            super::TOKEN,
-            Method::POST,
-            "/v1/planner/pins",
-            Some(question(json!(null))),
-        )
-        .await;
-    assert_eq!(s, StatusCode::FORBIDDEN);
+    // A card's agent token and another project's planner are not this planner.
+    let (worker, _) = api.agent_token("DEMO-1").await;
+    let other = api.planner_token("OTHER").await;
+    for token in [worker, other] {
+        let (s, _) = api
+            .call_with(
+                &token,
+                Method::POST,
+                "/v1/projects/DEMO/design-pins",
+                Some(question(json!(null))),
+            )
+            .await;
+        assert_eq!(s, StatusCode::FORBIDDEN);
+    }
 
     let (s, made) = pin(question(json!(null))).await;
     assert_eq!(s, StatusCode::CREATED, "{made}");
