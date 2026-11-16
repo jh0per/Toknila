@@ -6,8 +6,9 @@
 
 use std::sync::Arc;
 
+use crate::http::query::Query;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::response::Response;
 use serde::Deserialize;
 use tokio::sync::broadcast::error::RecvError;

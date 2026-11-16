@@ -2,8 +2,9 @@
 //! output is the WebSocket `/tickets/{ticket}/runner/stream` (`crate::runner::stream`).
 
 use crate::http::body::Json;
+use crate::http::query::Query;
 use axum::body::Bytes;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 use toknila_api_types::TerminalSize;
