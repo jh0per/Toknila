@@ -132,3 +132,26 @@ fn a_lost_runners_replacement_waits_for_a_slot_too() {
     assert!(live <= 1, "{live} runners at a limit of 1");
     let _ = act;
 }
+
+/// Run 12: the answer is pending, the ended process's Stop hook (or a typed delivery) claims it
+/// while B holds the only slot. A must stay Waiting in the queue, not read Running beside B.
+#[test]
+fn a_late_claim_of_the_answer_does_not_start_a_paused_agent_past_the_limit() {
+    let mut mem = a_paused_b_running();
+    answer(&mut mem);
+    settle(&mut mem);
+    let t = a(&mem);
+    let claimed = crate::instructions::claim(&mut mem, &t).expect("claim");
+    assert_eq!(claimed.count, 1);
+    settle(&mut mem);
+    let t = a(&mem);
+    assert_eq!(t.status, TicketStatus::Waiting, "A waits for the slot");
+    assert!(t.agent_paused.is_some(), "A keeps its paused agent");
+    let running = mem
+        .view
+        .tickets
+        .iter()
+        .filter(|t| t.status == TicketStatus::Running)
+        .count();
+    assert_eq!(running, 1, "one Running card at a limit of 1");
+}

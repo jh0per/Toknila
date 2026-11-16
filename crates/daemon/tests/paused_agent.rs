@@ -296,6 +296,20 @@ async fn a_waiting_card_frees_its_slot_and_a_comment_resumes_it_when_one_is_free
         .await;
     assert_eq!(answered["ticket"]["agent_paused"]["resume"], true);
     assert_eq!(answered["queue_position"], 1);
+    // The inbox, as the wire carries it: the answer is an informational row, not a question.
+    let inbox = rig
+        .send(Method::GET, "/v1/projects/DEMO/inbox", Value::Null)
+        .await;
+    let rows = inbox.as_array().expect("inbox list");
+    let [row] = rows.as_slice() else {
+        panic!("one row: {inbox}");
+    };
+    assert_eq!(row["kind"], "answered", "{row}");
+    assert_eq!(row["needs_human"], false, "{row}");
+    assert_eq!(
+        row["text"], "Answered; the agent gets it when a slot is free (#1 in line)",
+        "{row}"
+    );
     // A slot frees: the card starts again from its session with the answer as its first input.
     rig.send(
         Method::POST,
@@ -304,6 +318,10 @@ async fn a_waiting_card_frees_its_slot_and_a_comment_resumes_it_when_one_is_free
     )
     .await;
     rig.until("the first card running", 1, is("running")).await;
+    let inbox = rig
+        .send(Method::GET, "/v1/projects/DEMO/inbox", Value::Null)
+        .await;
+    assert_eq!(inbox, json!([]), "delivered: the row is gone");
     let out = rig.output_has(1, "resume=sess-1").await;
     assert!(out.contains("resume=sess-1"), "{out}");
     assert!(
