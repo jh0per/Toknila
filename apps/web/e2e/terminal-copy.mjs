@@ -165,12 +165,7 @@ try {
   await clearClip(page);
   await page.locator("[data-testid=term-copy-more]").click();
   await page.locator("[data-testid=term-copy-all]").click();
-  // On Windows the console (ConPTY) hands the terminal CRLF lines and keeps a shorter scrollback,
-  // so the copy there starts later than line 1 and ends the same way; the lost head is a Windows
-  // terminal matter of its own, not the copy's.
-  const whole = process.platform === "win32"
-    ? /^scroll line \d+\r?\n[\s\S]*scroll line 80\r?\n\s*marker alpha(\r?\n)+marker omega$/
-    : /^scroll line 1\n[\s\S]*scroll line 80\nmarker alpha\n+marker omega$/;
+  const whole = /^scroll line 1\n[\s\S]*scroll line 80\nmarker alpha\n+marker omega$/;
   await expectClip(page, whole, "Copy all copies the whole scrollback");
 
   // A window whose clipboard refuses without a gesture: "Copied text ready", then a click copies.
