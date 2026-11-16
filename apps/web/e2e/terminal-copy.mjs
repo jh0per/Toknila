@@ -65,7 +65,7 @@ try {
       if (got === want || (want instanceof RegExp && want.test(got))) break;
     }
     const ok = want instanceof RegExp ? want.test(got) : got === want;
-    if (!ok) throw new Error(`${what}: expected the clipboard to hold ${want}, got ${JSON.stringify(got).slice(0, 200)}`);
+    if (!ok) throw new Error(`${what}: expected the clipboard to hold ${want}, got ${JSON.stringify(got).slice(0, 200)} ... ${JSON.stringify(got.slice(-200))}`);
     console.log(`PASS ${what}`);
   };
 
@@ -165,7 +165,9 @@ try {
   await clearClip(page);
   await page.locator("[data-testid=term-copy-more]").click();
   await page.locator("[data-testid=term-copy-all]").click();
-  const whole = /^scroll line 1\n[\s\S]*scroll line 80\nmarker alpha\n+marker omega$/;
+  // Line 1 first on every OS. Windows' console ends its lines with CRLF (CI run 43854240266 showed
+  // the copy starting "scroll line 1\r\n", nothing lost), so the line ends allow a CR.
+  const whole = /^scroll line 1\r?\n[\s\S]*scroll line 80\r?\nmarker alpha(\r?\n)+marker omega$/;
   await expectClip(page, whole, "Copy all copies the whole scrollback");
 
   // A window whose clipboard refuses without a gesture: "Copied text ready", then a click copies.
