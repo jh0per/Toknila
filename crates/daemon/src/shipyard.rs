@@ -190,6 +190,19 @@ impl Shipyard for GitShipyard {
         self.between(look, from, to)
     }
 
+    fn added_between(
+        &self,
+        look: &ShipLook,
+        from: &str,
+        to: &str,
+    ) -> Result<Vec<String>, ShipError> {
+        self.added(look, from, to)
+    }
+
+    fn ignored_among(&self, look: &ShipLook, files: &[String]) -> Result<Vec<String>, ShipError> {
+        self.ignored(look, files)
+    }
+
     fn planner_site(&self, spec: &PlannerSpec) -> PlannerSite {
         self.site_for(spec)
     }
