@@ -348,5 +348,23 @@ pub fn open_threads(threads: &[Thread], has_version: impl Fn(&Thread) -> bool) -
         .collect()
 }
 
+/// The person's last message when it is newer than version `approved` of the thread: the words
+/// that come with an approval and win over the version where they differ. `None` when no version
+/// is approved or the person said nothing since it.
+pub fn approval_decisions<'a>(
+    versions: &[ThreadVersion],
+    messages: &'a [ThreadMessage],
+    approved: Option<u32>,
+) -> Option<&'a ThreadMessage> {
+    let at = versions
+        .iter()
+        .find(|v| Some(v.number) == approved)?
+        .created_at;
+    messages
+        .iter()
+        .rfind(|m| m.author == Actor::Human)
+        .filter(|m| m.created_at > at)
+}
+
 #[cfg(test)]
 mod tests;

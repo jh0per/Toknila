@@ -15,6 +15,9 @@ pub struct BriefThread {
     pub approved_version: Option<u32>,
     /// When a person approved it.
     pub approved_at: Option<Timestamp>,
+    /// What the person said after the approved version, when the approval came with words: the
+    /// decisions that win over the version where they differ.
+    pub approval_message: Option<String>,
 }
 
 impl BriefThread {
@@ -31,6 +34,7 @@ impl BriefThread {
                 state: t.state,
                 approved_version: t.approved_version,
                 approved_at: t.approved_at,
+                approval_message: None,
             })
             .collect();
         out.sort_by_key(|t| t.number);
@@ -71,6 +75,20 @@ pub(super) fn threads_section(brief: &RunBrief<'_>) -> String {
     for t in brief.threads {
         out.push_str(&t.line());
         out.push('\n');
+        if let Some(said) = t
+            .approval_message
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            out.push_str(
+                "  The approval came with these decisions of the person; where they differ from \
+                 the approved version, the decisions win. Check against both:\n",
+            );
+            for line in said.lines() {
+                out.push_str(&format!("  > {line}\n").replace("  > \n", "  >\n"));
+            }
+        }
     }
     out
 }

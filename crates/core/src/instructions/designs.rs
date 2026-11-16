@@ -56,6 +56,7 @@ pub(super) fn design_section(brief: &RunBrief<'_>) -> String {
      wait: the person's approval or request for changes arrives as an instruction. Do not ask \
      for it with `ask_human`, and do not open a second thread for the same design; answer a \
      request with a new version in the same thread. Write code only after the person approved a \
-     version. `finished` is refused until one is approved.\n"
+     version. An approval may come with the person's decisions; where they differ from the \
+     version, the decisions win. `finished` is refused until one is approved.\n"
         .to_owned()
 }

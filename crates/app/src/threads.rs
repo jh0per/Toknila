@@ -205,10 +205,25 @@ pub fn approve<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, th: &Thread) -> 
         .approved_version
         .map(|v| format!(" version {v}"))
         .unwrap_or_default();
-    let head = format!(
-        "Thread {} \"{}\"{version} is approved.",
-        th.number, th.title
-    );
+    let decided = thread::approval_decisions(
+        &uow.thread_versions(th.id)?,
+        &uow.thread_messages(th.id)?,
+        next.approved_version,
+    )
+    .is_some();
+    let head = if decided {
+        format!(
+            "Thread {} \"{}\"{version} is approved with these decisions of the person. Where \
+             they differ from{version}, the decisions win; say in the hand-in how you followed \
+             each:",
+            th.number, th.title
+        )
+    } else {
+        format!(
+            "Thread {} \"{}\"{version} is approved.",
+            th.number, th.title
+        )
+    };
     tell_worker(uow, t, head, said)?;
     Ok(next)
 }

@@ -10,6 +10,7 @@ fn two_threads() -> Vec<BriefThread> {
             state: ThreadState::Approved,
             approved_version: Some(2),
             approved_at: Some(Timestamp(1_700_000_000_000)),
+            approval_message: Some("No alias period; fold the 18 routes.".to_owned()),
         },
         BriefThread {
             number: 2,
@@ -18,6 +19,7 @@ fn two_threads() -> Vec<BriefThread> {
             state: ThreadState::Open,
             approved_version: None,
             approved_at: None,
+            approval_message: None,
         },
     ]
 }
@@ -44,6 +46,12 @@ fn the_reviewer_reads_the_threads_and_the_whole_hand_in_in_its_instructions() {
     );
     assert!(
         text.contains("- thread 2 (flow): The verdict flow, open, not approved\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "the decisions win. Check against both:\n  > No alias period; fold the 18 routes.\n"
+        ),
         "{text}"
     );
     for line in HAND_IN.lines() {

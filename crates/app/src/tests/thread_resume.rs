@@ -11,7 +11,7 @@ use crate::recovery::recover;
 use crate::runner::RunnerState;
 use crate::threads::{self, NewVersion};
 
-const TEXT: &str = r#"Thread 1 "Flow" version 1 is approved. Use the left layout. Continue."#;
+const TEXT: &str = r#"Thread 1 "Flow" version 1 is approved with these decisions of the person. Where they differ from version 1, the decisions win; say in the hand-in how you followed each: Use the left layout. Continue."#;
 
 /// A running card with an idle agent that takes typed input, and a design thread with a
 /// version and a message from the person.
@@ -39,6 +39,7 @@ fn designed() -> (Mem, Thread) {
     mem.actor = toknila_core::Actor::Agent;
     threads::post_version(&mut mem, &t, &th, version).expect("version");
     mem.actor = toknila_core::Actor::Human;
+    mem.now = toknila_core::Timestamp(mem.now.0 + 1_000);
     threads::post_message(&mut mem, &t, &th, "Use the left layout.").expect("message");
     (mem, th)
 }
@@ -145,6 +146,29 @@ fn a_permission_prompt_is_not_answered_by_a_thread() {
         now.status_reason,
         Some(StatusReason::Waiting(WaitingReason::Permission { .. }))
     ));
+}
+
+#[test]
+fn approving_without_a_newer_person_message_keeps_the_plain_text() {
+    let (mut mem, th) = designed();
+    // The version is posted again after the person's message: the message is older now.
+    let t = a(&mem);
+    mem.actor = toknila_core::Actor::Agent;
+    mem.now = toknila_core::Timestamp(mem.now.0 + 1_000);
+    let version = NewVersion {
+        format: toknila_core::ArtifactFormat::Mermaid,
+        body: "graph TD; A-->C".to_owned(),
+        message: None,
+    };
+    threads::post_version(&mut mem, &t, &th, version).expect("version 2");
+    mem.actor = toknila_core::Actor::Human;
+    ask(&mut mem, false);
+    threads::approve(&mut mem, &t, &th).expect("approve");
+    settle(&mut mem);
+    assert_eq!(
+        instructions(&mem),
+        [r#"Thread 1 "Flow" version 2 is approved. Use the left layout. Continue."#]
+    );
 }
 
 #[test]
