@@ -2807,8 +2807,8 @@ export interface components {
             profile: components["schemas"]["AgentProfile"];
         };
         /**
-         * @description Why a check that has a free place still waits: the machine's one-minute load average is at
-         *     or above its core count.
+         * @description The machine's one-minute load average is at or above its core count, so a further check
+         *     waits.
          */
         LoadHold: {
             /**
