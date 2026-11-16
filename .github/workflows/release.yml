@@ -158,8 +158,30 @@ jobs:
             dist/app/*.app.tar.gz.sig
           if-no-files-found: error
 
+  # A release is published only after CI passed on the tag's commit (the push to main that carried
+  # the same SHA). Waits for that run (polls once a minute, gives up after 90 minutes) and fails
+  # with its URL and failed jobs otherwise; with no CI run for the SHA it fails and dispatches
+  # nothing. Runs beside `build`, so the wait costs no extra time. A manual dispatch waits the same way.
+  wait-ci:
+    name: wait for CI
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # The workflow's own ref carries the script, also when an old tag is dispatched by hand.
+      - uses: actions/checkout@v4
+      - name: Wait for the CI run of the tag's commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(gh api "repos/${{ github.repository }}/commits/$TAG" --jq .sha)
+          python3 .github/scripts/wait_for_ci.py "${{ github.repository }}" "$sha"
+
   publish:
-    needs: build
+    needs: [build, wait-ci]
     if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

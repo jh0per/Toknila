@@ -8,7 +8,7 @@ import { HandIn, InboxHandInBlocks } from "./HandIn";
 import type { Intent } from "../store/msg";
 import type { Route } from "../store/route";
 import type { State } from "../store/state";
-import { itemRoute } from "../store/inbox";
+import { itemRoute, needsPerson } from "../store/inbox";
 import { epicTitle } from "../store/title";
 import { Answer } from "./Answer";
 import { NavLink } from "./Link";
@@ -26,6 +26,7 @@ const KIND_LINE: Record<InboxKind, string> = {
   leftovers: "Tasks were left open behind a finished story",
   design_question: "The assistant asks about a design",
   pin: "The assistant asks about a design",
+  answered: "Nothing is needed from you",
 };
 
 /// The second line of a row: for a blocked card the reason's own sentence (a double loss of the
@@ -59,7 +60,7 @@ export function InboxRow({ state, item, dispatch }: { state: State; item: InboxI
     <NavLink route={route} dispatch={dispatch} className="btn" testId="inbox-open-card">Open story</NavLink>
   );
   return (
-    <li data-kind={item.kind} data-key={item.ticket}>
+    <li data-kind={item.kind} data-key={item.ticket} className={needsPerson(item) ? undefined : "informational"}>
       <div className="row-head">
         <span className="t">{item.title}</span>
         {route ? <NavLink route={route} dispatch={dispatch} className="key">{item.ticket}</NavLink> : <span className="key">{item.ticket}</span>}
@@ -114,6 +115,13 @@ function Body({ item, route, open, dispatch, detail }: BodyProps & { route: Rout
     case "leftovers": return <Leftovers item={item} open={open} dispatch={dispatch} />;
     case "design_question": return <DesignQuestion item={item} project={item.project ?? (route?.name === "card" ? route.project : undefined)} open={open} />;
     case "pin": return null;
+    case "answered":
+      return (
+        <div className="row-body" data-testid="inbox-answered">
+          <span className="muted">{item.text}</span>
+          <div className="btns">{open}</div>
+        </div>
+      );
   }
 }
 
