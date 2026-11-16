@@ -31,9 +31,9 @@ pub enum BodyRejection {
 }
 
 /// The fields a struct names when it is deserialised; the first struct asked for wins.
-struct Capture<D> {
-    inner: D,
-    fields: std::rc::Rc<std::cell::RefCell<Option<&'static [&'static str]>>>,
+pub(super) struct Capture<D> {
+    pub(super) inner: D,
+    pub(super) fields: std::rc::Rc<std::cell::RefCell<Option<&'static [&'static str]>>>,
 }
 
 macro_rules! forward {

@@ -1,8 +1,9 @@
 //! `GET /v1/stream?since=<seq>`: WebSocket of journal events. First everything after `since`
 //! from the journal, then live events, without gaps or duplicates.
 
+use crate::http::query::Query;
+use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Query, State};
 use axum::response::Response;
 use serde::Deserialize;
 use tokio::sync::broadcast::error::RecvError;

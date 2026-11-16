@@ -1,9 +1,10 @@
 //! `/projects/{project}/chains`, `/chains`.
 
-use std::collections::HashMap;
+use serde::Deserialize;
 
 use crate::http::body::Json;
-use axum::extract::{Path, Query, State};
+use crate::http::query::Query;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use toknila_app::removal::{self, Removed};
 use toknila_app::{chains, moves, resolve, roadmap};
@@ -79,17 +80,24 @@ pub async fn export_chain(
     Ok(Json(ChainFile { toml }))
 }
 
+/// The query of the chain routes that take a project to tell two chains of one name apart.
+#[derive(Debug, Deserialize)]
+pub struct ProjectQuery {
+    project: Option<String>,
+}
+
 #[utoipa::path(get, path = "/chains", tag = "chains",
     params(("project" = Option<String>, Query, description = "Project id or key")),
     responses((status = 200, body = Vec<ChainItem>)))]
 pub async fn list_chains(
     State(state): State<AppState>,
-    Query(q): Query<HashMap<String, String>>,
+    Query(q): Query<ProjectQuery>,
 ) -> ApiResult<Json<Vec<ChainItem>>> {
     let at = now();
     let items = read(&state, move |repo| {
         let project = q
-            .get("project")
+            .project
+            .as_deref()
             .map(|p| resolve::project(repo, p))
             .transpose()?;
         let mut out = Vec::new();
@@ -135,10 +143,10 @@ pub async fn get_chain(
 pub async fn patch_chain(
     State(state): State<AppState>,
     Path(chain): Path<String>,
-    Query(q): Query<HashMap<String, String>>,
+    Query(q): Query<ProjectQuery>,
     Json(settings): Json<ChainSettings>,
 ) -> ApiResult<Json<ChainDetail>> {
-    let project = q.get("project").cloned();
+    let project = q.project;
     let detail = chain_write(&state, Actor::Human, move |tx| {
         Ok(chains::set_settings(
             tx,
@@ -160,10 +168,10 @@ pub async fn patch_chain(
 pub async fn move_chain(
     State(state): State<AppState>,
     Path(chain): Path<String>,
-    Query(q): Query<HashMap<String, String>>,
+    Query(q): Query<ProjectQuery>,
     Json(to): Json<MoveChain>,
 ) -> ApiResult<Json<ChainDetail>> {
-    let project = q.get("project").cloned();
+    let project = q.project;
     let detail = chain_write(&state, Actor::Human, move |tx| {
         Ok(roadmap::move_chain(tx, &chain, project.as_deref(), to)?)
     })
@@ -183,9 +191,9 @@ pub async fn move_chain(
 pub async fn delete_chain(
     State(state): State<AppState>,
     Path(chain): Path<String>,
-    Query(q): Query<HashMap<String, String>>,
+    Query(q): Query<ProjectQuery>,
 ) -> ApiResult<Json<ChainDeletion>> {
-    let project = q.get("project").cloned();
+    let project = q.project;
     let (removed, _) = state
         .store
         .write(Actor::Human, now(), move |tx| -> ApiResult<Removed> {

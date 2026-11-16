@@ -1,10 +1,11 @@
 //! `/projects/{project}/designs`: the design library of a project, and its Figma token.
 
-use std::collections::HashMap;
+use serde::Deserialize;
 
 use crate::http::body::Json;
+use crate::http::query::Query;
 use axum::body::{Body, to_bytes};
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use toknila_app::design_use::{self, DesignUse};
@@ -64,6 +65,18 @@ pub async fn list_designs(
     Ok(Json(list))
 }
 
+/// Query of the design upload: the file's name.
+#[derive(Debug, Deserialize)]
+pub struct NameQuery {
+    name: Option<String>,
+}
+
+/// Query of the design delete: `force=true` (or `1`) removes the references too.
+#[derive(Debug, Deserialize)]
+pub struct ForceQuery {
+    force: Option<String>,
+}
+
 #[utoipa::path(post, path = "/projects/{project}/designs", tag = "designs",
     params(("project" = String, Path, description = "Project id or key"),
         ("name" = String, Query, description = "The file's name")),
@@ -74,7 +87,7 @@ pub async fn list_designs(
 pub async fn upload_design(
     State(state): State<AppState>,
     Path(project): Path<String>,
-    Query(q): Query<HashMap<String, String>>,
+    Query(q): Query<NameQuery>,
     body: Body,
 ) -> ApiResult<(StatusCode, Json<Design>)> {
     let d = designs_of(&state, project).await?;
@@ -83,7 +96,7 @@ pub async fn upload_design(
             "That file is too large for a design.",
         ))
     })?;
-    let name = q.get("name").cloned().unwrap_or_default();
+    let name = q.name.unwrap_or_default();
     let at = now();
     let renderer = state.pdf_renderer.clone();
     // A pdf's first page is drawn here, on the blocking thread; no renderer: no thumbnail.
@@ -199,7 +212,8 @@ pub async fn rename_design(
 
 #[utoipa::path(delete, path = "/projects/{project}/designs/{design}", tag = "designs",
     params(("project" = String, Path, description = "Project id or key"),
-        ("design" = String, Path, description = "Design id")),
+        ("design" = String, Path, description = "Design id"),
+        ("force" = Option<String>, Query, description = "`true` or `1`: remove the references and open pins too")),
     responses((status = 204), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
 /// Removes a design and its file. A design that cards or open pins still use is refused with 409
 /// (`used_by` names them) unless `force=true`: then the references and the open pins go in the
@@ -207,9 +221,9 @@ pub async fn rename_design(
 pub async fn delete_design(
     State(state): State<AppState>,
     Path((project, design)): Path<(String, String)>,
-    Query(q): Query<HashMap<String, String>>,
+    Query(q): Query<ForceQuery>,
 ) -> ApiResult<Response> {
-    let force = matches!(q.get("force").map(String::as_str), Some("true" | "1"));
+    let force = matches!(q.force.as_deref(), Some("true" | "1"));
     let p = read(&state, move |repo| Ok(resolve::project(repo, &project)?)).await?;
     let d = Designs::new(&state.home, p.id);
     let id = design_id(&design)?;

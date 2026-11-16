@@ -1,8 +1,9 @@
 //! `/usage`: tokens and estimated cost, and the plan quota Claude Code reported.
 
 use crate::http::body::Json;
+use crate::http::query::Query;
 use axum::Extension;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::Deserialize;
 use toknila_core::usage::WINDOWS;

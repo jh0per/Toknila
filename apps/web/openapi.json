@@ -2920,6 +2920,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "description": "`true` or `1`: remove the references and open pins too",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {

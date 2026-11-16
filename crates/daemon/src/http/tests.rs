@@ -52,6 +52,7 @@ mod smart_defaults;
 mod strays;
 mod threads;
 mod unknown_fields;
+mod unknown_query;
 mod usage;
 mod workspaces;
 
