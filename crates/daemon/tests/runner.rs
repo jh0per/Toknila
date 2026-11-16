@@ -912,3 +912,114 @@ fn a_bare_claude_is_found_as_claude_cmd_on_path_and_launched() {
     assert!(out.contains("from-claude-cmd"), "{out:?}");
     rig.runners.stop(rig.ticket);
 }
+
+/// The fake agent's steps for 80 numbered lines, then exit.
+fn eighty_lines() -> Vec<String> {
+    let mut steps = Vec::new();
+    for i in 1..=80 {
+        steps.push("print".to_owned());
+        steps.push(format!("scroll line {i}"));
+    }
+    steps.extend(["exit".to_owned(), "0".to_owned()]);
+    steps
+}
+
+/// Whether `text` holds "scroll line 1" as a whole line (not the start of "scroll line 10").
+fn has_first_line(text: &str) -> bool {
+    text.match_indices("scroll line 1")
+        .any(|(at, m)| !text[at + m.len()..].starts_with(|c: char| c.is_ascii_digit()))
+}
+
+/// TOKNILA-148 probe, layers "log" and "scrollback": an agent that prints 80 numbered lines must
+/// keep line 1 in the run log and in the scrollback. On failure the message carries the first bytes
+/// of the log, so a failing run says whether the lines were already missing there.
+#[test]
+fn the_first_of_eighty_lines_reaches_the_log_and_the_scrollback() {
+    let mut rig = Rig::new();
+    let steps = eighty_lines();
+    let steps: Vec<&str> = steps.iter().map(String::as_str).collect();
+    rig.profile("fake", &steps, "");
+    let started = rig.start("fake");
+    rig.wait_end();
+    let log = log_of(rig.dir.path(), rig.ticket, &started.run.id.to_string());
+    let on_disk = String::from_utf8_lossy(&std::fs::read(log).expect("log")).into_owned();
+    let head = |t: &str| format!("{:?}", t.chars().take(300).collect::<String>());
+    assert!(
+        has_first_line(&on_disk),
+        "LAYER log: line 1 is not in the run log; first bytes: {}",
+        head(&on_disk)
+    );
+    let kept = rig.output();
+    assert!(
+        has_first_line(&kept),
+        "LAYER scrollback: the log has line 1 but the scrollback has not; first bytes: {}",
+        head(&kept)
+    );
+}
+
+/// TOKNILA-148 probe, layer "reader": what the pty reader itself gets first from a ConPTY of the
+/// runner's size, with no daemon code in between. Windows only: ConPTY renders a screen and may
+/// emit VT for it, so lines that scroll off before its first render never reach the reader; on
+/// Unix the reader gets the program's bytes as they are.
+#[cfg(windows)]
+#[test]
+fn the_reader_of_a_conpty_gets_the_first_of_eighty_lines() {
+    use portable_pty::{CommandBuilder, native_pty_system};
+    use toknila_core::instructions::terminal;
+
+    let _turn = support::hold();
+    let pair = native_pty_system()
+        .openpty(portable_pty::PtySize {
+            rows: terminal::DEFAULT.rows,
+            cols: terminal::DEFAULT.cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .expect("openpty");
+    let mut cmd = CommandBuilder::new(AGENT);
+    cmd.args(["sleep", "toknila-148-probe"]);
+    cmd.args(eighty_lines());
+    let mut child = pair.slave.spawn_command(cmd).expect("spawn");
+    drop(pair.slave);
+    let mut reader = pair.master.try_clone_reader().expect("reader");
+    let mut writer = pair.master.take_writer().expect("writer");
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 8192];
+        while let Ok(n) = std::io::Read::read(&mut reader, &mut buf) {
+            if n == 0 || tx.send(buf[..n].to_vec()).is_err() {
+                break;
+            }
+        }
+    });
+    let mut got: Vec<u8> = Vec::new();
+    let mut answered = false;
+    let until = Instant::now() + WAIT;
+    let mut exited = None;
+    while Instant::now() < until {
+        if let Ok(chunk) = rx.recv_timeout(Duration::from_millis(50)) {
+            got.extend_from_slice(&chunk);
+            if !answered && got.windows(4).any(|w| w == b"\x1b[6n") {
+                answered = true;
+                std::io::Write::write_all(&mut writer, b"\x1b[1;1R").expect("answer");
+            }
+        }
+        if exited.is_none() && child.try_wait().expect("wait").is_some() {
+            exited = Some(Instant::now());
+        }
+        if exited.is_some_and(|t| t.elapsed() > Duration::from_millis(1500)) {
+            break;
+        }
+    }
+    drop(pair.master);
+    let text = String::from_utf8_lossy(&got).into_owned();
+    let tail: Vec<char> = text.chars().rev().take(200).collect();
+    assert!(
+        has_first_line(&text),
+        "LAYER reader: line 1 never reached the pty reader ({} bytes in all); first bytes: {:?}; \
+         last bytes: {:?}",
+        got.len(),
+        text.chars().take(300).collect::<String>(),
+        tail.into_iter().rev().collect::<String>()
+    );
+}
