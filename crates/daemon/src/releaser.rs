@@ -300,12 +300,24 @@ impl Ctx<'_> {
             &format!("refs/tags/{}", plan.tag),
         ];
         match self.git.run_within(&plan.repo, &args, PUSH_LIMIT) {
-            Ok(_) => Ok(pushed_text(
-                &plan.base,
-                &plan.tag,
-                &remote.name,
-                &remote.url,
-            )),
+            Ok(_) => {
+                // The tag's commit is the one CI must pass on.
+                let short = self
+                    .git
+                    .run(
+                        &plan.repo,
+                        &["rev-parse", "--short", &format!("{}^{{commit}}", plan.tag)],
+                    )
+                    .map(|s| s.trim().to_owned())
+                    .unwrap_or_default();
+                Ok(pushed_text(
+                    &plan.base,
+                    &plan.tag,
+                    &remote.name,
+                    &remote.url,
+                    &short,
+                ))
+            }
             // The detail holds git's stderr and the porcelain report (the refused ref); the last
             // line is the one a person reads.
             Err(GitError::Failed { command, detail }) => {

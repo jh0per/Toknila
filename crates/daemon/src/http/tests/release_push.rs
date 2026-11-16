@@ -63,9 +63,12 @@ async fn a_local_mode_release_with_push_lands_the_base_and_the_tag_in_the_remote
     let run = finished_run(&e.api, "2.0.0").await;
 
     assert_eq!(states(&run), ["tag:done", "push:done"], "{run}");
+    let short = git(&e.repo, &["rev-parse", "--short", "v2.0.0^{commit}"]);
     assert_eq!(
-        run["steps"][1]["label"],
-        json!("Pushed develop and v2.0.0 to origin"),
+        run["steps"][1]["output"],
+        json!(format!(
+            "Pushed develop and v2.0.0 to origin\nGitHub publishes after CI passes on {short}"
+        )),
         "{run}"
     );
     assert_eq!(git(&remote, &["tag", "--list"]), "v2.0.0");
@@ -213,9 +216,12 @@ async fn the_only_remote_is_used_when_none_is_called_origin_and_two_remotes_with
     assert_eq!(offer["remote"], json!(remote.to_string_lossy()), "{offer}");
     release(&e.api, json!({ "version": "2.0.0", "push": true })).await;
     let run = finished_run(&e.api, "2.0.0").await;
+    let short = git(&e.repo, &["rev-parse", "--short", "v2.0.0^{commit}"]);
     assert_eq!(
-        run["steps"][1]["label"],
-        json!("Pushed develop and v2.0.0 to upstream"),
+        run["steps"][1]["output"],
+        json!(format!(
+            "Pushed develop and v2.0.0 to upstream\nGitHub publishes after CI passes on {short}"
+        )),
         "{run}"
     );
     assert_eq!(git(&remote, &["tag", "--list"]), "v2.0.0");
