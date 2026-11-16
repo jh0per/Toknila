@@ -1,0 +1,212 @@
+# Phase 11: the rest of the backlog. The owner's words on 2026-11-16: "доробити весь беклог"
+# (finish the whole backlog). Triaged against v0.3.5 the same hour: what phases 5 to 10 did not
+# close, what run 12 found, and what CI showed after the 0.3.4/0.3.5 tags. Includes the two items
+# earlier phases left out on purpose (the Windows terminal's lost lines and the planner routes
+# folded into the card routes), because the owner asked for the whole backlog twice.
+# Import: tok chain import plans/phase-11.toml --project TOKNILA
+#
+# `after` names the cards whose files a card shares; a card without `after` may run at once.
+
+[chain]
+name = "phase-11"
+title = "The rest of the backlog"
+goal = "Nothing left in the orchestrator's notes: a release never ships a red main, a waiting agent never takes a slot it does not have, a flaky test never costs a round, the reviewer reads what it reviews, tests never start a real agent, and the planner's routes are the card routes"
+autostart = true
+version = "0.3.6"
+
+[[ticket]]
+id = "release-waits-for-ci"
+title = "A release is published only after CI passed on the same commit"
+prompt = """
+What happened (2026-11-15). Toknila's own release runs tagged v0.3.4 and v0.3.5 and pushed them; .github/workflows/release.yml built and published both (its `publish` job `needs: build` only), while .github/workflows/ci.yml on the very same commits was red on every OS: a Windows daemon stack overflow at startup and two cli tests that started the real agent. Four fix commits followed on `main` after the tags. The local release run's Check step runs `cargo xtask verify` on this Mac only, so it cannot see a Windows or Linux failure.
+
+Build this.
+
+1. The publish waits for CI. In release.yml, before anything is uploaded or `latest.json` changes, a job waits for the CI workflow run of the tag's commit (the `push` to `main` that carried the same SHA; `gh api repos/{owner}/{repo}/actions/runs?head_sha=<sha>&event=push` filtered by the CI workflow's name or file) to finish, and fails with one line naming the run's URL and its failed jobs when its conclusion is not `success`. It polls with a pause of at least 60 s between calls (the API has a rate limit) and gives up after 90 minutes with a line saying so. When no CI run exists for the SHA (a tag pushed alone), it dispatches nothing and fails with "push main with this commit first; CI must run on it". `publish` needs that job. A manual `workflow_dispatch` of an existing tag waits the same way.
+2. The local release says so. The release run's Push step (crates/daemon/src/releaser.rs, TOKNILA-131), after a successful push, adds one line to its step text: "GitHub publishes after CI passes on <short sha>". docs/guide (the Release section) gets the same sentence.
+3. Tests and proof. The wait is a small script under .github/scripts/ (shell or a tiny Python with no packages) with its own test that feeds recorded API answers (success, failure with two failed jobs, still running then success, no run) and checks the exit code and the line; run it locally and quote the four results. Do not push a tag to test it. A daemon test for the Push step's new line. Run `cargo xtask verify`.
+
+Keep the change inside .github/workflows/release.yml, .github/scripts/, crates/daemon (releaser), docs. Never print or touch the updater's signing key or any secret.
+"""
+acceptance = [
+  "release.yml publishes only after the CI run of the tag's commit succeeded, fails with the run's URL and failed jobs otherwise, polls at most once a minute and gives up after 90 minutes; a tag with no CI run fails with a sentence",
+  "The release run's Push step and the guide say GitHub publishes after CI passes",
+  "The wait script is tested against recorded API answers (four cases quoted); a daemon test covers the Push line",
+]
+
+[[ticket]]
+id = "answered-agent-waits-for-a-slot"
+title = "An agent answered while it waits starts only when a slot is free, and the inbox says it is answered"
+prompt = """
+What happened (run 12, 2026-11-15). TOKNILA-127 asked a question; since TOKNILA-92 a card that waits for a person frees its slot, so TOKNILA-133 took it. The person answered 127 with `tok answer`, and 127's agent was resumed at once: four agents ran at a project limit of three and the load average went to 82. The other way round on 131: the person answered while every slot was busy, the answer stayed undelivered (pending `waits_for_slot`, TOKNILA-118), and the inbox kept showing the question as open, so the orchestrator's monitor woke on it again and again although the person had done their part.
+
+Find the resume path that skips the slot check (crates/app/src/paused.rs, crates/app/src/runs.rs `queue_resume`, crates/core/src/graph/settle.rs and the schedule, `ResumeWanted`/`ResumeStart` in crates/core/src/machine/pause.rs) and the inbox builder (crates/core/src/inbox/).
+
+Build this.
+
+1. A resume is a start. Every path that brings a paused agent back (an answer, an instruction, an approval, a lost runner's replacement of TOKNILA-117) goes through the same admission as a start: it runs only when the project's running agents are below `max_parallel`, else it waits in the queue with its position, ahead of cards that have never started (a resumed agent was already working). No path launches a runner past the limit. Name in the hand-in the path that did it.
+2. An answered question leaves the person's list. A question, permission or thread approval that a person answered and whose delivery waits for a slot is no longer an inbox item of kind `question`: it shows as an informational row "Answered; the agent gets it when a slot is free (#2 in line)" that needs nothing from the person (`needs_human: false`; the window's inbox shows it under the person's items, greyed; `tok inbox` prints it after them with the same words). It disappears when the answer is delivered.
+3. Tests, red first and quoted: an app test with a limit of 1, card A paused on a question and card B running: answering A queues it (no runner start), B's end starts A with the answer in its kickoff; the same for a lost runner's replacement; a core inbox test that an answered, undelivered question is not a person item and reads the sentence; a cli test of `tok inbox` output. Run `cargo xtask verify` (and `cargo xtask web` if the window's inbox changes).
+
+Keep the change inside crates/core (graph, machine pause, inbox), crates/app (paused, runs), crates/daemon (routes if the inbox shape changes), crates/cli (inbox), crates/api-types (then `npm run gen`), apps/web (Inbox rows), and the tests.
+"""
+acceptance = [
+  "A paused agent brought back by an answer, an instruction, an approval or a lost-runner replacement starts only within max_parallel, waiting in the queue ahead of never-started cards; the path that skipped the limit is named",
+  "A question answered while its agent waits for a slot is no longer a person item: the inbox and tok inbox say it is answered and when it goes, and it disappears on delivery",
+  "Covered by app, core and cli tests seen red first",
+]
+
+[[ticket]]
+id = "flaky-check-is-not-a-round"
+title = "A check that fails once and passes again is a flaky test for the person, not a round for the agent"
+prompt = """
+What happened (run 12). TOKNILA-131's daemon check failed twice on crates/client's EINVAL test, a test its change does not touch, while the machine was loaded by the owner's other work (load average 150+); each failure counted as one of the card's three rounds and sent the agent to "fix" what it had not broken. The agent asked the person instead of guessing, which cost a person turn too. A test that passes when run again is a flaky test: real, worth a card, but not the card's fault.
+
+Today the check turn (crates/app/src/checks.rs `run_on_host`, `checks::queue_for`; the round written by `review::check_done` in crates/core/src/machine/review.rs; `CheckOutcome` in crates/core/src/model/check_outcome.rs, which since TOKNILA-130 records `base` and `head`) runs the command once and a failure is a round for the agent.
+
+Build this.
+
+1. One more run on a failure. When the check command (or an extra check of TOKNILA-130) fails, the daemon runs the same command once more on the same commit, right away, in the same line of the machine-wide check queue (TOKNILA-28). If the second run passes, the check passes: the round says "The check passed on the second run; the first failed:" followed by the first run's last 30 lines, and `CheckOutcome` records `flaky: true` with that output. If it fails again, the round goes to the agent as today with the second run's output. A command that cannot run (exit 127, "command not found": U12's machine problem) is not run again.
+2. The person learns of the flaky test. A flaky pass adds an informational inbox item (kind `flaky`, needs nothing from the person to go on) "A test failed once and passed on the second run while checking TOKNILA-131: <the first failing line>" with the output behind a disclosure, so the person can make a card of it; `tok inbox` prints it; it can be dismissed. The reviewer's gate text (crates/core/src/instructions/gate.rs) says the gate passed on the second run and quotes the first failure's line.
+3. Words. The Review card's round list shows "passed on the second run" with a small flaky mark. The Guide (Review section) gets one sentence.
+4. Tests, red first and quoted: an app or daemon test with a check command that fails the first time and passes the second (a counter file or `git config` entry as crates/daemon/tests/recheck_at_accept.rs does; never a shell redirect, it must run in `cmd.exe` too): the round passes, `flaky` is set, the inbox item exists; a command that fails twice is a round with the second output; exit 127 runs once; the gate snapshot. Run `cargo xtask verify` and `cargo xtask web`.
+
+Keep the change inside crates/core (model check_outcome, machine review, inbox, instructions gate and its snapshot), crates/app (checks), crates/daemon (routes for the inbox item and its dismissal), crates/cli (inbox), crates/api-types (then `npm run gen`), apps/web (round list, inbox row), docs, and the tests.
+"""
+acceptance = [
+  "A failed check or extra check runs once more on the same commit; a pass then is a passed round that says so with the first failure's lines, and CheckOutcome records flaky; two failures are a round as today; a command that cannot run is not repeated",
+  "A flaky pass becomes a dismissable inbox item naming the first failing line, shown in tok inbox, on the Review card's rounds and in the reviewer's gate text",
+  "Covered by daemon or app tests with a command that fails once (no shell redirects), the gate snapshot and web tests, seen red first",
+]
+
+[[ticket]]
+id = "one-version-one-epic"
+title = "A version belongs to one epic; an epic shipped inside another's tag is marked released with it"
+prompt = """
+What happened (run 12). The owner's epic "Сховати проект зі списку" (chain `skhovaty-proekt-zi-spysku`, TOKNILA-122 and 123) merged on 2026-11-14 and shipped inside phase-9's tag v0.3.3, but its own release node stayed `planned` at 0.3.4. When phase-10 planned 0.3.4 too, `tok release steps 0.3.4` answered "2 releases have version 0.3.4; use the release id", and the owner's roadmap still shows a release to make for work that is out.
+
+Releases live in crates/core/src/model/release.rs and crates/core/src/release_run.rs; the run in crates/daemon/src/releaser.rs and crates/daemon/src/http/routes/releases.rs; the CLI in crates/cli (release run, steps); chains' versions in crates/core/src/model/chain*.rs and the planner's `new_chain`/`edit_chain`.
+
+Build this.
+
+1. A tag carries every finished epic it contains. When a release run tags vX on the project's base branch, every other epic of the project whose stories are all Merged (none Released, none open) and whose last merge commit is an ancestor of the tagged commit gets its release node marked released "with vX (cut by <epic>)": its stories become Released, its node shows the tag, its version field becomes X when it was planned higher. Journaled; the window's Finish node and `tok chain show` say "released with v0.3.3 by phase-9".
+2. A person can say it for an old tag. `tok release mark <EPIC> --with v0.3.3` (and the API route behind it, person only) does item 1 for one epic against an existing tag, refusing with a sentence when the tag does not exist or does not contain the epic's merges. This is how the owner's stale node gets fixed after this story ships.
+3. One planned version per project. Creating or editing an epic (CLI, window, planner's tools) with a version another unreleased epic of the project already plans is refused with "0.3.4 is planned by phase-10; pick another version or move that one", in the API, the CLI and the planner tool's answer; the window's New epic dialog suggests the next free version (TOKNILA-87's suggestion already exists; make it skip planned ones).
+4. Releases are named by epic too. `tok release steps` and `tok release run` accept the epic's name (`tok release steps phase-10`) besides the version and the id; with a version that two releases share (old data), the error lists both epics.
+5. Tests, red first and quoted: core or app tests for item 1 (an epic merged before the tag is marked, one with an open story is not, one merged after the tag is not); a daemon test of the mark route and its two refusals; tests for the version refusal through the API, the CLI and the planner tool; a cli test of `tok release steps <epic>`. Run `cargo xtask verify` and `cargo xtask web`.
+
+Keep the change inside crates/core (model release and chain, release_run), crates/app (releases, chains, planner tools), crates/daemon (releaser, routes releases, chains), crates/cli (release), crates/api-types (then `npm run gen`), apps/web (Finish node, New epic suggestion), docs, and the tests.
+"""
+acceptance = [
+  "Tagging vX marks every other finished epic whose merges the tag contains as released with vX, shown on its Finish node and in tok chain show; tok release mark <EPIC> --with <tag> does it for an existing tag and refuses a tag that does not contain the epic",
+  "A version already planned by another unreleased epic is refused in the API, the CLI and the planner tool; the window suggests the next free version; tok release steps and run accept the epic's name",
+  "Covered by core or app, daemon and cli tests seen red first",
+]
+
+[[ticket]]
+id = "reviewer-reads-the-hand-in"
+title = "The reviewer reads the hand-in it reviews, and its git commands pass in don't-ask mode"
+prompt = """
+What the record shows. The reviewer's kickoff (crates/core/src/instructions/mod.rs `kickoff`, the Reviewer arm) says "run the single tests the hand-in names", and its instructions (snapshot crates/core/src/instructions/snapshots/review.md: The task, Acceptance, The story's threads, The gate's result, Work alone, How to review, Run what the hand-in names, Give your verdict, Short output) never contain the hand-in: reviewers wrote "the hand-in, which I did not see" (TOKNILA-70, TOKNILA-104) and judged by the diff alone. Second, TOKNILA-129's reviewer (2026-11-15) ran `git log --format=%h\\ %ci\\ %s main..HEAD` three times and Claude Code refused each "because Claude Code is running in don't-ask mode", although its settings allow `Bash(git log *)`: a command with backslash escapes, quotes or format strings is not matched by the allow rule and is denied, so the reviewer wrote "I could not run git log" and could not compare the design approval with the commit times.
+
+Build this.
+
+1. "The hand-in" section. The reviewer's instructions carry, after "The gate's result", the latest hand-in of the card as the worker wrote it: What changed, Checks, Left and For you (TOKNILA-134), from the stored hand-in body (`CommentBody`: gist, what, how_to_verify, consequences and the For-you field). After a Return the section also carries "Since the Return" (U8's `SinceReturn`, the files changed since). The kickoff's sentence points to it: "run the single tests the hand-in names (in The hand-in)". The instructions builder gets the hand-in through `RunBrief` (crates/core/src/instructions/mod.rs) from the daemon's run wiring (crates/daemon/src/runner/ or crates/app/src/runs.rs, wherever the reviewer's brief is filled).
+2. Commands that pass. "Run what the hand-in names" gains the forms that pass in don't-ask mode and those that never do: plain arguments only, no backslashes, no quotes, no `%` format strings, no globs, no pipes or redirects; for history use `git log --pretty=fuller main..HEAD` and `git show --stat <sha>`; for a search `grep -rn <word> <folder>`. A command refused once is rewritten in a plain form once before it is marked NOT_RUN. The same list goes into the worker protocol's short "Share the machine" part only if it is not there already.
+3. Tests: the snapshot review.md (and a second one for a re-review after a Return) updated with TOKNILA_UPDATE_SNAPSHOTS=1, the diff read and quoted in short; a core test that the section is absent with a sentence ("no hand-in was recorded") when there is none; a daemon or app test that a reviewer run's instructions file contains the hand-in's What changed line. Red first. Run `cargo xtask verify`.
+
+Keep the change inside crates/core (instructions and snapshots), crates/app or crates/daemon (where the reviewer's brief is filled), and the tests.
+"""
+acceptance = [
+  "The reviewer's instructions carry The hand-in (What changed, Checks, Left, For you, and Since the Return after a Return) and the kickoff points to it; with no recorded hand-in the section says so",
+  "The reviewer's instructions list command forms that pass in don't-ask mode (git log --pretty=fuller main..HEAD, git show --stat, grep -rn) and those that never do, and a refused command is rewritten plainly once before NOT_RUN",
+  "Snapshots updated and quoted, a core test and a daemon or app test seen red first",
+]
+
+[[ticket]]
+id = "tests-stay-inside"
+title = "Test runs stay inside: the leak checks work on Windows, and a test can never start a real agent"
+prompt = """
+Two holes the CI of 2026-11-15 showed.
+
+First, the leak checks of `cargo xtask verify` and `cargo xtask e2e-web` (xtask/src/leaks.rs `listing()`) list processes with `ps`, and on Windows print "leak check skipped (no `ps` here)". The e2e helper already lists processes on Windows with PowerShell's Win32_Process (apps/web/e2e/helpers.mjs `processesWith`). Give `listing()` the same: on Windows, `powershell -NoProfile -NonInteractive -Command "Get-CimInstance Win32_Process | ..."` printing pid, creation time (for the age) and command line, parsed into the same `Daemon`/`Agent` records; reading a daemon's `TOKNILA_HOME` on Windows (where `ps eww` does not exist) comes from its command line or from the `daemon.json` of the homes under the run root instead. Remove the "skipped" path for Windows. A unit test parses a recorded PowerShell output; CI on Windows proves the rest (say in the hand-in that the Windows run is the evidence, and push nothing to CI yourself).
+
+Second, two cli tests started the real `claude` profile (ship_ls from TOKNILA-132, ship_prune from TOKNILA-62's time): their projects had no `--sim`, so on CI the card blocked and on the owner's Mac a real Claude Code started in every verify run, for weeks. The cli test helper now refuses `tok start` on such a project (crates/cli/tests/common/mod.rs `refuse_a_real_agent`), but browser specs, daemon tests and autostarting chains are not covered. Close it in the product: when the daemon runs under a test root (`TOKNILA_TEST_ROOT` set, the same switch that already lowers `TOKNILA_TICK_MS`), launching a profile whose command is the real agent program (`claude`, or any program the built-in real profiles name; never the workspace's `fake-agent` or a profile file the test wrote) fails before any process starts, and the card blocks with "A test may not start a real agent: give the project --sim or a fake --profile". A daemon test proves it (a test-root daemon, a project with the default profile, start: Blocked with the sentence, no process with `claude` in its command line was spawned: assert through the runner's spawn hook or the run record, not by looking for a binary).
+
+Run `cargo xtask verify` and `cargo xtask e2e-web`, quote both result lines and the leak check lines. Keep the change inside xtask (leaks), crates/daemon (runner launch, a test), crates/core (the reason text if it lives there), AGENTS.md (one sentence under Testing), and the tests.
+"""
+acceptance = [
+  "xtask's leak checks list processes on Windows through PowerShell with pid, age and command line, a unit test parses a recorded output, and the skipped path is gone",
+  "A daemon under TOKNILA_TEST_ROOT refuses to launch a real agent program and blocks the card with a sentence; a daemon test proves no real agent process is spawned",
+  "cargo xtask verify and e2e-web green with their leak check lines quoted",
+]
+
+[[ticket]]
+id = "strict-query-parameters"
+title = "An unknown query parameter is refused, as an unknown body field is"
+prompt = """
+TOKNILA-64 made every request body strict: an unknown field answers 400 naming it (crates/daemon/src/http/body.rs, `serde_ignored`). Query strings are still lenient: `GET /v1/usage?window=30` silently answers the default 7-day window (the parameter is `days`, or whatever crates/daemon/src/http/routes/usage.rs `UsageQuery` names), and a misspelt filter on any GET route is ignored. The orchestrator and scripts were bitten by silent acceptance twice before (a PATCH field, a query).
+
+Build this.
+
+1. A strict query extractor beside the strict body one (body.rs or a sibling query.rs): it deserializes the query with `serde_ignored` and answers 400 in the API's error shape, "unknown query parameter `window`, expected one of `days`, `project`", for anything it does not know; a wrong value type answers 400 naming the parameter.
+2. Every route that takes `Query<...>` uses it (grep the routes for `Query(`); routes that take no query keep accepting none, and any query on them is refused only if that is a one-line change (else leave them and say so).
+3. The OpenAPI document is unchanged except where a parameter was undocumented (then document it; regenerate with TOKNILA_UPDATE_SNAPSHOTS=1 for the one test, and `npm run gen` in apps/web).
+4. Tests, red first: unit tests of the extractor (unknown parameter, wrong type, known ones pass); a daemon http test of `/v1/usage?window=30` answering 400 with the sentence. Check that the window and the CLI never send an unknown parameter: `cargo xtask web` and `cargo xtask e2e-web` must stay green. Run `cargo xtask verify`.
+
+Keep the change inside crates/daemon (http, routes), the generated API files if a parameter gets documented, and the tests.
+"""
+acceptance = [
+  "Every route that reads a query string refuses an unknown parameter or a wrong type with 400 naming it and the known ones",
+  "The window and the CLI send no unknown parameter: web, e2e-web and verify green",
+  "Unit tests of the extractor and a daemon test of /v1/usage?window=30, seen red first",
+]
+
+[[ticket]]
+id = "windows-terminal-keeps-its-head"
+title = "On Windows the terminal of an agent keeps the first lines of its output"
+after = ["tests-stay-inside"]
+prompt = """
+What is known. On Windows CI the e2e spec apps/web/e2e/terminal-copy.mjs saw the scrollback of an agent that printed 80 numbered lines start at "scroll line 11", while macOS and Linux start at line 1; the spec was relaxed for Windows only (the `whole` regex around line 171, commit 093eb21, 2026-11-13) with the comment "the lost head is a Windows terminal matter of its own". The runner opens the agent's terminal with portable-pty 0.9 (crates/daemon/src/runner/pty.rs `spawn`, a fixed size `SIZE`); on Windows that is ConPTY, which renders a screen and emits VT sequences for it rather than passing the program's bytes through, so output that scrolls off before ConPTY renders may never reach the stream. The scrollback the page shows comes from the run's log (the pty reader writes it) and the live stream.
+
+Find out and fix, on the only Windows machine available: GitHub's Windows runner.
+
+1. Make the spec strict on every OS again (expect "scroll line 1" first on Windows too) and add, in a small daemon test or the spec, a probe that records what the pty reader received first on Windows (the first bytes of the run log), so a failing run says which layer lost the lines: the reader, the log, or the page.
+2. Run it on Windows CI by pushing your branch to `ci/toknila-<number>` (the CI workflow runs on `ci/**`). Rules: at most six pushes in total; between pushes look at the run with `gh run view <id>` no more than once every 15 minutes (never `gh run watch`; the GitHub API has a rate limit shared with the person); never push to `main` or a tag.
+3. Fix the layer that loses them. Candidates to try in this order, each kept only if CI shows it works: start the reader before the child process writes (the order in `spawn`), give ConPTY a taller screen (rows) so 80 lines do not scroll before the first render, or on Windows read the agent's output with ConPTY's passthrough mode if portable-pty 0.9 exposes it (check its source; do not upgrade the crate without a sentence why). If no fix holds after six runs, keep the strict spec only where it passes, leave the Windows relaxation with a comment that names the evidence, and say so in the hand-in: that is an acceptable outcome, a guess is not.
+4. Run `cargo xtask verify` and `cargo xtask e2e-web` on this Mac too.
+
+Keep the change inside crates/daemon (runner pty and its tests), apps/web/e2e/terminal-copy.mjs, and nothing else. Name in the hand-in each CI run's URL and what it showed.
+"""
+acceptance = [
+  "The cause of the lost first lines on Windows is shown by a probe on the Windows CI runner, naming the layer that loses them",
+  "Either the spec is strict on Windows and passes there after a fix, or the relaxation stays with a comment naming the evidence; never a guess",
+  "At most six ci/ pushes, gh run view at most every 15 minutes, nothing pushed to main or a tag; verify and e2e-web green on this Mac",
+]
+
+[[ticket]]
+id = "planner-routes-are-card-routes"
+title = "The planner's routes are the card and epic routes, scoped by who calls them"
+after = ["answered-agent-waits-for-a-slot", "flaky-check-is-not-a-round", "one-version-one-epic", "reviewer-reads-the-hand-in", "strict-query-parameters", "windows-terminal-keeps-its-head"]
+model = "opus"
+design_first = true
+prompt = """
+Why. The daemon has two sets of routes for the same things: the person's (`/v1/chains/...`, `/v1/tickets/...`, `/v1/projects/...`) and the planner's (`/v1/planner/chains`, `/v1/planner/chains/{chain}/cards`, `PATCH /v1/planner/cards/{card}`, edges, moves, threads, pins, suggestions, and the reads `plan`, `overview`, `chains/{chain}`, `cards/{card}`, `designs/{design}`: the list `PLANNER_ROUTES` in crates/daemon/src/server/auth.rs). Each planner route re-implements what the person's route does, with the planner's limits (it starts nothing, accepts nothing, edits only what `planner::ensure_story_target` of TOKNILA-124 allows) mixed into the handler. Every new rule has had to be written twice and drifted once (the roadmap context of TOKNILA-124 lived in prose until a daemon rule was added). The code audit of 2026-11-08 named it; the owner asked for the whole backlog.
+
+This story is design first and runs on a stronger model: it changes the API that the window, the CLI and the planner's MCP tools all use. Before any code open a thread of kind architecture with:
+- the target: one route per action, the caller's principal (person, planner of project P, card agent of ticket T, reviewer) decides what it may do, in one place (auth.rs's principal plus an app-level `may(principal, action, target)` in crates/app or core, never inside handlers);
+- the table of every planner route today, the person route it folds into, and the planner's limit that moves into `may` (with the test that pins it today);
+- what the planner's MCP tools (crates/cli/src/cmd/mcp_tools.rs and the planner tool list) call afterwards, and that their tool names, arguments and answers do not change (the planner's instructions and snapshots stay as they are);
+- how old clients keep working during the change (the planner routes stay as thin aliases for one release, answering the same, then go), and how the OpenAPI document changes;
+- the order of the steps, each leaving `main` green.
+Wait for the person's approval; the approved thread wins over this text.
+
+Then build it in the approved steps. Rules that hold throughout: every existing test that pins a planner refusal (403s in crates/daemon/src/http/tests and crates/cli/tests/planner.rs, the list test in auth.rs) passes unchanged or moves with a sentence in the hand-in; a planner still starts nothing, accepts nothing, and edits only what TOKNILA-124 allows; a card agent's token still reaches only its own ticket's routes; the window and the CLI need no change beyond regenerated types. Run `cargo xtask verify`, `cargo xtask web`, `cargo xtask e2e-web` at every step you commit.
+
+Keep the change inside crates/daemon (server auth, http routes), crates/app (the `may` rule and the use cases the planner routes call), crates/core (if the rule is pure), crates/cli (mcp tools' paths), crates/api-types and the generated files, docs/architecture.md, and the tests. A production file stays at or under 400 lines.
+"""
+acceptance = [
+  "An approved architecture thread names the target, the table of planner routes and where each folds, the planner limits moved into one may(principal, action, target) rule, the alias period and the steps",
+  "The planner's MCP tools call the person's routes under the planner principal; the planner routes are thin aliases or gone as the thread said; the planner still starts and accepts nothing and edits only what TOKNILA-124 allows; a card agent stays inside its ticket",
+  "Every refusal test passes unchanged or moves with a sentence; verify, web and e2e-web green at each committed step; docs/architecture.md describes the rule",
+]
