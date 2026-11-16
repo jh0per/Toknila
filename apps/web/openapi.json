@@ -5146,6 +5146,55 @@
         }
       }
     },
+    "/tickets/{ticket}/flaky/dismiss": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "A person dismisses the inbox item of a test that failed once and passed on the second run.",
+        "operationId": "dismiss_flaky",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "The card whose check passed on its second run (id or key)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/instructions/claim": {
       "post": {
         "tags": [
@@ -7848,6 +7897,14 @@
             "type": "string",
             "description": "The command that ran; empty when the checker never said which."
           },
+          "flaky": {
+            "type": "boolean",
+            "description": "The check failed once and passed on the second run on the same commit."
+          },
+          "flaky_output": {
+            "type": "string",
+            "description": "The last 30 lines of the first, failed run when `flaky`; empty otherwise."
+          },
           "head": {
             "type": [
               "string",
@@ -9178,6 +9235,7 @@
           "leftovers",
           "design_question",
           "pin",
+          "flaky",
           "answered"
         ]
       },
@@ -12449,6 +12507,10 @@
                 "type": "null"
               }
             ]
+          },
+          "flaky_dismissed": {
+            "type": "boolean",
+            "description": "A person dismissed the inbox item of the last check's flaky pass."
           },
           "handed_in": {
             "type": [

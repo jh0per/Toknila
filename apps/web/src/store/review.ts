@@ -22,8 +22,18 @@ export function gistText(comment: string, max = 120): string {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 
+/// The first line of the round the daemon writes when a check passed only on its second run
+/// (core's `check_done`).
+const FLAKY_ROUND = "The check passed on the second run";
+
+/// Whether the round is the check's pass on its second run (a flaky test).
+export function isFlakyRound(r: ReviewRound): boolean {
+  return r.reviewer === "system" && r.verdict === "approve" && r.comment.startsWith(FLAKY_ROUND);
+}
+
 /// "Round 2: you asked for changes — handle the error case".
 export function roundText(r: ReviewRound): string {
+  if (isFlakyRound(r)) return `Round ${r.number}: the check passed on the second run`;
   const skipped = r.reviewer === "system" ? systemRoundText(r.verdict, r.comment) : undefined;
   if (skipped) return `Round ${r.number}: ${skipped}`;
   const gist = gistText(r.comment);

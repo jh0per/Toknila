@@ -17,10 +17,19 @@ pub(super) fn text(check: Option<&CheckOutcome>) -> String {
     } else {
         c.command.as_str()
     };
+    let flaky = if c.flaky {
+        format!(
+            " The gate passed on the second run: the first run failed with `{}`; that is a flaky \
+             test, not a fault of this hand-in.",
+            c.first_failing_line()
+        )
+    } else {
+        String::new()
+    };
     format!(
-        "Toknila ran the gate on this hand-in's commit: `{command}` finished {} with {word}. Quote \
-         it as the evidence of the check item with basis `ran`; do not run the whole gate again. \
-         Its output (the command and the end of its output):\n\n```\n{}\n```",
+        "Toknila ran the gate on this hand-in's commit: `{command}` finished {} with {word}.{flaky} \
+         Quote it as the evidence of the check item with basis `ran`; do not run the whole gate \
+         again. Its output (the command and the end of its output):\n\n```\n{}\n```",
         c.at.utc_text(),
         c.output.trim_end()
     )

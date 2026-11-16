@@ -49,6 +49,20 @@ pub async fn resolve_leftovers(
     .await
 }
 
+#[utoipa::path(post, path = "/tickets/{ticket}/flaky/dismiss", tag = "tickets",
+    params(("ticket" = String, Path, description = "The card whose check passed on its second run (id or key)")),
+    responses((status = 200, body = TicketDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// A person dismisses the inbox item of a test that failed once and passed on the second run.
+pub async fn dismiss_flaky(
+    State(state): State<AppState>,
+    Path(ticket): Path<String>,
+) -> ApiResult<Json<TicketDetail>> {
+    ticket_write(&state, ticket, Actor::Human, move |tx, t| {
+        Ok(inbox::dismiss_flaky(tx, &t)?)
+    })
+    .await
+}
+
 #[utoipa::path(get, path = "/projects/{project}/suggestion", tag = "projects",
     params(("project" = String, Path, description = "Project id or key")),
     responses((status = 200, body = Option<Suggestion>), (status = 404, body = ErrorBody)))]

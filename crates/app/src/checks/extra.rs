@@ -17,6 +17,8 @@ pub struct Ran {
     pub seen: Option<Seen>,
     /// The extra checks that ran, in order.
     pub extras: Vec<ExtraRun>,
+    /// The check command's failed first run, when its second run passed.
+    pub first: Option<CheckResult>,
 }
 
 /// One extra check that ran.
@@ -28,6 +30,8 @@ pub struct ExtraRun {
     pub result: Result<CheckResult, CheckError>,
     /// How long it took.
     pub secs: u64,
+    /// The failed first run, when the second one passed.
+    pub first: Option<CheckResult>,
 }
 
 impl ExtraRun {
@@ -67,10 +71,29 @@ pub(super) struct Summary {
     pub lines: Vec<String>,
     /// The first extra command whose program was not found on this machine.
     pub missing: Option<String>,
+    /// The last 30 lines of every first run that failed before a second run passed.
+    pub flaky: Option<String>,
 }
 
 /// Puts the check command's `result` and the `extras` that ran into one verdict.
-pub(super) fn summarize(command: &str, result: &CheckResult, extras: &[ExtraRun]) -> Summary {
+pub(super) fn summarize(
+    command: &str,
+    (result, first): (&CheckResult, Option<&CheckResult>),
+    extras: &[ExtraRun],
+) -> Summary {
+    let flaky: Vec<String> = first
+        .map(|f| toknila_core::last_lines(&f.output))
+        .into_iter()
+        .chain(extras.iter().filter_map(|e| {
+            let f = e.first.as_ref()?;
+            Some(format!(
+                "{}\n{}",
+                e.line(),
+                toknila_core::last_lines(&f.output)
+            ))
+        }))
+        .collect();
+    let flaky = (result.success && !flaky.is_empty()).then(|| flaky.join("\n\n"));
     let mut output = report(command, result);
     if !extras.is_empty() {
         output.push('\n');
@@ -91,6 +114,7 @@ pub(super) fn summarize(command: &str, result: &CheckResult, extras: &[ExtraRun]
         output,
         lines: extras.iter().map(ExtraRun::line).collect(),
         missing,
+        flaky,
     }
 }
 
@@ -134,15 +158,19 @@ pub(super) fn run_all(
             },
         );
         let started = Instant::now();
-        let result = host.checker.run(&CheckSpec {
-            command: command.clone(),
-            dir: spec.dir.clone(),
-        });
+        let attempt = super::run_twice(
+            host.checker,
+            &CheckSpec {
+                command: command.clone(),
+                dir: spec.dir.clone(),
+            },
+        );
         let run = ExtraRun {
             label: extra.label(),
             command,
-            result,
+            result: attempt.result,
             secs: started.elapsed().as_secs(),
+            first: attempt.first,
         };
         let failed = !run.passed();
         ran.push(run);
@@ -168,6 +196,7 @@ mod tests {
                 output: "boom".to_owned(),
             }),
             secs,
+            first: None,
         }
     }
 

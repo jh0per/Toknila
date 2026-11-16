@@ -28,9 +28,47 @@ fn done(passed: bool, base: Option<&str>, head: Option<&str>) -> TicketEvent {
         base: base.map(str::to_owned),
         head: head.map(str::to_owned),
         lines: vec!["extra check apps/web/**: PASS cargo xtask web, 4 min".to_owned()],
+        flaky: None,
         mode: ReviewMode::Both,
         max_rounds: 3,
     }
+}
+
+#[test]
+fn a_flaky_pass_says_so_in_its_round_and_is_recorded() {
+    let TicketEvent::CheckDone {
+        passed,
+        output,
+        base,
+        head,
+        lines,
+        mode,
+        max_rounds,
+        ..
+    } = done(true, None, None)
+    else {
+        unreachable!()
+    };
+    let event = TicketEvent::CheckDone {
+        passed,
+        output,
+        base,
+        head,
+        lines,
+        flaky: Some("test einval ... FAILED".to_owned()),
+        mode,
+        max_rounds,
+    };
+    let tr = step(&checking(), &event);
+    let kept = tr.ticket.review.last_check.expect("kept");
+    assert!(kept.passed && kept.flaky);
+    assert_eq!(kept.flaky_output, "test einval ... FAILED");
+    let round = tr.ticket.review.rounds.last().expect("round");
+    assert_eq!(
+        round.comment,
+        "The check passed on the second run; the first failed:\ntest einval ... FAILED\nextra check apps/web/**: PASS cargo xtask web, 4 min"
+    );
+    assert_eq!(round.verdict, Verdict::Approve);
 }
 
 /// A card a person accepted whose merge is running, its last check having seen main at `base`.

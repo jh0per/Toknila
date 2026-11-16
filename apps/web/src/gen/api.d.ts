@@ -1613,6 +1613,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tickets/{ticket}/flaky/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person dismisses the inbox item of a test that failed once and passed on the second run. */
+        post: operations["dismiss_flaky"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tickets/{ticket}/instructions/claim": {
         parameters: {
             query?: never;
@@ -2422,6 +2439,10 @@ export interface components {
             base?: string | null;
             /** @description The command that ran; empty when the checker never said which. */
             command?: string;
+            /** @description The check failed once and passed on the second run on the same commit. */
+            flaky?: boolean;
+            /** @description The last 30 lines of the first, failed run when `flaky`; empty otherwise. */
+            flaky_output?: string;
             /** @description The ship's HEAD the check ran on; `None` when the host could not say. */
             head?: string | null;
             /** @description The command and the end of its output, as the worker reads it. */
@@ -2903,7 +2924,7 @@ export interface components {
          * @description What kind of thing waits on the person; the order is the order clients group them in.
          * @enum {string}
          */
-        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers" | "design_question" | "pin" | "answered";
+        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers" | "design_question" | "pin" | "flaky" | "answered";
         /**
          * @description Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
          *     worked, now handed over and marked delivered.
@@ -4111,6 +4132,8 @@ export interface components {
              */
             accepted?: boolean;
             check?: components["schemas"]["CheckPhase"] | null;
+            /** @description A person dismissed the inbox item of the last check's flaky pass. */
+            flaky_dismissed?: boolean;
             /**
              * @description The commit the ship's branch was at when the worker last handed in; `None` before the
              *     first hand-in, or when the host could not look.
@@ -8634,6 +8657,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    dismiss_flaky: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The card whose check passed on its second run (id or key) */
+                ticket: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
                 };
             };
             404: {

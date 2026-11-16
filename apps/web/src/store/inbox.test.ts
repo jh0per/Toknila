@@ -28,6 +28,13 @@ describe("groupInbox", () => {
   it("is empty for an empty inbox", () => {
     expect(groupInbox([])).toEqual([]);
   });
+
+  it("lists a flaky test last, titled, and dismissing it asks the daemon for the card's dismissal", () => {
+    const groups = groupInbox([item("flaky", "DEMO-1", 90), item("review", "DEMO-2", 80)]);
+    expect(groups.map((g) => [g.kind, g.title])).toEqual([["review", "Waiting for review"], ["flaky", "Flaky tests"]]);
+    const [, fx] = reduce(initialState({ name: "chains" }), { type: "dismissFlaky", key: "DEMO-1" });
+    expect(fx).toEqual([{ type: "dismissFlaky", key: "DEMO-1" }]);
+  });
 });
 
 describe("a pin no card owns", () => {

@@ -75,6 +75,10 @@ pub enum TicketEvent {
         /// passing round shows them under "The check passed."
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         lines: Vec<String>,
+        /// The last 30 lines of the first run, when `passed` only on a second run of the same
+        /// command on the same commit (a flaky test); `None` otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        flaky: Option<String>,
         #[serde(skip)]
         mode: ReviewMode,
         #[serde(skip)]

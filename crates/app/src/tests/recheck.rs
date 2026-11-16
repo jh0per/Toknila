@@ -85,7 +85,7 @@ fn accept_with_main_where_the_check_saw_it_merges_at_once() {
 fn a_failing_check_again_is_a_round_for_the_agent() {
     let mut mem = checked_at_m1();
     main_at(&mem, "m2", Some(1));
-    answer(&mem, [fails("error: broke on the new main")]);
+    answer(&mem, ["error: broke on the new main"; 2].map(fails));
     accept(&mut mem);
     settle(&mut mem);
     let t = a(&mem);
@@ -175,6 +175,7 @@ fn a_failing_extra_check_fails_the_round_with_its_output_and_stops_the_rest() {
                 output: "ok".to_owned(),
             }),
             fails("web spec failed: login.mjs"),
+            fails("web spec failed: login.mjs"),
         ],
     );
     finish(&mut mem, "done".to_owned());
@@ -188,8 +189,8 @@ fn a_failing_extra_check_fails_the_round_with_its_output_and_stops_the_rest() {
         .collect();
     assert_eq!(
         ran,
-        ["cargo xtask verify", "web-gate one"],
-        "apps-gate did not run after the failure"
+        ["cargo xtask verify", "web-gate one", "web-gate one"],
+        "the failing extra check ran twice, apps-gate not after it"
     );
     let t = a(&mem);
     assert_eq!(t.status, TicketStatus::Running, "back to the agent");
