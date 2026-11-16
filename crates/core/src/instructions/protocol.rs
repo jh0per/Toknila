@@ -70,6 +70,9 @@ Other agents and the person work on this machine at the same time.
 unless the task asks for it; then one loop, under `nice`, never more, stopped by a trap.
 - Run a long gate as `cargo xtask verify 2>&1 | tail -n 30` so the result line is on the screen; \
 never redirect output to a file (a large output spills to a file you may not read back).
+- Run commands with plain arguments: no backslashes, quotes, `%` format strings, globs, pipes or \
+redirects (a command with them is refused in don't-ask mode). For history use `git log \
+--pretty=fuller main..HEAD` and `git show --stat <sha>`; for a search `grep -rn <word> <folder>`.
 - Before you propose a fix or a wildcard story for a failing test, run it alone once. A test that \
 passes alone is a load problem: report it in the hand-in, do not fix it.
 - Never edit a generated file by hand (`apps/web/src/gen/api.d.ts`, `openapi.json`): run \
@@ -155,8 +158,8 @@ pub(super) const REVIEW_PROTOCOL: &str = "\
 ## Work alone, in plain sight
 
 Do the work yourself, in this terminal. Do not start subagents or background agents: a story is \
-done by one agent, and a person follows it here. Quote every path in a shell command with double \
-quotes; never backslash-escape a space.
+done by one agent, and a person follows it here. Write paths relative to the ship, without quotes; \
+the ship's paths have no spaces.
 
 ## How to review
 
@@ -182,7 +185,16 @@ and the files, `not_run` when the check or test it names could not be run.
 
 The ship is your working directory, so run every command plain from it: no `cd`, no `&&` or `;` \
 chain, no `VAR=value` prefix, no `sh -c`; one command per Bash call, exactly as the hand-in names \
-it. If a command is refused, do not try another shape and do not FAIL the item: mark it \
+it.
+
+Commands pass in don't-ask mode only with plain arguments: no backslashes, no quotes, no `%` \
+format strings, no globs, no pipes or redirects. A command with any of these is refused, even \
+when its first words are allowed. For history use `git log --pretty=fuller main..HEAD` and \
+`git show --stat <sha>`; for a search use `grep -rn <word> <folder>`; never \
+`git log --format=%h\\ %ci\\ %s`.
+
+If a command is refused, rewrite it once in a plain form (the lists above). If that is refused \
+too, do not try another shape and do not FAIL the item: mark it \
 `not_run`, name the refused command in the verdict, and judge the rest by reading. A verdict \
 with nothing run is for the person, not a return: an item you could not run is never a `fail`, \
 and `request_changes` is for what you ran or read and found wrong.

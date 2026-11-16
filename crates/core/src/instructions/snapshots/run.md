@@ -60,6 +60,7 @@ Other agents and the person work on this machine at the same time.
 
 - Run one build or test run at a time. Do not start load loops or repeat a suite many times unless the task asks for it; then one loop, under `nice`, never more, stopped by a trap.
 - Run a long gate as `cargo xtask verify 2>&1 | tail -n 30` so the result line is on the screen; never redirect output to a file (a large output spills to a file you may not read back).
+- Run commands with plain arguments: no backslashes, quotes, `%` format strings, globs, pipes or redirects (a command with them is refused in don't-ask mode). For history use `git log --pretty=fuller main..HEAD` and `git show --stat <sha>`; for a search `grep -rn <word> <folder>`.
 - Before you propose a fix or a wildcard story for a failing test, run it alone once. A test that passes alone is a load problem: report it in the hand-in, do not fix it.
 - Never edit a generated file by hand (`apps/web/src/gen/api.d.ts`, `openapi.json`): run `npm run gen` and let `gen:check` prove it.
 - Stop only processes you started, by pid. Never stop processes by name or pattern (`pkill -f`, `killall`): that has killed other agents' work.

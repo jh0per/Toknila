@@ -5,6 +5,7 @@
 //! The worker's runner is never replaced by the reviewer's: the reviewer runs next to it on its
 //! own runner, so a `Return` goes back to a worker session that still has its context.
 
+use super::check_phase::Checked;
 use super::checks::{non_empty, run_on_ship};
 use super::{Effect, TransitionError};
 use crate::{
@@ -63,16 +64,6 @@ pub(super) fn person_decides(
 /// Where a card goes after a verdict, as a status and its reason.
 pub(super) type Outcome = (TicketStatus, Option<StatusReason>);
 
-/// What a finished check says: how it ended, and the main commit and ship HEAD it ran on.
-pub(super) struct Checked<'a> {
-    pub passed: bool,
-    pub output: &'a str,
-    pub base: Option<&'a str>,
-    pub head: Option<&'a str>,
-    /// The extra checks' lines; a pass shows them in its round.
-    pub lines: &'a [String],
-}
-
 /// The check ran. A pass goes on to whoever the review mode says (the reviewer agent, or the
 /// person, who then sees a card that already passes); the check Accept asked for because main
 /// moved merges at once. A failure sends the card back to the worker with the output, a round
@@ -91,6 +82,7 @@ pub(super) fn check_done(
         base,
         head,
         lines,
+        flaky,
     } = seen;
     if next.review.turn != Some(ReviewTurn::Check) {
         return Err(TransitionError::NotAllowed {
@@ -110,10 +102,19 @@ pub(super) fn check_done(
         at: now,
         base: base.map(str::to_owned),
         head: head.map(str::to_owned),
+        flaky: passed && flaky.is_some(),
+        flaky_output: flaky.filter(|_| passed).unwrap_or_default().to_owned(),
     });
+    next.review.flaky_dismissed = false;
     let again = std::mem::take(&mut next.review.recheck);
     if passed {
-        let comment = std::iter::once("The check passed.")
+        let head_line = match flaky {
+            Some(first) => {
+                format!("The check passed on the second run; the first failed:\n{first}")
+            }
+            None => "The check passed.".to_owned(),
+        };
+        let comment = std::iter::once(head_line.as_str())
             .chain(lines.iter().map(String::as_str))
             .collect::<Vec<_>>()
             .join("\n");

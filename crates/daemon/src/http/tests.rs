@@ -53,6 +53,7 @@ mod smart_defaults;
 mod strays;
 mod threads;
 mod unknown_fields;
+mod unknown_query;
 mod usage;
 mod workspaces;
 
@@ -1069,6 +1070,7 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/designs/{index}/move",
             "/tickets/{ticket}/discussion",
             "/tickets/{ticket}/events",
+            "/tickets/{ticket}/flaky/dismiss",
             "/tickets/{ticket}/instructions/claim",
             "/tickets/{ticket}/leftovers/{action}",
             "/tickets/{ticket}/move-to-chain",

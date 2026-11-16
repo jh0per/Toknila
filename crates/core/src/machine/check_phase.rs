@@ -8,6 +8,18 @@ use crate::{
     Actor, CheckPhase, ReviewMode, ReviewNote, ReviewTurn, Ticket, TicketStatus, Timestamp, Verdict,
 };
 
+/// What a finished check says: how it ended, and the main commit and ship HEAD it ran on.
+pub(super) struct Checked<'a> {
+    pub passed: bool,
+    pub output: &'a str,
+    pub base: Option<&'a str>,
+    pub head: Option<&'a str>,
+    /// The extra checks' lines; a pass shows them in its round.
+    pub lines: &'a [String],
+    /// The first run's last lines, when only a second run passed.
+    pub flaky: Option<&'a str>,
+}
+
 /// The daemon starts checking the hand-in: the card waits for the check command's result.
 pub(super) fn enter_check(next: &mut Ticket, effects: &mut Vec<Effect>) {
     effects.push(Effect::RunCheck);
@@ -48,15 +60,17 @@ pub(super) fn step(
             base,
             head,
             lines,
+            flaky,
             mode,
             max_rounds,
         } => {
-            let seen = review::Checked {
+            let seen = Checked {
                 passed: *passed,
                 output,
                 base: base.as_deref(),
                 head: head.as_deref(),
                 lines,
+                flaky: flaky.as_deref(),
             };
             review::check_done(next, seen, (*mode, *max_rounds), now, effects)
         }

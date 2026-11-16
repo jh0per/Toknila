@@ -131,6 +131,12 @@ impl From<LeftoverError> for AppError {
     }
 }
 
+impl From<toknila_core::inbox::flaky::FlakyError> for AppError {
+    fn from(e: toknila_core::inbox::flaky::FlakyError) -> Self {
+        AppError::conflict(e.to_string())
+    }
+}
+
 impl From<ThreadError> for AppError {
     fn from(e: ThreadError) -> Self {
         match e {

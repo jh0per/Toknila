@@ -75,20 +75,31 @@ pub(super) fn threads_section(brief: &RunBrief<'_>) -> String {
     out
 }
 
-/// The section with the whole hand-in report (what changed, the checks, what is left); empty
-/// when the worker gave none.
+/// The section with the latest hand-in as the worker wrote it (What changed, Checks, Left, For
+/// you) and, after a Return, what changed since it; says so when no hand-in was recorded.
 pub(super) fn hand_in_section(brief: &RunBrief<'_>) -> String {
+    let mut out = String::from("\n## The hand-in\n\n");
     match brief.hand_in.map(str::trim).filter(|h| !h.is_empty()) {
         Some(text) => {
-            let mut out = String::from(
-                "\n## The hand-in\n\nThe worker's report, whole. \"The hand-in says\" is judged \
-                 from it, with basis `ran`:\n\n",
+            out.push_str(
+                "The worker's report, whole. \"The hand-in says\" is judged from it, with basis \
+                 `ran`; run the single tests its Checks name:\n\n",
             );
             for line in text.lines() {
                 out.push_str(&format!("> {line}\n").replace("> \n", ">\n"));
             }
-            out
         }
-        None => String::new(),
+        None => out.push_str(
+            "The story has no hand-in to read: no hand-in was recorded. Judge by the diff and \
+             say so in the verdict.\n",
+        ),
     }
+    if let Some(s) = brief.returned.and_then(|r| r.since.as_ref()) {
+        out.push_str(&format!(
+            "\n### Since the Return\n\nThis hand-in answers a Return. Read what changed since it \
+             first, then the rest:\n\n```\n{}```\n",
+            s.text()
+        ));
+    }
+    out
 }

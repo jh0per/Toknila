@@ -3,6 +3,7 @@
 pub use toknila_api_types as dto;
 pub mod body;
 pub mod error;
+pub mod query;
 pub mod routes;
 mod strict;
 
@@ -70,6 +71,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(get_inbox))
         .routes(routes!(get_suggestion))
         .routes(routes!(resolve_leftovers))
+        .routes(routes!(dismiss_flaky))
         .routes(routes!(create_chain))
         .routes(routes!(import_chain))
         .routes(routes!(export_chain))

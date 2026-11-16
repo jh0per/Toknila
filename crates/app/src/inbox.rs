@@ -7,7 +7,7 @@ use toknila_core::inbox::{InboxData, InboxItem, ThreadFacts, compute};
 use toknila_core::question::{PendingPermission, RunFacts};
 use toknila_core::{ProjectId, Ticket, TicketKey, Timestamp};
 
-use crate::{AppResult, Reader};
+use crate::{AppResult, Reader, UnitOfWork};
 
 /// Every ticket of a project, chain by chain.
 pub(crate) fn project_tickets<R: Reader + ?Sized>(
@@ -19,6 +19,18 @@ pub(crate) fn project_tickets<R: Reader + ?Sized>(
         out.extend(r.tickets(Some(chain.id))?);
     }
     Ok(out)
+}
+
+/// A person dismisses the `flaky` item of `card`: the mark stays on the check, the item goes.
+pub fn dismiss_flaky<U: UnitOfWork + ?Sized>(uow: &mut U, card: &Ticket) -> AppResult<()> {
+    toknila_core::machine::person_only(uow.actor(), "dismiss a flaky test")?;
+    toknila_core::inbox::flaky::require_pending(card)?;
+    crate::with_chain(uow, card.chain_id, |ctx| {
+        if let Some(t) = ctx.view.tickets.iter_mut().find(|t| t.id == card.id) {
+            t.review.flaky_dismissed = true;
+        }
+        Ok::<_, crate::AppError>(())
+    })
 }
 
 /// What the host knows about the live runs: not stored, so it comes with the request.

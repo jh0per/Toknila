@@ -15,7 +15,9 @@ use crate::sync::{SyncOutcome, SyncSpec};
 use crate::{AppResult, ChainTx, Reader, UnitOfWork, projects, reviews};
 
 mod extra;
+mod retry;
 pub use extra::{ExtraRun, Ran};
+pub use retry::{Attempt, run_twice};
 
 /// The most characters of a check's output a round and the worker's instruction keep (the end of
 /// it, where the failure is).
@@ -143,7 +145,10 @@ pub(crate) fn run_on_host(
             let command = spec.command.clone();
             host.progress.stage(ticket, CheckStage::Running { command });
             ran.seen = sync.and_then(|s| host.merger.seen(s, None));
-            let result = host.checker.run(spec);
+            // A failure runs once more on the same commit, still in this turn of the line.
+            let attempt = run_twice(host.checker, spec);
+            let result = attempt.result;
+            ran.first = attempt.first;
             if result.as_ref().is_ok_and(|r| r.success) {
                 let seen = (sync, ran.seen.as_ref());
                 ran.extras = extra::run_all(host, ticket, spec, seen, extras);
@@ -258,6 +263,7 @@ pub(crate) fn sync_conflict<U: UnitOfWork + ?Sized>(
         base: None,
         head: None,
         lines: Vec::new(),
+        flaky: None,
         mode: reviews::mode_of(uow, &t)?,
         max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
     };
@@ -320,7 +326,8 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
             }
         }
         Ok(r) => {
-            let sum = extra::summarize(command.unwrap_or_default(), &r, &ran.extras);
+            let first = ran.first.as_ref();
+            let sum = extra::summarize(command.unwrap_or_default(), (&r, first), &ran.extras);
             match sum.missing {
                 Some(command) => TicketEvent::CheckCannotRun { command },
                 None => TicketEvent::CheckDone {
@@ -329,6 +336,7 @@ pub(crate) fn finished<U: UnitOfWork + ?Sized>(
                     base: ran.seen.as_ref().map(|s| s.base.clone()),
                     head: ran.seen.as_ref().map(|s| s.head.clone()),
                     lines: sum.lines,
+                    flaky: sum.flaky,
                     mode: reviews::mode_of(uow, &t)?,
                     max_rounds: projects::of_ticket(uow, &t)?.max_review_rounds,
                 },

@@ -220,7 +220,7 @@ pub fn kickoff(role: crate::AgentRole, brief: &RunBrief<'_>) -> String {
         ),
         crate::AgentRole::Reviewer => format!(
             "Review ticket {key} now, as your Toknila instructions say: read what changed on this \
-             branch, run the single tests the hand-in names and whatever the diff makes you doubt \
+             branch, run the single tests the hand-in names (in The hand-in) and whatever the diff makes you doubt \
              and quote their result lines (each command plain, one per call, no `cd` or `&&`), \
              mark NOT_RUN what you could not run (never FAIL it), then call `review_verdict` \
              once. You do not change the code. Do not run the whole gate again.{since}{commands}\n\n\
@@ -332,19 +332,12 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
-    if let Some(s) = brief.returned.and_then(|r| r.since.as_ref()) {
-        out.push_str(&format!(
-            "\n## Since the Return\n\nThis hand-in answers a Return. Read what changed since it \
-             first, then the rest:\n\n```\n{}```\n",
-            s.text()
-        ));
-    }
     out.push_str(&record::threads_section(brief));
-    out.push_str(&record::hand_in_section(brief));
     out.push_str(&format!(
         "\n## The gate's result\n\n{}\n",
         gate::text(brief.check)
     ));
+    out.push_str(&record::hand_in_section(brief));
     out.push('\n');
     out.push_str(protocol::REVIEW_PROTOCOL);
     out
