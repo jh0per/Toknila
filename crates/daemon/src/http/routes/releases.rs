@@ -13,10 +13,10 @@ use crate::http::dto::{
     ChainDetail, NewRelease, ReleaseOffer, ReleaseRun, StartRelease, VersionSuggestion,
 };
 use crate::http::error::ErrorBody;
-use crate::releaser;
 use crate::server::{AppState, now};
 use crate::shipyard::remote::{Remote, has_upstream, remote_of};
 use crate::store::release_runs::Entry;
+use crate::{release_carry, releaser};
 use toknila_api_types::{RunState, StepState};
 
 #[utoipa::path(post, path = "/chains/{chain}/releases", tag = "releases", request_body = NewRelease,
@@ -73,7 +73,7 @@ fn push_facts(p: &toknila_core::Project) -> (Option<Remote>, bool) {
     (remote, default)
 }
 
-fn repo_of(p: &toknila_core::Project) -> Result<String, AppError> {
+pub(super) fn repo_of(p: &toknila_core::Project) -> Result<String, AppError> {
     p.repo_path
         .clone()
         .filter(|r| !r.trim().is_empty())
@@ -234,6 +234,33 @@ fn journal(
         .map_err(|e: crate::store::StoreError| e.to_string())
 }
 
+/// The finished epics of the project whose merges the new tag contains: they ship with it. A
+/// failure to look means none are carried; the release itself stands.
+async fn carried_by(state: &AppState, plan: &releaser::Plan) -> Vec<toknila_core::ChainId> {
+    let id = plan.release;
+    let epics = read(state, move |repo| {
+        let r = resolve::release(repo, &id.to_string())?;
+        let c = repo
+            .chain(r.chain_id)?
+            .ok_or_else(|| AppError::not_found("epic"))?;
+        Ok(releases::finished_epics(repo, c.project_id, Some(c.id))?)
+    })
+    .await
+    .unwrap_or_default();
+    if epics.is_empty() {
+        return Vec::new();
+    }
+    let (repo, tag) = (plan.repo.clone(), plan.tag.clone());
+    tokio::task::spawn_blocking(move || {
+        let (_, commit) = release_carry::tag_commit(&repo, &tag)?;
+        release_carry::contained(&repo, &commit, &epics)
+    })
+    .await
+    .ok()
+    .and_then(Result::ok)
+    .unwrap_or_default()
+}
+
 /// The run itself: the steps on a blocking thread, then the milestone is saved as released and
 /// the run ends in the same transaction.
 async fn run_release(state: AppState, plan: releaser::Plan) {
@@ -249,10 +276,11 @@ async fn run_release(state: AppState, plan: releaser::Plan) {
     };
     let failure = match ran {
         Ok(Ok(())) => {
+            let carried = carried_by(&state, &plan).await;
             let saved = state
                 .store
                 .write(Actor::Human, now(), move |tx| -> ApiResult<()> {
-                    releases::finish(tx, id, &tag)?;
+                    releases::finish(tx, id, &tag, &carried)?;
                     Ok(tx.journal_release_run(id, &Entry::RunDone)?)
                 })
                 .await;

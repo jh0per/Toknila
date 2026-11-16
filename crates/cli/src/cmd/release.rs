@@ -31,10 +31,20 @@ pub enum ReleaseCmd {
     },
     /// Cut a manual milestone (release/<version> leaves develop).
     Start { release: String },
+    /// Say that a finished epic shipped inside a tag that already exists (an older epic's release).
+    Mark {
+        /// The epic.
+        chain: String,
+        /// The tag, such as `v0.3.3`; it must contain the merges of every story of the epic.
+        #[arg(long = "with")]
+        with: String,
+    },
     /// Release a finished epic: runs the check, the bump, the tag and the push.
     Run {
+        /// The epic's name or id.
         chain: String,
-        version: String,
+        /// The version; left out, the epic's own.
+        version: Option<String>,
         /// Run an interrupted or failed release again from its step; passed steps are not redone.
         #[arg(long)]
         resume: bool,
@@ -47,7 +57,10 @@ pub enum ReleaseCmd {
         no_push: bool,
     },
     /// Show the steps of a release's last run, as the journal has them (also after a restart).
-    Steps { release: String },
+    Steps {
+        /// The epic's name, the version or the release id.
+        release: String,
+    },
 }
 
 /// The steps of a run, one line each, then why it stopped.
@@ -105,13 +118,21 @@ pub(super) fn run(c: &Client, cmd: ReleaseCmd, json_out: bool) -> Result<()> {
             emit(json_out, &c.release_run(&release)?, steps);
             return Ok(());
         }
+        ReleaseCmd::Mark { chain, with } => c.mark_release(&chain, &with)?,
         ReleaseCmd::Run {
             chain,
             version,
             resume,
             push,
             no_push,
-        } => c.start_release(&chain, &version, resume, push_choice(push, no_push))?,
+        } => {
+            let version = match version {
+                Some(v) => v,
+                // The epic's own version: what the Release dialog offers.
+                None => c.release_offer(&chain)?.version,
+            };
+            c.start_release(&chain, &version, resume, push_choice(push, no_push))?
+        }
         ReleaseCmd::New {
             chain,
             version,

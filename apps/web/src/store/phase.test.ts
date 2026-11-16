@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChainDetail } from "../api/types";
-import { dayText, finishText, readFinishedOpen, splitChains, storeFinishedOpen } from "./phase";
+import { dayText, finishText, finishView, readFinishedOpen, splitChains, storeFinishedOpen } from "./phase";
 
 const chain = (name: string, phase: ChainDetail["summary"]["phase"]) =>
   ({ chain: { id: name, name }, summary: { phase, total: 4, done: 1, finished_at: null } }) as unknown as ChainDetail;
@@ -18,6 +18,15 @@ describe("phase", () => {
     expect(finishText({ phase: "finished", finished_at: ms, total: 4, done: 4 })).toBe(`Finished · ${dayText(ms)}`);
     expect(dayText(ms)).toBe("12 Nov");
     expect(finishText({ phase: "active", finished_at: null, total: 4, done: 1 })).toBe("3 left");
+  });
+  it("words an epic released inside another epic's tag", () => {
+    const released = (by?: string) =>
+      finishView({
+        total: 2, done: 2,
+        finish: { version: "0.3.3", state: "released", tag: "v0.3.3", released_at: 1, released_with: { tag: "v0.3.3", by } },
+      });
+    expect(released("phase-9")?.text).toBe("released with v0.3.3 by phase-9");
+    expect(released()?.text).toBe("released with v0.3.3");
   });
 });
 

@@ -111,6 +111,7 @@ impl Builder {
             cut_at: None,
             released_at: None,
             tag: None,
+            released_with: None,
         };
         let id = r.id;
         self.view.releases.push(r);

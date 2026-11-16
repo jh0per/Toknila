@@ -40,6 +40,7 @@ mod profiles;
 mod questions;
 mod release_leaves;
 mod release_push;
+mod release_with;
 mod releases;
 mod removal;
 mod resume;
@@ -992,6 +993,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/export",
             "/chains/{chain}/move",
             "/chains/{chain}/release",
+            "/chains/{chain}/release/mark",
             "/chains/{chain}/releases",
             "/chains/{chain}/tickets",
             "/chains/{chain}/tickets/{ticket}/move",

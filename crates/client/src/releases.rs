@@ -55,6 +55,18 @@ impl Client {
         )
     }
 
+    /// `POST /chains/{chain}/release/mark`: the epic shipped inside the existing `tag`.
+    pub fn mark_release(&self, chain: &str, tag: &str) -> ClientResult<ChainDetail> {
+        let body = toknila_api_types::MarkRelease {
+            tag: tag.to_owned(),
+        };
+        self.call(
+            "POST",
+            &format!("/chains/{}/release/mark", enc(chain)),
+            Some(&body),
+        )
+    }
+
     /// `GET /releases/{release}/run`: the steps of the last release run.
     pub fn release_run(&self, release: &str) -> ClientResult<toknila_api_types::ReleaseRun> {
         self.call(

@@ -43,7 +43,7 @@ pub use profile::{
     AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules, Permissions,
 };
 pub use project::{MODEL_ALIASES, MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
-pub use release::{Release, ReleaseChannel, ReleaseState, StartMode};
+pub use release::{Release, ReleaseChannel, ReleaseState, ReleasedWith, StartMode};
 pub use review::{
     CheckPhase, ItemBasis, ItemOutcome, ItemVerdict, ItemsError, Review, ReviewNote, ReviewRound,
     ReviewTurn, Verdict, check_items, effective_verdict, render_items, request_is_unfounded,

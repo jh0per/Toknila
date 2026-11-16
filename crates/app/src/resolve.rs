@@ -72,18 +72,48 @@ pub fn ticket<R: Reader + ?Sized>(repo: &R, r: &str) -> AppResult<Ticket> {
     )
 }
 
-/// A milestone by id or unique version.
+/// A milestone by id, by version, or by the name of its epic (the epic's own release). A version
+/// that epics share names the release that was cut itself, not the ones that shipped inside it;
+/// when that is still not one, the error lists the epics.
 pub fn release<R: Reader + ?Sized>(repo: &R, r: &str) -> AppResult<Release> {
     if let Ok(id) = r.parse()
         && let Some(rel) = repo.release(id)?
     {
         return Ok(rel);
     }
-    let found = repo.releases_by_version(r)?;
+    let mut found = repo.releases_by_version(r)?;
+    if found.len() > 1 && found.iter().filter(|x| x.released_with.is_none()).count() == 1 {
+        found.retain(|x| x.released_with.is_none());
+    }
+    if found.len() > 1 {
+        let mut names = Vec::new();
+        for rel in &found {
+            if let Some(c) = repo.chain(rel.chain_id)? {
+                names.push(c.name);
+            }
+        }
+        return Err(AppError::ambiguous(format!(
+            "{} releases have version {r}: {}; use the epic's name or the release id",
+            found.len(),
+            names.join(", ")
+        )));
+    }
+    if let Some(rel) = found.pop() {
+        return Ok(rel);
+    }
+    let mut own = Vec::new();
+    for c in repo.chains_named(r)? {
+        if let Some(rel) = repo
+            .chain_view(c.id)?
+            .and_then(|v| v.finish_release().cloned())
+        {
+            own.push(rel);
+        }
+    }
     unique(
-        found,
+        own,
         || format!("release {r}"),
-        |n| format!("{n} releases have version {r}; use the release id"),
+        |n| format!("{n} epics named {r} have a release; use the release id"),
     )
 }
 
