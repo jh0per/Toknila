@@ -129,6 +129,15 @@ pub fn slots_used(chains: &[ChainView], live: &[LiveRunner]) -> u32 {
 pub fn plan(chains: &[ChainView], limit: u32, live: &[LiveRunner]) -> Plan {
     let used = slots_used(chains, live);
     let mut wanted: Vec<TicketId> = chains.iter().flat_map(ChainView::start_requests).collect();
+    // A resume is a start, and a resumed agent was already working: it goes ahead of the cards
+    // that never started (the sort is stable, so each group keeps its chain order).
+    let resumes = |id: &TicketId| {
+        chains
+            .iter()
+            .flat_map(|c| &c.tickets)
+            .any(|t| t.id == *id && t.agent_paused.is_some())
+    };
+    wanted.sort_by_key(|id| !resumes(id));
     let free = usize::try_from(limit.saturating_sub(used)).unwrap_or(usize::MAX);
     let queue = wanted.split_off(free.min(wanted.len()));
     Plan {

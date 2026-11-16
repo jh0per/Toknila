@@ -31,6 +31,9 @@
 .inbox .row-body .btns input, .answer .btns input { flex: 1 1 14em; }
 .answer { display: flex; flex-direction: column; gap: var(--sp2); align-items: flex-start; width: 100%; }
 
+/* An answer that waits for a slot needs nothing from the person: greyed, under their items. */
+.inbox li.informational { opacity: 0.6; }
+
 /* The planner's next step: the most prominent row, tonal, with the button of its action. */
 .suggestion { display: flex; align-items: center; gap: var(--sp3); min-height: var(--row-h); padding: var(--sp3) var(--sp4); background: var(--primary-container); color: var(--on-primary-container); border-radius: var(--shape-m); font-size: var(--fs-title-m); line-height: var(--lh-title-m); font-weight: var(--fw-medium); }
 .suggestion > .key:first-child { font-size: var(--fs-label-m); letter-spacing: 0.06em; text-transform: uppercase; font-weight: var(--fw-semibold); }

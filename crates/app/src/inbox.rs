@@ -73,6 +73,8 @@ pub fn load_with<R: Reader + ?Sized>(
         }
     }
     data.pins = r.design_pins(project)?;
+    // The place in line of an answer that waits for a slot.
+    data.positions = crate::schedule::queue_positions(r)?.into_iter().collect();
     data.tickets = tickets;
     Ok(compute(&data))
 }
