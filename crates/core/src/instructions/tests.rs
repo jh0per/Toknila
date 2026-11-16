@@ -164,9 +164,16 @@ fn the_checks_section_points_at_the_migration_bullet_and_the_npm_ci_line() {
 fn both_roles_are_told_to_work_alone_and_to_quote_paths() {
     for text in [protocol(), review_protocol()] {
         assert!(text.contains("Do not start subagents or background agents"));
-        assert!(text.contains("Quote every path in a shell command with double quotes"));
-        assert!(text.contains("never backslash-escape a space"));
     }
+    let worker = protocol();
+    assert!(worker.contains("Quote every path in a shell command with double quotes"));
+    assert!(worker.contains("never backslash-escape a space"));
+    // The reviewer runs in don't-ask mode, where a quoted command is refused.
+    let reviewer = review_protocol();
+    assert!(reviewer.contains(
+        "Write paths relative to the ship, without quotes; the ship's paths have no spaces."
+    ));
+    assert!(!reviewer.contains("Quote every path"));
 }
 
 #[test]

@@ -992,3 +992,18 @@ fn a_worker_may_read_exactly_the_design_files_of_its_card_and_is_told_them() {
         "{text}"
     );
 }
+
+#[test]
+fn a_reviewer_run_gets_the_what_changed_line_of_the_hand_in_in_its_instructions() {
+    let mut rig = Rig::new();
+    rig.brief.hand_in = Some(
+        "**What changed:** The reviewer reads the hand-in\n**Checks:**\n- PASS gate: ok\n**Left:** nothing"
+            .to_owned(),
+    );
+    rig.prepare_as(&AgentProfile::claude_code_reviewer(), AgentRole::Reviewer);
+    let (_, instructions) = rig.file_of("reviewer", "instructions.md");
+    assert!(
+        instructions.contains("> **What changed:** The reviewer reads the hand-in\n"),
+        "{instructions}"
+    );
+}
