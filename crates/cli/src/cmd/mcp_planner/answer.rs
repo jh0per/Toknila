@@ -26,8 +26,10 @@ impl From<String> for Answer {
 
 /// `show_design`: the design's metadata as text, then its picture as image content (png, jpg,
 /// webp), or words when there is no file. A pdf answers its metadata and path only.
-pub(super) fn show_design(client: &Client, design: &str) -> Result<Answer, String> {
-    let found = client.planner_design(design).map_err(|e| e.to_string())?;
+pub(super) fn show_design(client: &Client, project: &str, design: &str) -> Result<Answer, String> {
+    let found = client
+        .planner_design(project, design)
+        .map_err(|e| e.to_string())?;
     let text = serde_json::to_string_pretty(&found).map_err(|x| x.to_string())?;
     let more = match (&found.path, found.mime.as_deref()) {
         (None, _) => vec![json!({

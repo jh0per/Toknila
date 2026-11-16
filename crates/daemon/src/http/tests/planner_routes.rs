@@ -103,8 +103,9 @@ async fn the_planner_plans_its_own_project_on_the_persons_routes_and_no_other() 
     assert!(told.iter().any(|t| t.contains("DEMO-1")), "{told:?}");
 
     // The other project's things, by name and key: refused, and untouched.
-    let foreign: [(Method, &'static str, Option<Value>); 13] = [
+    let foreign: [(Method, &'static str, Option<Value>); 14] = [
         (Method::GET, "/v1/projects/OTHER/plan", None),
+        (Method::GET, "/v1/chains/theirs", None),
         (Method::GET, "/v1/chains/theirs/plan", None),
         (Method::GET, "/v1/tickets/OTHER-1/plan", None),
         (

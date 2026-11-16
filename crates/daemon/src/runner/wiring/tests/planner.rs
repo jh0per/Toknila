@@ -66,6 +66,27 @@ fn the_mcp_config_of_a_planner_names_no_ticket_variable() {
 }
 
 #[test]
+fn the_planner_names_its_project_for_the_persons_routes_its_tools_call() {
+    let rig = planner_rig();
+    let w = rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);
+    let project = w
+        .env
+        .iter()
+        .find(|(k, _)| k == "TOKNILA_PROJECT")
+        .map(|(_, v)| v.as_str());
+    assert_eq!(project, Some("DEMO"));
+    let (_, text) = rig.file_of("planner", "mcp.json");
+    let v: Value = serde_json::from_str(&text).expect("json");
+    assert_eq!(
+        v["mcpServers"]["toknila"]["env"]["TOKNILA_PROJECT"],
+        "${TOKNILA_PROJECT}"
+    );
+    // A card's agent has its ticket and no project.
+    let worker = Rig::new().prepare_as(&AgentProfile::claude_code(), AgentRole::Worker);
+    assert!(worker.env.iter().all(|(k, _)| k != "TOKNILA_PROJECT"));
+}
+
+#[test]
 fn the_planner_reads_its_instructions_from_its_own_folder() {
     let rig = planner_rig();
     let w = rig.prepare_as(&AgentProfile::claude_code_planner(), AgentRole::Planner);

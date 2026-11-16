@@ -1,13 +1,14 @@
 //! The tools of a project's planner (`tok mcp` with the planner role): read the plan, create and
 //! edit chains and cards, change dependencies and order, write in threads. A tool call is parsed
-//! here into a [`PlannerCall`] and sent to the daemon's `/planner/...` routes with the run's own
-//! token; the daemon's use cases decide, so a refused call comes back as the tool's error text.
+//! here into a [`PlannerCall`] and sent to the person's routes of the daemon (the project's
+//! `TOKNILA_PROJECT` in their paths) with the run's own token; the daemon's access rule decides,
+//! so a refused call comes back as the tool's error text.
 //! There is no tool that starts, pauses, resumes, cancels, accepts, returns, reopens or merges.
 
 use serde_json::Value;
 use toknila_api_types::{
-    CardEdit, ChainDetail, EdgeInput, EditPlanChain, NewCard, NewDesignPin, NewMessage,
-    NewPlanChain, NewSuggestion, NewThread, NewVersion, PlannerMove, Say, TicketDetail,
+    CardEdit, ChainDetail, EdgeInput, EditPlanChain, MoveInput, NewCard, NewDesignPin, NewMessage,
+    NewPlanChain, NewSuggestion, NewThread, NewVersion, Say, TicketDetail,
 };
 use toknila_client::Client;
 use toknila_core::graph::Place;
@@ -142,6 +143,13 @@ pub(super) fn call(name: &str, arguments: &Value) -> Result<PlannerCall, ToolErr
                 place,
                 to_chain,
             } = args(arguments)?;
+            let refuse = |why: &str| Err(ToolError::BadArguments(why.to_owned()));
+            if anchor.is_some() != place.is_some() {
+                return refuse("give both anchor and place, or neither");
+            }
+            if to_chain.is_none() && anchor.is_none() {
+                return refuse("give anchor and place, or to_chain");
+            }
             PlannerCall::MoveCard {
                 chain,
                 card,
@@ -203,39 +211,42 @@ fn card_line(verb: &str, d: &TicketDetail) -> String {
     )
 }
 
-/// Sends the call to the daemon and answers what came of it: `show_design` also gives the picture.
-pub(super) fn send(client: &Client, call: &PlannerCall) -> Result<Answer, String> {
+/// Sends the call of the planner of `project` to the person's routes of the daemon and answers
+/// what came of it: `show_design` also gives the picture.
+pub(super) fn send(client: &Client, project: &str, call: &PlannerCall) -> Result<Answer, String> {
     match call {
-        PlannerCall::ShowDesign { design } => answer::show_design(client, design),
-        other => send_text(client, other).map(Answer::from),
+        PlannerCall::ShowDesign { design } => answer::show_design(client, project, design),
+        other => send_text(client, project, other).map(Answer::from),
     }
 }
 
 /// Sends the call to the daemon and says in a few lines what came of it.
-fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
+fn send_text(client: &Client, project: &str, call: &PlannerCall) -> Result<String, String> {
     let e = |e: toknila_client::ClientError| e.to_string();
     match call {
         PlannerCall::ShowPlan(scope) => {
             // Compact JSON: the overview must stay small at any size of the plan.
             let text = match scope {
                 PlanScope::Overview => {
-                    serde_json::to_string(&client.planner_overview().map_err(e)?)
+                    serde_json::to_string(&client.planner_overview(project).map_err(e)?)
                 }
                 PlanScope::Chain(c) => serde_json::to_string(&client.planner_chain(c).map_err(e)?),
                 PlanScope::Card(c) => serde_json::to_string(&client.planner_card(c).map_err(e)?),
             };
             text.map_err(|x| x.to_string())
         }
-        PlannerCall::ShowDesign { design } => answer::show_design(client, design).map(|a| a.text),
+        PlannerCall::ShowDesign { design } => {
+            answer::show_design(client, project, design).map(|a| a.text)
+        }
         PlannerCall::DesignQuestion(q) => {
-            let pin = client.planner_pin(q).map_err(e)?;
+            let pin = client.planner_pin(project, q).map_err(e)?;
             Ok(format!(
                 "pinned #{} on {}: the owner answers on the mockup, and the answer shows in show_plan under pins",
                 pin.number, pin.design_name
             ))
         }
         PlannerCall::NewChain(c) => {
-            let d = client.planner_new_chain(c).map_err(e)?;
+            let d = client.planner_new_chain(project, c).map_err(e)?;
             Ok(format!(
                 "epic {} created; its stories wait for the owner to start them",
                 d.chain.name
@@ -260,7 +271,7 @@ fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
             .map(|d| card_line("updated", &d))
             .map_err(e),
         PlannerCall::Suggest(s) => client
-            .planner_suggest(s)
+            .planner_suggest(project, s)
             .map(|s| match s.card {
                 Some(card) => format!(
                     "next step kept: {} {card}",
@@ -304,15 +315,17 @@ fn send_text(client: &Client, call: &PlannerCall) -> Result<String, String> {
             place,
             to_chain,
         } => {
-            let m = PlannerMove {
-                anchor: anchor.clone(),
-                place: *place,
-                to_chain: to_chain.clone(),
+            // The arguments were checked: both anchor and place, or neither with `to_chain`.
+            let at = anchor
+                .clone()
+                .zip(*place)
+                .map(|(anchor, place)| MoveInput { anchor, place });
+            let moved = match (to_chain, at) {
+                (Some(to), at) => client.planner_move_card_to(chain, card, to, at),
+                (None, Some(at)) => client.planner_move_card(chain, card, &at),
+                (None, None) => return Err("give anchor and place, or to_chain".to_owned()),
             };
-            client
-                .planner_move_card(chain, card, &m)
-                .map(|d| order(&d))
-                .map_err(e)
+            moved.map(|d| order(&d)).map_err(e)
         }
         PlannerCall::OpenThread { card, kind, title } => {
             let t = NewThread {
@@ -588,6 +601,33 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn a_move_names_both_anchor_and_place_or_neither_and_then_another_epic() {
+        let refused = |arguments: Value| match call("move_card", &arguments) {
+            Err(ToolError::BadArguments(why)) => why,
+            other => panic!("{arguments}: {other:?}"),
+        };
+        assert_eq!(
+            refused(json!({ "chain": "p", "card": "A-2", "anchor": "A-1" })),
+            "give both anchor and place, or neither"
+        );
+        assert_eq!(
+            refused(json!({ "chain": "p", "card": "A-2", "place": "after", "to_chain": "q" })),
+            "give both anchor and place, or neither"
+        );
+        assert_eq!(
+            refused(json!({ "chain": "p", "card": "A-2" })),
+            "give anchor and place, or to_chain"
+        );
+        assert!(
+            call(
+                "move_card",
+                &json!({ "chain": "p", "card": "A-2", "to_chain": "q", "anchor": "B-1", "place": "after" })
+            )
+            .is_ok()
+        );
     }
 
     #[test]

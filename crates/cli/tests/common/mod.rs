@@ -225,7 +225,12 @@ pub fn mcp_session(
         .env("TOKNILA_RUN_TOKEN", token)
         // Nothing of the data home is needed: the daemon is found through the environment.
         .env("TOKNILA_HOME", "/nonexistent-toknila-home");
-    for var in ["TOKNILA_TICKET", "TOKNILA_ROLE", "TOKNILA_RUN"] {
+    for var in [
+        "TOKNILA_TICKET",
+        "TOKNILA_ROLE",
+        "TOKNILA_RUN",
+        "TOKNILA_PROJECT",
+    ] {
         match identity.iter().find(|(k, _)| *k == var) {
             Some((_, v)) => cmd.env(var, v),
             None => cmd.env_remove(var),

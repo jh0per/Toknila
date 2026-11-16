@@ -69,7 +69,12 @@ fn mcp_config(bin: &Path, role: AgentRole) -> Value {
     // A planner works on a project, not a card: it has no ticket for the variable to name, and a
     // reference to a variable that is not set would stop the agent's config from loading.
     let names: &[&str] = match role {
-        AgentRole::Planner => &[agent_env::URL, agent_env::TOKEN, agent_env::ROLE],
+        AgentRole::Planner => &[
+            agent_env::URL,
+            agent_env::TOKEN,
+            agent_env::ROLE,
+            agent_env::PROJECT,
+        ],
         _ => &[
             agent_env::URL,
             agent_env::TOKEN,
@@ -306,11 +311,12 @@ pub(super) fn prepare_with(
     wiring
         .env
         .push((agent_env::TOKEN.to_owned(), cx.token.to_owned()));
-    if cx.role != AgentRole::Planner {
-        wiring
-            .env
-            .push((agent_env::TICKET.to_owned(), cx.key.to_string()));
-    }
+    // A planner names its project in the person's routes it calls; a card's agent its ticket.
+    let (name, value) = match cx.role {
+        AgentRole::Planner => (agent_env::PROJECT, cx.key.project().to_string()),
+        _ => (agent_env::TICKET, cx.key.to_string()),
+    };
+    wiring.env.push((name.to_owned(), value));
     wiring.env.extend([
         (agent_env::RUN.to_owned(), cx.run.to_string()),
         (

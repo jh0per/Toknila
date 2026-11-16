@@ -47,6 +47,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** One epic with its cards, graph and figures. A planner reads its own project's. */
         get: operations["get_chain"];
         put?: never;
         post?: never;
@@ -5167,6 +5168,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChainDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {

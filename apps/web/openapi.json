@@ -75,6 +75,7 @@
         "tags": [
           "chains"
         ],
+        "summary": "One epic with its cards, graph and figures. A planner reads its own project's.",
         "operationId": "get_chain",
         "parameters": [
           {
@@ -93,6 +94,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }

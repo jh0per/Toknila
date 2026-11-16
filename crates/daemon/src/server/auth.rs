@@ -41,10 +41,11 @@ pub const AGENT_ROUTES: [&str; 6] = [
 /// release, its old `/planner/...` routes as deprecated aliases. Every route here runs a use case
 /// that asks core's `access::may` as the caller the token names, so a planner reaches only its
 /// own project and only what its limits allow; nothing here starts, accepts or merges.
-pub const PLANNER_ROUTES: [(&str, &str); 39] = [
+pub const PLANNER_ROUTES: [(&str, &str); 40] = [
     ("GET", "/v1/projects/{project}/plan"),
     ("GET", "/v1/projects/{project}/plan/overview"),
     ("GET", "/v1/projects/{project}/designs/{design}"),
+    ("GET", "/v1/chains/{chain}"),
     ("GET", "/v1/chains/{chain}/plan"),
     ("GET", "/v1/tickets/{ticket}/plan"),
     ("POST", "/v1/projects/{project}/design-pins"),

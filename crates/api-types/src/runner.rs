@@ -32,6 +32,9 @@ pub mod agent_env {
     pub const TOKEN: &str = "TOKNILA_RUN_TOKEN";
     /// Key of the run's ticket.
     pub const TICKET: &str = "TOKNILA_TICKET";
+    /// Key of a planner run's project, which a planner names in the person's routes; it has no
+    /// ticket.
+    pub const PROJECT: &str = "TOKNILA_PROJECT";
     /// Id of the run.
     pub const RUN: &str = "TOKNILA_RUN";
     /// What the run is: `worker` or `reviewer`. `tok mcp` offers the tools of that role.

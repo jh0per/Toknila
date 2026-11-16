@@ -8,7 +8,7 @@ use crate::http::query::Query;
 use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use toknila_app::access::Caller;
+use toknila_app::access::{self, Action, Caller};
 use toknila_app::removal::{self, Removed};
 use toknila_app::{as_caller, chains, moves, resolve, roadmap};
 use toknila_core::Actor;
@@ -180,15 +180,19 @@ pub async fn list_chains(
 
 #[utoipa::path(get, path = "/chains/{chain}", tag = "chains",
     params(("chain" = String, Path, description = "Chain id or name")),
-    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody)))]
+    responses((status = 200, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// One epic with its cards, graph and figures. A planner reads its own project's.
 pub async fn get_chain(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(chain): Path<String>,
 ) -> ApiResult<Json<ChainDetail>> {
     let (at, prices) = stamp(&state);
+    let caller = principal.caller();
     Ok(Json(
         read(&state, move |repo| {
-            let c = resolve::chain(repo, &chain)?;
+            let c = access::chain(repo, &caller, None, &chain)?;
+            access::on_epic(repo, &caller, &Action::ReadPlan, &c)?;
             load_chain_detail(repo, c.id, at, &prices)
         })
         .await?,
