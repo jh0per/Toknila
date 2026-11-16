@@ -41,15 +41,30 @@ pub struct NewTicket {
     /// Show the person a design to approve before any code.
     #[serde(default)]
     pub design_first: bool,
-    /// Designs of the project the card is about (by id), with an optional region of each.
+    /// Designs of the project the card is about, by id or file name, with an optional region of
+    /// each. The daemon turns a file name into the id; a design the project lacks is refused.
     #[serde(default)]
-    pub designs: Vec<toknila_core::design::DesignRef>,
+    pub designs: Vec<toknila_core::design::DesignPick>,
     #[serde(default)]
     pub paused: bool,
     /// Put the card after the chain's last cards (what nothing waits for yet) when `after` is
     /// empty. Without it a card with no `after` has no dependencies and may start at once.
     #[serde(default)]
     pub at_end: bool,
+}
+
+impl NewTicket {
+    /// Whether it sets what only the owner sets on a new story: its agent profile, review mode,
+    /// reviewer, secrets, pause, or the stories it goes before (`toknila_core::access` decides
+    /// who may).
+    pub fn sets_owner_fields(&self) -> bool {
+        self.profile.is_some()
+            || self.review_mode.is_some()
+            || self.reviewer.is_some()
+            || self.needs_secrets
+            || self.paused
+            || !self.before.is_empty()
+    }
 }
 
 /// The key of the next card of a project (`DEMO-7`); takes its number.
@@ -75,7 +90,13 @@ pub fn create<U: UnitOfWork + ?Sized>(
     if title.is_empty() {
         return Err(AppError::bad_request("ticket title is empty"));
     }
-    toknila_core::design::check_refs(&input.designs).map_err(AppError::bad_request)?;
+    let designs = input
+        .designs
+        .iter()
+        .map(toknila_core::design::DesignPick::to_ref)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(AppError::bad_request)?;
+    toknila_core::design::check_refs(&designs).map_err(AppError::bad_request)?;
     let model = match input.model.as_deref() {
         Some(m) => toknila_core::Project::clean_model(m).map_err(AppError::bad_request)?,
         None => None,
@@ -93,7 +114,7 @@ pub fn create<U: UnitOfWork + ?Sized>(
         model,
         needs_secrets: input.needs_secrets,
         design_first: input.design_first,
-        designs: input.designs,
+        designs,
     };
     let t = Ticket::new_backlog(TicketId::new(), c.id, key, draft, uow.now());
     let id = t.id;
@@ -159,9 +180,7 @@ pub fn edit<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, patch: TicketPatch)
     if patch.title.as_deref().is_some_and(|v| v.trim().is_empty()) {
         return Err(AppError::bad_request("ticket title is empty"));
     }
-    if let Some(designs) = &patch.designs {
-        toknila_core::design::check_refs(designs).map_err(AppError::bad_request)?;
-    }
+    patch.design_refs().map_err(AppError::bad_request)?;
     if let Some(m) = &patch.model {
         toknila_core::Project::clean_model(m).map_err(AppError::bad_request)?;
     }

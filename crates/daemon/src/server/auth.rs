@@ -5,14 +5,18 @@
 //! [`AGENT_ROUTES`], for its own ticket; everything else, including every route added later, is
 //! refused with `403` until it is listed there on purpose. A planner's token (its role says so)
 //! reaches [`PLANNER_ROUTES`] and nothing else, so it cannot start, pause, resume, cancel,
-//! accept, return, reopen or merge anything: those routes are not on the list.
+//! accept, return, reopen or merge anything: those routes are not on the list. On a listed route,
+//! what the caller may do to what is core's `access::may` ([`Principal::caller`]), asked by the
+//! use case; no handler holds a rule of its own.
 
 use axum::Json;
 use axum::extract::{MatchedPath, Request, State};
 use axum::http::{Method, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use toknila_app::{AppError, AppResult, agent};
+use toknila_app::AppResult;
+use toknila_app::access::{self, Action, Caller};
+use toknila_core::access::{self as rule, Refusal, Target};
 use toknila_core::agent::AgentEvent;
 use toknila_core::{AgentRole, ProjectId, RunId, Ticket, planner};
 
@@ -32,10 +36,32 @@ pub const AGENT_ROUTES: [&str; 6] = [
     "/v1/usage/quota",
 ];
 
-/// The only routes a planner's token may call, as `(method, path)`. Each acts on the planner's own
-/// project, which the token names, so no path carries a project. Every route here runs a use case
-/// of `toknila_app::planner`, which checks the scope again.
-pub const PLANNER_ROUTES: [(&str, &str); 20] = [
+/// The only routes a planner's token may call, as `(method, path)`: the person's routes of the
+/// actions a planner has (TOKNILA-149), its own voice (`say`) and turn (`activity`), and, for one
+/// release, its old `/planner/...` routes as deprecated aliases. Every route here runs a use case
+/// that asks core's `access::may` as the caller the token names, so a planner reaches only its
+/// own project and only what its limits allow; nothing here starts, accepts or merges.
+pub const PLANNER_ROUTES: [(&str, &str); 40] = [
+    ("GET", "/v1/projects/{project}/plan"),
+    ("GET", "/v1/projects/{project}/plan/overview"),
+    ("GET", "/v1/projects/{project}/designs/{design}"),
+    ("GET", "/v1/chains/{chain}"),
+    ("GET", "/v1/chains/{chain}/plan"),
+    ("GET", "/v1/tickets/{ticket}/plan"),
+    ("POST", "/v1/projects/{project}/design-pins"),
+    ("POST", "/v1/projects/{project}/chains"),
+    ("PATCH", "/v1/chains/{chain}"),
+    ("POST", "/v1/chains/{chain}/tickets"),
+    ("PATCH", "/v1/tickets/{ticket}"),
+    ("POST", "/v1/tickets/{ticket}/show"),
+    ("PUT", "/v1/projects/{project}/suggestion"),
+    ("POST", "/v1/chains/{chain}/edges"),
+    ("DELETE", "/v1/chains/{chain}/edges"),
+    ("POST", "/v1/chains/{chain}/tickets/{ticket}/move"),
+    ("POST", "/v1/tickets/{ticket}/move-to-chain"),
+    ("POST", "/v1/tickets/{ticket}/threads"),
+    ("POST", "/v1/tickets/{ticket}/threads/{thread}/messages"),
+    ("POST", "/v1/tickets/{ticket}/threads/{thread}/versions"),
     ("POST", "/v1/planner/activity"),
     ("POST", "/v1/planner/say"),
     ("GET", "/v1/planner/plan"),
@@ -58,8 +84,9 @@ pub const PLANNER_ROUTES: [(&str, &str); 20] = [
     ("POST", "/v1/planner/cards/{card}/threads/{thread}/versions"),
 ];
 
-/// Who is calling, as the token says. Handlers of agent routes check [`Principal::owns`] and, for
-/// events, [`Principal::may_send`].
+/// Who is calling, as the token says. What it may do is core's `access::may`, asked through
+/// [`Principal::caller`] by the use cases and, for a story's run, by [`Principal::owns`] and
+/// [`Principal::may_send`].
 #[derive(Debug, Clone, Copy)]
 pub enum Principal {
     /// The person's token.
@@ -69,25 +96,32 @@ pub enum Principal {
 }
 
 impl Principal {
+    /// The caller the access rule knows: the person, a project's planner, or a story's run.
+    pub fn caller(&self) -> Caller {
+        match self {
+            Principal::Person => Caller::Person,
+            Principal::Agent(grant) if grant.role == AgentRole::Planner => {
+                Caller::Planner(planner::project_of(grant.ticket))
+            }
+            Principal::Agent(grant) => Caller::Card {
+                ticket: grant.ticket,
+                role: grant.role,
+            },
+        }
+    }
+
     /// An agent may act on its own ticket only; a person on any.
     pub fn owns(&self, ticket: &Ticket) -> AppResult<()> {
-        match self {
-            Principal::Person => Ok(()),
-            Principal::Agent(grant) => agent::ensure_granted(grant.ticket, ticket),
-        }
+        access::on_run_story(&self.caller(), &Action::RunSignal, ticket)
     }
 
     /// The project a planner's token works on. Only a planner has one: a person uses the project
     /// routes, and a card's agent has its ticket.
     pub fn planner_project(&self) -> AppResult<ProjectId> {
-        match self {
-            Principal::Agent(grant) if grant.role == AgentRole::Planner => {
-                Ok(planner::project_of(grant.ticket))
-            }
-            _ => Err(AppError::forbidden(
-                "these routes are for a project's planner",
-            )),
-        }
+        Ok(self
+            .caller()
+            .planner_project()
+            .ok_or(Refusal::PlannerOnly)?)
     }
 
     /// The project and the run of a planner's token; anyone else is refused as in
@@ -96,31 +130,17 @@ impl Principal {
         let project = self.planner_project()?;
         match self {
             Principal::Agent(grant) => Ok((project, grant.run)),
-            Principal::Person => Err(AppError::forbidden(
-                "these routes are for a project's planner",
-            )),
+            Principal::Person => Err(Refusal::PlannerOnly.into()),
         }
     }
 
     /// What an agent may report depends on its role: a worker reports its work, a reviewer
     /// only gives its verdict on it. A person may send any event (a simulated agent is one).
     pub fn may_send(&self, event: &AgentEvent) -> AppResult<()> {
-        let Principal::Agent(grant) = self else {
-            return Ok(());
+        let report = Action::SendEvent {
+            verdict: event.is_review_verdict(),
         };
-        match (grant.role, event.is_review_verdict()) {
-            (AgentRole::Reviewer, true) | (AgentRole::Worker, false) => Ok(()),
-            (AgentRole::Reviewer, false) => Err(AppError::forbidden(
-                "a reviewer agent may only send its review_verdict",
-            )),
-            (AgentRole::Planner, false) => Err(AppError::forbidden(
-                "a planner may not send story events; it plans through its own tools",
-            )),
-            (_, true) => Err(AppError::forbidden(
-                "only the reviewer agent may send a review_verdict",
-            )),
-            (AgentRole::Release, false) => Ok(()),
-        }
+        Ok(rule::may(&self.caller(), &report, &Target::default())?)
     }
 }
 

@@ -14,18 +14,6 @@ use crate::{
     AppError, AppResult, UnitOfWork, checks, projects, reviews, threads, wildcards, with_chain,
 };
 
-/// An agent holds a grant for one ticket and acts on that ticket only.
-pub fn ensure_granted(granted: TicketId, t: &Ticket) -> AppResult<()> {
-    if granted == t.id {
-        Ok(())
-    } else {
-        Err(AppError::forbidden(format!(
-            "this agent works on another ticket, not {}",
-            t.key
-        )))
-    }
-}
-
 /// Applies one event an agent reported about `t`. Returns the ticket the answer is about: `t`,
 /// or the new card for `propose`.
 pub fn ticket_event<U: UnitOfWork + ?Sized>(

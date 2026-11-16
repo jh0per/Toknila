@@ -6,7 +6,8 @@ use toknila_core::conversation::{self, About};
 use toknila_core::events::DomainEvent;
 use toknila_core::suggestion::{self, Suggestion, SuggestionAction};
 
-use super::card;
+use super::card_for;
+use crate::access::{self, Action, Caller};
 use crate::{AppError, AppResult, UnitOfWork};
 
 /// What the planner says as its next step.
@@ -33,10 +34,11 @@ pub fn suggest<U: UnitOfWork + ?Sized>(
     let p = uow
         .project(project)?
         .ok_or_else(|| AppError::not_found(format!("project {project}")))?;
+    access::on_project(&*uow, &Caller::Planner(project), &Action::Speak, project)?;
     let ticket = new
         .card
         .as_deref()
-        .map(|r| card(&*uow, project, r))
+        .map(|r| card_for(&*uow, project, r, &Action::Speak))
         .transpose()?;
     suggestion::check(&new.text, new.action, ticket.as_ref())
         .map_err(|e| AppError::bad_request(e.to_string()))?;

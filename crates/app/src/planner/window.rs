@@ -3,7 +3,7 @@
 use toknila_core::events::DomainEvent;
 use toknila_core::{ProjectId, Ticket};
 
-use super::card;
+use crate::access::Caller;
 use crate::{AppError, AppResult, UnitOfWork};
 
 /// Asks the window to show a card of the planner's project: one `window.show_card` event, no
@@ -13,20 +13,7 @@ pub fn show_card<U: UnitOfWork + ?Sized>(
     project: ProjectId,
     reference: &str,
 ) -> AppResult<Ticket> {
-    let t = card(&*uow, project, reference)?;
-    let chain = uow
-        .chain(t.chain_id)?
-        .ok_or_else(|| AppError::not_found(format!("epic of {}", t.key)))?;
-    let p = uow
-        .project(project)?
-        .ok_or_else(|| AppError::not_found(format!("project {project}")))?;
-    uow.emit(&DomainEvent::WindowShowCard {
-        project,
-        project_key: p.key,
-        chain: chain.name,
-        ticket: t.key.clone(),
-    })?;
-    Ok(t)
+    crate::as_caller::show_story(uow, &Caller::Planner(project), reference)
 }
 
 /// The planner's turn started (`working`) or ended: one `planner.turn` event, so every open

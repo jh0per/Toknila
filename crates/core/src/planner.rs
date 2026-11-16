@@ -1,7 +1,7 @@
 //! The planner: a project's main agent. It plans (chains, cards, dependencies, threads) and
 //! starts, pauses, resumes, cancels, accepts, returns, reopens and merges nothing; those stay
-//! with the owner. Pure rules only; the application orders them into commands and the daemon
-//! decides which routes a planner's token reaches.
+//! with the owner. Pure rules only: [`crate::access::may`] applies them to a planner's calls, and
+//! the daemon decides which routes a planner's token reaches.
 //!
 //! A planner run belongs to a project, not to a card, but the runner machinery is keyed by card
 //! ids. A planner run is therefore keyed by [`run_key`], its project's id read as a card id; ids
@@ -21,40 +21,9 @@ pub fn project_of(run_key: TicketId) -> ProjectId {
     ProjectId(run_key.0)
 }
 
-/// Why a planner may not do what it asked.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum Refusal {
-    /// The thing belongs to another project than the planner's.
-    #[error("{what} belongs to another project; this planner works on {project} only")]
-    OtherProject { what: String, project: String },
-    /// A change of the graph in a chain that starts its cards by itself could start one.
-    #[error(
-        "epic {chain} starts its ready stories by itself (autostart), so changing its stories' \
-         order or dependencies could start work, and only the owner starts stories. Ask the owner \
-         to turn autostart off, or plan in a new epic"
-    )]
-    AutostartChain { chain: String },
-    /// The card's agent has its prompt already, or the card is done.
-    #[error(
-        "{card} is {status}; the planner edits only stories that have not started. Tell the owner \
-         what should change, or open a thread on the story"
-    )]
-    CardStarted { card: String, status: String },
-    /// On the roadmap the planner changes the top level; stories go only to an epic it made in
-    /// this turn or one the person named.
-    #[error(
-        "the person is on the roadmap, where you change epics; stories of epic {chain} are not \
-         yours to change now. Add stories only to the epic you made in this turn or one the \
-         person named, or ask them to open epic {chain}"
-    )]
-    RoadmapStory { chain: String },
-    /// A planner reads the repository, so the project needs one.
-    #[error("project {0} has no repository for the planner to read")]
-    NoRepository(String),
-    /// An archived project runs no agents.
-    #[error("project {0} is archived")]
-    Archived(String),
-}
+/// Why a planner may not do what it asked: the refusals of [`crate::access`], whose
+/// [`may`](crate::access::may) is the one place that applies the rules below.
+pub use crate::access::Refusal;
 
 /// Whether a thing of project `owner` is in the planner's project.
 pub fn ensure_in_project(

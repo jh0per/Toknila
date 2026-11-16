@@ -133,6 +133,16 @@ pub struct MoveToChain {
     pub place: Option<MoveInput>,
 }
 
+/// The query of `POST /v1/tickets/{ticket}/move-to-chain`.
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct MoveFrom {
+    /// The epic (id or name) the caller says the card is in now; the move is refused when it is
+    /// not.
+    #[serde(default)]
+    pub from: Option<String>,
+}
+
 /// `POST /v1/planner/chains/{chain}/cards/{card}/move`: the planner puts a card next to another
 /// of its epic, or moves it to another epic (`to_chain`: at the end unless `anchor` and `place`
 /// say where).

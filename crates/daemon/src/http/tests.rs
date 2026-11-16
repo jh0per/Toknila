@@ -33,6 +33,7 @@ mod parallel;
 mod pins;
 mod planner;
 mod planner_roadmap;
+mod planner_routes;
 mod planning;
 mod plans;
 mod prepare;
@@ -992,6 +993,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/edges/move",
             "/chains/{chain}/export",
             "/chains/{chain}/move",
+            "/chains/{chain}/plan",
             "/chains/{chain}/release",
             "/chains/{chain}/release/mark",
             "/chains/{chain}/releases",
@@ -1038,6 +1040,8 @@ async fn openapi_describes_every_route() {
             "/projects/{project}/import-path",
             "/projects/{project}/inbox",
             "/projects/{project}/next-version",
+            "/projects/{project}/plan",
+            "/projects/{project}/plan/overview",
             "/projects/{project}/planner",
             "/projects/{project}/planner/input",
             "/projects/{project}/planner/scrollback",
@@ -1075,11 +1079,13 @@ async fn openapi_describes_every_route() {
             "/tickets/{ticket}/leftovers/{action}",
             "/tickets/{ticket}/move-to-chain",
             "/tickets/{ticket}/permission",
+            "/tickets/{ticket}/plan",
             "/tickets/{ticket}/pre-tool",
             "/tickets/{ticket}/runner/answer",
             "/tickets/{ticket}/runner/input",
             "/tickets/{ticket}/runner/scrollback",
             "/tickets/{ticket}/runner/size",
+            "/tickets/{ticket}/show",
             "/tickets/{ticket}/subtasks",
             "/tickets/{ticket}/subtasks/{position}",
             "/tickets/{ticket}/threads",

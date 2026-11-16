@@ -350,7 +350,7 @@ fn the_planner_tools_edit_the_plan_through_the_daemon_and_stop_at_the_owners_cal
     let answers = mcp_session(
         &tok.info().base_url(),
         &token,
-        &[("TOKNILA_ROLE", "planner")],
+        &[("TOKNILA_ROLE", "planner"), ("TOKNILA_PROJECT", "DEMO")],
         &lines,
     );
     lines.clear();
@@ -593,7 +593,7 @@ fn show_plan_without_arguments_stays_small_for_a_project_of_a_hundred_big_cards(
     let answers = mcp_session(
         &tok.info().base_url(),
         &token,
-        &[("TOKNILA_ROLE", "planner")],
+        &[("TOKNILA_ROLE", "planner"), ("TOKNILA_PROJECT", "DEMO")],
         &lines,
     );
     let by_id = |id: u64| {
@@ -679,7 +679,7 @@ fn show_design_gives_the_picture_of_a_design_added_after_the_planner_started() {
     let answers = mcp_session(
         &info.base_url(),
         &token,
-        &[("TOKNILA_ROLE", "planner")],
+        &[("TOKNILA_ROLE", "planner"), ("TOKNILA_PROJECT", "DEMO")],
         &[
             call(1, "show_design", json!({ "design": "late.png" })),
             call(2, "show_design", json!({ "design": "Checkout" })),
@@ -733,7 +733,7 @@ fn a_card_takes_the_model_the_assistant_names_and_a_key_no_tool_takes_is_refused
     let answers = mcp_session(
         &info.base_url(),
         &token,
-        &[("TOKNILA_ROLE", "planner")],
+        &[("TOKNILA_ROLE", "planner"), ("TOKNILA_PROJECT", "DEMO")],
         &[
             call(1, "new_chain", json!({ "name": "m" })),
             call(
@@ -785,5 +785,59 @@ fn a_card_takes_the_model_the_assistant_names_and_a_key_no_tool_takes_is_refused
         assert_eq!(by_id(id)["result"]["isError"], true, "{}", by_id(id));
         assert!(text_of(by_id(id)).contains(key), "{}", text_of(by_id(id)));
     }
+    tok.run(&["planner", "stop", "DEMO"]);
+}
+
+/// `move_card` with `to_chain` goes through the person's move to another epic and answers the
+/// epic the card went to, as it did on the planner's old route; a card not in the epic the tool
+/// names stays where it is.
+#[test]
+fn move_card_to_another_epic_answers_that_epic_and_refuses_a_card_named_in_the_wrong_one() {
+    let (_dir, tok, _) = setup(&["env", "TOKNILA_RUN_TOKEN", "hold"]);
+    tok.run(&["planner", "start", "DEMO", "--profile", "fake-planner"]);
+    wait_for(&tok, "the token line", || {
+        planner_logs(&tok).contains("TOKNILA_RUN_TOKEN=")
+    });
+    let token = planner_logs(&tok)
+        .lines()
+        .find_map(|l| {
+            l.trim()
+                .strip_prefix("TOKNILA_RUN_TOKEN=")
+                .map(str::to_owned)
+        })
+        .expect("token");
+    let answers = mcp_session(
+        &tok.info().base_url(),
+        &token,
+        &[("TOKNILA_ROLE", "planner"), ("TOKNILA_PROJECT", "DEMO")],
+        &[
+            call(1, "new_chain", json!({ "name": "here" })),
+            call(2, "new_chain", json!({ "name": "there" })),
+            call(3, "add_card", json!({ "chain": "here", "title": "One" })),
+            call(4, "add_card", json!({ "chain": "there", "title": "Two" })),
+            call(
+                5,
+                "move_card",
+                json!({ "chain": "here", "card": "DEMO-1", "to_chain": "there",
+                        "anchor": "DEMO-2", "place": "before" }),
+            ),
+            call(
+                6,
+                "move_card",
+                json!({ "chain": "here", "card": "DEMO-1", "to_chain": "here" }),
+            ),
+        ],
+    );
+    let by_id = |id: u64| answers.iter().find(|a| a["id"] == id).expect("answer");
+    for id in [1, 2, 3, 4, 5] {
+        assert_eq!(by_id(id)["result"]["isError"], false, "{}", by_id(id));
+    }
+    assert_eq!(text_of(by_id(5)), "epic there: DEMO-1 < DEMO-2");
+    assert_eq!(by_id(6)["result"]["isError"], true, "{}", by_id(6));
+    assert!(
+        text_of(by_id(6)).contains("DEMO-1 is not in epic here"),
+        "{}",
+        text_of(by_id(6))
+    );
     tok.run(&["planner", "stop", "DEMO"]);
 }

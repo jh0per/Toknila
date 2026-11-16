@@ -26,8 +26,8 @@ mod workspaces;
 pub use agents::{ProjectAgents, QueuedCard};
 pub use card_size::{CARD_MAX_H, CARD_MAX_W, CARD_MIN_W, SizeLimits, clamp_size};
 pub use chains::{
-    ChainDetail, ChainItem, DesignMoveInput, EdgeInput, EdgeMoveInput, MoveInput, MoveToChain,
-    PlannerMove, ReleaseMember,
+    ChainDetail, ChainItem, DesignMoveInput, EdgeInput, EdgeMoveInput, MoveFrom, MoveInput,
+    MoveToChain, PlannerMove, ReleaseMember,
 };
 pub use conversation::ConversationQuery;
 pub use designs::{
@@ -68,6 +68,7 @@ pub use toknila_app::tickets::{NewComment, NewTicket};
 pub use toknila_app::wildcards::NewWildcard;
 pub use toknila_core::TicketPatch as PatchTicket;
 pub use toknila_core::agent::{AgentEvent, Proposal, ReleaseEvent};
+pub use toknila_core::design::DesignPick;
 pub use toknila_core::design::pin::DesignPin;
 pub use toknila_core::planner::turn::Signal as PlannerSignal;
 pub use toknila_core::plans::{FoundPlan, PlanKind, PlanScan, WorkingCopyBehind};

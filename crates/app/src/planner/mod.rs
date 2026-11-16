@@ -1,8 +1,9 @@
 //! The planner: a project's main agent, as use cases. Each command here is one the planner's MCP
 //! tools call, scoped to the planner's own project: a chain or card of another project is
 //! refused (`403`), and so is anything that could start a card. It goes through the same use
-//! cases as the window and the CLI (`chains`, `tickets`, `threads`), so core's rules apply; this
-//! module adds the scope, and `toknila_core::planner` holds the rules of what a planner may do.
+//! cases as the window and the CLI (`chains`, `tickets`, `threads`), so core's rules apply; what
+//! a planner may do is asked of [`crate::access`] as `Caller::Planner`, whose rule is core's
+//! `access::may`.
 //!
 //! The planner's own run (start, stop, input, size) is here too: a project has at most one.
 
@@ -14,12 +15,12 @@ mod suggest;
 mod window;
 mod with_designs;
 
-use crate::conversation as conv;
+use crate::access::{self, Action, Caller};
+use crate::as_caller;
 use serde::{Deserialize, Serialize};
-use toknila_core::conversation::{self, About};
 use toknila_core::instructions::ProjectFacts;
 use toknila_core::machine::person_only;
-use toknila_core::planner::{self, Refusal};
+use toknila_core::planner;
 use toknila_core::{
     Actor, AgentProfile, AgentRole, BaseBehind, Chain, ChainId, EdgeKind, PlannerSite, Project,
     ProjectId, Thread, ThreadKind, Ticket, TicketKey,
@@ -37,63 +38,43 @@ pub use window::{show_card, turn};
 pub use with_designs::{request_with, start_with};
 
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError, Started};
-use crate::{AppError, AppResult, ErrorKind, Reader, UnitOfWork, chains, resolve, threads};
+use crate::{AppError, AppResult, ErrorKind, Reader, UnitOfWork, chains, resolve};
 
-impl From<Refusal> for AppError {
-    fn from(r: Refusal) -> Self {
-        let kind = match r {
-            Refusal::OtherProject { .. }
-            | Refusal::AutostartChain { .. }
-            | Refusal::RoadmapStory { .. }
-            | Refusal::CardStarted { .. } => ErrorKind::Forbidden,
-            Refusal::NoRepository(_) | Refusal::Archived(_) => ErrorKind::Conflict,
-        };
-        AppError::new(kind, r.to_string())
-    }
+/// A chain of the planner's project by id or name, for `action`. A chain of another project is
+/// refused, one that does not exist is not found.
+pub(crate) fn chain_for<R: Reader + ?Sized>(
+    r: &R,
+    project: ProjectId,
+    reference: &str,
+    action: &Action,
+) -> AppResult<Chain> {
+    let caller = Caller::Planner(project);
+    let c = access::chain(r, &caller, None, reference)?;
+    access::on_epic(r, &caller, action, &c)?;
+    Ok(c)
+}
+
+/// A card of the planner's project by id, key or title, for `action`.
+pub(crate) fn card_for<R: Reader + ?Sized>(
+    r: &R,
+    project: ProjectId,
+    reference: &str,
+    action: &Action,
+) -> AppResult<Ticket> {
+    let t = resolve::ticket(r, reference)?;
+    access::on_story(r, &Caller::Planner(project), action, &t)?;
+    Ok(t)
 }
 
 /// A chain of the planner's project by id or name. A chain of another project is refused, one
 /// that does not exist is not found.
 pub fn chain<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> AppResult<Chain> {
-    if let Ok(id) = reference.parse::<ChainId>()
-        && let Some(c) = r.chain(id)?
-    {
-        return in_project(r, project, c);
-    }
-    if let Some(c) = r.chain_by_name(project, reference)? {
-        return Ok(c);
-    }
-    // A name that only another project has is that project's chain.
-    match r.chains_named(reference)?.into_iter().next() {
-        Some(c) => in_project(r, project, c),
-        None => Err(AppError::not_found(format!("epic {reference}"))),
-    }
-}
-
-fn in_project<R: Reader + ?Sized>(r: &R, project: ProjectId, c: Chain) -> AppResult<Chain> {
-    let owner = r
-        .project(c.project_id)?
-        .map_or_else(String::new, |p| p.key.to_string());
-    planner::ensure_in_project(project, c.project_id, format!("epic {}", c.name), &owner)?;
-    Ok(c)
+    chain_for(r, project, reference, &Action::ReadPlan)
 }
 
 /// A card of the planner's project by id, key or title.
 pub fn card<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> AppResult<Ticket> {
-    let t = resolve::ticket(r, reference)?;
-    let chain = r
-        .chain(t.chain_id)?
-        .ok_or_else(|| AppError::not_found(format!("epic of {}", t.key)))?;
-    let owner = r
-        .project(chain.project_id)?
-        .map_or_else(String::new, |p| p.key.to_string());
-    planner::ensure_in_project(
-        project,
-        chain.project_id,
-        format!("story {}", t.key),
-        &owner,
-    )?;
-    Ok(t)
+    card_for(r, project, reference, &Action::ReadPlan)
 }
 
 /// What the planner may give for a new chain; a chain it makes never starts cards by itself.
@@ -118,37 +99,27 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
     project: ProjectId,
     input: NewPlanChain,
 ) -> AppResult<ChainId> {
-    let title = crate::epic::clean_title(input.title.as_deref());
-    let name = match input
-        .name
-        .as_deref()
-        .map(str::trim)
-        .filter(|n| !n.is_empty())
-    {
-        Some(n) => n.to_owned(),
-        None => match &title {
-            Some(t) => crate::epic::unique_name(uow, project, t)?,
-            None => return Err(AppError::bad_request("an epic needs a title")),
-        },
-    };
-    let input = chains::NewChain {
-        name: Some(name),
-        title,
-        goal: input.goal,
-        autostart: Some(planner::NEW_CHAIN_AUTOSTART),
-        review_mode: None,
-        reviewer: None,
-        version: input.version,
-    };
-    let id = chains::create(uow, &project.to_string(), input)?;
-    if let Some(c) = uow.chain(id)? {
-        let version = uow
-            .chain_view(id)?
-            .and_then(|v| v.finish_release().map(|r| r.version.clone()));
-        let text = conversation::added_chain(&c.display_title(), version.as_deref());
-        conv::line(uow, project, text, Some(About::chain_of(&c)))?;
+    as_caller::new_epic(
+        uow,
+        &Caller::Planner(project),
+        &project.to_string(),
+        input.into(),
+    )
+}
+
+impl From<NewPlanChain> for chains::NewChain {
+    /// The person's new epic with the planner's fields; the planner's caller sets autostart off.
+    fn from(input: NewPlanChain) -> Self {
+        chains::NewChain {
+            name: input.name,
+            title: input.title,
+            goal: input.goal,
+            autostart: None,
+            review_mode: None,
+            reviewer: None,
+            version: input.version,
+        }
     }
-    Ok(id)
 }
 
 /// What the planner may change on an epic: a field left out is kept.
@@ -171,31 +142,20 @@ pub fn edit_chain<U: UnitOfWork + ?Sized>(
     chain_ref: &str,
     edit: EditPlanChain,
 ) -> AppResult<ChainId> {
-    let c = chain(uow, project, chain_ref)?;
-    let view = uow
-        .chain_view(c.id)?
-        .ok_or_else(|| AppError::not_found(format!("epic {chain_ref}")))?;
-    if let Some(r) = view.finish_release()
-        && r.state != toknila_core::ReleaseState::Planned
-    {
-        return Err(AppError::conflict(format!(
-            "release {} of epic {} is cut or released: the epic can no longer change",
-            r.version, c.name
-        )));
+    as_caller::edit_epic(uow, &Caller::Planner(project), chain_ref, None, edit.into())
+}
+
+impl From<EditPlanChain> for chains::ChainSettings {
+    /// The person's epic settings with the planner's fields; the rest is kept.
+    fn from(edit: EditPlanChain) -> Self {
+        chains::ChainSettings {
+            name: edit.name,
+            title: edit.title,
+            goal: edit.goal,
+            version: edit.version,
+            ..Default::default()
+        }
     }
-    let settings = crate::epic::ChainSettings {
-        name: edit.name,
-        title: edit.title,
-        goal: edit.goal,
-        version: edit.version,
-        ..Default::default()
-    };
-    let id = crate::epic::set_settings(uow, &c.id.to_string(), None, settings)?;
-    // The chain as it is now: an edit may have renamed it.
-    let now = uow.chain(id)?.unwrap_or(c);
-    let text = conversation::edited_chain(&now.display_title());
-    conv::line(uow, project, text, Some(About::chain_of(&now)))?;
-    Ok(id)
 }
 
 /// Makes `to` wait for `from` in a chain of the planner's project.
@@ -206,9 +166,8 @@ pub fn add_dependency<U: UnitOfWork + ?Sized>(
     from: &str,
     to: &str,
 ) -> AppResult<ChainId> {
-    let c = chain(uow, project, chain_ref)?;
-    planner::ensure_graph_change(&c)?;
-    chains::add_edge(uow, &c.id.to_string(), from, to, EdgeKind::Normal)
+    let caller = Caller::Planner(project);
+    as_caller::add_dependency(uow, &caller, chain_ref, (from, to), EdgeKind::Normal)
 }
 
 /// Removes the wait of `to` for `from`.
@@ -219,9 +178,7 @@ pub fn remove_dependency<U: UnitOfWork + ?Sized>(
     from: &str,
     to: &str,
 ) -> AppResult<ChainId> {
-    let c = chain(uow, project, chain_ref)?;
-    planner::ensure_graph_change(&c)?;
-    chains::remove_edge(uow, &c.id.to_string(), from, to)
+    as_caller::remove_dependency(uow, &Caller::Planner(project), chain_ref, (from, to))
 }
 
 /// Puts a card directly before or after another in a chain of the planner's project.
@@ -233,9 +190,8 @@ pub fn move_card<U: UnitOfWork + ?Sized>(
     anchor: &str,
     place: toknila_core::graph::Place,
 ) -> AppResult<ChainId> {
-    let c = chain(uow, project, chain_ref)?;
-    planner::ensure_graph_change(&c)?;
-    chains::move_ticket(uow, &c.id.to_string(), card_ref, anchor, place)
+    let caller = Caller::Planner(project);
+    as_caller::move_story(uow, &caller, chain_ref, card_ref, (anchor, place))
 }
 
 /// Opens a thread on a card of the planner's project.
@@ -246,11 +202,7 @@ pub fn open_thread<U: UnitOfWork + ?Sized>(
     kind: ThreadKind,
     title: &str,
 ) -> AppResult<(Ticket, Thread)> {
-    let t = card(uow, project, card_ref)?;
-    let th = threads::open(uow, &t, kind, title)?;
-    let text = conversation::opened_thread(th.number, &t.key);
-    conv::line_about_card(uow, project, text, t.key.clone())?;
-    Ok((t, th))
+    as_caller::open_thread(uow, &Caller::Planner(project), card_ref, kind, title)
 }
 
 /// A thread of a card of the planner's project, by number or id.
@@ -260,9 +212,7 @@ pub fn thread<R: Reader + ?Sized>(
     card_ref: &str,
     thread_ref: &str,
 ) -> AppResult<(Ticket, Thread)> {
-    let t = card(r, project, card_ref)?;
-    let th = threads::find(r, &t, thread_ref)?;
-    Ok((t, th))
+    as_caller::thread(r, &Caller::Planner(project), card_ref, thread_ref)
 }
 
 /// What a project's planner run is told about the project.

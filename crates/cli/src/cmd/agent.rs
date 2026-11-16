@@ -14,6 +14,17 @@ pub(super) struct AgentEnv {
     pub ticket: String,
     /// What the run is: the ticket's worker, the reviewer next to it, or a project's planner.
     pub role: AgentRole,
+    /// Key of a planner's project, which its tools name in the person's routes; only `tok mcp`
+    /// of a planner needs it (see [`AgentEnv::project`]).
+    project: Option<String>,
+}
+
+/// What a planner's tool answers when its run names no project.
+fn no_project() -> String {
+    format!(
+        "{} is not set: this command runs inside a Toknila agent",
+        agent_env::PROJECT
+    )
 }
 
 impl AgentEnv {
@@ -42,6 +53,12 @@ impl AgentEnv {
                 var(agent_env::TICKET)?
             },
             role,
+            project: var(agent_env::PROJECT).ok(),
         })
+    }
+
+    /// The planner's project, or the sentence its tools answer when the run names none.
+    pub fn project(&self) -> Result<&str, String> {
+        self.project.as_deref().ok_or_else(no_project)
     }
 }

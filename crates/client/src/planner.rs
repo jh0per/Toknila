@@ -2,10 +2,10 @@
 //! itself (a client with its run token) reads and edits the plan.
 
 use toknila_api_types::{
-    CardEdit, ChainDetail, ConversationPage, DesignPin, EdgeInput, EditPlanChain, NewCard,
-    NewMessage, NewPlanChain, NewSuggestion, NewThread, NewVersion, PlanCard, PlanChain,
-    PlannerActivity, PlannerDesign, PlannerMove, PlannerOverview, PlannerPlan, PlannerState, Say,
-    StartPlanner, TerminalSize, ThreadDetail, TicketDetail,
+    CardEdit, ChainDetail, ChainSettings, ConversationPage, DesignPin, EdgeInput, EditPlanChain,
+    MoveInput, MoveToChain, NewCard, NewChain, NewMessage, NewPlanChain, NewSuggestion, NewThread,
+    NewVersion, PlanCard, PlanChain, PlannerActivity, PlannerDesign, PlannerOverview, PlannerPlan,
+    PlannerState, Say, StartPlanner, TerminalSize, ThreadDetail, TicketDetail,
 };
 use toknila_core::RunId;
 use toknila_core::conversation::Message;
@@ -84,36 +84,43 @@ impl Client {
         )
     }
 
-    // ---- the planner plans, with its run token ----
+    // ---- the planner plans, with its run token, on the person's routes (TOKNILA-149) ----
 
-    /// `GET /planner/plan`.
-    pub fn planner_plan(&self) -> ClientResult<PlannerPlan> {
-        self.call("GET", "/planner/plan", NO_BODY)
+    /// `GET /projects/{project}/plan`.
+    pub fn planner_plan(&self, project: &str) -> ClientResult<PlannerPlan> {
+        self.call("GET", &format!("/projects/{}/plan", enc(project)), NO_BODY)
     }
 
-    /// `GET /planner/overview`: the plan in short records, at any size.
-    pub fn planner_overview(&self) -> ClientResult<PlannerOverview> {
-        self.call("GET", "/planner/overview", NO_BODY)
+    /// `GET /projects/{project}/plan/overview`: the plan in short records, at any size.
+    pub fn planner_overview(&self, project: &str) -> ClientResult<PlannerOverview> {
+        let path = format!("/projects/{}/plan/overview", enc(project));
+        self.call("GET", &path, NO_BODY)
     }
 
-    /// `GET /planner/chains/{chain}`: one chain with every card in full.
+    /// `GET /chains/{chain}/plan`: one chain with every card in full.
     pub fn planner_chain(&self, chain: &str) -> ClientResult<PlanChain> {
-        self.call("GET", &format!("/planner/chains/{}", enc(chain)), NO_BODY)
+        self.call("GET", &format!("/chains/{}/plan", enc(chain)), NO_BODY)
     }
 
-    /// `GET /planner/cards/{card}`: one card in full.
+    /// `GET /tickets/{card}/plan`: one card in full.
     pub fn planner_card(&self, card: &str) -> ClientResult<PlanCard> {
-        self.call("GET", &format!("/planner/cards/{}", enc(card)), NO_BODY)
+        self.call("GET", &format!("/tickets/{}/plan", enc(card)), NO_BODY)
     }
 
-    /// `GET /planner/designs/{design}`.
-    pub fn planner_design(&self, design: &str) -> ClientResult<PlannerDesign> {
-        self.call("GET", &format!("/planner/designs/{}", enc(design)), NO_BODY)
+    /// `GET /projects/{project}/designs/{design}`.
+    pub fn planner_design(&self, project: &str, design: &str) -> ClientResult<PlannerDesign> {
+        let path = format!("/projects/{}/designs/{}", enc(project), enc(design));
+        self.call("GET", &path, NO_BODY)
     }
 
-    /// `POST /planner/pins`.
-    pub fn planner_pin(&self, pin: &toknila_api_types::NewDesignPin) -> ClientResult<DesignPin> {
-        self.call("POST", "/planner/pins", Some(pin))
+    /// `POST /projects/{project}/design-pins`.
+    pub fn planner_pin(
+        &self,
+        project: &str,
+        pin: &toknila_api_types::NewDesignPin,
+    ) -> ClientResult<DesignPin> {
+        let path = format!("/projects/{}/design-pins", enc(project));
+        self.call("POST", &path, Some(pin))
     }
 
     /// `GET /projects/{project}/design-pins`.
@@ -131,34 +138,38 @@ impl Client {
         self.call("POST", &path, Some(&body))
     }
 
-    /// `POST /planner/chains`.
-    pub fn planner_new_chain(&self, c: &NewPlanChain) -> ClientResult<ChainDetail> {
-        self.call("POST", "/planner/chains", Some(c))
+    /// `POST /projects/{project}/chains` with the planner's fields; its epic waits for the owner.
+    pub fn planner_new_chain(&self, project: &str, c: &NewPlanChain) -> ClientResult<ChainDetail> {
+        let path = format!("/projects/{}/chains", enc(project));
+        self.call("POST", &path, Some(&NewChain::from(c.clone())))
     }
 
-    /// `PATCH /planner/chains/{chain}`.
+    /// `PATCH /chains/{chain}` with the planner's fields.
     pub fn planner_edit_chain(&self, chain: &str, e: &EditPlanChain) -> ClientResult<ChainDetail> {
-        self.call("PATCH", &format!("/planner/chains/{}", enc(chain)), Some(e))
+        let settings = ChainSettings::from(e.clone());
+        self.call("PATCH", &format!("/chains/{}", enc(chain)), Some(&settings))
     }
 
-    /// `POST /planner/chains/{chain}/cards`.
+    /// `POST /chains/{chain}/tickets` with the planner's fields: at the end of the epic unless it
+    /// names what it waits for, its designs by file name or id.
     pub fn planner_add_card(&self, chain: &str, c: &NewCard) -> ClientResult<TicketDetail> {
-        let path = format!("/planner/chains/{}/cards", enc(chain));
-        self.call("POST", &path, Some(c))
+        let path = format!("/chains/{}/tickets", enc(chain));
+        self.call("POST", &path, Some(&c.clone().into_story()))
     }
 
-    /// `PATCH /planner/cards/{card}`.
+    /// `PATCH /tickets/{card}` with the planner's fields and checklist changes, in one command.
     pub fn planner_edit_card(&self, card: &str, e: &CardEdit) -> ClientResult<TicketDetail> {
-        self.call("PATCH", &format!("/planner/cards/{}", enc(card)), Some(e))
+        let patch = e.clone().into_story();
+        self.call("PATCH", &format!("/tickets/{}", enc(card)), Some(&patch))
     }
 
-    /// `POST /planner/chains/{chain}/edges`.
+    /// `POST /chains/{chain}/edges`.
     pub fn planner_add_dependency(&self, chain: &str, e: &EdgeInput) -> ClientResult<ChainDetail> {
-        let path = format!("/planner/chains/{}/edges", enc(chain));
+        let path = format!("/chains/{}/edges", enc(chain));
         self.call("POST", &path, Some(e))
     }
 
-    /// `DELETE /planner/chains/{chain}/edges`.
+    /// `DELETE /chains/{chain}/edges`.
     pub fn planner_remove_dependency(
         &self,
         chain: &str,
@@ -166,7 +177,7 @@ impl Client {
         to: &str,
     ) -> ClientResult<ChainDetail> {
         let path = format!(
-            "/planner/chains/{}/edges?from={}&to={}",
+            "/chains/{}/edges?from={}&to={}",
             enc(chain),
             enc(from),
             enc(to)
@@ -174,26 +185,47 @@ impl Client {
         self.call("DELETE", &path, NO_BODY)
     }
 
-    /// `POST /planner/chains/{chain}/cards/{card}/move`.
+    /// `POST /chains/{chain}/tickets/{card}/move`: puts `card` next to `at`'s anchor in its epic.
     pub fn planner_move_card(
         &self,
         chain: &str,
         card: &str,
-        m: &PlannerMove,
+        at: &MoveInput,
     ) -> ClientResult<ChainDetail> {
-        let path = format!("/planner/chains/{}/cards/{}/move", enc(chain), enc(card));
-        self.call("POST", &path, Some(m))
+        let path = format!("/chains/{}/tickets/{}/move", enc(chain), enc(card));
+        self.call("POST", &path, Some(at))
     }
 
-    /// `POST /planner/cards/{card}/show`.
+    /// `POST /tickets/{card}/move-to-chain?from={chain}`: moves `card` of epic `chain` to epic
+    /// `to`, at the end unless `place` says where; answers that epic (`GET /chains/{id}`).
+    pub fn planner_move_card_to(
+        &self,
+        chain: &str,
+        card: &str,
+        to: &str,
+        place: Option<MoveInput>,
+    ) -> ClientResult<ChainDetail> {
+        let path = format!("/tickets/{}/move-to-chain?from={}", enc(card), enc(chain));
+        let body = MoveToChain {
+            chain: to.to_owned(),
+            place,
+        };
+        let moved: TicketDetail = self.call("POST", &path, Some(&body))?;
+        let epic = moved.ticket.chain_id.to_string();
+        self.call("GET", &format!("/chains/{}", enc(&epic)), NO_BODY)
+    }
+
+    /// `POST /tickets/{card}/show`.
     pub fn planner_show_card(&self, card: &str) -> ClientResult<TicketDetail> {
-        let path = format!("/planner/cards/{}/show", enc(card));
+        let path = format!("/tickets/{}/show", enc(card));
         self.call("POST", &path, NO_BODY)
     }
 
-    /// `POST /planner/suggestion`: keeps the planner's next step, replacing the last one.
-    pub fn planner_suggest(&self, s: &NewSuggestion) -> ClientResult<Suggestion> {
-        self.call("POST", "/planner/suggestion", Some(s))
+    /// `PUT /projects/{project}/suggestion`: keeps the planner's next step, replacing the last
+    /// one.
+    pub fn planner_suggest(&self, project: &str, s: &NewSuggestion) -> ClientResult<Suggestion> {
+        let path = format!("/projects/{}/suggestion", enc(project));
+        self.call("PUT", &path, Some(s))
     }
 
     /// `POST /planner/say`: the planner says something to the person.
@@ -236,39 +268,31 @@ impl Client {
         self.call("GET", &path, NO_BODY)
     }
 
-    /// `POST /planner/cards/{card}/threads`.
+    /// `POST /tickets/{card}/threads`.
     pub fn planner_open_thread(&self, card: &str, t: &NewThread) -> ClientResult<ThreadDetail> {
-        let path = format!("/planner/cards/{}/threads", enc(card));
+        let path = format!("/tickets/{}/threads", enc(card));
         self.call("POST", &path, Some(t))
     }
 
-    /// `POST /planner/cards/{card}/threads/{thread}/messages`.
+    /// `POST /tickets/{card}/threads/{thread}/messages`.
     pub fn planner_thread_message(
         &self,
         card: &str,
         thread: &str,
         m: &NewMessage,
     ) -> ClientResult<ThreadDetail> {
-        let path = format!(
-            "/planner/cards/{}/threads/{}/messages",
-            enc(card),
-            enc(thread)
-        );
+        let path = format!("/tickets/{}/threads/{}/messages", enc(card), enc(thread));
         self.call("POST", &path, Some(m))
     }
 
-    /// `POST /planner/cards/{card}/threads/{thread}/versions`.
+    /// `POST /tickets/{card}/threads/{thread}/versions`.
     pub fn planner_thread_version(
         &self,
         card: &str,
         thread: &str,
         v: &NewVersion,
     ) -> ClientResult<ThreadDetail> {
-        let path = format!(
-            "/planner/cards/{}/threads/{}/versions",
-            enc(card),
-            enc(thread)
-        );
+        let path = format!("/tickets/{}/threads/{}/versions", enc(card), enc(thread));
         self.call("POST", &path, Some(v))
     }
 }

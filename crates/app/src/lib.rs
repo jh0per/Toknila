@@ -4,7 +4,9 @@
 //! database or HTTP type, so the same rules serve the daemon's HTTP API, its startup recovery and
 //! tests. Domain rules stay in `toknila-core`; this crate orders them into commands.
 
+pub mod access;
 pub mod agent;
+pub mod as_caller;
 pub mod chain;
 pub mod chains;
 pub mod checks;

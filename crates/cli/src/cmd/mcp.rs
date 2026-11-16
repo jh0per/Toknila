@@ -151,7 +151,7 @@ pub(super) fn run() -> Result<()> {
             .map(|d| stands(&d))
             .map_err(|e| e.to_string())
     };
-    let planner = |call: &PlannerCall| mcp_planner::send(&agent.client, call);
+    let planner = |call: &PlannerCall| mcp_planner::send(&agent.client, agent.project()?, call);
     serve(
         agent.role,
         std::io::stdin().lock(),

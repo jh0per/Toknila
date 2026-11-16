@@ -197,6 +197,43 @@ pub struct DesignRef {
     pub region: Option<Region>,
 }
 
+/// A design as a caller names it for a story: its id or its file name in the project's library,
+/// and the part of the image that matters. The host turns a file name into the id, so the use
+/// case reads ids only ([`DesignPick::to_ref`]).
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct DesignPick {
+    pub design: String,
+    /// In whole percent of the image; left out for the whole image.
+    #[serde(default)]
+    pub region: Option<Region>,
+}
+
+impl From<DesignRef> for DesignPick {
+    fn from(r: DesignRef) -> Self {
+        DesignPick {
+            design: r.design.to_string(),
+            region: r.region,
+        }
+    }
+}
+
+impl DesignPick {
+    /// The reference this pick names by id; a name the host did not turn into an id is a design
+    /// the project does not have.
+    pub fn to_ref(&self) -> Result<DesignRef, String> {
+        let design = self
+            .design
+            .trim()
+            .parse::<DesignId>()
+            .map_err(|_| format!("the project has no design {:?}", self.design))?;
+        Ok(DesignRef {
+            design,
+            region: self.region,
+        })
+    }
+}
+
 /// Checks a card's list of references: every region is valid and no reference repeats.
 pub fn check_refs(refs: &[DesignRef]) -> Result<(), String> {
     for (i, r) in refs.iter().enumerate() {

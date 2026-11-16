@@ -1,13 +1,16 @@
-//! `/projects/{project}/chains`, `/chains`.
+//! `/projects/{project}/chains`, `/chains`. The routes a planner reaches too (`PLANNER_ROUTES`)
+//! run as the caller the token names; core's `access::may` decides what it may.
 
 use serde::Deserialize;
 
 use crate::http::body::Json;
 use crate::http::query::Query;
+use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use toknila_app::access::{self, Action, Caller};
 use toknila_app::removal::{self, Removed};
-use toknila_app::{chains, moves, resolve, roadmap};
+use toknila_app::{as_caller, chains, moves, resolve, roadmap};
 use toknila_core::Actor;
 
 use super::{ApiResult, chain_write, load_chain_detail, read, stamp};
@@ -16,20 +19,80 @@ use crate::http::dto::{
     MoveChain, MoveInput, NewChain,
 };
 use crate::http::error::ErrorBody;
-use crate::server::{AppState, now};
+use crate::server::{AppState, Principal, now};
+
+/// A new epic in `project`, made by `caller`.
+pub(super) async fn new_epic(
+    state: &AppState,
+    caller: Caller,
+    project: String,
+    input: NewChain,
+) -> ApiResult<ChainDetail> {
+    chain_write(state, caller.actor(), move |tx| {
+        Ok(as_caller::new_epic(tx, &caller, &project, input)?)
+    })
+    .await
+}
+
+/// `caller` changes an epic's settings; `project` narrows a person's lookup of the name.
+pub(super) async fn edit_epic(
+    state: &AppState,
+    caller: Caller,
+    chain: String,
+    project: Option<String>,
+    settings: ChainSettings,
+) -> ApiResult<ChainDetail> {
+    chain_write(state, caller.actor(), move |tx| {
+        let project = project.as_deref();
+        Ok(as_caller::edit_epic(
+            tx, &caller, &chain, project, settings,
+        )?)
+    })
+    .await
+}
+
+/// `caller` makes `e.to` wait for `e.from`.
+pub(super) async fn add_dependency(
+    state: &AppState,
+    caller: Caller,
+    chain: String,
+    e: EdgeInput,
+) -> ApiResult<ChainDetail> {
+    chain_write(state, caller.actor(), move |tx| {
+        let ends = (e.from.as_str(), e.to.as_str());
+        Ok(as_caller::add_dependency(
+            tx, &caller, &chain, ends, e.kind,
+        )?)
+    })
+    .await
+}
+
+/// `caller` removes the wait of `e.to` for `e.from`.
+pub(super) async fn remove_dependency(
+    state: &AppState,
+    caller: Caller,
+    chain: String,
+    e: EdgeInput,
+) -> ApiResult<ChainDetail> {
+    chain_write(state, caller.actor(), move |tx| {
+        let ends = (e.from.as_str(), e.to.as_str());
+        Ok(as_caller::remove_dependency(tx, &caller, &chain, ends)?)
+    })
+    .await
+}
 
 #[utoipa::path(post, path = "/projects/{project}/chains", tag = "chains", request_body = NewChain,
     params(("project" = String, Path, description = "Project id or key")),
-    responses((status = 201, body = ChainDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+    responses((status = 201, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// A new epic at the end of the project's roadmap. A planner's never starts its stories by
+/// itself, and the review settings are the owner's.
 pub async fn create_chain(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(project): Path<String>,
     Json(input): Json<NewChain>,
 ) -> ApiResult<(StatusCode, Json<ChainDetail>)> {
-    let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(chains::create(tx, &project, input)?)
-    })
-    .await?;
+    let detail = new_epic(&state, principal.caller(), project, input).await?;
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
@@ -117,15 +180,19 @@ pub async fn list_chains(
 
 #[utoipa::path(get, path = "/chains/{chain}", tag = "chains",
     params(("chain" = String, Path, description = "Chain id or name")),
-    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody)))]
+    responses((status = 200, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// One epic with its cards, graph and figures. A planner reads its own project's.
 pub async fn get_chain(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(chain): Path<String>,
 ) -> ApiResult<Json<ChainDetail>> {
     let (at, prices) = stamp(&state);
+    let caller = principal.caller();
     Ok(Json(
         read(&state, move |repo| {
-            let c = resolve::chain(repo, &chain)?;
+            let c = access::chain(repo, &caller, None, &chain)?;
+            access::on_epic(repo, &caller, &Action::ReadPlan, &c)?;
             load_chain_detail(repo, c.id, at, &prices)
         })
         .await?,
@@ -135,27 +202,21 @@ pub async fn get_chain(
 #[utoipa::path(patch, path = "/chains/{chain}", tag = "chains", request_body = ChainSettings,
     params(("chain" = String, Path, description = "Chain id or name"),
         ("project" = Option<String>, Query, description = "Project id or key, when two projects have a chain of this name")),
-    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody)))]
-/// Sets the chain's review mode, reviewer agent profile and autostart. A ticket that sets its
-/// own review keeps it; a field left out is kept. Turning autostart on starts the chain's ready
-/// cards that have a free slot: it is the owner's act, and the journal records it
-/// (`chain.updated`).
+    responses((status = 200, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Sets the chain's name, title, goal, version, review mode, reviewer agent profile and
+/// autostart. A ticket that sets its own review keeps it; a field left out is kept. Turning
+/// autostart on starts the chain's ready cards that have a free slot: it is the owner's act, and
+/// the journal records it (`chain.updated`). A planner changes only the name, title, goal and
+/// version of an epic whose release is not cut.
 pub async fn patch_chain(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(chain): Path<String>,
     Query(q): Query<ProjectQuery>,
     Json(settings): Json<ChainSettings>,
 ) -> ApiResult<Json<ChainDetail>> {
-    let project = q.project;
-    let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(chains::set_settings(
-            tx,
-            &chain,
-            project.as_deref(),
-            settings,
-        )?)
-    })
-    .await?;
+    let caller = principal.caller();
+    let detail = edit_epic(&state, caller, chain, q.project, settings).await?;
     Ok(Json(detail))
 }
 
@@ -207,16 +268,15 @@ pub async fn delete_chain(
 
 #[utoipa::path(post, path = "/chains/{chain}/edges", tag = "chains", request_body = EdgeInput,
     params(("chain" = String, Path, description = "Chain id or name")),
-    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+    responses((status = 200, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Makes `to` wait for `from`. A planner changes no epic that starts its stories by itself.
 pub async fn add_edge(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(chain): Path<String>,
     Json(e): Json<EdgeInput>,
 ) -> ApiResult<Json<ChainDetail>> {
-    let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(chains::add_edge(tx, &chain, &e.from, &e.to, e.kind)?)
-    })
-    .await?;
+    let detail = add_dependency(&state, principal.caller(), chain, e).await?;
     Ok(Json(detail))
 }
 
@@ -244,17 +304,18 @@ pub async fn move_edge(
 
 #[utoipa::path(post, path = "/chains/{chain}/tickets/{ticket}/move", tag = "chains", request_body = MoveInput,
     params(("chain" = String, Path, description = "Chain id or name"), ("ticket" = String, Path, description = "Ticket key")),
-    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+    responses((status = 200, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
 /// Puts a card directly before or after another card; the dependencies around it are rewired.
 pub async fn move_ticket(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path((chain, ticket)): Path<(String, String)>,
     Json(m): Json<MoveInput>,
 ) -> ApiResult<Json<ChainDetail>> {
-    let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(chains::move_ticket(
-            tx, &chain, &ticket, &m.anchor, m.place,
-        )?)
+    let caller = principal.caller();
+    let detail = chain_write(&state, caller.actor(), move |tx| {
+        let to = (m.anchor.as_str(), m.place);
+        Ok(as_caller::move_story(tx, &caller, &chain, &ticket, to)?)
     })
     .await?;
     Ok(Json(detail))
@@ -277,15 +338,14 @@ pub async fn arrange_chain(
 
 #[utoipa::path(delete, path = "/chains/{chain}/edges", tag = "chains",
     params(("chain" = String, Path, description = "Chain id or name"), EdgeInput),
-    responses((status = 200, body = ChainDetail), (status = 404, body = ErrorBody)))]
+    responses((status = 200, body = ChainDetail), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// Removes the wait of `to` for `from`.
 pub async fn remove_edge(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(chain): Path<String>,
     Query(e): Query<EdgeInput>,
 ) -> ApiResult<Json<ChainDetail>> {
-    let detail = chain_write(&state, Actor::Human, move |tx| {
-        Ok(chains::remove_edge(tx, &chain, &e.from, &e.to)?)
-    })
-    .await?;
+    let detail = remove_dependency(&state, principal.caller(), chain, e).await?;
     Ok(Json(detail))
 }

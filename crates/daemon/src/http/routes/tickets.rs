@@ -1,25 +1,30 @@
-//! `/chains/{chain}/tickets`, `/chains/{chain}/wildcards`, `/tickets`.
+//! `/chains/{chain}/tickets`, `/chains/{chain}/wildcards`, `/tickets`. The routes a planner
+//! reaches too (`PLANNER_ROUTES`) run as the caller the token names; core's `access::may`
+//! decides what it may.
 
 use std::collections::HashMap;
 
 use crate::http::body::Json;
 use crate::http::query::Query;
+use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use toknila_app::access::{self, Action, Caller};
 use toknila_app::ships::GuardError;
 use toknila_app::tickets::{self, TicketAction};
-use toknila_app::{moves, notes, resolve, schedule, ships, wildcards};
+use toknila_app::{as_caller, moves, notes, resolve, schedule, ships, wildcards};
+use toknila_core::design::DesignPick;
 use toknila_core::guard::ShipProblem;
 use toknila_core::machine::TicketEvent;
 use toknila_core::{Actor, ChainId, ReviewTurn, TicketStatus};
 
 use super::{ApiResult, load_ticket_detail, read, stamp, ticket_write};
 use crate::http::dto::{
-    ActionInput, DesignMoveInput, MoveToChain, NewComment, NewSubtask, NewTicket, NewWildcard,
-    PatchSubtask, PatchTicket, TicketDetail, TicketItem, TicketQuery, clamp_size,
+    ActionInput, DesignMoveInput, MoveFrom, MoveToChain, NewComment, NewSubtask, NewTicket,
+    NewWildcard, PatchSubtask, PatchTicket, TicketDetail, TicketItem, TicketQuery, clamp_size,
 };
 use crate::http::error::ErrorBody;
-use crate::server::{AppState, now};
+use crate::server::{AppState, Principal, now};
 
 /// Where the check of `t` stands: queued behind others in the machine's `line`, else what the
 /// checker last reported. `None` outside the check turn.
@@ -38,40 +43,97 @@ fn check_phase_of(
         .or_else(|| t.review.check.clone())
 }
 
-/// Refuses design references to a design the project does not have.
-async fn check_design_ids(
+/// `picks` with every design named by its id in `project`'s library: one the project does not
+/// have is refused, with the names it has.
+async fn by_id(
     state: &AppState,
     project: toknila_core::ProjectId,
-    refs: Vec<toknila_core::design::DesignRef>,
-) -> ApiResult<()> {
+    picks: Vec<DesignPick>,
+) -> ApiResult<Vec<DesignPick>> {
+    if picks.is_empty() {
+        return Ok(picks);
+    }
     let designs = crate::designs::Designs::new(&state.home, project);
-    Ok(tokio::task::spawn_blocking(move || designs.check_refs(&refs)).await??)
+    let refs = tokio::task::spawn_blocking(move || designs.resolve(&picks)).await??;
+    Ok(refs.into_iter().map(DesignPick::from).collect())
+}
+
+/// `caller` adds a story to `chain`; its designs may be named by file name.
+pub(super) async fn add_story(
+    state: &AppState,
+    caller: Caller,
+    chain: String,
+    mut input: NewTicket,
+) -> ApiResult<TicketDetail> {
+    if !input.designs.is_empty() {
+        let name = chain.clone();
+        // The epic is the caller's to read before its project's library is looked at.
+        let project = read(state, move |repo| {
+            let c = access::chain(repo, &caller, None, &name)?;
+            access::on_epic(repo, &caller, &Action::ReadPlan, &c)?;
+            Ok(c.project_id)
+        })
+        .await?;
+        input.designs = by_id(state, project, std::mem::take(&mut input.designs)).await?;
+    }
+    let (at, prices) = stamp(state);
+    let (detail, _) = state
+        .store
+        .write(caller.actor(), at, move |tx| -> ApiResult<TicketDetail> {
+            let id = as_caller::add_story(tx, &caller, &chain, input)?;
+            load_ticket_detail(&tx.repo(), id, at, &prices)
+        })
+        .await?;
+    Ok(detail)
+}
+
+/// `caller` edits a story; its designs may be named by file name, and a size out of range is
+/// kept at the nearest size inside the limits (the answer says so).
+pub(super) async fn edit_story(
+    state: &AppState,
+    caller: Caller,
+    ticket: String,
+    mut patch: PatchTicket,
+) -> ApiResult<TicketDetail> {
+    let mut clamped = None;
+    if let Some(Some(asked)) = patch.size {
+        let kept = clamp_size(asked);
+        if kept != asked {
+            clamped = Some(asked);
+            patch.size = Some(Some(kept));
+        }
+    }
+    if let Some(picks) = patch.designs.take() {
+        let key = ticket.clone();
+        let project = read(state, move |repo| {
+            let t = resolve::ticket(repo, &key)?;
+            access::on_story(repo, &caller, &Action::ReadPlan, &t)?;
+            Ok(resolve::chain(repo, &t.chain_id.to_string())?.project_id)
+        })
+        .await?;
+        patch.designs = Some(by_id(state, project, picks).await?);
+    }
+    let Json(mut detail) = ticket_write(state, ticket, caller.actor(), move |tx, t| {
+        as_caller::edit_story(tx, &caller, &t, patch)?;
+        Ok(())
+    })
+    .await?;
+    detail.size_clamped = clamped;
+    Ok(detail)
 }
 
 #[utoipa::path(post, path = "/chains/{chain}/tickets", tag = "tickets", request_body = NewTicket,
     params(("chain" = String, Path, description = "Chain id or name")),
-    responses((status = 201, body = TicketDetail), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+    responses((status = 201, body = TicketDetail), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// A new story in an epic. A planner adds only its fields, to an epic that waits for the owner to
+/// start its stories.
 pub async fn create_ticket(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(chain): Path<String>,
     Json(input): Json<NewTicket>,
 ) -> ApiResult<(StatusCode, Json<TicketDetail>)> {
-    if !input.designs.is_empty() {
-        let (name, refs) = (chain.clone(), input.designs.clone());
-        let project = read(&state, move |repo| {
-            Ok(resolve::chain(repo, &name)?.project_id)
-        })
-        .await?;
-        check_design_ids(&state, project, refs).await?;
-    }
-    let (at, prices) = stamp(&state);
-    let (detail, _) = state
-        .store
-        .write(Actor::Human, at, move |tx| -> ApiResult<TicketDetail> {
-            let id = tickets::create(tx, &chain, input)?;
-            load_ticket_detail(&tx.repo(), id, at, &prices)
-        })
-        .await?;
+    let detail = add_story(&state, principal.caller(), chain, input).await?;
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
@@ -163,36 +225,18 @@ pub async fn get_ticket(
 
 #[utoipa::path(patch, path = "/tickets/{ticket}", tag = "tickets", request_body = PatchTicket,
     params(("ticket" = String, Path, description = "Ticket id or key")),
-    responses((status = 200, body = TicketDetail), (status = 404, body = ErrorBody)))]
+    responses((status = 200, body = TicketDetail), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+/// Changes a story's fields, and renames and appends checklist items, in one command. A planner
+/// edits a story that has not started, and only its words, checklist, designs and model.
 pub async fn patch_ticket(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(ticket): Path<String>,
-    Json(mut patch): Json<PatchTicket>,
+    Json(patch): Json<PatchTicket>,
 ) -> ApiResult<Json<TicketDetail>> {
-    // A size out of range is stored at the nearest size inside the limits; the answer says so.
-    let mut clamped = None;
-    if let Some(Some(asked)) = patch.size {
-        let kept = clamp_size(asked);
-        if kept != asked {
-            clamped = Some(asked);
-            patch.size = Some(Some(kept));
-        }
-    }
-    if let Some(refs) = patch.designs.clone() {
-        let key = ticket.clone();
-        let project = read(&state, move |repo| {
-            let t = resolve::ticket(repo, &key)?;
-            Ok(resolve::chain(repo, &t.chain_id.to_string())?.project_id)
-        })
-        .await?;
-        check_design_ids(&state, project, refs).await?;
-    }
-    let Json(mut detail) = ticket_write(&state, ticket, Actor::Human, move |tx, t| {
-        Ok(tickets::edit(tx, &t, patch)?)
-    })
-    .await?;
-    detail.size_clamped = clamped;
-    Ok(Json(detail))
+    Ok(Json(
+        edit_story(&state, principal.caller(), ticket, patch).await?,
+    ))
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/designs/{index}/move", tag = "tickets", request_body = DesignMoveInput,
@@ -214,17 +258,23 @@ pub async fn move_design(
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/move-to-chain", tag = "tickets", request_body = MoveToChain,
-    params(("ticket" = String, Path, description = "Ticket id or key")),
-    responses((status = 200, body = TicketDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
+    params(("ticket" = String, Path, description = "Ticket id or key"), MoveFrom),
+    responses((status = 200, body = TicketDetail), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody), (status = 409, body = ErrorBody)))]
 /// Moves a card that has not started to another epic of its project, to the end or next to a card.
+/// When a planner moves it, neither epic may start its stories by itself.
 pub async fn move_to_chain(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(ticket): Path<String>,
+    Query(q): Query<MoveFrom>,
     Json(m): Json<MoveToChain>,
 ) -> ApiResult<Json<TicketDetail>> {
-    ticket_write(&state, ticket, Actor::Human, move |tx, t| {
+    let caller = principal.caller();
+    ticket_write(&state, ticket, caller.actor(), move |tx, t| {
         let place = m.place.as_ref().map(|p| (p.anchor.as_str(), p.place));
-        Ok(moves::move_to_chain(tx, &t, &m.chain, place)?)
+        let (story, from) = (t.id.to_string(), q.from.as_deref());
+        as_caller::move_story_to_epic(tx, &caller, &story, &m.chain, place, from)?;
+        Ok(())
     })
     .await
 }
