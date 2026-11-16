@@ -8,7 +8,7 @@ import { HandIn, InboxHandInBlocks } from "./HandIn";
 import type { Intent } from "../store/msg";
 import type { Route } from "../store/route";
 import type { State } from "../store/state";
-import { itemRoute } from "../store/inbox";
+import { itemRoute, needsPerson } from "../store/inbox";
 import { epicTitle } from "../store/title";
 import { Answer } from "./Answer";
 import { NavLink } from "./Link";
@@ -60,7 +60,7 @@ export function InboxRow({ state, item, dispatch }: { state: State; item: InboxI
     <NavLink route={route} dispatch={dispatch} className="btn" testId="inbox-open-card">Open story</NavLink>
   );
   return (
-    <li data-kind={item.kind} data-key={item.ticket} className={item.needs_human ? undefined : "informational"}>
+    <li data-kind={item.kind} data-key={item.ticket} className={needsPerson(item) ? undefined : "informational"}>
       <div className="row-head">
         <span className="t">{item.title}</span>
         {route ? <NavLink route={route} dispatch={dispatch} className="key">{item.ticket}</NavLink> : <span className="key">{item.ticket}</span>}

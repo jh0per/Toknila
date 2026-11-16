@@ -115,7 +115,7 @@ fn a_late_signal_of_the_ended_process_does_not_bring_a_paused_agent_back() {
     assert!(t.agent_paused.is_some(), "still paused");
     assert!(mem.runner.started.borrow().is_empty());
     let line = schedule::queue_positions(&mem).expect("positions");
-    assert!(line.get(&t.id).is_none(), "nobody wants it yet");
+    assert!(!line.contains_key(&t.id), "nobody wants it yet");
 }
 
 #[test]

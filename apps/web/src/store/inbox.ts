@@ -32,6 +32,10 @@ export function groupInbox(items: InboxItem[]): InboxGroup[] {
     .filter((g) => g.items.length > 0);
 }
 
+/// Whether the item waits on a person; only an informational row (an answer waiting for a slot)
+/// says it does not, so an item from an older daemon still counts.
+export const needsPerson = (i: Pick<InboxItem, "needs_human">): boolean => i.needs_human !== false;
+
 /// A key that tells two items apart (a card may have several threads).
 export function itemKey(i: InboxItem): string {
   return `${i.kind}:${i.ticket ?? ""}:${i.thread ?? ""}${i.pin ?? ""}`;

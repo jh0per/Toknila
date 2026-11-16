@@ -1,4 +1,5 @@
 import type { InboxItem, ProjectRun } from "../api/types";
+import { needsPerson } from "./inbox";
 import type { Route } from "./route";
 import type { State } from "./state";
 
@@ -35,7 +36,7 @@ export function inboxOf(s: Pick<State, "inbox" | "chains">, project: { id: strin
 }
 
 /// How many items wait for the person in a project.
-export const waitingIn = (s: Pick<State, "inbox" | "chains">, project: { id: string }): number => inboxOf(s, project).filter((i) => i.needs_human).length;
+export const waitingIn = (s: Pick<State, "inbox" | "chains">, project: { id: string }): number => inboxOf(s, project).filter(needsPerson).length;
 
 /// What runs in a project as the daemon said: its runs (assistant first, then cards), the slots
 /// in use and the limit. Without a report: nothing runs and the limit is the project's own.

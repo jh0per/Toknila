@@ -1,5 +1,6 @@
 import type { Intent } from "../store/msg";
 import { type State, currentProject } from "../store/state";
+import { needsPerson } from "../store/inbox";
 import { updateReady } from "../store/updates";
 import { NavLink } from "./Link";
 import { NavIcon } from "./NavIcon";
@@ -7,7 +8,7 @@ import { SidebarProjects } from "./SidebarProjects";
 
 export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const project = currentProject(state);
-  const waiting = state.inbox.filter((i) => i.needs_human).length;
+  const waiting = state.inbox.filter(needsPerson).length;
   return (
     <nav className="sidebar" aria-label="Sidebar" data-link={state.link}>
       <div className="brand">
