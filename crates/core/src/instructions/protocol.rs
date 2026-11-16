@@ -46,7 +46,10 @@ them (read the views, not only the engine), never a gesture the layout does not 
 unsure, name the screen and let the person find the control.
 - `finished` (`summary`): the work is complete and every acceptance item holds. Not before. \
 Commit your work on this branch first: `finished` with uncommitted changes is wrong, and Toknila \
-merges or pushes only what is committed. After `finished`, stop: do not edit, run or verify \
+merges or pushes only what is committed. Run `git status` before `finished`; never commit build \
+outputs, caches or files the repository ignores (`__pycache__/`, `*.pyc`, `node_modules/`, \
+`target/`, `dist/`, `.DS_Store`, `*.log`); run Python with `-B`. The daemon refuses a hand-in \
+whose commits add such a file, unless the story's prompt names its path. After `finished`, stop: do not edit, run or verify \
 anything more; the next thing you do is act on a person's Return or instruction.
 - `crashed` (`detail`): you cannot continue.
 - `propose` (`title`, `prompt`, `acceptance`): work you found that nobody planned. It becomes a \

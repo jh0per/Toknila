@@ -65,6 +65,19 @@ pub async fn agent_event(
             ) {
                 return Err(ships::refuse_unchanged(round, head).into());
             }
+            // Nothing built or ignored goes in: the files the ship's commits add are listed.
+            if let Some(head) = seen.head.clone() {
+                let files = state
+                    .store
+                    .built_artifacts(look.clone(), head, target.0.prompt.clone())
+                    .await
+                    .map_err(|e| {
+                        ships::refuse_finished(toknila_app::ships::GuardError::Ship(e), &look)
+                    })?;
+                if !files.is_empty() {
+                    return Err(toknila_app::hand_in::refuse_artifacts(&files).into());
+                }
+            }
             // The work since the Return, derived from the returned HEAD to the new one.
             if let Some(head) = seen.head.as_deref() {
                 since = state
