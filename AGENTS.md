@@ -156,6 +156,9 @@ A check you have never seen fail is a claim, not a check.
 
 ## Testing
 
+- A test never starts a real agent: a daemon under `TOKNILA_TEST_ROOT` refuses to launch a
+  built-in `claude` profile (the card blocks with "A test may not start a real agent: give the
+  project --sim or a fake --profile"), so give a test project `--sim` or a fake `--profile`.
 - A test never blocks without a deadline on something the behaviour under test may not produce:
   an accept, a read, a channel receive, a join of a thread that does such a thing. A hang costs a
   runner its whole time limit; a deadline costs one failing test.
