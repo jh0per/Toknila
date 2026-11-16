@@ -102,7 +102,22 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
         return Ok(());
     }
     let dir = uow.ship(ticket)?.map(|s| s.path);
-    let threads = BriefThread::of(&uow.threads(ticket)?);
+    let mut threads = BriefThread::of(&uow.threads(ticket)?);
+    for bt in &mut threads {
+        let Some(th) = uow
+            .threads(ticket)?
+            .into_iter()
+            .find(|x| x.number == bt.number)
+        else {
+            continue;
+        };
+        bt.approval_message = toknila_core::thread::approval_decisions(
+            &uow.thread_versions(th.id)?,
+            &uow.thread_messages(th.id)?,
+            bt.approved_version,
+        )
+        .map(|m| m.text.clone());
+    }
     let hand_in = latest_hand_in(&uow.comments(ticket)?);
     uow.defer(ExternalEffect::StartReviewer {
         ticket,

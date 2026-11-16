@@ -231,7 +231,9 @@ async fn approving_a_thread_answers_the_question_the_worker_waits_on() {
     let card = api.get("/v1/tickets/DEMO-1").await;
     let text = card.to_string();
     assert!(
-        text.contains(r#"Thread 1 \"List screen\" version 1 is approved. Looks right. Continue."#),
+        text.contains(
+            r#"Thread 1 \"List screen\" version 1 is approved with these decisions of the person. Where they differ from version 1, the decisions win; say in the hand-in how you followed each: Looks right. Continue."#
+        ),
         "{text}"
     );
 }
