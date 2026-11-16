@@ -44,6 +44,15 @@ describe("InboxRow", () => {
     expect(render(item({ hand_in: base }))).not.toContain("steps-for-you");
   });
 
+  it("shows an answered question greyed, with the sentence, no answer box and no action", () => {
+    const text = "Answered; the agent gets it when a slot is free (#2 in line)";
+    const html = render(item({ kind: "answered", needs_human: false, text, allowed_actions: [] }));
+    expect(html).toContain('class="informational"');
+    expect(html).toMatch(/data-testid="inbox-answered"[^>]*>.*Answered; the agent gets it when a slot is free \(#2 in line\)/);
+    expect(html).not.toContain("<textarea");
+    expect(html).not.toContain("<input");
+  });
+
   it("shows a question's text and a pin's design name from the item", () => {
     expect(render(item({ kind: "question", text: "Which flag?", answers: [], allowed_actions: [] }))).toContain("Which flag?");
     const pin = render(item({ kind: "design_question", text: "home.png: Is the logo fixed?", design: "home.png", pin: "p1", allowed_actions: [] }));

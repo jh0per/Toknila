@@ -35,6 +35,7 @@ mod questions;
 mod recheck;
 mod restart;
 mod resume;
+mod resume_slot;
 mod return_kickoff;
 mod reviews;
 mod runs;

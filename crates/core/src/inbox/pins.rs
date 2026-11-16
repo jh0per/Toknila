@@ -58,5 +58,6 @@ fn cardless(p: &DesignPin) -> InboxItem {
         allow_always_none: None,
         hand_in: None,
         design: None,
+        needs_human: true,
     }
 }
