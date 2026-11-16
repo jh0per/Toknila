@@ -18,6 +18,7 @@ use crate::{
     AppError, AppResult, ErrorKind, Reader, UnitOfWork, agent, chains, resolve, tickets, with_chain,
 };
 
+mod check_line;
 mod checks;
 mod deletion;
 mod design_use;

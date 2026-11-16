@@ -1128,6 +1128,54 @@
         }
       }
     },
+    "/machine/settings": {
+      "get": {
+        "tags": [
+          "machine"
+        ],
+        "summary": "How many hand-in checks may run at once on this machine.",
+        "operationId": "get_machine_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "machine"
+        ],
+        "summary": "Sets how many hand-in checks may run at once (at least 1); it applies to the line at once and\nis kept across restarts.",
+        "operationId": "put_machine_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MachineSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineSettings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/planner/activity": {
       "post": {
         "tags": [
@@ -7416,12 +7464,22 @@
         "oneOf": [
           {
             "type": "object",
-            "description": "Another check runs; this one is the `place`-th in line (1 is next).",
+            "description": "Another check runs, or the machine is too busy; this one is the `place`-th in line (1 is\nnext). `held` is set when it is next but waits for the machine's load to fall.",
             "required": [
               "place",
               "phase"
             ],
             "properties": {
+              "held": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/LoadHold"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "phase": {
                 "type": "string",
                 "enum": [
@@ -8780,6 +8838,44 @@
             "$ref": "#/components/schemas/AgentProfile"
           }
         }
+      },
+      "LoadHold": {
+        "type": "object",
+        "description": "Why a check that has a free place still waits: the machine's one-minute load average is at\nor above its core count.",
+        "required": [
+          "load",
+          "cores"
+        ],
+        "properties": {
+          "cores": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The number of CPU cores.",
+            "minimum": 0
+          },
+          "load": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The one-minute load average, rounded.",
+            "minimum": 0
+          }
+        }
+      },
+      "MachineSettings": {
+        "type": "object",
+        "description": "`GET` and `PUT /v1/machine/settings`: what the daemon does on this machine, whichever the\nproject.",
+        "required": [
+          "max_checks"
+        ],
+        "properties": {
+          "max_checks": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many hand-in checks may run at once (at least 1; the default 1). A further one\nstarts only while the one-minute load average is below the number of CPU cores.",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
       },
       "MarkRelease": {
         "type": "object",

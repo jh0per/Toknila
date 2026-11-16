@@ -28,6 +28,7 @@ export type InboxHandIn = Schemas["InboxHandIn"];
 export type CardItem = InboxItem & { ticket: string; chain: string };
 export const isCardItem = (i: InboxItem): i is CardItem => Boolean(i.ticket && i.chain);
 export type Suggestion = Schemas["Suggestion"];
+export type MachineSettings = Schemas["MachineSettings"];
 export type InboxKind = Schemas["InboxKind"];
 export type AnswerKind = Schemas["AnswerKind"];
 export type AgentRole = Schemas["AgentRole"];

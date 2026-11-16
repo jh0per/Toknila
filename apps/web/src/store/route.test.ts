@@ -15,6 +15,7 @@ describe("the settings routes", () => {
     ["/projects/DEMO/settings/updates", { name: "settings", project: "DEMO", section: "updates" }],
     ["/projects/DEMO/settings/about", { name: "settings", project: "DEMO", section: "about" }],
     ["/projects/DEMO/settings/checks", { name: "settings", project: "DEMO", section: "checks" }],
+    ["/settings/machine", { name: "settings", section: "machine" }],
     ["/settings/updates", { name: "settings", section: "updates" }],
     ["/settings/about", { name: "settings", section: "about" }],
     ["/settings/checks", { name: "settings", section: "checks" }],

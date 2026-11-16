@@ -68,6 +68,50 @@ fn accept_after_main_moved_checks_once_more_and_then_merges_by_itself() {
     );
 }
 
+/// The kind of every check queued for the host.
+fn queued_kinds(mem: &Mem) -> Vec<crate::checks::CheckKind> {
+    mem.deferred
+        .iter()
+        .filter_map(|e| match e {
+            crate::external::ExternalEffect::RunCheck { kind, .. } => Some(*kind),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_hand_in_queues_a_hand_in_check_and_an_accepts_recheck_queues_a_recheck() {
+    use crate::checks::CheckKind;
+    let mut mem = running(ReviewMode::Human, 3);
+    main_at(&mem, "m1", None);
+    finish(&mut mem, "done".to_owned());
+    assert_eq!(queued_kinds(&mem), [CheckKind::HandIn]);
+    settle(&mut mem);
+    main_at(&mem, "m2", Some(3));
+    accept(&mut mem);
+    // The Accept's own work (the sync that found main moved) comes first; settle it step by
+    // step until the re-check is queued.
+    let mut seen = Vec::new();
+    while !mem.deferred.is_empty() {
+        seen.extend(queued_kinds(&mem));
+        let queued = std::mem::take(&mut mem.deferred);
+        let host = crate::external::Host {
+            yard: &mem.yard,
+            merger: &mem.merger,
+            runner: &mem.runner,
+            checker: &mem.checker,
+            gate: &crate::OpenGate,
+            progress: &crate::NoProgress,
+        };
+        let outcomes = crate::external::execute(host, queued);
+        crate::external::apply(&mut mem, outcomes).expect("apply outcomes");
+    }
+    assert!(
+        seen.contains(&CheckKind::Recheck),
+        "the check Accept asked for is a re-check: {seen:?}"
+    );
+}
+
 #[test]
 fn accept_with_main_where_the_check_saw_it_merges_at_once() {
     let mut mem = checked_at_m1();

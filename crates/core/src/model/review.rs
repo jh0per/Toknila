@@ -206,14 +206,40 @@ pub enum ReviewTurn {
     Merging,
 }
 
+/// Why a check that has a free place still waits: the machine's one-minute load average is at
+/// or above its core count.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LoadHold {
+    /// The one-minute load average, rounded.
+    pub load: u32,
+    /// The number of CPU cores.
+    pub cores: u32,
+}
+
+impl LoadHold {
+    /// What the card says: `waits for the machine: load 41 on 16 cores`.
+    pub fn words(&self) -> String {
+        format!(
+            "waits for the machine: load {} on {} cores",
+            self.load, self.cores
+        )
+    }
+}
+
 /// Where a card's check stands while its turn is `Check`. The checker reports `Syncing` and
 /// `Running`; `Queued` is the daemon's line, added when the card is shown.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "phase", rename_all = "snake_case")]
 pub enum CheckPhase {
-    /// Another check runs; this one is the `place`-th in line (1 is next).
-    Queued { place: u32 },
+    /// Another check runs, or the machine is too busy; this one is the `place`-th in line (1 is
+    /// next). `held` is set when it is next but waits for the machine's load to fall.
+    Queued {
+        place: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        held: Option<LoadHold>,
+    },
     /// Its turn came: the base branch is being brought into the ship.
     Syncing,
     /// The project's check command runs on the ship, since `since`.

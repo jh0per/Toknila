@@ -69,6 +69,8 @@ pub enum ExternalEffect {
     /// `sync` first merges the base into the ship when it moved.
     RunCheck {
         ticket: TicketId,
+        /// A hand-in's check, or the re-check an Accept asked for (it goes first in the line).
+        kind: crate::checks::CheckKind,
         spec: Option<CheckSpec>,
         /// The project's extra checks, in order; those whose paths match the ship's changes run
         /// after the command.
@@ -295,12 +297,14 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
             ExternalEffect::DeliverInstruction { .. } => {}
             ExternalEffect::RunCheck {
                 ticket,
+                kind,
                 spec,
                 extras,
                 sync,
             } => {
                 let plan = (spec, extras.as_slice());
-                checks::run_on_host(&host, ticket, plan, sync.as_ref(), &mut outcomes);
+                let who = (ticket, kind);
+                checks::run_on_host(&host, who, plan, sync.as_ref(), &mut outcomes);
             }
         }
     }

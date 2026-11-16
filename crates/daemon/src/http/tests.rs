@@ -27,6 +27,7 @@ mod designs;
 mod discussion;
 mod hand_in_only;
 mod inbox;
+mod machine;
 mod merges;
 mod moves;
 mod parallel;

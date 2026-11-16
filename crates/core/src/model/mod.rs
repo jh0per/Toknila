@@ -47,9 +47,9 @@ pub use profile::{
 pub use project::{MODEL_ALIASES, MergeMethod, MergeMode, MergeSettings, Project, ReviewMode};
 pub use release::{Release, ReleaseChannel, ReleaseState, ReleasedWith, StartMode};
 pub use review::{
-    CheckPhase, ItemBasis, ItemOutcome, ItemVerdict, ItemsError, Review, ReviewNote, ReviewRound,
-    ReviewTurn, Verdict, check_items, effective_verdict, render_items, request_is_unfounded,
-    resolve_mode as resolve_review_mode, resolve_reviewer, reviewer_profile,
+    CheckPhase, ItemBasis, ItemOutcome, ItemVerdict, ItemsError, LoadHold, Review, ReviewNote,
+    ReviewRound, ReviewTurn, Verdict, check_items, effective_verdict, render_items,
+    request_is_unfounded, resolve_mode as resolve_review_mode, resolve_reviewer, reviewer_profile,
 };
 pub use reviewer_rules::{RepoTool, reviewer_check_rules, reviewer_commands};
 pub use run::{ProcessExit, Run};
