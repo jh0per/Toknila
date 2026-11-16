@@ -4,8 +4,9 @@
 //! `toknila-e2e-<run id>-` folder of this run, or a `fake-agent` whose command line carries this
 //! run's marker `toknila-fa-<run id>-<spec>-<random>` (the specs get the run id in `TOKNILA_E2E_RUN`).
 //! Other runs on the machine have other roots and other ids: what they left is only a warning
-//! (older than an hour), never killed. Needs `ps`; where there is none (Windows) it checks nothing
-//! and says so (the Windows CI job lists the leftovers itself).
+//! (older than an hour), never killed. Processes are listed with `ps`, on Windows with PowerShell's
+//! Win32_Process (pid, age, command line); a daemon's home on Windows is the `TOKNILA_HOME` of its
+//! command line or the folder of the `daemon.json` that names its pid.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -58,12 +59,10 @@ pub struct Agent {
 /// Daemons and fake agents of other runs, older than an hour, are warned about and left alone.
 pub fn check(root: Option<&Path>, grace: Duration) -> Result<(), String> {
     let deadline = Instant::now() + grace;
-    let mut skipped = true;
-    let leaked = loop {
+    let leaked: Vec<String> = loop {
         let Some((all, agents)) = listing() else {
-            break Vec::new();
+            return Err("daemon leak check: the process list cannot be read".to_owned());
         };
-        skipped = false;
         let found = leaked(&all, &scopes(root));
         if found.is_empty() || Instant::now() >= deadline {
             for w in old_leftovers(&all, &agents, &scopes(root), &scopes(None), OLD_AFTER) {
@@ -73,10 +72,6 @@ pub fn check(root: Option<&Path>, grace: Duration) -> Result<(), String> {
         }
         std::thread::sleep(Duration::from_millis(250));
     };
-    if skipped {
-        eprintln!("xtask: daemon leak check skipped (no `ps` here)");
-        return Ok(());
-    }
     if leaked.is_empty() {
         eprintln!("xtask: no test daemon left running");
         return Ok(());
@@ -93,8 +88,7 @@ pub fn check_e2e(run_id: &str, grace: Duration) -> Result<(), String> {
     let deadline = Instant::now() + grace;
     let found = loop {
         let Some((all, agents)) = listing() else {
-            eprintln!("xtask: e2e leak check skipped (no `ps` here)");
-            return Ok(());
+            return Err("e2e leak check: the process list cannot be read".to_owned());
         };
         let found = e2e_leftovers(&all, &agents, run_id, &scopes(None));
         if found.is_empty() || Instant::now() >= deadline {
@@ -110,7 +104,14 @@ pub fn check_e2e(run_id: &str, grace: Duration) -> Result<(), String> {
         return Ok(());
     }
     for (pid, _) in &found {
-        let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+        let pid = pid.to_string();
+        let _ = if cfg!(windows) {
+            Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid])
+                .status()
+        } else {
+            Command::new("kill").args(["-9", &pid]).status()
+        };
     }
     let lines: Vec<String> = found.into_iter().map(|(_, text)| text).collect();
     Err(format!(
@@ -225,8 +226,22 @@ pub fn old_leftovers(
     out
 }
 
-/// Every `tok daemon run` and every `fake-agent` of this user, or `None` when `ps` is unavailable.
+/// What PowerShell prints per process: `pid age-in-seconds command line`. Only the processes whose
+/// command line mentions a daemon run or a fake agent (the filters here are coarse, `parse` is exact).
+const WINDOWS_LISTING: &str = "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ($_.CommandLine -match 'daemon run' -or $_.CommandLine -match 'fake-agent') } | ForEach-Object { \"$($_.ProcessId) $([int]((Get-Date) - $_.CreationDate).TotalSeconds) $($_.CommandLine)\" }";
+
+/// Every `tok daemon run` and every `fake-agent` of this user, or `None` when the process list
+/// cannot be read (`ps`, or PowerShell on Windows, did not run or failed).
 fn listing() -> Option<(Vec<Daemon>, Vec<Agent>)> {
+    if cfg!(windows) {
+        let out = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", WINDOWS_LISTING])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())?;
+        let homes = daemon_json_homes(&search_roots());
+        return Some(parse_windows(&String::from_utf8_lossy(&out.stdout), &homes));
+    }
     let out = Command::new("ps")
         .args(["-axww", "-o", "pid=,etime=,command="])
         .output()
@@ -260,6 +275,114 @@ fn listing() -> Option<(Vec<Daemon>, Vec<Agent>)> {
     Some((daemons, agents))
 }
 
+/// The records of the PowerShell listing (`pid age command line` per line). A daemon's home is
+/// the `TOKNILA_HOME` of its command line, else the folder whose `daemon.json` names its pid
+/// (`homes`: pid and folder); a daemon with neither is not listed, as on Unix. An agent's home is
+/// the same, or none.
+pub fn parse_windows(text: &str, homes: &[(u32, PathBuf)]) -> (Vec<Daemon>, Vec<Agent>) {
+    let (mut daemons, mut agents) = (Vec::new(), Vec::new());
+    for line in text.lines() {
+        let mut parts = line.trim().splitn(3, ' ');
+        let (Some(pid), Some(age), Some(command)) = (parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
+        let (Ok(pid), Ok(age)) = (pid.parse::<u32>(), age.parse::<u64>()) else {
+            continue;
+        };
+        let command = command.trim();
+        let home = home_in_command(command).or_else(|| {
+            homes
+                .iter()
+                .find(|(p, _)| *p == pid)
+                .map(|(_, h)| h.clone())
+        });
+        if is_daemon_run(command) {
+            if let Some(home) = home {
+                let command = command.to_owned();
+                daemons.push(Daemon {
+                    pid,
+                    age,
+                    home,
+                    command,
+                });
+            }
+        } else if is_fake_agent(command) {
+            let command = command.to_owned();
+            agents.push(Agent {
+                pid,
+                age,
+                command,
+                home,
+            });
+        }
+    }
+    (daemons, agents)
+}
+
+/// A `TOKNILA_HOME=<path>` in a command line.
+fn home_in_command(command: &str) -> Option<PathBuf> {
+    let rest = command.split("TOKNILA_HOME=").nth(1)?;
+    let rest = rest.trim_start_matches('"');
+    let end = rest.find('"').unwrap_or(rest.len());
+    let path = rest[..end].split_whitespace().next().unwrap_or("");
+    (!path.is_empty()).then(|| PathBuf::from(path))
+}
+
+/// The folders whose `daemon.json` files name the daemons of this run: the run root, else the
+/// temp dir.
+fn search_roots() -> Vec<PathBuf> {
+    let root = std::env::var_os(ROOT_VAR).map(PathBuf::from);
+    vec![root.unwrap_or_else(std::env::temp_dir)]
+}
+
+/// Pid and folder of each `daemon.json` under `roots`: in a folder directly under a root or a few
+/// levels deeper (a test home is `<root>/<test folder>/home`); a root that is the temp dir is
+/// searched only in the folders named `toknila-*`.
+pub fn daemon_json_homes(roots: &[PathBuf]) -> Vec<(u32, PathBuf)> {
+    fn walk(dir: &Path, depth: u32, out: &mut Vec<(u32, PathBuf)>) {
+        if let Ok(text) = std::fs::read_to_string(dir.join("daemon.json"))
+            && let Some(pid) = pid_in_json(&text)
+        {
+            out.push((pid, dir.to_path_buf()));
+        }
+        if depth == 0 {
+            return;
+        }
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in entries.filter_map(Result::ok) {
+            if e.path().is_dir() {
+                walk(&e.path(), depth - 1, out);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for root in roots {
+        let is_temp = root == &std::env::temp_dir();
+        let Ok(entries) = std::fs::read_dir(root) else {
+            continue;
+        };
+        walk(root, 0, &mut out);
+        for e in entries.filter_map(Result::ok) {
+            let name = e.file_name();
+            if e.path().is_dir() && (!is_temp || name.to_string_lossy().starts_with("toknila-")) {
+                walk(&e.path(), 4, &mut out);
+            }
+        }
+    }
+    out
+}
+
+/// The number after `"pid":` in the text of a `daemon.json`.
+pub fn pid_in_json(text: &str) -> Option<u32> {
+    let rest = text.split("\"pid\"").nth(1)?.trim_start();
+    let rest = rest.strip_prefix(':')?.trim_start();
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    digits.parse().ok()
+}
+
 /// `pid etime command` of one `ps` line.
 fn split_line(line: &str) -> Option<(u32, u64, &str)> {
     let mut parts = line.split_whitespace();
@@ -281,22 +404,29 @@ pub fn parse_line(line: &str) -> Option<(u32, u64, &str)> {
 }
 
 fn is_daemon_run(command: &str) -> bool {
-    let words: Vec<&str> = command.split_whitespace().collect();
-    let exe = words
-        .first()
-        .and_then(|w| Path::new(w).file_stem())
+    // A Windows command line quotes a program path with spaces: `"C:\a b\tok.exe" daemon run`.
+    let (exe, rest) = match command.strip_prefix('"').and_then(|c| c.split_once('"')) {
+        Some((exe, rest)) => (exe, rest),
+        None => command
+            .split_once(char::is_whitespace)
+            .unwrap_or((command, "")),
+    };
+    let exe = Path::new(exe.rsplit(['/', '\\']).next().unwrap_or(exe))
+        .file_stem()
         .and_then(|s| s.to_str());
+    let mut words = rest.split_whitespace();
     matches!(exe, Some("tok" | "toknila"))
-        && words.get(1) == Some(&"daemon")
-        && words.get(2) == Some(&"run")
+        && words.next() == Some("daemon")
+        && words.next() == Some("run")
 }
 
 /// The program is `fake-agent`, or a shell or interpreter running a file of that name.
 fn is_fake_agent(command: &str) -> bool {
-    command
-        .split_whitespace()
-        .take(2)
-        .any(|w| Path::new(w).file_stem().and_then(|s| s.to_str()) == Some("fake-agent"))
+    command.split_whitespace().take(2).any(|w| {
+        let w = w.trim_matches('"');
+        let name = w.rsplit(['/', '\\']).next().unwrap_or(w);
+        Path::new(name).file_stem().and_then(|s| s.to_str()) == Some("fake-agent")
+    })
 }
 
 /// `[[dd-]hh:]mm:ss` as seconds.
@@ -351,6 +481,62 @@ mod tests {
         assert_eq!(parse_etime("02:03:04"), Some(7384));
         assert_eq!(parse_etime("4-00:00:01"), Some(345_601));
         assert_eq!(parse_etime("x"), None);
+    }
+
+    /// What `WINDOWS_LISTING` printed on a Windows runner (CRLF, a quoted path with a space, a
+    /// daemon without `TOKNILA_HOME` in its command line, a line with no command line).
+    const RECORDED: &str = "4120 35 \"C:\\Program Files\\toknila\\target\\debug\\tok.exe\" daemon run --exit-with-parent\r\n\
+        5230 12 C:\\a\\target\\debug\\tok.exe daemon run TOKNILA_HOME=C:\\Users\\runneradmin\\AppData\\Local\\Temp\\toknila-verify-77\\t1\\home\r\n\
+        6001 7200 \"C:\\a\\target\\debug\\fake-agent.exe\" sleep toknila-fa-r9-lost-answer-Q1w2E3 hold\r\n\
+        6002 5\r\n\
+        6003 9 C:\\a\\target\\debug\\tok.exe daemon status\r\n\
+        \r\n\
+        7000 4 \"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -Command Get-CimInstance 'daemon run'\r\n";
+
+    #[test]
+    fn the_powershell_listing_parses_into_daemons_and_agents() {
+        let home = PathBuf::from(
+            "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\toknila-verify-77\\t0\\home",
+        );
+        let (daemons, agents) = parse_windows(RECORDED, &[(4120, home.clone())]);
+        assert_eq!(daemons.len(), 2, "{daemons:?}");
+        // Home from daemon.json, by pid.
+        assert_eq!((daemons[0].pid, daemons[0].age), (4120, 35));
+        assert_eq!(daemons[0].home, home);
+        // Home from the command line.
+        assert_eq!((daemons[1].pid, daemons[1].age), (5230, 12));
+        assert_eq!(
+            daemons[1].home,
+            PathBuf::from(
+                "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\toknila-verify-77\\t1\\home"
+            )
+        );
+        assert_eq!(agents.len(), 1, "{agents:?}");
+        assert_eq!(
+            (agents[0].pid, agents[0].age, agents[0].home.clone()),
+            (6001, 7200, None)
+        );
+        assert!(agents[0].command.contains("toknila-fa-r9-lost-answer"));
+        // The e2e check names the agent of its run through the marker in the command line.
+        let found = e2e_leftovers(&daemons, &agents, "r9", &[]);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].1.contains("of spec lost-answer"), "{found:?}");
+        // A daemon whose home is unknown is not listed, as on Unix.
+        assert!(parse_windows(RECORDED, &[]).0.len() == 1);
+    }
+
+    #[test]
+    fn a_daemon_json_names_the_pid_of_its_folder() {
+        assert_eq!(pid_in_json("{\"pid\": 4120, \"port\": 1}"), Some(4120));
+        assert_eq!(pid_in_json("{\"port\":1,\"pid\":7}"), Some(7));
+        assert_eq!(pid_in_json("{}"), None);
+        let dir = std::env::temp_dir().join(format!("toknila-xtask-homes-{}", std::process::id()));
+        let home = dir.join("t").join("home");
+        std::fs::create_dir_all(&home).expect("folder");
+        std::fs::write(home.join("daemon.json"), "{\"pid\": 99}").expect("file");
+        let found = daemon_json_homes(std::slice::from_ref(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(found, vec![(99, home)]);
     }
 
     #[test]
