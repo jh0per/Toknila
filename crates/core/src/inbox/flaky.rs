@@ -20,6 +20,7 @@ pub(super) fn of_card(t: &Ticket) -> Option<InboxItem> {
     i.detail = Some(check.flaky_output.clone());
     // Nothing the card's own actions could do: the item is read, then dismissed.
     i.allowed_actions = Vec::new();
+    i.needs_human = false;
     Some(i)
 }
 
