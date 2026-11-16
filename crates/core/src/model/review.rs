@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Actor, Chain, Project, ReviewMode, Ticket, Timestamp};
+use super::{Actor, Chain, LoadHold, Project, ReviewMode, Ticket, Timestamp};
 
 /// A reviewer's decision about the work.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -204,27 +204,6 @@ pub enum ReviewTurn {
     /// The work was accepted and its merge into the base branch is running on the host. Nobody
     /// is awaited; the outcome arrives as an event (`MergeDone`, or a block with the reason).
     Merging,
-}
-
-/// Why a check that has a free place still waits: the machine's one-minute load average is at
-/// or above its core count.
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LoadHold {
-    /// The one-minute load average, rounded.
-    pub load: u32,
-    /// The number of CPU cores.
-    pub cores: u32,
-}
-
-impl LoadHold {
-    /// What the card says: `waits for the machine: load 41 on 16 cores`.
-    pub fn words(&self) -> String {
-        format!(
-            "waits for the machine: load {} on {} cores",
-            self.load, self.cores
-        )
-    }
 }
 
 /// Where a card's check stands while its turn is `Check`. The checker reports `Syncing` and
