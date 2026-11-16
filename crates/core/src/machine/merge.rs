@@ -14,10 +14,24 @@ pub(super) fn done(next: &mut Ticket, effects: &mut Vec<Effect>) -> Option<Outco
     next.review.turn = None;
     next.review.note = None;
     next.review.accepted = false;
+    next.review.accept_withdrawn = None;
     effects.push(Effect::RetireShip);
     effects.push(Effect::StopRunner);
     effects.push(Effect::DependencySatisfied);
     Some((TicketStatus::Merged, None))
+}
+
+/// The reviewer just asked for changes (its round is the last): a person's remembered Accept
+/// stands across the daemon's own rounds only, so new work voids it and the person looks again.
+pub(super) fn withdraw_accept(next: &mut Ticket, effects: &mut Vec<Effect>) {
+    if !next.review.accepted {
+        return;
+    }
+    next.review.accepted = false;
+    next.review.accept_withdrawn = Some(next.review.rounds.len().try_into().unwrap_or(u32::MAX));
+    effects.push(Effect::RecordNotice {
+        summary: crate::ACCEPT_WITHDRAWN.to_owned(),
+    });
 }
 
 /// The merge of an accepted card conflicted: the card goes back to the worker with `text`, a

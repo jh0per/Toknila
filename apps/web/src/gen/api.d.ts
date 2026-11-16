@@ -3914,6 +3914,13 @@ export interface components {
         /** @description A ticket's review state: whose turn it is while in Review, and every round so far. */
         Review: {
             /**
+             * Format: int32
+             * @description The number of the round in which the reviewer asked for changes after a person's Accept
+             *     and so voided it; the card waits for the person as for a first review and says so.
+             *     Cleared when a person decides.
+             */
+            accept_withdrawn?: number | null;
+            /**
              * @description A person accepted, but the merge met a conflict and the card went back to the worker: the
              *     next hand-in that passes the check and the reviewer merges without a second Accept.
              */

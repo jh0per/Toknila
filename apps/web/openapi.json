@@ -11846,6 +11846,15 @@
         "type": "object",
         "description": "A ticket's review state: whose turn it is while in Review, and every round so far.",
         "properties": {
+          "accept_withdrawn": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The number of the round in which the reviewer asked for changes after a person's Accept\nand so voided it; the card waits for the person as for a first review and says so.\nCleared when a person decides.",
+            "minimum": 0
+          },
           "accepted": {
             "type": "boolean",
             "description": "A person accepted, but the merge met a conflict and the card went back to the worker: the\nnext hand-in that passes the check and the reviewer merges without a second Accept."

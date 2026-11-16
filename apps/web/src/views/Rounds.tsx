@@ -1,5 +1,5 @@
 import type { TicketDetail } from "../api/types";
-import { awaitingText, basisText, isFlakyRound, itemRows, loopText, roundText, whenText } from "../store/review";
+import { ACCEPT_WITHDRAWN, awaitingText, basisText, isFlakyRound, itemRows, loopText, roundText, whenText } from "../store/review";
 
 /// The acceptance items of a verdict, each with whether the reviewer ran what shows it or only read.
 function RoundItems({ comment }: { comment: string }) {
@@ -35,6 +35,9 @@ export function Rounds({ detail }: { detail?: TicketDetail }) {
             {isFlakyRound(r) && <span className="flaky muted" data-testid="flaky-mark" title="A test failed once and passed on the second run">flaky</span>}{" "}
             <time className="muted" dateTime={new Date(r.decided_at).toISOString()}>{whenText(r.decided_at)}</time>
             <RoundItems comment={r.comment} />
+            {detail?.ticket?.review?.accept_withdrawn === r.number && (
+              <p className="muted" data-testid="accept-withdrawn">{ACCEPT_WITHDRAWN}</p>
+            )}
           </li>
         ))}
       </ul>

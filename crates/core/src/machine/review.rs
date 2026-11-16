@@ -58,6 +58,7 @@ pub(super) fn person_decides(
 ) {
     leave(next, effects);
     next.review.accepted &= verdict == Verdict::Approve;
+    next.review.accept_withdrawn = None;
     next.review.record(Actor::Human, verdict, comment, now);
 }
 
@@ -204,6 +205,9 @@ pub(super) fn agent_decides(
         return super::unfounded::wait_for_person(next, &text, effects);
     }
     next.review.record(Actor::Agent, verdict, &text, now);
+    if verdict == Verdict::RequestChanges {
+        super::merge::withdraw_accept(next, effects);
+    }
     // The reviewer is done: its process ends and its slot is free. The worker's runner stays.
     effects.push(Effect::StopReviewer);
     match verdict {

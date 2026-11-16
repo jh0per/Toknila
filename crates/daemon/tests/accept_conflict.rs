@@ -57,6 +57,12 @@ struct Rig {
 
 impl Rig {
     async fn new() -> Rig {
+        Rig::with_mode("human").await
+    }
+
+    /// A rig whose project reviews in `mode`; the reviewer is the simulated one, whose verdict
+    /// the test sends.
+    async fn with_mode(mode: &str) -> Rig {
         let tmp = tempfile::tempdir().expect("tmp");
         let repo = tmp.path().join("repo");
         std::fs::create_dir_all(&repo).expect("mkdir");
@@ -104,7 +110,8 @@ impl Rig {
             Method::POST,
             "/v1/projects",
             json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(),
-                    "default_profile": "fake", "default_review_mode": "human" }),
+                    "default_profile": "fake", "default_review_mode": mode,
+                    "default_reviewer": "sim-reviewer" }),
         )
         .await;
         rig.call(
@@ -251,5 +258,81 @@ async fn a_conflict_at_accept_restarts_the_agent_with_the_return_and_its_next_ha
         .output()
         .expect("git");
     assert_eq!(String::from_utf8_lossy(&shown.stdout), "ship says hi\n");
+    rig.runners.stop_role(rig.ticket, AgentRole::Worker);
+}
+
+#[tokio::test]
+async fn a_reviewer_who_asks_for_changes_after_the_conflict_round_voids_the_accept() {
+    let rig = Rig::with_mode("both").await;
+    rig.output_with("DEMO-1").await;
+    let ship = PathBuf::from(
+        rig.card().await["ship"]["path"]
+            .as_str()
+            .expect("the card has a ship"),
+    );
+    let verdict = |v: &'static str, comment: &'static str| json!({ "event": "review_verdict", "verdict": v, "comment": comment, "items": [] });
+    // Hand in; the simulated reviewer approves, so the card waits for the person.
+    commit_file(&ship, "README.md", "ship says hi\n");
+    rig.hand_in("done").await;
+    rig.call(
+        Method::POST,
+        "/v1/tickets/DEMO-1/events",
+        verdict("approve", "fine"),
+    )
+    .await;
+    assert_eq!(rig.card().await["review"]["awaiting"]["by"], "person");
+    rig.runners.stop_role(rig.ticket, AgentRole::Worker);
+
+    // The base conflicts; the person accepts; the card goes back for the conflict round.
+    commit_file(&rig.repo, "README.md", "base says hi\n");
+    rig.call(Method::POST, "/v1/tickets/DEMO-1/actions/accept", json!({}))
+        .await;
+    assert_eq!(rig.card().await["ticket"]["status"], "running");
+    rig.output_with("This story was returned").await;
+
+    // The agent resolves it and hands in; the reviewer asks for changes; the agent adds them.
+    git(&ship, &["merge", "--no-edit", "-s", "ours", "develop"]);
+    rig.hand_in("merged").await;
+    rig.call(
+        Method::POST,
+        "/v1/tickets/DEMO-1/events",
+        verdict("request_changes", "the tests are red"),
+    )
+    .await;
+    let card = rig.card().await;
+    assert_eq!(card["ticket"]["status"], "running", "{card}");
+    // Rounds: 1 check, 2 reviewer, 3 person, 4 conflict, 5 check, 6 the reviewer's request.
+    assert_eq!(card["ticket"]["review"]["accept_withdrawn"], 6, "{card}");
+    commit_file(&ship, "NOTES.md", "tests\n");
+    rig.hand_in("tests added").await;
+    rig.call(
+        Method::POST,
+        "/v1/tickets/DEMO-1/events",
+        verdict("approve", "now fine"),
+    )
+    .await;
+
+    // The card waits for the person, who has not seen this work; develop is untouched.
+    let card = rig.card().await;
+    assert_eq!(card["ticket"]["status"], "review", "{card}");
+    assert_eq!(card["review"]["awaiting"]["by"], "person", "{card}");
+    assert_eq!(card["ticket"]["review"]["accept_withdrawn"], 6, "{card}");
+    let shown = Command::new("git")
+        .arg("-C")
+        .arg(&rig.repo)
+        .args(["show", "develop:README.md"])
+        .output()
+        .expect("git");
+    assert_eq!(String::from_utf8_lossy(&shown.stdout), "base says hi\n");
+    let comments = card["comments"].to_string();
+    assert!(
+        comments.contains("Accept withdrawn: the reviewer asked for changes after it"),
+        "the journal says so: {comments}"
+    );
+
+    // Their own Accept then merges.
+    rig.call(Method::POST, "/v1/tickets/DEMO-1/actions/accept", json!({}))
+        .await;
+    assert_eq!(rig.card().await["ticket"]["status"], "merged");
     rig.runners.stop_role(rig.ticket, AgentRole::Worker);
 }
