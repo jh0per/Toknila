@@ -55,6 +55,20 @@ pub struct Release {
     /// The git tag of the release (`v1.4.0`), set when a release run made it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
+    /// Set when the epic shipped inside another epic's tag: the tag and the epic that cut it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub released_with: Option<ReleasedWith>,
+}
+
+/// The tag an epic's work shipped in, and the epic whose release run (or a person) made it count.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReleasedWith {
+    /// The git tag (`v0.3.3`).
+    pub tag: String,
+    /// The name of the epic whose release run made the tag; none for a tag a person made.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
 }
 
 impl Release {
@@ -77,6 +91,7 @@ impl Release {
             cut_at: None,
             released_at: None,
             tag: None,
+            released_with: None,
         }
     }
 }

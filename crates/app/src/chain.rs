@@ -14,6 +14,7 @@ use crate::{
 };
 
 mod cross;
+mod release;
 
 /// A chain being changed by one command. Every step is journaled by the graph
 /// ([`ChainView::record`]) so each transition, including intermediate ones

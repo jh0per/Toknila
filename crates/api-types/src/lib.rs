@@ -40,7 +40,8 @@ pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedCha
 pub use profiles::ProfileList;
 pub use questions::{AnswerOutcome, NewAnswer, PermissionAsk, PermissionDecision, PermissionReply};
 pub use release_run::{
-    ReleaseOffer, ReleaseRun, RunState, RunStep, StartRelease, StepState, VersionSuggestion,
+    MarkRelease, ReleaseOffer, ReleaseRun, RunState, RunStep, StartRelease, StepState,
+    VersionSuggestion,
 };
 pub use removal::{ChainDeletion, DeleteProject, ProjectDeletion};
 pub use runner::TerminalSize;

@@ -2,7 +2,7 @@ import { type ReactNode, useState } from "react";
 import type { Project } from "../api/types";
 import { ESTIMATE_NOTE, costText } from "../format";
 import { runningSpend, todayOf } from "../store/spend";
-import { KIND_TITLE, itemKey, itemRoute } from "../store/inbox";
+import { KIND_TITLE, itemKey, itemRoute, needsPerson } from "../store/inbox";
 import type { Intent } from "../store/msg";
 import type { State } from "../store/state";
 import { agentsOf, inboxOf, runRouteIn } from "../store/tree";
@@ -48,7 +48,7 @@ const leafRow = (children: ReactNode) => (
 export function InboxNode({ project, state, dispatch, onScreen }: Props) {
   const [touched, setTouched] = useState<boolean>();
   const open = touched ?? onScreen;
-  const items = inboxOf(state, project);
+  const items = inboxOf(state, project).filter(needsPerson);
   const sel = state.route.name === "inbox" && state.route.project === project.key;
   return (
     <Node

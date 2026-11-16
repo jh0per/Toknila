@@ -12,6 +12,7 @@
 //! | `leftovers` | a card was done out of order and an earlier card still has open subtasks that nobody dismissed |
 //! | `design_question` | a pin of the assistant on a design is about the card and the person has not answered it |
 //! | `pin` | an open pin of the assistant has no card (or its card is not in the project); it is answered in place |
+//! | `answered` | a person answered a question or permission and its agent, which has no process, waits for a free slot; informational (`needs_human: false`), listed after the person's items |
 //!
 //! Items come newest first. The person's actions on them are the ordinary ones (approve,
 //! reject, unblock, a comment, approve a thread) plus the three leftover actions in
@@ -20,6 +21,7 @@
 pub mod hand_in;
 pub mod leftovers;
 mod pins;
+mod questions;
 mod screens;
 
 use std::collections::BTreeSet;
@@ -55,6 +57,8 @@ pub enum InboxKind {
     DesignQuestion,
     /// The assistant pinned a question on a design and no card owns it; answered in place.
     Pin,
+    /// A person answered and the answer waits for a free slot; informational.
+    Answered,
 }
 
 /// One entry of the inbox.
@@ -128,6 +132,8 @@ pub struct InboxItem {
     /// The name of the design a pin is about (`design_question` items).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub design: Option<String>,
+    /// Whether the item waits on a person; an `answered` row only informs.
+    pub needs_human: bool,
 }
 
 /// Says on a worker's permission question what "Allow always" would add, or why nothing.
@@ -178,6 +184,8 @@ pub struct InboxData {
     pub runs: Vec<RunFacts>,
     /// The comments of the cards in review (the hand-in is read from them).
     pub comments: Vec<Comment>,
+    /// Place in line (1 is next) of the cards that wait for a slot.
+    pub positions: Vec<(crate::TicketId, u32)>,
 }
 
 impl Default for InboxData {
@@ -191,20 +199,25 @@ impl Default for InboxData {
             permissions: Vec::new(),
             runs: Vec::new(),
             comments: Vec::new(),
+            positions: Vec::new(),
         }
     }
 }
 
 /// The inbox of a project, newest first (ties by key).
 pub fn compute(data: &InboxData) -> Vec<InboxItem> {
-    let mut items: Vec<InboxItem> = data.tickets.iter().filter_map(card_item).collect();
+    let mut items: Vec<InboxItem> = data
+        .tickets
+        .iter()
+        .filter_map(|t| questions::answered(t, data).or_else(|| card_item(t)))
+        .collect();
     items.extend(
         data.threads
             .iter()
             .filter_map(|f| thread_item(f, &data.tickets)),
     );
     items.extend(leftover_items(data));
-    items.extend(question_items(data));
+    items.extend(questions::items(data));
     items.extend(pins::pin_items(data));
     for i in items.iter_mut().filter(|i| i.kind == InboxKind::Review) {
         if let Some(t) = data
@@ -215,7 +228,12 @@ pub fn compute(data: &InboxData) -> Vec<InboxItem> {
             i.hand_in = hand_in::of_card(t, &data.comments);
         }
     }
-    items.sort_by(|a, b| b.since.cmp(&a.since).then_with(|| a.ticket.cmp(&b.ticket)));
+    // What needs the person first; the informational rows after, greyed by the clients.
+    items.sort_by(|a, b| {
+        (b.needs_human.cmp(&a.needs_human))
+            .then_with(|| b.since.cmp(&a.since))
+            .then_with(|| a.ticket.cmp(&b.ticket))
+    });
     items
 }
 
@@ -247,6 +265,7 @@ fn item(kind: InboxKind, t: &Ticket, since: Timestamp, text: String) -> InboxIte
         allow_always_none: None,
         hand_in: None,
         design: None,
+        needs_human: true,
     }
 }
 
@@ -336,30 +355,6 @@ fn card_item(t: &Ticket) -> Option<InboxItem> {
         }
     }
     Some(i)
-}
-
-/// The questions that no card status shows: a permission dialog a run reported, and a run that
-/// waits on its screen.
-fn question_items(data: &InboxData) -> Vec<InboxItem> {
-    let card = |id| data.tickets.iter().find(|t| t.id == id);
-    let mut items = Vec::new();
-    for p in &data.permissions {
-        let Some(t) = card(p.ticket) else { continue };
-        // The worker's dialog already makes the card Waiting, and the card lists it.
-        if p.role == AgentRole::Worker && t.status == TicketStatus::Waiting {
-            continue;
-        }
-        let mut i = item(InboxKind::Question, t, p.since, p.text.clone());
-        i.role = Some(p.role);
-        i.detail.clone_from(&p.detail);
-        i.answers = QuestionKind::Permission.answers();
-        if p.role == AgentRole::Worker {
-            set_allow_always(&mut i);
-        }
-        items.push(i);
-    }
-    items.extend(screens::items(data));
-    items
 }
 
 fn thread_item(f: &ThreadFacts, tickets: &[Ticket]) -> Option<InboxItem> {

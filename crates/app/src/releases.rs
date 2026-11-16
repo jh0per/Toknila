@@ -3,12 +3,14 @@
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use toknila_core::graph::ChainView;
 use toknila_core::{
-    ChainId, Edge, EdgeKind, NodeRef, Release, ReleaseChannel, ReleaseId, ReleaseState, StartMode,
+    ChainId, Edge, EdgeKind, NodeRef, ProjectId, Release, ReleaseChannel, ReleaseId, ReleaseState,
+    StartMode,
 };
 
 use crate::chains::change;
-use crate::{AppError, AppResult, UnitOfWork, with_chain};
+use crate::{AppError, AppResult, Reader, UnitOfWork, with_chain};
 
 /// `POST /v1/chains/{chain}/releases`.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -188,13 +190,139 @@ pub fn begin<U: UnitOfWork + ?Sized>(
     Ok((release, project))
 }
 
-/// Marks a cut milestone released with the tag its release run made.
-pub fn finish<U: UnitOfWork + ?Sized>(uow: &mut U, release: ReleaseId, tag: &str) -> AppResult<()> {
+/// Marks a cut milestone released with the tag its release run made, and every epic in `carried`
+/// (the finished epics the tag contains, see [`finished_epics`]) released with it.
+pub fn finish<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    release: ReleaseId,
+    tag: &str,
+    carried: &[ChainId],
+) -> AppResult<()> {
     let r = uow
         .release(release)?
         .ok_or_else(|| AppError::not_found("release"))?;
+    let by = uow.chain(r.chain_id)?.map(|c| c.name);
     with_chain(uow, r.chain_id, |ctx| -> AppResult<()> {
         ctx.complete_release(release, Some(tag.to_owned()))?;
         Ok(())
+    })?;
+    for chain in carried {
+        // An epic that changed since the run looked (a story reopened, released by hand) stays.
+        let still = uow.chain_view(*chain)?.is_some_and(|v| ships_in_a_tag(&v));
+        if still {
+            mark_with(uow, *chain, tag, by.as_deref())?;
+        }
+    }
+    Ok(())
+}
+
+/// A finished epic of a project, as a tag has to contain it to carry it.
+#[derive(Debug, Clone)]
+pub struct FinishedEpic {
+    pub chain: ChainId,
+    pub name: String,
+    /// The keys of its Merged stories.
+    pub keys: Vec<String>,
+}
+
+fn ships_in_a_tag(v: &ChainView) -> bool {
+    v.carriable()
+        && v.finish_release()
+            .is_some_and(|r| r.state == ReleaseState::Planned)
+}
+
+impl FinishedEpic {
+    /// The epic of `view` when it can ship inside a tag: every story Merged, none Released or
+    /// open, and a planned release node to mark.
+    pub fn of(view: &ChainView) -> Option<Self> {
+        ships_in_a_tag(view).then(|| Self {
+            chain: view.chain.id,
+            name: view.chain.name.clone(),
+            keys: view
+                .tickets
+                .iter()
+                .filter(|t| t.in_plan() && t.status == toknila_core::TicketStatus::Merged)
+                .map(|t| t.key.to_string())
+                .collect(),
+        })
+    }
+}
+
+/// The finished epics of a project, but `except`: what a tag of a release run may carry.
+pub fn finished_epics<R: Reader + ?Sized>(
+    repo: &R,
+    project: ProjectId,
+    except: Option<ChainId>,
+) -> AppResult<Vec<FinishedEpic>> {
+    let mut found = Vec::new();
+    for c in repo.chains(Some(project))? {
+        if Some(c.id) != except
+            && let Some(view) = repo.chain_view(c.id)?
+            && let Some(epic) = FinishedEpic::of(&view)
+        {
+            found.push(epic);
+        }
+    }
+    Ok(found)
+}
+
+/// The epic of the project whose release run made `tag`, by name.
+pub fn cutter_of<R: Reader + ?Sized>(
+    repo: &R,
+    project: ProjectId,
+    tag: &str,
+) -> AppResult<Option<String>> {
+    for c in repo.chains(Some(project))? {
+        if let Some(view) = repo.chain_view(c.id)?
+            && view
+                .releases
+                .iter()
+                .any(|r| r.tag.as_deref() == Some(tag) && r.released_with.is_none())
+        {
+            return Ok(Some(c.name));
+        }
+    }
+    Ok(None)
+}
+
+/// Marks the epic's planned release released with `tag`, named by the epic that cut it when there
+/// is one. The caller checked that the tag contains the epic's merges.
+pub fn mark_with<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    chain: ChainId,
+    tag: &str,
+    by: Option<&str>,
+) -> AppResult<()> {
+    with_chain(uow, chain, |ctx| -> AppResult<()> {
+        ctx.release_with(tag, by)?;
+        Ok(())
     })
+}
+
+/// Refuses `version` when another unreleased epic of the project plans it. `except` is the epic
+/// being saved.
+pub fn ensure_version_free<R: Reader + ?Sized>(
+    repo: &R,
+    project: ProjectId,
+    except: Option<ChainId>,
+    version: &str,
+) -> AppResult<()> {
+    for c in repo.chains(Some(project))? {
+        if Some(c.id) == except {
+            continue;
+        }
+        let Some(view) = repo.chain_view(c.id)? else {
+            continue;
+        };
+        let released = view
+            .finish_release()
+            .is_some_and(|r| r.state == ReleaseState::Released);
+        if !released && view.version().as_deref() == Some(version) {
+            return Err(AppError::conflict(format!(
+                "{version} is planned by {}; pick another version or move that one",
+                c.name
+            )));
+        }
+    }
+    Ok(())
 }

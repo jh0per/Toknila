@@ -39,8 +39,8 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
         agents::*, asks::*, chains::*, conversation::*, designs::*, events::*, inbox::*, pins::*,
         planner::*, planner_activity::*, planner_run::*, plans::*, profiles::*, projects::*,
-        questions::*, releases::*, runner::*, strays::*, system::*, threads::*, tickets::*,
-        usage::*, workspaces::*,
+        questions::*, release_mark::*, releases::*, runner::*, strays::*, system::*, threads::*,
+        tickets::*, usage::*, workspaces::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -145,6 +145,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(release_offer))
         .routes(routes!(next_version))
         .routes(routes!(start_release))
+        .routes(routes!(mark_release))
         .routes(routes!(release_run))
         .routes(routes!(list_events))
         .routes(routes!(agent_event))
