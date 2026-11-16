@@ -7075,7 +7075,10 @@ export interface operations {
     };
     delete_design: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `true` or `1`: remove the references and open pins too */
+                force?: string;
+            };
             header?: never;
             path: {
                 /** @description Project id or key */
