@@ -218,6 +218,24 @@ impl Store {
         .unwrap_or_else(|e| Err(ShipError::Io(format!("look panicked: {e}"))))
     }
 
+    /// The built or ignored files the ship's commits add up to `head`, unless `prompt` names them.
+    /// A store without a shipyard has none. Looks on a blocking thread.
+    pub async fn built_artifacts(
+        &self,
+        look: ShipLook,
+        head: String,
+        prompt: String,
+    ) -> Result<Vec<String>, ShipError> {
+        let Some(yard) = self.yard.clone() else {
+            return Ok(Vec::new());
+        };
+        tokio::task::spawn_blocking(move || {
+            toknila_app::hand_in::built_artifacts(&*yard, &look, &head, &prompt)
+        })
+        .await
+        .unwrap_or_else(|e| Err(ShipError::Io(format!("look panicked: {e}"))))
+    }
+
     /// What changed since the Return that `review` is back from, up to `head`; `None` when no
     /// Return is open or git cannot say (the hand-in goes on without the block).
     pub async fn since_return(
