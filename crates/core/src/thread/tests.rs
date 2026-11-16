@@ -398,3 +398,43 @@ fn a_second_thread_of_a_kind_names_the_first_unless_it_was_withdrawn() {
         "{err}"
     );
 }
+
+fn said(t: &Thread, by: Actor, text: &str, at: i64) -> ThreadMessage {
+    message(
+        t,
+        ThreadMessageId::new(),
+        by,
+        MessageKind::Message,
+        text,
+        Timestamp(at),
+    )
+    .expect("message")
+}
+
+#[test]
+fn approval_decisions_are_the_persons_last_message_newer_than_the_approved_version() {
+    let t = thread();
+    let versions = [artifact(&t, 1, "graph TD; A-->B").expect("v1")]; // created at NOW = 10
+    let newer = said(&t, Actor::Human, "No aliases.", 11);
+    let got = approval_decisions(&versions, std::slice::from_ref(&newer), Some(1));
+    assert_eq!(got.map(|m| m.text.as_str()), Some("No aliases."));
+
+    let older = said(&t, Actor::Human, "Before.", 9);
+    assert!(approval_decisions(&versions, &[older], Some(1)).is_none());
+
+    // The boundary: a message at the very instant of the version is not newer.
+    let same = said(&t, Actor::Human, "Same instant.", 10);
+    assert!(approval_decisions(&versions, &[same], Some(1)).is_none());
+
+    // The person's last message is the one; an agent's reply after it does not hide it, and an
+    // agent's message alone is no decision.
+    let reply = said(&t, Actor::Agent, "Done.", 12);
+    let both = [newer.clone(), reply.clone()];
+    let got = approval_decisions(&versions, &both, Some(1));
+    assert_eq!(got.map(|m| m.text.as_str()), Some("No aliases."));
+    assert!(approval_decisions(&versions, &[reply], Some(1)).is_none());
+
+    // No approved version, or one that does not exist: nothing to compare with.
+    assert!(approval_decisions(&versions, std::slice::from_ref(&newer), None).is_none());
+    assert!(approval_decisions(&versions, &[newer], Some(2)).is_none());
+}
