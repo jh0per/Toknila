@@ -70,8 +70,7 @@ pub struct Repo<'c> {
     live: Vec<LiveRun>,
 }
 
-const RELEASE_COLS: &str =
-    "id, chain_id, version, channel, start_mode, state, branch, cut_at, released_at, tag";
+const RELEASE_COLS: &str = "id, chain_id, version, channel, start_mode, state, branch, cut_at, released_at, tag, released_with";
 
 impl<'c> Repo<'c> {
     /// A repository that knows which runners are alive.
@@ -94,10 +93,11 @@ impl<'c> Repo<'c> {
     pub fn upsert_release(&self, r: &Release) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO releases ({RELEASE_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
+                "INSERT INTO releases ({RELEASE_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) \
                  ON CONFLICT(id) DO UPDATE SET version = excluded.version, channel = excluded.channel, \
                  start_mode = excluded.start_mode, state = excluded.state, branch = excluded.branch, \
-                 cut_at = excluded.cut_at, released_at = excluded.released_at, tag = excluded.tag"
+                 cut_at = excluded.cut_at, released_at = excluded.released_at, tag = excluded.tag, \
+                 released_with = excluded.released_with"
             ),
             params![
                 r.id.to_string(),
@@ -110,6 +110,10 @@ impl<'c> Repo<'c> {
                 r.cut_at.map(|t| t.0),
                 r.released_at.map(|t| t.0),
                 r.tag,
+                r.released_with
+                    .as_ref()
+                    .map(serde_json::to_string)
+                    .transpose()?,
             ],
         )?;
         Ok(())
@@ -127,6 +131,7 @@ impl<'c> Repo<'c> {
             Option<i64>,
             Option<i64>,
             Option<String>,
+            Option<String>,
         );
         let mut st = self.conn.prepare(&format!(
             "SELECT {RELEASE_COLS} FROM releases WHERE chain_id = ?1 ORDER BY rowid"
@@ -143,6 +148,7 @@ impl<'c> Repo<'c> {
                 r.get(7)?,
                 r.get(8)?,
                 r.get(9)?,
+                r.get(10)?,
             ))
         })?;
         rows.map(|r| {
@@ -158,6 +164,7 @@ impl<'c> Repo<'c> {
                 cut_at: r.7.map(Timestamp),
                 released_at: r.8.map(Timestamp),
                 tag: r.9,
+                released_with: r.10.as_deref().map(serde_json::from_str).transpose()?,
             })
         })
         .collect()

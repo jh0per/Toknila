@@ -1064,6 +1064,29 @@ fn fast_forward_is_not_offered_when_it_is_not_possible_and_other_blocks_have_nei
 }
 
 #[test]
+fn only_a_resume_start_brings_a_paused_agent_back_to_running() {
+    let waiting = ticket_in(TicketStatus::Waiting);
+    let paused = apply(&waiting, &TicketEvent::AgentPaused { session: None }, NOW)
+        .expect("pause")
+        .ticket;
+    // A late sign of life or delivery from the process that ended must not give the card a slot
+    // (Running) with no start behind it.
+    for event in [
+        TicketEvent::AgentActive,
+        TicketEvent::InstructionDelivered,
+        TicketEvent::Answered,
+    ] {
+        let t = apply(&paused, &event, NOW).expect("not an error").ticket;
+        assert_eq!(t.status, TicketStatus::Waiting, "{event:?}");
+        assert_eq!(t.agent_paused, paused.agent_paused, "{event:?}");
+        assert_eq!(t.status_reason, paused.status_reason, "{event:?}");
+    }
+    // Control: a card whose agent was never paused goes back to Running as before.
+    let t = apply(&waiting, &TicketEvent::AgentActive, NOW).expect("active");
+    assert_eq!(t.ticket.status, TicketStatus::Running);
+}
+
+#[test]
 fn a_paused_agent_keeps_its_session_and_comes_back_through_a_resume_start() {
     let waiting = ticket_in(TicketStatus::Waiting);
     let session = Some("abc".to_owned());

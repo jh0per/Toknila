@@ -158,6 +158,12 @@ pub fn chain(d: &ChainDetail) {
             .map(|t| format!(", tag {t}"))
             .unwrap_or_default();
         println!("Release v{}: {}{tag}", f.version, w(&f.state));
+        if let Some(with) = &f.released_with {
+            match &with.by {
+                Some(by) => println!("released with {} by {by}", with.tag),
+                None => println!("released with {}", with.tag),
+            }
+        }
     }
     if let Some(stop) = &s.stopped_at {
         let r = match reason(stop.reason.as_ref()) {

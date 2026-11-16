@@ -67,6 +67,14 @@ fn numbers(text: &str) -> Option<Vec<u64>> {
     Some(parts)
 }
 
+/// Whether version `a` is higher than `b`, both plain versions; false when either is not one.
+pub fn is_higher(a: &str, b: &str) -> bool {
+    match (numbers(a), numbers(b)) {
+        (Some(a), Some(b)) => a > b,
+        _ => false,
+    }
+}
+
 /// The version a new epic takes: the patch after the greatest of the newest version tag (`tags`,
 /// newest first) and the versions the project's chains plan, or `0.1.0` when there is none.
 pub fn next_version<T: AsRef<str>, P: AsRef<str>>(tags: &[T], planned: &[P]) -> String {

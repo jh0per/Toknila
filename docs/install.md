@@ -283,6 +283,20 @@ tok approve DEMO-5                    # it joins the plan and starts once DEMO-1
 tok reject DEMO-5 "not now"           # or turn it down instead: Cancelled with the reason
 ```
 
+Releases belong to one epic each. A version is planned by one unreleased epic of the project:
+creating or editing an epic with a version another one plans is refused ("0.3.4 is planned by
+phase-10; pick another version or move that one"). A release run that tags `vX` on the base branch
+also marks every other finished epic of the project whose story merges the tag contains (every
+story Merged, none open or Released) as released with it: its stories become Released, its Finish
+node reads "released with vX by <epic>", and a version it planned higher becomes X. For a tag that
+already exists, say it yourself:
+
+```sh
+tok release mark phase-10 --with v0.3.3   # refused when the tag is missing or lacks the epic's merges
+tok release steps phase-10                # a release is also addressed by its epic's name
+tok release run phase-10                  # the version defaults to the epic's own
+```
+
 `--before KEY` makes planned work wait for the card; approval is refused if that work has already
 started. A person proposes a card with `tok propose demo "<title>" --after DEMO-1 --from DEMO-1`.
 
