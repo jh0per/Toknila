@@ -1,8 +1,11 @@
 //! The inbox of a project and the person's decisions about leftovers.
 
 use crate::http::body::Json;
+use axum::Extension;
 use axum::extract::{Path, State};
+use toknila_app::access::{self, Action, Caller};
 use toknila_app::leftovers::{self, LeftoverAction};
+use toknila_app::planner::{self, NewSuggestion};
 use toknila_app::{inbox, resolve};
 use toknila_core::Actor;
 use toknila_core::inbox::InboxItem;
@@ -11,7 +14,42 @@ use toknila_core::suggestion::Suggestion;
 use super::{ApiResult, read, ticket_write};
 use crate::http::dto::TicketDetail;
 use crate::http::error::ErrorBody;
-use crate::server::{AppState, now};
+use crate::server::{AppState, Principal, now};
+
+/// Keeps `caller`'s next step for `project`; only the project's planner speaks for it.
+pub(super) async fn suggest_as(
+    state: &AppState,
+    caller: Caller,
+    project: String,
+    new: NewSuggestion,
+) -> ApiResult<Suggestion> {
+    let (s, _) = state
+        .store
+        .write(caller.actor(), now(), move |tx| -> ApiResult<Suggestion> {
+            let p = resolve::project(&*tx, &project)?;
+            access::on_project(&*tx, &caller, &Action::Speak, p.id)?;
+            Ok(planner::suggest(tx, p.id, new)?)
+        })
+        .await?;
+    Ok(s)
+}
+
+#[utoipa::path(put, path = "/projects/{project}/suggestion", tag = "projects", request_body = NewSuggestion,
+    params(("project" = String, Path, description = "Project id or key")),
+    responses((status = 200, body = Suggestion), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// The project's planner keeps its next step, replacing the previous one (a `window.suggest`
+/// event). The owner's window shows it with the button of its action; the planner starts,
+/// answers and accepts nothing itself.
+pub async fn put_suggestion(
+    State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
+    Path(project): Path<String>,
+    Json(new): Json<NewSuggestion>,
+) -> ApiResult<Json<Suggestion>> {
+    Ok(Json(
+        suggest_as(&state, principal.caller(), project, new).await?,
+    ))
+}
 
 #[utoipa::path(get, path = "/projects/{project}/inbox", tag = "projects",
     params(("project" = String, Path, description = "Project id or key")),

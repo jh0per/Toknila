@@ -38,6 +38,19 @@ pub fn move_edge<U: UnitOfWork + ?Sized>(
     })
 }
 
+/// The epic `to_chain` names for a card leaving `from`: one of `from`'s project first, else any
+/// project's (which the move then refuses).
+pub fn target_epic<R: crate::Reader + ?Sized>(
+    r: &R,
+    from: &toknila_core::Chain,
+    to_chain: &str,
+) -> AppResult<toknila_core::Chain> {
+    match resolve::chain_in(r, Some(&from.project_id.to_string()), to_chain) {
+        Err(e) if e.kind == crate::ErrorKind::NotFound => resolve::chain(r, to_chain),
+        other => other,
+    }
+}
+
 /// Moves a card that has not started to another epic of its project, in one change: the card
 /// leaves its epic and joins `to_chain` at the end (after the cards nothing waits for yet) or
 /// directly before or after `place`'s anchor. A cancelled card joins loose, with no place. The
@@ -51,10 +64,7 @@ pub fn move_to_chain<U: UnitOfWork + ?Sized>(
     let from = uow
         .chain(ticket.chain_id)?
         .ok_or_else(|| AppError::not_found(format!("epic of {}", ticket.key)))?;
-    let to = match resolve::chain_in(uow, Some(&from.project_id.to_string()), to_chain) {
-        Err(e) if e.kind == crate::ErrorKind::NotFound => resolve::chain(uow, to_chain)?,
-        other => other?,
-    };
+    let to = target_epic(&*uow, &from, to_chain)?;
     let has_ship = uow.ship(ticket.id)?.is_some();
     if place.is_some() && ticket.status == toknila_core::TicketStatus::Cancelled {
         return Err(AppError::bad_request(format!(

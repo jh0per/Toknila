@@ -35,13 +35,15 @@ impl Modify for BearerAuth {
     }
 }
 
-/// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
+/// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them. The
+/// planner's old `/planner/...` routes are deprecated aliases for one release (TOKNILA-149).
+#[allow(deprecated)]
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
         agents::*, asks::*, chains::*, conversation::*, designs::*, events::*, inbox::*, pins::*,
-        planner::*, planner_activity::*, planner_run::*, plans::*, profiles::*, projects::*,
-        questions::*, release_mark::*, releases::*, runner::*, strays::*, system::*, threads::*,
-        tickets::*, usage::*, workspaces::*,
+        plan_view::*, planner::*, planner_activity::*, planner_run::*, plans::*, profiles::*,
+        projects::*, questions::*, release_mark::*, releases::*, runner::*, strays::*, system::*,
+        threads::*, tickets::*, usage::*, workspaces::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -52,11 +54,16 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(fetch_design))
         .routes(routes!(design_file))
         .routes(routes!(design_thumb))
-        .routes(routes!(rename_design, delete_design))
+        .routes(routes!(get_design, rename_design, delete_design))
         .routes(routes!(put_figma_token, delete_figma_token))
-        .routes(routes!(list_pins))
+        .routes(routes!(list_pins, ask_pin))
         .routes(routes!(answer_pin))
         .routes(routes!(planner_pin))
+        .routes(routes!(project_plan))
+        .routes(routes!(project_plan_overview))
+        .routes(routes!(chain_plan))
+        .routes(routes!(ticket_plan))
+        .routes(routes!(show_ticket))
         .routes(routes!(system_checks))
         .routes(routes!(system_places))
         .routes(routes!(cli_status))
@@ -69,7 +76,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(put_usage_settings))
         .routes(routes!(post_usage_quota))
         .routes(routes!(get_inbox))
-        .routes(routes!(get_suggestion))
+        .routes(routes!(get_suggestion, put_suggestion))
         .routes(routes!(resolve_leftovers))
         .routes(routes!(dismiss_flaky))
         .routes(routes!(create_chain))

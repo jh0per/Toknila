@@ -10,7 +10,7 @@
 
 use crate::conversation::Message;
 use crate::planner;
-use crate::{Actor, AgentRole, Chain, ProjectId, Ticket, TicketId};
+use crate::{Actor, AgentRole, Chain, Project, ProjectId, Ticket, TicketId};
 
 /// Who calls, as its token says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +59,8 @@ pub enum Action {
     /// Change a story's words, checklist, designs or model. `owner_fields`: anything else.
     EditStory { owner_fields: bool },
     /// Change an epic's graph: add or remove a dependency, move a story in or out of it.
-    ChangeGraph,
+    /// `owner_fields`: a dependency that waits for a release rather than for the story.
+    ChangeGraph { owner_fields: bool },
     /// Ask the window to show a story.
     ShowStory,
     /// Open a thread on a story, or write in one.
@@ -107,6 +108,8 @@ const EPIC_SETTINGS: &str = "an epic's autostart, review mode and reviewer";
 /// What a planner may not set: the owner's settings of a story.
 const STORY_SETTINGS: &str = "a story's agent profile, review mode, reviewer, secrets, pause, \
      the stories it goes before and its place on the canvas";
+/// What a planner may not set: a dependency of another kind than a plain one.
+const GRAPH_SETTINGS: &str = "a dependency that waits for a release";
 
 /// Why a caller may not do what it asked.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -198,6 +201,22 @@ pub fn new_epic_autostart(caller: &Caller, asked: Option<bool>) -> bool {
     })
 }
 
+/// The model `caller` may name for a story, cleaned: the assistant names an alias or a full
+/// model name, a person types any one word. Empty text clears it.
+pub fn story_model(caller: &Caller, text: &str) -> Result<Option<String>, String> {
+    match caller {
+        Caller::Planner(_) => Project::choose_model(text),
+        _ => Project::clean_model(text).map_err(str::to_owned),
+    }
+}
+
+/// Whether a new prompt or acceptance `caller` gives a story the person talks over with the
+/// assistant is only a proposal, which lands when the person accepts it. The person's own edit
+/// lands at once.
+pub fn proposes_edits(caller: &Caller) -> bool {
+    matches!(caller, Caller::Planner(_))
+}
+
 /// Whether `caller` may do `action` on `target`.
 pub fn may(caller: &Caller, action: &Action, target: &Target<'_>) -> Result<(), Refusal> {
     match *caller {
@@ -260,7 +279,10 @@ fn planner_may(project: ProjectId, action: &Action, t: &Target<'_>) -> Result<()
                 planner::ensure_story_target(t.turn, c)?;
             }
         }
-        Action::ChangeGraph => {
+        Action::ChangeGraph { owner_fields } => {
+            if owner_fields {
+                return Err(Refusal::OwnerOnly(GRAPH_SETTINGS));
+            }
             if let Some(c) = t.epic {
                 planner::ensure_graph_change(c)?;
             }

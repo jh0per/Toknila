@@ -1,12 +1,12 @@
 //! The planner's `move_card`: a card goes next to another of its epic, or to another epic of the
-//! project.
+//! project. Both are the person's moves ([`crate::as_caller`]) made as the planner.
 
 use toknila_core::graph::Place;
 use toknila_core::{ChainId, ProjectId};
 
-use super::{card, chain, chain_for, move_card};
-use crate::access::Action;
-use crate::{AppError, AppResult, UnitOfWork};
+use super::move_card;
+use crate::access::Caller;
+use crate::{AppError, AppResult, UnitOfWork, as_caller};
 
 /// Moves a card that has not started from `chain_ref` to another epic of the planner's project,
 /// to the end or next to `place`'s anchor. Neither epic may start its cards by itself. Returns the
@@ -19,20 +19,22 @@ pub fn move_card_to_chain<U: UnitOfWork + ?Sized>(
     to_chain: &str,
     place: Option<(&str, Place)>,
 ) -> AppResult<ChainId> {
-    // Both epics are the planner's before either is looked at for autostart, as before.
-    chain(&*uow, project, chain_ref)?;
-    chain(&*uow, project, to_chain)?;
-    let from = chain_for(&*uow, project, chain_ref, &Action::ChangeGraph)?;
-    let to = chain_for(&*uow, project, to_chain, &Action::ChangeGraph)?;
-    let t = card(&*uow, project, card_ref)?;
-    if t.chain_id != from.id {
-        return Err(AppError::bad_request(format!(
-            "{} is not in epic {}",
-            t.key, from.name
-        )));
+    let caller = Caller::Planner(project);
+    as_caller::move_story_to_epic(uow, &caller, card_ref, to_chain, place, Some(chain_ref))
+}
+
+/// The anchor and place a move names: both, or neither.
+fn anchor_and_place(
+    anchor: Option<&str>,
+    place: Option<Place>,
+) -> AppResult<Option<(&str, Place)>> {
+    match (anchor, place) {
+        (Some(a), Some(p)) => Ok(Some((a, p))),
+        (None, None) => Ok(None),
+        _ => Err(AppError::bad_request(
+            "give both anchor and place, or neither",
+        )),
     }
-    crate::moves::move_to_chain(uow, &t, &to.id.to_string(), place)?;
-    Ok(to.id)
 }
 
 /// What `POST /planner/chains/{chain}/cards/{card}/move` asks: with `to_chain` the card changes
@@ -46,15 +48,7 @@ pub fn move_card_by<U: UnitOfWork + ?Sized>(
     to: (Option<&str>, Option<&str>, Option<Place>),
 ) -> AppResult<ChainId> {
     let (to_chain, anchor, place) = to;
-    let at = match (anchor, place) {
-        (Some(a), Some(p)) => Some((a, p)),
-        (None, None) => None,
-        _ => {
-            return Err(AppError::bad_request(
-                "give both anchor and place, or neither",
-            ));
-        }
-    };
+    let at = anchor_and_place(anchor, place)?;
     match (to_chain, at) {
         (Some(to), at) => move_card_to_chain(uow, project, chain_ref, card_ref, to, at),
         (None, Some((a, p))) => move_card(uow, project, chain_ref, card_ref, a, p),

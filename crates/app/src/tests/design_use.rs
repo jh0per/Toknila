@@ -26,10 +26,13 @@ fn pin(design: DesignId, card: Option<&str>) -> NewPin {
 fn reference(mem: &mut Mem, title: &str, design: DesignId) {
     let card = mem.ticket_by_title(title);
     let patch = TicketPatch {
-        designs: Some(vec![DesignRef {
-            design,
-            region: None,
-        }]),
+        designs: Some(vec![
+            DesignRef {
+                design,
+                region: None,
+            }
+            .into(),
+        ]),
         ..TicketPatch::default()
     };
     tickets::edit(mem, &card, patch).expect("designs");

@@ -5,7 +5,9 @@
 //! [`AGENT_ROUTES`], for its own ticket; everything else, including every route added later, is
 //! refused with `403` until it is listed there on purpose. A planner's token (its role says so)
 //! reaches [`PLANNER_ROUTES`] and nothing else, so it cannot start, pause, resume, cancel,
-//! accept, return, reopen or merge anything: those routes are not on the list.
+//! accept, return, reopen or merge anything: those routes are not on the list. On a listed route,
+//! what the caller may do to what is core's `access::may` ([`Principal::caller`]), asked by the
+//! use case; no handler holds a rule of its own.
 
 use axum::Json;
 use axum::extract::{MatchedPath, Request, State};
@@ -34,10 +36,31 @@ pub const AGENT_ROUTES: [&str; 6] = [
     "/v1/usage/quota",
 ];
 
-/// The only routes a planner's token may call, as `(method, path)`. Each acts on the planner's own
-/// project, which the token names, so no path carries a project. Every route here runs a use case
-/// of `toknila_app::planner`, which checks the scope again.
-pub const PLANNER_ROUTES: [(&str, &str); 20] = [
+/// The only routes a planner's token may call, as `(method, path)`: the person's routes of the
+/// actions a planner has (TOKNILA-149), its own voice (`say`) and turn (`activity`), and, for one
+/// release, its old `/planner/...` routes as deprecated aliases. Every route here runs a use case
+/// that asks core's `access::may` as the caller the token names, so a planner reaches only its
+/// own project and only what its limits allow; nothing here starts, accepts or merges.
+pub const PLANNER_ROUTES: [(&str, &str); 39] = [
+    ("GET", "/v1/projects/{project}/plan"),
+    ("GET", "/v1/projects/{project}/plan/overview"),
+    ("GET", "/v1/projects/{project}/designs/{design}"),
+    ("GET", "/v1/chains/{chain}/plan"),
+    ("GET", "/v1/tickets/{ticket}/plan"),
+    ("POST", "/v1/projects/{project}/design-pins"),
+    ("POST", "/v1/projects/{project}/chains"),
+    ("PATCH", "/v1/chains/{chain}"),
+    ("POST", "/v1/chains/{chain}/tickets"),
+    ("PATCH", "/v1/tickets/{ticket}"),
+    ("POST", "/v1/tickets/{ticket}/show"),
+    ("PUT", "/v1/projects/{project}/suggestion"),
+    ("POST", "/v1/chains/{chain}/edges"),
+    ("DELETE", "/v1/chains/{chain}/edges"),
+    ("POST", "/v1/chains/{chain}/tickets/{ticket}/move"),
+    ("POST", "/v1/tickets/{ticket}/move-to-chain"),
+    ("POST", "/v1/tickets/{ticket}/threads"),
+    ("POST", "/v1/tickets/{ticket}/threads/{thread}/messages"),
+    ("POST", "/v1/tickets/{ticket}/threads/{thread}/versions"),
     ("POST", "/v1/planner/activity"),
     ("POST", "/v1/planner/say"),
     ("GET", "/v1/planner/plan"),

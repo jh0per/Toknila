@@ -1,17 +1,66 @@
-//! `/tickets/{ticket}/threads`: threads on a card. Every route here runs as a person; an agent
-//! reaches the same use cases through `/tickets/{ticket}/events`, where approval does not exist.
+//! `/tickets/{ticket}/threads`: threads on a card. Opening a thread and writing in one run as the
+//! caller the token names (a planner too, `PLANNER_ROUTES`; core's `access::may` decides);
+//! approving, asking for changes and the discussion are a person's. A card's agent reaches the
+//! same use cases through `/tickets/{ticket}/events`, where approval does not exist.
 
 use crate::http::body::Json;
+use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use toknila_app::{discussion, resolve, threads};
+use toknila_app::access::Caller;
+use toknila_app::{as_caller, discussion, resolve, threads};
 use toknila_core::{Actor, ThreadId, Ticket};
 
 use super::{ApiResult, load_thread_detail, read};
 use crate::http::dto::{NewMessage, NewThread, NewVersion, ThreadDetail, TicketThreads};
 use crate::http::error::ErrorBody;
-use crate::server::{AppState, now};
+use crate::server::{AppState, Principal, now};
 use crate::store::WriteTx;
+
+/// `caller` opens a thread on a story.
+pub(super) async fn open_as(
+    state: &AppState,
+    caller: Caller,
+    ticket: String,
+    input: NewThread,
+) -> ApiResult<Json<ThreadDetail>> {
+    thread_write(state, ticket, caller.actor(), move |tx, t| {
+        let story = t.id.to_string();
+        let (_, th) = as_caller::open_thread(tx, &caller, &story, input.kind, &input.title)?;
+        Ok(th.id)
+    })
+    .await
+}
+
+/// `caller` posts a message in a thread of a story.
+pub(super) async fn message_as(
+    state: &AppState,
+    caller: Caller,
+    (ticket, thread): (String, String),
+    input: NewMessage,
+) -> ApiResult<Json<ThreadDetail>> {
+    thread_write(state, ticket, caller.actor(), move |tx, t| {
+        let (t, th) = as_caller::thread(&*tx, &caller, &t.id.to_string(), &thread)?;
+        threads::post_message(tx, &t, &th, &input.text)?;
+        Ok(th.id)
+    })
+    .await
+}
+
+/// `caller` posts the next artifact version of a thread; an approved thread reopens.
+pub(super) async fn version_as(
+    state: &AppState,
+    caller: Caller,
+    (ticket, thread): (String, String),
+    input: NewVersion,
+) -> ApiResult<Json<ThreadDetail>> {
+    thread_write(state, ticket, caller.actor(), move |tx, t| {
+        let (t, th) = as_caller::thread(&*tx, &caller, &t.id.to_string(), &thread)?;
+        threads::post_version(tx, &t, &th, input)?;
+        Ok(th.id)
+    })
+    .await
+}
 
 const TICKET: &str = "Ticket id or key, e.g. DEMO-3";
 const THREAD: &str = "Thread number on the ticket (1, 2, ...) or thread id";
@@ -46,52 +95,42 @@ pub async fn list_threads(
 
 #[utoipa::path(post, path = "/tickets/{ticket}/threads", tag = "threads", request_body = NewThread,
     params(("ticket" = String, Path, description = TICKET)),
-    responses((status = 201, body = ThreadDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)))]
-/// A person opens a thread on a ticket.
+    responses((status = 201, body = ThreadDetail), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// A person (or the project's planner) opens a thread on a ticket.
 pub async fn open_thread(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     Path(ticket): Path<String>,
     Json(input): Json<NewThread>,
 ) -> ApiResult<(StatusCode, Json<ThreadDetail>)> {
-    let detail = thread_write(&state, ticket, move |tx, t| {
-        Ok(threads::open(tx, t, input.kind, &input.title)?.id)
-    })
-    .await?;
+    let detail = open_as(&state, principal.caller(), ticket, input).await?;
     Ok((StatusCode::CREATED, detail))
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/threads/{thread}/messages", tag = "threads", request_body = NewMessage,
     params(("ticket" = String, Path, description = TICKET), ("thread" = String, Path, description = THREAD)),
-    responses((status = 200, body = ThreadDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)))]
-/// A person posts a message in a thread.
+    responses((status = 200, body = ThreadDetail), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// A person (or the project's planner) posts a message in a thread.
 pub async fn post_thread_message(
     State(state): State<AppState>,
-    Path((ticket, thread)): Path<(String, String)>,
+    Extension(principal): Extension<Principal>,
+    Path(at): Path<(String, String)>,
     Json(input): Json<NewMessage>,
 ) -> ApiResult<Json<ThreadDetail>> {
-    thread_write(&state, ticket, move |tx, t| {
-        let th = threads::find(&*tx, t, &thread)?;
-        threads::post_message(tx, t, &th, &input.text)?;
-        Ok(th.id)
-    })
-    .await
+    message_as(&state, principal.caller(), at, input).await
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/threads/{thread}/versions", tag = "threads", request_body = NewVersion,
     params(("ticket" = String, Path, description = TICKET), ("thread" = String, Path, description = THREAD)),
-    responses((status = 200, body = ThreadDetail), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)))]
-/// A person posts a new artifact version; an approved thread reopens.
+    responses((status = 200, body = ThreadDetail), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
+/// A person (or the project's planner) posts a new artifact version; an approved thread reopens.
 pub async fn post_thread_version(
     State(state): State<AppState>,
-    Path((ticket, thread)): Path<(String, String)>,
+    Extension(principal): Extension<Principal>,
+    Path(at): Path<(String, String)>,
     Json(input): Json<NewVersion>,
 ) -> ApiResult<Json<ThreadDetail>> {
-    thread_write(&state, ticket, move |tx, t| {
-        let th = threads::find(&*tx, t, &thread)?;
-        threads::post_version(tx, t, &th, input)?;
-        Ok(th.id)
-    })
-    .await
+    version_as(&state, principal.caller(), at, input).await
 }
 
 #[utoipa::path(post, path = "/tickets/{ticket}/threads/{thread}/approve", tag = "threads",
@@ -102,7 +141,7 @@ pub async fn approve_thread(
     State(state): State<AppState>,
     Path((ticket, thread)): Path<(String, String)>,
 ) -> ApiResult<Json<ThreadDetail>> {
-    thread_write(&state, ticket, move |tx, t| {
+    thread_write(&state, ticket, Actor::Human, move |tx, t| {
         let th = threads::find(&*tx, t, &thread)?;
         Ok(threads::approve(tx, t, &th)?.id)
     })
@@ -118,7 +157,7 @@ pub async fn request_thread_changes(
     Path((ticket, thread)): Path<(String, String)>,
     Json(input): Json<NewMessage>,
 ) -> ApiResult<Json<ThreadDetail>> {
-    thread_write(&state, ticket, move |tx, t| {
+    thread_write(&state, ticket, Actor::Human, move |tx, t| {
         let th = threads::find(&*tx, t, &thread)?;
         threads::request_changes(tx, t, &th, &input.text)?;
         Ok(th.id)
@@ -139,7 +178,7 @@ pub async fn post_discussion(
 ) -> ApiResult<Json<ThreadDetail>> {
     let said = std::sync::Arc::new(std::sync::Mutex::new(None));
     let slot = said.clone();
-    let detail = thread_write(&state, ticket, move |tx, t| {
+    let detail = thread_write(&state, ticket, Actor::Human, move |tx, t| {
         let (th, m) = discussion::say(tx, t, &input.text)?;
         if let Ok(mut s) = slot.lock() {
             *s = Some((t.id, t.key.to_string(), m.id));
@@ -184,7 +223,7 @@ async fn decide_edit(
     message: String,
     accept: bool,
 ) -> ApiResult<Json<ThreadDetail>> {
-    thread_write(state, ticket, move |tx, t| {
+    thread_write(state, ticket, Actor::Human, move |tx, t| {
         let th = threads::find(&*tx, t, &thread)?;
         discussion::decide(tx, t, &th, &message, accept)?;
         Ok(th.id)
@@ -192,16 +231,17 @@ async fn decide_edit(
     .await
 }
 
-/// Runs `f` as a person's command on a ticket and answers with the fresh detail of the thread
-/// it returns.
+/// Runs `f` as `actor`'s command on a ticket and answers with the fresh detail of the thread it
+/// returns.
 async fn thread_write(
     state: &AppState,
     ticket: String,
+    actor: Actor,
     f: impl FnOnce(&mut WriteTx<'_>, &Ticket) -> ApiResult<ThreadId> + Send + 'static,
 ) -> ApiResult<Json<ThreadDetail>> {
     let (detail, _) = state
         .store
-        .write(Actor::Human, now(), move |tx| -> ApiResult<ThreadDetail> {
+        .write(actor, now(), move |tx| -> ApiResult<ThreadDetail> {
             let t = resolve::ticket(&*tx, &ticket)?;
             let id = f(tx, &t)?;
             let fresh = threads::find(&*tx, &t, &id.to_string())?;

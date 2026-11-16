@@ -60,7 +60,9 @@ const ACTIONS: [Action; 13] = [
     Action::EditStory {
         owner_fields: false,
     },
-    Action::ChangeGraph,
+    Action::ChangeGraph {
+        owner_fields: false,
+    },
     Action::ShowStory,
     Action::Thread,
     Action::Speak,
@@ -136,7 +138,7 @@ fn table_actions() -> usize {
         Action::EditEpic { .. } => 2,
         Action::AddStory { .. } => 3,
         Action::EditStory { .. } => 4,
-        Action::ChangeGraph => 5,
+        Action::ChangeGraph { .. } => 5,
         Action::ShowStory => 6,
         Action::Thread => 7,
         Action::Speak => 8,
@@ -209,11 +211,27 @@ fn a_planners_epic_never_starts_its_stories_and_the_owners_settings_are_the_owne
         Action::EditEpic { owner_fields: true },
         Action::AddStory { owner_fields: true },
         Action::EditStory { owner_fields: true },
+        Action::ChangeGraph { owner_fields: true },
     ] {
         let e = may(&planner, &owner, &target).expect_err("the owner's");
         assert!(e.to_string().starts_with("only the owner sets "), "{e}");
         assert_eq!(may(&Caller::Person, &owner, &target), Ok(()));
     }
+}
+
+#[test]
+fn the_assistant_names_a_known_model_and_proposes_edits_and_the_person_types_and_edits() {
+    let planner = Caller::Planner(ProjectId::new());
+    assert_eq!(story_model(&planner, "opus"), Ok(Some("opus".to_owned())));
+    let e = story_model(&planner, "gpt").expect_err("not a model");
+    assert!(e.starts_with("unknown model \"gpt\""), "{e}");
+    assert_eq!(
+        story_model(&Caller::Person, "gpt"),
+        Ok(Some("gpt".to_owned()))
+    );
+    assert_eq!(story_model(&Caller::Person, " "), Ok(None));
+    assert!(proposes_edits(&planner));
+    assert!(!proposes_edits(&Caller::Person));
 }
 
 #[test]
@@ -226,8 +244,11 @@ fn a_planner_changes_no_graph_of_an_autostart_epic_and_no_cut_epic_and_no_starte
         epic: Some(&auto),
         ..Target::default()
     };
+    let change = Action::ChangeGraph {
+        owner_fields: false,
+    };
     for graph in [
-        Action::ChangeGraph,
+        change,
         Action::AddStory {
             owner_fields: false,
         },
@@ -245,7 +266,7 @@ fn a_planner_changes_no_graph_of_an_autostart_epic_and_no_cut_epic_and_no_starte
     ] {
         assert_eq!(may(&planner, &open, &on_auto), Ok(()), "{open:?}");
     }
-    assert_eq!(may(&Caller::Person, &Action::ChangeGraph, &on_auto), Ok(()));
+    assert_eq!(may(&Caller::Person, &change, &on_auto), Ok(()));
 
     let manual = epic(p, false);
     let cut = Target {
@@ -310,7 +331,12 @@ fn on_the_roadmap_a_planner_adds_and_edits_stories_only_of_the_epic_made_or_name
         assert_eq!(may(&planner, &action, &on(&[][..])), Ok(()));
         assert_eq!(may(&Caller::Person, &action, &on(&roadmap[..])), Ok(()));
     }
-    assert!(!needs_turn(&planner, &Action::ChangeGraph));
+    assert!(!needs_turn(
+        &planner,
+        &Action::ChangeGraph {
+            owner_fields: false
+        }
+    ));
 }
 
 #[test]

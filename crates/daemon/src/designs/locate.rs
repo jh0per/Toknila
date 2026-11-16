@@ -60,18 +60,6 @@ impl Designs {
         Ok(refs)
     }
 
-    /// Refuses references to a design the project does not have.
-    pub fn check_refs(&self, refs: &[DesignRef]) -> Result<(), DesignError> {
-        let all = self.load()?;
-        match refs.iter().find(|r| !all.iter().any(|d| d.id == r.design)) {
-            Some(r) => Err(DesignError::Invalid(format!(
-                "the project has no design {}",
-                r.design
-            ))),
-            None => Ok(()),
-        }
-    }
-
     /// The references that still name a design of the library, in order, with their files. A
     /// design that was deleted is left out.
     pub fn locate(&self, refs: &[DesignRef]) -> Vec<Located> {

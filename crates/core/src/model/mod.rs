@@ -8,6 +8,7 @@ mod comment;
 mod extra_check;
 mod ids;
 mod keys;
+mod patch;
 mod paused;
 mod profile;
 mod profile_brief;
@@ -38,6 +39,7 @@ pub use ids::{
     ThreadMessageId, ThreadVersionId, TicketId,
 };
 pub use keys::{KeyError, ProjectKey, TicketKey};
+pub use patch::{SubtaskEdit, TicketPatch};
 pub use paused::PausedAgent;
 pub use profile::{
     AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules, Permissions,
@@ -59,7 +61,7 @@ pub use thread::{
     ArtifactFormat, MessageKind, Phase, Thread, ThreadKind, ThreadMessage, ThreadState,
     ThreadVersion,
 };
-pub use ticket::{OutOfOrder, Pos, Size, Subtask, Ticket, TicketDraft, TicketPatch, Wildcard};
+pub use ticket::{OutOfOrder, Pos, Size, Subtask, Ticket, TicketDraft, Wildcard};
 pub use time::Timestamp;
 
 #[cfg(test)]

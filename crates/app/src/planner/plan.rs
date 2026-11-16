@@ -7,7 +7,8 @@ use toknila_core::{
     Chain, NodeRef, Project, ProjectId, Subtask, Thread, ThreadMessage, Ticket, Timestamp,
 };
 
-use crate::{AppError, AppResult, Reader};
+use crate::access::{self, Action, Caller};
+use crate::{AppError, AppResult, Reader, resolve};
 
 /// A thread of a card with what was said in it.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -101,29 +102,31 @@ fn chain_plan<R: Reader + ?Sized>(r: &R, view: ChainView, at: Timestamp) -> AppR
     })
 }
 
-/// One chain of the planner's project with every card in full. A chain of another project is
-/// refused, one that does not exist is not found.
+/// One chain with every card in full, as `caller` may read it (a planner: of its own project). A
+/// chain the caller may not read is refused, one that does not exist is not found.
 pub fn chain_in_full<R: Reader + ?Sized>(
     r: &R,
-    project: ProjectId,
+    caller: &Caller,
     reference: &str,
     at: Timestamp,
 ) -> AppResult<PlanChain> {
-    let chain = super::chain(r, project, reference)?;
+    let chain = access::chain(r, caller, None, reference)?;
+    access::on_epic(r, caller, &Action::ReadPlan, &chain)?;
     let view = r
         .chain_view(chain.id)?
         .ok_or_else(|| AppError::not_found(format!("epic {reference}")))?;
     chain_plan(r, view, at)
 }
 
-/// One card of the planner's project in full: prompt, acceptance, subtasks, threads with their
+/// One card in full, as `caller` may read it: prompt, acceptance, subtasks, threads with their
 /// messages, review results and pull request.
 pub fn card_in_full<R: Reader + ?Sized>(
     r: &R,
-    project: ProjectId,
+    caller: &Caller,
     reference: &str,
 ) -> AppResult<PlanCard> {
-    let ticket = super::card(r, project, reference)?;
+    let ticket = resolve::ticket(r, reference)?;
+    access::on_story(r, caller, &Action::ReadPlan, &ticket)?;
     let view = r
         .chain_view(ticket.chain_id)?
         .ok_or_else(|| AppError::not_found(format!("epic of {}", ticket.key)))?;

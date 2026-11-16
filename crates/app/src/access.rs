@@ -4,12 +4,12 @@
 //! here; no handler holds a rule of its own.
 
 use toknila_core::access::{self, Refusal, Target};
-use toknila_core::conversation::{Author, Message};
+use toknila_core::conversation::{About, Author, Message};
 use toknila_core::{Chain, ChainId, ProjectId, ReleaseState, Ticket};
 
 pub use toknila_core::access::{Action, Caller};
 
-use crate::{AppError, AppResult, ErrorKind, Reader, resolve};
+use crate::{AppError, AppResult, ErrorKind, Reader, UnitOfWork, resolve};
 
 impl From<Refusal> for AppError {
     fn from(r: Refusal) -> Self {
@@ -24,10 +24,16 @@ impl From<Refusal> for AppError {
 
 /// A chain by id or name as `caller` names it. A planner's names are looked up in its own project
 /// first, and a name only another project has is that project's epic (which [`on_epic`] then
-/// refuses it); anyone else names a chain by id or a unique name.
-pub fn chain<R: Reader + ?Sized>(r: &R, caller: &Caller, reference: &str) -> AppResult<Chain> {
+/// refuses it); anyone else names a chain by id or by a name unique in `project` (id or key) when
+/// it is given, in every project otherwise.
+pub fn chain<R: Reader + ?Sized>(
+    r: &R,
+    caller: &Caller,
+    project: Option<&str>,
+    reference: &str,
+) -> AppResult<Chain> {
     let Some(project) = caller.planner_project() else {
-        return resolve::chain(r, reference);
+        return resolve::chain_in(r, project, reference);
     };
     if let Ok(id) = reference.parse::<ChainId>()
         && let Some(c) = r.chain(id)?
@@ -134,6 +140,20 @@ pub fn on_story<R: Reader + ?Sized>(
         turn: &turn,
     };
     Ok(access::may(caller, action, &target)?)
+}
+
+/// Tells what the assistant did in its project's conversation (`added story DEMO-3`), so the
+/// person reads it in the chat and the next turn's rule sees it; what a person does is not told.
+pub fn tell<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    caller: &Caller,
+    text: String,
+    about: Option<About>,
+) -> AppResult<()> {
+    match caller.planner_project() {
+        Some(project) => crate::conversation::line(uow, project, text, about),
+        None => Ok(()),
+    }
 }
 
 /// Whether `caller` may do `action` on story `t`, looking at the story alone: what a story's run

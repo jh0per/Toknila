@@ -168,7 +168,7 @@
         "tags": [
           "chains"
         ],
-        "summary": "Sets the chain's review mode, reviewer agent profile and autostart. A ticket that sets its\nown review keeps it; a field left out is kept. Turning autostart on starts the chain's ready\ncards that have a free slot: it is the owner's act, and the journal records it\n(`chain.updated`).",
+        "summary": "Sets the chain's name, title, goal, version, review mode, reviewer agent profile and\nautostart. A ticket that sets its own review keeps it; a field left out is kept. Turning\nautostart on starts the chain's ready cards that have a free slot: it is the owner's act, and\nthe journal records it (`chain.updated`). A planner changes only the name, title, goal and\nversion of an epic whose release is not cut.",
         "operationId": "patch_chain",
         "parameters": [
           {
@@ -210,7 +210,25 @@
               }
             }
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -267,6 +285,7 @@
         "tags": [
           "chains"
         ],
+        "summary": "Makes `to` wait for `from`. A planner changes no epic that starts its stories by itself.",
         "operationId": "add_edge",
         "parameters": [
           {
@@ -299,6 +318,15 @@
               }
             }
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "404": {
             "content": {
               "application/json": {
@@ -323,6 +351,7 @@
         "tags": [
           "chains"
         ],
+        "summary": "Removes the wait of `to` for `from`.",
         "operationId": "remove_edge",
         "parameters": [
           {
@@ -367,6 +396,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -529,6 +567,55 @@
             }
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chains/{chain}/plan": {
+      "get": {
+        "tags": [
+          "plan"
+        ],
+        "summary": "One epic with every story in full.",
+        "operationId": "chain_plan",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanChain"
+                }
+              }
+            }
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -776,6 +863,7 @@
         "tags": [
           "tickets"
         ],
+        "summary": "A new story in an epic. A planner adds only its fields, to an epic that waits for the owner to\nstart its stories.",
         "operationId": "create_ticket",
         "parameters": [
           {
@@ -804,6 +892,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -872,6 +978,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -1050,7 +1165,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "One card of the planner's project in full: prompt, acceptance, subtasks, threads with their\nmessages, review results and pull request.",
+        "summary": "Deprecated alias of `GET /tickets/{ticket}/plan`.",
         "operationId": "planner_card",
         "parameters": [
           {
@@ -1091,13 +1206,14 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       },
       "patch": {
         "tags": [
           "planner"
         ],
-        "summary": "Edits a card of the planner's project that has not started.",
+        "summary": "Deprecated alias of `PATCH /tickets/{ticket}`.",
         "operationId": "planner_edit_card",
         "parameters": [
           {
@@ -1148,7 +1264,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/cards/{card}/show": {
@@ -1156,7 +1273,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Asks the window to show a card of the planner's project (a `window.show_card` event).",
+        "summary": "Deprecated alias of `POST /tickets/{ticket}/show`.",
         "operationId": "planner_show_card",
         "parameters": [
           {
@@ -1197,7 +1314,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/cards/{card}/threads": {
@@ -1205,7 +1323,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Opens a thread on a card of the planner's project.",
+        "summary": "Deprecated alias of `POST /tickets/{ticket}/threads`.",
         "operationId": "planner_open_thread",
         "parameters": [
           {
@@ -1256,7 +1374,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/cards/{card}/threads/{thread}/messages": {
@@ -1264,7 +1383,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Posts a message in a thread of a card of the planner's project.",
+        "summary": "Deprecated alias of `POST /tickets/{ticket}/threads/{thread}/messages`.",
         "operationId": "planner_thread_message",
         "parameters": [
           {
@@ -1324,7 +1443,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/cards/{card}/threads/{thread}/versions": {
@@ -1332,7 +1452,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Posts the next artifact version of a thread; an approved thread reopens.",
+        "summary": "Deprecated alias of `POST /tickets/{ticket}/threads/{thread}/versions`.",
         "operationId": "planner_thread_version",
         "parameters": [
           {
@@ -1392,7 +1512,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/chains": {
@@ -1400,7 +1521,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "A new chain in the planner's project. It never starts its cards by itself.",
+        "summary": "Deprecated alias of `POST /projects/{project}/chains` for the planner's project.",
         "operationId": "planner_new_chain",
         "requestBody": {
           "content": {
@@ -1449,7 +1570,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/chains/{chain}": {
@@ -1457,7 +1579,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "One chain of the planner's project with every card in full.",
+        "summary": "Deprecated alias of `GET /chains/{chain}/plan`.",
         "operationId": "planner_chain",
         "parameters": [
           {
@@ -1498,13 +1620,14 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       },
       "patch": {
         "tags": [
           "planner"
         ],
-        "summary": "Changes the name, goal and version of a chain of the planner's project whose release is not\ncut.",
+        "summary": "Deprecated alias of `PATCH /chains/{chain}`.",
         "operationId": "planner_edit_chain",
         "parameters": [
           {
@@ -1573,7 +1696,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/chains/{chain}/cards": {
@@ -1581,7 +1705,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "A new card in a chain of the planner's project.",
+        "summary": "Deprecated alias of `POST /chains/{chain}/tickets`.",
         "operationId": "planner_add_card",
         "parameters": [
           {
@@ -1632,7 +1756,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/chains/{chain}/cards/{card}/move": {
@@ -1640,7 +1765,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Puts a card directly before or after another (the dependencies around it are rewired), or\nmoves it to another epic of the project (`to_chain`).",
+        "summary": "Deprecated alias of `POST /chains/{chain}/tickets/{ticket}/move` (next to a card) and\n`POST /tickets/{ticket}/move-to-chain?from={chain}` (`to_chain`); answers the epic the card\nis in afterwards.",
         "operationId": "planner_move_card",
         "parameters": [
           {
@@ -1718,7 +1843,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/chains/{chain}/edges": {
@@ -1726,7 +1852,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Makes `to` wait for `from`.",
+        "summary": "Deprecated alias of `POST /chains/{chain}/edges`; the dependency is a plain one, as before.",
         "operationId": "planner_add_dependency",
         "parameters": [
           {
@@ -1786,13 +1912,14 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       },
       "delete": {
         "tags": [
           "planner"
         ],
-        "summary": "Removes the wait of `to` for `from`.",
+        "summary": "Deprecated alias of `DELETE /chains/{chain}/edges`.",
         "operationId": "planner_remove_dependency",
         "parameters": [
           {
@@ -1859,7 +1986,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/designs/{design}": {
@@ -1867,7 +1995,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "One design of the planner's project: its metadata and the path of its file.",
+        "summary": "Deprecated alias of `GET /projects/{project}/designs/{design}` for the planner's project.",
         "operationId": "planner_design",
         "parameters": [
           {
@@ -1908,7 +2036,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/overview": {
@@ -1916,7 +2045,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "The plan of the planner's project in short records (every chain, the cards of the chains that\nare not finished, the designs with their paths, the pins): small at any size of the plan.",
+        "summary": "Deprecated alias of `GET /projects/{project}/plan/overview` for the planner's own project.",
         "operationId": "planner_overview",
         "responses": {
           "200": {
@@ -1937,7 +2066,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/pins": {
@@ -1945,7 +2075,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Pins a question on a region of a design of the planner's project. It shows on the mockup and\nin the inbox until the person answers.",
+        "summary": "Pins a question on a region of a design of the planner's project. Deprecated: the planner\nasks `POST /projects/{project}/design-pins`; this alias answers the same for one release.",
         "operationId": "planner_pin",
         "requestBody": {
           "content": {
@@ -1994,7 +2124,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/plan": {
@@ -2002,7 +2133,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "The whole plan of the planner's project: chains, cards in order, dependencies, threads, and\nthe project's designs with the path of each file.",
+        "summary": "Deprecated alias of `GET /projects/{project}/plan` for the planner's own project.",
         "operationId": "planner_plan",
         "responses": {
           "200": {
@@ -2023,7 +2154,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/planner/say": {
@@ -2088,7 +2220,7 @@
         "tags": [
           "planner"
         ],
-        "summary": "Keeps the planner's next step for its project, replacing the previous one (a\n`window.suggest` event). The owner's window shows it with the button of its action; the\nplanner starts, answers and accepts nothing itself.",
+        "summary": "Deprecated alias of `PUT /projects/{project}/suggestion` for the planner's project.",
         "operationId": "planner_suggest",
         "requestBody": {
           "content": {
@@ -2137,7 +2269,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/profiles": {
@@ -2439,6 +2572,7 @@
         "tags": [
           "chains"
         ],
+        "summary": "A new epic at the end of the project's roadmap. A planner's never starts its stories by\nitself, and the review settings are the owner's.",
         "operationId": "create_chain",
         "parameters": [
           {
@@ -2467,6 +2601,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -2700,6 +2843,72 @@
                   "items": {
                     "$ref": "#/components/schemas/DesignPin"
                   }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "designs"
+        ],
+        "summary": "The project's planner pins a question on a region of one of its designs. It shows on the\nmockup and in the inbox until the person answers.",
+        "operationId": "ask_pin",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewDesignPin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignPin"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -2955,6 +3164,62 @@
       }
     },
     "/projects/{project}/designs/{design}": {
+      "get": {
+        "tags": [
+          "plan"
+        ],
+        "summary": "One design of a project: its metadata and the path of its file.",
+        "operationId": "get_design",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "design",
+            "in": "path",
+            "description": "Design id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerDesign"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "designs"
@@ -3595,6 +3860,104 @@
         }
       }
     },
+    "/projects/{project}/plan": {
+      "get": {
+        "tags": [
+          "plan"
+        ],
+        "summary": "The whole plan of a project: epics, stories in order, dependencies, threads, and the\nproject's designs with the path of each file. A planner reads its own project's.",
+        "operationId": "project_plan",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerPlan"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/plan/overview": {
+      "get": {
+        "tags": [
+          "plan"
+        ],
+        "summary": "The plan of a project in short records (every epic, the stories of the epics that are not\nfinished, the designs with their paths, the pins): small at any size of the plan.",
+        "operationId": "project_plan_overview",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerOverview"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project}/planner": {
       "get": {
         "tags": [
@@ -4171,6 +4534,72 @@
             }
           }
         }
+      },
+      "put": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "The project's planner keeps its next step, replacing the previous one (a `window.suggest`\nevent). The owner's window shows it with the button of its action; the planner starts,\nanswers and accepts nothing itself.",
+        "operationId": "put_suggestion",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project id or key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSuggestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suggestion"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/projects/{project}/unarchive": {
@@ -4643,6 +5072,7 @@
         "tags": [
           "tickets"
         ],
+        "summary": "Changes a story's fields, and renames and appends checklist items, in one command. A planner\nedits a story that has not started, and only its words, checklist, designs and model.",
         "operationId": "patch_ticket",
         "parameters": [
           {
@@ -4675,7 +5105,34 @@
               }
             }
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5307,7 +5764,7 @@
         "tags": [
           "tickets"
         ],
-        "summary": "Moves a card that has not started to another epic of its project, to the end or next to a card.",
+        "summary": "Moves a card that has not started to another epic of its project, to the end or next to a card.\nWhen a planner moves it, neither epic may start its stories by itself.",
         "operationId": "move_to_chain",
         "parameters": [
           {
@@ -5317,6 +5774,18 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "The epic (id or name) the caller says the card is in now; the move is refused when it is\nnot.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         ],
@@ -5341,6 +5810,15 @@
             }
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5404,6 +5882,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PermissionReply"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/plan": {
+      "get": {
+        "tags": [
+          "plan"
+        ],
+        "summary": "One story in full: prompt, acceptance, subtasks, threads with their messages, review results\nand pull request.",
+        "operationId": "ticket_plan",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCard"
                 }
               }
             }
@@ -5757,6 +6284,55 @@
         }
       }
     },
+    "/tickets/{ticket}/show": {
+      "post": {
+        "tags": [
+          "plan"
+        ],
+        "summary": "Asks the window to show a story (a `window.show_card` event); nothing in the plan changes.",
+        "operationId": "show_ticket",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "description": "Ticket id, key or title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tickets/{ticket}/subtasks": {
       "post": {
         "tags": [
@@ -5909,7 +6485,7 @@
         "tags": [
           "threads"
         ],
-        "summary": "A person opens a thread on a ticket.",
+        "summary": "A person (or the project's planner) opens a thread on a ticket.",
         "operationId": "open_thread",
         "parameters": [
           {
@@ -5943,6 +6519,15 @@
             }
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -6228,7 +6813,7 @@
         "tags": [
           "threads"
         ],
-        "summary": "A person posts a message in a thread.",
+        "summary": "A person (or the project's planner) posts a message in a thread.",
         "operationId": "post_thread_message",
         "parameters": [
           {
@@ -6279,6 +6864,15 @@
               }
             }
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "404": {
             "content": {
               "application/json": {
@@ -6296,7 +6890,7 @@
         "tags": [
           "threads"
         ],
-        "summary": "A person posts a new artifact version; an approved thread reopens.",
+        "summary": "A person (or the project's planner) posts a new artifact version; an approved thread reopens.",
         "operationId": "post_thread_version",
         "parameters": [
           {
@@ -6339,6 +6933,15 @@
             }
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
             "content": {
               "application/json": {
                 "schema": {
@@ -8340,7 +8943,7 @@
       },
       "DesignPick": {
         "type": "object",
-        "description": "A design the planner names: its file name (or id) in the project's library, and the part of\nthe image that matters. The host finds the design and gives the use case a [`DesignRef`].",
+        "description": "A design as a caller names it for a story: its id or its file name in the project's library,\nand the part of the image that matters. The host turns a file name into the id, so the use\ncase reads ids only ([`DesignPick::to_ref`]).",
         "required": [
           "design"
         ],
@@ -8456,8 +9059,7 @@
               }
             ]
           }
-        },
-        "additionalProperties": false
+        }
       },
       "DesignUse": {
         "type": "object",
@@ -10160,9 +10762,9 @@
           "designs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DesignRef"
+              "$ref": "#/components/schemas/DesignPick"
             },
-            "description": "Designs of the project the card is about (by id), with an optional region of each."
+            "description": "Designs of the project the card is about, by id or file name, with an optional region of\neach. The daemon turns a file name into the id; a design the project lacks is refused."
           },
           "model": {
             "type": [
@@ -10757,7 +11359,7 @@
       },
       "PatchTicket": {
         "type": "object",
-        "description": "Fields a person may change on an existing ticket; `None` keeps the current value. Status is\nnot among them: it moves only through the state machine.",
+        "description": "Fields a person may change on an existing ticket; `None` keeps the current value. Status is\nnot among them: it moves only through the state machine. Checklist items to rename and to\nappend ride along in the same command; [`TicketPatch::apply`] leaves them to it.",
         "properties": {
           "acceptance": {
             "type": [
@@ -10767,6 +11369,13 @@
             "items": {
               "type": "string"
             }
+          },
+          "add_subtasks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Checklist items to append."
           },
           "design_first": {
             "type": [
@@ -10780,9 +11389,16 @@
               "null"
             ],
             "items": {
-              "$ref": "#/components/schemas/DesignRef"
+              "$ref": "#/components/schemas/DesignPick"
             },
-            "description": "The card's designs, replacing the whole list (an empty list clears it); left out to keep\nthem."
+            "description": "The card's designs by id or file name, replacing the whole list (an empty list clears it);\nleft out to keep them. The daemon turns a file name into the id."
+          },
+          "edit_subtasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubtaskEdit"
+            },
+            "description": "Checklist items to rename."
           },
           "model": {
             "type": [

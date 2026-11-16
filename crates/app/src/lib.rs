@@ -6,6 +6,7 @@
 
 pub mod access;
 pub mod agent;
+pub mod as_caller;
 pub mod chain;
 pub mod chains;
 pub mod checks;
