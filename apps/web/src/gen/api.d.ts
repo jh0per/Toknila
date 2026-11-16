@@ -176,6 +176,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chains/{chain}/release/mark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A person says the epic shipped inside an existing tag: its release node reads released with
+         *     that tag. Refused with a sentence when the tag does not exist or does not contain the merges of
+         *     every story of the epic.
+         */
+        post: operations["mark_release"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/chains/{chain}/releases": {
         parameters: {
             query?: never;
@@ -2708,6 +2729,7 @@ export interface components {
          */
         Finish: {
             released_at?: components["schemas"]["Timestamp"] | null;
+            released_with?: components["schemas"]["ReleasedWith"] | null;
             state: components["schemas"]["FinishState"];
             tag?: string | null;
             version: string;
@@ -2939,6 +2961,11 @@ export interface components {
             /** @description File name in the profiles folder; `None` for a built-in profile. */
             file?: string | null;
             profile: components["schemas"]["AgentProfile"];
+        };
+        /** @description Body of `POST /v1/chains/{chain}/release/mark`: a person says an epic shipped in an old tag. */
+        MarkRelease: {
+            /** @description The tag that exists in the repository, such as `v0.3.3`. */
+            tag: string;
         };
         /**
          * @description How an agent receives its MCP server (the agent event contract): the runner writes a config
@@ -3950,6 +3977,7 @@ export interface components {
             cut_at?: components["schemas"]["Timestamp"] | null;
             id: components["schemas"]["ReleaseId"];
             released_at?: components["schemas"]["Timestamp"] | null;
+            released_with?: components["schemas"]["ReleasedWith"] | null;
             start_mode: components["schemas"]["StartMode"];
             state: components["schemas"]["ReleaseState"];
             /** @description The git tag of the release (`v1.4.0`), set when a release run made it. */
@@ -4021,6 +4049,13 @@ export interface components {
          * @enum {string}
          */
         ReleaseStep: "check" | "bump" | "tag" | "push";
+        /** @description The tag an epic's work shipped in, and the epic whose release run (or a person) made it count. */
+        ReleasedWith: {
+            /** @description The name of the epic whose release run made the tag; none for a tag a person made. */
+            by?: string | null;
+            /** @description The git tag (`v0.3.3`). */
+            tag: string;
+        };
         /** @description Body of `PATCH /v1/projects/{project}/designs/{design}`. */
         RenameDesign: {
             name: string;
@@ -5339,6 +5374,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    mark_release: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chain id or name */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkRelease"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainDetail"];
                 };
             };
             404: {
