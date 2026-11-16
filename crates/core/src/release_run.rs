@@ -138,13 +138,14 @@ pub fn tag_page(remote_url: &str, tag: &str) -> Option<String> {
 }
 
 /// What the Push step says when it passed: `Pushed main and v0.3.4 to origin`, then the tag's
-/// page on its own line when the remote is on GitHub.
-pub fn pushed_text(base: &str, tag: &str, remote: &str, remote_url: &str) -> String {
+/// page on its own line when the remote is on GitHub, then the line that says GitHub waits for CI.
+pub fn pushed_text(base: &str, tag: &str, remote: &str, remote_url: &str, short: &str) -> String {
     let line = format!("Pushed {base} and {tag} to {remote}");
-    match tag_page(remote_url, tag) {
+    let line = match tag_page(remote_url, tag) {
         Some(page) => format!("{line}\n{page}"),
         None => line,
-    }
+    };
+    format!("{line}\nGitHub publishes after CI passes on {short}")
 }
 
 /// The line a person reads when a push failed: git's own reason for a refused ref
@@ -229,13 +230,14 @@ mod tests {
                 "main",
                 "v0.3.4",
                 "origin",
-                "git@github.com:acme/toknila.git"
+                "git@github.com:acme/toknila.git",
+                "a1b2c3d"
             ),
-            "Pushed main and v0.3.4 to origin\nhttps://github.com/acme/toknila/releases/tag/v0.3.4"
+            "Pushed main and v0.3.4 to origin\nhttps://github.com/acme/toknila/releases/tag/v0.3.4\nGitHub publishes after CI passes on a1b2c3d"
         );
         assert_eq!(
-            pushed_text("main", "v0.3.4", "origin", "/srv/r.git"),
-            "Pushed main and v0.3.4 to origin"
+            pushed_text("main", "v0.3.4", "origin", "/srv/r.git", "a1b2c3d"),
+            "Pushed main and v0.3.4 to origin\nGitHub publishes after CI passes on a1b2c3d"
         );
         let refused = "To /srv/r.git\n!\trefs/heads/main:refs/heads/main\t[rejected] (non-fast-forward)\nDone\nerror: failed to push some refs";
         assert_eq!(
