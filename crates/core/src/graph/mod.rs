@@ -59,6 +59,10 @@ pub enum GraphError {
     DependencyLocked { node: String, state: String },
     #[error("{0} is not a proposed story")]
     NotProposed(String),
+    #[error("the epic has no release to mark: give it a version first")]
+    NoRelease,
+    #[error("the epic is not finished: every story must be merged, none released and none open")]
+    NotFinished,
 }
 
 fn format_cycle(path: &[String]) -> String {
@@ -200,6 +204,9 @@ pub struct Finish {
     pub tag: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub released_at: Option<Timestamp>,
+    /// Set when the epic shipped inside another epic's tag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub released_with: Option<crate::ReleasedWith>,
 }
 
 /// What a product person sees at a glance.

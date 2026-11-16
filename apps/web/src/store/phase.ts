@@ -77,8 +77,10 @@ export function finishView(s: Pick<ChainSummary, "finish" | "total" | "done">): 
   if (!f) return undefined;
   const left = Math.max(0, s.total - s.done);
   const tag = f.tag ? ` · ${f.tag}` : "";
+  const w = f.released_with;
   const text =
-    f.state === "released" ? `${f.released_at == null ? "" : dayText(f.released_at)}${tag}`.replace(/^ · /, "")
+    f.state === "released" && w ? `released with ${w.tag}${w.by ? ` by ${w.by}` : ""}`
+    : f.state === "released" ? `${f.released_at == null ? "" : dayText(f.released_at)}${tag}`.replace(/^ · /, "")
     : f.state === "ready" ? "every story is merged"
     : f.state === "again" ? `new stories merged since${tag}`
     : `${left} left`;

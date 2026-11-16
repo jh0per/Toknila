@@ -86,6 +86,20 @@ pub fn resume_steps(all: &[ReleaseStep], passed: &[ReleaseStep]) -> Vec<ReleaseS
         .collect()
 }
 
+/// Whether the subject of a merge commit on the base branch is the merge of the story `key` of
+/// the epic named `chain`: a local merge says `Merge ship/<chain>/<key>-<title>: KEY Title`, a
+/// pull request's merge names the same branch (`Merge pull request #4 from o/ship/<chain>/...`).
+pub fn merges_story(subject: &str, chain: &str, key: &str) -> bool {
+    let branch = format!("ship/{}/{}", crate::slugify(chain), crate::slugify(key));
+    let on_branch = subject.match_indices(&branch).any(|(at, _)| {
+        subject[at + branch.len()..]
+            .chars()
+            .next()
+            .is_none_or(|c| matches!(c, '-' | ':' | ' ' | '/'))
+    });
+    on_branch || subject.contains(&format!(": {key} "))
+}
+
 /// The tag a version gets: `v1.4.0`.
 pub fn tag_name(version: &str) -> String {
     format!("v{version}")
@@ -174,6 +188,19 @@ pub fn bump_command(template: &str, version: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_merge_subject_names_the_story_it_brought_in() {
+        let local = "Merge ship/phase-9/toknila-14-add-login: TOKNILA-14 Add login";
+        assert!(merges_story(local, "phase-9", "TOKNILA-14"));
+        assert!(!merges_story(local, "phase-9", "TOKNILA-1"), "not a prefix");
+        assert!(!merges_story(local, "phase-9", "TOKNILA-144"));
+        assert!(!merges_story(local, "phase-9", "TOKNILA-15"), "other story");
+        let pr = "Merge pull request #4 from me/ship/phase-9/toknila-14-add-login";
+        assert!(merges_story(pr, "phase-9", "TOKNILA-14"));
+        let renamed = "Merge ship/old-name/toknila-14-add-login: TOKNILA-14 Add login";
+        assert!(merges_story(renamed, "phase-9", "TOKNILA-14"), "by key");
+    }
 
     #[test]
     fn the_steps_follow_what_the_project_has() {
