@@ -163,7 +163,8 @@ fn a_planner_plans_with_its_token_and_is_refused_everything_that_starts_or_accep
     let threads = tok.run(&["thread", "ls", "DEMO-1"]);
     assert_eq!(threads["threads"][0]["thread"]["opened_by"], "agent");
     assert_eq!(threads["phase"], "design");
-    assert_eq!(tok.run(&["planner", "start", "DEMO"])["running"], true);
+    let again = tok.run(&["planner", "start", "DEMO", "--profile", "fake-planner"]);
+    assert_eq!(again["running"], true);
 
     // The owner stops it; a second stop is fine.
     assert_eq!(

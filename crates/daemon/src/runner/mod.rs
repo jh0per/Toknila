@@ -20,6 +20,7 @@ mod pausing;
 mod private;
 mod prompts;
 mod pty;
+mod real_agent;
 mod resumed;
 mod reviewer;
 pub(crate) mod screens;
@@ -35,7 +36,7 @@ mod ws;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
@@ -46,6 +47,7 @@ use toknila_core::{AgentProfile, AgentRole, OutputRules, ProcessExit, Run, RunId
 
 use active::Active;
 pub use prompts::Prompts;
+pub use real_agent::REFUSAL as REAL_AGENT_REFUSAL;
 pub use silence::{tick as silence_tick, watch as watch_silence};
 pub use supervise::supervise;
 pub use tokens::{Activity, AgentTokens, Grant, SpawnFacts};
@@ -89,6 +91,8 @@ pub struct Runners {
     pause_grace_ms: AtomicU64,
     /// The daemon's address, known once it listens; agents get it in their environment.
     url: OnceLock<String>,
+    /// Launching a built-in real agent fails: set for a daemon under `TOKNILA_TEST_ROOT`.
+    refuse_real_agent: AtomicBool,
 }
 
 impl Runners {
@@ -112,6 +116,7 @@ impl Runners {
             permission_wait_ms: AtomicU64::new(toknila_core::hook::PERMISSION_WAIT_SECS * 1000),
             pause_grace_ms: AtomicU64::new(pausing::GRACE.as_millis() as u64),
             url: OnceLock::new(),
+            refuse_real_agent: AtomicBool::new(real_agent::under_test_root()),
         };
         (Arc::new(runners), rx)
     }
@@ -292,7 +297,7 @@ impl Runners {
 
 impl Runner for Runners {
     fn start(&self, req: &RunRequest) -> Result<Started, RunnerError> {
-        let profile = self.profile(&req.profile)?;
+        let profile = self.profile_to_start(&req.profile)?;
         stopping::wait_out(self, req);
         let mut map = self.active();
         if let Some(a) = map
