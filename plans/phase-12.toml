@@ -1,0 +1,113 @@
+# Phase 12: what the run of phase 11 found (2026-11-16), so the backlog ends empty. The owner's goal
+# for the day: "доробити весь беклог".
+# Import: tok chain import plans/phase-12.toml --project TOKNILA
+#
+# `after` names the cards whose files a card shares; a card without `after` may run at once.
+
+[chain]
+name = "phase-12"
+title = "What phase 11 found"
+goal = "An Accept means what the person saw, nothing built lands in the repository, checks run as fast as the machine allows, a test leaves nothing behind however it is run, and the reviewer can run the tests a hand-in names"
+autostart = true
+version = "0.3.7"
+
+[[ticket]]
+id = "a-return-voids-an-earlier-accept"
+title = "A request for changes after an Accept voids the Accept; the person sees the final work"
+prompt = """
+What happened (TOKNILA-143, 2026-11-16). The person accepted the card. The daemon's re-check at Accept (TOKNILA-130) met a conflict with `main` and sent the card to its agent as a round (TOKNILA-102). The agent resolved it and handed in; the reviewer then asked for changes (tests red first, a missing CLI test); the agent added them, the check and the reviewer passed, and the card merged on the person's earlier Accept. The person never saw the work the reviewer had asked for. TOKNILA-102 meant "an Accept survives a conflict the agent resolves", not "an Accept survives new work".
+
+Find where an earlier Accept is remembered (crates/core/src/machine/review.rs, merge.rs; the "remembered Accept" guard of TOKNILA-102, `Review` in crates/core/src/model/review.rs).
+
+Build this.
+1. An Accept stands only across the daemon's own rounds: a conflict at Accept and a failed or passed check. A request for changes by the reviewer or by a person after the Accept voids it: after the next hand-in passes its check and its reviewer, the card waits at the person's turn as for a first review, and the Review card says "Your Accept was before the reviewer asked for changes; look again". A card whose rounds after the Accept are all the daemon's merges on the Accept as today.
+2. Journal and words: the voiding is a journal entry; `tok show` and the round list say "Accept withdrawn: the reviewer asked for changes after it".
+3. Tests, red first and quoted: core machine tests (Accept, conflict round, hand-in, check pass, reviewer approve: merges; Accept, conflict round, hand-in, reviewer request_changes, hand-in, approve: waits for the person; Accept, person Return: as today); a daemon test through the router for the second path. Run `cargo xtask verify` and `cargo xtask web` if the Review card changes.
+
+Keep the change inside crates/core (machine, model review), crates/app or crates/daemon only where the remembered Accept is read, crates/cli (show), apps/web (the Review card's line), and the tests.
+"""
+acceptance = [
+  "An Accept stands across the daemon's own rounds only; a reviewer's or person's request for changes after it voids it, and the card waits at the person's turn after the next approval, saying why",
+  "The voiding is journaled and shown in tok show and the round list",
+  "Covered by core machine tests for the three paths and a daemon test, seen red first",
+]
+
+[[ticket]]
+id = "nothing-built-lands"
+title = "A hand-in never adds a build artifact to the repository"
+prompt = """
+What happened (TOKNILA-141, 2026-11-16). The agent ran its Python tests without `-B` and committed `.github/scripts/__pycache__/wait_for_ci.cpython-315.pyc`. The daemon's check and the reviewer passed it; the person found it in the diff and returned the card. Earlier phases had committed screenshots under docs/ and once hand-edited generated files.
+
+Build this.
+1. A hand-in guard. At `finished` (where TOKNILA-52's guards refuse a hand-in: crates/app/src/hand_in.rs, the core rule beside it), the daemon lists the files the ship's commits add since the base (the shipyard's `changes_between`, added files only) and refuses the hand-in when one matches the built-artifact list: `__pycache__/`, `*.pyc`, `node_modules/`, `target/`, `dist/`, `.DS_Store`, `*.log`, `*.tmp`, and anything the repository's own `.gitignore` ignores (ask git: `git check-ignore --no-index`). The refusal names each file and says: "these are built or ignored files; remove them from git (git rm --cached) and hand in again". A card whose prompt names such a path (a story that adds a fixture under `dist/`, say) is let through for that path.
+2. The protocol says it, in the worker's hand-in bullet (crates/core/src/instructions/protocol.rs): run `git status` before `finished`; never commit build outputs, caches or files the repository ignores; run Python with `-B`. Snapshots updated (TOKNILA_UPDATE_SNAPSHOTS=1), diff read.
+3. Tests, red first and quoted: core or app tests of the matcher (each pattern, the `.gitignore` case through git, a path the prompt names); a daemon test where a ship commits `x/__pycache__/a.pyc` and `finished` is refused with the sentence; the snapshots. Run `cargo xtask verify`.
+
+Keep the change inside crates/core (the rule, instructions and snapshots), crates/app (hand_in), crates/daemon (shipyard listing if needed, a test), and the tests.
+"""
+acceptance = [
+  "finished is refused when the ship's commits add a built artifact or an ignored file, naming each and saying how to remove it; a path the card's prompt names passes",
+  "The worker protocol says to check git status, never commit built or ignored files, and run Python with -B; snapshots updated",
+  "Covered by matcher tests, a daemon test of the refusal and the snapshots, seen red first",
+]
+
+[[ticket]]
+id = "checks-as-fast-as-the-machine-allows"
+title = "Checks run side by side while the machine has room, and an Accept's re-check goes first"
+prompt = """
+What happened (phase 11, 2026-11-16). The machine-wide check line of TOKNILA-28 runs one check at a time. With the extra web and e2e checks of TOKNILA-130 a turn takes about fifteen minutes, so six cards waited up to forty minutes for their checks while the load average was 4.5 on an idle Mac; and an Accept's re-check, which a person is waiting for, queued behind hand-in checks.
+
+Find the check line (crates/app/src/checks.rs, the queue and its admission; crates/daemon where it is driven; the turn words "being checked: queued, #3 in line").
+
+Build this.
+1. A setting for checks at once: `max_checks` on the machine (the daemon's settings, beside the agents' limit; default 1, so nothing changes until a person raises it), shown and edited in Settings → Machine (or where the agent limit lives) and through `tok daemon set --max-checks N` or the existing settings command. A second check starts only while fewer than `max_checks` run and the one-minute load average is below the number of CPU cores (read portably: `sysinfo` if the workspace already has it, else /proc/loadavg on Linux, `sysctl vm.loadavg` on macOS, and on Windows no load gate); a check held back by load says so in its turn words ("waits for the machine: load 41 on 16 cores").
+2. Priority: an Accept's re-check goes ahead of hand-in checks in the line (a person waits for it); between two of the same kind, first come first served as today.
+3. Tests, red first and quoted: app tests of admission (max 2 starts two; max 1 one; a load above the cores holds the second with the sentence, through an injected load reader); the priority order; a daemon test of the setting's route and the CLI. Run `cargo xtask verify` and `cargo xtask web`.
+
+Keep the change inside crates/core (if the rule is pure), crates/app (checks), crates/daemon (settings route, load reader), crates/cli, crates/api-types (then `npm run gen`), apps/web (Settings), and the tests.
+"""
+acceptance = [
+  "A machine setting max_checks (default 1) lets checks run side by side while the load average is below the core count; a held check says it waits for the machine with the numbers",
+  "An Accept's re-check goes ahead of hand-in checks",
+  "Covered by app tests with an injected load reader, the priority order and a daemon test of the setting, seen red first",
+]
+
+[[ticket]]
+id = "a-test-leaves-nothing-however-it-runs"
+title = "A test leaves no daemon behind however it is run, and an old leftover is always reported"
+prompt = """
+What happened (2026-11-16). Two leftovers were found and killed by hand: (a) a `tok daemon run` and its fake planner from a browser spec (apps/web/e2e/assistant-chat.mjs) run directly with `node`, outside `cargo xtask e2e-web`, after TOKNILA-137 had given every spec its `session()` helper; it lived twenty hours; (b) a test daemon and its fake agent of a phase-7 ship whose folder had already been retired, alive three days, which `cargo xtask verify`'s warning about old leftovers (TOKNILA-137, xtask/src/leaks.rs) did not list.
+
+Build this.
+1. Reproduce (a): run a fake-agent spec directly (`node e2e/assistant-chat.mjs <tok> <fake-agent>`, no TOKNILA_E2E_RUN) and list what is left after it exits; find what `session()` (apps/web/e2e/helpers.mjs) does differently without the run id or what the spec starts outside the session, and fix it so a direct run ends every daemon and agent it started. Quote the before and after listing.
+2. Fix (b): the old-leftover warning lists every `tok daemon run` and `fake-agent` older than an hour whose TOKNILA_HOME is a temporary folder (under the OS temp dir or a `.toknila-ships` worktree) whether or not that folder still exists; a missing home is named as "home gone". It still never kills what this run did not start.
+3. `cargo xtask leaks --kill-old` (new, explicit) ends such leftovers older than a day, printing each; never run by verify or e2e-web themselves.
+4. Tests, red first: an xtask unit test of the listing with a recorded process table holding a leftover whose home is gone; a node test of the direct run (or the fix's unit). Run `cargo xtask verify` and `cargo xtask e2e-web` and quote the leak check lines.
+
+Keep the change inside apps/web/e2e (helpers and the spec if it needs it), xtask (leaks), AGENTS.md (one sentence on `--kill-old`), and the tests.
+"""
+acceptance = [
+  "A fake-agent spec run directly with node leaves no daemon or agent behind; the before and after listings are quoted",
+  "verify's old-leftover warning names a leftover whose home folder is gone; cargo xtask leaks --kill-old ends leftovers older than a day on request only",
+  "Covered by an xtask unit test with a recorded process table and a test of the direct run, seen red first",
+]
+
+[[ticket]]
+id = "reviewer-runs-the-named-tests"
+title = "The reviewer may run the exact test commands the hand-in names when they run a file of the repository"
+after = ["nothing-built-lands"]
+prompt = """
+What happened (2026-11-16). TOKNILA-141's tests were a Python script (`python3 .github/scripts/test_wait_for_ci.py`), and TOKNILA-146's reviewer wanted a new daemon test binary run with a flag it was not allowed; both reviewers ended with every item NOT_RUN ("could not run what it needed"), so the cards went to the person, who ran the tests by hand. The reviewer's allow rules (crates/core/src/model/reviewer_rules.rs, `reviewer_check_rules`, `repo_tools` of TOKNILA-133; written by crates/daemon/src/runner/wiring.rs) cover cargo and npm by prefix only.
+
+Build this.
+1. Exact rules from the hand-in. For each Checks line of the latest hand-in (TOKNILA-134/145's stored body) whose command runs a file inside the repository with an interpreter (`python3 -B <path>`, `python3 <path>`, `node <path>`, `sh <path>`, `bash <path>`), with the path relative to the ship, existing and tracked by git, and no shell syntax (no `;`, `&&`, `|`, `>`, backticks, `$(`), add an exact allow rule `Bash(<interpreter> <path>)` (with `-B` forced for python3) to the reviewer's settings. Nothing else is derived: no wildcard, no `-c`, no path outside the repository.
+2. The reviewer's instructions list those commands under "Run what the hand-in names" so it knows they are allowed.
+3. Tests, red first and quoted: core tests of the derivation (a python script line gives one exact rule; `python3 -c`, a path outside, an untracked file, a `&&` chain give none); a wiring test that the reviewer's settings.json carries the rule; the review snapshot. Run `cargo xtask verify`.
+
+Keep the change inside crates/core (reviewer_rules, instructions and the snapshot), crates/daemon (wiring), crates/app if the hand-in is read there, and the tests.
+"""
+acceptance = [
+  "The reviewer's settings carry an exact allow rule for each hand-in Checks command that runs a tracked repository file with python3, node, sh or bash and no shell syntax, and nothing broader",
+  "The reviewer's instructions list those commands",
+  "Covered by derivation tests including the refused shapes, a wiring test and the snapshot, seen red first",
+]
