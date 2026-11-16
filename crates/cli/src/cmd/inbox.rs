@@ -55,6 +55,14 @@ fn lines(i: &InboxItem) -> String {
     } else if !i.text.is_empty() {
         out.push_str(&format!("  {}\n", i.text));
     }
+    if i.kind == toknila_core::inbox::InboxKind::Flaky
+        && let Some(first) = &i.detail
+    {
+        out.push_str("  the first run:\n");
+        for l in first.lines() {
+            out.push_str(&format!("    {l}\n"));
+        }
+    }
     out
 }
 
@@ -110,6 +118,35 @@ mod tests {
             out,
             "question  DEMO-2  card 2\n  which db?\n\
              answered  DEMO-9  card 9\n  Answered; the agent gets it when a slot is free (#2 in line)\n"
+        );
+    }
+
+    #[test]
+    fn a_flaky_item_prints_the_first_failing_line_and_the_first_run_output() {
+        let mut t = asking(4, None);
+        t.status = TicketStatus::Running;
+        t.status_reason = None;
+        t.review.last_check = Some(toknila_core::CheckOutcome {
+            command: "cargo test".to_owned(),
+            passed: true,
+            output: "ok".to_owned(),
+            at: Timestamp(5),
+            base: None,
+            head: None,
+            flaky: true,
+            flaky_output: "running 2 tests\ntest einval ... FAILED\ntest result: FAILED".to_owned(),
+        });
+        let items = compute(&InboxData {
+            tickets: vec![t],
+            ..InboxData::default()
+        });
+        let out = render(&items);
+        assert_eq!(
+            out,
+            "nothing waits on you\n\
+             flaky  DEMO-4  card 4\n  \
+             A test failed once and passed on the second run while checking DEMO-4: test einval ... FAILED\n  \
+             the first run:\n    running 2 tests\n    test einval ... FAILED\n    test result: FAILED\n"
         );
     }
 

@@ -38,6 +38,7 @@ fn check_done(passed: bool, mode: ReviewMode, max_rounds: u32) -> TicketEvent {
         base: None,
         head: None,
         lines: Vec::new(),
+        flaky: None,
         mode,
         max_rounds,
     }

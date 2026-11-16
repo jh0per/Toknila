@@ -2,8 +2,37 @@
 //! done. A person decides once per card: move them into a new card at the end of the chain,
 //! close them, or leave them.
 
+use std::collections::BTreeSet;
+
+use super::{InboxData, InboxItem, InboxKind, item};
 use crate::graph::ChainView;
 use crate::{Actor, CommentBody, NodeRef, Subtask, Ticket, TicketId, TicketKey};
+
+/// One item per earlier card that has open subtasks behind a card done out of order.
+pub(super) fn items(data: &InboxData) -> Vec<InboxItem> {
+    let behind: BTreeSet<&TicketKey> = data
+        .tickets
+        .iter()
+        .filter_map(|t| t.done_out_of_order.as_ref())
+        .flat_map(|m| &m.behind)
+        .collect();
+    behind
+        .into_iter()
+        .filter_map(|key| {
+            let card = data.tickets.iter().find(|t| &t.key == key)?;
+            let open = open_subtasks(&data.subtasks, card.id);
+            let marks = marks_awaiting(&data.tickets, key);
+            let since = marks.iter().map(|m| m.status_since).max()?;
+            if open.is_empty() {
+                return None;
+            }
+            let mut i = item(InboxKind::Leftovers, card, since, String::new());
+            i.subtasks = open.into_iter().map(|s| s.text).collect();
+            i.done_cards = marks.iter().map(|m| m.key.clone()).collect();
+            Some(i)
+        })
+        .collect()
+}
 
 /// Why a leftover action was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

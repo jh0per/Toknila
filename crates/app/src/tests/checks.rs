@@ -132,7 +132,11 @@ fn a_failing_check_returns_the_card_to_the_worker_with_the_output_and_no_person(
     let mut mem = running(ReviewMode::Human, 3);
     answer(
         &mem,
-        [fails("error[E0308]: mismatched types\n --> src/lib.rs:3")],
+        // A failure runs once more; it failed again, so it is a round.
+        [
+            fails("error[E0308]: mismatched types\n --> src/lib.rs:3"),
+            fails("error[E0308]: mismatched types\n --> src/lib.rs:3"),
+        ],
     );
     finish(&mut mem, "done".to_owned());
     settle(&mut mem);
@@ -162,9 +166,51 @@ fn a_failing_check_returns_the_card_to_the_worker_with_the_output_and_no_person(
 }
 
 #[test]
+fn a_check_that_fails_once_and_passes_on_the_second_run_passes_and_is_flaky() {
+    let mut mem = running(ReviewMode::Human, 3);
+    answer(&mem, [fails("test einval ... FAILED\nfailures: 1")]);
+    finish(&mut mem, "done".to_owned());
+    settle(&mut mem);
+    let t = a(&mem);
+    assert_eq!(t.status, TicketStatus::Review);
+    assert_eq!(t.review.turn, Some(ReviewTurn::Person));
+    let kept = t.review.last_check.clone().expect("last check");
+    assert!(kept.passed && kept.flaky, "{kept:?}");
+    assert_eq!(kept.flaky_output, "test einval ... FAILED\nfailures: 1");
+    assert_eq!(
+        t.review.rounds.last().map(|r| r.comment.as_str()),
+        Some(
+            "The check passed on the second run; the first failed:\ntest einval ... FAILED\nfailures: 1"
+        )
+    );
+    assert_eq!(
+        mem.checker.asked.borrow().len(),
+        2,
+        "the same command twice"
+    );
+    let items = toknila_core::inbox::compute(&toknila_core::inbox::InboxData {
+        tickets: vec![t],
+        ..Default::default()
+    });
+    assert_eq!(
+        items
+            .iter()
+            .filter(|i| i.kind == toknila_core::inbox::InboxKind::Flaky)
+            .map(|i| i.text.clone())
+            .collect::<Vec<_>>(),
+        [
+            "A test failed once and passed on the second run while checking DEMO-1: test einval ... FAILED"
+        ]
+    );
+}
+
+#[test]
 fn after_the_round_limit_the_card_waits_for_the_person_with_the_whole_history() {
     let mut mem = running(ReviewMode::Both, 2);
-    answer(&mem, [fails("first"), fails("second"), fails("third")]);
+    answer(
+        &mem,
+        ["first", "first", "second", "second", "third", "third"].map(fails),
+    );
     for round in 1..=2 {
         finish(&mut mem, format!("try {round}"));
         settle(&mut mem);

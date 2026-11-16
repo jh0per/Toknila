@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewRound, ReviewView } from "../api/types";
-import { awaitingText, basisText, itemRows, loopText, roundText } from "./review";
+import { awaitingText, basisText, isFlakyRound, itemRows, loopText, roundText } from "./review";
 
 const round = (extra: Partial<ReviewRound>) =>
   ({ number: 1, reviewer: "human", verdict: "request_changes", comment: "", decided_at: 0, ...extra }) as ReviewRound;
@@ -21,6 +21,18 @@ describe("roundText", () => {
     expect(roundText(none)).toBe("Round 1: brought up to main; the project has no check command");
     const failed = round({ reviewer: "system", comment: "`cargo xtask verify` exited with code 101.\n\n```\nlong output\n```" });
     expect(roundText(failed)).toBe("Round 1: the check failed — `cargo xtask verify` exited with code 101.");
+  });
+
+  it("words a check that passed only on its second run, and marks the round flaky", () => {
+    const flaky = round({
+      reviewer: "system",
+      verdict: "approve",
+      comment: "The check passed on the second run; the first failed:\ntest einval ... FAILED",
+    });
+    expect(roundText(flaky)).toBe("Round 1: the check passed on the second run");
+    expect(isFlakyRound(flaky)).toBe(true);
+    expect(isFlakyRound(round({ reviewer: "system", verdict: "approve", comment: "The check passed." }))).toBe(false);
+    expect(isFlakyRound(round({ reviewer: "agent", verdict: "approve", comment: flaky.comment }))).toBe(false);
   });
 });
 

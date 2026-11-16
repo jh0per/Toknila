@@ -12,19 +12,19 @@
 //! | `leftovers` | a card was done out of order and an earlier card still has open subtasks that nobody dismissed |
 //! | `design_question` | a pin of the assistant on a design is about the card and the person has not answered it |
 //! | `pin` | an open pin of the assistant has no card (or its card is not in the project); it is answered in place |
+//! | `flaky` | a card's last check failed once and passed on the second run, and nobody dismissed it (informational; see [`flaky`]) |
 //! | `answered` | a person answered a question or permission and its agent, which has no process, waits for a free slot; informational (`needs_human: false`), listed after the person's items |
 //!
 //! Items come newest first. The person's actions on them are the ordinary ones (approve,
 //! reject, unblock, a comment, approve a thread) plus the three leftover actions in
 //! [`leftovers`].
 
+pub mod flaky;
 pub mod hand_in;
 pub mod leftovers;
 mod pins;
 mod questions;
 mod screens;
-
-use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
@@ -57,6 +57,8 @@ pub enum InboxKind {
     DesignQuestion,
     /// The assistant pinned a question on a design and no card owns it; answered in place.
     Pin,
+    /// A check failed once and passed on the second run; informational, dismissable.
+    Flaky,
     /// A person answered and the answer waits for a free slot; informational.
     Answered,
 }
@@ -216,7 +218,8 @@ pub fn compute(data: &InboxData) -> Vec<InboxItem> {
             .iter()
             .filter_map(|f| thread_item(f, &data.tickets)),
     );
-    items.extend(leftover_items(data));
+    items.extend(leftovers::items(data));
+    items.extend(data.tickets.iter().filter_map(flaky::of_card));
     items.extend(questions::items(data));
     items.extend(pins::pin_items(data));
     for i in items.iter_mut().filter(|i| i.kind == InboxKind::Review) {
@@ -363,32 +366,6 @@ fn thread_item(f: &ThreadFacts, tickets: &[Ticket]) -> Option<InboxItem> {
     let mut i = item(InboxKind::Thread, card, since, f.thread.title.clone());
     i.thread = Some(f.thread.number);
     Some(i)
-}
-
-/// One item per earlier card that has open subtasks behind a card done out of order.
-fn leftover_items(data: &InboxData) -> Vec<InboxItem> {
-    let behind: BTreeSet<&TicketKey> = data
-        .tickets
-        .iter()
-        .filter_map(|t| t.done_out_of_order.as_ref())
-        .flat_map(|m| &m.behind)
-        .collect();
-    behind
-        .into_iter()
-        .filter_map(|key| {
-            let card = data.tickets.iter().find(|t| &t.key == key)?;
-            let open = leftovers::open_subtasks(&data.subtasks, card.id);
-            let marks = leftovers::marks_awaiting(&data.tickets, key);
-            let since = marks.iter().map(|m| m.status_since).max()?;
-            if open.is_empty() {
-                return None;
-            }
-            let mut i = item(InboxKind::Leftovers, card, since, String::new());
-            i.subtasks = open.into_iter().map(|s| s.text).collect();
-            i.done_cards = marks.iter().map(|m| m.key.clone()).collect();
-            Some(i)
-        })
-        .collect()
 }
 
 #[cfg(test)]

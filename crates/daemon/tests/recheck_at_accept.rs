@@ -74,6 +74,14 @@ struct Rig {
 
 impl Rig {
     async fn new() -> Rig {
+        // The same words on every platform's shell: count the run, then require `ok.txt`.
+        Rig::with_command(
+            "git config --add toknila.checks 1 && git ls-files --error-unmatch ok.txt",
+        )
+        .await
+    }
+
+    async fn with_command(command: &str) -> Rig {
         let tmp = tempfile::tempdir().expect("tmp");
         let repo = tmp.path().join("repo");
         std::fs::create_dir_all(&repo).expect("mkdir");
@@ -119,8 +127,6 @@ impl Rig {
             ship: PathBuf::new(),
             ticket: toknila_core::TicketId::new(),
         };
-        // The same words on every platform's shell: count the run, then require `ok.txt`.
-        let command = "git config --add toknila.checks 1 && git ls-files --error-unmatch ok.txt";
         rig.call(
             Method::POST,
             "/v1/projects",
@@ -328,7 +334,9 @@ async fn a_failing_check_after_main_moved_returns_the_card_to_the_agent_as_a_rou
 
     let card = rig.card().await;
     assert_eq!(card["ticket"]["status"], "running", "{card}");
-    assert_eq!(runs(&rig.repo, "checks"), 2);
+    // The first check passed once; the one Accept asked for failed, and failed again on its
+    // second run: that is a round, not a flaky pass.
+    assert_eq!(runs(&rig.repo, "checks"), 3);
     assert_eq!(rig.develop(), main, "nothing was merged");
     assert_ne!(before, main);
     let rounds = rig.rounds().await;
@@ -372,4 +380,119 @@ async fn an_extra_check_runs_only_when_a_matching_file_changed_and_its_line_is_i
         "{last}"
     );
     assert!(last.contains(", 0 s"), "{last}");
+}
+
+/// Fails the first time and passes the second, with the repository's git config (shared by
+/// every worktree) as the counter; `&&` and `||` mean the same in `sh` and in `cmd.exe`, and
+/// there is no redirect. The test seeds `toknila.n` with two values. Run 1: setting `n` to one
+/// value is refused (error: cannot overwrite multiple values), the `||` branch removes them, and
+/// the last step finds nothing to unset and fails. Run 2: `n` is absent, so setting it works, the
+/// `||` branch is skipped, and the last step unsets it and passes.
+const FAILS_ONCE: &str = "git config --add toknila.checks 1 && git config toknila.n y || git config --unset-all toknila.n && git config --unset toknila.n";
+
+fn seed_two_values(repo: &Path) {
+    git(repo, &["config", "--add", "toknila.n", "a"]);
+    git(repo, &["config", "--add", "toknila.n", "b"]);
+}
+
+async fn inbox_items(rig: &Rig, kind: &str) -> Vec<Value> {
+    let all = rig
+        .call(Method::GET, "/v1/projects/DEMO/inbox", Value::Null)
+        .await;
+    all.as_array()
+        .expect("a list")
+        .iter()
+        .filter(|i| i["kind"] == kind)
+        .cloned()
+        .collect()
+}
+
+#[tokio::test]
+async fn a_check_that_fails_once_and_passes_again_is_a_flaky_pass_not_a_round() {
+    let rig = Rig::with_command(FAILS_ONCE).await;
+    seed_two_values(&rig.repo);
+    rig.handed_in_with("feature.txt").await;
+    let card = rig.card().await;
+    let kept = &card["ticket"]["review"]["last_check"];
+    assert_eq!(kept["passed"], true, "{card}");
+    assert_eq!(kept["flaky"], true, "{kept}");
+    assert!(
+        kept["flaky_output"]
+            .as_str()
+            .is_some_and(|o| o.contains("cannot overwrite multiple values")),
+        "{kept}"
+    );
+    assert_eq!(card["ticket"]["status"], "review", "{card}");
+    let rounds = rig.rounds().await;
+    assert_eq!(rounds.len(), 1, "one round, a pass: {rounds:?}");
+    assert!(
+        rounds[0].starts_with("The check passed on the second run; the first failed:\n"),
+        "{rounds:?}"
+    );
+    assert!(
+        rounds[0].contains("cannot overwrite multiple values"),
+        "{rounds:?}"
+    );
+    assert_eq!(
+        runs(&rig.repo, "checks"),
+        2,
+        "run twice, on the same commit"
+    );
+
+    // The person learns of it, and may dismiss it.
+    let items = inbox_items(&rig, "flaky").await;
+    assert_eq!(items.len(), 1, "{items:?}");
+    assert_eq!(
+        items[0]["text"],
+        "A test failed once and passed on the second run while checking DEMO-1: error: cannot overwrite multiple values with a single value"
+    );
+    assert!(
+        items[0]["detail"]
+            .as_str()
+            .is_some_and(|d| d.contains("cannot overwrite multiple values")),
+        "{:?}",
+        items[0]
+    );
+    rig.call(
+        Method::POST,
+        "/v1/tickets/DEMO-1/flaky/dismiss",
+        Value::Null,
+    )
+    .await;
+    assert!(inbox_items(&rig, "flaky").await.is_empty());
+    let (status, _) = rig
+        .send(
+            Method::POST,
+            "/v1/tickets/DEMO-1/flaky/dismiss",
+            Value::Null,
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "nothing left to dismiss");
+}
+
+#[tokio::test]
+async fn a_check_that_fails_twice_is_a_round_with_the_second_output() {
+    let rig = Rig::with_command(
+        "git config --add toknila.checks 1 && echo test einval FAILED && git config --get toknila.nope",
+    )
+    .await;
+    rig.handed_in_with("feature.txt").await;
+    let card = rig.card().await;
+    assert_eq!(card["ticket"]["status"], "running", "{card}");
+    assert_eq!(runs(&rig.repo, "checks"), 2, "one more run, no more");
+    assert_ne!(card["ticket"]["review"]["last_check"]["flaky"], true);
+    let last = rig.rounds().await.pop().expect("a round");
+    assert!(last.contains("test einval FAILED"), "{last}");
+    assert!(inbox_items(&rig, "flaky").await.is_empty());
+    rig.runners.stop_role(rig.ticket, AgentRole::Worker);
+}
+
+#[tokio::test]
+async fn a_command_that_cannot_run_is_not_run_again() {
+    // Exit 127 in `sh`, 9009 and a message in `cmd.exe`; the counter runs only with the command.
+    let rig =
+        Rig::with_command("git config --add toknila.checks 1 && toknila-no-such-program-zz").await;
+    rig.handed_in_with("feature.txt").await;
+    assert_eq!(runs(&rig.repo, "checks"), 1, "a missing program runs once");
+    assert!(inbox_items(&rig, "flaky").await.is_empty());
 }

@@ -457,7 +457,12 @@ the agent hands in and passes it to the machine in the `Finished` event.
   kept) runs it after the commit and answers `CheckDone` (or `CheckLost` when it could not run, or
   the daemon restarted meanwhile: a person decides). A pass is a round by the `system` actor and
   hands the card on as the review mode says (reviewer agent, or the person, who then sees a card that
-  already passes). A failure is a round too, and the card goes back to the worker at once with the
+  already passes). A command (or extra check) that fails runs once more on the same commit, in the
+  same turn of the machine-wide check queue, unless it timed out or its program was not found (exit
+  127: a machine problem, run once); a pass on the second run is a passed round ("The check passed
+  on the second run; the first failed:" and the first run's last 30 lines), `CheckOutcome.flaky` is
+  set, and a `flaky` inbox item (dismissable, `POST /v1/tickets/{ticket}/flaky/dismiss`) tells the
+  person. A failure that stays is a round too, and the card goes back to the worker at once with the
   command's output as an instruction (`RecordCheckOutput`), no person involved. The reviewer's
   `request_changes` returns the card the same way in `agent` and `both` mode. Each return counts
   against the project's `max_review_rounds` (default 3, `tok project set --review-rounds`); the
@@ -994,6 +999,7 @@ the kind uses them).
 | `review` | a card is in Review and it is the person's turn (not while the reviewer agent has it, and not while its accepted work is `merging`; a merge that failed is a `blocked` item with its reason) | open the card |
 | `thread` | a thread is open and its newest version came after the person's last request for changes (`thread::awaiting_person`) | open the thread |
 | `leftovers` | a card was done out of order (`Ticket::done_out_of_order`) and an earlier card in its `behind` list still has open subtasks that nobody dismissed | the three decisions below |
+| `flaky` | a card's last check failed once and passed on the second run (`CheckOutcome::flaky`) and nobody dismissed it; informational, the text names the first failing line, the first run's output is the `detail` | dismiss |
 
 A silent agent (Waiting, `silent`) is not an inbox item yet. A `review` item whose reviewer gave
 no verdict carries the text "The reviewer gave no verdict", the reviewer's last screen lines

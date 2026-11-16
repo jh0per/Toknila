@@ -28,7 +28,7 @@ mod time;
 pub use crate::pr::{CheckRun, CheckState, PullRequest};
 pub use chain::{Chain, Edge, EdgeKind, NodeRef};
 pub use chain_title::{readable_name, slug_from_title};
-pub use check_outcome::{CheckOutcome, Recheck};
+pub use check_outcome::{CheckOutcome, FLAKY_LINES, Recheck, first_failing_line, last_lines};
 pub use command_policy::CommandPolicy;
 pub use comment::{Actor, Comment, CommentBody, CommentKind};
 pub use extra_check::ExtraCheck;
