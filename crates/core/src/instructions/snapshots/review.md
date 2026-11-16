@@ -28,7 +28,7 @@ The story has no hand-in to read: no hand-in was recorded. Judge by the diff and
 
 ## Work alone, in plain sight
 
-Do the work yourself, in this terminal. Do not start subagents or background agents: a story is done by one agent, and a person follows it here. Quote every path in a shell command with double quotes; never backslash-escape a space.
+Do the work yourself, in this terminal. Do not start subagents or background agents: a story is done by one agent, and a person follows it here. Write paths relative to the ship, without quotes; the ship's paths have no spaces.
 
 ## How to review
 
