@@ -6,6 +6,7 @@
 pub mod access;
 pub mod address;
 pub mod agent;
+pub mod artifacts;
 pub mod card_move;
 pub mod conversation;
 pub mod dag;

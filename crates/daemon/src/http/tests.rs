@@ -14,6 +14,7 @@ use crate::store::Store;
 
 mod agent_tokens;
 mod ask_story;
+mod built_artifacts;
 mod card_chain;
 mod card_designs;
 mod chain_settings;
