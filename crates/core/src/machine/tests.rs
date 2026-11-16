@@ -908,6 +908,7 @@ fn any_event() -> impl Strategy<Value = TicketEvent> {
             base: None,
             head: None,
             lines: Vec::new(),
+            flaky: None,
             mode: crate::ReviewMode::Both,
             max_rounds: 1,
         }),

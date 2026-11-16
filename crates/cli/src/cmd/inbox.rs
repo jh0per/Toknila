@@ -43,5 +43,13 @@ fn lines(i: &InboxItem) -> String {
     } else if !i.text.is_empty() {
         out.push_str(&format!("  {}\n", i.text));
     }
+    if i.kind == toknila_core::inbox::InboxKind::Flaky
+        && let Some(first) = &i.detail
+    {
+        out.push_str("  the first run:\n");
+        for l in first.lines() {
+            out.push_str(&format!("    {l}\n"));
+        }
+    }
     out
 }

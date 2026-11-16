@@ -67,6 +67,7 @@ export type LeftoverAction = "move" | "close" | "leave";
 export type CardCommand =
   | { type: "ticketAction"; key: string; action: TicketAction; text?: string }
   | { type: "leftovers"; key: string; action: LeftoverAction }
+  | { type: "dismissFlaky"; key: string }
   | { type: "addComment"; key: string; kind: CommentKind; text: string }
   | { type: "answer"; key: string; role: AgentRole; answer: AnswerKind; text?: string; choice?: number; always?: boolean };
 

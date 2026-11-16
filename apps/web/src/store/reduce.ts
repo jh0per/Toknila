@@ -81,7 +81,7 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "pickVersion":
       return [{ ...s, versionPick: { ...s.versionPick, [msg.thread]: msg.number } }, []];
     case "threadAction":
-    case "leftovers":
+    case "leftovers": case "dismissFlaky":
     case "ticketAction":
     case "addComment":
     case "answer":

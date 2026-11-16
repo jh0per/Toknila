@@ -26,6 +26,7 @@ const KIND_LINE: Record<InboxKind, string> = {
   leftovers: "Tasks were left open behind a finished story",
   design_question: "The assistant asks about a design",
   pin: "The assistant asks about a design",
+  flaky: "For your information: a test is flaky",
 };
 
 /// The second line of a row: for a blocked card the reason's own sentence (a double loss of the
@@ -114,6 +115,7 @@ function Body({ item, route, open, dispatch, detail }: BodyProps & { route: Rout
     case "leftovers": return <Leftovers item={item} open={open} dispatch={dispatch} />;
     case "design_question": return <DesignQuestion item={item} project={item.project ?? (route?.name === "card" ? route.project : undefined)} open={open} />;
     case "pin": return null;
+    case "flaky": return <Flaky item={item} open={open} dispatch={dispatch} />;
   }
 }
 
@@ -258,6 +260,26 @@ function Review({ item, open, dispatch, detail }: BodyProps & { detail: TicketDe
           <button className="btn primary" type="submit" data-testid="review-return" disabled={!comment.trim()}>Send back</button>
         </form>
       )}
+    </div>
+  );
+}
+
+/// A test that failed once and passed on the second run: nothing to decide. The first run's
+/// output is behind a disclosure, so the person can make a story of it; Dismiss removes the row.
+function Flaky({ item, open, dispatch }: BodyProps) {
+  return (
+    <div className="row-body">
+      <p className="muted" data-testid="flaky-text">{item.text}</p>
+      {item.detail && (
+        <details data-testid="flaky-output">
+          <summary>The first run's output</summary>
+          <pre>{item.detail}</pre>
+        </details>
+      )}
+      <div className="btns">
+        <button className="btn" data-testid="flaky-dismiss" onClick={() => dispatch({ type: "dismissFlaky", key: item.ticket })}>Dismiss</button>
+        {open}
+      </div>
     </div>
   );
 }

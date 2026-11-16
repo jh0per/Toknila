@@ -51,6 +51,7 @@ function cardRequest(e: CardCommand): [string, unknown] {
   switch (e.type) {
     case "ticketAction": return [`/tickets/${ticket}/actions/${e.action}`, { text: e.text }];
     case "leftovers": return [`/tickets/${ticket}/leftovers/${e.action}`, {}];
+    case "dismissFlaky": return [`/tickets/${ticket}/flaky/dismiss`, {}];
     case "addComment": return [`/tickets/${ticket}/comments`, { kind: e.kind, text: e.text }];
     case "answer": return [`/tickets/${ticket}/runner/answer`, { role: e.role, answer: e.answer, text: e.text, choice: e.choice, always: e.always }];
   }
@@ -181,6 +182,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
         return;
       case "ticketAction":
       case "leftovers":
+      case "dismissFlaky":
       case "addComment":
         void post<TicketDetail>(...cardRequest(e))
           .then((detail) => dispatch({ type: "detailLoaded", detail }))

@@ -279,6 +279,9 @@ pub struct Review {
     /// check; a pass merges by itself.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub recheck: bool,
+    /// A person dismissed the inbox item of the last check's flaky pass.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub flaky_dismissed: bool,
 }
 
 impl Review {

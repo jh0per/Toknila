@@ -57,7 +57,7 @@ fn pinned_tasks() -> Vec<BriefTask> {
     ]
 }
 
-fn assert_pinned(text: &str, name: &str) {
+pub(super) fn assert_pinned(text: &str, name: &str) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src/instructions/snapshots")
         .join(name);

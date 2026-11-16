@@ -1,5 +1,6 @@
 //! The reviewer is given the daemon's own result of the gate.
 
+use super::tests::assert_pinned;
 use super::*;
 use crate::{AgentRole, CheckOutcome, Timestamp};
 
@@ -36,7 +37,23 @@ fn outcome(passed: bool) -> CheckOutcome {
         at: Timestamp(1_700_000_000_000),
         base: None,
         head: None,
+        flaky: false,
+        flaky_output: String::new(),
     }
+}
+
+#[test]
+fn a_flaky_pass_is_told_with_the_first_failing_line() {
+    let flaky = CheckOutcome {
+        flaky: true,
+        flaky_output: "running 2 tests\ntest einval ... FAILED\nfailures: 1".to_owned(),
+        ..outcome(true)
+    };
+    let text = gate::text(Some(&flaky));
+    assert!(text.contains("passed on the second run"), "{text}");
+    assert!(text.contains("`test einval ... FAILED`"), "{text}");
+    assert!(!gate::text(Some(&outcome(true))).contains("second run"));
+    assert_pinned(&text, "gate_flaky.md");
 }
 
 #[test]

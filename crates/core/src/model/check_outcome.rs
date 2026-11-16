@@ -24,6 +24,42 @@ pub struct CheckOutcome {
     /// The ship's HEAD the check ran on; `None` when the host could not say.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head: Option<String>,
+    /// The check failed once and passed on the second run on the same commit.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub flaky: bool,
+    /// The last 30 lines of the first, failed run when `flaky`; empty otherwise.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub flaky_output: String,
+}
+
+/// How many lines of the failed first run a flaky pass keeps.
+pub const FLAKY_LINES: usize = 30;
+
+impl CheckOutcome {
+    /// The first line of the failed first run that says what failed: the first line that names
+    /// a failure (`FAIL`, `failed`, `error`, `panicked`), else the last non-empty line.
+    pub fn first_failing_line(&self) -> String {
+        first_failing_line(&self.flaky_output)
+    }
+}
+
+/// The first line of `output` that names a failure, else its last non-empty line.
+pub fn first_failing_line(output: &str) -> String {
+    let lines = || output.lines().map(str::trim).filter(|l| !l.is_empty());
+    lines()
+        .find(|l| {
+            let l = l.to_lowercase();
+            ["fail", "error", "panicked"].iter().any(|w| l.contains(w))
+        })
+        .or_else(|| lines().next_back())
+        .unwrap_or_default()
+        .to_owned()
+}
+
+/// The last [`FLAKY_LINES`] lines of `output`.
+pub fn last_lines(output: &str) -> String {
+    let lines: Vec<&str> = output.trim_end().lines().collect();
+    lines[lines.len().saturating_sub(FLAKY_LINES)..].join("\n")
 }
 
 /// What Accept knows about the last check when the merge runs: the main commit it saw. A merge
@@ -61,7 +97,20 @@ mod tests {
             at: Timestamp(1),
             base: base.map(str::to_owned),
             head: None,
+            flaky: false,
+            flaky_output: String::new(),
         }
+    }
+
+    #[test]
+    fn the_first_failing_line_and_the_last_thirty_lines() {
+        let out = "running 2 tests\ntest a ... ok\ntest b ... FAILED\nsummary";
+        assert_eq!(first_failing_line(out), "test b ... FAILED");
+        assert_eq!(first_failing_line("one\ntwo\n"), "two");
+        let long: String = (1..=50).map(|n| format!("l{n}\n")).collect();
+        let kept = last_lines(&long);
+        assert_eq!(kept.lines().count(), 30);
+        assert!(kept.starts_with("l21") && kept.ends_with("l50"));
     }
 
     #[test]

@@ -84,6 +84,8 @@ mod tests {
             at: toknila_core::Timestamp(1),
             base: base.map(str::to_owned),
             head: head.map(str::to_owned),
+            flaky: false,
+            flaky_output: String::new(),
         }
     }
 
