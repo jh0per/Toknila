@@ -1,8 +1,9 @@
 //! The planner: a project's main agent, as use cases. Each command here is one the planner's MCP
 //! tools call, scoped to the planner's own project: a chain or card of another project is
 //! refused (`403`), and so is anything that could start a card. It goes through the same use
-//! cases as the window and the CLI (`chains`, `tickets`, `threads`), so core's rules apply; this
-//! module adds the scope, and `toknila_core::planner` holds the rules of what a planner may do.
+//! cases as the window and the CLI (`chains`, `tickets`, `threads`), so core's rules apply; what
+//! a planner may do is asked of [`crate::access`] as `Caller::Planner`, whose rule is core's
+//! `access::may`.
 //!
 //! The planner's own run (start, stop, input, size) is here too: a project has at most one.
 
@@ -14,12 +15,13 @@ mod suggest;
 mod window;
 mod with_designs;
 
+use crate::access::{self, Action, Caller};
 use crate::conversation as conv;
 use serde::{Deserialize, Serialize};
 use toknila_core::conversation::{self, About};
 use toknila_core::instructions::ProjectFacts;
 use toknila_core::machine::person_only;
-use toknila_core::planner::{self, Refusal};
+use toknila_core::planner;
 use toknila_core::{
     Actor, AgentProfile, AgentRole, BaseBehind, Chain, ChainId, EdgeKind, PlannerSite, Project,
     ProjectId, Thread, ThreadKind, Ticket, TicketKey,
@@ -39,61 +41,41 @@ pub use with_designs::{request_with, start_with};
 use crate::runner::{RunBrief, RunRequest, Runner, RunnerError, Started};
 use crate::{AppError, AppResult, ErrorKind, Reader, UnitOfWork, chains, resolve, threads};
 
-impl From<Refusal> for AppError {
-    fn from(r: Refusal) -> Self {
-        let kind = match r {
-            Refusal::OtherProject { .. }
-            | Refusal::AutostartChain { .. }
-            | Refusal::RoadmapStory { .. }
-            | Refusal::CardStarted { .. } => ErrorKind::Forbidden,
-            Refusal::NoRepository(_) | Refusal::Archived(_) => ErrorKind::Conflict,
-        };
-        AppError::new(kind, r.to_string())
-    }
+/// A chain of the planner's project by id or name, for `action`. A chain of another project is
+/// refused, one that does not exist is not found.
+pub(crate) fn chain_for<R: Reader + ?Sized>(
+    r: &R,
+    project: ProjectId,
+    reference: &str,
+    action: &Action,
+) -> AppResult<Chain> {
+    let caller = Caller::Planner(project);
+    let c = access::chain(r, &caller, reference)?;
+    access::on_epic(r, &caller, action, &c)?;
+    Ok(c)
+}
+
+/// A card of the planner's project by id, key or title, for `action`.
+pub(crate) fn card_for<R: Reader + ?Sized>(
+    r: &R,
+    project: ProjectId,
+    reference: &str,
+    action: &Action,
+) -> AppResult<Ticket> {
+    let t = resolve::ticket(r, reference)?;
+    access::on_story(r, &Caller::Planner(project), action, &t)?;
+    Ok(t)
 }
 
 /// A chain of the planner's project by id or name. A chain of another project is refused, one
 /// that does not exist is not found.
 pub fn chain<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> AppResult<Chain> {
-    if let Ok(id) = reference.parse::<ChainId>()
-        && let Some(c) = r.chain(id)?
-    {
-        return in_project(r, project, c);
-    }
-    if let Some(c) = r.chain_by_name(project, reference)? {
-        return Ok(c);
-    }
-    // A name that only another project has is that project's chain.
-    match r.chains_named(reference)?.into_iter().next() {
-        Some(c) => in_project(r, project, c),
-        None => Err(AppError::not_found(format!("epic {reference}"))),
-    }
-}
-
-fn in_project<R: Reader + ?Sized>(r: &R, project: ProjectId, c: Chain) -> AppResult<Chain> {
-    let owner = r
-        .project(c.project_id)?
-        .map_or_else(String::new, |p| p.key.to_string());
-    planner::ensure_in_project(project, c.project_id, format!("epic {}", c.name), &owner)?;
-    Ok(c)
+    chain_for(r, project, reference, &Action::ReadPlan)
 }
 
 /// A card of the planner's project by id, key or title.
 pub fn card<R: Reader + ?Sized>(r: &R, project: ProjectId, reference: &str) -> AppResult<Ticket> {
-    let t = resolve::ticket(r, reference)?;
-    let chain = r
-        .chain(t.chain_id)?
-        .ok_or_else(|| AppError::not_found(format!("epic of {}", t.key)))?;
-    let owner = r
-        .project(chain.project_id)?
-        .map_or_else(String::new, |p| p.key.to_string());
-    planner::ensure_in_project(
-        project,
-        chain.project_id,
-        format!("story {}", t.key),
-        &owner,
-    )?;
-    Ok(t)
+    card_for(r, project, reference, &Action::ReadPlan)
 }
 
 /// What the planner may give for a new chain; a chain it makes never starts cards by itself.
@@ -118,6 +100,12 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
     project: ProjectId,
     input: NewPlanChain,
 ) -> AppResult<ChainId> {
+    let caller = Caller::Planner(project);
+    let asked = Action::NewEpic {
+        autostart: None,
+        owner_fields: false,
+    };
+    access::on_project(&*uow, &caller, &asked, project)?;
     let title = crate::epic::clean_title(input.title.as_deref());
     let name = match input
         .name
@@ -135,7 +123,7 @@ pub fn new_chain<U: UnitOfWork + ?Sized>(
         name: Some(name),
         title,
         goal: input.goal,
-        autostart: Some(planner::NEW_CHAIN_AUTOSTART),
+        autostart: Some(toknila_core::access::new_epic_autostart(&caller, None)),
         review_mode: None,
         reviewer: None,
         version: input.version,
@@ -171,18 +159,10 @@ pub fn edit_chain<U: UnitOfWork + ?Sized>(
     chain_ref: &str,
     edit: EditPlanChain,
 ) -> AppResult<ChainId> {
-    let c = chain(uow, project, chain_ref)?;
-    let view = uow
-        .chain_view(c.id)?
-        .ok_or_else(|| AppError::not_found(format!("epic {chain_ref}")))?;
-    if let Some(r) = view.finish_release()
-        && r.state != toknila_core::ReleaseState::Planned
-    {
-        return Err(AppError::conflict(format!(
-            "release {} of epic {} is cut or released: the epic can no longer change",
-            r.version, c.name
-        )));
-    }
+    let edit_epic = Action::EditEpic {
+        owner_fields: false,
+    };
+    let c = chain_for(&*uow, project, chain_ref, &edit_epic)?;
     let settings = crate::epic::ChainSettings {
         name: edit.name,
         title: edit.title,
@@ -206,8 +186,7 @@ pub fn add_dependency<U: UnitOfWork + ?Sized>(
     from: &str,
     to: &str,
 ) -> AppResult<ChainId> {
-    let c = chain(uow, project, chain_ref)?;
-    planner::ensure_graph_change(&c)?;
+    let c = chain_for(&*uow, project, chain_ref, &Action::ChangeGraph)?;
     chains::add_edge(uow, &c.id.to_string(), from, to, EdgeKind::Normal)
 }
 
@@ -219,8 +198,7 @@ pub fn remove_dependency<U: UnitOfWork + ?Sized>(
     from: &str,
     to: &str,
 ) -> AppResult<ChainId> {
-    let c = chain(uow, project, chain_ref)?;
-    planner::ensure_graph_change(&c)?;
+    let c = chain_for(&*uow, project, chain_ref, &Action::ChangeGraph)?;
     chains::remove_edge(uow, &c.id.to_string(), from, to)
 }
 
@@ -233,8 +211,7 @@ pub fn move_card<U: UnitOfWork + ?Sized>(
     anchor: &str,
     place: toknila_core::graph::Place,
 ) -> AppResult<ChainId> {
-    let c = chain(uow, project, chain_ref)?;
-    planner::ensure_graph_change(&c)?;
+    let c = chain_for(&*uow, project, chain_ref, &Action::ChangeGraph)?;
     chains::move_ticket(uow, &c.id.to_string(), card_ref, anchor, place)
 }
 
@@ -246,7 +223,7 @@ pub fn open_thread<U: UnitOfWork + ?Sized>(
     kind: ThreadKind,
     title: &str,
 ) -> AppResult<(Ticket, Thread)> {
-    let t = card(uow, project, card_ref)?;
+    let t = card_for(&*uow, project, card_ref, &Action::Thread)?;
     let th = threads::open(uow, &t, kind, title)?;
     let text = conversation::opened_thread(th.number, &t.key);
     conv::line_about_card(uow, project, text, t.key.clone())?;
@@ -260,7 +237,7 @@ pub fn thread<R: Reader + ?Sized>(
     card_ref: &str,
     thread_ref: &str,
 ) -> AppResult<(Ticket, Thread)> {
-    let t = card(r, project, card_ref)?;
+    let t = card_for(r, project, card_ref, &Action::Thread)?;
     let th = threads::find(r, &t, thread_ref)?;
     Ok((t, th))
 }

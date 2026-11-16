@@ -2,10 +2,10 @@
 //! project.
 
 use toknila_core::graph::Place;
-use toknila_core::planner;
 use toknila_core::{ChainId, ProjectId};
 
-use super::{card, chain, move_card};
+use super::{card, chain, chain_for, move_card};
+use crate::access::Action;
 use crate::{AppError, AppResult, UnitOfWork};
 
 /// Moves a card that has not started from `chain_ref` to another epic of the planner's project,
@@ -19,11 +19,12 @@ pub fn move_card_to_chain<U: UnitOfWork + ?Sized>(
     to_chain: &str,
     place: Option<(&str, Place)>,
 ) -> AppResult<ChainId> {
-    let from = chain(uow, project, chain_ref)?;
-    let to = chain(uow, project, to_chain)?;
-    planner::ensure_graph_change(&from)?;
-    planner::ensure_graph_change(&to)?;
-    let t = card(uow, project, card_ref)?;
+    // Both epics are the planner's before either is looked at for autostart, as before.
+    chain(&*uow, project, chain_ref)?;
+    chain(&*uow, project, to_chain)?;
+    let from = chain_for(&*uow, project, chain_ref, &Action::ChangeGraph)?;
+    let to = chain_for(&*uow, project, to_chain, &Action::ChangeGraph)?;
+    let t = card(&*uow, project, card_ref)?;
     if t.chain_id != from.id {
         return Err(AppError::bad_request(format!(
             "{} is not in epic {}",

@@ -3,7 +3,8 @@
 use toknila_core::events::DomainEvent;
 use toknila_core::{ProjectId, Ticket};
 
-use super::card;
+use super::card_for;
+use crate::access::Action;
 use crate::{AppError, AppResult, UnitOfWork};
 
 /// Asks the window to show a card of the planner's project: one `window.show_card` event, no
@@ -13,7 +14,7 @@ pub fn show_card<U: UnitOfWork + ?Sized>(
     project: ProjectId,
     reference: &str,
 ) -> AppResult<Ticket> {
-    let t = card(&*uow, project, reference)?;
+    let t = card_for(&*uow, project, reference, &Action::ShowStory)?;
     let chain = uow
         .chain(t.chain_id)?
         .ok_or_else(|| AppError::not_found(format!("epic of {}", t.key)))?;

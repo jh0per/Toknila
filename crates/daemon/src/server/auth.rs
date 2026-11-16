@@ -12,7 +12,9 @@ use axum::extract::{MatchedPath, Request, State};
 use axum::http::{Method, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use toknila_app::{AppError, AppResult, agent};
+use toknila_app::AppResult;
+use toknila_app::access::{self, Action, Caller};
+use toknila_core::access::{self as rule, Refusal, Target};
 use toknila_core::agent::AgentEvent;
 use toknila_core::{AgentRole, ProjectId, RunId, Ticket, planner};
 
@@ -58,8 +60,9 @@ pub const PLANNER_ROUTES: [(&str, &str); 20] = [
     ("POST", "/v1/planner/cards/{card}/threads/{thread}/versions"),
 ];
 
-/// Who is calling, as the token says. Handlers of agent routes check [`Principal::owns`] and, for
-/// events, [`Principal::may_send`].
+/// Who is calling, as the token says. What it may do is core's `access::may`, asked through
+/// [`Principal::caller`] by the use cases and, for a story's run, by [`Principal::owns`] and
+/// [`Principal::may_send`].
 #[derive(Debug, Clone, Copy)]
 pub enum Principal {
     /// The person's token.
@@ -69,25 +72,32 @@ pub enum Principal {
 }
 
 impl Principal {
+    /// The caller the access rule knows: the person, a project's planner, or a story's run.
+    pub fn caller(&self) -> Caller {
+        match self {
+            Principal::Person => Caller::Person,
+            Principal::Agent(grant) if grant.role == AgentRole::Planner => {
+                Caller::Planner(planner::project_of(grant.ticket))
+            }
+            Principal::Agent(grant) => Caller::Card {
+                ticket: grant.ticket,
+                role: grant.role,
+            },
+        }
+    }
+
     /// An agent may act on its own ticket only; a person on any.
     pub fn owns(&self, ticket: &Ticket) -> AppResult<()> {
-        match self {
-            Principal::Person => Ok(()),
-            Principal::Agent(grant) => agent::ensure_granted(grant.ticket, ticket),
-        }
+        access::on_run_story(&self.caller(), &Action::RunSignal, ticket)
     }
 
     /// The project a planner's token works on. Only a planner has one: a person uses the project
     /// routes, and a card's agent has its ticket.
     pub fn planner_project(&self) -> AppResult<ProjectId> {
-        match self {
-            Principal::Agent(grant) if grant.role == AgentRole::Planner => {
-                Ok(planner::project_of(grant.ticket))
-            }
-            _ => Err(AppError::forbidden(
-                "these routes are for a project's planner",
-            )),
-        }
+        Ok(self
+            .caller()
+            .planner_project()
+            .ok_or(Refusal::PlannerOnly)?)
     }
 
     /// The project and the run of a planner's token; anyone else is refused as in
@@ -96,31 +106,17 @@ impl Principal {
         let project = self.planner_project()?;
         match self {
             Principal::Agent(grant) => Ok((project, grant.run)),
-            Principal::Person => Err(AppError::forbidden(
-                "these routes are for a project's planner",
-            )),
+            Principal::Person => Err(Refusal::PlannerOnly.into()),
         }
     }
 
     /// What an agent may report depends on its role: a worker reports its work, a reviewer
     /// only gives its verdict on it. A person may send any event (a simulated agent is one).
     pub fn may_send(&self, event: &AgentEvent) -> AppResult<()> {
-        let Principal::Agent(grant) = self else {
-            return Ok(());
+        let report = Action::SendEvent {
+            verdict: event.is_review_verdict(),
         };
-        match (grant.role, event.is_review_verdict()) {
-            (AgentRole::Reviewer, true) | (AgentRole::Worker, false) => Ok(()),
-            (AgentRole::Reviewer, false) => Err(AppError::forbidden(
-                "a reviewer agent may only send its review_verdict",
-            )),
-            (AgentRole::Planner, false) => Err(AppError::forbidden(
-                "a planner may not send story events; it plans through its own tools",
-            )),
-            (_, true) => Err(AppError::forbidden(
-                "only the reviewer agent may send a review_verdict",
-            )),
-            (AgentRole::Release, false) => Ok(()),
-        }
+        Ok(rule::may(&self.caller(), &report, &Target::default())?)
     }
 }
 

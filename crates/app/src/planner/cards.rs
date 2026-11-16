@@ -1,14 +1,14 @@
 //! The planner's cards: adding one and editing one that has not started, with the designs it
 //! references.
 
+use crate::access::Action;
 use crate::conversation as conv;
 use serde::{Deserialize, Serialize};
 use toknila_core::conversation;
 use toknila_core::design::DesignRef;
-use toknila_core::planner;
 use toknila_core::{Project, ProjectId, TicketId, TicketPatch};
 
-use super::{card, chain};
+use super::{card_for, chain_for};
 use crate::tickets;
 use crate::tickets::NewTicket;
 use toknila_core::discussion::EditProposal;
@@ -54,21 +54,6 @@ pub struct DesignPick {
     pub region: Option<toknila_core::design::Region>,
 }
 
-/// Refuses a change of `chain`'s stories that the person's latest message does not allow.
-fn ensure_story_target<R: crate::Reader + ?Sized>(
-    r: &R,
-    project: ProjectId,
-    chain: &toknila_core::Chain,
-) -> AppResult<()> {
-    use toknila_core::conversation::Author;
-    let recent = r.conversation_page(project, None, 200)?;
-    let from = recent
-        .iter()
-        .rposition(|m| m.author == Author::Person)
-        .unwrap_or(recent.len());
-    Ok(planner::ensure_story_target(&recent[from..], chain)?)
-}
-
 /// Adds a card to a chain of the planner's project, without designs.
 pub fn add_card<U: UnitOfWork + ?Sized>(
     uow: &mut U,
@@ -88,9 +73,10 @@ pub fn add_card_with_designs<U: UnitOfWork + ?Sized>(
     input: NewCard,
     designs: Vec<DesignRef>,
 ) -> AppResult<TicketId> {
-    let c = chain(uow, project, chain_ref)?;
-    planner::ensure_graph_change(&c)?;
-    ensure_story_target(&*uow, project, &c)?;
+    let add = Action::AddStory {
+        owner_fields: false,
+    };
+    let c = chain_for(&*uow, project, chain_ref, &add)?;
     let model = match input.model.as_deref() {
         Some(m) => Project::choose_model(m).map_err(AppError::bad_request)?,
         None => None,
@@ -166,11 +152,10 @@ pub fn edit_card_with_designs<U: UnitOfWork + ?Sized>(
     edit: CardEdit,
     designs: Option<Vec<DesignRef>>,
 ) -> AppResult<TicketId> {
-    let t = card(uow, project, card_ref)?;
-    planner::ensure_card_editable(&t)?;
-    if let Some(c) = uow.chain(t.chain_id)? {
-        ensure_story_target(&*uow, project, &c)?;
-    }
+    let edit_story = Action::EditStory {
+        owner_fields: false,
+    };
+    let t = card_for(&*uow, project, card_ref, &edit_story)?;
     if let Some(m) = edit.model.as_deref() {
         Project::choose_model(m).map_err(AppError::bad_request)?;
     }
