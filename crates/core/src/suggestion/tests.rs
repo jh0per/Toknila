@@ -71,6 +71,7 @@ fn a_status_change_ends_the_suggestions_about_that_card_and_a_release_those_of_i
         cut_at: None,
         released_at: None,
         tag: None,
+        released_with: None,
     };
     assert_eq!(
         ends(&DomainEvent::ReleaseCreated { release }),

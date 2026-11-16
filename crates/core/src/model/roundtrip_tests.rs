@@ -297,6 +297,10 @@ fn releases_roundtrip() {
                 cut_at: Some(Timestamp(10)),
                 released_at: None,
                 tag: None,
+                released_with: Some(crate::ReleasedWith {
+                    tag: "v1.0.0".to_owned(),
+                    by: Some("other".to_owned()),
+                }),
             });
         }
     }

@@ -1,6 +1,7 @@
 //! The Finish node: the chain's version, its end release and where the release stands.
 
 use super::*;
+use crate::ReleasedWith;
 
 fn merged(b: &mut Builder, n: usize) {
     b.view.tickets[n].status = TicketStatus::Merged;
@@ -28,6 +29,7 @@ fn the_chains_own_version_is_planned_until_every_card_is_merged_then_ready() {
             state: FinishState::Planned,
             tag: None,
             released_at: None,
+            released_with: None,
         }
     );
     merged(&mut b, 0);
@@ -74,8 +76,87 @@ fn a_released_end_release_reads_released_with_its_tag_and_date() {
             state: FinishState::Released,
             tag: Some("v1.4.0".to_owned()),
             released_at: Some(Timestamp(2_000)),
+            released_with: None,
         })
     );
+}
+
+/// A finished epic with a planned end release `version`, every story Merged.
+fn finished(version: &str, stories: usize) -> Builder {
+    let mut b = Builder::new(false);
+    let r = b.release(version, StartMode::Manual);
+    for n in 0..stories {
+        let t = b.ticket();
+        b.edge(t, r);
+        merged(&mut b, n);
+    }
+    b
+}
+
+#[test]
+fn a_finished_epic_is_released_with_a_tag_another_epic_made() {
+    let mut b = finished("0.3.4", 2);
+    b.view
+        .release_with("v0.3.3", Some("phase-9"), Timestamp(5_000))
+        .expect("released with");
+    let r = &b.view.releases[0];
+    assert_eq!(r.state, ReleaseState::Released);
+    assert_eq!(r.tag.as_deref(), Some("v0.3.3"));
+    assert_eq!(r.version, "0.3.3", "planned higher: the tag's version");
+    assert_eq!(b.view.chain.version.as_deref(), Some("0.3.3"));
+    assert!(
+        b.view
+            .tickets
+            .iter()
+            .all(|t| t.status == TicketStatus::Released)
+    );
+    let f = b.view.finish().expect("finish");
+    assert_eq!(f.state, FinishState::Released);
+    assert_eq!(
+        f.released_with,
+        Some(ReleasedWith {
+            tag: "v0.3.3".to_owned(),
+            by: Some("phase-9".to_owned())
+        })
+    );
+}
+
+#[test]
+fn a_version_planned_lower_than_the_tag_stays() {
+    let mut b = finished("0.3.0", 1);
+    b.view
+        .release_with("v0.3.3", Some("phase-9"), Timestamp(5_000))
+        .expect("released with");
+    assert_eq!(b.view.releases[0].version, "0.3.0");
+}
+
+#[test]
+fn an_epic_with_an_open_story_or_a_released_one_is_not_released_with_a_tag() {
+    let mut open = finished("0.3.4", 2);
+    open.view.tickets[1].status = TicketStatus::Running;
+    assert!(
+        open.view
+            .release_with("v0.3.3", None, Timestamp(1))
+            .is_err()
+    );
+    assert_eq!(open.view.releases[0].state, ReleaseState::Planned);
+    assert_eq!(open.view.tickets[0].status, TicketStatus::Merged);
+
+    let mut done = finished("0.3.4", 2);
+    done.view.tickets[0].status = TicketStatus::Released;
+    assert!(
+        done.view
+            .release_with("v0.3.3", None, Timestamp(1))
+            .is_err()
+    );
+}
+
+#[test]
+fn an_epic_without_a_release_node_cannot_be_released_with_a_tag() {
+    let mut b = Builder::new(false);
+    b.ticket();
+    merged(&mut b, 0);
+    assert!(b.view.release_with("v0.3.3", None, Timestamp(1)).is_err());
 }
 
 #[test]

@@ -654,6 +654,65 @@
         }
       }
     },
+    "/chains/{chain}/release/mark": {
+      "post": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "A person says the epic shipped inside an existing tag: its release node reads released with\nthat tag. Refused with a sentence when the tag does not exist or does not contain the merges of\nevery story of the epic.",
+        "operationId": "mark_release",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "path",
+            "description": "Chain id or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkRelease"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain}/releases": {
       "post": {
         "tags": [
@@ -8609,6 +8668,17 @@
               }
             ]
           },
+          "released_with": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReleasedWith",
+                "description": "Set when the epic shipped inside another epic's tag."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "state": {
             "$ref": "#/components/schemas/FinishState"
           },
@@ -9179,6 +9249,20 @@
             "$ref": "#/components/schemas/AgentProfile"
           }
         }
+      },
+      "MarkRelease": {
+        "type": "object",
+        "description": "Body of `POST /v1/chains/{chain}/release/mark`: a person says an epic shipped in an old tag.",
+        "required": [
+          "tag"
+        ],
+        "properties": {
+          "tag": {
+            "type": "string",
+            "description": "The tag that exists in the repository, such as `v0.3.3`."
+          }
+        },
+        "additionalProperties": false
       },
       "McpWiring": {
         "type": "object",
@@ -11922,6 +12006,17 @@
               }
             ]
           },
+          "released_with": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReleasedWith",
+                "description": "Set when the epic shipped inside another epic's tag: the tag and the epic that cut it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "start_mode": {
             "$ref": "#/components/schemas/StartMode"
           },
@@ -12119,6 +12214,26 @@
           "tag",
           "push"
         ]
+      },
+      "ReleasedWith": {
+        "type": "object",
+        "description": "The tag an epic's work shipped in, and the epic whose release run (or a person) made it count.",
+        "required": [
+          "tag"
+        ],
+        "properties": {
+          "by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the epic whose release run made the tag; none for a tag a person made."
+          },
+          "tag": {
+            "type": "string",
+            "description": "The git tag (`v0.3.3`)."
+          }
+        }
       },
       "RenameDesign": {
         "type": "object",

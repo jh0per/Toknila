@@ -129,6 +129,14 @@ pub fn set_settings<U: UnitOfWork + ?Sized>(
         }
         _ => None,
     };
+    if let Some(v) = settings.version.as_deref().filter(|v| !v.trim().is_empty())
+        && uow
+            .chain_view(c.id)?
+            .is_some_and(|view| view.version().as_deref() != Some(v.trim().trim_start_matches('v')))
+    {
+        let version = clean_version(v)?;
+        crate::releases::ensure_version_free(uow, c.project_id, Some(c.id), &version)?;
+    }
     with_chain(uow, c.id, |ctx| -> AppResult<()> {
         if let Some(v) = settings.version.as_deref().filter(|v| !v.trim().is_empty())
             && ctx.view.version().as_deref() != Some(v.trim().trim_start_matches('v'))
