@@ -1002,6 +1002,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/tickets/{ticket}/move",
             "/chains/{chain}/wildcards",
             "/events",
+            "/machine/settings",
             "/planner/activity",
             "/planner/say",
             "/profiles",
