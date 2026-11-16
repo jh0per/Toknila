@@ -262,7 +262,7 @@ changes. A window follows it once per event (by `seq`) and only when it shows th
 assistant or a chain of it; it then opens the card's page with a notice and Back. Any other
 window ignores it. `tok watch` prints it as `window show_card DEMO-2`.
 
-The planner's `suggest` tool (`POST /v1/planner/suggestion`) keeps one standing suggestion per
+The planner's `suggest` tool (`PUT /v1/projects/{project}/suggestion`) keeps one standing suggestion per
 project, the owner's next step, and journals `window` kind `suggest` (`{"project","suggestion"}`;
 the suggestion is `{"project","text","card","chain","action","at"}`, `action` one of `start`,
 `answer`, `accept`, `release`, absent with no card when nothing waits for the owner). A new one
@@ -278,7 +278,7 @@ person stopped it or its run ended. Two entries per message; the steps inside th
 journaled: a window reads the turn with `GET /v1/projects/{project}/planner` (`working`, `step`,
 `since`). `tok watch` prints it as `planner turn`.
 
-The planner's `design_question` tool (`POST /v1/planner/pins`) pins a question on a region of a
+The planner's `design_question` tool (`POST /v1/projects/{project}/design-pins`) pins a question on a region of a
 design and journals `design_pin` kind `asked` (`{"pin"}`; the pin is `{"id","project","design",
 "design_name","number","region","text","card","answer","created_at","answered_at"}`, `card` and
 `answer` absent when none). A person's answer (`POST /v1/projects/{project}/design-pins/{pin}/answer`)

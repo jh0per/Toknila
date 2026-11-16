@@ -712,15 +712,51 @@ How a running agent talks back, over the same route and use cases as `tok sim` (
 - **Tokens.** `runner/tokens.rs` (`AgentTokens`, owned by `Runners`): `Runners::start` issues one
   token per run, scoped to the run's ticket; the watcher thread revokes it when the process ends.
   The token reaches the agent only through its environment (`TOKNILA_URL`, `TOKNILA_RUN_TOKEN`,
-  `TOKNILA_TICKET`, `TOKNILA_RUN`, `TOKNILA_ROLE`, in `toknila_api_types::runner::agent_env`); the
-  person's token is not known to `Runners` at all. A token carries its run's role: a worker's may
-  send every event but `review_verdict`, a reviewer's only `review_verdict`
-  (`Principal::may_send`, `403` otherwise).
+  `TOKNILA_TICKET` for a card's run or `TOKNILA_PROJECT` for a planner's, `TOKNILA_RUN`,
+  `TOKNILA_ROLE`, in `toknila_api_types::runner::agent_env`); the person's token is not known to
+  `Runners` at all. A token carries its run's role: a worker's may send every event but
+  `review_verdict`, a reviewer's only `review_verdict` (`403` otherwise; the rule is below).
 - **Who is calling.** `server/auth.rs` turns the bearer token into a `Principal` (`Person` or
-  `Agent(grant)`) for the handlers. An agent may call only `AGENT_ROUTES` (events, activity, the plan quota and
-  the instruction claim of its own ticket); everything else is `403`. The ownership rule is `toknila_app::agent::ensure_granted`
-  (`ErrorKind::Forbidden`, `403`). Business rules stay in core: `person_only` still guards the
-  use cases, the allowlist keeps agents from reaching them.
+  `Agent(grant)`), and `Principal::caller` into the `Caller` the rule knows. An agent may call only
+  `AGENT_ROUTES` (events, activity, the plan quota and the instruction claim of its own ticket), a
+  planner only `PLANNER_ROUTES`; everything else, including every route added later, is `403`.
+  Business rules stay in core: `person_only` still guards the use cases, the lists keep agents
+  from reaching them.
+
+### Who may do what
+
+One route per action; the caller decides what it may do, in one place (TOKNILA-149). There are
+two parts, and neither is in a handler:
+
+- **Which routes a token reaches** — the lists in `server/auth.rs`, deny by default: the person
+  every route, a card's run `AGENT_ROUTES`, a planner `PLANNER_ROUTES` (the person's routes of
+  the actions it has, its `say` and `activity`, and for one release its old `/planner/...`
+  routes).
+- **What a caller may do to what** — `toknila_core::access::may(caller, action, target)`, pure,
+  with a test of every caller × action (`access/tests.rs`). `Caller` is `Person`,
+  `Planner(project)` or `Card { ticket, role }` (worker, reviewer, release run). `Action` names
+  what a route does (`ReadPlan`, `NewEpic`, `EditEpic`, `AddStory`, `EditStory`, `ChangeGraph`,
+  `ShowStory`, `Thread`, `Speak`, `ReportTurn`, `SendEvent`, `RunSignal`), with `owner_fields`
+  where the body sets what only the owner sets. `Target` is what the application found: the
+  project and its key, the epic, whether its release is cut, the story, and the conversation turn
+  when the rule needs it (`access::needs_turn`). The answer is `Ok` or a `Refusal`
+  (`403`, or `409` for a cut epic), with the words the refusal always had.
+- **The rule.** A person may do everything but speak for the assistant (`say`, its next step,
+  its pins). A planner reaches its own project only (`403` "belongs to another project"); never
+  sets autostart, review mode, reviewer, a story's agent, secrets, pause, place or a release-wait
+  dependency ("only the owner sets ..."); changes no graph of an epic that starts its stories by
+  itself; rewrites only stories that have not started; edits no epic whose release is cut; and on
+  the roadmap adds and edits stories only of the epic it made in the turn or one the person named
+  (TOKNILA-124). Its new epics never start their stories (`access::new_epic_autostart`), the model
+  it names is an alias or a full name (`access::story_model`), and its prompt or acceptance edit
+  of a story the person talks over is a proposal (`access::proposes_edits`). A card's run acts on
+  its own story only and reports what its role may.
+- **Where it is asked.** `toknila_app::access` resolves the target (a planner's names are looked
+  up in its project first) and asks; `toknila_app::as_caller` holds the plan's commands as any
+  caller makes them (new or edited epic, story, dependency, move, thread, show), runs them as
+  `caller.actor()` and tells what the assistant did in its conversation (`access::tell`). The
+  person's routes call these with the principal's caller; `Principal::owns` and `may_send` ask the
+  same rule for a story's run.
 - **Wiring.** `runner/wiring.rs`: for a profile with `mcp.enabled` / `hooks.enabled` (or allow
   rules) and the flag set, the runner writes `runs/<ticket id>/<role>/mcp.json` and
   `settings.json` under the data home (`<role>` is `worker`, `reviewer` or `release`, so the
@@ -836,12 +872,22 @@ the cards; the owner starts cards and accepts work.
   empty project, an empty chain and the last step of the first-run page send their text the same
   way. The terminal connection is `terminal/connect.ts` with the project's routes
   (`openPlannerTerminal`). There is no chat transcript of the planner: the terminal is the record.
-- **Tools and routes.** `tok mcp` with `TOKNILA_ROLE=planner` offers `show_plan`, `new_chain`,
-  `add_card`, `edit_card`, `show_card`, `add_dependency`, `remove_dependency`, `move_card`,
-  `open_thread`, `thread_message` and `thread_version` (`cmd/mcp_planner`), each a call to
-  `/v1/planner/...` (`PLANNER_ROUTES`; `http/routes/planner.rs`) with the run's token. A planner
-  token reaches those routes and its turn's (below) and no other (`403`); nothing in them starts,
-  accepts or merges.
+- **Tools and routes.** `tok mcp` with `TOKNILA_ROLE=planner` offers `show_plan`, `show_design`,
+  `design_question`, `new_chain`, `edit_chain`, `add_card`, `edit_card`, `say`, `show_card`,
+  `suggest`, `add_dependency`, `remove_dependency`, `move_card`, `open_thread`, `thread_message`
+  and `thread_version` (`cmd/mcp_planner`), each a call with the run's token to the person's
+  route of that action, the project named by `TOKNILA_PROJECT`: `GET /projects/{project}/plan`
+  and `/plan/overview`, `GET /chains/{chain}/plan`, `GET /tickets/{ticket}/plan`,
+  `GET /projects/{project}/designs/{design}`, `POST /projects/{project}/design-pins`,
+  `POST /projects/{project}/chains`, `PATCH /chains/{chain}`, `POST /chains/{chain}/tickets`,
+  `PATCH /tickets/{ticket}` (fields and checklist in one command), `POST /tickets/{ticket}/show`,
+  `PUT /projects/{project}/suggestion`, the edges, `POST /chains/{chain}/tickets/{ticket}/move`,
+  `POST /tickets/{ticket}/move-to-chain?from=` (then `GET /chains/{id}` for the answer) and the
+  thread routes; `say` stays `POST /planner/say`. What it may do there is the rule of "Who may do
+  what" above. A planner token reaches `PLANNER_ROUTES` and no other route (`403`); nothing on it
+  starts, accepts or merges. The old `/planner/...` routes stay for one release as thin aliases
+  (`http/routes/planner.rs`, `deprecated` in the OpenAPI document) that fill the project from the
+  token and call the same functions, so a planner started before an upgrade keeps working.
 - **Turn and step.** A turn is on from the moment the planner takes a message until it stops; a
   step is one line a person can read about what it does now ("Reading the plan", "Reading
   apps/web/src/main.tsx", "Adding a story"). The planner's process reports them with its own
@@ -885,8 +931,8 @@ the cards; the owner starts cards and accepts work.
   is one line on stderr. The planner's instructions say nothing of it. The fake agent's
   `activity <signal>` plays these hooks in tests (`activity pre_tool_use <tool> <summary>` names
   a step).
-- **Opening a card.** `show_card` (`POST /v1/planner/cards/{card}/show`,
-  `toknila_app::planner::show_card`) changes nothing in the plan: it journals one `window`
+- **Opening a card.** `show_card` (`POST /v1/tickets/{ticket}/show`,
+  `toknila_app::as_caller::show_story`) changes nothing in the plan: it journals one `window`
   event, kind `show_card` (see `events.md`). The web app follows it in the reducer
   (`store/follow.ts`, `applyWindow` in `store/reduce.ts`): a window on that project's assistant
   or on one of its chains (or a card of one) goes to the card's page and shows a notice

@@ -95,3 +95,18 @@ checkout of the fetched `origin/<base>` at `<ships root>/<project>/_planner`, mo
 base on every start (a planner that is still live is left alone) and removed with the project. In
 local mode it runs in the working copy, and when the base is behind its upstream its instructions
 say so in one line. If the checkout cannot be made, it falls back to the working copy.
+
+**The planner's routes are the person's (TOKNILA-149, 2026-11):** this decision's route list is
+replaced in part. Every planner route re-implemented a person's route with the planner's limits
+inside the handler, so each rule had to be written twice. Now there is one route per action and
+the caller decides: `server/auth.rs` still keeps a deny-by-default list per token
+(`PLANNER_ROUTES` now names the person's routes of the planner's actions, plus `say` and
+`activity`), and what a caller may do to what is one pure rule, `toknila_core::access::may`,
+asked by the use cases (`toknila_app::access`, `toknila_app::as_caller`), never by a handler. The
+alternative rejected above ("the existing card routes with a scope check in each handler") stays
+rejected for its reason: no handler holds the check, and a route nobody listed is still `403`
+for a planner. The planner's limits (own project, autostart epics, started stories, cut epics,
+the roadmap turn, the owner's settings) are the rule's parts, with a test of every caller ×
+action. The tools call the person's routes with `TOKNILA_PROJECT`; their names, arguments and
+answers did not change. The old `/planner/...` routes stay for one release as deprecated aliases;
+see `docs/architecture.md`, "Who may do what".
