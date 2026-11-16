@@ -24,6 +24,9 @@ path = sys.argv[2]
 if "/jobs" in path:
     sys.stdout.write(open(os.path.join(d, "jobs.json")).read())
     sys.exit(0)
+if "/workflows/" in path:
+    sys.stdout.write(open(os.path.join(d, "later.json")).read())
+    sys.exit(0)
 counter = os.path.join(d, "calls")
 n = int(open(counter).read()) if os.path.exists(counter) else 0
 open(counter, "w").write(str(n + 1))
@@ -49,13 +52,15 @@ def answer(*runs):
 
 
 class WaitForCi(unittest.TestCase):
-    def wait(self, answers, jobs=None, extra_env=None):
+    def wait(self, answers, jobs=None, extra_env=None, later=None):
         with tempfile.TemporaryDirectory() as d:
             for i, a in enumerate(answers):
                 with open(os.path.join(d, f"runs-{i}.json"), "w") as f:
                     json.dump(a, f)
             with open(os.path.join(d, "jobs.json"), "w") as f:
                 json.dump({"jobs": jobs or []}, f)
+            with open(os.path.join(d, "later.json"), "w") as f:
+                json.dump(later or answer(), f)
             with open(os.path.join(d, "fake_gh.py"), "w") as f:
                 f.write(FAKE_GH)
             env = dict(
@@ -112,6 +117,23 @@ class WaitForCi(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(calls, 3, "looked three times: the run may be registered late")
         self.assertEqual(lines, ["push main with this commit first; CI must run on it"])
+
+    def test_cancelled_names_the_newer_run(self):
+        newer = run(43, "in_progress", None)
+        newer["created_at"] = "2026-11-15T10:10:00Z"
+        code, lines, _ = self.wait(
+            [answer(run(42, "completed", "cancelled"))], later=answer(newer, run(42, "completed", "cancelled"))
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(
+            lines,
+            [f"CI on 0123456 was cancelled by a newer push (https://github.com/acme/toknila/actions/runs/43); rerun it from {URL}"],
+        )
+
+    def test_cancelled_without_a_newer_run_in_the_api(self):
+        code, lines, _ = self.wait([answer(run(42, "completed", "cancelled"))])
+        self.assertEqual(code, 1)
+        self.assertEqual(lines, [f"CI on 0123456 was cancelled by a newer push; rerun it from {URL}"])
 
     def test_gives_up_after_the_limit(self):
         code, lines, _ = self.wait(

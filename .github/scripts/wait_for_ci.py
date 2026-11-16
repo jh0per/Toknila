@@ -55,6 +55,18 @@ def failed_jobs(repo, run):
     return [j["name"] for j in jobs if j.get("conclusion") not in (None, "success", "skipped")]
 
 
+def newer_run(repo, run):
+    """The next CI run on main created after `run`, or None."""
+    data = gh([f"repos/{repo}/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=100"])
+    later = [
+        r
+        for r in data.get("workflow_runs", [])
+        if (r.get("created_at", ""), r.get("id", 0)) > (run.get("created_at", ""), run.get("id", 0))
+    ]
+    later.sort(key=lambda r: (r.get("created_at", ""), r.get("id", 0)))
+    return later[0] if later else None
+
+
 def main(argv):
     if len(argv) != 3:
         print(__doc__, file=sys.stderr)
@@ -82,6 +94,14 @@ def main(argv):
             if run.get("conclusion") == "success":
                 print(f"CI passed on {short}: {run['html_url']}")
                 return 0
+            if run.get("conclusion") == "cancelled":
+                try:
+                    newer = newer_run(repo, run)
+                except RuntimeError:
+                    newer = None
+                by = f" by a newer push ({newer['html_url']})" if newer else " by a newer push"
+                print(f"CI on {short} was cancelled{by}; rerun it from {run['html_url']}")
+                return 1
             try:
                 names = failed_jobs(repo, run)
             except RuntimeError:
