@@ -66,6 +66,82 @@ impl GitShipyard {
         ))
     }
 
+    /// The files the ship's own commits (first parents; a base-sync merge brings nothing of its
+    /// own) add from `from` to `to` and that are still there at `to`.
+    pub(super) fn added(
+        &self,
+        look: &ShipLook,
+        from: &str,
+        to: &str,
+    ) -> Result<Vec<String>, ShipError> {
+        let range = format!("{from}..{to}");
+        let own = self.git(
+            &look.path,
+            [
+                "log",
+                "--first-parent",
+                "--diff-filter=A",
+                "--name-only",
+                "-z",
+                "--format=",
+                range.as_str(),
+            ],
+        )?;
+        let net = self.git(
+            &look.path,
+            ["diff", "--diff-filter=A", "--name-only", "-z", from, to],
+        )?;
+        let net: Vec<&str> = net.split('\0').filter(|p| !p.is_empty()).collect();
+        let mut added: Vec<String> = Vec::new();
+        for path in own.split('\0').map(|p| p.trim_matches('\n')) {
+            if net.contains(&path) && !added.iter().any(|a| a == path) {
+                added.push(path.to_owned());
+            }
+        }
+        Ok(added)
+    }
+
+    /// Which of `files` git ignores by the repository's own rules, tracked or not.
+    pub(super) fn ignored(
+        &self,
+        look: &ShipLook,
+        files: &[String],
+    ) -> Result<Vec<String>, ShipError> {
+        let mut found = Vec::new();
+        for chunk in files.chunks(200) {
+            let mut args = [
+                "-c",
+                "core.quotepath=off",
+                "check-ignore",
+                "--no-index",
+                "--",
+            ]
+            .map(str::to_owned)
+            .to_vec();
+            args.extend(chunk.iter().cloned());
+            let out = self
+                .git
+                .output(&look.path, &args)
+                .map_err(ShipError::from)?;
+            // Exit 1 means none of them is ignored; anything else but 0 is a failure.
+            match out.status.code() {
+                Some(0) | Some(1) => found.extend(
+                    String::from_utf8_lossy(&out.stdout)
+                        .lines()
+                        .filter(|p| !p.is_empty())
+                        .map(str::to_owned),
+                ),
+                _ => {
+                    return Err(ShipError::Git(GitError::Failed {
+                        command: "check-ignore".to_owned(),
+                        detail: String::from_utf8_lossy(&out.stderr).trim().to_owned(),
+                    }));
+                }
+            }
+        }
+        Ok(found)
+    }
+
     pub(super) fn look(&self, look: &ShipLook) -> Result<ShipState, ShipError> {
         let dir = look.path.as_str();
         let out = self

@@ -113,6 +113,23 @@ pub trait Shipyard: std::fmt::Debug {
         let _ = (look, from, to);
         Ok((Vec::new(), Vec::new()))
     }
+    /// The files added (not changed or removed) from `from` to `to` by the ship's own commits and
+    /// still there at `to`. A yard that cannot look says none.
+    fn added_between(
+        &self,
+        look: &ShipLook,
+        from: &str,
+        to: &str,
+    ) -> Result<Vec<String>, ShipError> {
+        let _ = (look, from, to);
+        Ok(Vec::new())
+    }
+    /// Which of `files` the repository's own `.gitignore` ignores, as git says (it is asked about
+    /// paths that may be tracked). A yard that cannot look says none.
+    fn ignored_among(&self, look: &ShipLook, files: &[String]) -> Result<Vec<String>, ShipError> {
+        let _ = (look, files);
+        Ok(Vec::new())
+    }
     /// Gets the place the project's planner reads the code from, fresh as far as the network
     /// allows (a fetch that fails is fine): in pull-request mode a checkout of the fetched
     /// `origin/<base>` of its own, in local mode the working copy, with what is known about its
