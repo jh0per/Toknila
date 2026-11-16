@@ -177,3 +177,23 @@ fn the_reviewer_of_a_hand_in_after_a_return_is_told_to_read_what_changed_since_i
     );
     assert!(!generate_review(&plain).contains("Since the Return"));
 }
+
+#[test]
+fn the_review_file_after_a_return_is_pinned() {
+    let acceptance = vec!["The re-review reads the hand-in".to_owned()];
+    let mut returned = returned_round(Actor::Human, "Rename the flag");
+    returned.since = Some(crate::SinceReturn::new(
+        1,
+        "f8afe06aaaaaaaa",
+        "b0b0b0bbbbbbbbb",
+        vec!["rename flag".to_owned()],
+        vec!["flag.txt".to_owned()],
+    ));
+    let hand_in = "**What changed:** The flag is renamed\n**Checks:**\n- PASS cargo xtask verify: test result: ok. 12 passed\n**Left:** nothing\n**For you:**\n- Open the Review screen and read the flag";
+    let text = generate_review(&RunBrief {
+        returned: Some(&returned),
+        hand_in: Some(hand_in),
+        ..brief(&acceptance)
+    });
+    super::tests::assert_pinned(&text, "review_after_return.md");
+}
