@@ -35,15 +35,13 @@ impl Modify for BearerAuth {
     }
 }
 
-/// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them. The
-/// planner's old `/planner/...` routes are deprecated aliases for one release (TOKNILA-149).
-#[allow(deprecated)]
+/// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
         agents::*, asks::*, chains::*, conversation::*, designs::*, events::*, inbox::*, pins::*,
-        plan_view::*, planner::*, planner_activity::*, planner_run::*, plans::*, profiles::*,
-        projects::*, questions::*, release_mark::*, releases::*, runner::*, strays::*, system::*,
-        threads::*, tickets::*, usage::*, workspaces::*,
+        plan_view::*, planner_activity::*, planner_run::*, plans::*, profiles::*, projects::*,
+        questions::*, release_mark::*, releases::*, runner::*, strays::*, system::*, threads::*,
+        tickets::*, usage::*, workspaces::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -58,7 +56,6 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(put_figma_token, delete_figma_token))
         .routes(routes!(list_pins, ask_pin))
         .routes(routes!(answer_pin))
-        .routes(routes!(planner_pin))
         .routes(routes!(project_plan))
         .routes(routes!(project_plan_overview))
         .routes(routes!(chain_plan))
@@ -129,21 +126,6 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(planner_scrollback))
         .routes(routes!(planner_input))
         .routes(routes!(planner_size))
-        .routes(routes!(planner_plan))
-        .routes(routes!(planner_overview))
-        .routes(routes!(planner_chain))
-        .routes(routes!(planner_design))
-        .routes(routes!(planner_new_chain))
-        .routes(routes!(planner_edit_chain))
-        .routes(routes!(planner_add_card))
-        .routes(routes!(planner_edit_card, planner_card))
-        .routes(routes!(planner_show_card))
-        .routes(routes!(planner_suggest))
-        .routes(routes!(planner_add_dependency, planner_remove_dependency))
-        .routes(routes!(planner_move_card))
-        .routes(routes!(planner_open_thread))
-        .routes(routes!(planner_thread_message))
-        .routes(routes!(planner_thread_version))
         .routes(routes!(scrollback))
         .routes(routes!(runner_input))
         .routes(routes!(runner_answer))

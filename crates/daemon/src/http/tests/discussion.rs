@@ -87,7 +87,7 @@ async fn a_message_is_kept_in_a_discussion_thread_the_planner_answers_in_and_it_
     let (s, d) = talk
         .planner(
             Method::POST,
-            "/v1/planner/cards/DEMO-1/threads/1/messages",
+            "/v1/tickets/DEMO-1/threads/1/messages",
             json!({ "text": "I would add the 4xx case" }),
         )
         .await;
@@ -117,7 +117,7 @@ async fn an_edit_the_planner_proposes_lands_only_when_the_person_accepts_it() {
     let (s, _) = talk
         .planner(
             Method::PATCH,
-            "/v1/planner/cards/DEMO-1",
+            "/v1/tickets/DEMO-1",
             json!({ "prompt": "new prompt", "acceptance": ["one", "two"] }),
         )
         .await;
@@ -185,7 +185,7 @@ async fn a_rejected_edit_leaves_the_card_as_it_was() {
     .await;
     talk.planner(
         Method::PATCH,
-        "/v1/planner/cards/DEMO-1",
+        "/v1/tickets/DEMO-1",
         json!({ "prompt": "another prompt" }),
     )
     .await;
@@ -223,7 +223,7 @@ async fn an_edit_proposed_against_a_card_that_changed_since_is_refused_on_accept
     .await;
     talk.planner(
         Method::PATCH,
-        "/v1/planner/cards/DEMO-1",
+        "/v1/tickets/DEMO-1",
         json!({ "prompt": "proposed" }),
     )
     .await;
@@ -250,7 +250,7 @@ async fn without_a_discussion_the_planners_edit_lands_at_once_as_before() {
     let (s, _) = talk
         .planner(
             Method::PATCH,
-            "/v1/planner/cards/DEMO-1",
+            "/v1/tickets/DEMO-1",
             json!({ "prompt": "direct" }),
         )
         .await;
@@ -297,7 +297,7 @@ async fn a_message_nobody_answers_in_time_is_logged_as_a_warning_and_an_answered
     // The assistant answers: the same watch finds nothing to warn about.
     talk.planner(
         Method::POST,
-        "/v1/planner/cards/DEMO-1/threads/1/messages",
+        "/v1/tickets/DEMO-1/threads/1/messages",
         json!({ "text": "yes" }),
     )
     .await;

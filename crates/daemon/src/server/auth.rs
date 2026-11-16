@@ -37,11 +37,11 @@ pub const AGENT_ROUTES: [&str; 6] = [
 ];
 
 /// The only routes a planner's token may call, as `(method, path)`: the person's routes of the
-/// actions a planner has (TOKNILA-149), its own voice (`say`) and turn (`activity`), and, for one
-/// release, its old `/planner/...` routes as deprecated aliases. Every route here runs a use case
-/// that asks core's `access::may` as the caller the token names, so a planner reaches only its
-/// own project and only what its limits allow; nothing here starts, accepts or merges.
-pub const PLANNER_ROUTES: [(&str, &str); 40] = [
+/// actions a planner has (TOKNILA-149), its own voice (`say`) and turn (`activity`). Every route here
+/// runs a use case that asks core's `access::may` as the caller the token names, so a planner
+/// reaches only its own project and only what its limits allow; nothing here starts, accepts or
+/// merges.
+pub const PLANNER_ROUTES: [(&str, &str); 22] = [
     ("GET", "/v1/projects/{project}/plan"),
     ("GET", "/v1/projects/{project}/plan/overview"),
     ("GET", "/v1/projects/{project}/designs/{design}"),
@@ -64,24 +64,6 @@ pub const PLANNER_ROUTES: [(&str, &str); 40] = [
     ("POST", "/v1/tickets/{ticket}/threads/{thread}/versions"),
     ("POST", "/v1/planner/activity"),
     ("POST", "/v1/planner/say"),
-    ("GET", "/v1/planner/plan"),
-    ("GET", "/v1/planner/overview"),
-    ("GET", "/v1/planner/chains/{chain}"),
-    ("GET", "/v1/planner/cards/{card}"),
-    ("GET", "/v1/planner/designs/{design}"),
-    ("POST", "/v1/planner/pins"),
-    ("POST", "/v1/planner/chains"),
-    ("PATCH", "/v1/planner/chains/{chain}"),
-    ("POST", "/v1/planner/chains/{chain}/cards"),
-    ("PATCH", "/v1/planner/cards/{card}"),
-    ("POST", "/v1/planner/cards/{card}/show"),
-    ("POST", "/v1/planner/suggestion"),
-    ("POST", "/v1/planner/chains/{chain}/edges"),
-    ("DELETE", "/v1/planner/chains/{chain}/edges"),
-    ("POST", "/v1/planner/chains/{chain}/cards/{card}/move"),
-    ("POST", "/v1/planner/cards/{card}/threads"),
-    ("POST", "/v1/planner/cards/{card}/threads/{thread}/messages"),
-    ("POST", "/v1/planner/cards/{card}/threads/{thread}/versions"),
 ];
 
 /// Who is calling, as the token says. What it may do is core's `access::may`, asked through

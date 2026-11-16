@@ -108,5 +108,5 @@ rejected for its reason: no handler holds the check, and a route nobody listed i
 for a planner. The planner's limits (own project, autostart epics, started stories, cut epics,
 the roadmap turn, the owner's settings) are the rule's parts, with a test of every caller ×
 action. The tools call the person's routes with `TOKNILA_PROJECT`; their names, arguments and
-answers did not change. The old `/planner/...` routes stay for one release as deprecated aliases;
-see `docs/architecture.md`, "Who may do what".
+answers did not change. The old `/planner/...` routes (but `say` and `activity`) are gone
+(TOKNILA-150); see `docs/architecture.md`, "Who may do what".

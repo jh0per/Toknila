@@ -44,7 +44,7 @@ try {
   git(repo, "commit", "--quiet", "-m", "init");
   mkdirSync(join(home, "profiles"), { recursive: true });
   const steps = [
-    "post", "/planner/pins", JSON.stringify({ design: "login.png", region: { x: 12, y: 30, w: 40, h: 20 }, text: QUESTION, card: "PIN-1" }),
+    "post", "/projects/PIN/design-pins", JSON.stringify({ design: "login.png", region: { x: 12, y: 30, w: 40, h: 20 }, text: QUESTION, card: "PIN-1" }),
     "print", "pinned",
     "hold",
   ];

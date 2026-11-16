@@ -38,8 +38,8 @@ async fn setup(api: &Api) -> (String, String) {
             .call_with(
                 &token,
                 Method::POST,
-                "/v1/planner/chains/plan/cards",
-                Some(json!({ "title": title, "designs": [{ "design": "home.png" }] })),
+                "/v1/chains/plan/tickets",
+                Some(json!({ "title": title, "at_end": true, "designs": [{ "design": "home.png" }] })),
             )
             .await;
         assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -49,7 +49,7 @@ async fn setup(api: &Api) -> (String, String) {
             .call_with(
                 &token,
                 Method::POST,
-                "/v1/planner/pins",
+                "/v1/projects/DEMO/design-pins",
                 Some(
                     json!({ "design": "home.png", "text": "Which logo?", "card": card,
                     "region": { "x": 1, "y": 2, "w": 3, "h": 4 } }),
@@ -227,7 +227,7 @@ async fn a_pin_without_a_card_is_an_inbox_item_answered_in_place() {
     );
     // The answer reaches the planner's plan.
     let (s, plan) = api
-        .call_with(&token, Method::GET, "/v1/planner/plan", None)
+        .call_with(&token, Method::GET, "/v1/projects/DEMO/plan", None)
         .await;
     assert_eq!(s, StatusCode::OK, "{plan}");
     assert!(

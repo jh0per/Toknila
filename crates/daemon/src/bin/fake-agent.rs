@@ -194,6 +194,11 @@ fn main() {
                 let json = args.next().unwrap_or_default();
                 say(&send("PATCH", &path, &json));
             }
+            "put" => {
+                let path = args.next().unwrap_or_default();
+                let json = args.next().unwrap_or_default();
+                say(&send("PUT", &path, &json));
+            }
             "stop" => say(&post(
                 "/tickets/{ticket}/activity",
                 r#"{"signal":"hook:stop"}"#,

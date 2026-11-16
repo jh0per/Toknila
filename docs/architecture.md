@@ -730,8 +730,7 @@ two parts, and neither is in a handler:
 
 - **Which routes a token reaches** — the lists in `server/auth.rs`, deny by default: the person
   every route, a card's run `AGENT_ROUTES`, a planner `PLANNER_ROUTES` (the person's routes of
-  the actions it has, its `say` and `activity`, and for one release its old `/planner/...`
-  routes).
+  the actions it has, its `say` and `activity`).
 - **What a caller may do to what** — `toknila_core::access::may(caller, action, target)`, pure,
   with a test of every caller × action (`access/tests.rs`). `Caller` is `Person`,
   `Planner(project)` or `Card { ticket, role }` (worker, reviewer, release run). `Action` names
@@ -885,9 +884,7 @@ the cards; the owner starts cards and accepts work.
   `POST /tickets/{ticket}/move-to-chain?from=` (then `GET /chains/{id}` for the answer) and the
   thread routes; `say` stays `POST /planner/say`. What it may do there is the rule of "Who may do
   what" above. A planner token reaches `PLANNER_ROUTES` and no other route (`403`); nothing on it
-  starts, accepts or merges. The old `/planner/...` routes stay for one release as thin aliases
-  (`http/routes/planner.rs`, `deprecated` in the OpenAPI document) that fill the project from the
-  token and call the same functions, so a planner started before an upgrade keeps working.
+  starts, accepts or merges.
 - **Turn and step.** A turn is on from the moment the planner takes a message until it stops; a
   step is one line a person can read about what it does now ("Reading the plan", "Reading
   apps/web/src/main.tsx", "Adding a story"). The planner's process reports them with its own

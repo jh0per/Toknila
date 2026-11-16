@@ -88,7 +88,7 @@ fn setup(steps: &[&str]) -> (tempfile::TempDir, Tok, PathBuf) {
 fn a_planner_plans_with_its_token_and_is_refused_everything_that_starts_or_accepts() {
     let json = |s: &str| s.to_owned();
     let chain = json(r#"{"name":"plan","goal":"the first plan"}"#);
-    let one = json(r#"{"title":"One","prompt":"do one","acceptance":["it works"]}"#);
+    let one = json(r#"{"title":"One","prompt":"do one","acceptance":["it works"],"at_end":true}"#);
     let two = json(r#"{"title":"Two","prompt":"do two","after":["DEMO-1"]}"#);
     let thread = json(r#"{"kind":"design","title":"Order of work"}"#);
     let (_dir, tok, repo) = setup(&[
@@ -96,13 +96,13 @@ fn a_planner_plans_with_its_token_and_is_refused_everything_that_starts_or_accep
         "env",
         "TOKNILA_ROLE",
         "post",
-        "/planner/chains",
+        "/projects/DEMO/chains",
         &chain,
         "post",
-        "/planner/chains/plan/cards",
+        "/chains/plan/tickets",
         &one,
         "post",
-        "/planner/chains/plan/cards",
+        "/chains/plan/tickets",
         &two,
         "post",
         "/tickets/DEMO-1/actions/start",
@@ -114,7 +114,7 @@ fn a_planner_plans_with_its_token_and_is_refused_everything_that_starts_or_accep
         "/tickets/DEMO-1/events",
         r#"{"event":"started"}"#,
         "post",
-        "/planner/cards/DEMO-1/threads",
+        "/tickets/DEMO-1/threads",
         &thread,
         "post",
         "/projects/DEMO/planner/stop",

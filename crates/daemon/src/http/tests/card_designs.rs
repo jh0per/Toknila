@@ -47,11 +47,13 @@ async fn the_planner_sets_and_changes_designs_by_name_and_a_missing_one_is_refus
         .call_with(
             &token,
             Method::POST,
-            "/v1/planner/chains/plan/cards",
-            Some(json!({ "title": "Login screen", "designs": [
-                { "design": "login.png", "region": { "x": 20, "y": 10, "w": 40, "h": 30 } },
-                { "design": home },
-            ]})),
+            "/v1/chains/plan/tickets",
+            Some(
+                json!({ "title": "Login screen", "at_end": true, "designs": [
+                    { "design": "login.png", "region": { "x": 20, "y": 10, "w": 40, "h": 30 } },
+                    { "design": home },
+                ]}),
+            ),
         )
         .await;
     assert_eq!(s, StatusCode::CREATED, "{card}");
@@ -74,7 +76,7 @@ async fn the_planner_sets_and_changes_designs_by_name_and_a_missing_one_is_refus
 
     let token = api.planner_token("DEMO").await;
     // edit_card replaces the list; leaving it out keeps it; [] clears it.
-    let uri = format!("/v1/planner/cards/{key}");
+    let uri = format!("/v1/tickets/{key}");
     let (s, v) = api
         .call_with(
             &token,
