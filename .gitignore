@@ -6,4 +6,6 @@ apps/web/dist/
 .idea/
 .vscode/
 /.toknila/
+__pycache__/
+*.pyc
 /dist/

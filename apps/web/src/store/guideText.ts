@@ -88,7 +88,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     alt: "A finished epic's diagram: its version and the Release button at the end",
     text:
       "The roadmap is the epics, each with its stories and ending in a release. When all an epic's stories are done, a Release button appears at the end of its diagram. " +
-      "Check the version (it becomes the tag, like v0.3.0) and press Release: Toknila checks, bumps the version and tags; in local mode you push main and the tag yourself, a GitHub project pushes as its steps say. " +
+      "Check the version (it becomes the tag, like v0.3.0) and press Release: Toknila checks, bumps the version and tags; in local mode you push main and the tag yourself, a GitHub project pushes as its steps say; GitHub publishes after CI passes on the tagged commit, and nothing when that run is red. " +
       "Nothing is tagged or pushed before you press it; a failed step stops the run and says which, and steps that passed are not done again.",
   },
   {
