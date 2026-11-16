@@ -116,6 +116,25 @@ fn the_review_file_is_pinned() {
 }
 
 #[test]
+fn the_review_file_lists_the_commands_the_reviewer_may_run_and_is_pinned() {
+    let acceptance = vec!["The review file is pinned by a snapshot test".to_owned()];
+    let commands = vec![
+        "cargo test".to_owned(),
+        "python3 -B .github/scripts/test_wait_for_ci.py".to_owned(),
+    ];
+    let brief = RunBrief {
+        review_commands: &commands,
+        ..pinned_brief(&acceptance)
+    };
+    let text = generate_review(&brief);
+    let at = text.find("## Run what the hand-in names").expect("section");
+    let list = text.find("- `python3 -B .github/scripts/test_wait_for_ci.py`");
+    assert!(list.is_some_and(|l| l > at), "{text}");
+    assert!(!generate_review(&pinned_brief(&acceptance)).contains("Commands you may run"));
+    assert_pinned(&text, "review_commands.md");
+}
+
+#[test]
 fn the_check_command_is_to_be_run_as_given_and_files_changed_with_the_edit_tools() {
     let brief = RunBrief {
         check_command: Some("cargo xtask verify"),

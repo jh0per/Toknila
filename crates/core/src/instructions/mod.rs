@@ -339,7 +339,21 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
     ));
     out.push_str(&record::hand_in_section(brief));
     out.push('\n');
-    out.push_str(protocol::REVIEW_PROTOCOL);
+    // The commands the reviewer may run go under "Run what the hand-in names", before the
+    // paragraph on how to type them.
+    let (head, tail) = protocol::REVIEW_PROTOCOL
+        .split_once("The ship is your working directory")
+        .expect("the review protocol has the ship paragraph");
+    out.push_str(head);
+    if !brief.review_commands.is_empty() {
+        out.push_str("Commands you may run, exactly as written:\n\n");
+        for command in brief.review_commands {
+            out.push_str(&format!("- `{command}`\n"));
+        }
+        out.push('\n');
+    }
+    out.push_str("The ship is your working directory");
+    out.push_str(tail);
     out
 }
 
