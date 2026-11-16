@@ -40,14 +40,19 @@ async fn add_x_then_davai_leaves_an_epic_with_two_stories_and_no_open_the_epic_s
 
     let (s, epic) = call(
         Method::POST,
-        "/v1/planner/chains".into(),
+        "/v1/projects/DEMO/chains".into(),
         json!({ "title": "Сховати проект зі списку", "goal": "g", "version": "0.3.4" }),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{epic}");
     let name = epic["chain"]["name"].as_str().expect("name").to_owned();
-    let add = format!("/v1/planner/chains/{name}/cards");
-    let (s, first) = call(Method::POST, add.clone(), json!({ "title": "Поле hidden" })).await;
+    let add = format!("/v1/chains/{name}/tickets");
+    let (s, first) = call(
+        Method::POST,
+        add.clone(),
+        json!({ "title": "Поле hidden", "at_end": true }),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED, "{first}");
     let key = first["ticket"]["key"].as_str().expect("key").to_owned();
     let (s, second) = call(
@@ -70,7 +75,7 @@ async fn add_x_then_davai_leaves_an_epic_with_two_stories_and_no_open_the_epic_s
         .call_with(
             &token,
             Method::GET,
-            &format!("/v1/planner/chains/{name}"),
+            &format!("/v1/chains/{name}/plan"),
             None,
         )
         .await;
@@ -121,22 +126,27 @@ async fn from_the_roadmap_stories_go_to_the_epic_made_in_the_turn_or_one_named_n
     say(&api, json!({ "kind": "roadmap" }), "add hiding a project").await;
     let (s, made) = call(
         Method::POST,
-        "/v1/planner/chains".into(),
+        "/v1/projects/DEMO/chains".into(),
         json!({ "title": "Hide a project", "goal": "g" }),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{made}");
     let name = made["chain"]["name"].as_str().expect("name").to_owned();
-    let uri = format!("/v1/planner/chains/{name}/cards");
+    let uri = format!("/v1/chains/{name}/tickets");
 
     // The epic made in this turn takes stories.
-    let (s, one) = call(Method::POST, uri.clone(), json!({ "title": "One" })).await;
+    let (s, one) = call(
+        Method::POST,
+        uri.clone(),
+        json!({ "title": "One", "at_end": true }),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED, "{one}");
     // Another epic does not, and neither does a story of it.
     let (s, body) = call(
         Method::POST,
-        "/v1/planner/chains/plan/cards".into(),
-        json!({ "title": "Sneaky" }),
+        "/v1/chains/plan/tickets".into(),
+        json!({ "title": "Sneaky", "at_end": true }),
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN, "{body}");
@@ -148,7 +158,7 @@ async fn from_the_roadmap_stories_go_to_the_epic_made_in_the_turn_or_one_named_n
     );
     let (s, body) = call(
         Method::PATCH,
-        "/v1/planner/cards/DEMO-1".into(),
+        "/v1/tickets/DEMO-1".into(),
         json!({ "title": "Edited" }),
     )
     .await;
@@ -156,7 +166,7 @@ async fn from_the_roadmap_stories_go_to_the_epic_made_in_the_turn_or_one_named_n
     // A story of the epic made in the turn may be edited.
     let (s, body) = call(
         Method::PATCH,
-        "/v1/planner/cards/DEMO-2".into(),
+        "/v1/tickets/DEMO-2".into(),
         json!({ "title": "One!" }),
     )
     .await;
@@ -164,13 +174,18 @@ async fn from_the_roadmap_stories_go_to_the_epic_made_in_the_turn_or_one_named_n
 
     // A new message about the roadmap is a new turn; naming an epic opens it.
     say(&api, json!({ "kind": "roadmap" }), "now more").await;
-    let (s, body) = call(Method::POST, uri.clone(), json!({ "title": "Two" })).await;
+    let (s, body) = call(
+        Method::POST,
+        uri.clone(),
+        json!({ "title": "Two", "at_end": true }),
+    )
+    .await;
     assert_eq!(s, StatusCode::FORBIDDEN, "{body}");
     say(&api, json!({ "kind": "roadmap" }), "add a story to plan").await;
     let (s, body) = call(
         Method::POST,
-        "/v1/planner/chains/plan/cards".into(),
-        json!({ "title": "Named" }),
+        "/v1/chains/plan/tickets".into(),
+        json!({ "title": "Named", "at_end": true }),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{body}");
@@ -181,6 +196,11 @@ async fn from_the_roadmap_stories_go_to_the_epic_made_in_the_turn_or_one_named_n
         json!({ "text": "more here", "about": { "kind": "chain", "name": name } }),
     )
     .await;
-    let (s, body) = call(Method::POST, uri, json!({ "title": "Three" })).await;
+    let (s, body) = call(
+        Method::POST,
+        uri,
+        json!({ "title": "Three", "at_end": true }),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED, "{body}");
 }

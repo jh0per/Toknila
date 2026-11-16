@@ -57,8 +57,8 @@ try {
   git(repo, "commit", "--quiet", "-m", "init");
   mkdirSync(join(home, "profiles"), { recursive: true });
   const steps = (...s) => s.map((x) => `'${x}'`).join(", ");
-  const answer = (text) => ["post", "/planner/cards/DS-1/threads/1/messages", JSON.stringify({ text })];
-  const edit = (change) => ["patch", "/planner/cards/DS-1", JSON.stringify(change)];
+  const answer = (text) => ["post", "/tickets/DS-1/threads/1/messages", JSON.stringify({ text })];
+  const edit = (change) => ["patch", "/tickets/DS-1", JSON.stringify(change)];
   writeFileSync(
     join(home, "profiles", "fake-planner.toml"),
     `role = 'planner'\ncommand = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps(

@@ -42,10 +42,10 @@ try {
     "print", "planner ready",
     "echo",
     "post", "/planner/say", JSON.stringify({ text: "Two releases: the list, then billing. Shall I add them?", about: "roadmap" }),
-    "post", "/planner/chains", JSON.stringify({ name: "list", goal: "Show the items.", version: "0.5.0" }),
-    "post", "/planner/chains", JSON.stringify({ name: "billing", goal: "Take payments.", version: "0.6.0" }),
+    "post", "/projects/RA/chains", JSON.stringify({ name: "list", goal: "Show the items.", version: "0.5.0" }),
+    "post", "/projects/RA/chains", JSON.stringify({ name: "billing", goal: "Take payments.", version: "0.6.0" }),
     // An epic the owner named in words: the title only, the daemon derives the slug.
-    "post", "/planner/chains", JSON.stringify({ title: "MIDI controllers", goal: "Play it with a keyboard.", version: "0.7.0" }),
+    "post", "/projects/RA/chains", JSON.stringify({ title: "MIDI controllers", goal: "Play it with a keyboard.", version: "0.7.0" }),
     "hold",
   ].map((x) => `'${x}'`).join(", ");
   writeFileSync(join(home, "profiles", "fake-planner.toml"), `role = 'planner'\ncommand = ['${fakeAgent}', 'sleep', '${fakeMarker}',${steps}]\nstartup_secs = 0\n`);

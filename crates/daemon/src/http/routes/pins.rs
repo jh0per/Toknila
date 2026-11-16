@@ -63,21 +63,6 @@ pub async fn ask_pin(
     Ok((StatusCode::CREATED, Json(pin)))
 }
 
-#[utoipa::path(post, path = "/planner/pins", tag = "planner", request_body = NewDesignPin,
-    responses((status = 201, body = DesignPin), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody), (status = 404, body = ErrorBody)))]
-#[deprecated(note = "use POST /projects/{project}/design-pins; kept for one release")]
-/// Pins a question on a region of a design of the planner's project. Deprecated: the planner
-/// asks `POST /projects/{project}/design-pins`; this alias answers the same for one release.
-pub async fn planner_pin(
-    State(state): State<AppState>,
-    Extension(principal): Extension<Principal>,
-    Json(input): Json<NewDesignPin>,
-) -> ApiResult<(StatusCode, Json<DesignPin>)> {
-    let project = principal.planner_project()?.to_string();
-    let pin = ask_as(&state, principal.caller(), project, input).await?;
-    Ok((StatusCode::CREATED, Json(pin)))
-}
-
 #[utoipa::path(get, path = "/projects/{project}/design-pins", tag = "designs",
     params(("project" = String, Path, description = "Project id or key")),
     responses((status = 200, body = Vec<DesignPin>), (status = 404, body = ErrorBody)))]

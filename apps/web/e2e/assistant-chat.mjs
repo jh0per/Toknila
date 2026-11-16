@@ -48,12 +48,12 @@ try {
     "echo",
     // The person's bubble is on screen for the whole wait: the planner has not answered yet.
     "sleep", "2500",
-    "post", "/planner/chains", JSON.stringify({ name: "roadmap" }),
-    "post", "/planner/chains/roadmap/cards", JSON.stringify({ title: "Design the list", prompt: "p" }),
+    "post", "/projects/WEB/chains", JSON.stringify({ name: "roadmap" }),
+    "post", "/chains/roadmap/tickets", JSON.stringify({ title: "Design the list", prompt: "p", at_end: true }),
     "post", "/planner/say", JSON.stringify({ text: "Planned one card: the list.", about: "WEB-1" }),
-    "patch", "/planner/cards/WEB-1", JSON.stringify({ prompt: "A better prompt" }),
-    "post", "/planner/cards/WEB-1/threads", JSON.stringify({ kind: "design", title: "The list" }),
-    "post", "/planner/suggestion", JSON.stringify({ text: "Start the design card", card: "WEB-1", action: "start" }),
+    "patch", "/tickets/WEB-1", JSON.stringify({ prompt: "A better prompt" }),
+    "post", "/tickets/WEB-1/threads", JSON.stringify({ kind: "design", title: "The list" }),
+    "put", "/projects/WEB/suggestion", JSON.stringify({ text: "Start the design card", card: "WEB-1", action: "start" }),
     "print", "planner done",
     "hold",
   ];

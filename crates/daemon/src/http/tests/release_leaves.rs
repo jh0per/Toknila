@@ -67,7 +67,7 @@ async fn a_story_added_by_the_window_or_the_assistant_goes_before_the_release() 
         .call_with(
             &token,
             Method::POST,
-            "/v1/planner/chains/auth/cards",
+            "/v1/chains/auth/tickets",
             Some(json!({ "title": "assistant", "after": ["DEMO-2"] })),
         )
         .await;
