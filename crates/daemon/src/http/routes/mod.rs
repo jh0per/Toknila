@@ -17,6 +17,7 @@ pub mod profiles;
 pub mod projects;
 pub mod questions;
 mod raise;
+pub mod release_mark;
 pub mod releases;
 pub mod runner;
 pub mod strays;

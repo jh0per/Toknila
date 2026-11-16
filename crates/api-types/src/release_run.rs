@@ -45,6 +45,14 @@ pub struct StartRelease {
     pub push: Option<bool>,
 }
 
+/// Body of `POST /v1/chains/{chain}/release/mark`: a person says an epic shipped in an old tag.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct MarkRelease {
+    /// The tag that exists in the repository, such as `v0.3.3`.
+    pub tag: String,
+}
+
 /// Where one step of a release run is.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]

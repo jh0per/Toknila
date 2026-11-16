@@ -560,6 +560,10 @@ async fn chain_view_saves_and_loads_without_loss() {
         cut_at: Some(Timestamp(7)),
         released_at: None,
         tag: None,
+        released_with: Some(toknila_core::ReleasedWith {
+            tag: "v0.1.0".to_owned(),
+            by: Some("other".to_owned()),
+        }),
     };
     let view = ChainView {
         chain: c.clone(),

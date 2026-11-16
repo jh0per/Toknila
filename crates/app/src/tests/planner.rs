@@ -89,29 +89,64 @@ fn a_new_chain_never_starts_its_cards_by_itself() {
 }
 
 #[test]
+fn the_planner_cannot_plan_a_version_another_unreleased_epic_of_the_project_plans() {
+    let mut mem = manual_demo();
+    let p = project(&mem);
+    // The demo's chain `demo` plans 0.4.0.
+    mem.view.chain.version = Some("0.4.0".to_owned());
+    let refused = new_chain(
+        &mut mem,
+        p,
+        NewPlanChain {
+            name: Some("plan".to_owned()),
+            version: Some("v0.4.0".to_owned()),
+            ..NewPlanChain::default()
+        },
+    )
+    .expect_err("0.4.0 is taken");
+    assert_eq!(refused.kind, ErrorKind::Conflict);
+    assert_eq!(
+        refused.message,
+        "0.4.0 is planned by demo; pick another version or move that one"
+    );
+    // A free version is fine.
+    let id = new_chain(
+        &mut mem,
+        p,
+        NewPlanChain {
+            name: Some("plan".to_owned()),
+            version: Some("0.5.0".to_owned()),
+            ..NewPlanChain::default()
+        },
+    )
+    .expect("a free version");
+    assert_eq!(mem.view.chain.id, id);
+}
+
+#[test]
 fn a_new_chain_with_only_a_title_gets_a_unique_slug_and_the_did_line_says_the_title() {
     let mut mem = manual_demo();
     let p = project(&mem);
-    let make = |mem: &mut Mem, title: &str| {
+    let make = |mem: &mut Mem, title: &str, version: &str| {
         new_chain(
             mem,
             p,
             NewPlanChain {
                 title: Some(title.to_owned()),
-                version: Some("0.4.0".to_owned()),
+                version: Some(version.to_owned()),
                 ..NewPlanChain::default()
             },
         )
         .expect("chain");
         mem.view.chain.clone()
     };
-    let c = make(&mut mem, "MIDI controllers");
+    let c = make(&mut mem, "MIDI controllers", "0.4.0");
     assert_eq!(c.name, "midi-controllers");
     assert_eq!(c.title.as_deref(), Some("MIDI controllers"));
     assert_eq!(c.display_title(), "MIDI controllers");
     let (_, line) = mem.conversation.last().expect("a did-line");
     assert_eq!(line.text, "added epic MIDI controllers v0.4.0");
-    let c = make(&mut mem, "安卓发布");
+    let c = make(&mut mem, "安卓发布", "0.4.1");
     assert!(c.name.starts_with("epic-"), "{}", c.name);
     let err = new_chain(&mut mem, p, NewPlanChain::default()).expect_err("no title, no name");
     assert_eq!(err.kind, ErrorKind::BadRequest);

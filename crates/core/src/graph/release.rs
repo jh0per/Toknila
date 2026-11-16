@@ -108,7 +108,84 @@ impl ChainView {
             state,
             tag: release.and_then(|r| r.tag.clone()),
             released_at: release.and_then(|r| r.released_at),
+            released_with: release.and_then(|r| r.released_with.clone()),
         })
+    }
+
+    /// The epic's work is finished and not shipped: it has stories, every one is Merged (or
+    /// cancelled), none is Released and none is open. Only such an epic can ship inside another
+    /// epic's tag.
+    pub fn carriable(&self) -> bool {
+        self.releasable()
+            && !self
+                .tickets
+                .iter()
+                .any(|t| t.in_plan() && t.status == TicketStatus::Released)
+    }
+
+    /// Marks the epic's release node released with a tag another epic made: its Merged stories
+    /// become Released, the node shows the tag and says who cut it, and a version planned higher
+    /// than the tag's becomes the tag's. Refused when the epic is not finished or its release is
+    /// cut or released already.
+    pub fn release_with(
+        &mut self,
+        tag: &str,
+        by: Option<&str>,
+        now: Timestamp,
+    ) -> Result<Vec<Applied>, GraphError> {
+        let Some(r) = self.finish_release().cloned() else {
+            return Err(GraphError::NoRelease);
+        };
+        if r.state != ReleaseState::Planned {
+            return Err(GraphError::ReleaseState {
+                version: r.version,
+                state: r.state,
+                action: "release with a tag",
+            });
+        }
+        if !self.carriable() {
+            return Err(GraphError::NotFinished);
+        }
+        let tagged = tag.strip_prefix('v').unwrap_or(tag).to_owned();
+        let version = if crate::roadmap::is_higher(&r.version, &tagged) {
+            tagged
+        } else {
+            r.version.clone()
+        };
+        let members: Vec<TicketId> = self
+            .tickets
+            .iter()
+            .filter(|t| t.in_plan() && t.status == TicketStatus::Merged)
+            .map(|t| t.id)
+            .collect();
+        let taken: BTreeSet<TicketId> = self.release_tickets.iter().map(|(_, t)| *t).collect();
+        self.release_tickets.extend(
+            members
+                .iter()
+                .filter(|t| !taken.contains(t))
+                .map(|t| (r.id, *t)),
+        );
+        if let Some(x) = self.releases.iter_mut().find(|x| x.id == r.id) {
+            x.state = ReleaseState::Released;
+            x.released_at = Some(now);
+            x.tag = Some(tag.to_owned());
+            x.version = version.clone();
+            x.released_with = Some(crate::ReleasedWith {
+                tag: tag.to_owned(),
+                by: by.map(str::to_owned),
+            });
+        }
+        self.chain.version = Some(version);
+        let mut log = Vec::new();
+        for id in members {
+            let action = Action::Ticket {
+                ticket: id,
+                event: TicketEvent::Released,
+            };
+            let effects = self.apply_action(&action, now)?;
+            log.push(Applied { action, effects });
+        }
+        Ok(log)
     }
 
     /// Makes the chain's end release and its version one: a chain that has an end release takes

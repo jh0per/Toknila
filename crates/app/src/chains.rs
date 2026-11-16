@@ -67,6 +67,9 @@ pub fn create<U: UnitOfWork + ?Sized>(
         .map(clean_version)
         .transpose()?;
     let p = resolve::project(uow, project)?;
+    if let Some(v) = &version {
+        crate::releases::ensure_version_free(uow, p.id, None, v)?;
+    }
     let name = match (typed, &title) {
         (Some(n), _) => n.to_owned(),
         (None, Some(t)) => crate::epic::unique_name(uow, p.id, t)?,
