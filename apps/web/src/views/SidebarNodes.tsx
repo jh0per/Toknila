@@ -48,7 +48,7 @@ const leafRow = (children: ReactNode) => (
 export function InboxNode({ project, state, dispatch, onScreen }: Props) {
   const [touched, setTouched] = useState<boolean>();
   const open = touched ?? onScreen;
-  const items = inboxOf(state, project);
+  const items = inboxOf(state, project).filter((i) => i.needs_human);
   const sel = state.route.name === "inbox" && state.route.project === project.key;
   return (
     <Node

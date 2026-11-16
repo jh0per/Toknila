@@ -2856,6 +2856,8 @@ export interface components {
              *     closed pull request, a conflict); absent otherwise.
              */
             link?: string | null;
+            /** @description Whether the item waits on a person; an `answered` row only informs. */
+            needs_human: boolean;
             /** @description The pin to answer (`design_question` items). */
             pin?: string | null;
             project?: components["schemas"]["ProjectId"] | null;
@@ -2879,7 +2881,7 @@ export interface components {
          * @description What kind of thing waits on the person; the order is the order clients group them in.
          * @enum {string}
          */
-        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers" | "design_question" | "pin";
+        InboxKind: "proposal" | "question" | "blocked" | "review" | "thread" | "leftovers" | "design_question" | "pin" | "answered";
         /**
          * @description Answer of `POST /v1/tickets/{ticket}/instructions/claim`: what a person told the agent while it
          *     worked, now handed over and marked delivered.

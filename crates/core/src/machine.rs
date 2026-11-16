@@ -103,6 +103,13 @@ pub fn apply(
         (S::Blocked, TicketEvent::Unblock) if pause::blocked_lost(ticket) => {
             pause::unblock_lost(ticket, &mut next, now)
         }
+        // A resume is a start: a card whose agent has no process goes back to Running only by
+        // `ResumeStart`, which the schedule sends when a slot is free. A late sign of life or
+        // delivery from the process that ended changes nothing.
+        (
+            S::Waiting,
+            TicketEvent::InstructionDelivered | TicketEvent::AgentActive | TicketEvent::Answered,
+        ) if ticket.agent_paused.is_some() => (S::Waiting, ticket.status_reason.clone()),
         (
             S::Waiting,
             TicketEvent::InstructionDelivered | TicketEvent::AgentActive | TicketEvent::Answered,

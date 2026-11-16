@@ -269,6 +269,21 @@ fn a_waiting_card_with_a_paused_agent_holds_no_slot_and_the_next_card_starts() {
 }
 
 #[test]
+fn a_resumed_agent_is_ahead_of_cards_that_never_started_in_line_and_at_a_free_slot() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let _busy = w.card(c, TicketStatus::Running, false);
+    let fresh = w.card(c, TicketStatus::Ready, true);
+    let answered = paused(&mut w, c, true);
+    let full = w.plan(1);
+    assert_eq!(full.queue, vec![answered, fresh]);
+    assert_eq!(full.position(answered), Some(1));
+    // One free slot goes to the agent that was already working.
+    let free = w.plan(2);
+    assert_eq!((free.start, free.queue), (vec![answered], vec![fresh]));
+}
+
+#[test]
 fn a_paused_card_with_an_answer_starts_when_a_slot_is_free_and_queues_otherwise() {
     let mut w = World::new();
     let c = w.chain(false);

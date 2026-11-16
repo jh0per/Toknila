@@ -8914,7 +8914,8 @@
           "text",
           "subtasks",
           "done_cards",
-          "allowed_actions"
+          "allowed_actions",
+          "needs_human"
         ],
         "properties": {
           "allow_always": {
@@ -9012,6 +9013,10 @@
             ],
             "description": "The card's pull request on GitHub, for a blocked card that has one (failed checks, a\nclosed pull request, a conflict); absent otherwise."
           },
+          "needs_human": {
+            "type": "boolean",
+            "description": "Whether the item waits on a person; an `answered` row only informs."
+          },
           "pin": {
             "type": [
               "string",
@@ -9093,7 +9098,8 @@
           "thread",
           "leftovers",
           "design_question",
-          "pin"
+          "pin",
+          "answered"
         ]
       },
       "InstructionClaim": {

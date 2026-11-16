@@ -6,7 +6,7 @@ import type { Route } from "./route";
 import type { State } from "./state";
 
 /// Display order of the groups, the order of the kinds in core.
-export const KIND_ORDER: InboxKind[] = ["proposal", "question", "blocked", "review", "thread", "leftovers", "design_question", "pin"];
+export const KIND_ORDER: InboxKind[] = ["proposal", "question", "blocked", "review", "thread", "leftovers", "design_question", "pin", "answered"];
 
 export const KIND_TITLE: Record<InboxKind, string> = {
   proposal: "Awaiting approval",
@@ -17,6 +17,7 @@ export const KIND_TITLE: Record<InboxKind, string> = {
   leftovers: "Leftovers",
   design_question: "Questions of the assistant",
   pin: "Questions of the assistant about a design",
+  answered: "Answered, waiting for a slot",
 };
 
 export interface InboxGroup {

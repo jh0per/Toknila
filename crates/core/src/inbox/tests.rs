@@ -7,6 +7,7 @@ use crate::{
     WaitingReason, Wildcard,
 };
 
+mod answered_items;
 mod hand_in_items;
 mod leftover_items;
 mod pin_items;
@@ -342,11 +343,15 @@ fn items_come_newest_first_and_ties_follow_the_key() {
 #[test]
 fn kinds_are_ordered_for_grouping() {
     use InboxKind::*;
-    let mut kinds = vec![Leftovers, Thread, Review, Blocked, Question, Proposal];
+    let mut kinds = vec![
+        Answered, Leftovers, Thread, Review, Blocked, Question, Proposal,
+    ];
     kinds.sort();
     assert_eq!(
         kinds,
-        [Proposal, Question, Blocked, Review, Thread, Leftovers]
+        [
+            Proposal, Question, Blocked, Review, Thread, Leftovers, Answered
+        ]
     );
 }
 

@@ -7,7 +7,7 @@ import { SidebarProjects } from "./SidebarProjects";
 
 export function Sidebar({ state, dispatch }: { state: State; dispatch: (i: Intent) => void }) {
   const project = currentProject(state);
-  const waiting = state.inbox.length;
+  const waiting = state.inbox.filter((i) => i.needs_human).length;
   return (
     <nav className="sidebar" aria-label="Sidebar" data-link={state.link}>
       <div className="brand">
