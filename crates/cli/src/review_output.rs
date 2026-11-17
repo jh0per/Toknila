@@ -66,6 +66,9 @@ pub fn review(d: &TicketDetail) {
             format!(": {}", round.comment)
         };
         println!("  round {}: the {who} {verdict}{said}", round.number);
+        if d.ticket.review.accept_withdrawn == Some(round.number) {
+            println!("    {}", toknila_core::ACCEPT_WITHDRAWN);
+        }
     }
     if let Some(since) = &d.ticket.review.since_return {
         print!("{}", since.text());

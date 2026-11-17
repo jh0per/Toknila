@@ -261,3 +261,95 @@ fn a_remembered_accept_merges_when_the_check_and_the_reviewer_pass_and_a_return_
     };
     assert!(!step(&t, &back).ticket.review.accepted);
 }
+
+fn hand_in(mode: crate::ReviewMode) -> TicketEvent {
+    TicketEvent::Finished {
+        summary: "done".to_owned(),
+        open_threads: vec![],
+        mode,
+        check: false,
+        max_rounds: 3,
+    }
+}
+
+fn reviewer_says(verdict: Verdict, comment: &str) -> TicketEvent {
+    TicketEvent::ReviewVerdict {
+        verdict,
+        comment: comment.to_owned(),
+        items: vec![],
+        max_rounds: 3,
+    }
+}
+
+/// A card a person accepted whose merge conflicted: back with the worker, the Accept remembered.
+fn accepted_then_conflicted() -> Ticket {
+    let accepted = step(
+        &in_review(ReviewTurn::Person),
+        &TicketEvent::Accept { comment: None },
+    );
+    let back = step(
+        &accepted.ticket,
+        &TicketEvent::MergeConflicted {
+            text: "Conflicting files: a.rs.".to_owned(),
+        },
+    );
+    assert_eq!(back.ticket.status, TicketStatus::Running);
+    back.ticket
+}
+
+#[test]
+fn an_accept_stands_across_the_conflict_round_and_the_reviewer_who_approves() {
+    let t = accepted_then_conflicted();
+    let handed = step(&t, &hand_in(crate::ReviewMode::Both));
+    assert_eq!(
+        handed.ticket.review.turn,
+        Some(ReviewTurn::Agent { decides: false })
+    );
+    let tr = step(&handed.ticket, &reviewer_says(Verdict::Approve, "ok"));
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Merging));
+    assert!(tr.effects.contains(&Effect::Merge));
+    assert_eq!(tr.ticket.review.accept_withdrawn, None);
+}
+
+#[test]
+fn a_reviewer_who_asks_for_changes_after_the_accept_voids_it_and_the_person_looks_again() {
+    let t = accepted_then_conflicted();
+    let handed = step(&t, &hand_in(crate::ReviewMode::Both));
+    let asked = step(
+        &handed.ticket,
+        &reviewer_says(Verdict::RequestChanges, "tests are red"),
+    );
+    assert_eq!(asked.ticket.status, TicketStatus::Running);
+    assert!(!asked.ticket.review.accepted);
+    let round = asked.ticket.review.rounds.last().expect("a round").number;
+    assert_eq!(asked.ticket.review.accept_withdrawn, Some(round));
+    assert!(asked.effects.contains(&Effect::RecordNotice {
+        summary: "Accept withdrawn: the reviewer asked for changes after it".to_owned()
+    }));
+
+    let again = step(&asked.ticket, &hand_in(crate::ReviewMode::Both));
+    let tr = step(&again.ticket, &reviewer_says(Verdict::Approve, "ok"));
+    assert_eq!(tr.ticket.status, TicketStatus::Review);
+    assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+    assert!(!tr.effects.contains(&Effect::Merge));
+    assert_eq!(tr.ticket.review.accept_withdrawn, Some(round));
+
+    // The person's own Accept then merges and clears the mark.
+    let merged = step(&tr.ticket, &TicketEvent::Accept { comment: None });
+    assert_eq!(merged.ticket.review.accept_withdrawn, None);
+    assert!(merged.effects.contains(&Effect::Merge));
+}
+
+#[test]
+fn a_person_who_returns_after_the_accept_forgets_it_without_a_withdrawal() {
+    let mut t = in_review(ReviewTurn::Person);
+    t.review.accepted = true;
+    let back = step(
+        &t,
+        &TicketEvent::Return {
+            comment: "no".to_owned(),
+        },
+    );
+    assert!(!back.ticket.review.accepted);
+    assert_eq!(back.ticket.review.accept_withdrawn, None);
+}

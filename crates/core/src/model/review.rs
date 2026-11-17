@@ -241,6 +241,9 @@ pub enum ReviewNote {
     CheckCannotRun { command: String },
 }
 
+/// What the journal and the round list say when the reviewer's request voided an Accept.
+pub const ACCEPT_WITHDRAWN: &str = "Accept withdrawn: the reviewer asked for changes after it";
+
 /// A ticket's review state: whose turn it is while in Review, and every round so far.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -280,6 +283,11 @@ pub struct Review {
     /// next hand-in that passes the check and the reviewer merges without a second Accept.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub accepted: bool,
+    /// The number of the round in which the reviewer asked for changes after a person's Accept
+    /// and so voided it; the card waits for the person as for a first review and says so.
+    /// Cleared when a person decides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accept_withdrawn: Option<u32>,
     /// The check of this turn is the one Accept asked for because main moved since the last
     /// check; a pass merges by itself.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -294,6 +302,7 @@ impl Review {
     pub fn is_empty(&self) -> bool {
         self.turn.is_none()
             && !self.accepted
+            && self.accept_withdrawn.is_none()
             && !self.recheck
             && self.check.is_none()
             && self.rounds.is_empty()

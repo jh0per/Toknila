@@ -4,6 +4,13 @@
 import type { ReviewRound, ReviewView } from "../api/types";
 import { checkText, systemRoundText } from "./checkPhase";
 
+/// What the round list says under the round whose request voided the person's Accept (core's
+/// `ACCEPT_WITHDRAWN`).
+export const ACCEPT_WITHDRAWN = "Accept withdrawn: the reviewer asked for changes after it";
+
+/// What the Review card says when the person's turn comes after such a voiding.
+export const ACCEPT_BEFORE_CHANGES = "Your Accept was before the reviewer asked for changes; look again";
+
 /// Who gave a round, in words: a person, the daemon's check or the reviewer agent.
 export function whoText(r: ReviewRound): string {
   if (r.reviewer === "human") return "you";

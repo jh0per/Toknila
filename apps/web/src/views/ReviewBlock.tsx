@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { TicketDetail } from "../api/types";
 import { finishReport } from "../store/permissionReports";
+import { ACCEPT_BEFORE_CHANGES } from "../store/review";
 import { HandIn } from "./HandIn";
 import { NeedsYou, ReviewHint, ReviewLines } from "./NeedsYou";
 
@@ -12,6 +13,9 @@ export function ReviewBlock({ detail, project, children }: { detail: TicketDetai
   const report = finishReport(detail?.comments ?? []);
   return (
     <section className="review-block" data-testid="review-block">
+      {detail?.ticket.review?.accept_withdrawn != null && detail.review?.awaiting?.by === "person" && (
+        <p className="review-withdrawn" data-testid="accept-before-changes" role="note">{ACCEPT_BEFORE_CHANGES}</p>
+      )}
       <h4>What the agent reported</h4>
       {report ? (
         <HandIn report={report} since={detail?.ticket.review?.since_return} />
