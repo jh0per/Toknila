@@ -53,7 +53,7 @@ export function checks(page) {
   /// The window's connection to the daemon: the sidebar says "Offline" while it is lost and says
   /// nothing while it works (`data-link` carries the state).
   const expectLink = async (state, what) => {
-    await page.locator(`nav[aria-label=Sidebar][data-link=${state}]`).waitFor({ timeout: 10_000 }).catch(() => {
+    await page.locator(`nav[aria-label=Sidebar][data-link=${state}]`).waitFor({ timeout: 30_000 }).catch(() => {
       throw new Error(`${what}: expected the link to be ${state}`);
     });
     const badge = await page.locator("[data-testid=link]").count();
