@@ -8820,6 +8820,23 @@
         },
         "additionalProperties": false
       },
+      "LinePlace": {
+        "type": "object",
+        "description": "An accepted card's place in its project's merge line, kept on its review.",
+        "required": [
+          "since"
+        ],
+        "properties": {
+          "holds": {
+            "type": "boolean",
+            "description": "The card holds the turn: its merge (and the re-check it needs) runs, and no other card of\nthe project merges until it ends."
+          },
+          "since": {
+            "$ref": "#/components/schemas/Timestamp",
+            "description": "When the card joined the line; the cards that wait go in this order."
+          }
+        }
+      },
       "ListedProfile": {
         "type": "object",
         "description": "A profile and where it comes from.",
@@ -8953,6 +8970,55 @@
             "description": "Title of a pull request; `{key}` and `{title}` are the card's."
           }
         }
+      },
+      "MergeWait": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A release run is ahead (it holds the line or takes it next): the card merges after its Tag.",
+            "required": [
+              "version",
+              "for"
+            ],
+            "properties": {
+              "for": {
+                "type": "string",
+                "enum": [
+                  "release"
+                ]
+              },
+              "version": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The card `key` holds the turn (it is first); the one that waits is `place`-th in line.",
+            "required": [
+              "key",
+              "place",
+              "for"
+            ],
+            "properties": {
+              "for": {
+                "type": "string",
+                "enum": [
+                  "card"
+                ]
+              },
+              "key": {
+                "$ref": "#/components/schemas/TicketKey"
+              },
+              "place": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              }
+            }
+          }
+        ],
+        "description": "What a card or a release waits for in the merge line."
       },
       "Message": {
         "type": "object",
@@ -11713,6 +11779,10 @@
           "tag": {
             "type": "string"
           },
+          "turn": {
+            "type": "boolean",
+            "description": "The run took its turn in its project's merge line; a running run without it waits for\nthe merge in progress, and no card merges while it holds the turn (until its Tag and\nPush ended)."
+          },
           "version": {
             "type": "string"
           }
@@ -11982,6 +12052,17 @@
               {
                 "$ref": "#/components/schemas/CheckOutcome",
                 "description": "What the check command said about the current hand-in; `None` before it ran, when the\nproject has no check command, or after a new hand-in until it ran again."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "merge_line": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LinePlace",
+                "description": "The card's place in its project's merge line while it is in its merge (merging, or in the\nre-check its Accept asked for); see [`crate::merge_line`]."
               },
               {
                 "type": "null"
@@ -12264,6 +12345,17 @@
             "description": "The project's round limit of the loop, and how many returns the loop has used since a\nperson last decided.",
             "minimum": 0
           },
+          "merge_wait": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MergeWait",
+                "description": "The card was accepted and waits in its project's merge line: for the release run that\nholds it, or for the card whose turn runs (with its own place). Absent while its turn runs."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "mode": {
             "$ref": "#/components/schemas/ReviewMode",
             "description": "The review mode that applies: the ticket's, the chain's or the project's."
@@ -12346,6 +12438,13 @@
           },
           "step": {
             "$ref": "#/components/schemas/ReleaseStep"
+          },
+          "wait": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the step waits for while it cannot start, read when the run is shown: `waits for\nits turn (#2 in the check line)`, `waits for DEMO-3 to merge (#2 in line)`."
           }
         }
       },
@@ -13564,6 +13663,17 @@
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          },
+          "merge_wait": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MergeWait",
+                "description": "The card was accepted and waits in its project's merge line, and for what. Absent\notherwise, and while its turn runs."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "needs_human": {
             "type": "boolean"

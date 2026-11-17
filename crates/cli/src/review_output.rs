@@ -22,13 +22,16 @@ fn short(commit: &str) -> &str {
     commit.get(..7).unwrap_or(commit)
 }
 
-/// How the card is reviewed, whose turn it is, the rounds so far, and the Since the Return block.
-pub fn review(d: &TicketDetail) {
-    let r = &d.review;
-    let turn = match r.awaiting {
+/// Whose turn it is, after a comma: `, waiting for a person`, `, accepted; waits for DEMO-3 to
+/// merge (#2 in line)`, `, being checked again: ...`; nothing outside Review.
+fn turn_words(r: &toknila_api_types::ReviewView) -> String {
+    match r.awaiting {
         Some(toknila_core::ReviewTurn::Person) => ", waiting for a person".to_owned(),
         Some(toknila_core::ReviewTurn::Agent { .. }) => ", waiting for the reviewer".to_owned(),
-        Some(toknila_core::ReviewTurn::Merging) => ", merging".to_owned(),
+        Some(toknila_core::ReviewTurn::Merging) => match &r.merge_wait {
+            Some(wait) => format!(", {}", wait.card_words()),
+            None => ", merging".to_owned(),
+        },
         Some(toknila_core::ReviewTurn::Check) => {
             let words = check_words_now(r.check.as_ref());
             let words = if r.rechecking {
@@ -39,7 +42,13 @@ pub fn review(d: &TicketDetail) {
             format!(", {words}")
         }
         None => String::new(),
-    };
+    }
+}
+
+/// How the card is reviewed, whose turn it is, the rounds so far, and the Since the Return block.
+pub fn review(d: &TicketDetail) {
+    let r = &d.review;
+    let turn = turn_words(r);
     println!(
         "review: {}  reviewer: {}  rounds of the loop: {} of {}{turn}",
         w(&r.mode),
@@ -90,6 +99,35 @@ mod tests {
             flaky: false,
             flaky_output: String::new(),
         }
+    }
+
+    #[test]
+    fn an_accepted_card_that_waits_in_the_merge_line_says_for_what() {
+        let mut r = toknila_api_types::ReviewView {
+            mode: toknila_core::ReviewMode::Human,
+            reviewer: "sim-reviewer".to_owned(),
+            awaiting: Some(toknila_core::ReviewTurn::Merging),
+            max_rounds: 3,
+            used_rounds: 0,
+            rounds: Vec::new(),
+            check_queue: None,
+            check: None,
+            rechecking: false,
+            merge_wait: None,
+        };
+        assert_eq!(turn_words(&r), ", merging");
+        r.merge_wait = Some(toknila_core::merge_line::MergeWait::Card {
+            key: "TOKNILA-152".parse().expect("key"),
+            place: 2,
+        });
+        assert_eq!(
+            turn_words(&r),
+            ", accepted; waits for TOKNILA-152 to merge (#2 in line)"
+        );
+        r.merge_wait = Some(toknila_core::merge_line::MergeWait::Release {
+            version: "0.3.8".to_owned(),
+        });
+        assert_eq!(turn_words(&r), ", accepted; waits for the release of 0.3.8");
     }
 
     #[test]

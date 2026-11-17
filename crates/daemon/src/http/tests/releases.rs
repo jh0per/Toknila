@@ -387,6 +387,7 @@ async fn the_steps_of_a_run_are_in_the_journal_and_are_still_there_after_a_resta
         kinds,
         [
             "run_started",
+            "turn_taken",
             "step_started",
             "step_passed",
             "step_started",

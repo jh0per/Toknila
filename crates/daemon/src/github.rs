@@ -3,10 +3,12 @@
 //! checks are watched, and `gh pr merge` merges it once every check passed.
 //!
 //! One call is one step. The first (`PrSpec::watching` is `None`) pushes and opens; later ones
-//! only look. Either way it ends with a [`MergeOutcome`] the machine understands: the checks are
-//! still running (`PrOpen`), failed, the pull request was closed or conflicts, or it merged and
-//! `origin` was fetched so the next ships start from the new base. Whether the checks are good
-//! enough is core's decision ([`toknila_core::pr::judge`]); this file only reads what `gh` says.
+//! only look while GitHub runs the checks, and the one that holds the merge turn pushes what the
+//! sync added and merges. Either way it ends with a [`MergeOutcome`] the machine understands: the
+//! pull request is open and not merged by this step (`PrOpen`), failed, was closed or conflicts,
+//! or it merged and `origin` was fetched so the next ships start from the new base. Whether the
+//! checks are good enough is core's decision ([`toknila_core::pr::judge`]); this file only reads
+//! what `gh` says.
 
 use serde::Deserialize;
 use toknila_app::{MergeError, MergeOutcome, Merger, Seen, SyncOutcome, SyncSpec};
@@ -61,13 +63,17 @@ impl GithubMerger {
         self
     }
 
-    /// Pushes the ship's branch to `origin` (the person's own git credentials).
-    fn push(&self, spec: &MergeSpec) -> Result<(), MergeError> {
+    /// Pushes the ship's branch to `origin` (the person's own git credentials). Returns whether
+    /// the branch on `origin` moved: git's porcelain report flags a new, fast-forwarded or forced
+    /// ref with `*`, ` ` or `+`, and one that was up to date with `=`.
+    fn push(&self, spec: &MergeSpec) -> Result<bool, MergeError> {
         let refspec = format!("refs/heads/{0}:refs/heads/{0}", spec.branch);
-        self.git
-            .run(&spec.repo, &["push", "origin", &refspec])
-            .map(drop)
-            .map_err(Into::into)
+        let out = self
+            .git
+            .run(&spec.repo, &["push", "--porcelain", "origin", &refspec])?;
+        Ok(out
+            .lines()
+            .any(|l| matches!(l.split('\t').next(), Some(" " | "+" | "*"))))
     }
 
     /// The pull request with this number or URL. One that cannot be found is a failure here: the
@@ -104,13 +110,13 @@ impl GithubMerger {
         Ok(all.pop())
     }
 
-    /// The branch's open pull request, or a new one.
-    fn open(&self, spec: &MergeSpec, pr: &PrSpec) -> Result<View, MergeError> {
-        self.push(spec)?;
+    /// The branch's open pull request, or a new one; and whether the push moved the branch.
+    fn open(&self, spec: &MergeSpec, pr: &PrSpec) -> Result<(View, bool), MergeError> {
+        let pushed = self.push(spec)?;
         if let Some(found) = self.find(&spec.repo, &spec.branch)?
             && found.state != "CLOSED"
         {
-            return Ok(found);
+            return Ok((found, pushed));
         }
         let create = [
             "pr",
@@ -127,7 +133,7 @@ impl GithubMerger {
         // The last line `gh pr create` prints is the new pull request's URL.
         let out = self.gh.run(&spec.repo, &create)?;
         let url = out.lines().last().unwrap_or_default().trim().to_owned();
-        self.view(&spec.repo, &url)
+        Ok((self.view(&spec.repo, &url)?, pushed))
     }
 
     /// The checks as `gh` reports them; none yet is an empty list.
@@ -184,8 +190,15 @@ impl GithubMerger {
         Ok(rollup.checks.is_empty())
     }
 
-    /// One look at the pull request, and the merge when it is ready.
-    fn step(&self, spec: &MergeSpec, pr: &PrSpec, view: View) -> Result<MergeOutcome, MergeError> {
+    /// One look at the pull request, and the merge when it is ready and `may_merge` (the step
+    /// holds the merge turn and pushed nothing new); else checks that passed are only reported.
+    fn step(
+        &self,
+        spec: &MergeSpec,
+        pr: &PrSpec,
+        view: View,
+        may_merge: bool,
+    ) -> Result<MergeOutcome, MergeError> {
         let repo = spec.repo.as_str();
         let checks = self.checks(repo, view.number)?;
         let pull = PullRequest::seen(view.number, view.url, checks);
@@ -204,6 +217,9 @@ impl GithubMerger {
         match judge(&pull.checks) {
             ChecksVerdict::Pending if !unchecked => Ok(MergeOutcome::PrOpen { pr: pull }),
             ChecksVerdict::Failed(failed) => Ok(MergeOutcome::CiFailed { pr: pull, failed }),
+            ChecksVerdict::Pending | ChecksVerdict::Passed if !may_merge => {
+                Ok(MergeOutcome::PrOpen { pr: pull })
+            }
             ChecksVerdict::Pending | ChecksVerdict::Passed => {
                 let number = pull.number.to_string();
                 match self
@@ -247,11 +263,17 @@ impl Merger for GithubMerger {
                 "a pull-request merge needs a pull request spec".to_owned(),
             ));
         };
-        let view = match &pr.watching {
-            Some(open) => self.view(&spec.repo, &open.number.to_string())?,
+        // With the merge turn the branch is pushed first: the ship may have been brought up to a
+        // base that moved while GitHub ran the checks.
+        let (view, pushed) = match &pr.watching {
+            Some(open) if pr.holds_turn => {
+                let pushed = self.push(spec)?;
+                (self.view(&spec.repo, &open.number.to_string())?, pushed)
+            }
+            Some(open) => (self.view(&spec.repo, &open.number.to_string())?, false),
             None => self.open(spec, pr)?,
         };
-        self.step(spec, pr, view)
+        self.step(spec, pr, view, pr.may_merge(pushed))
     }
 }
 

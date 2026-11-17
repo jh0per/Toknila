@@ -75,6 +75,10 @@ pub struct RunStep {
     pub state: StepState,
     /// What the step printed (the end of it when it is long).
     pub output: String,
+    /// What the step waits for while it cannot start, read when the run is shown: `waits for
+    /// its turn (#2 in the check line)`, `waits for DEMO-3 to merge (#2 in line)`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wait: Option<String>,
 }
 
 /// Where a release run is as a whole.
@@ -106,6 +110,11 @@ pub struct ReleaseRun {
     /// The step an interrupted run was in; only when it is interrupted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resume_from: Option<ReleaseStep>,
+    /// The run took its turn in its project's merge line; a running run without it waits for
+    /// the merge in progress, and no card merges while it holds the turn (until its Tag and
+    /// Push ended).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub turn: bool,
 }
 
 /// Answer of `GET /v1/projects/{project}/next-version`: the version a new chain suggests.

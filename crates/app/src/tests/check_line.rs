@@ -217,6 +217,57 @@ fn an_accepts_recheck_goes_ahead_of_hand_in_checks() {
 }
 
 #[test]
+fn a_release_check_goes_ahead_of_hand_ins_and_in_order_with_rechecks() {
+    let load = Arc::new(FakeLoad::default());
+    let line = line(&load, 1);
+    let (running, hand_in, recheck, later) = (id(), id(), id(), id());
+    let release = toknila_core::ReleaseId::new();
+    let first = line.enter(running, CheckKind::HandIn);
+    line.join(hand_in, CheckKind::HandIn);
+    line.join(recheck, CheckKind::Recheck);
+    line.join_release(release);
+    line.join(later, CheckKind::Recheck);
+    let stand = line.standing();
+    assert_eq!(
+        stand.place_release(release),
+        Some((2, None)),
+        "behind the re-check that joined first, ahead of the hand-in"
+    );
+    assert_eq!(
+        [recheck, later, hand_in].map(|t| stand.place(t).map(|(n, _)| n)),
+        [Some(1), Some(3), Some(4)],
+        "a re-check that joins later goes behind the release"
+    );
+    assert_eq!(line.snapshot(), [running, recheck, later, hand_in]);
+    let (ran_tx, ran) = channel();
+    let waiting = {
+        let line = line.clone();
+        std::thread::spawn(move || {
+            let turn = line.enter_release(release);
+            ran_tx.send(()).ok();
+            drop(turn);
+        })
+    };
+    assert!(
+        ran.recv_timeout(LOOK).is_err(),
+        "the release waits its turn"
+    );
+    drop(first);
+    let next = line.enter(recheck, CheckKind::Recheck);
+    drop(next);
+    assert!(
+        ran.recv_timeout(DEADLINE).is_ok(),
+        "then the release's check runs"
+    );
+    waiting.join().expect("the release's check ended");
+    assert_eq!(
+        line.standing().place_release(release),
+        None,
+        "it left the line"
+    );
+}
+
+#[test]
 fn between_two_hand_ins_the_first_to_join_goes_first() {
     let load = Arc::new(FakeLoad::default());
     let line = line(&load, 1);

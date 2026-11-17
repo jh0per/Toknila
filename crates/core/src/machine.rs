@@ -356,6 +356,7 @@ pub fn apply(
     }
     next.status = status;
     next.status_reason = reason;
+    crate::merge_line::stamp(&mut next, now);
     Ok(Transition {
         ticket: next,
         effects,

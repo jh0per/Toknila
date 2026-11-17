@@ -8,15 +8,15 @@ use toknila_app::releases::{self, ReleaseAction};
 use toknila_app::{AppError, resolve};
 use toknila_core::{Actor, release_run};
 
-use super::{ApiResult, chain_write, read};
+use super::{ApiResult, chain_write, read, release_task};
 use crate::http::dto::{
     ChainDetail, NewRelease, ReleaseOffer, ReleaseRun, StartRelease, VersionSuggestion,
 };
 use crate::http::error::ErrorBody;
-use crate::server::{AppState, now};
+use crate::releaser;
+use crate::server::AppState;
 use crate::shipyard::remote::{Remote, has_upstream, remote_of};
 use crate::store::release_runs::Entry;
-use crate::{release_carry, releaser};
 use toknila_api_types::{RunState, StepState};
 
 #[utoipa::path(post, path = "/chains/{chain}/releases", tag = "releases", request_body = NewRelease,
@@ -87,6 +87,7 @@ pub async fn release_offer(
     State(state): State<AppState>,
     Path(chain): Path<String>,
 ) -> ApiResult<Json<ReleaseOffer>> {
+    let checks = state.store.check_line().standing();
     let (releasable, own, project, run) = read(&state, move |repo| {
         let c = resolve::chain(repo, &chain)?;
         let view = repo
@@ -97,9 +98,10 @@ pub async fn release_offer(
             .ok_or_else(|| AppError::not_found("project"))?;
         let end = view.end_release();
         let own = end.map(|r| r.version.clone());
-        let run = match end {
-            Some(r) => repo.release_run(r.id)?,
-            None => None,
+        let run = match end.map(|r| (r.id, repo.release_run(r.id))) {
+            Some((id, Ok(Some(run)))) => Some(release_task::with_waits(repo, &checks, id, run)?),
+            Some((_, Err(e))) => return Err(e.into()),
+            _ => None,
         };
         Ok((view.releasable(), own, project, run))
     })
@@ -189,6 +191,7 @@ pub async fn start_release(
         tx.journal_release_run(r.id, &entry)?;
         let plan = releaser::Plan {
             release: r.id,
+            project: project.id,
             repo,
             base: project.work_branch.clone(),
             tag: release_run::tag_name(&version),
@@ -214,93 +217,9 @@ pub async fn start_release(
         .take();
     if let Some(mut plan) = plan {
         plan.scratch = state.ships.join(".releases");
-        tokio::spawn(run_release(state, plan));
+        tokio::spawn(release_task::run_release(state, plan));
     }
     Ok(Json(detail))
-}
-
-/// Journals `entry` of the run of `id`; blocking, for the run's thread.
-fn journal(
-    store: &crate::store::Store,
-    handle: &tokio::runtime::Handle,
-    id: toknila_core::ReleaseId,
-    entry: Entry,
-) -> Result<(), String> {
-    handle
-        .block_on(store.write(Actor::System, now(), move |tx| {
-            tx.journal_release_run(id, &entry)
-        }))
-        .map(|_: ((), _)| ())
-        .map_err(|e: crate::store::StoreError| e.to_string())
-}
-
-/// The finished epics of the project whose merges the new tag contains: they ship with it. A
-/// failure to look means none are carried; the release itself stands.
-async fn carried_by(state: &AppState, plan: &releaser::Plan) -> Vec<toknila_core::ChainId> {
-    let id = plan.release;
-    let epics = read(state, move |repo| {
-        let r = resolve::release(repo, &id.to_string())?;
-        let c = repo
-            .chain(r.chain_id)?
-            .ok_or_else(|| AppError::not_found("epic"))?;
-        Ok(releases::finished_epics(repo, c.project_id, Some(c.id))?)
-    })
-    .await
-    .unwrap_or_default();
-    if epics.is_empty() {
-        return Vec::new();
-    }
-    let (repo, tag) = (plan.repo.clone(), plan.tag.clone());
-    tokio::task::spawn_blocking(move || {
-        let (_, commit) = release_carry::tag_commit(&repo, &tag)?;
-        release_carry::contained(&repo, &commit, &epics)
-    })
-    .await
-    .ok()
-    .and_then(Result::ok)
-    .unwrap_or_default()
-}
-
-/// The run itself: the steps on a blocking thread, then the milestone is saved as released and
-/// the run ends in the same transaction.
-async fn run_release(state: AppState, plan: releaser::Plan) {
-    let (id, tag) = (plan.release, plan.tag.clone());
-    let ran = {
-        let plan = plan.clone();
-        let store = state.store.clone();
-        let handle = tokio::runtime::Handle::current();
-        tokio::task::spawn_blocking(move || {
-            releaser::execute(&plan, &|e| journal(&store, &handle, id, e))
-        })
-        .await
-    };
-    let failure = match ran {
-        Ok(Ok(())) => {
-            let carried = carried_by(&state, &plan).await;
-            let saved = state
-                .store
-                .write(Actor::Human, now(), move |tx| -> ApiResult<()> {
-                    releases::finish(tx, id, &tag, &carried)?;
-                    Ok(tx.journal_release_run(id, &Entry::RunDone)?)
-                })
-                .await;
-            match saved {
-                Ok(_) => return,
-                Err(e) => format!("the release could not be saved: {e:?}"),
-            }
-        }
-        Ok(Err(_)) => return,
-        Err(e) => format!("the release run crashed: {e}"),
-    };
-    let entry = Entry::RunFailed { error: failure };
-    let _ = state
-        .store
-        .write(Actor::System, now(), move |tx| {
-            tx.journal_release_run(id, &entry)
-        })
-        .await
-        .map(|_: ((), _)| ())
-        .map_err(|e: crate::store::StoreError| e);
 }
 
 #[utoipa::path(get, path = "/releases/{release}/run", tag = "releases",
@@ -310,10 +229,13 @@ pub async fn release_run(
     State(state): State<AppState>,
     Path(release): Path<String>,
 ) -> ApiResult<Json<ReleaseRun>> {
+    let checks = state.store.check_line().standing();
     let run = read(&state, move |repo| {
         let r = resolve::release(repo, &release)?;
-        repo.release_run(r.id)?
-            .ok_or_else(|| AppError::not_found(format!("a release run of {}", r.version)).into())
+        let run = repo
+            .release_run(r.id)?
+            .ok_or_else(|| AppError::not_found(format!("a release run of {}", r.version)))?;
+        release_task::with_waits(repo, &checks, r.id, run)
     })
     .await?;
     Ok(Json(run))

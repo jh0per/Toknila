@@ -26,6 +26,7 @@ mod discussion;
 mod epic;
 mod import_done;
 mod leftovers;
+mod merge_line;
 mod merges;
 mod nudge;
 mod parallel;
@@ -71,6 +72,8 @@ struct Mem {
     taken: u32,
     /// Who issues the commands; a person unless a test says otherwise.
     actor: Actor,
+    /// The release runs in the project's merge line, as the host keeps them.
+    release_turns: Vec<toknila_core::merge_line::ReleaseTurn>,
 }
 
 impl Mem {
@@ -163,6 +166,7 @@ impl Mem {
             now,
             taken: 2,
             actor: Actor::Human,
+            release_turns: vec![],
         }
     }
 
@@ -300,6 +304,18 @@ impl Reader for Mem {
     fn live_runners(&self) -> AppResult<Vec<(TicketId, toknila_core::AgentRole)>> {
         Ok(crate::Runner::live_runners(&self.runner))
     }
+    fn release_turns(
+        &self,
+        project: ProjectId,
+    ) -> AppResult<Vec<toknila_core::merge_line::ReleaseTurn>> {
+        let mine = project == self.project.id;
+        Ok(self
+            .release_turns
+            .iter()
+            .filter(|_| mine)
+            .cloned()
+            .collect())
+    }
     fn last_snapshot_payload(
         &self,
         entity: &str,
@@ -425,6 +441,12 @@ impl UnitOfWork for Mem {
     }
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {
         self.events.push(event.clone());
+        Ok(())
+    }
+    fn take_release_turn(&mut self, release: ReleaseId) -> AppResult<()> {
+        let turn = self.release_turns.iter_mut().find(|r| r.release == release);
+        turn.ok_or_else(|| AppError::not_found("release run"))?
+            .holds = true;
         Ok(())
     }
 }

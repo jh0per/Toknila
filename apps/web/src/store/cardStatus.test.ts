@@ -107,6 +107,15 @@ describe("the status sentence", () => {
       .toBe("Approved: merging into the main branch");
   });
 
+  it("says what an accepted card waits for in the merge line", () => {
+    const waiting = (merge_wait: TicketDetail["review"]["merge_wait"]) =>
+      ({ allowed_actions: [], review: { rounds: [], awaiting: { by: "merging" }, merge_wait } }) as unknown as TicketDetail;
+    expect(statusLine(card("review"), waiting({ for: "card", key: "TOKNILA-152", place: 2 }), pace()))
+      .toEqual({ tone: "going", text: "Accepted; waits for TOKNILA-152 to merge (#2 in line)" });
+    expect(statusLine(card("review"), waiting({ for: "release", version: "0.3.8" }), pace()).text)
+      .toBe("Accepted; waits for the release of 0.3.8");
+  });
+
   it("says done, and cancelled with its reason", () => {
     expect(statusLine(card("merged"), detail([]), pace())).toEqual({ tone: "done", text: "Done" });
     const reason = { status: "cancelled", text: "not needed any more" } as StatusReason;

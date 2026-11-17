@@ -74,6 +74,10 @@ pub struct TicketItem {
     /// check command since a time. Absent otherwise, and before the checker reports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check: Option<toknila_core::CheckPhase>,
+    /// The card was accepted and waits in its project's merge line, and for what. Absent
+    /// otherwise, and while its turn runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_wait: Option<toknila_core::merge_line::MergeWait>,
     /// The card's agent is the simulated one (`sim`): no process runs.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub simulated: bool,

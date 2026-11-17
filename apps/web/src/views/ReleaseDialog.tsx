@@ -71,7 +71,7 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
           <ol className="release-steps" data-testid="release-steps">
             {(r.run?.steps ?? plannedSteps(r).map((step) => ({ step, label: LABEL[step], state: "pending" as const, output: "" }))).map((s) => (
               <li key={s.step} data-step={s.step} data-state={s.state}>
-                <b>{MARK[s.state]} {s.label}</b>
+                <b>{MARK[s.state]} {s.label}{"wait" in s && s.wait ? `: ${s.wait}` : ""}</b>
                 {s.output && <pre className="output">{s.step === "push" ? withLinks(s.output) : s.output}</pre>}
               </li>
             ))}

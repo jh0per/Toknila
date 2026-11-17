@@ -90,6 +90,12 @@ pub fn judge(checks: &[CheckRun]) -> ChecksVerdict {
     }
 }
 
+/// Whether the pull request may merge as last seen: every check passed, or none was ever reported
+/// and a person said "merge now".
+pub fn ready(pr: &PullRequest) -> bool {
+    judge(&pr.checks) == ChecksVerdict::Passed || (pr.checks.is_empty() && pr.merge_unchecked)
+}
+
 /// What a card's pull request is made from, decided here and executed by the host.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrSpec {
@@ -100,17 +106,29 @@ pub struct PrSpec {
     /// nothing is pushed or created. `None` (a merge starts: accept, unblock) pushes the branch
     /// and opens or reuses the pull request.
     pub watching: Option<PullRequest>,
+    /// The card holds its project's merge turn: the step may push the branch and merge the pull
+    /// request. Without it the step only looks at the pull request while GitHub runs its checks;
+    /// checks that passed are reported, not merged.
+    pub holds_turn: bool,
 }
 
 impl PrSpec {
-    /// The pull request of `ticket` under `project`'s settings.
-    pub fn for_ticket(project: &Project, ticket: &Ticket) -> Self {
+    /// The pull request of `ticket` under `project`'s settings, for a step that holds the merge
+    /// turn or not.
+    pub fn for_ticket(project: &Project, ticket: &Ticket, holds_turn: bool) -> Self {
         Self {
             title: title(&project.merge.pr_title, ticket),
             body: body(ticket),
             method: project.merge.method,
             watching: ticket.pr.clone(),
+            holds_turn,
         }
+    }
+
+    /// Whether this step may merge the pull request once its checks allow it: it holds the merge
+    /// turn and pushed no new commit (GitHub has not checked those yet; the next look does).
+    pub fn may_merge(&self, pushed: bool) -> bool {
+        self.holds_turn && !pushed
     }
 }
 

@@ -5,8 +5,9 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use toknila_api_types::{ReleaseRun, RunState, RunStep, StepState};
-use toknila_core::ReleaseId;
-use toknila_core::release_run::ReleaseStep;
+use toknila_core::merge_line::ReleaseTurn;
+use toknila_core::release_run::{ReleaseStep, in_merge_line};
+use toknila_core::{ProjectId, ReleaseId};
 
 use super::codec::Repo;
 use super::{StoreError, WriteTx};
@@ -28,6 +29,9 @@ pub enum Entry {
     },
     /// An interrupted run goes on; the steps that passed stay passed.
     RunResumed,
+    /// The run took its turn in its project's merge line: no card merges until its Tag (and
+    /// Push) ended.
+    TurnTaken,
     /// A step began.
     StepStarted { step: ReleaseStep },
     /// A step passed, with the end of what it printed.
@@ -47,6 +51,7 @@ impl Entry {
         match self {
             Self::RunStarted { .. } => "run_started",
             Self::RunResumed => "run_resumed",
+            Self::TurnTaken => "turn_taken",
             Self::StepStarted { .. } => "step_started",
             Self::StepPassed { .. } => "step_passed",
             Self::StepFailed { .. } => "step_failed",
@@ -103,6 +108,50 @@ impl Repo<'_> {
         Ok(fold(release, &entries))
     }
 
+    /// The release runs of `project` that stand in its merge line: running, with their Tag (or
+    /// Push) still to pass, in the order they began or resumed.
+    pub fn release_turns(&self, project: ProjectId) -> Result<Vec<ReleaseTurn>, StoreError> {
+        let mut st = self.conn.prepare(
+            "SELECT entity_id, MAX(seq) AS began FROM events WHERE entity = ?1 \
+             AND kind IN ('run_started', 'run_resumed') GROUP BY entity_id ORDER BY began",
+        )?;
+        let rows = st.query_map([ENTITY], |r| r.get::<_, String>(0))?;
+        let mut ids = Vec::new();
+        for row in rows {
+            ids.push(super::codec::parse::<ReleaseId>(&row?, "release id")?);
+        }
+        let mut turns = Vec::new();
+        for id in ids {
+            let Some(run) = self
+                .release_run(id)?
+                .filter(|r| r.state == RunState::Running)
+            else {
+                continue;
+            };
+            let all: Vec<ReleaseStep> = run.steps.iter().map(|s| s.step).collect();
+            let passed: Vec<ReleaseStep> = run
+                .steps
+                .iter()
+                .filter(|s| s.state == StepState::Done)
+                .map(|s| s.step)
+                .collect();
+            let mine = match self.release(id)? {
+                Some(r) => self
+                    .chain(r.chain_id)?
+                    .is_some_and(|c| c.project_id == project),
+                None => false,
+            };
+            if mine && in_merge_line(&all, &passed) {
+                turns.push(ReleaseTurn {
+                    release: id,
+                    version: run.version,
+                    holds: run.turn,
+                });
+            }
+        }
+        Ok(turns)
+    }
+
     /// The milestones that have a release run in the journal.
     pub fn release_run_ids(&self) -> Result<Vec<ReleaseId>, StoreError> {
         let mut st = self
@@ -139,10 +188,12 @@ pub fn fold(release: ReleaseId, entries: &[Entry]) -> Option<ReleaseRun> {
                             label: s.label().to_owned(),
                             state: StepState::Pending,
                             output: String::new(),
+                            wait: None,
                         })
                         .collect(),
                     error: None,
                     resume_from: None,
+                    turn: false,
                 });
             }
             other => {
@@ -169,12 +220,15 @@ fn apply(r: &mut ReleaseRun, entry: &Entry) {
             r.state = RunState::Running;
             r.error = None;
             r.resume_from = None;
+            // A resumed run asks for its turn again.
+            r.turn = false;
             for s in &mut r.steps {
                 if s.state != StepState::Done {
                     s.state = StepState::Pending;
                 }
             }
         }
+        Entry::TurnTaken => r.turn = true,
         Entry::StepStarted { step } => set(r, *step, StepState::Running, None),
         Entry::StepPassed { step, output } => {
             set(r, *step, StepState::Done, Some(output));

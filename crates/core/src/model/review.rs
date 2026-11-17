@@ -292,6 +292,10 @@ pub struct Review {
     /// check; a pass merges by itself.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub recheck: bool,
+    /// The card's place in its project's merge line while it is in its merge (merging, or in the
+    /// re-check its Accept asked for); see [`crate::merge_line`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_line: Option<crate::merge_line::LinePlace>,
     /// A person dismissed the inbox item of the last check's flaky pass.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub flaky_dismissed: bool,
@@ -304,6 +308,7 @@ impl Review {
             && !self.accepted
             && self.accept_withdrawn.is_none()
             && !self.recheck
+            && self.merge_line.is_none()
             && self.check.is_none()
             && self.rounds.is_empty()
             && !self.nudged

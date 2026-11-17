@@ -1,7 +1,7 @@
 // What a card's Details says first: a status sentence and the next step, in words. The status,
 // the reason, the review turn and the queue place all come from the daemon; this only words them.
 
-import type { Ticket, TicketDetail } from "../api/types";
+import type { MergeWait, Ticket, TicketDetail } from "../api/types";
 import { RUNNER_LOST_TWICE, reasonText } from "../format";
 import { checkText } from "./checkPhase";
 
@@ -75,7 +75,10 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
         return { tone: "going", text: "In review: the reviewer agent is checking the work", next: "You can read the agent's report below meanwhile." };
       }
       if (turn?.by === "check" && detail) return { tone: "going", text: checkText(detail.review, pace.now ?? Date.now()) };
-      if (turn?.by === "merging") return { tone: "going", text: "Approved: merging into the main branch" };
+      if (turn?.by === "merging") {
+        const wait = detail?.review.merge_wait;
+        return { tone: "going", text: wait ? `Accepted; ${mergeWaitText(wait)}` : "Approved: merging into the main branch" };
+      }
       return { tone: "needs", text: "In review: read the agent's report below, then Accept or Return" };
     }
     case "merged":
@@ -87,6 +90,14 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
       return { tone: "quiet", text: why ? `Cancelled: ${why}` : "Cancelled", next: can("reopen") ? "Reopen it to bring it back." : undefined };
     }
   }
+}
+
+/// What an accepted card waits for in its project's merge line (the daemon's `MergeWait`):
+/// "waits for the release of 0.3.8", "waits for TOKNILA-152 to merge (#2 in line)".
+export function mergeWaitText(wait: MergeWait): string {
+  return wait.for === "release"
+    ? `waits for the release of ${wait.version}`
+    : `waits for ${wait.key} to merge (#${wait.place} in line)`;
 }
 
 /// The sentence of a card whose agent has a design on the table: waiting for the person's verdict
