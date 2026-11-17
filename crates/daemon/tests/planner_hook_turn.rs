@@ -167,6 +167,23 @@ impl Rig {
             .unwrap_or_default()
     }
 
+    /// Polls the planner's terminal until `what` shows at least `times` times (the deadline is
+    /// `WAIT`), and returns what it shows.
+    async fn output_with_count(&self, key: TicketId, what: &str, times: usize) -> String {
+        let until = Instant::now() + WAIT;
+        loop {
+            let out = self.output(key);
+            if out.matches(what).count() >= times {
+                return out;
+            }
+            assert!(
+                Instant::now() < until,
+                "fewer than {times} of {what:?} in {out:?}"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    }
+
     /// Polls the planner's state until `ok` holds of it.
     async fn until(&self, key: TicketId, what: &str, ok: impl Fn(&Value) -> bool) -> Value {
         let until = Instant::now() + WAIT;
@@ -231,6 +248,7 @@ async fn a_scripted_turn_shows_working_then_its_step_then_not_working() {
         .filter_map(|m| m["text"].as_str())
         .collect();
     assert_eq!(said, [ANSWER], "{page}");
-    let out = rig.output(key);
+    // The terminal can lag the state: wait until the third post is shown, then assert.
+    let out = rig.output_with_count(key, "post=204", 3).await;
     assert_eq!(out.matches("post=204").count(), 3, "{out}");
 }

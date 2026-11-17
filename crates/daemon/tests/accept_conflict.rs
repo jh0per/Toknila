@@ -229,7 +229,11 @@ async fn a_conflict_at_accept_restarts_the_agent_with_the_return_and_its_next_ha
     let card = rig.card().await;
     assert_eq!(card["ticket"]["status"], "running", "{card}");
     assert_ne!(card["ticket"]["status"], "blocked");
-    let out = rig.output_with("This story was returned").await;
+    // The kickoff can arrive in several chunks: wait for each text (the output only grows).
+    rig.output_with("This story was returned").await;
+    rig.output_with("Conflicting files: README.md").await;
+    rig.output_with("git merge develop").await;
+    let out = rig.output_with("run the gates").await;
     for want in [
         "Conflicting files: README.md",
         "git merge develop",

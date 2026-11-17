@@ -57,6 +57,30 @@ fn a_flaky_pass_is_told_with_the_first_failing_line() {
 }
 
 #[test]
+fn a_gate_that_failed_on_an_extra_check_names_that_check() {
+    let extra = CheckOutcome {
+        command: "cargo xtask web && cargo xtask e2e-web".to_owned(),
+        output: "extra check apps/web/**: `cargo xtask web && cargo xtask e2e-web` exited with \
+                 code 1.\n\n```\nboom\n```\n\n`cargo xtask verify` passed."
+            .to_owned(),
+        ..outcome(false)
+    };
+    let text = gate::text(Some(&extra));
+    assert!(
+        text.contains("extra check apps/web/**: `cargo xtask web && cargo xtask e2e-web` finished"),
+        "{text}"
+    );
+    assert_pinned(&text, "gate_extra_failed.md");
+    // A failure of the main command, and a pass, are told as before.
+    let main = gate::text(Some(&outcome(false)));
+    assert!(!main.contains("extra check"), "{main}");
+    assert!(
+        main.contains("commit: `cargo xtask verify` finished"),
+        "{main}"
+    );
+}
+
+#[test]
 fn the_reviewer_kickoff_carries_the_command_the_verdict_and_the_output() {
     let pass = outcome(true);
     let text = kickoff(AgentRole::Reviewer, &brief_with(Some(&pass)));

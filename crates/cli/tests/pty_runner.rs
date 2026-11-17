@@ -139,7 +139,8 @@ fn a_runner_streams_takes_input_stops_on_cancel_crashes_and_is_lost_with_the_dae
 
     // Output reaches the scrollback, and the runner works in the ship, not in the repository.
     wait_until(&tok, "the agent's output", || {
-        tok.logs("DEMO-1").contains("hello from the agent")
+        let out = tok.logs("DEMO-1");
+        out.contains("hello from the agent") && out.contains("demo-1-alpha")
     });
     let out = tok.logs("DEMO-1");
     assert!(out.contains("demo-1-alpha"), "pwd is the ship: {out:?}");
