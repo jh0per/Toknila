@@ -705,6 +705,142 @@ async fn a_removal_that_failed_once_is_retried_by_the_next_round_of_the_ticker()
     assert!(!ship.exists(), "the worktree is gone after the next round");
 }
 
+// --- TOKNILA-157: a card holds the merge line only while the daemon works on the base ---
+
+impl Rig {
+    /// A card alone in a new epic `epic`, started on its own ship (it waits for no other card).
+    async fn started_in(&self, epic: &str, key: &str, title: &str) -> PathBuf {
+        self.post("/v1/projects/DEMO/chains", json!({ "name": epic }))
+            .await;
+        self.post(
+            &format!("/v1/chains/{epic}/tickets"),
+            json!({ "title": title }),
+        )
+        .await;
+        PathBuf::from(self.card(key).await["ship"]["path"].as_str().expect("ship"))
+    }
+
+    /// `key`'s work, one file committed on `ship`, handed in and accepted.
+    async fn hand_in_and_accept(&self, key: &str, ship: &Path, file: &str) {
+        commit_file(ship, file, &format!("{file}\n"));
+        let summary = toknila_core::handin::from_plain("done");
+        self.post(
+            &format!("/v1/tickets/{key}/events"),
+            json!({ "event": "finished", "summary": summary }),
+        )
+        .await;
+        self.post(&format!("/v1/tickets/{key}/actions/accept"), json!({}))
+            .await;
+    }
+
+    async fn status_of(&self, key: &str) -> String {
+        self.card(key).await["ticket"]["status"]
+            .as_str()
+            .expect("status")
+            .to_owned()
+    }
+
+    /// The checks of the `i`-th pull request the fake knows, as GitHub would move them.
+    fn pr_checks(&self, i: usize, bucket: &str) {
+        self.gh_edit(|s| s["prs"][i]["checks"] = json!([{ "name": "verify", "bucket": bucket }]));
+    }
+
+    /// Runs the ticker until `key` is `want`; a few rounds at most (a round that pushes a sync
+    /// commit merges at the next one).
+    async fn tick_until(&self, key: &str, want: &str) {
+        for _ in 0..5 {
+            if self.status_of(key).await == want {
+                return;
+            }
+            self.tick().await;
+        }
+        assert_eq!(self.status_of(key).await, want, "{}", self.card(key).await);
+    }
+
+    /// The release run of 0.3.8 once it ended; fails at the deadline.
+    async fn release_ended(&self) -> Value {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        loop {
+            let run = self.get("/v1/releases/0.3.8/run").await;
+            if run["state"] != "running" {
+                return run;
+            }
+            assert!(
+                std::time::Instant::now() < until,
+                "the release never ended: {run}"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn two_accepted_cards_open_their_pull_requests_side_by_side_and_merge_as_their_checks_pass() {
+    let rig = Rig::new().await;
+    rig.accepted().await;
+    let ship = rig.started_in("pay", "DEMO-2", "Pay").await;
+    rig.hand_in_and_accept("DEMO-2", &ship, "pay.txt").await;
+
+    // Both pull requests are open at once: the second did not wait for the first one's checks.
+    let gh = rig.gh();
+    let prs = gh["prs"].as_array().expect("prs");
+    assert_eq!(prs.len(), 2, "{gh}");
+    assert!(prs.iter().all(|p| p["state"] == "OPEN"), "{gh}");
+    for (key, number) in [("DEMO-1", 1), ("DEMO-2", 2)] {
+        let d = rig.card(key).await;
+        assert_eq!(d["ticket"]["pr"]["number"], number, "{d}");
+        assert_eq!(d["review"]["merge_wait"], Value::Null, "{d}");
+    }
+
+    // The second one's checks pass first: it merges first.
+    rig.pr_checks(1, "pass");
+    rig.tick_until("DEMO-2", "merged").await;
+    assert_eq!(rig.status_of("DEMO-1").await, "review");
+    assert!(rig.origin_has("develop", "pay.txt"));
+    assert!(!rig.origin_has("develop", "login.txt"));
+
+    // Then the first one's: at its merge turn it is brought up to date with the base that moved
+    // and that is pushed; GitHub has not checked the push yet, so the same step does not merge.
+    rig.pr_checks(0, "pass");
+    rig.tick().await;
+    assert!(rig.origin_has(BRANCH, "pay.txt"), "the sync was pushed");
+    assert_eq!(rig.status_of("DEMO-1").await, "review");
+    rig.tick_until("DEMO-1", "merged").await;
+    assert!(rig.origin_has("develop", "login.txt"));
+    assert!(
+        rig.origin_has("develop", "pay.txt"),
+        "the first one's branch has the second one's work: it was brought up to date"
+    );
+}
+
+#[tokio::test]
+async fn a_release_started_while_a_pull_request_waits_for_its_checks_tags_without_waiting() {
+    let rig = Rig::new().await;
+    rig.accepted().await;
+    rig.checks("pass");
+    rig.tick_until("DEMO-1", "merged").await;
+    let ship = rig.started_in("pay", "DEMO-2", "Pay").await;
+    rig.hand_in_and_accept("DEMO-2", &ship, "pay.txt").await;
+    assert_eq!(rig.card("DEMO-2").await["ticket"]["pr"]["number"], 2);
+
+    rig.post(
+        "/v1/chains/auth/release",
+        json!({ "version": "0.3.8", "push": false }),
+    )
+    .await;
+    let run = rig.release_ended().await;
+    assert_eq!(run["state"], "done", "{run}");
+    assert_eq!(git(&rig.repo, &["tag", "--list", "v0.3.8"]), "v0.3.8");
+    let d = rig.card("DEMO-2").await;
+    assert_eq!(d["ticket"]["status"], "review", "{d}");
+    assert_eq!(d["ticket"]["pr"]["checks"][0]["state"], "pending", "{d}");
+
+    // Its checks pass after the release: it merges.
+    rig.pr_checks(1, "pass");
+    rig.tick_until("DEMO-2", "merged").await;
+    assert!(rig.origin_has("develop", "pay.txt"));
+}
+
 impl Rig {
     /// The merged card left no worktree and no record; its branch is gone, or kept with a line
     /// on the card that says why.

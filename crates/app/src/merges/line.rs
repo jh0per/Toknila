@@ -2,7 +2,9 @@
 //! [`toknila_core::merge_line`]). A card's place is on its review, stamped by the machine; after
 //! every change of an epic the free turn goes to the next one in line ([`advance`]): a card's
 //! merge is queued only then, so no two cards of a project merge at once and a re-check runs
-//! against a main that stays. A release run asks for its turn itself ([`take_release_turn`]).
+//! against a main that stays. In pull-request mode a card is out of the line while GitHub runs
+//! its checks, and back in it once they passed. A release run asks for its turn itself
+//! ([`take_release_turn`]).
 
 use toknila_core::merge_line::{Entrant, Line, MergeWait, in_merge};
 use toknila_core::{ProjectId, ReleaseId, Ticket};
@@ -49,7 +51,7 @@ pub fn advance<U: UnitOfWork + ?Sized>(uow: &mut U, project: ProjectId) -> AppRe
     let (Some(t), Some(chain)) = (uow.ticket(id)?, uow.chain(t.chain_id)?) else {
         return Ok(());
     };
-    super::queue_merge(uow, &chain, &t)
+    super::queue_merge(uow, &chain, &t).map(drop)
 }
 
 /// The run of `release` asks for its turn in `project`'s line: `None` when it holds the turn now

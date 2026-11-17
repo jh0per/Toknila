@@ -1,6 +1,10 @@
 //! The merge line of a project. Accepted cards merge one at a time, in the order they joined the
 //! line, each holding its turn across "sync with main, re-check when main moved, merge", so its
-//! re-check runs against a main that stays. A release run holds the same line from its start
+//! re-check runs against a main that stays. In pull-request mode a card holds the turn only while
+//! the daemon works on the base (the sync, the re-check, the push and the opening of the pull
+//! request; later the merge): while GitHub runs its checks the card is out of the line, and it
+//! joins it again at the end once they passed, so cards merge in the order their checks pass and
+//! nobody waits for somebody else's CI. A release run holds the same line from its start
 //! until its Tag (and Push) ended: it waits for the turn in progress and goes ahead of the cards
 //! that wait, so no card merges while it tags. The rules are here; the app gives the turn and the
 //! host keeps the release runs' part.
@@ -21,14 +25,22 @@ pub struct LinePlace {
     pub holds: bool,
 }
 
-/// Whether `t` is in its merge: accepted and merging, or in the re-check its Accept asked for.
+/// Whether `t` is in its merge line: accepted and merging (in pull-request mode: before its pull
+/// request is open, or once its checks passed), or in the re-check its Accept asked for.
 pub fn in_merge(t: &Ticket) -> bool {
     t.status == TicketStatus::Review
         && match t.review.turn {
-            Some(ReviewTurn::Merging) => true,
+            Some(ReviewTurn::Merging) => !waits_for_github(t),
             Some(ReviewTurn::Check) => t.review.recheck,
             _ => false,
         }
+}
+
+/// Whether `t` is merging through a pull request that waits for GitHub: open, its checks not
+/// passed yet (as last seen). Such a card is out of the line; it joins it when they passed.
+pub fn waits_for_github(t: &Ticket) -> bool {
+    t.review.turn == Some(ReviewTurn::Merging)
+        && t.pr.as_ref().is_some_and(|pr| !crate::pr::ready(pr))
 }
 
 /// Keeps the card's place in step with its state after a transition at `now`: a card that
@@ -308,6 +320,48 @@ mod tests {
                 .as_deref(),
             Some("accepted; waits for the release of 0.3.8")
         );
+    }
+
+    #[test]
+    fn a_card_whose_pull_request_waits_for_its_checks_is_out_of_the_line_until_they_passed() {
+        use crate::{CheckRun, CheckState, PullRequest};
+        let pr = |state| {
+            PullRequest::seen(
+                7,
+                "https://github.com/o/r/pull/7".to_owned(),
+                vec![CheckRun {
+                    name: "ci".to_owned(),
+                    state,
+                }],
+            )
+        };
+        // Before its pull request is open the card is in line: the turn pushes and opens it.
+        let mut t = card(1, 5, true);
+        assert!(in_merge(&t) && !waits_for_github(&t));
+        // Open, its checks running: it gives the turn back and waits for GitHub out of line.
+        t.pr = Some(pr(CheckState::Pending));
+        stamp(&mut t, Timestamp(8));
+        assert!(waits_for_github(&t));
+        assert_eq!(t.review.merge_line, None, "the turn is given back");
+        assert_eq!(Line::of(std::slice::from_ref(&t), &[]), Line::default());
+        // Its checks passed: it joins the line at the end, for the moment it merges.
+        t.pr = Some(pr(CheckState::Passed));
+        stamp(&mut t, Timestamp(9));
+        assert_eq!(
+            t.review.merge_line,
+            Some(LinePlace {
+                since: Timestamp(9),
+                holds: false
+            })
+        );
+        // No check ever reported and a person said "merge now": ready too.
+        t.pr = Some(PullRequest {
+            merge_unchecked: true,
+            ..PullRequest::seen(7, String::new(), Vec::new())
+        });
+        assert!(in_merge(&t));
+        t.pr = Some(PullRequest::seen(7, String::new(), Vec::new()));
+        assert!(!in_merge(&t), "no check yet: it waits");
     }
 
     #[test]

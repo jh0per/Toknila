@@ -90,13 +90,19 @@ fn an_open_pull_request_stays_on_the_card_and_the_ticker_only_looks_at_it() {
         (TicketStatus::Review, Some(ReviewTurn::Merging))
     );
     assert_eq!(a.pr, Some(pr(CheckState::Pending)));
+    assert_eq!(
+        a.review.merge_line, None,
+        "it gave the merge turn back while GitHub runs the checks"
+    );
 
     let keys = merges::poll(&mut mem).expect("poll");
     assert_eq!(keys.len(), 1);
     settle(&mut mem);
     let specs = asked(&mem);
     assert_eq!(specs.len(), 2);
+    assert!(specs[0].holds_turn, "pushing and opening holds the turn");
     assert_eq!(specs[1].watching, Some(pr(CheckState::Pending)));
+    assert!(!specs[1].holds_turn, "the ticker only looks");
 }
 
 #[test]

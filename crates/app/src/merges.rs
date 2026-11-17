@@ -4,6 +4,7 @@
 //! event for the ticket: `MergeDone`, or a block with a typed reason.
 
 use toknila_core::guard::ShipProblem;
+use toknila_core::merge_line::waits_for_github;
 use toknila_core::pr::PrSpec;
 use toknila_core::{
     Chain, MergeMode, MergeSpec, PullRequest, Recheck, ReviewTurn, ShipSpec, Ticket, TicketKey,
@@ -37,7 +38,8 @@ pub enum MergeOutcome {
     BaseConflict { detail: String },
     /// The base branch is checked out at `path` with local changes; nothing was changed.
     BaseCheckoutDirty { path: String },
-    /// Pull-request mode: the pull request is open and its checks have not all finished.
+    /// Pull-request mode: the pull request is open and this step did not merge it: its checks
+    /// have not all finished, or they passed and the step had no merge turn (or pushed new work).
     PrOpen { pr: PullRequest },
     /// Pull-request mode: the checks finished and these failed.
     CiFailed {
@@ -120,8 +122,14 @@ pub trait Merger: std::fmt::Debug {
 /// Runs one step of a merge on the host. When the step would push or merge the ship's work (a
 /// local merge, or opening the pull request) the work is looked at first: changes that are not
 /// committed, or a branch with nothing of its own, end the merge as a typed outcome and nothing
-/// is pushed. Watching a pull request that is already open does not look again.
+/// is pushed. Watching a pull request that is already open does not look again. A step that
+/// holds the merge turn brings the ship up to the base first (and checks it again when main
+/// moved since its check), also for a pull request that is open: the base may have moved while
+/// GitHub ran its checks. A step without the turn only looks at the pull request.
 pub(crate) fn run(host: &Host<'_>, spec: &MergeSpec) -> Result<MergeOutcome, MergeError> {
+    if spec.pr.as_ref().is_some_and(|pr| !pr.holds_turn) {
+        return host.merger.merge(spec);
+    }
     let watching = spec.pr.as_ref().is_some_and(|pr| pr.watching.is_some());
     if !watching {
         match ships::guard(host.yard, &spec.look) {
@@ -135,19 +143,17 @@ pub(crate) fn run(host: &Host<'_>, spec: &MergeSpec) -> Result<MergeOutcome, Mer
             }
         }
     }
-    if !watching {
-        // Accept on a ship that fell behind: the base goes into the ship first.
-        match host.merger.sync(&SyncSpec::of(spec))? {
-            SyncOutcome::Conflict { files, migrations } => {
-                return Ok(MergeOutcome::BaseConflict {
-                    detail: sync::conflict_text(&spec.look.start, &files, &migrations),
-                });
-            }
-            SyncOutcome::UpToDate | SyncOutcome::Merged { .. } => {}
+    // Accept on a ship that fell behind: the base goes into the ship first.
+    match host.merger.sync(&SyncSpec::of(spec))? {
+        SyncOutcome::Conflict { files, migrations } => {
+            return Ok(MergeOutcome::BaseConflict {
+                detail: sync::conflict_text(&spec.look.start, &files, &migrations),
+            });
         }
-        if let Some(moved) = main_moved(host, spec) {
-            return Ok(moved);
-        }
+        SyncOutcome::UpToDate | SyncOutcome::Merged { .. } => {}
+    }
+    if let Some(moved) = main_moved(host, spec) {
+        return Ok(moved);
     }
     host.merger.merge(spec)
 }
@@ -168,14 +174,16 @@ fn main_moved(host: &Host<'_>, spec: &MergeSpec) -> Option<MergeOutcome> {
 /// one that waits in it is queued when its turn comes ([`advance`]). A card without a ship (its
 /// project has no repository, or it never started) has nothing to merge: the host answers right
 /// away. In pull-request mode the spec says whether the pull request is already open (the card
-/// has one): then the host only looks at it.
+/// has one) and whether the step holds the turn: a card whose pull request waits for GitHub's
+/// checks is out of the line, and its step only looks. Returns whether a step was queued.
 pub(crate) fn queue_merge<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     chain: &Chain,
     ticket: &Ticket,
-) -> AppResult<()> {
-    if !ticket.review.merge_line.is_some_and(|p| p.holds) {
-        return Ok(());
+) -> AppResult<bool> {
+    let holds = ticket.review.merge_line.is_some_and(|p| p.holds);
+    if !holds && !waits_for_github(ticket) {
+        return Ok(false);
     }
     let project = uow
         .project(chain.project_id)?
@@ -192,7 +200,7 @@ pub(crate) fn queue_merge<U: UnitOfWork + ?Sized>(
             }
             .merge_spec(&ticket.title, &ship.path);
             if project.merge.mode == MergeMode::Github {
-                merge.pr = Some(PrSpec::for_ticket(&project, ticket));
+                merge.pr = Some(PrSpec::for_ticket(&project, ticket, holds));
             }
             // What the last check saw of main: Accept checks again when main is elsewhere now.
             merge.recheck = project
@@ -207,11 +215,13 @@ pub(crate) fn queue_merge<U: UnitOfWork + ?Sized>(
         ticket: ticket.id,
         spec,
     });
-    Ok(())
+    Ok(true)
 }
 
 /// The daemon's ticker: every card whose pull request is open and whose merge is running gets
-/// its pull request looked at again, after the commit. Returns the keys asked.
+/// its pull request looked at again, after the commit: one that waits for GitHub only looks, the
+/// one that holds the merge turn merges it. A card whose checks passed and that waits in the line
+/// for its turn is not asked. Returns the keys asked.
 pub fn poll<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Vec<TicketKey>> {
     let mut asked = Vec::new();
     for chain in uow.chains(None)? {
@@ -219,8 +229,8 @@ pub fn poll<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Vec<TicketKey>> {
             if t.status == TicketStatus::Review
                 && t.review.turn == Some(ReviewTurn::Merging)
                 && t.pr.is_some()
+                && queue_merge(uow, &chain, &t)?
             {
-                queue_merge(uow, &chain, &t)?;
                 asked.push(t.key);
             }
         }
