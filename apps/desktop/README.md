@@ -26,5 +26,11 @@ main workspace does not assume. CI builds it on macOS.
 `cargo xtask app` builds the local Mac bundle (`Toknila.app` and a `.dmg`, ad-hoc signed; see
 [docs/install.md](../../docs/install.md)). It bundles two sidecars next to the shell: `toknila` (the
 daemon) and `tok` (the command). The shell starts the daemon with the `PATH` of the login shell
-(`src/path.rs`), because Finder gives apps a bare one. Installers for other people (Developer ID,
-notarisation, other platforms) come later.
+(`src/path.rs`), because Finder gives apps a bare one.
+
+A release's app is built by `cargo xtask mac-release` on the maintainer's Mac: signed with the
+Developer ID under the hardened runtime, notarized and stapled (docs/install.md, "Signing and
+notarizing the Mac app"). `src-tauri/entitlements.plist` is what the shell may do under the
+hardened runtime: only `com.apple.security.device.audio-input`, for the microphone button. Add an
+entitlement there only with the reason in docs/install.md; a test in xtask pins the list.
+Installers for other platforms come later.

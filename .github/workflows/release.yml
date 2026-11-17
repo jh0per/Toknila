@@ -4,6 +4,13 @@ name: Release
 # GitHub release: the CLI archives, the macOS app (`.dmg`) and the files the in-app updater reads
 # (`.app.tar.gz`, `.sig`, `latest.json`). On main it only builds, so a release is never the first
 # build. Pull requests do not run these heavy builds; `ci.yml` covers them.
+#
+# Where the Mac app comes from is the repository variable MAC_APP_SOURCE (a variable, not a
+# secret). Unset or `ci`: CI builds and signs it here, as before. `release`: the maintainer's Mac
+# builds it, signs it with the Developer ID, notarizes it and uploads it to a draft release
+# (`cargo xtask mac-release`, the release's Build step); CI skips every Mac app step, so no running
+# step gets a signing secret, and `publish` takes the Mac files from that draft. See
+# docs/install.md, "Signing and notarizing the Mac app".
 on:
   push:
     tags: ["v*"]
@@ -25,6 +32,7 @@ env:
   CARGO_TERM_COLOR: always
   TAG: ${{ inputs.tag || github.ref_name }}
   RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+  MAC_APP_SOURCE: ${{ vars.MAC_APP_SOURCE || 'ci' }}
 
 jobs:
   build:
@@ -73,12 +81,13 @@ jobs:
       - name: cargo xtask dist
         run: cargo xtask dist ${{ matrix.target }}
 
-      # One signing identity for every Mac build, so macOS keeps the privacy permissions the
-      # owner granted across updates. With the three secrets the certificate goes into a
-      # temporary keychain and `cargo xtask app` signs with it (APPLE_SIGNING_IDENTITY); without
-      # them the app is signed ad hoc and the step says so. See docs/install.md, "Signing the Mac app".
+      # MAC_APP_SOURCE=ci only (the steps up to the app artifact): one signing identity for every
+      # Mac build, so macOS keeps the privacy permissions the owner granted across updates. With
+      # the three secrets the certificate goes into a temporary keychain and `cargo xtask app`
+      # signs with it (APPLE_SIGNING_IDENTITY); without them the app is signed ad hoc and the step
+      # says so. With MAC_APP_SOURCE=release the maintainer's Mac makes the app instead.
       - name: Import the signing certificate
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && env.MAC_APP_SOURCE != 'release'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -108,7 +117,7 @@ jobs:
       # The Mac app and its update archive. The archive is signed with the updater key on a
       # release only; on main there is no key in the build and the step says it skipped signing.
       - name: cargo xtask app
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && env.MAC_APP_SOURCE != 'release'
         run: cargo xtask app --target ${{ matrix.target }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ env.RELEASE == 'true' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
@@ -116,7 +125,7 @@ jobs:
 
       # Proves the signature. Fails when a signing secret was given and the app is still ad hoc.
       - name: Check the app signature
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && env.MAC_APP_SOURCE != 'release'
         shell: bash
         run: |
           # `cargo xtask app` writes the bundle to dist/app.
@@ -135,7 +144,7 @@ jobs:
           fi
 
       - name: Remove the signing keychain
-        if: always() && runner.os == 'macOS'
+        if: always() && runner.os == 'macOS' && env.MAC_APP_SOURCE != 'release'
         shell: bash
         run: |
           if [ -n "$KEYCHAIN" ]; then security delete-keychain "$KEYCHAIN" || true; fi
@@ -149,7 +158,7 @@ jobs:
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && env.MAC_APP_SOURCE != 'release'
         with:
           name: app-${{ matrix.target }}
           path: |
@@ -180,10 +189,12 @@ jobs:
           sha=$(gh api "repos/${{ github.repository }}/commits/$TAG" --jq .sha)
           python3 .github/scripts/wait_for_ci.py "${{ github.repository }}" "$sha"
 
+  # With MAC_APP_SOURCE=release it waits up to 60 minutes for the Mac files on the draft release.
   publish:
     needs: [build, wait-ci]
     if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: write
     steps:
@@ -201,22 +212,10 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Release notes and latest.json
+      - name: Release notes and body
         run: |
           cargo xtask release-notes "$TAG" > notes.md
           cat notes.md
-          cargo xtask latest-json dist "${TAG#v}" notes.md
-          cat dist/latest.json
-
-      - name: Checksums
-        working-directory: dist
-        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
-
-      - name: Publish release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          body=$(mktemp)
           {
             echo "## What changed"
             echo
@@ -227,6 +226,21 @@ jobs:
             echo "The Mac app is \`Toknila-${TAG#v}-aarch64.dmg\` (Apple silicon) or \`Toknila-${TAG#v}-x86_64.dmg\` (Intel). Installed apps update themselves."
             echo "The command-line archives are \`toknila-${TAG#v}-<platform>\`. Steps: [docs/install.md](https://github.com/${{ github.repository }}/blob/$TAG/docs/install.md)"
             echo
-            echo "The binaries are not notarised; on macOS download with curl or run \`xattr -dr com.apple.quarantine .\` in the unpacked folder."
-          } > "$body"
-          gh release create "$TAG" dist/* --title "Toknila $TAG" --notes-file "$body" --verify-tag
+            # Lower-cased: the `if:` expressions above compare the variable without case.
+            if [ "${MAC_APP_SOURCE,,}" = release ]; then
+              echo "The Mac app is signed with a Developer ID and notarized by Apple. The command-line binaries are not notarised; on macOS download them with curl or run \`xattr -dr com.apple.quarantine .\` in the unpacked folder."
+            else
+              echo "The binaries are not notarised; on macOS download with curl or run \`xattr -dr com.apple.quarantine .\` in the unpacked folder."
+            fi
+          } > body.md
+
+      # The Mac files from CI's build (ci) or from the draft the maintainer's Mac uploaded
+      # (release, waiting up to 60 minutes); then latest.json, SHA256SUMS.txt and the release,
+      # published last. Tested by .github/scripts/test_assemble_release.py (cargo xtask verify).
+      - name: Assemble and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 -B .github/scripts/assemble_release.py "$MAC_APP_SOURCE" "$TAG" dist notes.md body.md
+          cat dist/latest.json dist/SHA256SUMS.txt

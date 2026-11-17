@@ -167,6 +167,9 @@ A check you have never seen fail is a claim, not a check.
   runner its whole time limit; a deadline costs one failing test.
 - A test of an operating-system-specific failure is gated with `cfg(target_os = "...")`, and its
   comment says which system and why (a reset that only macOS reports, say).
+- When a test is gated by OS (`cfg(unix)`, `cfg(target_os = "macos")`), its helpers and imports
+  carry the same gate (`#[cfg(all(test, unix))]` on a test-only method): clippy runs with
+  `-D warnings` on Linux and Windows too, where a helper only gated tests use is dead code.
 - A test of a race asserts the invariant that holds whichever way the race goes (a GET answers
   with the list, a POST opens one connection), never that the race went one particular way.
 - A lock that tests share across processes (the pty turn in `crates/daemon/tests/support`) is

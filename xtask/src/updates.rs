@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::run;
+use crate::runner::{Cmd, Exec, Process, Redact, check};
 
 /// The Tauri CLI that signs. Pinned, so a release never depends on whatever is newest.
 const TAURI_CLI: &str = "@tauri-apps/cli@2.12.4";
@@ -18,9 +18,12 @@ const TAURI_CLI: &str = "@tauri-apps/cli@2.12.4";
 const KEY_ENV: &str = "TAURI_SIGNING_PRIVATE_KEY";
 const KEY_PATH_ENV: &str = "TAURI_SIGNING_PRIVATE_KEY_PATH";
 
+/// The GitHub repository the releases are published in.
+pub const REPO: &str = "jh0per/Toknila";
+
 /// Where the release files are published, for the `url` fields of `latest.json`.
 pub fn default_base_url(version: &str) -> String {
-    format!("https://github.com/jh0per/Toknila/releases/download/v{version}")
+    format!("https://github.com/{REPO}/releases/download/v{version}")
 }
 
 /// The updater's platform key for an architecture name (`aarch64`, `x86_64`).
@@ -171,6 +174,13 @@ pub fn release_notes(tag: &str) -> Result<String, String> {
     Ok(titles.iter().map(|t| format!("- {t}\n")).collect())
 }
 
+/// The official signer's command for `file`; the key comes from the environment the caller gives.
+pub fn signer(file: &Path, dir: &Path) -> Cmd {
+    Cmd::new("npx", dir)
+        .args(["--yes", TAURI_CLI, "signer", "sign"])
+        .path(file)
+}
+
 /// Signs `file` with the official signer and returns the signature, or `None` (with a line on
 /// stderr saying so) when no key is configured.
 pub fn sign(file: &Path, dir: &Path) -> Result<Option<String>, String> {
@@ -181,32 +191,31 @@ pub fn sign(file: &Path, dir: &Path) -> Result<Option<String>, String> {
         );
         return Ok(None);
     }
-    let file_s = file.to_string_lossy();
-    run("npx", &["--yes", TAURI_CLI, "signer", "sign", &file_s], dir)?;
-    let sig = PathBuf::from(format!("{file_s}.sig"));
+    check(&mut Process::new(Redact::default()), &signer(file, dir))?;
+    let sig = PathBuf::from(format!("{}.sig", file.to_string_lossy()));
     std::fs::read_to_string(&sig)
         .map(Some)
         .map_err(|e| format!("{}: {e}", sig.display()))
 }
 
-/// Packs `Toknila.app` from `out` into `Toknila-<version>-<arch>.app.tar.gz`, signs it and writes
-/// `latest.json` for that one architecture. Returns the archive path.
-pub fn package(out: &Path, version: &str, arch: &str) -> Result<PathBuf, String> {
+/// Packs `Toknila.app` from `out` into `Toknila-<version>-<arch>.app.tar.gz` and returns its path.
+pub fn pack(exec: &mut dyn Exec, out: &Path, version: &str, arch: &str) -> Result<PathBuf, String> {
     let archive = out.join(format!("Toknila-{version}-{arch}.app.tar.gz"));
     // The updater unpacks the archive and drops its first path component, so `Toknila.app` must
     // be the top folder. COPYFILE_DISABLE keeps bsdtar from adding `._` metadata files.
-    eprintln!("$ tar -czf {} Toknila.app", archive.display());
-    let status = Command::new("tar")
+    let tar = Cmd::new("tar", out)
         .env("COPYFILE_DISABLE", "1")
         .args(["-czf"])
-        .arg(&archive)
-        .arg("Toknila.app")
-        .current_dir(out)
-        .status()
-        .map_err(|e| format!("cannot run tar: {e}"))?;
-    if !status.success() {
-        return Err(format!("tar exited with {status}"));
-    }
+        .path(&archive)
+        .args(["Toknila.app"]);
+    check(exec, &tar)?;
+    Ok(archive)
+}
+
+/// Packs `Toknila.app` from `out` into `Toknila-<version>-<arch>.app.tar.gz`, signs it and writes
+/// `latest.json` for that one architecture. Returns the archive path.
+pub fn package(out: &Path, version: &str, arch: &str) -> Result<PathBuf, String> {
+    let archive = pack(&mut Process::new(Redact::default()), out, version, arch)?;
     let Some(signature) = sign(&archive, out)? else {
         return Ok(archive);
     };
