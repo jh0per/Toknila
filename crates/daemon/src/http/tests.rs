@@ -42,6 +42,7 @@ mod plans;
 mod prepare;
 mod profiles;
 mod questions;
+mod release_build;
 mod release_leaves;
 mod release_push;
 mod release_with;

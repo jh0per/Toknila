@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use toknila_app::checks::CheckLine;
 use toknila_app::{CheckSpec, Checker};
-use toknila_core::release_run::{ReleaseStep, bump_command};
+use toknila_core::release_run::{ReleaseStep, artifact_command, bump_command};
 use toknila_core::{ProjectId, ReleaseId};
 
 use crate::checker::ShellChecker;
@@ -23,6 +23,9 @@ mod publish;
 
 /// How long a push may take.
 const PUSH_LIMIT: Duration = Duration::from_secs(300);
+
+/// How long the Build step may take: a notarization alone can take many minutes.
+const BUILD_LIMIT: Duration = Duration::from_secs(4 * 60 * 60);
 
 /// Where a run reports its steps; an error stops the run (the journal could not be written).
 pub type Journal<'a> = &'a (dyn Fn(Entry) -> Result<(), String> + Sync);
@@ -40,6 +43,8 @@ pub struct Plan {
     pub tag: String,
     pub check: Option<String>,
     pub bump: Option<String>,
+    /// The command of the Build step, with `{version}` and `{tag}` still to be filled in.
+    pub artifact: Option<String>,
     /// Where the Push step sends the base and the tag, as the shipyard read it.
     pub remote: Option<Remote>,
     /// Every step the project's release has.
@@ -178,15 +183,39 @@ impl Ctx<'_> {
             ReleaseStep::Bump => self.bump(),
             ReleaseStep::Tag => self.tag(),
             ReleaseStep::Push => self.push(),
+            ReleaseStep::Build => {
+                // A build loads the machine: it takes a turn in the check line, but none in the
+                // merge line (the tag is made, cards may merge meanwhile).
+                let _turn = self.line.enter_release(self.plan.release);
+                self.build()
+            }
         }
     }
 
+    /// The artifact command in the worktree, moved to the tagged commit first: the base branch
+    /// may have moved on since (cards merge while a build runs, and a resumed run starts from
+    /// the base's tip).
+    fn build(&self) -> Result<String, String> {
+        let plan = self.plan;
+        let template = plan.artifact.as_deref().unwrap_or_default();
+        let commit = format!("refs/tags/{}^{{commit}}", plan.tag);
+        self.git
+            .run(&self.dir, &["checkout", "--quiet", "--detach", &commit])
+            .map_err(|e| format!("cannot check out {}: {e}", plan.tag))?;
+        let command = artifact_command(template, &plan.version, &plan.tag);
+        self.shell_within(&command, BUILD_LIMIT)
+    }
+
     fn shell(&self, command: &str) -> Result<String, String> {
+        self.shell_within(command, crate::checker::CHECK_TIMEOUT)
+    }
+
+    fn shell_within(&self, command: &str, limit: Duration) -> Result<String, String> {
         let spec = CheckSpec {
             command: command.to_owned(),
             dir: self.dir.clone(),
         };
-        match ShellChecker::default().run(&spec) {
+        match ShellChecker::new(limit).run(&spec) {
             Ok(r) if r.success => Ok(format!("$ {command}\n{}", r.output)),
             Ok(r) if r.timed_out => Err(format!("$ {command}\n{}\ntimed out", r.output)),
             Ok(r) => Err(format!(

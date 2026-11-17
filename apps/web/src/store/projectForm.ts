@@ -22,6 +22,8 @@ export interface ProjectForm {
   setup_command: string;
   /// The command a release runs to bump the version (`{version}` is the version).
   bump_command: string;
+  /// The command a release runs on this computer after the tag (`{version}`, `{tag}`).
+  artifact_command: string;
   worker_model: string;
   reviewer_model: string;
   planner_model: string;
@@ -54,6 +56,7 @@ export function formOf(p: Project): ProjectForm {
     extra_checks: (p.extra_checks ?? []).map((e) => ({ paths: e.paths.join(", "), command: e.command })),
     setup_command: p.setup_command ?? "",
     bump_command: p.bump_command ?? "",
+    artifact_command: p.artifact_command ?? "",
     worker_model: p.worker_model ?? "",
     reviewer_model: p.reviewer_model ?? "",
     planner_model: p.planner_model ?? "",
@@ -70,7 +73,7 @@ export function formOf(p: Project): ProjectForm {
   };
 }
 
-const TEXT = ["work_branch", "check_command", "setup_command", "bump_command", "worker_model", "reviewer_model", "planner_model", "pr_title"] as const;
+const TEXT = ["work_branch", "check_command", "setup_command", "bump_command", "artifact_command", "worker_model", "reviewer_model", "planner_model", "pr_title"] as const;
 
 /// The form with its text fields trimmed, as Save sends them.
 export function tidy(f: ProjectForm): ProjectForm {
@@ -99,6 +102,7 @@ export function patchOf(f: ProjectForm): PatchProject {
     extra_checks: t.extra_checks.map((r) => ({ paths: pathsOf(r.paths), command: r.command })),
     setup_command: t.setup_command,
     bump_command: t.bump_command,
+    artifact_command: t.artifact_command,
     worker_model: t.worker_model,
     reviewer_model: t.reviewer_model,
     planner_model: t.planner_model,
@@ -131,6 +135,7 @@ export function sectionOfField(field: string): ProjectSection {
     case "extra_checks":
     case "setup_command":
     case "bump_command":
+    case "artifact_command":
     case "command_policy":
     case "allowed_commands":
     case "worker_model":

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use toknila_api_types::{ReleaseRun, RunState, StepState};
 use toknila_app::{AppError, merges, releases, resolve};
-use toknila_core::release_run::{ReleaseStep, check_line_words};
+use toknila_core::release_run::{ReleaseStep, check_line_words, command_words};
 use toknila_core::{Actor, ProjectId, ReleaseId};
 
 use super::{ApiResult, read};
@@ -143,6 +143,35 @@ async fn failed(state: &AppState, run: (ReleaseId, ProjectId), error: String) {
         .await;
 }
 
+/// The Build step reads with the first words of the project's artifact command (`Build:
+/// ./release-mac.sh`), so a person sees what runs.
+fn name_build(repo: &Repo<'_>, release: ReleaseId, run: &mut ReleaseRun) -> ApiResult<()> {
+    if !run.steps.iter().any(|s| s.step == ReleaseStep::Build) {
+        return Ok(());
+    }
+    let Some(r) = repo.release(release)? else {
+        return Ok(());
+    };
+    let Some(project) = repo
+        .chain(r.chain_id)?
+        .and_then(|c| repo.project(c.project_id).ok().flatten())
+    else {
+        return Ok(());
+    };
+    let words = project
+        .artifact_command
+        .as_deref()
+        .filter(|c| !c.trim().is_empty())
+        .map(command_words);
+    if let (Some(words), Some(step)) = (
+        words,
+        run.steps.iter_mut().find(|s| s.step == ReleaseStep::Build),
+    ) {
+        step.label = format!("{}: {words}", step.step.label());
+    }
+    Ok(())
+}
+
 /// `run` as a person reads it while it goes: the step that cannot start says what it waits
 /// for, its run's turn in the merge line or its Check's turn in the machine's check line.
 pub(super) fn with_waits(
@@ -151,6 +180,7 @@ pub(super) fn with_waits(
     release: ReleaseId,
     mut run: ReleaseRun,
 ) -> ApiResult<ReleaseRun> {
+    name_build(repo, release, &mut run)?;
     if run.state != RunState::Running {
         return Ok(run);
     }
@@ -168,10 +198,9 @@ pub(super) fn with_waits(
         }
         return Ok(run);
     }
-    let check = run
-        .steps
-        .iter_mut()
-        .find(|s| s.step == ReleaseStep::Check && s.state == StepState::Running);
+    let check = run.steps.iter_mut().find(|s| {
+        matches!(s.step, ReleaseStep::Check | ReleaseStep::Build) && s.state == StepState::Running
+    });
     if let Some(step) = check
         && let Some((place, held)) = checks.place_release(release).filter(|(n, _)| *n > 0)
     {

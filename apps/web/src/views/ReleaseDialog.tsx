@@ -9,6 +9,7 @@ const LABEL: Record<ReleaseStep, string> = {
   bump: "Bump the version",
   tag: "Tag",
   push: "Push",
+  build: "Build",
 };
 
 const MARK = { pending: "○", running: "…", done: "✓", failed: "✗", interrupted: "⏸" } as const;
@@ -32,9 +33,11 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
   const interrupted = r.run?.state === "interrupted";
   const from = interrupted && r.run?.resume_from ? LABEL[r.run.resume_from] : undefined;
   const offer = r.offer;
-  // Only the push failed: the tag is made and stays; the run goes on from the push.
-  const pushFailed = r.run?.state === "failed" && r.run.steps.some((s) => s.step === "push" && s.state === "failed");
-  const resume = interrupted || pushFailed;
+  // Only the push or the build failed: the tag is made and stays; the run goes on from there.
+  const failedAfterTag = r.run?.state === "failed" ? r.run.steps.find((s) => (s.step === "push" || s.step === "build") && s.state === "failed") : undefined;
+  const pushFailed = failedAfterTag?.step === "push";
+  const buildFailed = failedAfterTag?.step === "build";
+  const resume = interrupted || !!failedAfterTag;
   const push = releasePush(r);
   const fixed = running || done || resume || !!r.run;
   return (
@@ -69,7 +72,7 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
             <p className="muted" data-testid="release-no-remote">no remote: the tag stays local</p>
           )}
           <ol className="release-steps" data-testid="release-steps">
-            {(r.run?.steps ?? plannedSteps(r).map((step) => ({ step, label: LABEL[step], state: "pending" as const, output: "" }))).map((s) => (
+            {(r.run?.steps ?? plannedSteps(r).map((step) => ({ step, label: step === "build" && offer.build ? `${LABEL[step]}: ${offer.build}` : LABEL[step], state: "pending" as const, output: "" }))).map((s) => (
               <li key={s.step} data-step={s.step} data-state={s.state}>
                 <b>{MARK[s.state]} {s.label}{"wait" in s && s.wait ? `: ${s.wait}` : ""}</b>
                 {s.output && <pre className="output">{s.step === "push" ? withLinks(s.output) : s.output}</pre>}
@@ -103,7 +106,7 @@ export function ReleaseDialog({ chain: id, state, dispatch }: { chain: string; s
             disabled={!offer || !offer.releasable || running || !r.version.trim()}
             onClick={() => dispatch({ type: "startRelease", chain: id, version: r.version, push, ...(resume ? { resume: true } : {}) })}
           >
-            {pushFailed ? "Push again" : interrupted ? `Run again from ${from ?? "the start"}` : r.run?.state === "failed" ? "Release again" : "Release"}
+            {pushFailed ? "Push again" : buildFailed ? "Build again" : interrupted ? `Run again from ${from ?? "the start"}` : r.run?.state === "failed" ? "Release again" : "Release"}
           </button>
         )}
         <button type="button" className="btn" data-testid="release-close" onClick={() => dispatch({ type: "closeDialog" })}>

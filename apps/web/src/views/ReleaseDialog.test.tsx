@@ -93,6 +93,28 @@ describe("the Release dialog's push checkbox", () => {
     expect(merging).not.toContain("Tag:");
   });
 
+  it("lists Build last with the command's first words, after the push when there is one", () => {
+    const withBuild = offer({ steps: ["tag", "push", "build"], build: "./scripts/release-mac.sh --notarize" });
+    const html = render({ offer: withBuild });
+    expect(html).toContain("Build: ./scripts/release-mac.sh --notarize");
+    expect(html.indexOf('data-step="push"')).toBeLessThan(html.indexOf('data-step="build"'));
+    expect(plannedSteps({ ...initialRelease, offer: withBuild })).toEqual(["tag", "push", "build"]);
+    expect(plannedSteps({ ...initialRelease, offer: withBuild, push: false })).toEqual(["tag", "build"]);
+  });
+
+  it("offers Build again, not Release again, when only the build failed", () => {
+    const failed: ReleaseRun = {
+      release: "r1", version: "0.3.4", tag: "v0.3.4", state: "failed", error: "Build failed: exit code 1",
+      steps: [
+        { step: "tag", label: "Tag", state: "done", output: "Tagged v0.3.4" },
+        { step: "build", label: "Build: make dist", state: "failed", output: "exit code 1" },
+      ],
+    };
+    const html = render({ offer: offer({ steps: ["tag", "build"], build: "make dist" }), run: failed });
+    expect(html).toMatch(/data-testid="release-confirm"[^>]*>Build again</);
+    expect(html).toContain("Build: make dist");
+  });
+
   it("derives the choice from the offer in the store", () => {
     expect(releasePush({ ...initialRelease, offer: offer({ push: true }) })).toBe(true);
     expect(releasePush({ ...initialRelease, offer: offer({ remote: null, push: true }) })).toBe(false);

@@ -200,6 +200,7 @@ mod tests {
             extra_checks: Vec::new(),
             setup_command: None,
             bump_command: None,
+            artifact_command: None,
             worker_model: None,
             reviewer_model: None,
             planner_model: None,

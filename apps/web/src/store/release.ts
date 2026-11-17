@@ -34,7 +34,10 @@ export function releasePush(r: ReleaseUi): boolean {
 /// The steps the dialog lists before the click: the offer's, with the push as the box says.
 export function plannedSteps(r: ReleaseUi): ReleaseStep[] {
   const steps = (r.offer?.steps ?? []).filter((s) => s !== "push");
-  return releasePush(r) ? [...steps, "push"] : steps;
+  if (!releasePush(r)) return steps;
+  // The push goes before the build, which is always last.
+  const at = steps.indexOf("build");
+  return at < 0 ? [...steps, "push"] : [...steps.slice(0, at), "push", ...steps.slice(at)];
 }
 
 /// What the person did.
