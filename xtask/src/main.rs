@@ -1,7 +1,9 @@
 //! `cargo xtask <task>`: repository automation that must behave the same locally and in CI.
 //!
-//! - `verify`: fmt check, clippy with warnings denied, tests, architecture guards.
-//! - `guards`: architecture guards only (see [`guards`]).
+//! - `verify`: fmt check, clippy with warnings denied, tests, the workflow scripts' tests,
+//!   architecture guards.
+//! - `guards`: architecture guards only (see [`guards`]); `scripts`: the scripts' tests only
+//!   (see [`pytests`]).
 //! - `web`: install `apps/web`, check its generated API types, run its reducer tests, type-check
 //!   and build it (needs Node), so the daemon embeds it.
 //!   Run it before `verify` or a release build; CI does.
@@ -14,6 +16,8 @@
 //! - `dist <target>`: release archive for one target triple in `dist/` (web page embedded).
 //! - `app [--target <triple>]`: the macOS `Toknila.app`, `.dmg` and the signed update archive
 //!   (see [`app`] and [`updates`]).
+//! - `mac-release <tag> [--no-upload]`: the release's Mac files, signed with the Developer ID,
+//!   notarized and uploaded from the maintainer's Mac (see [`mac_release`]).
 //! - `bump <X.Y.Z>`: set the version everywhere, regenerate locks and the API document.
 //! - `latest-json`, `release-notes`: the release's updater manifest and notes (CI uses them).
 //! - `desktop`: build the Tauri shell in `apps/desktop` with `toknila` as its sidecar, and run
@@ -29,6 +33,12 @@ mod css_guard;
 mod e2e;
 mod guards;
 mod leaks;
+mod mac_release;
+mod mac_settings;
+mod mac_sign;
+mod mac_upload;
+mod pytests;
+mod runner;
 mod shots;
 mod testrun;
 mod updates;
@@ -54,6 +64,8 @@ fn main() -> ExitCode {
         "dist" => dist(std::env::args().nth(2)),
         "desktop" => desktop(),
         "app" => app::app(),
+        "mac-release" => mac_release::mac_release(),
+        "scripts" => app::root().and_then(|root| pytests::run(&root)),
         "bump" => bump::bump(std::env::args().nth(2)),
         "latest-json" => updates::latest_json_cmd(&std::env::args().skip(2).collect::<Vec<_>>()),
         "release-notes" => std::env::args()
@@ -63,7 +75,7 @@ fn main() -> ExitCode {
             .map(|notes| print!("{notes}")),
         _ => {
             eprintln!(
-                "usage: cargo xtask <verify|guards|web|e2e-web|guide-shots|desktop|app [--target <triple>]|dist <target>|bump <X.Y.Z>|latest-json|release-notes <tag>>"
+                "usage: cargo xtask <verify|guards|scripts|web|e2e-web|guide-shots|desktop|app [--target <triple>]|mac-release <tag> [--no-upload]|dist <target>|bump <X.Y.Z>|latest-json|release-notes <tag>>"
             );
             return ExitCode::from(2);
         }
@@ -90,6 +102,7 @@ fn verify_in(root: &std::path::Path) -> Result<(), String> {
             cargo(&[clippy.as_slice(), &["--", "-D", "warnings"]].concat())
         })?;
         t.phase("tests", || testrun::cargo_test(&cargo_bin(), root))?;
+        t.phase("scripts", || pytests::run(&app::root()?))?;
         t.phase("guards", guards)?;
         t.phase("leaks", || leaks::check(Some(root), Duration::from_secs(5)))
     })();
@@ -303,7 +316,7 @@ fn desktop() -> Result<(), String> {
     // The window shows the page the daemon embeds.
     web()?;
     cargo(&["build", "--locked", "--bin", "toknila", "--bin", "tok"])?;
-    app::stage_sidecars(&root, "debug", None)?;
+    app::stage_sidecars(&root, "debug", None, None)?;
     let manifest = app::shell_dir(&root).join("Cargo.toml");
     let manifest = manifest.to_string_lossy();
     cargo(&["fmt", "--manifest-path", &manifest, "--check"])?;

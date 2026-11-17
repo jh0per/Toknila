@@ -75,7 +75,8 @@ class WaitForCi(unittest.TestCase):
                 [sys.executable, SCRIPT, "acme/toknila", SHA],
                 capture_output=True, text=True, env=env, timeout=60,
             )
-            calls = int(open(os.path.join(d, "calls")).read())
+            with open(os.path.join(d, "calls")) as f:
+                calls = int(f.read())
             return p.returncode, p.stdout.strip().splitlines(), calls
 
     def test_success(self):
