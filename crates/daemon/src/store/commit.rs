@@ -94,8 +94,8 @@ impl Store {
                 // after the commit: the line holds the hand-ins in the order they committed,
                 // whichever effect task reaches the host first.
                 for effect in &deferred {
-                    if let ExternalEffect::RunCheck { ticket, .. } = effect {
-                        line.join(*ticket);
+                    if let ExternalEffect::RunCheck { ticket, kind, .. } = effect {
+                        line.join(*ticket, *kind);
                     }
                 }
                 // The effects start here too, counted before this job returns, so no await

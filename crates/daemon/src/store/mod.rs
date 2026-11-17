@@ -11,6 +11,7 @@ mod commit;
 mod conversation;
 mod error;
 mod external;
+mod machine;
 mod migrations;
 mod notes;
 mod pins;
@@ -29,6 +30,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use machine::MAX_CHECKS;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -176,7 +178,19 @@ impl Store {
         let backups = path.parent().unwrap_or(Path::new("")).join("backups");
         backup::check(&conn, path, &backups)?;
         migrations::migrate(&mut conn, &backups, &migrations::all()?)?;
-        Ok(Self::spawn(conn, path.to_owned()))
+        let max_checks = conn
+            .query_row(
+                "SELECT value FROM app_settings WHERE key = ?1",
+                [MAX_CHECKS],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()?
+            .and_then(|v| v.parse::<u32>().ok());
+        let store = Self::spawn(conn, path.to_owned());
+        if let Some(n) = max_checks {
+            store.line.set_max_checks(n);
+        }
+        Ok(store)
     }
 
     fn spawn(mut conn: Connection, path: PathBuf) -> Store {
@@ -199,7 +213,7 @@ impl Store {
             yard: None,
             merger: Arc::new(external::NoMerger),
             checker: Arc::new(crate::checker::ShellChecker::default()),
-            line: Arc::default(),
+            line: crate::check_line::machine_line(),
             runner: Arc::new(NoRunner),
             tasks: settle::Tasks::new(),
             hook: commit::Hook::default(),

@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Actor, Chain, Project, ReviewMode, Ticket, Timestamp};
+use super::{Actor, Chain, LoadHold, Project, ReviewMode, Ticket, Timestamp};
 
 /// A reviewer's decision about the work.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -212,8 +212,13 @@ pub enum ReviewTurn {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "phase", rename_all = "snake_case")]
 pub enum CheckPhase {
-    /// Another check runs; this one is the `place`-th in line (1 is next).
-    Queued { place: u32 },
+    /// Another check runs, or the machine is too busy; this one is the `place`-th in line (1 is
+    /// next). `held` is set when it is next but waits for the machine's load to fall.
+    Queued {
+        place: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        held: Option<LoadHold>,
+    },
     /// Its turn came: the base branch is being brought into the ship.
     Syncing,
     /// The project's check command runs on the ship, since `since`.

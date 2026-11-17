@@ -8,6 +8,7 @@ mod comment;
 mod extra_check;
 mod ids;
 mod keys;
+mod load_hold;
 mod patch;
 mod paused;
 mod profile;
@@ -40,6 +41,7 @@ pub use ids::{
     ThreadMessageId, ThreadVersionId, TicketId,
 };
 pub use keys::{KeyError, ProjectKey, TicketKey};
+pub use load_hold::LoadHold;
 pub use patch::{SubtaskEdit, TicketPatch};
 pub use paused::PausedAgent;
 pub use profile::{

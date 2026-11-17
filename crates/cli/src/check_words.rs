@@ -7,8 +7,11 @@ use toknila_core::CheckPhase;
 pub fn check_words(phase: Option<&CheckPhase>, now_ms: i64) -> String {
     let what = match phase {
         None => "starting".to_owned(),
-        Some(CheckPhase::Queued { place: 1 }) => "queued, next in line".to_owned(),
-        Some(CheckPhase::Queued { place }) => format!("queued, #{place} in line"),
+        Some(CheckPhase::Queued {
+            held: Some(held), ..
+        }) => held.words(),
+        Some(CheckPhase::Queued { place: 1, .. }) => "queued, next in line".to_owned(),
+        Some(CheckPhase::Queued { place, .. }) => format!("queued, #{place} in line"),
         Some(CheckPhase::Syncing) => "syncing with main".to_owned(),
         Some(CheckPhase::Running { command, since }) => {
             let secs = (now_ms - since.0).max(0) / 1000;
@@ -53,12 +56,38 @@ mod tests {
             "being checked: syncing with main"
         );
         assert_eq!(
-            words(Some(CheckPhase::Queued { place: 1 }), 0),
+            words(
+                Some(CheckPhase::Queued {
+                    place: 1,
+                    held: None
+                }),
+                0
+            ),
             "being checked: queued, next in line"
         );
         assert_eq!(
-            words(Some(CheckPhase::Queued { place: 3 }), 0),
+            words(
+                Some(CheckPhase::Queued {
+                    place: 3,
+                    held: None
+                }),
+                0
+            ),
             "being checked: queued, #3 in line"
+        );
+        let held = toknila_core::LoadHold {
+            load: 41,
+            cores: 16,
+        };
+        assert_eq!(
+            words(
+                Some(CheckPhase::Queued {
+                    place: 1,
+                    held: Some(held)
+                }),
+                0
+            ),
+            "being checked: waits for the machine: load 41 on 16 cores"
         );
         assert_eq!(words(None, 0), "being checked: starting");
     }

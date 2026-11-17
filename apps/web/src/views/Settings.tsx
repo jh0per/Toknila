@@ -4,12 +4,13 @@ import { type State, currentProject } from "../store/state";
 import { trustFacts } from "../store/trustAsked";
 import { About } from "./About";
 import { Checks } from "./Checks";
+import { MachineSettings } from "./MachineSettings";
 import { ProfilesSettings } from "./ProfilesSettings";
 import { ProjectSettings } from "./ProjectSettings";
 import { TrustNote } from "./TrustNote";
 import { UpdatesSettings } from "./UpdatesSettings";
 
-const TITLE = { projects: "Projects", profiles: "Agents", updates: "Updates", about: "About", checks: "System checks" } as const;
+const TITLE = { projects: "Projects", profiles: "Agents", machine: "Machine", updates: "Updates", about: "About", checks: "System checks" } as const;
 
 /// Settings: one page of the flat list (Projects, Agents, Updates, About, System checks), shown
 /// beside the settings sidebar. Each page and each project section has an address of its own
@@ -24,6 +25,7 @@ export function Settings({ state, dispatch }: { state: State; dispatch: (i: Inte
         <h1>{TITLE[page]}</h1>
         {isProjectSection(section) && <ProjectSettings state={state} dispatch={dispatch} project={project} section={section} />}
         {section === "profiles" && <ProfilesSettings state={state} dispatch={dispatch} />}
+        {section === "machine" && <MachineSettings />}
         {section === "updates" && <UpdatesSettings state={state} dispatch={dispatch} />}
         {section === "about" && <About state={state} dispatch={dispatch} />}
         {section === "checks" && (

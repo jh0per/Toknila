@@ -15,8 +15,10 @@ use crate::sync::{SyncOutcome, SyncSpec};
 use crate::{AppResult, ChainTx, Reader, UnitOfWork, projects, reviews};
 
 mod extra;
+mod line;
 mod retry;
 pub use extra::{ExtraRun, Ran};
+pub use line::{CheckKind, CheckLine, Load, LoadReader, NoLoad, Standing, Turn};
 pub use retry::{Attempt, run_twice};
 
 /// The most characters of a check's output a round and the worker's instruction keep (the end of
@@ -73,11 +75,12 @@ pub trait Checker: std::fmt::Debug {
 pub trait CheckTurn {}
 impl<T> CheckTurn for T {}
 
-/// The line the checks of a machine stand in: only one runs at a time, across projects.
+/// The line the checks of a machine stand in: the machine's `max_checks` run at a time, across
+/// projects.
 pub trait CheckGate: std::fmt::Debug + Sync {
     /// The card joins the line (when it is not in it) and waits for its turn; the turn lasts
     /// until the returned guard is dropped.
-    fn enter(&self, ticket: TicketId) -> Box<dyn CheckTurn + '_>;
+    fn enter(&self, ticket: TicketId, kind: CheckKind) -> Box<dyn CheckTurn + '_>;
 }
 
 /// A gate with no line: every check starts at once (tests of the use cases, no host).
@@ -85,7 +88,7 @@ pub trait CheckGate: std::fmt::Debug + Sync {
 pub struct OpenGate;
 
 impl CheckGate for OpenGate {
-    fn enter(&self, _ticket: TicketId) -> Box<dyn CheckTurn + '_> {
+    fn enter(&self, _ticket: TicketId, _kind: CheckKind) -> Box<dyn CheckTurn + '_> {
         Box::new(())
     }
 }
@@ -117,14 +120,14 @@ impl CheckProgress for NoProgress {
 /// the command, and reports each stage on the way. Touches no database.
 pub(crate) fn run_on_host(
     host: &Host<'_>,
-    ticket: TicketId,
+    (ticket, kind): (TicketId, CheckKind),
     (spec, extras): (Option<CheckSpec>, &[ExtraCheck]),
     sync: Option<&SyncSpec>,
     outcomes: &mut Vec<ExternalOutcome>,
 ) {
     let mut ran = Ran::default();
-    // One check at a time on the machine: wait for the turn, hold it until done.
-    let _turn = host.gate.enter(ticket);
+    // Only `max_checks` at a time on the machine: wait for the turn, hold it until done.
+    let _turn = host.gate.enter(ticket, kind);
     let synced = match sync {
         Some(sync) => {
             host.progress.stage(ticket, CheckStage::Syncing);
@@ -215,8 +218,15 @@ fn queue_for<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket) -> AppResult<()> {
         _ => None,
     };
     let dir = ship.map(|s| s.path);
+    // An Accept's re-check (main moved) goes ahead of the hand-ins: a person waits for it.
+    let kind = if t.review.recheck {
+        CheckKind::Recheck
+    } else {
+        CheckKind::HandIn
+    };
     uow.defer(ExternalEffect::RunCheck {
         ticket,
+        kind,
         spec: project
             .check_command
             .zip(dir)
