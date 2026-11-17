@@ -304,6 +304,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/machine/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many hand-in checks may run at once on this machine. */
+        get: operations["get_machine_settings"];
+        /**
+         * Sets how many hand-in checks may run at once (at least 1); it applies to the line at once and
+         *     is kept across restarts.
+         */
+        put: operations["put_machine_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/planner/activity": {
         parameters: {
             query?: never;
@@ -2281,6 +2302,7 @@ export interface components {
          *     `Running`; `Queued` is the daemon's line, added when the card is shown.
          */
         CheckPhase: {
+            held?: components["schemas"]["LoadHold"] | null;
             /** @enum {string} */
             phase: "queued";
             /** Format: int32 */
@@ -2783,6 +2805,34 @@ export interface components {
             /** @description File name in the profiles folder; `None` for a built-in profile. */
             file?: string | null;
             profile: components["schemas"]["AgentProfile"];
+        };
+        /**
+         * @description The machine's one-minute load average is at or above its core count, so a further check
+         *     waits.
+         */
+        LoadHold: {
+            /**
+             * Format: int32
+             * @description The number of CPU cores.
+             */
+            cores: number;
+            /**
+             * Format: int32
+             * @description The one-minute load average, rounded.
+             */
+            load: number;
+        };
+        /**
+         * @description `GET` and `PUT /v1/machine/settings`: what the daemon does on this machine, whichever the
+         *     project.
+         */
+        MachineSettings: {
+            /**
+             * Format: int32
+             * @description How many hand-in checks may run at once (at least 1; the default 1). A further one
+             *     starts only while the one-minute load average is below the number of CPU cores.
+             */
+            max_checks: number;
         };
         /** @description Body of `POST /v1/chains/{chain}/release/mark`: a person says an epic shipped in an old tag. */
         MarkRelease: {
@@ -5517,6 +5567,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventRecord"][];
+                };
+            };
+        };
+    };
+    get_machine_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MachineSettings"];
+                };
+            };
+        };
+    };
+    put_machine_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MachineSettings"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MachineSettings"];
                 };
             };
         };

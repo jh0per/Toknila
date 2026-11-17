@@ -23,6 +23,13 @@ pub enum DaemonCmd {
     Stop,
     /// Show whether the daemon is running, and where.
     Status,
+    /// Change the daemon's machine settings (without a flag: show them).
+    Set {
+        /// How many hand-in checks may run at once (default 1). A further one starts only while
+        /// the one-minute load average is below the number of CPU cores.
+        #[arg(long, value_name = "N")]
+        max_checks: Option<u32>,
+    },
     /// Run the daemon in the foreground (what `start` launches).
     Run {
         /// Stop (agents included) when stdin, a pipe the parent holds open, closes.
@@ -83,7 +90,28 @@ pub fn run(cmd: DaemonCmd, json: bool) -> Result<()> {
             print_status(&paths, info.as_ref(), json);
             Ok(())
         }
+        DaemonCmd::Set { max_checks } => set(&paths, max_checks, json),
     }
+}
+
+/// `daemon set --max-checks N`: the machine settings, through the running daemon.
+fn set(paths: &Paths, max_checks: Option<u32>, json: bool) -> Result<()> {
+    if max_checks == Some(0) {
+        bail!("--max-checks must be at least 1");
+    }
+    let client = crate::client::connect(paths)?;
+    let settings = match max_checks {
+        Some(max_checks) => {
+            client.set_machine_settings(&toknila_api_types::MachineSettings { max_checks })?
+        }
+        None => client.machine_settings()?,
+    };
+    if json {
+        println!("{}", serde_json::to_string(&settings)?);
+    } else {
+        println!("checks at once: {}", settings.max_checks);
+    }
+    Ok(())
 }
 
 fn print_status(paths: &Paths, info: Option<&DaemonInfo>, json: bool) {

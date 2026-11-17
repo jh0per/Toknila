@@ -12,6 +12,7 @@ mod body;
 mod chains;
 mod events;
 mod inbox;
+mod machine;
 mod planner;
 mod plans;
 mod projects;

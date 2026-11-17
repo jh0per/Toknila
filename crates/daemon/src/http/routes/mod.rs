@@ -8,6 +8,7 @@ pub mod conversation;
 pub mod designs;
 pub mod events;
 pub mod inbox;
+pub mod machine;
 pub mod pins;
 pub mod plan_view;
 pub mod planner_activity;
@@ -62,7 +63,7 @@ fn scrollback_response(chunk: crate::runner::Chunk) -> Response {
 /// began (a card's place in it is part of its detail). Reads as the price table.
 struct Pricing {
     prices: PriceTable,
-    checks: Vec<TicketId>,
+    checks: toknila_app::checks::Standing,
 }
 
 impl std::ops::Deref for Pricing {
@@ -74,7 +75,7 @@ impl std::ops::Deref for Pricing {
 
 /// The time of a command, and the prices its answer is costed with.
 fn stamp(state: &AppState) -> (Timestamp, Pricing) {
-    let checks = state.store.check_line().snapshot();
+    let checks = state.store.check_line().standing();
     (
         now(),
         Pricing {
@@ -116,13 +117,10 @@ fn load_ticket_detail(
     let ship = repo.ship(t.id)?;
     let mut review = toknila_app::reviews::view(repo, &t)?;
     if review.awaiting == Some(toknila_core::ReviewTurn::Check) {
-        review.check_queue = prices
-            .checks
-            .iter()
-            .position(|c| *c == t.id)
-            .and_then(|i| u32::try_from(i).ok());
-        if let Some(place) = review.check_queue.filter(|p| *p > 0) {
-            review.check = Some(toknila_core::CheckPhase::Queued { place });
+        let stand = prices.checks.place(t.id);
+        review.check_queue = stand.map(|(place, _)| place);
+        if let Some((place, held)) = stand.filter(|(place, _)| *place > 0) {
+            review.check = Some(toknila_core::CheckPhase::Queued { place, held });
         }
     }
     let rows = repo.usage_rows(RowFilter {
