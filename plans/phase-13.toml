@@ -1,0 +1,115 @@
+# Phase 13: the release tail and a Mac app that opens without a warning. Agreed with the owner on
+# 2026-11-17 ("тоді ок"): the tail the runs of phases 11 and 12 left (a release and merges race, an
+# accepted card's re-check chases main, a round names the wrong command, two tests read an agent's
+# output once), and the Mac app signed and notarized on the owner's Mac by the release itself, so
+# that no signing secret has to live on GitHub. The first steps toward a public release.
+# Import: tok chain import plans/phase-13.toml --project TOKNILA
+#
+# `after` names the cards whose files a card shares; a card without `after` may run at once.
+
+[chain]
+name = "phase-13"
+title = "A release that takes its turn, and a Mac app that opens"
+goal = "A release and the merges never race, a check round says what failed, and the release builds, signs and notarizes the Mac app on the maintainer's Mac"
+autostart = true
+version = "0.3.8"
+
+[[ticket]]
+id = "one-merge-line"
+title = "Merges and a release take turns: one merge line per project"
+model = "opus"
+prompt = """
+What happened (16 and 17 November 2026). The release of 0.3.6 took three attempts: its Tag step refused "main moved while the release ran; nothing was tagged. Release again" (`Ctx::tag` in crates/daemon/src/releaser.rs, when `GitMerger::advance_base` answers false) because a card accepted during the release's Check merged at once. The night before, the release's Check ran beside a card's check on a machine at load 150 and failed on a timing test: the release's Check does not use the machine-wide check line (`Ctx::run` → `Ctx::shell` builds a `CheckSpec` and calls `ShellChecker::default().run` directly). And an accepted card's re-check chased main: TOKNILA-152 was accepted, its re-check at Accept (TOKNILA-130) ran, another card merged meanwhile, so it re-checked again ("main moved since the check: 1 commit", then "8 commits").
+
+Today nothing orders merges: each accepted card runs `merges::run` (crates/app/src/merges.rs: ship guard, `merger.sync`, `main_moved`, `merger.merge`) on its own; only `GitMerger` (crates/daemon/src/merger.rs) guards the base with a compare-and-swap and three attempts. The check line is `CheckLine` in crates/app/src/checks/line.rs (`max_checks`, `LoadReader`, `CheckKind::{HandIn, Recheck}`, entered through `host.gate.enter(ticket, kind)` in `checks::run_on_host`); `SystemLoad` and `machine_line()` are in crates/daemon/src/check_line.rs.
+
+Build this.
+
+1. One merge line per project (crates/app, beside the check line; pure ordering rules in core if they are pure). An accepted card takes a turn in it for the whole of "sync with main, re-check when main moved, merge": while it holds the turn no other card of the project merges, so its re-check is against a main that stays. Cards wait in the order they were accepted. A release run takes a turn in the same line from its start until its Tag (and Push when it pushes) ended or failed: no card merges while a release runs, and a release waits for the turn in progress to end before it starts. A turn is released on every path (pass, fail, conflict, a daemon restart: recovery clears turns nobody holds and re-queues accepted cards in their order).
+2. The release's Check takes a turn in the machine-wide check line like any check, as its own kind that goes ahead of hand-in checks (a person waits for a release) and in order with Accept re-checks.
+3. Words a person reads. A card that waits says so on the Review card, in `tok show` and `tok ls` (the turn words of TOKNILA-53): "accepted; waits for the release of 0.3.8" or "accepted; waits for TOKNILA-152 to merge (#2 in line)". The release's steps show "Check: waits for its turn (#2 in the check line)". The refusal "moved while the release ran" stays as the last guard for a change made outside Toknila (a push by hand) and its text says so.
+4. Tests, red first and quoted in the hand-in: app tests of the line (two accepted cards merge in Accept order and the first one's re-check runs once although the second is ready; a card accepted during a release merges after the release's Tag and the release tags without "main moved"; a release started while a card's turn runs waits for it; a turn is released when its check fails and when the daemon restarts); a daemon test through the router for the Accept-during-release path with a slow fake check command (never a shell redirect: it must run in `cmd.exe` too; see crates/daemon/tests/recheck_at_accept.rs for the `git config --add` counter); a test that the release's Check enters the check line. Every wait has a deadline. Run `cargo xtask verify` and `cargo xtask web`.
+
+Keep the change inside crates/core (ordering rules, turn words), crates/app (merges, checks/line, a merge line), crates/daemon (releaser, merger, recovery, routes if a read model changes), crates/cli (show, ls), crates/api-types (then `npm run gen`), apps/web (the Review card's line, the Release dialog's step text), and the tests. A production file stays at or under 400 lines; merges.rs, checks.rs and releaser.rs are near it, split before you add.
+"""
+acceptance = [
+  "Accepted cards of a project merge one at a time in the order they were accepted, each holding its turn across sync, re-check and merge, so a re-check runs once; a release holds the same line until its Tag and Push ended, and cards accepted meanwhile merge after it",
+  "The release's Check takes a turn in the machine-wide check line ahead of hand-in checks; a waiting card and a waiting release step say what they wait for",
+  "Covered by app and daemon tests seen red first, including Accept during a release and a restart that frees a turn",
+]
+
+[[ticket]]
+id = "three-loose-ends-of-phase-12"
+title = "Three loose ends: two tests wait for what they assert, and a round names the check that failed"
+prompt = """
+Three small things, each with its place.
+
+1. crates/daemon/tests/paused_agent.rs, `a_waiting_card_frees_its_slot_and_a_comment_resumes_it_when_one_is_free`: it waits with `rig.output_has(1, "resume=sess-1")` (a poll, 30 s) and then asserts on that same snapshot that the output also contains `prompt=` and "use sqlite"; the prompt can arrive in a later chunk, and on Windows CI it did (run 44073371037, 2026-11-17: the test failed, and passed on a rerun of the same commit). Wait for the last text the test needs, then assert on all of it.
+2. crates/daemon/tests/planner_hook_turn.rs, `a_scripted_turn_shows_working_then_its_step_then_not_working`: `Rig::output(key)` reads the planner's terminal once and the test asserts `out.matches("post=204").count() == 3`; on macOS CI the same run saw 2. The Rig has no waiting read: give it one (a poll with a deadline, as `output_has` in paused_agent.rs) and wait until the third post is there.
+   Then look through the other files of crates/daemon/tests and crates/cli/tests for the same shape (a single read of an agent's output asserted right after a wait on state) and fix each you find the same way; name them in the hand-in, or say you found none and how you looked.
+3. A failed check round names what failed. `report(command, &CheckResult)` in crates/app/src/checks.rs writes the headline "`<command>` exited with code N." and `extra::summarize` (crates/app/src/checks/extra.rs) appends the extra checks' lines; when the main command passed and an extra check failed, the round's headline still reads "`cargo xtask verify` exited with code 0." (TOKNILA-152's round 1). Make the headline of a failed round the check that failed: "extra check apps/web/**: `cargo xtask web && cargo xtask e2e-web` exited with code 1." with its output's tail, and the main command's pass as a line after it ("`cargo xtask verify` passed."). A round where the main command failed reads as today. The reviewer's gate text (crates/core/src/instructions/gate.rs) and the flaky wording of TOKNILA-143 use the same name.
+
+Tests: for 1 and 2 the proof is the changed wait, plus 30 runs in a row of each test quoted (`cargo test -p toknila-daemon --test paused_agent <name>` in a loop, and the same for planner_hook_turn); for 3 an app test of the headline in both cases and the gate snapshot if it changes, red first. Run `cargo xtask verify`.
+
+Keep the change inside crates/daemon/tests, crates/cli/tests, crates/app (checks), crates/core (gate text and snapshot if needed).
+"""
+acceptance = [
+  "The two tests wait for the last text they assert, with a deadline; 30 runs in a row of each are quoted; the same shape elsewhere in the daemon and cli tests is fixed or reported absent",
+  "A failed round's headline names the check that failed, with the main command's pass after it when an extra check failed",
+  "An app test of the headline in both cases, seen red first; cargo xtask verify green",
+]
+
+[[ticket]]
+id = "release-runs-the-artifact-step"
+title = "A release can run the project's own build step on this computer, after the tag"
+after = ["one-merge-line"]
+prompt = """
+Why. Some things a release makes cannot be made by CI without handing it secrets: a Mac app signed with the maintainer's Developer ID and notarized is the case at hand (the next story builds that command for Toknila itself). The owner does not want signing material on GitHub. Toknila's release run already does Check, Bump, Tag and Push on the owner's computer (`ReleaseStep` in crates/core/src/release_run.rs with `label()`, `steps(check, bump, push)` and `resume_steps`; `Ctx::run` in crates/daemon/src/releaser.rs; journaled per step in crates/daemon/src/store/release_runs.rs as `Entry::StepPassed`/`StepFailed` with the output's tail; `project_steps`, `start_release` and `push_facts` in crates/daemon/src/http/routes/releases.rs; the dialog's `LABEL` record in apps/web/src/views/ReleaseDialog.tsx and `plannedSteps` in apps/web/src/store/release.ts).
+
+Build this.
+
+1. A project setting `artifact_command` (beside `bump_command`; `{version}` and `{tag}` are filled in): `tok project set --artifact-command '<command>'` (and a way to clear it), the project's Settings page under the bump command with one sentence of help ("runs on this computer after the tag: build and upload what CI cannot"), and the API (crates/api-types; then `npm run gen`).
+2. A release step "Build" (variant, label, `steps()` rule: present only when the project names the command), after Push when the release pushes, else after Tag. It runs the command in the release's worktree at the tagged commit with the release's environment (the same PATH adoption as the checks), with no time limit shorter than an hour (a notarization can take minutes), streams its output's tail into the step as the other steps do, and passes on exit code 0. A failure leaves the run resumable at Build (`resume_steps`: Tag and Push are not redone) with a "Build again" control in the dialog; the tag stays.
+3. The step holds no merge-line turn (the tag is made): cards may merge while it runs. It does take a turn in the machine-wide check line, because a build loads the machine.
+4. Words: the dialog lists Build with the command's first words; `tok release steps` prints it; docs/guide (Release section) gets two sentences.
+5. Tests, red first and quoted: core tests of `steps()` and `resume_steps` with the new step; a daemon test with a temp repo where the artifact command writes a marker through `git config --add` (no shell redirect) and the run ends released; a failing command leaves the run failed at Build and a resume runs only Build; a web unit test of the dialog's step list; a cli test of the flag. Run `cargo xtask verify` and `cargo xtask web`.
+
+Never put a secret's value in the setting's help, a test or a log: the command is a command line, and what it reads from the maintainer's keychain or files is its own business.
+
+Keep the change inside crates/core (release_run, model project), crates/app (projects), crates/daemon (releaser, routes releases and projects, store), crates/cli (project set, release steps), crates/api-types, apps/web (ReleaseDialog, release store, project Settings), docs, and the tests.
+"""
+acceptance = [
+  "A project can name an artifact command; a release then has a Build step after Push (or Tag) that runs it at the tagged commit, shows its output, and on failure is resumable at Build without redoing Tag or Push",
+  "The step takes a turn in the check line and none in the merge line; the dialog, tok release steps and the guide show it",
+  "Covered by core, daemon, web and cli tests seen red first",
+]
+
+[[ticket]]
+id = "mac-app-signed-and-notarized-here"
+title = "The Mac app is signed with a Developer ID and notarized on the maintainer's Mac, with no secret on GitHub"
+model = "opus"
+design_first = true
+prompt = """
+Why. A stranger who downloads Toknila's dmg today is told by macOS that it cannot be opened: `cargo xtask app` (xtask/src/app.rs; its header says "No Developer ID, no notarisation") signs ad hoc unless `APPLE_SIGNING_IDENTITY` is set, and nothing notarizes or staples. The same ad hoc identity is why macOS forgets the app's permissions after every update. The owner has an Apple Developer account and will not put signing material on GitHub. The release workflow (.github/workflows/release.yml: `build` matrix, `wait-ci`, `publish`) today builds the Mac app on CI and signs the updater archives with two Actions secrets (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`); docs/install.md ("Where the signing key lives") names the maintainer's folder for the updater key. The story before this one in the epic gives a release a Build step that runs a project's `artifact_command` on the maintainer's computer after the tag.
+
+This story is design first and runs on a stronger model: it changes how a release is assembled from two places. Before any code open a thread of kind flow with:
+- the target sequence of one release (who does what, in order): the release run on the Mac tags and pushes; its Build step runs one new xtask command that builds the app for both Mac targets, signs every binary and the bundle with the Developer ID identity (hardened runtime, timestamp), makes the dmg, submits it to Apple's notary service and waits, staples the app and the dmg, packages the updater archives from the stapled app and signs them with the maintainer's local updater key, and uploads dmg, archives and `.sig` files to the release on GitHub (created as a draft when it does not exist); CI builds and uploads the command-line archives, waits for CI on the commit, takes the Mac files it finds on the release, writes `latest.json` and `SHA256SUMS.txt` and publishes;
+- what the app needs to pass notarization and still work: an entitlements file (the app listens to the microphone and uses speech recognition, so name the entitlements and Info.plist keys that the hardened runtime requires for them; say which others a webview shell that starts child processes needs and which it does not), and how you checked each claim against Apple's documentation rather than memory;
+- the settings, all names and paths, never values: the signing identity's name, the notary keychain profile's name (the maintainer saves it once with `xcrun notarytool store-credentials`), the updater key's path; where they live (environment of the artifact command, or a small untracked file in the maintainer's folder) and that none is in the repository;
+- the transition: a repository variable (not a secret) says whether CI still builds the Mac app as today (the default, so releases keep working until the maintainer has set up the certificate) or takes the Mac files from the release; when it is switched and the first signed release is out, the two Actions secrets are deleted by the maintainer, and the workflow no longer names them; what happens when the Mac files are missing after a stated wait (the publish fails with one sentence naming the cause);
+- what a person must do once and at each release, as numbered steps in the person's words (create the Developer ID Application certificate, install it, save the notary profile, set the project's artifact command, run the release; how to verify with `spctl -a -vv` and `xcrun stapler validate`), for the hand-in's "For you" block and docs/install.md.
+Wait for the person's approval. An approval may come with decisions; where they differ from your version, the decisions win.
+
+Then build it as approved. Rules that hold throughout:
+- You never read, list or print the maintainer's keychain, the folder docs/install.md names for the updater key, or any certificate; you never run `security`, `codesign` with a real identity, `notarytool`, `stapler`, `gh release` or `git push` yourself. The code calls them; your tests use fake programs on a temporary PATH (or an injected command runner) that record their arguments, and assert the order and the arguments.
+- No value of a signing variable reaches a log line, an error text or a test snapshot; only names.
+- An ad hoc build (`cargo xtask app` with nothing configured) keeps working for developers.
+- The workflow change is proven without pushing a tag: the script that decides "Mac files from the release or from CI" and writes `latest.json` is tested with recorded inputs, as .github/scripts/test_wait_for_ci.py does; run Python with `-B`.
+
+Run `cargo xtask verify`. Keep the change inside xtask (app, updates, a new release command), .github/workflows/release.yml and .github/scripts, apps/desktop (entitlements, Info.plist keys), docs/install.md, and the tests. Name in the hand-in, under For you, every step only the maintainer can do, and mark as NOT_RUN what only a real certificate can prove.
+"""
+acceptance = [
+  "An approved flow thread names the sequence of a release across the Mac and CI, the entitlements with their sources, the settings by name, the transition variable and the maintainer's steps",
+  "One xtask command builds both Mac targets, signs with the Developer ID identity under the hardened runtime, notarizes, staples, packages and signs the updater archives with the local key and uploads to the release; CI takes the Mac files from the release when the variable says so, and names no signing secret then",
+  "Tests with fake programs assert the order and arguments and that no secret value is printed; an ad hoc build still works; the maintainer's steps are in the hand-in and docs/install.md; what needs a real certificate is NOT_RUN",
+]
