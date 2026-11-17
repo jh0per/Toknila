@@ -322,7 +322,11 @@ async fn a_waiting_card_frees_its_slot_and_a_comment_resumes_it_when_one_is_free
         .send(Method::GET, "/v1/projects/DEMO/inbox", Value::Null)
         .await;
     assert_eq!(inbox, json!([]), "delivered: the row is gone");
-    let out = rig.output_has(1, "resume=sess-1").await;
+    // The prompt can arrive in a later chunk than the resume argument: wait for the last text
+    // the test needs (the output only grows), then assert on all of it.
+    rig.output_has(1, "resume=sess-1").await;
+    rig.output_has(1, "prompt=").await;
+    let out = rig.output_has(1, "use sqlite").await;
     assert!(out.contains("resume=sess-1"), "{out}");
     assert!(
         out.contains("prompt=") && out.contains("use sqlite"),
