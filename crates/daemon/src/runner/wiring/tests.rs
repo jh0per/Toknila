@@ -10,6 +10,7 @@ use super::*;
 mod planner;
 mod reads;
 mod reviewer_rules;
+mod reviewer_scripts;
 mod settings_pins;
 
 const TOKEN: &str = "secret-run-token-0123456789abcdef";
