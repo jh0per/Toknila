@@ -17,9 +17,14 @@ import sys
 import tempfile
 import unittest
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+def _plain(path):
+    """Without the verbatim prefix Windows may give a path: `..` does not work after it."""
+    return path[4:] if path.startswith("\\\\?\\") else path
+
+
+HERE = _plain(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(HERE, "assemble_release.py")
-WORKFLOW = os.path.join(HERE, "..", "workflows", "release.yml")
+WORKFLOW = os.path.join(os.path.dirname(HERE), "workflows", "release.yml")
 TAG = "v0.3.8"
 MAC = [
     f"Toknila-0.3.8-{arch}{ext}"

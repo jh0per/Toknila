@@ -159,6 +159,8 @@ A check you have never seen fail is a claim, not a check.
 
 ## Testing
 
+- A path from `canonicalize` is never handed to another program or joined with `..` on Windows; strip the
+  `\\?\` prefix first.
 - A test never starts a real agent: a daemon under `TOKNILA_TEST_ROOT` refuses to launch a
   built-in `claude` profile (the card blocks with "A test may not start a real agent: give the
   project --sim or a fake --profile"), so give a test project `--sim` or a fake `--profile`.

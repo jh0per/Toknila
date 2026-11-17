@@ -12,7 +12,12 @@ import sys
 import tempfile
 import unittest
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+def _plain(path):
+    """Without the verbatim prefix Windows may give a path: `..` does not work after it."""
+    return path[4:] if path.startswith("\\\\?\\") else path
+
+
+HERE = _plain(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(HERE, "wait_for_ci.py")
 SHA = "0123456789abcdef0123456789abcdef01234567"
 URL = "https://github.com/acme/toknila/actions/runs/42"

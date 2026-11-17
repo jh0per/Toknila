@@ -40,8 +40,22 @@ fn python() -> Option<&'static str> {
     })
 }
 
+/// A path without the `\\?\` prefix Windows' `canonicalize` adds: other programs (Python) cannot
+/// join `..` onto a verbatim path.
+fn plain(p: &Path) -> PathBuf {
+    let s = p.to_string_lossy();
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    match s.strip_prefix(r"\\?\") {
+        Some(rest) => PathBuf::from(rest),
+        None => p.to_path_buf(),
+    }
+}
+
 /// Runs every test of `.github/scripts`; the first failure stops.
 pub fn run(root: &Path) -> Result<(), String> {
+    let root = &plain(root);
     let tests = test_files(&root.join(".github/scripts"))?;
     let Some(py) = python() else {
         eprintln!(
@@ -86,6 +100,18 @@ mod tests {
             .collect();
         // Control: the two scripts' tests are found, and the scripts themselves are not.
         assert_eq!(names, ["test_assemble_release.py", "test_wait_for_ci.py"]);
+    }
+
+    #[test]
+    fn verbatim_prefixes_are_stripped() {
+        let p = |s: &str| plain(Path::new(s));
+        assert_eq!(p(r"\\?\D:\a\b"), PathBuf::from(r"D:\a\b"));
+        assert_eq!(
+            p(r"\\?\UNC\server\share\x"),
+            PathBuf::from(r"\\server\share\x")
+        );
+        assert_eq!(p(r"D:\a\b"), PathBuf::from(r"D:\a\b"));
+        assert_eq!(p("/usr/x"), PathBuf::from("/usr/x"));
     }
 
     #[test]
