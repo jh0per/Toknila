@@ -208,6 +208,10 @@ function hookProcess() {
 /// process exit, on SIGINT and SIGTERM and on an uncaught error: stops the daemon (killed after a
 /// wait), kills every process whose command line carries the marker with its children, removes the
 /// home. A spec starts no process outside it; a second daemon is registered with `session.track(home)`.
+/// The run id only names things (`manual` without `TOKNILA_E2E_RUN`); it never decided whether a
+/// direct run is cleaned up. What leaked (TOKNILA-155) was a spec killed by SIGKILL (a runner's
+/// timeout, `kill -9`): every cleanup above lives in the spec's own process and a SIGKILL runs none,
+/// so the daemon and fake agents stayed. The watcher process of `startWatcher` ends them then.
 /// `opts.tok` is the `tok` binary (default: the spec's first argument), `opts.name` the spec's name.
 export function session(opts = {}) {
   const name = opts.name ?? basename(process.argv[1] ?? "e2e", ".mjs");
