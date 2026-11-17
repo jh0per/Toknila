@@ -18,6 +18,7 @@ mod project;
 mod release;
 mod review;
 mod reviewer_rules;
+mod reviewer_scripts;
 mod run;
 mod ship;
 mod since;
@@ -54,6 +55,7 @@ pub use review::{
     resolve_mode as resolve_review_mode, resolve_reviewer, reviewer_profile,
 };
 pub use reviewer_rules::{RepoTool, reviewer_check_rules, reviewer_commands};
+pub use reviewer_scripts::{hand_in_scripts, script_rule};
 pub use run::{ProcessExit, Run};
 pub use ship::{MergeSpec, PlannerSite, PlannerSpec, Ship, ShipLook, ShipSpec, slugify};
 pub use since::SinceReturn;
