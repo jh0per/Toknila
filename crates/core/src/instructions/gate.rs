@@ -13,9 +13,14 @@ pub(super) fn text(check: Option<&CheckOutcome>) -> String {
     };
     let word = if c.passed { "PASS" } else { "FAIL" };
     let command = if c.command.is_empty() {
-        "the check command"
+        "`the check command`".to_owned()
     } else {
-        c.command.as_str()
+        format!("`{}`", c.command)
+    };
+    // A round that failed on an extra check names that check, as the round's headline does.
+    let command = match c.failed_extra() {
+        Some(name) => format!("{name}: {command}"),
+        None => command,
     };
     let flaky = if c.flaky {
         format!(
@@ -27,7 +32,7 @@ pub(super) fn text(check: Option<&CheckOutcome>) -> String {
         String::new()
     };
     format!(
-        "Toknila ran the gate on this hand-in's commit: `{command}` finished {} with {word}.{flaky} \
+        "Toknila ran the gate on this hand-in's commit: {command} finished {} with {word}.{flaky} \
          Quote it as the evidence of the check item with basis `ran`; do not run the whole gate \
          again. Its output (the command and the end of its output):\n\n```\n{}\n```",
         c.at.utc_text(),

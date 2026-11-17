@@ -242,7 +242,7 @@ fn a_failing_extra_check_fails_the_round_with_its_output_and_stops_the_rest() {
     assert!(
         round
             .comment
-            .contains("extra check apps/web/**: FAIL web-gate one"),
+            .starts_with("extra check apps/web/**: `web-gate one` exited with code"),
         "{}",
         round.comment
     );
