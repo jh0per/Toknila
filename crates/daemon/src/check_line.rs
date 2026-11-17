@@ -30,11 +30,10 @@ pub fn machine_line() -> Arc<CheckLine> {
     Arc::new(CheckLine::new(Arc::new(SystemLoad)))
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
-    #[cfg(unix)]
     #[test]
     fn the_machine_reads_a_load_and_its_cores() {
         let load = SystemLoad
