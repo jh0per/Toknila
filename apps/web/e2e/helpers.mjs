@@ -1,9 +1,10 @@
 // What the browser e2e scripts share: the checks on a page, and launching the browser.
 
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 /// Launches the browser. With `E2E_ARTIFACTS` set (CI), every page is traced, and when the script
@@ -52,7 +53,7 @@ export function checks(page) {
   /// The window's connection to the daemon: the sidebar says "Offline" while it is lost and says
   /// nothing while it works (`data-link` carries the state).
   const expectLink = async (state, what) => {
-    await page.locator(`nav[aria-label=Sidebar][data-link=${state}]`).waitFor({ timeout: 10_000 }).catch(() => {
+    await page.locator(`nav[aria-label=Sidebar][data-link=${state}]`).waitFor({ timeout: 30_000 }).catch(() => {
       throw new Error(`${what}: expected the link to be ${state}`);
     });
     const badge = await page.locator("[data-testid=link]").count();
@@ -207,6 +208,10 @@ function hookProcess() {
 /// process exit, on SIGINT and SIGTERM and on an uncaught error: stops the daemon (killed after a
 /// wait), kills every process whose command line carries the marker with its children, removes the
 /// home. A spec starts no process outside it; a second daemon is registered with `session.track(home)`.
+/// The run id only names things (`manual` without `TOKNILA_E2E_RUN`); it never decided whether a
+/// direct run is cleaned up. What leaked (TOKNILA-155) was a spec killed by SIGKILL (a runner's
+/// timeout, `kill -9`): every cleanup above lives in the spec's own process and a SIGKILL runs none,
+/// so the daemon and fake agents stayed. The watcher process of `startWatcher` ends them then.
 /// `opts.tok` is the `tok` binary (default: the spec's first argument), `opts.name` the spec's name.
 export function session(opts = {}) {
   const name = opts.name ?? basename(process.argv[1] ?? "e2e", ".mjs");
@@ -224,26 +229,94 @@ export function session(opts = {}) {
     /// Registers the home of another daemon this spec starts; it is stopped and removed with the rest.
     track(other) {
       homes.push(other);
+      writeWatchList(home, homes);
       return other;
     },
     endSync() {
       if (ended) return;
       ended = true;
       sessions.delete(s);
-      for (const h of homes) stopDaemonSync(tokBin, h);
-      for (const pid of processesWith(marker)) killTree(pid);
-      for (const h of homes) {
+      if (watcher) {
         try {
-          rmSync(h, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-        } catch (e) {
-          console.warn(`warning: cannot remove ${h}: ${e.message}`);
+          process.kill(watcher, "SIGKILL");
+        } catch {
+          /* gone meanwhile */
         }
       }
+      cleanupHomes(tokBin, homes, marker);
     },
   };
+  writeWatchList(home, homes);
+  const watcher = startWatcher(tokBin, home, marker);
   sessions.add(s);
   hookProcess();
   return s;
+}
+
+/// Stops the daemon of each home, kills every process carrying `marker` with its children and
+/// removes the homes: the one cleanup of a session, run by the spec or by its watcher.
+function cleanupHomes(tokBin, homes, marker) {
+  for (const h of homes) stopDaemonSync(tokBin, h);
+  for (const pid of processesWith(marker)) killTree(pid);
+  for (const h of homes) {
+    try {
+      rmSync(h, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch (e) {
+      console.warn(`warning: cannot remove ${h}: ${e.message}`);
+    }
+  }
+}
+
+const WATCH_FILE = ".session-homes.json";
+
+/// Tells the watcher which homes the session owns (the home itself and every `track`ed one).
+function writeWatchList(home, homes) {
+  try {
+    writeFileSync(join(home, WATCH_FILE), JSON.stringify(homes));
+  } catch {
+    /* the home is gone: the session has ended */
+  }
+}
+
+/// A SIGKILL (a runner's timeout, `kill -9`) runs no handler, so nothing in the spec's own process
+/// can end its daemon and fake agents. This starts a detached watcher, a second `node` running this
+/// file, that waits until the spec's process is gone and then does the cleanup. `endSync` kills it.
+/// Returns its pid, or undefined when it cannot start.
+function startWatcher(tokBin, home, marker) {
+  try {
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), WATCH_ARG, String(process.pid), tokBin, home], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      env: { ...process.env, TOKNILA_WATCH_MARKER: marker },
+    });
+    child.unref();
+    return child.pid;
+  } catch {
+    return undefined;
+  }
+}
+
+const WATCH_ARG = "--watch-session";
+
+/// The watcher's body: wait for the spec's process `parent` to end, then clean up what its session
+/// owned (the homes named in the home's watch list; the marker comes in the environment, not the
+/// command line, so the leak checks never take the watcher for a fake agent).
+function watch(parent, tokBin, home) {
+  while (alive(parent)) pause(500);
+  let homes = [home];
+  try {
+    homes = JSON.parse(readFileSync(join(home, WATCH_FILE), "utf8"));
+  } catch {
+    /* no list: the home alone */
+  }
+  cleanupHomes(tokBin, homes, process.env.TOKNILA_WATCH_MARKER);
+}
+
+if (process.argv[2] === WATCH_ARG && process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  const [, , , parent, tokBin, home] = process.argv;
+  watch(Number(parent), tokBin, home);
+  process.exit(0);
 }
 
 /// The workspace folder of a card. The daemon makes it after the command that started the card
