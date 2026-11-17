@@ -117,6 +117,9 @@ pub fn tickets(items: &[TicketItem]) {
                 let words = check_words_now(it.check.as_ref());
                 status.push_str(&format!(" ({words})"));
             }
+            if let Some(wait) = &it.merge_wait {
+                status.push_str(&format!(" ({})", wait.card_words()));
+            }
             vec![
                 t.key.to_string(),
                 status,

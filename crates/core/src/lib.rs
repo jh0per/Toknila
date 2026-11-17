@@ -21,6 +21,7 @@ pub mod hook;
 pub mod inbox;
 pub mod instructions;
 pub mod machine;
+pub mod merge_line;
 pub mod migrations;
 pub mod model;
 pub mod nudge;

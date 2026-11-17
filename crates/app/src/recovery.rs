@@ -49,6 +49,10 @@ pub fn recover<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Recovery> {
     report.reviews_lost = reviews.iter().map(ToString::to_string).collect();
     let checks = crate::checks::resume(uow)?;
     report.checks_resumed = checks.iter().map(ToString::to_string).collect();
+    // The merge line: a card a daemon before it accepted gets its place; the holder's merge is
+    // queued again, and the chains' settling below gives a free turn (a release run's, which the
+    // stop interrupted) to the next card in line.
+    merges::place_unplaced(uow)?;
     let resumed = merges::resume(uow)?;
     report.merges_resumed = resumed.iter().map(ToString::to_string).collect();
     let retired = crate::finished_ships::retire_finished(uow, None)?;

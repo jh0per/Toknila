@@ -50,6 +50,10 @@ pub struct ReviewView {
     /// last check did not see, and a pass merges by itself.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub rechecking: bool,
+    /// The card was accepted and waits in its project's merge line: for the release run that
+    /// holds it, or for the card whose turn runs (with its own place). Absent while its turn runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_wait: Option<toknila_core::merge_line::MergeWait>,
 }
 
 fn context<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<(Chain, Project)> {
@@ -81,6 +85,10 @@ pub fn view<R: Reader + ?Sized>(r: &R, t: &Ticket) -> AppResult<ReviewView> {
         check_queue: None,
         check: t.review.check.clone(),
         rechecking: t.review.recheck,
+        merge_wait: match t.review.merge_line {
+            Some(place) if !place.holds => crate::merges::line_of(r, project.id)?.card_wait(t.id),
+            _ => None,
+        },
     })
 }
 

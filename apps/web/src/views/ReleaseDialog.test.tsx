@@ -75,6 +75,24 @@ describe("the Release dialog's push checkbox", () => {
     expect(done).toContain("Pushed main and v0.3.4 to origin");
   });
 
+  it("says what a step that cannot start waits for", () => {
+    const run: ReleaseRun = {
+      release: "r1", version: "0.3.8", tag: "v0.3.8", state: "running", turn: true,
+      steps: [
+        { step: "check", label: "Check", state: "running", output: "", wait: "waits for its turn (#2 in the check line)" },
+        { step: "tag", label: "Tag", state: "pending", output: "" },
+      ],
+    };
+    const html = render({ offer: offer({ steps: ["check", "tag"] }), run });
+    expect(html).toContain("Check: waits for its turn (#2 in the check line)");
+    const merging = render({
+      offer: offer({ steps: ["check", "tag"] }),
+      run: { ...run, turn: false, steps: [{ ...run.steps[0], state: "pending", wait: "waits for TOKNILA-152 to merge (#2 in line)" }, run.steps[1]] },
+    });
+    expect(merging).toContain("Check: waits for TOKNILA-152 to merge (#2 in line)");
+    expect(merging).not.toContain("Tag:");
+  });
+
   it("derives the choice from the offer in the store", () => {
     expect(releasePush({ ...initialRelease, offer: offer({ push: true }) })).toBe(true);
     expect(releasePush({ ...initialRelease, offer: offer({ remote: null, push: true }) })).toBe(false);

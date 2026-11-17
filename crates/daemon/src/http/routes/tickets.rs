@@ -182,23 +182,38 @@ pub async fn list_tickets(
             .into_iter()
             .map(|c| (c.id, c.project_id))
             .collect();
-        Ok(repo
-            .tickets(chain.map(|c| c.id))?
-            .into_iter()
-            .filter(|t| !q.needs_human || t.status.needs_human())
-            .map(|t| TicketItem {
-                simulated: owners
-                    .get(&t.chain_id)
-                    .and_then(|p| projects.get(p))
+        // A project's merge line is read once, for the first card that waits in it.
+        let mut merge_lines = HashMap::new();
+        let mut items = Vec::new();
+        let tickets = repo.tickets(chain.map(|c| c.id))?.into_iter();
+        for t in tickets.filter(|t| !q.needs_human || t.status.needs_human()) {
+            let project = owners.get(&t.chain_id).copied();
+            let merge_wait = match (t.review.merge_line, project) {
+                (Some(place), Some(p)) if !place.holds => {
+                    let line = match merge_lines.entry(p) {
+                        std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+                        std::collections::hash_map::Entry::Vacant(e) => {
+                            e.insert(toknila_app::merges::line_of(repo, p)?)
+                        }
+                    };
+                    line.card_wait(t.id)
+                }
+                _ => None,
+            };
+            items.push(TicketItem {
+                simulated: project
+                    .and_then(|p| projects.get(&p))
                     .is_some_and(|p| p.runs_simulated(&t)),
                 chain: names.get(&t.chain_id).cloned().unwrap_or_default(),
                 in_status_ms: at.millis_since(t.status_since),
                 needs_human: t.status.needs_human(),
                 queue_position: queue.get(&t.id).copied(),
                 check: check_phase_of(&t, &line),
+                merge_wait,
                 ticket: t,
-            })
-            .collect())
+            });
+        }
+        Ok(items)
     })
     .await?;
     Ok(Json(items))

@@ -2800,6 +2800,16 @@ export interface components {
             note?: string;
             outcome: components["schemas"]["ItemOutcome"];
         };
+        /** @description An accepted card's place in its project's merge line, kept on its review. */
+        LinePlace: {
+            /**
+             * @description The card holds the turn: its merge (and the re-check it needs) runs, and no other card of
+             *     the project merges until it ends.
+             */
+            holds?: boolean;
+            /** @description When the card joined the line; the cards that wait go in this order. */
+            since: components["schemas"]["Timestamp"];
+        };
         /** @description A profile and where it comes from. */
         ListedProfile: {
             /** @description File name in the profiles folder; `None` for a built-in profile. */
@@ -2873,6 +2883,18 @@ export interface components {
             no_checks_timeout_secs?: number;
             /** @description Title of a pull request; `{key}` and `{title}` are the card's. */
             pr_title: string;
+        };
+        /** @description What a card or a release waits for in the merge line. */
+        MergeWait: {
+            /** @enum {string} */
+            for: "release";
+            version: string;
+        } | {
+            /** @enum {string} */
+            for: "card";
+            key: components["schemas"]["TicketKey"];
+            /** Format: int32 */
+            place: number;
         };
         /** @description One message of a project's conversation. */
         Message: {
@@ -3876,6 +3898,12 @@ export interface components {
             state: components["schemas"]["RunState"];
             steps: components["schemas"]["RunStep"][];
             tag: string;
+            /**
+             * @description The run took its turn in its project's merge line; a running run without it waits for
+             *     the merge in progress, and no card merges while it holds the turn (until its Tag and
+             *     Push ended).
+             */
+            turn?: boolean;
             version: string;
         };
         /**
@@ -3984,6 +4012,7 @@ export interface components {
              */
             handed_in?: string | null;
             last_check?: components["schemas"]["CheckOutcome"] | null;
+            merge_line?: components["schemas"]["LinePlace"] | null;
             note?: components["schemas"]["ReviewNote"] | null;
             /** @description The reviewer was already nudged for a verdict in this round of review. */
             nudged?: boolean;
@@ -4066,6 +4095,7 @@ export interface components {
              *     person last decided.
              */
             max_rounds: number;
+            merge_wait?: components["schemas"]["MergeWait"] | null;
             /** @description The review mode that applies: the ticket's, the chain's or the project's. */
             mode: components["schemas"]["ReviewMode"];
             /**
@@ -4100,6 +4130,11 @@ export interface components {
             output: string;
             state: components["schemas"]["StepState"];
             step: components["schemas"]["ReleaseStep"];
+            /**
+             * @description What the step waits for while it cannot start, read when the run is shown: `waits for
+             *     its turn (#2 in the check line)`, `waits for DEMO-3 to merge (#2 in line)`.
+             */
+            wait?: string | null;
         };
         /** @description The time a card's runs took. */
         RunTime: {
@@ -4532,6 +4567,7 @@ export interface components {
             check?: components["schemas"]["CheckPhase"] | null;
             /** Format: int64 */
             in_status_ms: number;
+            merge_wait?: components["schemas"]["MergeWait"] | null;
             needs_human: boolean;
             /**
              * Format: int32
