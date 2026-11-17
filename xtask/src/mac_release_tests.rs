@@ -51,10 +51,17 @@ fn fake_build(built: &mut Vec<String>) -> impl FnMut(&str, &Path) -> Result<(), 
     }
 }
 
+// `line`, `expected` and `Fake::programs` serve the unix-only tests below only, so they carry the
+// same gate (clippy denies dead code on Windows).
+#[cfg(unix)]
+fn line(s: &[&str]) -> Vec<String> {
+    s.iter().map(|a| (*a).to_owned()).collect()
+}
+
 /// Every command of a release that uploads to a tag with no release yet, as program and arguments.
+#[cfg(unix)]
 fn expected(root: &Path, entitlements: &Path) -> Vec<Vec<String>> {
     let p = |p: &Path| p.to_string_lossy().into_owned();
-    let line = |s: &[&str]| s.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
     let view = line(&[
         "gh",
         "release",
@@ -63,17 +70,24 @@ fn expected(root: &Path, entitlements: &Path) -> Vec<Vec<String>> {
         "--repo",
         "jh0per/Toknila",
         "--json",
-        "isDraft",
+        "isDraft,assets",
         "--jq",
-        ".isDraft",
+        ".isDraft, .assets[].name",
     ]);
     let mut all = vec![
         line(&["xcrun", "--version"]),
         line(&["gh", "--version"]),
         line(&["rustup", "target", "list", "--installed"]),
+        line(&[
+            "gh",
+            "api",
+            "repos/jh0per/Toknila/git/ref/tags/v9.9.9",
+            "--jq",
+            ".ref",
+        ]),
         view.clone(),
     ];
-    let mut files = Vec::new();
+    let (mut files, mut sigs) = (Vec::new(), Vec::new());
     let ent = p(entitlements);
     for arch in ["aarch64", "x86_64"] {
         let out = root.join("dist/mac-release").join(arch);
@@ -147,7 +161,8 @@ fn expected(root: &Path, entitlements: &Path) -> Vec<Vec<String>> {
             "sign",
             archive,
         ]));
-        files.extend([dmg.to_owned(), archive.to_owned(), format!("{archive}.sig")]);
+        files.extend([dmg.to_owned(), archive.to_owned()]);
+        sigs.push(format!("{archive}.sig"));
     }
     all.push(view);
     all.push(line(&[
@@ -164,17 +179,20 @@ fn expected(root: &Path, entitlements: &Path) -> Vec<Vec<String>> {
         "--notes",
         "The Mac files are uploaded; the Release workflow adds the rest and publishes.",
     ]));
-    let mut upload = line(&[
-        "gh",
-        "release",
-        "upload",
-        TAG,
-        "--repo",
-        "jh0per/Toknila",
-        "--clobber",
-    ]);
-    upload.extend(files);
-    all.push(upload);
+    // The signatures go last: CI publishes only when all six files are there.
+    for set in [files, sigs] {
+        let mut upload = line(&[
+            "gh",
+            "release",
+            "upload",
+            TAG,
+            "--repo",
+            "jh0per/Toknila",
+            "--clobber",
+        ]);
+        upload.extend(set);
+        all.push(upload);
+    }
     all
 }
 
@@ -185,6 +203,9 @@ struct Fake {
     calls: Vec<Cmd>,
     said: Vec<String>,
     redact: Redact,
+    /// `pushed`, `missing` (404) or anything else (another gh error).
+    tag: &'static str,
+    /// `missing`, `draft` (a rerun: the aarch64 dmg and signature are there) or `published`.
     release: &'static str,
     targets: &'static str,
     notary: &'static str,
@@ -194,12 +215,14 @@ struct Fake {
 impl Fake {
     fn new() -> Fake {
         Fake {
+            tag: "pushed",
             release: "missing",
             targets: "aarch64-apple-darwin\nx86_64-apple-darwin\n",
             notary: r#"{"id":"sub-1","message":"Processing complete","status":"Accepted"}"#,
             ..Fake::default()
         }
     }
+    #[cfg(unix)]
     fn programs(&self) -> Vec<Vec<String>> {
         self.calls
             .iter()
@@ -230,10 +253,17 @@ impl Exec for Fake {
         };
         match (cmd.program.as_str(), a.as_slice()) {
             ("rustup", _) => ok(self.targets),
+            ("gh", ["api", ..]) => match self.tag {
+                "pushed" => ok("refs/tags/v9.9.9\n"),
+                "missing" => fail("gh: Not Found (HTTP 404)"),
+                _ => fail("error connecting to api.github.com\ncheck your internet connection"),
+            },
             ("gh", ["release", "view", ..]) => match self.release {
                 "missing" => fail("release not found"),
-                "draft" => ok("true\n"),
-                _ => ok("false\n"),
+                "draft" => {
+                    ok("true\nToknila-9.9.9-aarch64.dmg\nToknila-9.9.9-aarch64.app.tar.gz.sig\n")
+                }
+                _ => ok("false\nToknila-9.9.9-aarch64.dmg\n"),
             },
             ("codesign", ["--force", ..]) if self.codesign_err.is_some() => {
                 fail(self.codesign_err.unwrap_or_default())
@@ -320,6 +350,8 @@ fn a_release_builds_both_targets_signs_notarizes_staples_and_uploads_in_order() 
     );
 }
 
+/// A rerun on a draft: no new release, and the old signature goes first, so the draft lacks a
+/// signature (and CI waits) until the new archives and then the new signatures are up.
 #[cfg(unix)]
 #[test]
 fn a_draft_is_uploaded_to_without_creating_one_and_no_upload_touches_no_github() {
@@ -338,18 +370,20 @@ fn a_draft_is_uploaded_to_without_creating_one_and_no_upload_touches_no_github()
         &mut fake_build(&mut Vec::new()),
     )
     .expect("passes");
-    let starts = |c: &Vec<String>, with: [&str; 3]| c.get(..3).is_some_and(|s| s == with);
-    assert!(
-        !fake
-            .programs()
-            .iter()
-            .any(|c| starts(c, ["gh", "release", "create"]))
-    );
-    assert!(
-        fake.programs()
-            .last()
-            .is_some_and(|c| starts(c, ["gh", "release", "upload"]))
-    );
+    let mut want = expected(&t.0, &t.0);
+    let create = want.len() - 3;
+    assert_eq!(want[create][..3], ["gh", "release", "create"]);
+    want[create] = line(&[
+        "gh",
+        "release",
+        "delete-asset",
+        TAG,
+        "Toknila-9.9.9-aarch64.app.tar.gz.sig",
+        "--repo",
+        "jh0per/Toknila",
+        "--yes",
+    ]);
+    assert_eq!(fake.programs(), want);
 
     let mut fake = Fake::new();
     release(
@@ -399,6 +433,22 @@ fn preflight_refuses_in_seconds_before_any_build() {
             },
             args(true),
             "the Rust targets aarch64-apple-darwin and x86_64-apple-darwin are not installed: run rustup target add aarch64-apple-darwin x86_64-apple-darwin",
+        ),
+        (
+            Fake {
+                tag: "missing",
+                ..Fake::new()
+            },
+            args(true),
+            "the tag v9.9.9 is not on GitHub: push it (git push origin v9.9.9), then run the Build step again",
+        ),
+        (
+            Fake {
+                tag: "offline",
+                ..Fake::new()
+            },
+            args(true),
+            "gh could not look up the tag v9.9.9 on GitHub: check your internet connection",
         ),
         (
             Fake::new(),
@@ -569,7 +619,7 @@ fn fake_programs_on_a_temporary_path_record_the_order_and_nothing_secret_is_prin
         ),
         (
             "gh",
-            "if [ \"$2\" = view ]; then echo 'release not found' >&2; exit 1; fi\n".to_owned(),
+            "if [ \"$1\" = api ]; then echo refs/tags/v9.9.9; fi\nif [ \"$2\" = view ]; then echo 'release not found' >&2; exit 1; fi\n".to_owned(),
         ),
     ];
     for (name, body) in &fakes {

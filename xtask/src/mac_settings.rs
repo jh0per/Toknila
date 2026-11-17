@@ -26,13 +26,38 @@ const NAMES: [&str; 5] = [IDENTITY, PROFILE, KEY_PATH, PASSWORD_PATH, TARGET_DIR
 const WHERE: &str = "in the environment or in mac-release.env of the release folder (TOKNILA_RELEASE_DIR, by default ~/.toknila-release)";
 
 /// Everything the Mac release needs from the maintainer's computer.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Settings {
     pub identity: String,
     pub profile: String,
     pub key_path: PathBuf,
     pub password_path: PathBuf,
     pub target_dir: Option<PathBuf>,
+}
+
+/// A setting's name where a debug print would show its value: `<APPLE_SIGNING_IDENTITY>`.
+pub struct Named(pub &'static str);
+
+impl std::fmt::Debug for Named {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<{}>", self.0)
+    }
+}
+
+/// The settings' names in place of their values, so a debug print shows none of them.
+impl std::fmt::Debug for Settings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Settings")
+            .field("identity", &Named(IDENTITY))
+            .field("profile", &Named(PROFILE))
+            .field("key_path", &Named(KEY_PATH))
+            .field("password_path", &Named(PASSWORD_PATH))
+            .field(
+                "target_dir",
+                &self.target_dir.as_ref().map(|_| Named(TARGET_DIR)),
+            )
+            .finish()
+    }
 }
 
 /// `NAME=value` lines; blank lines and `#` comments are skipped. A line that is not `NAME=value`
@@ -280,6 +305,32 @@ mod tests {
         );
         let err = f.load(&[], Some("just a value\n")).expect_err("no =");
         assert_eq!(err, "mac-release.env line 1 is not NAME=value");
+    }
+
+    #[test]
+    fn the_debug_form_names_the_settings_and_shows_no_value() {
+        let s = Settings {
+            identity: ID.to_owned(),
+            profile: "fake-notary-profile".to_owned(),
+            key_path: PathBuf::from("/Users/someone/.toknila-release/updater.key"),
+            password_path: PathBuf::from("/Users/someone/.toknila-release/updater.password"),
+            target_dir: Some(PathBuf::from("/Users/someone/Library/Caches/target")),
+        };
+        assert_eq!(
+            format!("{s:?}"),
+            "Settings { identity: <APPLE_SIGNING_IDENTITY>, profile: <TOKNILA_NOTARY_PROFILE>, key_path: <TAURI_SIGNING_PRIVATE_KEY_PATH>, password_path: <TOKNILA_UPDATER_PASSWORD_PATH>, target_dir: Some(<CARGO_TARGET_DIR>) }"
+        );
+        let none = Settings {
+            target_dir: None,
+            ..s
+        };
+        assert!(format!("{none:#?}").contains("target_dir: None"));
+        assert!(!format!("{none:#?}").contains("someone"));
+        let r = format!("{:?}", none.redact("fake-password"));
+        assert_eq!(
+            r,
+            "Redact([<APPLE_SIGNING_IDENTITY>, <TAURI_SIGNING_PRIVATE_KEY_PATH>, <TOKNILA_NOTARY_PROFILE>, <team ID>, <updater key password>])"
+        );
     }
 
     #[test]

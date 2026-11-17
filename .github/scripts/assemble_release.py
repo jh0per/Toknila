@@ -3,14 +3,18 @@
 
 usage: assemble_release.py MODE TAG DIST NOTES BODY
 
-MODE is the repository variable MAC_APP_SOURCE: `ci` (or empty) or `release`.
+MODE is the repository variable MAC_APP_SOURCE: `ci` (or empty) or `release`, in any case, as the
+workflow's expressions compare it (`CI` is `ci`).
 
   ci       The Mac files (2 dmg, 2 .app.tar.gz, 2 .sig) come from CI's build and must be in DIST.
            A draft release for TAG means the maintainer's Mac uploaded while the variable says ci:
            that fails, naming the variable, instead of making a second release.
   release  The maintainer's Mac uploads the Mac files to a draft release for TAG
-           (`cargo xtask mac-release`). This waits until all six are there (one look a minute, at
-           most 60 minutes), downloads them into DIST, and fails naming the missing ones otherwise.
+           (`cargo xtask mac-release`, the .sig files last). This waits until all six are there and
+           completely uploaded (GitHub's asset state `uploaded`; one look a minute, at most 60
+           minutes, a gh error is retried until then), downloads them into DIST, and fails naming
+           the missing ones otherwise. A release that is already published is refused at once:
+           its latest.json and archives are public and never replaced.
 
 Then `cargo xtask latest-json DIST VERSION NOTES` writes latest.json (one writer of that format),
 SHA256SUMS.txt lists every file of DIST, and the release is published: created with every file in
@@ -58,19 +62,38 @@ def mac_files(version):
     ]
 
 
+class Unreadable(Failed):
+    """gh could not read the release; the text is gh's reason."""
+
+
 def release(tag):
-    """The release of TAG as {"isDraft": bool, "assets": [names]}, or None when there is none."""
+    """The release of TAG as {"isDraft": bool, "assets": {name: state}}, or None when there is none."""
     out = gh(["release", "view", tag, "--json", "isDraft,assets"], check=False)
     if out.returncode != 0:
         if "release not found" in out.stderr:
             return None
-        raise Failed(f"could not read the release {tag}: {out.stderr.strip() or 'gh failed'}")
-    data = json.loads(out.stdout)
-    return {"isDraft": data.get("isDraft"), "assets": [a.get("name") for a in data.get("assets", [])]}
+        lines = [l.strip() for l in out.stderr.splitlines() if l.strip()]
+        raise Unreadable(lines[-1] if lines else "gh failed")
+    try:
+        data = json.loads(out.stdout)
+    except ValueError:
+        raise Unreadable("gh answered no JSON") from None
+    assets = {a.get("name"): a.get("state") for a in data.get("assets", [])}
+    return {"isDraft": data.get("isDraft"), "assets": assets}
+
+
+def published(tag):
+    return Failed(
+        f"The release {tag} is already published: this job never replaces the files of a public release "
+        "(its latest.json and archives); cut a new version instead"
+    )
 
 
 def from_ci(tag, dist, names):
-    rel = release(tag)
+    try:
+        rel = release(tag)
+    except Unreadable as e:
+        raise Failed(f"could not read the release {tag}: {e}") from None
     if rel is not None and rel["isDraft"]:
         raise Failed(
             f"A draft release {tag} exists (the Mac's upload) but MAC_APP_SOURCE is not release: "
@@ -86,17 +109,31 @@ def from_ci(tag, dist, names):
 def from_release(tag, dist, names, pause, give_up):
     start = time.monotonic()
     while True:
-        rel = release(tag)
-        have = set(rel["assets"]) if rel else set()
-        missing = [n for n in names if n not in have]
-        if not missing:
+        error = None
+        try:
+            rel = release(tag)
+        except Unreadable as e:
+            rel, error = None, str(e)
+        if rel is not None and not rel["isDraft"]:
+            raise published(tag)
+        # A file still being uploaded (a first upload or a --clobber) is listed with state "open".
+        ready = {n for n, state in rel["assets"].items() if state == "uploaded"} if rel else set()
+        missing = [n for n in names if n not in ready]
+        if error is None and not missing:
             break
         if time.monotonic() - start + pause > give_up:
+            if error is not None:
+                raise Failed(
+                    f"Could not read the release {tag} for 60 minutes (gh: {error}): re-run this job when GitHub answers"
+                )
             raise Failed(
                 f"The Mac files are not on the release {tag} after 60 minutes (missing: {', '.join(missing)}): "
                 f"run the release's Build step on the Mac (cargo xtask mac-release {tag}), then re-run this job"
             )
-        print(f"waiting for the Mac files on the release {tag} (missing: {', '.join(missing)})", flush=True)
+        if error is not None:
+            print(f"could not read the release {tag} ({error}); looking again", flush=True)
+        else:
+            print(f"waiting for the Mac files on the release {tag} (missing: {', '.join(missing)})", flush=True)
         time.sleep(pause)
     args = ["release", "download", tag, "--dir", dist, "--clobber"]
     for n in names:
@@ -124,9 +161,11 @@ def main(argv):
     if len(argv) != 6:
         print(__doc__, file=sys.stderr)
         return 2
-    mode, tag, dist, notes, body = argv[1] or "ci", argv[2], argv[3], argv[4], argv[5]
+    raw, tag, dist, notes, body = argv[1], argv[2], argv[3], argv[4], argv[5]
+    # Lower-cased, as the workflow's `if:` expressions compare it (GitHub ignores case there).
+    mode = (raw or "ci").lower()
     if mode not in ("ci", "release"):
-        print(f"MAC_APP_SOURCE is {mode!r}; it must be ci or release")
+        print(f"MAC_APP_SOURCE is {raw!r}; it must be ci or release")
         return 2
     version = tag[1:] if tag.startswith("v") else tag
     pause, give_up = MIN_PAUSE, GIVE_UP

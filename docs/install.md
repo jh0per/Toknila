@@ -143,7 +143,7 @@ line archives for macOS (both architectures), Linux and Windows, waits for CI on
 writes `latest.json` and the release notes (the titles of the pull requests merged since the
 previous tag) and publishes the release with the `.dmg` files, the archives, the `.sig` files,
 `latest.json` and `SHA256SUMS.txt`. Where the Mac app comes from is the repository variable
-`MAC_APP_SOURCE` (a variable, not a secret):
+`MAC_APP_SOURCE` (a variable, not a secret; its case does not matter, `CI` is `ci`):
 
 - unset or `ci`, the default: CI builds the Mac app for Apple silicon and Intel and signs each
   `Toknila-<version>-<arch>.app.tar.gz` with the updater key from the repository secrets. The app
@@ -151,10 +151,13 @@ previous tag) and publishes the release with the `.dmg` files, the archives, the
 - `release`: the maintainer's Mac builds the app, signs it with the Developer ID, notarizes it and
   uploads the Mac files to a draft release (`cargo xtask mac-release`, the release's Build step;
   see Signing and notarizing the Mac app). CI runs no Mac app step and no step that receives a
-  signing secret. Its `publish` job waits up to 60 minutes for the six Mac files on the draft, adds
-  its own files and publishes. If they are not there in time it fails with one sentence: "The Mac
-  files are not on the release vX.Y.Z after 60 minutes (missing: …): run the release's Build step
-  on the Mac (cargo xtask mac-release vX.Y.Z), then re-run this job."
+  signing secret. Its `publish` job waits up to 60 minutes for the six Mac files on the draft (each
+  completely uploaded; a GitHub error during the wait is retried until then), adds its own files
+  and publishes. If they are not there in time it fails with one sentence: "The Mac files are not
+  on the release vX.Y.Z after 60 minutes (missing: …): run the release's Build step on the Mac
+  (cargo xtask mac-release vX.Y.Z), then re-run this job." A release that is already published
+  is never touched (a re-run, or a manual run of a tag that is out): "The release vX.Y.Z is
+  already published: this job never replaces the files of a public release …".
 
 A release whose archives are not signed fails instead of publishing. The publishing is
 `.github/scripts/assemble_release.py`; its tests run in `cargo xtask verify`. Pushes to `main` only
@@ -207,10 +210,14 @@ then Intel:
 6. packs `Toknila-<version>-<arch>.app.tar.gz` from the stapled app and signs it with the updater
    key.
 
-Then it uploads the two dmg, the two archives and their `.sig` files to the release on GitHub,
-creating the release as a draft when the tag has none. A published release is refused: its
-`latest.json` carries the signatures of the archives it has. With `--no-upload` it stops before
-GitHub, which is how to try the certificate and the notary profile.
+Then it uploads the two dmg and the two archives, and last their `.sig` files, to the release on
+GitHub, creating the release as a draft when the tag has none. On a draft that already has
+signatures (a second run) it deletes them first, so CI, which publishes only once all six files are
+there, never takes new archives with old signatures. A published release is refused: its
+`latest.json` carries the signatures of the archives it has. Before any build it checks, in
+seconds, that the tag is on GitHub and its release is not published. With `--no-upload` it stops
+before GitHub (and does not ask it anything), which is how to try the certificate and the notary
+profile.
 
 There is one notarization per architecture: Apple tickets the dmg and the code inside it, so the
 app outside the dmg is stapled too and the updater archive carries a stapled app. The app inside
@@ -315,7 +322,21 @@ the certificate's private key: the keychain window that asks for it was denied o
 no such certificate, "codesign found no certificate named by APPLE_SIGNING_IDENTITY in the
 keychain"; a refused notarization, "Apple's notary service answered Invalid for Toknila-….dmg
 (submission …); its log is above"; a missing Rust target, "… run rustup target add …"; a missing
-setting names the setting; a published release, "the release vX.Y.Z is already published".
+setting names the setting; a tag that was not pushed, "the tag vX.Y.Z is not on GitHub: push it
+(git push origin vX.Y.Z), then run the Build step again"; a published release, "the release
+vX.Y.Z is already published".
+
+#### Going back to CI's build
+
+Set the repository variable `MAC_APP_SOURCE` to `ci` (or delete it): the next release builds the
+Mac app in CI again, with the Actions secrets, which must still exist. In Toknila, clear the
+project's artifact command (`cargo xtask mac-release {tag}`), or the next release's Build step
+uploads a draft again. If a release was started in `release` mode and not published, its draft is
+left on GitHub: delete it by hand first (the repository's Releases page, the draft, Delete),
+keeping the tag; otherwise `publish` fails with "A draft release vX.Y.Z exists (the Mac's upload)
+but MAC_APP_SOURCE is not release". Then run the Release workflow again for that tag (Actions →
+Release → Run workflow, with the tag): a re-run of `publish` alone has no Mac files, because
+`build` skipped them.
 
 #### After the first signed release
 

@@ -11,8 +11,26 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 
 /// The values to hide, each with the name shown instead (`<APPLE_SIGNING_IDENTITY>`).
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct Redact(Vec<(String, String)>);
+
+/// The names only, sorted: a debug print never shows a value (nor their order by length).
+impl std::fmt::Debug for Redact {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut names: Vec<Bare> = self.0.iter().map(|(_, n)| Bare(n)).collect();
+        names.sort_unstable_by_key(|b| b.0);
+        f.debug_tuple("Redact").field(&names).finish()
+    }
+}
+
+/// A name printed without quotes (`<A>`, not `"<A>"`).
+struct Bare<'a>(&'a str);
+
+impl std::fmt::Debug for Bare<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
 
 impl Redact {
     /// Hides `value` behind `<name>`; an empty value is ignored.
@@ -36,8 +54,9 @@ impl Redact {
     }
 }
 
-/// One command: program, arguments, folder and the variables it sets or removes.
-#[derive(Debug, Clone)]
+/// One command: program, arguments, folder and the variables it sets or removes. No `Debug`: its
+/// arguments carry the identity and its variables the password; [`Cmd::shown`] is how it is printed.
+#[derive(Clone)]
 pub struct Cmd {
     pub program: String,
     pub args: Vec<String>,
@@ -149,14 +168,17 @@ impl Process {
     }
 
     /// Looks programs up in `path` instead of this process's `PATH` (tests with fake programs).
-    #[cfg(test)]
+    // Gated like its one test (`mac_release_tests.rs`, macOS only): clippy denies dead code on
+    // Linux and Windows.
+    #[cfg(all(test, target_os = "macos"))]
     pub fn with_path(mut self, path: OsString) -> Process {
         self.path = Some(path);
         self
     }
 
     /// Collects every printed line in `sink` instead of the terminal (tests).
-    #[cfg(test)]
+    // Gated like its tests (unix: they run `sh`, or are macOS only).
+    #[cfg(all(test, unix))]
     pub fn with_sink(mut self, sink: Arc<Mutex<Vec<String>>>) -> Process {
         self.sink = Some(sink);
         self

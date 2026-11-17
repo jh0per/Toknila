@@ -3,8 +3,9 @@
 //! `cargo xtask mac-release {tag}`). For aarch64, then x86_64, it builds and assembles
 //! `Toknila.app`, signs it with the Developer ID under the hardened runtime, makes and signs the
 //! dmg, has Apple notarize it, staples the app and the dmg, and packs and signs the updater archive
-//! from the stapled app (`mac_sign.rs`). Then it uploads the two dmg, the two archives and their
-//! `.sig` files to the release on GitHub, as a draft when the tag has none yet (`mac_upload.rs`).
+//! from the stapled app (`mac_sign.rs`). Then it uploads the two dmg, the two archives and, last,
+//! their `.sig` files to the release on GitHub, as a draft when the tag has none yet
+//! (`mac_upload.rs`).
 //! CI's Release workflow, with the repository variable `MAC_APP_SOURCE=release`, adds the rest and
 //! publishes. The settings are names and paths on the maintainer's computer (`mac_settings.rs`);
 //! `--no-upload` stops before GitHub, to try the certificate and the notary profile.
@@ -45,7 +46,8 @@ fn parse_args(args: impl Iterator<Item = String>) -> Result<Args, String> {
 }
 
 /// What can be checked in seconds, before an hour of building: the tag is the version, the tools
-/// are there, both Rust targets are installed, and the release is not already published.
+/// are there, both Rust targets are installed, and (when it uploads) the tag is on GitHub and its
+/// release is not already published.
 pub fn preflight(exec: &mut dyn Exec, root: &Path, a: &Args, version: &str) -> Result<(), String> {
     if a.tag != format!("v{version}") {
         return Err(format!(
@@ -88,8 +90,11 @@ pub fn preflight(exec: &mut dyn Exec, root: &Path, a: &Args, version: &str) -> R
             missing.join(" ")
         ));
     }
-    if a.upload && mac_upload::state(exec, root, &a.tag)? == Release::Published {
-        return Err(mac_upload::published(&a.tag));
+    if a.upload {
+        mac_upload::tag_on_github(exec, root, &a.tag)?;
+        if mac_upload::state(exec, root, &a.tag)? == Release::Published {
+            return Err(mac_upload::published(&a.tag));
+        }
     }
     Ok(())
 }

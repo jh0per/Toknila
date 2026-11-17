@@ -2,9 +2,10 @@
 """Tests of assemble_release.py against recorded GitHub answers. Run: python3 -B .github/scripts/test_assemble_release.py
 
 A fake `gh` serves the recorded answers: the Nth `release view` gets the Nth answer (the last one
-repeats; NOTFOUND answers like gh does for a tag without a release), `release download` writes the
-asked files, and every call is recorded in order. A fake `cargo xtask` records its arguments and
-writes a latest.json. Nothing touches the network. `cargo xtask verify` runs this file.
+repeats; NOTFOUND answers like gh does for a tag without a release, ERROR like gh does when GitHub
+fails), `release download` writes the asked files, and every call is recorded in order. A fake
+`cargo xtask` records its arguments and writes a latest.json. Nothing touches the network.
+`cargo xtask verify` runs this file.
 """
 import hashlib
 import json
@@ -42,6 +43,9 @@ if args[:2] == ["release", "view"]:
     if text == "NOTFOUND":
         sys.stderr.write("release not found\n")
         sys.exit(1)
+    if text == "ERROR":
+        sys.stderr.write("HTTP 502: Bad Gateway\n")
+        sys.exit(1)
     sys.stdout.write(text)
 elif args[:2] == ["release", "download"]:
     out = args[args.index("--dir") + 1]
@@ -61,8 +65,12 @@ with open(os.path.join(sys.argv[2], "latest.json"), "w") as f:
 '''
 
 
-def view(draft, assets):
-    return json.dumps({"isDraft": draft, "assets": [{"name": a} for a in assets]})
+def view(draft, assets, still_open=()):
+    """A `gh release view --json isDraft,assets` answer; the names in still_open are being uploaded."""
+    return json.dumps({
+        "isDraft": draft,
+        "assets": [{"name": a, "state": "open" if a in still_open else "uploaded"} for a in assets],
+    })
 
 
 class Assemble(unittest.TestCase):
@@ -193,6 +201,61 @@ class Assemble(unittest.TestCase):
         self.assertTrue(all(c[:3] == ["gh", "release", "view"] for c in calls), calls)
         self.assertIsNone(sums)
 
+    def test_release_mode_never_touches_a_published_release(self):
+        # A rerun, or a manual dispatch of a tag that is already out.
+        code, lines, calls, sums, *_ = self.assemble("release", [view(False, CLI + MAC)], CLI)
+        self.assertEqual(code, 1)
+        self.assertEqual(
+            lines,
+            ["The release v0.3.8 is already published: this job never replaces the files of a public release "
+             "(its latest.json and archives); cut a new version instead"],
+        )
+        self.assertEqual(calls, [["gh", "release", "view", TAG, "--json", "isDraft,assets"]])
+        self.assertIsNone(sums)
+
+    def test_release_mode_waits_while_a_mac_file_is_still_being_uploaded(self):
+        # A file of a (re-)upload is listed before it is complete: its state is "open".
+        views = [view(True, MAC, still_open=MAC[2:3]), view(True, MAC)]
+        code, lines, calls, *_ = self.assemble("release", views, CLI)
+        self.assertEqual(code, 0, lines)
+        self.assertEqual(
+            lines[:2],
+            ["waiting for the Mac files on the release v0.3.8 (missing: Toknila-0.3.8-aarch64.app.tar.gz.sig)",
+             "Mac files from the release v0.3.8: 6 downloaded"],
+        )
+        self.assertEqual([c[:3] for c in calls[:3]], [["gh", "release", "view"]] * 2 + [["gh", "release", "download"]])
+
+    def test_a_gh_error_during_the_wait_is_retried(self):
+        code, lines, calls, *_ = self.assemble("release", ["ERROR", "ERROR", view(True, MAC)], CLI)
+        self.assertEqual(code, 0, lines)
+        self.assertEqual(
+            lines,
+            ["could not read the release v0.3.8 (HTTP 502: Bad Gateway); looking again"] * 2
+            + ["Mac files from the release v0.3.8: 6 downloaded",
+               "Published v0.3.8 with 10 files (Mac files from release)"],
+        )
+        self.assertEqual([c[:3] for c in calls[:3]], [["gh", "release", "view"]] * 3)
+
+    def test_a_gh_error_until_the_time_limit_fails_naming_it(self):
+        code, lines, calls, sums, *_ = self.assemble("release", ["ERROR"], CLI, give_up=0)
+        self.assertEqual(code, 1)
+        self.assertEqual(
+            lines,
+            ["Could not read the release v0.3.8 for 60 minutes (gh: HTTP 502: Bad Gateway): "
+             "re-run this job when GitHub answers"],
+        )
+        self.assertEqual(calls, [["gh", "release", "view", TAG, "--json", "isDraft,assets"]])
+        self.assertIsNone(sums)
+
+    def test_the_mode_is_read_without_case_as_the_workflow_compares_it(self):
+        # GitHub's expressions ignore case: `CI` builds the Mac app in CI, `Release` skips it.
+        code, lines, *_ = self.assemble("CI", ["NOTFOUND"], CLI + MAC)
+        self.assertEqual(code, 0, lines)
+        self.assertEqual(lines[-1], "Published v0.3.8 with 10 files (Mac files from ci)")
+        code, lines, *_ = self.assemble("Release", [view(True, MAC)], CLI)
+        self.assertEqual(code, 0, lines)
+        self.assertEqual(lines[-1], "Published v0.3.8 with 10 files (Mac files from release)")
+
     def test_an_unknown_mode_is_refused(self):
         code, lines, calls, *_ = self.assemble("maybe", ["NOTFOUND"], CLI + MAC)
         self.assertEqual(code, 2)
@@ -232,7 +295,34 @@ def unguarded_secret_steps(text):
     return bad, sum("secrets." in "\n".join(s) for s in steps)
 
 
+def case_sensitive_mode_uses(text):
+    """Lines of a workflow that read MAC_APP_SOURCE's value with its case. Allowed: its definition,
+    an `if:` expression (GitHub compares strings without case), a shell comparison of the
+    lower-cased value, and the value handed to assemble_release.py (which lower-cases it)."""
+    allowed = (
+        lambda l: l.startswith("MAC_APP_SOURCE: ${{ vars.MAC_APP_SOURCE"),
+        lambda l: l.startswith("if:"),
+        lambda l: '"${MAC_APP_SOURCE,,}"' in l and l.count("MAC_APP_SOURCE") == 1,
+        lambda l: l.startswith('python3 -B .github/scripts/assemble_release.py "$MAC_APP_SOURCE" '),
+    )
+    bad = []
+    for line in text.splitlines():
+        l = line.strip()
+        if "MAC_APP_SOURCE" in l and not l.startswith("#") and not any(ok(l) for ok in allowed):
+            bad.append(l)
+    return bad
+
+
 class Workflow(unittest.TestCase):
+    def test_the_workflow_reads_the_mode_without_case_everywhere(self):
+        with open(WORKFLOW, encoding="utf-8") as f:
+            text = f.read()
+        self.assertEqual(case_sensitive_mode_uses(text), [])
+        # Control: a shell comparison with the value's own case is caught.
+        broken = text.replace('"${MAC_APP_SOURCE,,}" = release', '"$MAC_APP_SOURCE" = release')
+        self.assertNotEqual(broken, text)
+        self.assertEqual(case_sensitive_mode_uses(broken), ['if [ "$MAC_APP_SOURCE" = release ]; then'])
+
     def test_in_release_mode_no_running_step_names_a_signing_secret(self):
         with open(WORKFLOW, encoding="utf-8") as f:
             text = f.read()

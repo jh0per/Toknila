@@ -6,19 +6,32 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::mac_settings::{IDENTITY, KEY_PATH};
+use crate::mac_settings::{IDENTITY, KEY_PATH, Named, PROFILE};
 use crate::runner::{Cmd, Exec, check};
 use crate::{app, updates};
 
 /// What signing needs: the identity, the notary profile, the entitlements of the shell, the
 /// updater key's path and its password.
-#[derive(Debug)]
 pub struct Signing<'a> {
     pub identity: &'a str,
     pub profile: &'a str,
     pub entitlements: &'a Path,
     pub key_path: &'a Path,
     pub password: &'a str,
+}
+
+/// Names in place of the values: a debug print never shows the identity, the profile, the key's
+/// path or the password. The entitlements are the repository's file.
+impl std::fmt::Debug for Signing<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Signing")
+            .field("identity", &Named(IDENTITY))
+            .field("profile", &Named(PROFILE))
+            .field("entitlements", &self.entitlements)
+            .field("key_path", &Named(KEY_PATH))
+            .field("password", &Named("updater key password"))
+            .finish()
+    }
 }
 
 /// The entitlements of the shell (the bundle's main executable).
@@ -228,6 +241,31 @@ pub fn one_target(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_debug_form_names_the_settings_and_shows_no_value() {
+        let s = Signing {
+            identity: "Developer ID Application: Test Person (TEAM123456)",
+            profile: "fake-notary-profile",
+            entitlements: Path::new("apps/desktop/src-tauri/entitlements.plist"),
+            key_path: Path::new("/Users/someone/.toknila-release/updater.key"),
+            password: "fake-updater-password",
+        };
+        assert_eq!(
+            format!("{s:?}"),
+            r#"Signing { identity: <APPLE_SIGNING_IDENTITY>, profile: <TOKNILA_NOTARY_PROFILE>, entitlements: "apps/desktop/src-tauri/entitlements.plist", key_path: <TAURI_SIGNING_PRIVATE_KEY_PATH>, password: <updater key password> }"#
+        );
+        let pretty = format!("{s:#?}");
+        for value in [
+            "Test Person",
+            "TEAM123456",
+            "fake-notary",
+            "someone",
+            "fake-updater",
+        ] {
+            assert!(!pretty.contains(value), "{pretty}");
+        }
+    }
 
     #[test]
     fn notarytool_answers_are_read_as_json_or_as_text() {

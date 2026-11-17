@@ -226,7 +226,8 @@ jobs:
             echo "The Mac app is \`Toknila-${TAG#v}-aarch64.dmg\` (Apple silicon) or \`Toknila-${TAG#v}-x86_64.dmg\` (Intel). Installed apps update themselves."
             echo "The command-line archives are \`toknila-${TAG#v}-<platform>\`. Steps: [docs/install.md](https://github.com/${{ github.repository }}/blob/$TAG/docs/install.md)"
             echo
-            if [ "$MAC_APP_SOURCE" = release ]; then
+            # Lower-cased: the `if:` expressions above compare the variable without case.
+            if [ "${MAC_APP_SOURCE,,}" = release ]; then
               echo "The Mac app is signed with a Developer ID and notarized by Apple. The command-line binaries are not notarised; on macOS download them with curl or run \`xattr -dr com.apple.quarantine .\` in the unpacked folder."
             else
               echo "The binaries are not notarised; on macOS download with curl or run \`xattr -dr com.apple.quarantine .\` in the unpacked folder."
