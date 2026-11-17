@@ -41,6 +41,17 @@ impl CheckOutcome {
     pub fn first_failing_line(&self) -> String {
         first_failing_line(&self.flaky_output)
     }
+
+    /// `extra check <paths>` when the round failed on an extra check (its output opens with that
+    /// check's headline); `None` when the main command failed or the check passed.
+    pub fn failed_extra(&self) -> Option<&str> {
+        if self.passed {
+            return None;
+        }
+        let head = self.output.lines().next()?;
+        head.starts_with("extra check ")
+            .then(|| head.split_once(": `").map_or(head, |(name, _)| name))
+    }
 }
 
 /// The first line of `output` that names a failure, else its last non-empty line.

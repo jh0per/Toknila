@@ -51,11 +51,12 @@ impl ExtraRun {
         )
     }
 
-    /// What a worker reads about a failure: the line, then how it ended.
+    /// What a worker reads about a failure, headline first: `extra check <paths>: `<command>`
+    /// exited with code N.` and the end of its output.
     pub fn failure(&self) -> String {
         match &self.result {
-            Ok(r) => format!("{}\n\n{}", self.line(), report(&self.command, r)),
-            Err(e) => format!("{}\n\n`{}` {e}.", self.line(), self.command),
+            Ok(r) => format!("extra check {}: {}", self.label, report(&self.command, r)),
+            Err(e) => format!("extra check {}: `{}` {e}.", self.label, self.command),
         }
     }
 }
@@ -94,14 +95,33 @@ pub(super) fn summarize(
         }))
         .collect();
     let flaky = (result.success && !flaky.is_empty()).then(|| flaky.join("\n\n"));
-    let mut output = report(command, result);
-    if !extras.is_empty() {
-        output.push('\n');
-        for e in extras {
-            output.push('\n');
-            output.push_str(&if e.passed() { e.line() } else { e.failure() });
+    let output = match extras
+        .iter()
+        .find(|e| !e.passed())
+        .filter(|_| result.success)
+    {
+        // An extra check failed after the main command passed: the round opens with that check,
+        // then says the main command passed, then the extra checks that passed.
+        Some(failed) => {
+            let mut output = format!("{}\n\n`{command}` passed.", failed.failure());
+            for e in extras.iter().filter(|e| e.passed()) {
+                output.push('\n');
+                output.push_str(&e.line());
+            }
+            output
         }
-    }
+        None => {
+            let mut output = report(command, result);
+            if !extras.is_empty() {
+                output.push('\n');
+                for e in extras {
+                    output.push('\n');
+                    output.push_str(&e.line());
+                }
+            }
+            output
+        }
+    };
     let missing = extras.iter().find_map(|e| match &e.result {
         Ok(r) if !r.success && !r.timed_out => {
             let tail = super::tail(r.output.trim_end(), super::OUTPUT_LIMIT);
@@ -208,5 +228,46 @@ mod tests {
         );
         assert!(run(false, 5).line().ends_with(", 5 s"));
         assert!(run(false, 5).failure().contains("boom"));
+    }
+
+    fn main_result(ok: bool) -> CheckResult {
+        CheckResult {
+            success: ok,
+            code: Some(i32::from(!ok)),
+            timed_out: false,
+            output: "main output".to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_round_whose_extra_check_failed_opens_with_that_check_and_then_says_the_main_passed() {
+        let sum = summarize(
+            "cargo xtask verify",
+            (&main_result(true), None),
+            &[run(false, 5)],
+        );
+        assert!(!sum.passed);
+        assert!(
+            sum.output.starts_with(
+                "extra check apps/web/**: `cargo xtask web && cargo xtask e2e-web` exited with code 1.\n\n```\nboom\n```"
+            ),
+            "{}",
+            sum.output
+        );
+        assert!(
+            sum.output.contains("\n\n`cargo xtask verify` passed."),
+            "{}",
+            sum.output
+        );
+        assert!(!sum.output.contains("exited with code 0"), "{}", sum.output);
+    }
+
+    #[test]
+    fn a_round_whose_main_command_failed_reads_as_before() {
+        let sum = summarize("cargo xtask verify", (&main_result(false), None), &[]);
+        assert_eq!(
+            sum.output,
+            "`cargo xtask verify` exited with code 1.\n\n```\nmain output\n```"
+        );
     }
 }
