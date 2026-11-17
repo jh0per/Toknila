@@ -73,6 +73,7 @@ reader! {
     last_snapshot_payload(entity: &str, entity_id: &str, field: &str) -> Option<Value>;
     live_runners() -> Vec<(TicketId, AgentRole)>;
     live_runs() -> Vec<toknila_core::schedule::LiveRun>;
+    release_turns(project: ProjectId) -> Vec<toknila_core::merge_line::ReleaseTurn>;
 }
 
 impl UnitOfWork for WriteTx<'_> {
@@ -162,5 +163,10 @@ impl UnitOfWork for WriteTx<'_> {
 
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()> {
         Ok(WriteTx::emit(self, event)?)
+    }
+
+    fn take_release_turn(&mut self, release: ReleaseId) -> AppResult<()> {
+        let entry = super::release_runs::Entry::TurnTaken;
+        Ok(self.journal_release_run(release, &entry)?)
     }
 }

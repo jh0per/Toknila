@@ -48,6 +48,24 @@ pub fn steps(check: Option<&str>, bump: Option<&str>, push: bool) -> Vec<Release
     steps
 }
 
+/// Whether a run with `steps`, of which `passed` passed, is still in its project's merge line: it
+/// is until its Tag, and its Push when it has one, passed (a failed step ends the run).
+pub fn in_merge_line(steps: &[ReleaseStep], passed: &[ReleaseStep]) -> bool {
+    steps
+        .iter()
+        .filter(|s| matches!(s, ReleaseStep::Tag | ReleaseStep::Push))
+        .any(|s| !passed.contains(s))
+}
+
+/// What the Check step of a release says while it waits in the machine's check line: `place` is
+/// its place among those that wait (1 is next), `held` when the machine's load keeps it.
+pub fn check_line_words(place: u32, held: Option<crate::LoadHold>) -> String {
+    match held {
+        Some(held) => held.words(),
+        None => format!("waits for its turn (#{place} in the check line)"),
+    }
+}
+
 /// The version as a person typed it, without a leading `v`, or why it is not one. A version is
 /// numbers separated by dots, with an optional suffix of letters, digits, dots and dashes
 /// (`1.4.0`, `2.0.0-rc.1`): it becomes part of a tag and goes into the bump command.
@@ -201,6 +219,35 @@ mod tests {
         assert!(merges_story(pr, "phase-9", "TOKNILA-14"));
         let renamed = "Merge ship/old-name/toknila-14-add-login: TOKNILA-14 Add login";
         assert!(merges_story(renamed, "phase-9", "TOKNILA-14"), "by key");
+    }
+
+    #[test]
+    fn a_run_holds_the_merge_line_until_its_tag_and_push_passed() {
+        use ReleaseStep::*;
+        assert!(in_merge_line(&[Check, Tag], &[]));
+        assert!(in_merge_line(&[Check, Tag], &[Check]));
+        assert!(!in_merge_line(&[Check, Tag], &[Check, Tag]));
+        assert!(
+            in_merge_line(&[Tag, Push], &[Tag]),
+            "the push is still to go"
+        );
+        assert!(!in_merge_line(&[Tag, Push], &[Tag, Push]));
+    }
+
+    #[test]
+    fn a_waiting_release_check_says_its_place_in_the_check_line() {
+        assert_eq!(
+            check_line_words(2, None),
+            "waits for its turn (#2 in the check line)"
+        );
+        let held = crate::LoadHold {
+            load: 41,
+            cores: 16,
+        };
+        assert_eq!(
+            check_line_words(1, Some(held)),
+            "waits for the machine: load 41 on 16 cores"
+        );
     }
 
     #[test]

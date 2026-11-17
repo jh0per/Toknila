@@ -1,17 +1,16 @@
-//! The line the hand-in checks of a machine stand in. A check runs the project's whole test
-//! suite, so the machine admits only `max_checks` at a time (default 1), across projects, and
-//! a further one only while the one-minute load average is below the number of cores. The
-//! others wait here with their cards in the `Check` turn: an Accept's re-check (a person waits
-//! for it) before the hand-in checks, otherwise first come first served. The line lives in
-//! memory; after a restart the cards still in the `Check` turn are queued again from the
-//! database ([`super::resume`]).
+//! The line the checks of a machine stand in. A check runs the project's whole test suite, so
+//! the machine admits only `max_checks` at a time (default 1), across projects, and a further one
+//! only while the one-minute load average is below the number of cores. The others wait here:
+//! an Accept's re-check and a release's Check (a person waits for them) before the hand-in
+//! checks, otherwise first come first served. The line lives in memory; after a restart the
+//! cards still in the `Check` turn are queued again from the database ([`super::resume`]).
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
 
-use toknila_core::{LoadHold, TicketId};
+use toknila_core::{LoadHold, ReleaseId, TicketId};
 
 use super::{CheckGate, CheckTurn};
 
@@ -41,30 +40,48 @@ impl LoadReader for NoLoad {
     }
 }
 
-/// Why a check enters the line: a person waits for a re-check, nobody for a hand-in.
+/// Why a check enters the line: a person waits for a re-check or a release, nobody for a hand-in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckKind {
     /// The check of a worker's hand-in.
     HandIn,
     /// The check an Accept asked for because main moved: it goes ahead of hand-ins.
     Recheck,
+    /// A release's Check step: it goes ahead of hand-ins, in order with the re-checks.
+    Release,
 }
 
-/// Where cards stand at one moment: those that run, and those that wait, the next one first.
+/// Whose check stands in the line: a card's, or a release run's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Who {
+    Card(TicketId),
+    Release(ReleaseId),
+}
+
+/// Where checks stand at one moment: those that run, and those that wait, the next one first.
 #[derive(Debug, Clone, Default)]
 pub struct Standing {
-    running: Vec<TicketId>,
-    waiting: Vec<(TicketId, Option<LoadHold>)>,
+    running: Vec<Who>,
+    waiting: Vec<(Who, Option<LoadHold>)>,
 }
 
 impl Standing {
     /// `Some((0, None))` the card's check runs now, `Some((n, held))` it is the n-th that waits
     /// (1 is next; `held` when the machine's load keeps it from starting), `None` not in line.
     pub fn place(&self, ticket: TicketId) -> Option<(u32, Option<LoadHold>)> {
-        if self.running.contains(&ticket) {
+        self.place_of(Who::Card(ticket))
+    }
+
+    /// [`Standing::place`] of a release run's Check.
+    pub fn place_release(&self, release: ReleaseId) -> Option<(u32, Option<LoadHold>)> {
+        self.place_of(Who::Release(release))
+    }
+
+    fn place_of(&self, who: Who) -> Option<(u32, Option<LoadHold>)> {
+        if self.running.contains(&who) {
             return Some((0, None));
         }
-        let at = self.waiting.iter().position(|(t, _)| *t == ticket)?;
+        let at = self.waiting.iter().position(|(w, _)| *w == who)?;
         Some((u32::try_from(at + 1).ok()?, self.waiting[at].1))
     }
 }
@@ -78,8 +95,8 @@ fn whole(load: f64) -> u32 {
 
 #[derive(Debug, Default)]
 struct Line {
-    running: Vec<TicketId>,
-    waiting: VecDeque<(TicketId, CheckKind)>,
+    running: Vec<Who>,
+    waiting: VecDeque<(Who, CheckKind)>,
     held: Option<LoadHold>,
 }
 
@@ -103,13 +120,13 @@ impl Default for CheckLine {
 #[derive(Debug)]
 pub struct Turn<'a> {
     line: &'a CheckLine,
-    ticket: TicketId,
+    who: Who,
 }
 
 impl Drop for Turn<'_> {
     fn drop(&mut self) {
         let mut line = self.line.lock();
-        line.running.retain(|t| *t != self.ticket);
+        line.running.retain(|w| *w != self.who);
         self.line.turn.notify_all();
     }
 }
@@ -153,24 +170,30 @@ impl CheckLine {
     /// up. Does nothing when it is already in the line.
     pub fn join(&self, ticket: TicketId, kind: CheckKind) {
         let mut line = self.lock();
-        Self::queue(&mut line, ticket, kind);
+        Self::queue(&mut line, Who::Card(ticket), kind);
     }
 
-    /// Puts a card that is not in the line yet in its place: a re-check behind the re-checks
-    /// already waiting and ahead of every hand-in, a hand-in at the end.
-    fn queue(line: &mut Line, ticket: TicketId, kind: CheckKind) {
-        if line.running.contains(&ticket) || line.waiting.iter().any(|(t, _)| *t == ticket) {
+    /// A release run's Check takes its place in the line ([`CheckKind::Release`]).
+    pub fn join_release(&self, release: ReleaseId) {
+        let mut line = self.lock();
+        Self::queue(&mut line, Who::Release(release), CheckKind::Release);
+    }
+
+    /// Puts a check that is not in the line yet in its place: a re-check or a release's Check
+    /// behind those of them already waiting and ahead of every hand-in, a hand-in at the end.
+    fn queue(line: &mut Line, who: Who, kind: CheckKind) {
+        if line.running.contains(&who) || line.waiting.iter().any(|(w, _)| *w == who) {
             return;
         }
         let at = match kind {
             CheckKind::HandIn => line.waiting.len(),
-            CheckKind::Recheck => line
+            CheckKind::Recheck | CheckKind::Release => line
                 .waiting
                 .iter()
-                .take_while(|(_, k)| *k == CheckKind::Recheck)
+                .take_while(|(_, k)| *k != CheckKind::HandIn)
                 .count(),
         };
-        line.waiting.insert(at, (ticket, kind));
+        line.waiting.insert(at, (who, kind));
     }
 
     /// Whether the next card may start now: fewer than `max_checks` run and, when another check
@@ -201,8 +224,32 @@ impl CheckLine {
     /// The card leaves the line without having run (its work was dropped).
     pub fn leave(&self, ticket: TicketId) {
         let mut line = self.lock();
-        line.waiting.retain(|(t, _)| *t != ticket);
+        line.waiting.retain(|(w, _)| *w != Who::Card(ticket));
         self.turn.notify_all();
+    }
+
+    /// A release run's Check joins the line (when it is not in it) and waits for its turn,
+    /// which lasts until the returned guard is dropped.
+    pub fn enter_release(&self, release: ReleaseId) -> Turn<'_> {
+        self.enter_as(Who::Release(release), CheckKind::Release)
+    }
+
+    fn enter_as(&self, who: Who, kind: CheckKind) -> Turn<'_> {
+        let mut line = self.lock();
+        Self::queue(&mut line, who, kind);
+        // Only the next check looks at the machine; the others wait behind it. One held by load
+        // looks again every `poll`, since the load changes with no one to wake it.
+        while line.waiting.front().map(|(w, _)| w) != Some(&who) || !self.admits(&mut line) {
+            line = self
+                .turn
+                .wait_timeout(line, self.poll)
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .0;
+        }
+        line.waiting.pop_front();
+        line.held = None;
+        line.running.push(who);
+        Turn { line: self, who }
     }
 
     /// Where every card in the line stands.
@@ -219,30 +266,24 @@ impl CheckLine {
         }
     }
 
-    /// Every card in the line, the running ones first.
+    /// Every card in the line, the running ones first (a release's Check is left out).
     pub fn snapshot(&self) -> Vec<TicketId> {
         let line = self.lock();
-        let waiting = line.waiting.iter().map(|(t, _)| t);
-        line.running.iter().chain(waiting).copied().collect()
+        let waiting = line.waiting.iter().map(|(w, _)| w);
+        let card = |w: &Who| match w {
+            Who::Card(t) => Some(*t),
+            Who::Release(_) => None,
+        };
+        line.running
+            .iter()
+            .chain(waiting)
+            .filter_map(card)
+            .collect()
     }
 }
 
 impl CheckGate for CheckLine {
     fn enter(&self, ticket: TicketId, kind: CheckKind) -> Box<dyn CheckTurn + '_> {
-        let mut line = self.lock();
-        Self::queue(&mut line, ticket, kind);
-        // Only the next card looks at the machine; the others wait behind it. A card held by
-        // load looks again every `poll`, since the load changes with no one to wake it.
-        while line.waiting.front().map(|(t, _)| t) != Some(&ticket) || !self.admits(&mut line) {
-            line = self
-                .turn
-                .wait_timeout(line, self.poll)
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .0;
-        }
-        line.waiting.pop_front();
-        line.held = None;
-        line.running.push(ticket);
-        Box::new(Turn { line: self, ticket })
+        Box::new(self.enter_as(Who::Card(ticket), kind))
     }
 }

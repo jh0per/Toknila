@@ -4,18 +4,21 @@
 //! event for the ticket: `MergeDone`, or a block with a typed reason.
 
 use toknila_core::guard::ShipProblem;
-use toknila_core::machine::TicketEvent;
 use toknila_core::pr::PrSpec;
 use toknila_core::{
-    BlockedReason, Chain, MergeMode, MergeSettings, MergeSpec, PullRequest, Recheck, ReviewTurn,
-    ShipSpec, Ticket, TicketId, TicketKey, TicketStatus,
+    Chain, MergeMode, MergeSpec, PullRequest, Recheck, ReviewTurn, ShipSpec, Ticket, TicketKey,
+    TicketStatus,
 };
 
-use crate::chain::tell_ticket;
 use crate::external::{ExternalEffect, Host};
 use crate::ships::{self, GuardError};
 use crate::sync::{self, Seen, SyncOutcome, SyncSpec};
 use crate::{AppResult, GitError, UnitOfWork};
+
+mod line;
+mod outcome;
+pub use line::{advance, line_of, place_unplaced, take_release_turn};
+pub(crate) use outcome::finished;
 
 /// How a merge ended when nothing went wrong on the host.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,15 +164,19 @@ fn main_moved(host: &Host<'_>, spec: &MergeSpec) -> Option<MergeOutcome> {
         .then_some(MergeOutcome::MainMoved { commits })
 }
 
-/// `Merge`: queue the merge for after the commit. A card without a ship (its project has no
-/// repository, or it never started) has nothing to merge: the host answers right away. In
-/// pull-request mode the spec says whether the pull request is already open (the card has one):
-/// then the host only looks at it.
+/// `Merge`: queue the merge for after the commit, when the card holds its project's merge line;
+/// one that waits in it is queued when its turn comes ([`advance`]). A card without a ship (its
+/// project has no repository, or it never started) has nothing to merge: the host answers right
+/// away. In pull-request mode the spec says whether the pull request is already open (the card
+/// has one): then the host only looks at it.
 pub(crate) fn queue_merge<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     chain: &Chain,
     ticket: &Ticket,
 ) -> AppResult<()> {
+    if !ticket.review.merge_line.is_some_and(|p| p.holds) {
+        return Ok(());
+    }
     let project = uow
         .project(chain.project_id)?
         .ok_or_else(|| crate::AppError::not_found(format!("project of epic {}", chain.name)))?;
@@ -221,125 +228,21 @@ pub fn poll<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Vec<TicketKey>> {
     Ok(asked)
 }
 
-/// After a daemon start: a merge that was running when it stopped is queued again. It is safe to
-/// repeat: a merge that had landed finds its branch already in the base.
+/// After a daemon start: a merge that was running when it stopped (its card holds the merge
+/// line's turn) is queued again. It is safe to repeat: a merge that had landed finds its branch
+/// already in the base. The cards that wait in the line keep waiting.
 pub fn resume<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Vec<TicketKey>> {
     let mut resumed = Vec::new();
     for chain in uow.chains(None)? {
         for t in uow.tickets(Some(chain.id))? {
-            if t.status == TicketStatus::Review && t.review.turn == Some(ReviewTurn::Merging) {
+            if t.status == TicketStatus::Review
+                && t.review.turn == Some(ReviewTurn::Merging)
+                && t.review.merge_line.is_some_and(|p| p.holds)
+            {
                 queue_merge(uow, &chain, &t)?;
                 resumed.push(t.key);
             }
         }
     }
     Ok(resumed)
-}
-
-/// The host answered: the ticket is told through the machine.
-pub(crate) fn finished<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    ticket: TicketId,
-    result: Result<MergeOutcome, MergeError>,
-) -> AppResult<()> {
-    let event = match result {
-        Ok(MergeOutcome::Merged { .. } | MergeOutcome::UpToDate) => TicketEvent::MergeDone,
-        Ok(MergeOutcome::PrMerged { pr }) => {
-            record_pr(uow, ticket, pr)?;
-            TicketEvent::MergeDone
-        }
-        Ok(MergeOutcome::PrOpen { pr }) => return record_pr(uow, ticket, pr),
-        Ok(MergeOutcome::MainMoved { commits }) => TicketEvent::MainMoved {
-            text: match commits {
-                Some(1) => "main moved since the check: 1 commit".to_owned(),
-                Some(n) => format!("main moved since the check: {n} commits"),
-                None => "main moved since the check".to_owned(),
-            },
-        },
-        Ok(MergeOutcome::CiFailed { pr, failed }) => {
-            let url = pr.url.clone();
-            record_pr(uow, ticket, pr)?;
-            block(BlockedReason::CiFailed {
-                url,
-                checks: failed,
-            })
-        }
-        Ok(MergeOutcome::PrClosed { url }) => block(BlockedReason::PrClosed { url }),
-        Ok(MergeOutcome::PrConflict { url }) => {
-            let text = format!(
-                "GitHub reports a merge conflict on {url}. Merge the base branch into the ship, resolve it, run the gates, commit, then finish again."
-            );
-            conflict(uow, ticket, text)?
-        }
-        Ok(MergeOutcome::BaseConflict { detail }) => conflict(uow, ticket, detail)?,
-        Ok(MergeOutcome::Conflict { files }) => {
-            let base = base_of(uow, ticket)?.unwrap_or_else(|| "the base branch".to_owned());
-            let text = sync::conflict_text(&base, &files, &[]);
-            conflict(uow, ticket, text)?
-        }
-        Ok(MergeOutcome::ShipUncommitted { files }) => {
-            block(BlockedReason::ShipUncommitted { files })
-        }
-        Ok(MergeOutcome::ShipEmpty) => block(BlockedReason::ShipEmpty),
-        Ok(MergeOutcome::BaseCheckoutDirty { path }) => {
-            block(BlockedReason::BaseCheckoutDirty { path })
-        }
-        Err(e) => block(BlockedReason::MergeFailed {
-            detail: e.to_string(),
-        }),
-    };
-    tell_ticket(uow, ticket, event)
-}
-
-/// A conflict at Accept: a card with a ship goes back to its agent as a round (the Accept is
-/// remembered); a card without one (the sim profile) is blocked with `merge_conflict`.
-fn conflict<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    ticket: TicketId,
-    text: String,
-) -> AppResult<TicketEvent> {
-    Ok(if uow.ship(ticket)?.is_some() {
-        TicketEvent::MergeConflicted { text }
-    } else {
-        block(BlockedReason::MergeConflict { detail: text })
-    })
-}
-
-/// The base branch the card's work merges into, when it has a project to say.
-fn base_of<U: UnitOfWork + ?Sized>(uow: &mut U, ticket: TicketId) -> AppResult<Option<String>> {
-    let Some(t) = uow.ticket(ticket)? else {
-        return Ok(None);
-    };
-    let (Some(chain), Some(ship)) = (uow.chain(t.chain_id)?, uow.ship(ticket)?) else {
-        return Ok(None);
-    };
-    let Some(project) = uow.project(chain.project_id)? else {
-        return Ok(None);
-    };
-    Ok(ShipSpec::for_ticket(&project, &chain, &t)
-        .map(|s| s.merge_spec(&t.title, &ship.path).look.start))
-}
-
-/// The card's pull request as the host last saw it (an unchanged one changes nothing, so the
-/// journal gets no entry for it).
-fn record_pr<U: UnitOfWork + ?Sized>(
-    uow: &mut U,
-    ticket: TicketId,
-    pr: PullRequest,
-) -> AppResult<()> {
-    let ask_after_secs = match uow.ticket(ticket)? {
-        Some(t) => match uow.chain(t.chain_id)? {
-            Some(chain) => uow
-                .project(chain.project_id)?
-                .map(|p| p.merge.no_checks_timeout_secs),
-            None => None,
-        },
-        None => None,
-    }
-    .unwrap_or(MergeSettings::DEFAULT_NO_CHECKS_TIMEOUT_SECS);
-    tell_ticket(uow, ticket, TicketEvent::PrUpdated { pr, ask_after_secs })
-}
-
-fn block(reason: BlockedReason) -> TicketEvent {
-    TicketEvent::Block { reason }
 }

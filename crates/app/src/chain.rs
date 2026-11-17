@@ -263,6 +263,7 @@ where
 {
     let (out, project) = run_chain_in(uow, chain, f)?;
     schedule::run(uow, project)?;
+    merges::advance(uow, project)?;
     Ok(out)
 }
 

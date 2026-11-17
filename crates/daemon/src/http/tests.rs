@@ -29,6 +29,7 @@ mod discussion;
 mod hand_in_only;
 mod inbox;
 mod machine;
+mod merge_line;
 mod merges;
 mod moves;
 mod parallel;

@@ -8,7 +8,7 @@ use toknila_core::graph::ChainView;
 use toknila_core::{
     Actor, AgentRole, Chain, ChainId, Comment, PinId, Project, ProjectId, Release, ReleaseId, Ship,
     Subtask, Thread, ThreadId, ThreadMessage, ThreadVersion, Ticket, TicketId, TicketKey,
-    Timestamp, suggestion::Suggestion,
+    Timestamp, merge_line::ReleaseTurn, suggestion::Suggestion,
 };
 
 use crate::AppResult;
@@ -83,6 +83,11 @@ pub trait Reader {
             .map(|(t, r)| (t, r, toknila_core::Timestamp(0)))
             .collect())
     }
+    /// The release runs of a project that stand in its merge line (running, their Tag or Push
+    /// still to pass), in the order they began. A host without release runs has none.
+    fn release_turns(&self, _project: ProjectId) -> AppResult<Vec<ReleaseTurn>> {
+        Ok(Vec::new())
+    }
     /// Payload of the newest journal event about one entity that carries a snapshot under
     /// `field`; events without one are skipped.
     fn last_snapshot_payload(
@@ -142,4 +147,11 @@ pub trait UnitOfWork: Reader {
     fn defer(&mut self, effect: crate::external::ExternalEffect);
     /// Journals a domain event.
     fn emit(&mut self, event: &DomainEvent) -> AppResult<()>;
+    /// The release run of `release` takes its turn in its project's merge line (see
+    /// [`crate::merges::take_release_turn`]). A host without release runs refuses.
+    fn take_release_turn(&mut self, release: ReleaseId) -> AppResult<()> {
+        Err(crate::AppError::conflict(format!(
+            "this store keeps no release runs ({release})"
+        )))
+    }
 }

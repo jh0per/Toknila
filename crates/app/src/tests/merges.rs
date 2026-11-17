@@ -24,11 +24,14 @@ pub(super) struct FakeMerger {
     pub(super) sync_answer: RefCell<Result<SyncOutcome, MergeError>>,
     /// What main and the ship's HEAD are at; `None` is a merger that cannot say.
     pub(super) seen_answer: RefCell<Option<Seen>>,
+    /// A merge moves main: afterwards `seen` answers a commit named after the merged branch.
+    pub(super) moves_main: std::cell::Cell<bool>,
 }
 
 impl Default for FakeMerger {
     fn default() -> Self {
         Self {
+            moves_main: std::cell::Cell::new(false),
             seen_answer: RefCell::default(),
             asked: RefCell::default(),
             synced: RefCell::default(),
@@ -43,7 +46,15 @@ impl Default for FakeMerger {
 impl Merger for FakeMerger {
     fn merge(&self, spec: &MergeSpec) -> Result<MergeOutcome, MergeError> {
         self.asked.borrow_mut().push(spec.clone());
-        self.answer.borrow().clone()
+        let answer = self.answer.borrow().clone();
+        if self.moves_main.get() && matches!(answer, Ok(MergeOutcome::Merged { .. })) {
+            *self.seen_answer.borrow_mut() = Some(Seen {
+                base: format!("merged-{}", spec.branch),
+                head: format!("head-of-{}", spec.branch),
+                commits: Some(1),
+            });
+        }
+        answer
     }
 
     fn sync(&self, spec: &SyncSpec) -> Result<SyncOutcome, MergeError> {
