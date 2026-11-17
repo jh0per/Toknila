@@ -230,6 +230,7 @@ fn brief_of_key<'a>(
 }
 
 mod repo_tools;
+mod scripts;
 pub(super) use repo_tools::repo_tools;
 
 pub(super) use super::resumed::{briefed, resumed_argv};
@@ -258,10 +259,10 @@ pub(super) fn prepare_with(
     // The tests and checks the hand-in names: the check command's toolchain and the repository's.
     let tool_names: Vec<String> = cx.brief.repo_tools.iter().map(|t| t.tool.clone()).collect();
     let profile = &profile.with_reviewer_checks(cx.brief.check_command.as_deref(), &tool_names);
-    let review_commands = match cx.role {
-        AgentRole::Reviewer => toknila_core::reviewer_commands(&cx.brief.repo_tools),
-        _ => Vec::new(),
-    };
+    // And the repository scripts its Checks lines run, each by its exact command.
+    let scripts = scripts::of_hand_in(cx);
+    let profile = &profile.with_reviewer_scripts(&scripts);
+    let review_commands = scripts::review_commands(cx.role, &cx.brief.repo_tools, scripts);
     // A planner run is labelled by its project's key; there is no card.
     let key = match cx.role {
         AgentRole::Planner => cx.key.project().to_string(),
