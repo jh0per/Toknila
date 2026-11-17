@@ -33,14 +33,14 @@ export function withView(route: Route, view: ChainView | undefined): Route {
 export type ProjectSection = "general" | "agents" | "review" | "plans" | "designs" | "advanced";
 
 /// The pages of the settings list that are not about one project.
-export type AppSection = "profiles" | "updates" | "about" | "checks";
+export type AppSection = "profiles" | "machine" | "updates" | "about" | "checks";
 
 /// The sections of the settings screen: the flat list (Projects, Agents, Updates, About, System
 /// checks) and, under Projects, the focused project's sections.
 export type SettingsSection = AppSection | ProjectSection;
 
 export const PROJECT_SECTIONS: ProjectSection[] = ["general", "agents", "review", "plans", "designs", "advanced"];
-export const APP_SECTIONS: AppSection[] = ["profiles", "updates", "about", "checks"];
+export const APP_SECTIONS: AppSection[] = ["profiles", "machine", "updates", "about", "checks"];
 const ALL_SECTIONS: SettingsSection[] = [...APP_SECTIONS, ...PROJECT_SECTIONS];
 
 /// Addresses of earlier versions, kept working: the danger zone moved under Advanced, the App

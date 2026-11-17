@@ -7,6 +7,7 @@ import { NavLink } from "./Link";
 const PAGES: { id: string; label: string; section: SettingsSection | undefined }[] = [
   { id: "projects", label: "Projects", section: undefined },
   { id: "profiles", label: "Agents", section: "profiles" },
+  { id: "machine", label: "Machine", section: "machine" },
   { id: "updates", label: "Updates", section: "updates" },
   { id: "about", label: "About", section: "about" },
   { id: "checks", label: "System checks", section: "checks" },

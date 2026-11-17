@@ -30,16 +30,14 @@ use crate::server::{AppState, Principal, now};
 /// checker last reported. `None` outside the check turn.
 fn check_phase_of(
     t: &toknila_core::Ticket,
-    line: &[toknila_core::TicketId],
+    line: &toknila_app::checks::Standing,
 ) -> Option<toknila_core::CheckPhase> {
     if t.review.turn != Some(ReviewTurn::Check) {
         return None;
     }
-    line.iter()
-        .position(|c| *c == t.id)
-        .and_then(|i| u32::try_from(i).ok())
-        .filter(|p| *p > 0)
-        .map(|place| toknila_core::CheckPhase::Queued { place })
+    line.place(t.id)
+        .filter(|(place, _)| *place > 0)
+        .map(|(place, held)| toknila_core::CheckPhase::Queued { place, held })
         .or_else(|| t.review.check.clone())
 }
 
@@ -165,7 +163,7 @@ pub async fn list_tickets(
     Query(q): Query<TicketQuery>,
 ) -> ApiResult<Json<Vec<TicketItem>>> {
     let at = now();
-    let line = state.store.check_line().snapshot();
+    let line = state.store.check_line().standing();
     let items = read(&state, move |repo| {
         let chain = q
             .chain

@@ -28,6 +28,7 @@ mod designs;
 mod discussion;
 mod hand_in_only;
 mod inbox;
+mod machine;
 mod merges;
 mod moves;
 mod parallel;
@@ -1002,6 +1003,7 @@ async fn openapi_describes_every_route() {
             "/chains/{chain}/tickets/{ticket}/move",
             "/chains/{chain}/wildcards",
             "/events",
+            "/machine/settings",
             "/planner/activity",
             "/planner/say",
             "/profiles",

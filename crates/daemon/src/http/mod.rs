@@ -38,10 +38,10 @@ impl Modify for BearerAuth {
 /// `/v1` routes (without auth; the server adds it) and the OpenAPI document describing them.
 pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
     use routes::{
-        agents::*, asks::*, chains::*, conversation::*, designs::*, events::*, inbox::*, pins::*,
-        plan_view::*, planner_activity::*, planner_run::*, plans::*, profiles::*, projects::*,
-        questions::*, release_mark::*, releases::*, runner::*, strays::*, system::*, threads::*,
-        tickets::*, usage::*, workspaces::*,
+        agents::*, asks::*, chains::*, conversation::*, designs::*, events::*, inbox::*,
+        machine::*, pins::*, plan_view::*, planner_activity::*, planner_run::*, plans::*,
+        profiles::*, projects::*, questions::*, release_mark::*, releases::*, runner::*, strays::*,
+        system::*, threads::*, tickets::*, usage::*, workspaces::*,
     };
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(list_profiles))
@@ -68,6 +68,7 @@ pub fn v1() -> (axum::Router<AppState>, utoipa::openapi::OpenApi) {
         .routes(routes!(repos_check))
         .routes(routes!(repos_prepare))
         .routes(routes!(list_agents))
+        .routes(routes!(get_machine_settings, put_machine_settings))
         .routes(routes!(get_usage))
         .routes(routes!(get_usage_today))
         .routes(routes!(put_usage_settings))
