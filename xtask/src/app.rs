@@ -1,13 +1,18 @@
-//! `cargo xtask app`: the macOS bundle (`Toknila.app` and a `.dmg`) for the host architecture,
-//! ad-hoc signed so it runs on the Mac that built it. No Developer ID, no notarisation: handing it
-//! to other people is a later job. The desktop shell, its sidecars and the staging are shared
-//! with `cargo xtask desktop`. `--target <triple>` builds for another macOS architecture; the
-//! same step packs and signs the archive the in-app updater installs (see `updates.rs`).
+//! `cargo xtask app`: the macOS bundle (`Toknila.app` and a `.dmg`) for the host architecture, for
+//! developers: signed ad hoc so it runs on the Mac that built it (or with the identity
+//! `APPLE_SIGNING_IDENTITY` names, which CI's `ci` mode sets), not notarized. The release's signed
+//! and notarized app is `cargo xtask mac-release` (`mac_release.rs`); it builds the bundle with
+//! [`assemble`] and the dmg with [`make_dmg`] from here. The desktop shell, its sidecars and the
+//! staging are shared with `cargo xtask desktop`. `--target <triple>` builds for another macOS
+//! architecture; the same step packs and signs the archive the in-app updater installs (see
+//! `updates.rs`).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::{cargo, run, updates, versions, web};
+use crate::mac_settings::IDENTITY;
+use crate::runner::{Cmd, Exec, Process, Redact, check};
+use crate::{run, updates, versions, web};
 
 /// The repository root, resolved. The manifest folder is read from the environment cargo sets
 /// when it runs the task: the compiled-in path can belong to another checkout when several share
@@ -23,10 +28,11 @@ pub fn root() -> Result<PathBuf, String> {
         .map_err(|e| format!("repo root: {e}"))
 }
 
-/// The cargo target directory of the main workspace.
-fn target_dir(root: &Path) -> PathBuf {
-    std::env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
+/// The cargo target directory of the main workspace: `over` when given, else `CARGO_TARGET_DIR`,
+/// else `target` in the repository.
+fn target_dir(root: &Path, over: Option<&Path>) -> PathBuf {
+    over.map(Path::to_path_buf)
+        .or_else(|| std::env::var_os("CARGO_TARGET_DIR").map(PathBuf::from))
         .unwrap_or_else(|| root.join("target"))
 }
 
@@ -45,7 +51,7 @@ fn built_dir(target_dir: &Path, triple: Option<&str>, profile: &str) -> PathBuf 
 }
 
 /// The architecture name of a target triple (`aarch64-apple-darwin` is `aarch64`).
-fn arch_of(triple: &str) -> &str {
+pub fn arch_of(triple: &str) -> &str {
     triple.split('-').next().unwrap_or(triple)
 }
 
@@ -62,8 +68,13 @@ fn host_triple() -> Result<String, String> {
 
 /// Copies `toknila` and `tok` built under `profile` ("debug" or "release") to where Tauri looks
 /// for sidecars: `binaries/<name>-<triple>` in the shell folder. `target` is the triple they
-/// were cross-built for; `None` means this machine's.
-pub fn stage_sidecars(root: &Path, profile: &str, target: Option<&str>) -> Result<(), String> {
+/// were cross-built for; `None` means this machine's. `built` is the build folder, if not the default.
+pub fn stage_sidecars(
+    root: &Path,
+    profile: &str,
+    target: Option<&str>,
+    built: Option<&Path>,
+) -> Result<(), String> {
     let host = match target {
         Some(t) => t.to_owned(),
         None => host_triple()?,
@@ -72,11 +83,93 @@ pub fn stage_sidecars(root: &Path, profile: &str, target: Option<&str>) -> Resul
     let binaries = shell_dir(root).join("binaries");
     std::fs::create_dir_all(&binaries).map_err(|e| format!("binaries/: {e}"))?;
     for name in ["toknila", "tok"] {
-        let from = built_dir(&target_dir(root), target, profile).join(format!("{name}{exe}"));
+        let from =
+            built_dir(&target_dir(root, built), target, profile).join(format!("{name}{exe}"));
         let to = binaries.join(format!("{name}-{host}{exe}"));
         std::fs::copy(&from, &to).map_err(|e| format!("copy {}: {e}", from.display()))?;
     }
     Ok(())
+}
+
+/// Runs cargo, with `CARGO_TARGET_DIR` set to `target_dir` when one is given.
+fn cargo_in(args: &[&str], target_dir: Option<&Path>) -> Result<(), String> {
+    eprintln!("$ cargo {}", args.join(" "));
+    let mut cmd = Command::new(crate::cargo_bin());
+    cmd.args(args);
+    if let Some(t) = target_dir {
+        cmd.env("CARGO_TARGET_DIR", t);
+    }
+    let status = cmd.status().map_err(|e| format!("cannot run cargo: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("`cargo {}` exited with {status}", args.join(" ")))
+    }
+}
+
+/// One bundle's build: the target triple (`None`: this Mac's) and the build folder (`None`: the
+/// default one).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Build<'a> {
+    pub triple: Option<&'a str>,
+    pub target_dir: Option<&'a Path>,
+}
+
+/// Builds `toknila`, `tok` and the shell for one target and assembles `<out>/Toknila.app`, not yet
+/// signed; `out` is emptied first. The web page must be built before (`cargo xtask web`).
+pub fn assemble(root: &Path, b: Build, version: &str, out: &Path) -> Result<PathBuf, String> {
+    let mut build = vec!["build", "--release", "--locked"];
+    build.extend(b.triple.iter().flat_map(|t| ["--target", t]));
+    build.extend(["--bin", "toknila", "--bin", "tok"]);
+    cargo_in(&build, b.target_dir)?;
+    stage_sidecars(root, "release", b.triple, b.target_dir)?;
+    let shell = shell_dir(root);
+    let manifest = shell.join("Cargo.toml");
+    let manifest = manifest.to_string_lossy();
+    // `custom-protocol` makes the shell serve its own start page instead of a dev server.
+    let mut build = vec!["build", "--release", "--locked"];
+    build.extend(b.triple.iter().flat_map(|t| ["--target", t]));
+    build.extend([
+        "--manifest-path",
+        &manifest,
+        "--features",
+        "custom-protocol",
+    ]);
+    cargo_in(&build, b.target_dir)?;
+    let shell_target = b
+        .target_dir
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::var_os("CARGO_TARGET_DIR").map(PathBuf::from))
+        .unwrap_or_else(|| shell.join("target"));
+
+    let _ = std::fs::remove_dir_all(out);
+    let bundle = out.join("Toknila.app");
+    let macos = bundle.join("Contents/MacOS");
+    let resources = bundle.join("Contents/Resources");
+    for d in [&macos, &resources] {
+        std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
+    }
+    let target = built_dir(&target_dir(root, b.target_dir), b.triple, "release");
+    let copies = [
+        (
+            built_dir(&shell_target, b.triple, "release").join("toknila-desktop"),
+            "toknila-desktop",
+        ),
+        (target.join("toknila"), "toknila"),
+        (target.join("tok"), "tok"),
+    ];
+    for (from, name) in &copies {
+        std::fs::copy(from, macos.join(name))
+            .map_err(|e| format!("copy {}: {e}", from.display()))?;
+    }
+    std::fs::write(bundle.join("Contents/Info.plist"), info_plist(version))
+        .map_err(|e| format!("Info.plist: {e}"))?;
+    icon(
+        &shell.join("icons/icon.png"),
+        &resources.join("icon.icns"),
+        out,
+    )?;
+    Ok(bundle)
 }
 
 /// Builds the bundle and prints where the `.app` and the `.dmg` are.
@@ -94,115 +187,82 @@ pub fn app() -> Result<(), String> {
     let version = versions::current(&root)?;
     // The window shows the page the daemon embeds, so the web build comes first.
     web()?;
-    let mut build = vec!["build", "--release", "--locked"];
-    build.extend(triple.iter().flat_map(|t| ["--target", t]));
-    build.extend(["--bin", "toknila", "--bin", "tok"]);
-    cargo(&build)?;
-    stage_sidecars(&root, "release", triple)?;
-    let shell = shell_dir(&root);
-    let manifest = shell.join("Cargo.toml");
-    let manifest = manifest.to_string_lossy();
-    // `custom-protocol` makes the shell serve its own start page instead of a dev server.
-    let mut build = vec!["build", "--release", "--locked"];
-    build.extend(triple.iter().flat_map(|t| ["--target", t]));
-    build.extend([
-        "--manifest-path",
-        &manifest,
-        "--features",
-        "custom-protocol",
-    ]);
-    cargo(&build)?;
-    let shell_target = std::env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| shell.join("target"));
-
     let out = root.join("dist/app");
-    let _ = std::fs::remove_dir_all(&out);
-    let bundle = out.join("Toknila.app");
-    let macos = bundle.join("Contents/MacOS");
-    let resources = bundle.join("Contents/Resources");
-    for d in [&macos, &resources] {
-        std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
-    }
-    let target = built_dir(&target_dir(&root), triple, "release");
-    let copies = [
-        (
-            built_dir(&shell_target, triple, "release").join("toknila-desktop"),
-            "toknila-desktop",
-        ),
-        (target.join("toknila"), "toknila"),
-        (target.join("tok"), "tok"),
-    ];
-    for (from, name) in &copies {
-        std::fs::copy(from, macos.join(name))
-            .map_err(|e| format!("copy {}: {e}", from.display()))?;
-    }
-    std::fs::write(bundle.join("Contents/Info.plist"), info_plist(&version))
-        .map_err(|e| format!("Info.plist: {e}"))?;
-    icon(
-        &shell.join("icons/icon.png"),
-        &resources.join("icon.icns"),
-        &out,
-    )?;
+    let build = Build {
+        triple,
+        target_dir: None,
+    };
+    let bundle = assemble(&root, build, &version, &out)?;
 
     // One identity for every build when `APPLE_SIGNING_IDENTITY` names one (macOS keeps the
     // privacy permissions it granted under it across updates); ad hoc ("-") otherwise: runs here,
-    // carries no identity. Nested code first, then the bundle.
-    let identity = std::env::var("APPLE_SIGNING_IDENTITY")
+    // carries no identity. Nested code first, then the bundle. Its value is never printed.
+    let identity = std::env::var(IDENTITY)
         .ok()
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "-".to_owned());
+    let mut redact = Redact::default();
     match identity.as_str() {
-        "-" => println!("xtask app: signing ad hoc (APPLE_SIGNING_IDENTITY not set)"),
-        id => println!("xtask app: signing with {id}"),
+        "-" => println!("xtask app: signing ad hoc ({IDENTITY} not set)"),
+        id => {
+            redact.add(IDENTITY, id);
+            println!("xtask app: signing with the identity {IDENTITY} names");
+        }
     }
-    let path = |p: &Path| p.to_string_lossy().into_owned();
-    for name in ["toknila", "tok", "toknila-desktop"] {
-        let bin = path(&macos.join(name));
-        run("codesign", &["--force", "--sign", &identity, &bin], &out)?;
+    let mut exec = Process::new(redact);
+    let macos = bundle.join("Contents/MacOS");
+    for what in [
+        macos.join("toknila"),
+        macos.join("tok"),
+        macos.join("toknila-desktop"),
+        bundle.clone(),
+    ] {
+        let sign = Cmd::new("codesign", &out)
+            .args(["--force", "--sign", &identity])
+            .path(&what);
+        check(&mut exec, &sign)?;
     }
-    let app_path = path(&bundle);
-    run(
-        "codesign",
-        &["--force", "--sign", &identity, &app_path],
-        &out,
-    )?;
-    run("codesign", &["--verify", "--strict", &app_path], &out)?;
-
-    let stage = out.join("dmg");
-    std::fs::create_dir_all(&stage).map_err(|e| format!("{}: {e}", stage.display()))?;
-    run(
-        "ditto",
-        &[&app_path, &path(&stage.join("Toknila.app"))],
-        &out,
-    )?;
-    link_applications(&stage)?;
-    let dmg = out.join(format!("Toknila-{version}-{arch}.dmg"));
-    // `hdiutil create` fails now and then on a busy runner ("Resource busy"): try again.
-    retry(DMG_ATTEMPTS, DMG_PAUSE, "dmg", || {
-        run(
-            "hdiutil",
-            &[
-                "create",
-                "-volname",
-                "Toknila",
-                "-srcfolder",
-                &path(&stage),
-                "-ov",
-                "-format",
-                "UDZO",
-                &path(&dmg),
-            ],
-            &out,
-        )
-    })?;
-    let _ = std::fs::remove_dir_all(&stage);
+    let verify = Cmd::new("codesign", &out)
+        .args(["--verify", "--strict"])
+        .path(&bundle);
+    check(&mut exec, &verify)?;
+    let dmg = make_dmg(&mut exec, &out, &version, &arch)?;
     let archive = updates::package(&out, &version, &arch)?;
     eprintln!("xtask app: PASS");
     eprintln!("  app: {}", bundle.display());
     eprintln!("  dmg: {}", dmg.display());
     eprintln!("  update archive: {}", archive.display());
     Ok(())
+}
+
+/// Makes `<out>/Toknila-<version>-<arch>.dmg` from `<out>/Toknila.app` with a link to
+/// Applications beside it, and returns its path.
+pub fn make_dmg(
+    exec: &mut dyn Exec,
+    out: &Path,
+    version: &str,
+    arch: &str,
+) -> Result<PathBuf, String> {
+    let stage = out.join("dmg");
+    let _ = std::fs::remove_dir_all(&stage);
+    std::fs::create_dir_all(&stage).map_err(|e| format!("{}: {e}", stage.display()))?;
+    let ditto = Cmd::new("ditto", out)
+        .path(&out.join("Toknila.app"))
+        .path(&stage.join("Toknila.app"));
+    check(exec, &ditto)?;
+    link_applications(&stage)?;
+    let dmg = out.join(format!("Toknila-{version}-{arch}.dmg"));
+    let create = Cmd::new("hdiutil", out)
+        .args(["create", "-volname", "Toknila", "-srcfolder"])
+        .path(&stage)
+        .args(["-ov", "-format", "UDZO"])
+        .path(&dmg);
+    // `hdiutil create` fails now and then on a busy runner ("Resource busy"): try again.
+    retry(DMG_ATTEMPTS, DMG_PAUSE, "dmg", || {
+        check(exec, &create).map(|_| ())
+    })?;
+    let _ = std::fs::remove_dir_all(&stage);
+    Ok(dmg)
 }
 
 /// How many times the dmg step is tried, and the pause between tries.
@@ -262,7 +322,8 @@ fn link_applications(_: &Path) -> Result<(), String> {
 }
 
 /// `Info.plist` of the bundle: the shell is the main executable, the daemon and the CLI sit
-/// next to it in `Contents/MacOS`.
+/// next to it in `Contents/MacOS`. The two usage descriptions are what the microphone button
+/// needs under the hardened runtime too (with the audio-input entitlement in `entitlements.plist`).
 fn info_plist(version: &str) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -346,6 +407,10 @@ mod tests {
             built_dir(Path::new("t"), Some("x86_64-apple-darwin"), "release"),
             Path::new("t/x86_64-apple-darwin/release")
         );
+        assert_eq!(
+            target_dir(Path::new("repo"), Some(Path::new("/cache"))),
+            Path::new("/cache")
+        );
     }
 
     #[test]
@@ -386,5 +451,23 @@ mod tests {
         let p = info_plist("1.0.0");
         assert!(p.contains("<key>NSMicrophoneUsageDescription</key><string>Toknila listens"));
         assert!(p.contains("<key>NSSpeechRecognitionUsageDescription</key><string>Toknila turns"));
+    }
+
+    /// Notarization needs ASCII XML entitlements without `get-task-allow`; the hardened runtime
+    /// needs `audio-input` for the microphone. Nothing else is granted (see docs/install.md).
+    #[test]
+    fn the_entitlements_grant_audio_input_and_nothing_else() {
+        let root = root().expect("repo root");
+        let text = std::fs::read_to_string(crate::mac_sign::entitlements(&root)).expect("read");
+        assert!(text.is_ascii());
+        let keys: Vec<&str> = text
+            .split("<key>")
+            .skip(1)
+            .filter_map(|k| k.split("</key>").next())
+            .collect();
+        assert_eq!(keys, ["com.apple.security.device.audio-input"]);
+        let after = text.split("</key>").nth(1).expect("a value");
+        assert!(after.trim_start().starts_with("<true/>"), "{after}");
+        assert!(!text.contains("get-task-allow") && !text.contains("<!--"));
     }
 }
