@@ -72,7 +72,7 @@ if (role === "victim") {
   console.log(`READY ${JSON.stringify({ marker, home, daemon, agents, kids: kidsOf(agents) })}`);
   if (mode === "throw") setTimeout(() => { throw new Error("boom before finally"); }, 100);
   else if (mode === "exit") setTimeout(() => process.exit(3), 100);
-  else setInterval(() => {}, 1000); // sigterm: the parent ends it
+  else setInterval(() => {}, 1000); // sigterm, sigkill: the parent ends it
 } else {
   const { home } = session();
   let failed = false;
@@ -80,7 +80,7 @@ if (role === "victim") {
     // On Windows a killed process gets no signal (TerminateProcess ends it at once, no handler
     // runs), so the SIGTERM way cannot be shown there; the CI step that lists leftovers and the
     // daemon's own kill-after-stop cover that platform.
-    const modes = process.platform === "win32" ? ["throw", "exit"] : ["throw", "exit", "sigterm"];
+    const modes = process.platform === "win32" ? ["throw", "exit"] : ["throw", "exit", "sigterm", "sigkill"];
     for (const mode of modes) {
       const child = spawn(process.execPath, [process.argv[1], tokBin, fakeAgent, "victim", mode], {
         env: { ...process.env, TOKNILA_E2E_RUN: process.env.TOKNILA_E2E_RUN ?? "manual" },
@@ -95,12 +95,22 @@ if (role === "victim") {
       if (seen.agents.length === 0) throw new Error("control: no fake agent carries the marker while the victim lives");
       if (!alive(seen.daemon)) throw new Error("control: the victim's daemon is not alive");
       if (mode === "sigterm") child.kill("SIGTERM");
+      // SIGKILL runs no handler in the victim: only the session's watcher (a separate process) can
+      // end what it started, so it gets a deadline to do so.
+      if (mode === "sigkill") child.kill("SIGKILL");
       const { code, signal } = await exited;
-      const left = processesWith(seen.marker);
-      const children = [...seen.agents, ...seen.kids].filter(alive);
-      if (left.length || alive(seen.daemon) || children.length || existsSync(seen.home)) {
+      const state = () => ({
+        left: processesWith(seen.marker),
+        children: [...seen.agents, ...seen.kids].filter(alive),
+        daemon: alive(seen.daemon),
+        home: existsSync(seen.home),
+      });
+      const clean = (s) => !s.left.length && !s.daemon && !s.children.length && !s.home;
+      if (mode === "sigkill") await until("the watcher to end what the killed victim started", () => clean(state()));
+      const { left, children, daemon, home: homeLeft } = state();
+      if (!clean({ left, children, daemon, home: homeLeft })) {
         throw new Error(
-          `${mode}: after the victim ended (code ${code}, signal ${signal}) alive: marker ${JSON.stringify(left)}, daemon ${alive(seen.daemon)}, agents ${JSON.stringify(children)}, home ${existsSync(seen.home)}`,
+          `${mode}: after the victim ended (code ${code}, signal ${signal}) alive: marker ${JSON.stringify(left)}, daemon ${daemon}, agents ${JSON.stringify(children)}, home ${homeLeft}`,
         );
       }
       console.log(`PASS ${mode}: no daemon, no fake agent and no home left (victim code ${code}, signal ${signal})`);

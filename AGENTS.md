@@ -80,7 +80,10 @@ Running the gates on a developer Mac:
   in its arguments: `command = ['<fake-agent>', 'sleep', '<marker>', ...steps]`. A second daemon is
   registered with `session.track(home)`. `cargo xtask e2e-web` then fails, naming pid, command and
   spec, on a daemon or fake agent of its own run still alive; `cargo xtask verify` only warns
-  about ones older than an hour that another run left, and never kills them.
+  about ones older than an hour that another run left (naming "home gone" when their temporary
+  folder is already removed), and never kills them; `cargo xtask leaks --kill-old` ends such
+  leftovers older than a day, on request only. A spec killed with SIGKILL is cleaned up by the
+  session's watcher process.
 - When `apps/web/node_modules` is missing, run `npm ci --no-audit --no-fund` in `apps/web` first.
   Do not link or copy `node_modules` from another checkout.
 - macOS has no `timeout` command; do not wrap commands in it.

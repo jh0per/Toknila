@@ -40,6 +40,8 @@ fn main() -> ExitCode {
         "verify" => verify(),
         "guards" => guards(),
         // The leak check alone: under TOKNILA_TEST_ROOT, or every temp-home daemon when unset.
+        // `leaks --kill-old` ends what is older than a day, on request only.
+        "leaks" if std::env::args().nth(2).as_deref() == Some("--kill-old") => leaks::kill_old(),
         "leaks" => leaks::check(
             std::env::var_os(leaks::ROOT_VAR)
                 .map(std::path::PathBuf::from)

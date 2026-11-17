@@ -12,12 +12,17 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+mod old;
+pub use old::{kill_old, old_leftovers};
+
 /// The environment variable that names the folder a run's test homes are created under.
 pub const ROOT_VAR: &str = "TOKNILA_TEST_ROOT";
 /// The environment variable that carries the id of an `e2e-web` run to its specs.
 pub const E2E_RUN_VAR: &str = "TOKNILA_E2E_RUN";
 /// What a daemon or a fake agent of another run has to be older than (seconds) to be mentioned.
 pub const OLD_AFTER: u64 = 3600;
+/// What a leftover has to be older than (seconds) for `leaks --kill-old` to end it.
+pub const KILL_OLD_AFTER: u64 = 86_400;
 
 /// Runs `f` with a fresh run root (`<temp>/toknila-verify-<pid>`), removed afterwards.
 pub fn with_run_root(f: impl FnOnce(&Path) -> Result<(), String>) -> Result<(), String> {
@@ -65,7 +70,14 @@ pub fn check(root: Option<&Path>, grace: Duration) -> Result<(), String> {
         };
         let found = leaked(&all, &scopes(root));
         if found.is_empty() || Instant::now() >= deadline {
-            for w in old_leftovers(&all, &agents, &scopes(root), &scopes(None), OLD_AFTER) {
+            for w in old_leftovers(
+                &all,
+                &agents,
+                &scopes(root),
+                &scopes(None),
+                OLD_AFTER,
+                &old::exists,
+            ) {
                 eprintln!("xtask: warning: {w}");
             }
             break found.into_iter().map(describe).collect();
@@ -92,7 +104,7 @@ pub fn check_e2e(run_id: &str, grace: Duration) -> Result<(), String> {
         };
         let found = e2e_leftovers(&all, &agents, run_id, &scopes(None));
         if found.is_empty() || Instant::now() >= deadline {
-            for w in old_leftovers(&all, &agents, &[], &scopes(None), OLD_AFTER) {
+            for w in old_leftovers(&all, &agents, &[], &scopes(None), OLD_AFTER, &old::exists) {
                 eprintln!("xtask: warning: {w}");
             }
             break found;
@@ -104,14 +116,7 @@ pub fn check_e2e(run_id: &str, grace: Duration) -> Result<(), String> {
         return Ok(());
     }
     for (pid, _) in &found {
-        let pid = pid.to_string();
-        let _ = if cfg!(windows) {
-            Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid])
-                .status()
-        } else {
-            Command::new("kill").args(["-9", &pid]).status()
-        };
+        kill_tree(*pid);
     }
     let lines: Vec<String> = found.into_iter().map(|(_, text)| text).collect();
     Err(format!(
@@ -189,41 +194,15 @@ pub fn e2e_leftovers(
     found
 }
 
-/// Daemons with a home in a temp folder, and fake agents, that are at least `min_age` seconds old
-/// and not under `mine` (this run's root): what another run left. Said in words, never killed.
-pub fn old_leftovers(
-    daemons: &[Daemon],
-    agents: &[Agent],
-    mine: &[PathBuf],
-    temps: &[PathBuf],
-    min_age: u64,
-) -> Vec<String> {
-    let mut out = Vec::new();
-    for d in daemons {
-        if d.age >= min_age && under(&d.home, temps) && !under(&d.home, mine) {
-            out.push(format!(
-                "a daemon from {}, alive for {} h; another run left it (pid {}, not killed)",
-                d.home.display(),
-                d.age / 3600,
-                d.pid
-            ));
-        }
-    }
-    for a in agents {
-        let theirs = a.home.as_ref().is_none_or(|h| !under(h, mine));
-        if a.age >= min_age && theirs {
-            let from = a
-                .home
-                .as_ref()
-                .map_or_else(|| format!("`{}`", a.command), |h| h.display().to_string());
-            out.push(format!(
-                "a fake agent from {from}, alive for {} h; another run left it (pid {}, not killed)",
-                a.age / 3600,
-                a.pid
-            ));
-        }
-    }
-    out
+fn kill_tree(pid: u32) {
+    let pid = pid.to_string();
+    let _ = if cfg!(windows) {
+        Command::new("taskkill")
+            .args(["/F", "/T", "/PID", &pid])
+            .status()
+    } else {
+        Command::new("kill").args(["-9", &pid]).status()
+    };
 }
 
 /// What PowerShell prints per process: `pid age-in-seconds command line`. Only the processes whose
@@ -455,6 +434,7 @@ fn home_of(pid: u32) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use super::old::old_ones;
     use super::*;
 
     fn daemon(pid: u32, age: u64, home: &str) -> Daemon {
@@ -624,7 +604,7 @@ mod tests {
                 Some("/tmp/toknila-verify-9/y/home"),
             ),
         ];
-        let said = old_leftovers(&daemons, &agents, &mine, &temps, OLD_AFTER);
+        let said = old_leftovers(&daemons, &agents, &mine, &temps, OLD_AFTER, &|_| true);
         assert_eq!(
             said,
             vec![
@@ -632,6 +612,61 @@ mod tests {
                 "a fake agent from /tmp/toknila-verify-3/x/home, alive for 2 h; another run left it (pid 5, not killed)",
             ]
         );
+    }
+
+    /// A recorded process table (`ps` of a machine): a test daemon and its fake agent of a retired
+    /// ship (the folder is gone), one of a ship that still has its folder, a fresh one, the app's
+    /// own daemon and a file-less one outside any temporary folder.
+    fn recorded() -> (Vec<Daemon>, Vec<Agent>) {
+        let gone = "/Users/x/.toknila-ships/toknila/phase-7/old-ship/target/t1/home";
+        let kept = "/Users/x/.toknila-ships/toknila/phase-12/this-ship/target/t2/home";
+        let daemons = vec![
+            daemon(10, 3 * 86_400, gone),
+            daemon(11, 2 * 3600, kept),
+            daemon(12, 600, gone),
+            daemon(
+                13,
+                5 * 86_400,
+                "/Users/x/Library/Application Support/Toknila",
+            ),
+        ];
+        let agents = vec![
+            agent(20, 3 * 86_400, "/t/fake-agent hold", Some(gone)),
+            agent(21, 2 * 3600, "/t/fake-agent hold", Some(kept)),
+        ];
+        (daemons, agents)
+    }
+
+    #[test]
+    fn an_old_leftover_whose_home_is_gone_is_named() {
+        let (daemons, agents) = recorded();
+        let temps = [PathBuf::from("/var/tmp")];
+        let exists = |p: &Path| p.to_string_lossy().contains("this-ship");
+        let said = old_leftovers(&daemons, &agents, &[], &temps, OLD_AFTER, &exists);
+        assert_eq!(
+            said,
+            vec![
+                "a daemon from /Users/x/.toknila-ships/toknila/phase-7/old-ship/target/t1/home (home gone), alive for 72 h; another run left it (pid 10, not killed)",
+                "a daemon from /Users/x/.toknila-ships/toknila/phase-12/this-ship/target/t2/home, alive for 2 h; another run left it (pid 11, not killed)",
+                "a fake agent from /Users/x/.toknila-ships/toknila/phase-7/old-ship/target/t1/home (home gone), alive for 72 h; another run left it (pid 20, not killed)",
+                "a fake agent from /Users/x/.toknila-ships/toknila/phase-12/this-ship/target/t2/home, alive for 2 h; another run left it (pid 21, not killed)",
+            ]
+        );
+        // This run's own are never named: its root covers the second ship's home.
+        let mine = [PathBuf::from(
+            "/Users/x/.toknila-ships/toknila/phase-12/this-ship",
+        )];
+        let said = old_leftovers(&daemons, &agents, &mine, &temps, OLD_AFTER, &exists);
+        assert_eq!(said.len(), 2, "{said:?}");
+    }
+
+    #[test]
+    fn kill_old_picks_only_what_is_older_than_a_day() {
+        let (daemons, agents) = recorded();
+        let temps = [PathBuf::from("/var/tmp")];
+        let old = old_ones(&daemons, &agents, &[], &temps, KILL_OLD_AFTER, &|_| false);
+        let pids: Vec<u32> = old.iter().map(|o| o.pid).collect();
+        assert_eq!(pids, vec![10, 20]);
     }
 
     /// A shell running a file called `fake-agent` with the run's marker, left alive: the check
