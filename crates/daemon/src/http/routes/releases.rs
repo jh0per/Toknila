@@ -56,7 +56,12 @@ fn project_steps(
     p: &toknila_core::Project,
     push: bool,
 ) -> Vec<toknila_core::release_run::ReleaseStep> {
-    toknila_core::release_run::steps(p.check_command.as_deref(), p.bump_command.as_deref(), push)
+    toknila_core::release_run::steps(
+        p.check_command.as_deref(),
+        p.bump_command.as_deref(),
+        p.artifact_command.as_deref(),
+        push,
+    )
 }
 
 /// What the repository offers to push to, and whether the release pushes unless told otherwise:
@@ -126,6 +131,11 @@ pub async fn release_offer(
         remote: remote.map(|r| r.url),
         push,
         base: project.work_branch.clone(),
+        build: project
+            .artifact_command
+            .as_deref()
+            .filter(|c| !c.trim().is_empty())
+            .map(release_run::command_words),
         run,
     }))
 }
@@ -198,6 +208,7 @@ pub async fn start_release(
             version,
             check: project.check_command.clone(),
             bump: project.bump_command.clone(),
+            artifact: project.artifact_command.clone(),
             remote,
             steps,
             todo,

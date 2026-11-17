@@ -354,6 +354,11 @@ the base branch (`work_branch`), one at a time, and the person's checkout is nev
 3. **Tag**: an annotated `v<version>` on the release commit; a bump commit moves the base branch
    the way a merge does (`GitMerger::advance_base`), and the tag is deleted if the base moved.
 4. **Push**: the base branch and the tag to `origin`, only for a project that merges by pull request.
+5. **Build**: the project's `artifact_command` (`{version}` and `{tag}` are filled in; only when it
+   names one), in the worktree checked out at the tagged commit, with no limit under an hour. It
+   comes after the Push, else after the Tag; the tag is made, so it holds no merge-line turn
+   (cards merge meanwhile) but takes a turn in the machine's check line. A failure leaves the tag and
+   the run resumable at Build alone (`release_run::resume_steps`).
 
 The first failing step stops the run and is named (`Check failed: ...`); the milestone stays Cut and
 releasing again starts over. When the last step passes, `releases::finish` marks the milestone

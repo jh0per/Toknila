@@ -17,6 +17,8 @@ pub enum ReleaseStep {
     Tag,
     /// The base branch and the tag to the repository's remote; a choice of the release.
     Push,
+    /// The project's artifact command, in the worktree at the tagged commit.
+    Build,
 }
 
 impl ReleaseStep {
@@ -27,13 +29,20 @@ impl ReleaseStep {
             Self::Bump => "Bump the version",
             Self::Tag => "Tag",
             Self::Push => "Push",
+            Self::Build => "Build",
         }
     }
 }
 
-/// The steps a release of a project runs: the check and the bump only when the project names
-/// them, the tag always, the push only when the release asks for it.
-pub fn steps(check: Option<&str>, bump: Option<&str>, push: bool) -> Vec<ReleaseStep> {
+/// The steps a release of a project runs: the check, the bump and the build only when the
+/// project names them, the tag always, the push only when the release asks for it. The build
+/// comes last: after the push when there is one, else after the tag.
+pub fn steps(
+    check: Option<&str>,
+    bump: Option<&str>,
+    artifact: Option<&str>,
+    push: bool,
+) -> Vec<ReleaseStep> {
     let mut steps = Vec::new();
     if check.is_some_and(|c| !c.trim().is_empty()) {
         steps.push(ReleaseStep::Check);
@@ -44,6 +53,9 @@ pub fn steps(check: Option<&str>, bump: Option<&str>, push: bool) -> Vec<Release
     steps.push(ReleaseStep::Tag);
     if push {
         steps.push(ReleaseStep::Push);
+    }
+    if artifact.is_some_and(|a| !a.trim().is_empty()) {
+        steps.push(ReleaseStep::Build);
     }
     steps
 }
@@ -204,6 +216,21 @@ pub fn bump_command(template: &str, version: &str) -> String {
     template.replace("{version}", version)
 }
 
+/// The artifact command with the version and the tag put in (`{version}`, `{tag}`).
+pub fn artifact_command(template: &str, version: &str, tag: &str) -> String {
+    template.replace("{version}", version).replace("{tag}", tag)
+}
+
+/// The first words of a command, as the dialog and `tok release steps` name a step by it: up to
+/// three words.
+pub fn command_words(command: &str) -> String {
+    command
+        .split_whitespace()
+        .take(3)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,13 +280,54 @@ mod tests {
     #[test]
     fn the_steps_follow_what_the_project_has() {
         use ReleaseStep::*;
-        assert_eq!(steps(None, None, false), [Tag]);
-        assert_eq!(steps(Some("make test"), None, false), [Check, Tag]);
+        assert_eq!(steps(None, None, None, false), [Tag]);
+        assert_eq!(steps(Some("make test"), None, None, false), [Check, Tag]);
         assert_eq!(
-            steps(Some("make test"), Some("./bump {version}"), true),
+            steps(Some("make test"), Some("./bump {version}"), None, true),
             [Check, Bump, Tag, Push]
         );
-        assert_eq!(steps(Some("  "), Some(""), true), [Tag, Push]);
+        assert_eq!(steps(Some("  "), Some(""), Some(" "), true), [Tag, Push]);
+    }
+
+    #[test]
+    fn build_comes_after_the_push_when_there_is_one_else_after_the_tag() {
+        use ReleaseStep::*;
+        assert_eq!(
+            steps(Some("make"), Some("./bump"), Some("./dist"), true),
+            [Check, Bump, Tag, Push, Build]
+        );
+        assert_eq!(steps(None, None, Some("./dist"), false), [Tag, Build]);
+        assert_eq!(ReleaseStep::Build.label(), "Build");
+        // The tag is made: the build holds no place in the merge line.
+        assert!(!in_merge_line(&[Tag, Build], &[Tag]));
+        assert!(in_merge_line(&[Tag, Push, Build], &[Tag]));
+        assert!(!in_merge_line(&[Tag, Push, Build], &[Tag, Push]));
+    }
+
+    #[test]
+    fn a_failed_build_resumes_at_the_build_alone() {
+        use ReleaseStep::*;
+        let all = [Check, Bump, Tag, Push, Build];
+        assert_eq!(resume_steps(&all, &[Check, Bump, Tag, Push]), [Build]);
+        assert_eq!(resume_steps(&all, &all), Vec::<ReleaseStep>::new());
+    }
+
+    #[test]
+    fn the_artifact_command_carries_the_version_and_the_tag() {
+        assert_eq!(
+            artifact_command("./dist {version} {tag}", "1.4.0", "v1.4.0"),
+            "./dist 1.4.0 v1.4.0"
+        );
+        assert_eq!(artifact_command("./dist", "1.4.0", "v1.4.0"), "./dist");
+    }
+
+    #[test]
+    fn the_build_is_named_by_the_first_words_of_its_command() {
+        assert_eq!(
+            command_words("./scripts/release-mac.sh --notarize {version} --extra more"),
+            "./scripts/release-mac.sh --notarize {version}"
+        );
+        assert_eq!(command_words("make"), "make");
     }
 
     #[test]
@@ -267,11 +335,11 @@ mod tests {
         use ReleaseStep::*;
         // The merge mode is not an input: only the choice of the release is.
         assert_eq!(
-            steps(Some("make"), Some("./bump"), true),
+            steps(Some("make"), Some("./bump"), None, true),
             [Check, Bump, Tag, Push]
         );
         assert_eq!(
-            steps(Some("make"), Some("./bump"), false),
+            steps(Some("make"), Some("./bump"), None, false),
             [Check, Bump, Tag]
         );
     }

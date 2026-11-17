@@ -10104,6 +10104,13 @@
             },
             "description": "The commands remembered with \"Allow always\" (`Bash(cargo test *)`); the list replaces the\nremembered ones, so a rule is removed by sending the list without it."
           },
+          "artifact_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command a release runs on this computer after the tag, to build and upload what CI\ncannot (`{version}` and `{tag}` are filled in). An empty text clears it."
+          },
           "bump_command": {
             "type": [
               "string",
@@ -11079,6 +11086,13 @@
             "type": "boolean",
             "description": "Hidden from the sidebar; its data is kept and it can be brought back."
           },
+          "artifact_command": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The command a release runs on this computer after the tag, in a worktree at the tagged\ncommit: it builds and uploads what CI cannot (`{version}` and `{tag}` are filled in).\n`None`: no build step."
+          },
           "bump_command": {
             "type": [
               "string",
@@ -11689,6 +11703,13 @@
             "type": "string",
             "description": "The branch the release is made on."
           },
+          "build": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The first words of the project's artifact command, which the Build step runs; `None`\nwhen the project has none."
+          },
           "last_tag": {
             "type": [
               "string",
@@ -11804,7 +11825,8 @@
           "check",
           "bump",
           "tag",
-          "push"
+          "push",
+          "build"
         ]
       },
       "ReleasedWith": {

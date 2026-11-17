@@ -371,6 +371,7 @@ fn deletion_events_name_the_project_or_chain_and_carry_it_as_it_was() {
         check_command: None,
         setup_command: None,
         bump_command: None,
+        artifact_command: None,
         worker_model: None,
         reviewer_model: None,
         planner_model: None,

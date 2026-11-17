@@ -87,6 +87,9 @@ export function AgentsSection({ state, form, set }: FormProps) {
       <Field label="Version bump command (optional)" name="bump_command" error={fieldError(s, "bump_command")} hint="A release runs it to put the new version into your files; {version} is the version. What it changes is committed.">
         <input data-testid="bump-command" value={form.bump_command} spellCheck={false} onChange={(e) => set("bump_command", e.target.value)} />
       </Field>
+      <Field label="Release build command (optional)" name="artifact_command" error={fieldError(s, "artifact_command")} hint="Runs on this computer after the tag: build and upload what CI cannot. {version} and {tag} are filled in.">
+        <input data-testid="artifact-command" value={form.artifact_command} spellCheck={false} onChange={(e) => set("artifact_command", e.target.value)} />
+      </Field>
       <CommandsFields form={form} set={set} />
     </div>
   );

@@ -3273,6 +3273,11 @@ export interface components {
              */
             allowed_commands?: string[] | null;
             /**
+             * @description The command a release runs on this computer after the tag, to build and upload what CI
+             *     cannot (`{version}` and `{tag}` are filled in). An empty text clears it.
+             */
+            artifact_command?: string | null;
+            /**
              * @description The command a release runs to bump the version (`npm version {version}
              *     --no-git-tag-version`; `{version}` is the version). An empty text clears it.
              */
@@ -3626,6 +3631,12 @@ export interface components {
             /** @description Hidden from the sidebar; its data is kept and it can be brought back. */
             archived?: boolean;
             /**
+             * @description The command a release runs on this computer after the tag, in a worktree at the tagged
+             *     commit: it builds and uploads what CI cannot (`{version}` and `{tag}` are filled in).
+             *     `None`: no build step.
+             */
+            artifact_command?: string | null;
+            /**
              * @description The command a release runs to put its version into the project's files (`npm version
              *     {version} --no-git-tag-version`; `{version}` is the version). `None`: no bump step.
              */
@@ -3866,6 +3877,11 @@ export interface components {
         ReleaseOffer: {
             /** @description The branch the release is made on. */
             base: string;
+            /**
+             * @description The first words of the project's artifact command, which the Build step runs; `None`
+             *     when the project has none.
+             */
+            build?: string | null;
             /** @description The last tag of the repository, if it has one. */
             last_tag?: string | null;
             /**
@@ -3915,7 +3931,7 @@ export interface components {
          * @description One step of a release run, in the order it runs.
          * @enum {string}
          */
-        ReleaseStep: "check" | "bump" | "tag" | "push";
+        ReleaseStep: "check" | "bump" | "tag" | "push" | "build";
         /** @description The tag an epic's work shipped in, and the epic whose release run (or a person) made it count. */
         ReleasedWith: {
             /** @description The name of the epic whose release run made the tag; none for a tag a person made. */

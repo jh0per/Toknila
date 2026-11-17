@@ -75,6 +75,9 @@ pub struct PatchProject {
     /// The command a release runs to bump the version (`npm version {version}
     /// --no-git-tag-version`; `{version}` is the version). An empty text clears it.
     pub bump_command: Option<String>,
+    /// The command a release runs on this computer after the tag, to build and upload what CI
+    /// cannot (`{version}` and `{tag}` are filled in). An empty text clears it.
+    pub artifact_command: Option<String>,
     /// The Claude model of the project's card agents (`sonnet`, `opus`, a full model name). An
     /// empty text clears it: the person's own Claude Code default.
     pub worker_model: Option<String>,
@@ -154,6 +157,7 @@ pub fn create<U: UnitOfWork + ?Sized>(uow: &mut U, draft: NewProject) -> AppResu
             None => None,
         },
         bump_command: None,
+        artifact_command: None,
         worker_model: None,
         reviewer_model: None,
         planner_model: None,
@@ -221,6 +225,9 @@ pub fn patch<U: UnitOfWork + ?Sized>(
     }
     if let Some(c) = patch.bump_command {
         p.bump_command = Project::clean_bump_command(&c).map_err(AppError::bad_request)?;
+    }
+    if let Some(c) = patch.artifact_command {
+        p.artifact_command = Project::clean_artifact_command(&c).map_err(AppError::bad_request)?;
     }
     for (field, text) in [
         (&mut p.worker_model, patch.worker_model),

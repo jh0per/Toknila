@@ -9,7 +9,7 @@ use super::codec::{Repo, enum_from, enum_str, parse};
 const PROJECT_COLS: &str = "id, key, name, repo_path, work_branch, release_branch, default_profile, \
      default_review_mode, max_parallel, default_reviewer, merge_mode, pr_title, merge_method, check_command, archived, \
      worker_model, reviewer_model, planner_model, command_policy, allowed_commands, reviewer_web_domains, max_review_rounds, \
-     no_checks_timeout_secs, bump_command, setup_command, simulated, hidden, extra_checks";
+     no_checks_timeout_secs, bump_command, setup_command, simulated, hidden, extra_checks, artifact_command";
 
 type RawProject = (
     String,
@@ -40,6 +40,7 @@ type RawProject = (
     bool,
     bool,
     String,
+    Option<String>,
 );
 
 fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
@@ -72,6 +73,7 @@ fn project_row(r: &Row<'_>) -> rusqlite::Result<RawProject> {
         r.get(25)?,
         r.get(26)?,
         r.get(27)?,
+        r.get(28)?,
     ))
 }
 
@@ -105,6 +107,7 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
         simulated,
         hidden,
         extra_checks,
+        artifact_command,
     ) = c;
     Ok(Project {
         id: parse(&id, "project id")?,
@@ -136,6 +139,7 @@ fn project_from(c: RawProject) -> Result<Project, StoreError> {
             .map_err(|e| StoreError::Corrupt(format!("bad extra_checks: {e}")))?,
         setup_command,
         bump_command,
+        artifact_command,
         worker_model,
         reviewer_model,
         planner_model,
@@ -154,7 +158,7 @@ impl Repo<'_> {
     pub fn insert_project(&self, p: &Project) -> Result<(), StoreError> {
         self.conn.execute(
             &format!(
-                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)"
+                "INSERT INTO projects ({PROJECT_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29)"
             ),
             params![
                 p.id.to_string(),
@@ -185,6 +189,7 @@ impl Repo<'_> {
                 p.simulated,
                 p.hidden,
                 serde_json::to_string(&p.extra_checks)?,
+                p.artifact_command,
             ],
         )?;
         Ok(())
@@ -197,7 +202,7 @@ impl Repo<'_> {
              default_profile = ?6, default_review_mode = ?7, max_parallel = ?8, default_reviewer = ?9, \
              merge_mode = ?10, pr_title = ?11, merge_method = ?12, check_command = ?13, archived = ?14, \
              worker_model = ?15, reviewer_model = ?16, planner_model = ?17, command_policy = ?18, allowed_commands = ?19, reviewer_web_domains = ?20, \
-             max_review_rounds = ?21, no_checks_timeout_secs = ?22, bump_command = ?23, setup_command = ?24, simulated = ?25, hidden = ?26, extra_checks = ?27 WHERE id = ?1",
+             max_review_rounds = ?21, no_checks_timeout_secs = ?22, bump_command = ?23, setup_command = ?24, simulated = ?25, hidden = ?26, extra_checks = ?27, artifact_command = ?28 WHERE id = ?1",
             params![
                 p.id.to_string(),
                 p.name,
@@ -226,6 +231,7 @@ impl Repo<'_> {
                 p.simulated,
                 p.hidden,
                 serde_json::to_string(&p.extra_checks)?,
+                p.artifact_command,
             ],
         )?;
         Ok(())

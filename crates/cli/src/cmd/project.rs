@@ -104,6 +104,10 @@ pub enum ProjectCmd {
         /// --no-git-tag-version`; `{version}` is the version). An empty text clears it.
         #[arg(long)]
         bump_command: Option<String>,
+        /// The command a release runs on this computer after the tag, to build and upload what CI
+        /// cannot (`{version}` and `{tag}` are filled in). An empty text clears it.
+        #[arg(long)]
+        artifact_command: Option<String>,
         /// The Claude model of story agents (`sonnet`, `opus`, `haiku`, or a full model name);
         /// passed as `--model` to profiles that run Claude Code. An empty text goes back to your
         /// Claude Code default.
@@ -213,6 +217,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
             clear_extra_checks,
             setup_command,
             bump_command,
+            artifact_command,
             worker_model,
             reviewer_model,
             planner_model,
@@ -260,6 +265,7 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 extra_checks,
                 setup_command,
                 bump_command,
+                artifact_command,
                 worker_model,
                 reviewer_model,
                 planner_model,
@@ -286,6 +292,9 @@ pub(super) fn run(c: &Client, cmd: ProjectCmd, json_out: bool) -> Result<()> {
                 }
                 if let Some(c) = &p.bump_command {
                     println!("bump command: {c}");
+                }
+                if let Some(c) = &p.artifact_command {
+                    println!("artifact command: {c}");
                 }
                 println!(
                     "review: {}, up to {} rounds of the loop",

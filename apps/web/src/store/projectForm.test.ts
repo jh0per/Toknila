@@ -37,11 +37,11 @@ describe("the project form", () => {
   it("sends every field, trimmed, with the limit as a number", () => {
     const patch = patchOf({
       ...formOf(project), max_parallel: "4", check_command: " npm test ", setup_command: " npm ci --prefix apps/web ",
-      bump_command: " npm version {version} ", worker_model: "sonnet",
+      bump_command: " npm version {version} ", artifact_command: " ./release-mac.sh {tag} ", worker_model: "sonnet",
     });
     expect(patch).toEqual({
       work_branch: "main", default_profile: "claude-code", max_parallel: 4, check_command: "npm test",
-      setup_command: "npm ci --prefix apps/web", bump_command: "npm version {version}",
+      setup_command: "npm ci --prefix apps/web", bump_command: "npm version {version}", artifact_command: "./release-mac.sh {tag}",
       worker_model: "sonnet", reviewer_model: "", planner_model: "opus", review_mode: "human", max_review_rounds: 3, reviewer: "",
       merge_mode: "local", pr_title: "{key}: {title}", merge_method: "merge", no_checks_timeout_secs: 600,
       command_policy: "ask", allowed_commands: [], reviewer_web_domains: [], extra_checks: [],

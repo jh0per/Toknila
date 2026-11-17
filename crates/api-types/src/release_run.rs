@@ -25,6 +25,10 @@ pub struct ReleaseOffer {
     pub push: bool,
     /// The branch the release is made on.
     pub base: String,
+    /// The first words of the project's artifact command, which the Build step runs; `None`
+    /// when the project has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
     /// The last run of the chain's own release, read from the journal; `None` before the first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run: Option<ReleaseRun>,
