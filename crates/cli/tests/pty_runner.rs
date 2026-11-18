@@ -193,15 +193,12 @@ fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
-    // No hooks are wired, so the way in is the terminal. After the instruction it says its size
-    // each time it is given a line: on Windows a smaller screen reaches the agent once its output
-    // is quiet, so the size may land after the instruction (TOKNILA-162).
-    let mut steps = vec!["print", "ready", "echo", "size"];
-    for _ in 0..40 {
-        steps.extend(["echo", "size"]);
-    }
-    steps.extend(["sleep", "30000"]);
-    tok.profile("listener", &steps, "");
+    // No hooks are wired, so the way in is the terminal.
+    tok.profile(
+        "listener",
+        &["print", "ready", "echo", "size", "sleep", "30000"],
+        "",
+    );
     tok.run(&[
         "project",
         "new",
@@ -229,19 +226,8 @@ fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the
         tok.logs("DEMO-1")
             .contains("got:# [instruction] use rustls")
     });
-    // A line each time the agent has answered the last one, slower than the runner's settle time.
-    let mut asked = 1;
     wait_until(&tok, "the terminal to have the panel's size", || {
-        let logs = tok.logs("DEMO-1");
-        if logs.contains("size=90x30") {
-            return true;
-        }
-        if logs.matches("size=").count() == asked {
-            let _ = tok.client().runner_input("DEMO-1", b"go\r");
-            asked += 1;
-        }
-        std::thread::sleep(Duration::from_millis(300));
-        false
+        tok.logs("DEMO-1").contains("size=90x30")
     });
     wait_until(&tok, "the delivered mark", || {
         let shown = tok.run(&["show", "DEMO-1"]);

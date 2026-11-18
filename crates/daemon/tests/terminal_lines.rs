@@ -46,6 +46,9 @@ struct Case {
     /// When the screen shrinks to 152x14 (a panel's size), counted from the cursor answer (from
     /// the start on Unix, which asks nothing); `None`: never.
     shrink_after: Option<Duration>,
+    /// When a second answer to the cursor query is typed, counted the same way (the page's
+    /// terminal answers the query it finds in the scrollback); `None`: never.
+    again_after: Option<Duration>,
 }
 
 /// `bytes` as text without the terminal's escape sequences (CSI, OSC and two-byte ones).
@@ -191,20 +194,26 @@ impl Term {
     }
 
     /// Reads until the program's last line has arrived (or [`WAIT`] has passed); shrinks the
-    /// screen to 152x14 `shrink_after` the cursor answer (Unix: the start) when one is given.
-    fn until_end(&mut self, answer_after: Duration, shrink_after: Option<Duration>) {
+    /// screen to 152x14 and types a second cursor answer when the case says so, counted from the
+    /// cursor answer (Unix: the start).
+    fn until_end(&mut self, case: Case) {
         let until = Instant::now() + WAIT;
-        let mut shrink = shrink_after;
+        let (mut shrink, mut again) = (case.shrink_after, case.again_after);
         while Instant::now() < until && !plain(&self.got).contains(END) {
-            self.pump(answer_after);
+            self.pump(case.answer_after);
             let from = if cfg!(windows) {
                 self.answered
             } else {
                 Some(self.opened)
             };
-            if let Some(after) = shrink
-                && from.is_some_and(|t| t.elapsed() >= after)
-            {
+            let due = |after: Option<Duration>| {
+                after.is_some_and(|a| from.is_some_and(|t| t.elapsed() >= a))
+            };
+            if due(again) {
+                self.writer.write_all(b"\x1b[1;1R").expect("answer again");
+                again = None;
+            }
+            if due(shrink) {
                 self.resize(152, 14);
                 shrink = None;
             }
@@ -238,7 +247,7 @@ impl Term {
 /// One run of `case`: the numbers of the lines the reader got.
 fn run(case: Case) -> BTreeSet<u32> {
     let mut term = Term::open(case.rows, steps(case.print));
-    term.until_end(case.answer_after, case.shrink_after);
+    term.until_end(case);
     let text = plain(&term.got);
     term.close();
     numbers(&text)
@@ -268,11 +277,11 @@ fn report(case: Case, runs: &[BTreeSet<u32>]) -> String {
     let counts: Vec<String> = runs.iter().map(|r| r.len().to_string()).collect();
     let worst = runs.iter().min_by_key(|r| r.len()).expect("a run");
     let missing: Vec<u32> = (1..=LINES).filter(|n| !worst.contains(n)).collect();
-    let shrink = case
-        .shrink_after
-        .map_or("never".to_owned(), |d| format!("{}ms", d.as_millis()));
+    let when =
+        |d: Option<Duration>| d.map_or("never".to_owned(), |d| format!("{}ms", d.as_millis()));
+    let (shrink, again) = (when(case.shrink_after), when(case.again_after));
     format!(
-        "{:?} rows={} answer_after={}ms shrink_after={shrink}: got [{}] of {LINES}; worst missed [{}]",
+        "{:?} rows={} answer_after={}ms shrink_after={shrink} again_after={again}: got [{}] of {LINES}; worst missed [{}]",
         case.print,
         case.rows,
         case.answer_after.as_millis(),
@@ -332,6 +341,7 @@ fn every_line_of_a_fast_program_reaches_the_terminal_reader() {
         rows,
         answer_after,
         shrink_after: None,
+        again_after: None,
     });
     let (lost, lines) = probe(&cases);
     assert!(
@@ -341,10 +351,10 @@ fn every_line_of_a_fast_program_reaches_the_terminal_reader() {
     );
 }
 
-/// A panel's size that shrinks the screen while the program still prints: on Windows ConPTY
-/// drops the rows above its new screen that it has not rendered yet (the run log of the
-/// terminal-copy spec lacked lines 1-12 and 1-8 in two of six Windows runs of CI run
-/// 44317344931, after the page sent 152x14 during the output). On Unix nothing is lost.
+/// A panel's size that shrinks the screen while the program still prints loses nothing either:
+/// on GitHub's Windows runner every case got 80 of 80 in all five runs, twice (CI runs
+/// 44327828545 and 44338573473), though the terminal-copy spec's run log lacked lines 1-12 and
+/// 1-8 in two of six Windows runs of run 44317344931 after the page sent 152x14 during the output.
 #[test]
 fn a_screen_that_shrinks_while_the_program_prints() {
     let _turn = support::hold();
@@ -360,6 +370,34 @@ fn a_screen_that_shrinks_while_the_program_prints() {
         rows: 40,
         answer_after: Duration::ZERO,
         shrink_after: Some(Duration::from_millis(ms)),
+        again_after: None,
+    });
+    let (lost, lines) = probe(&cases);
+    assert!(
+        !lost,
+        "the terminal reader lost lines:\n{}",
+        lines.join("\n")
+    );
+}
+
+/// The page's terminal answers the cursor query it finds in the scrollback, so a second answer
+/// reaches ConPTY while the program prints (alone, and with a shrink after it).
+#[test]
+fn a_second_cursor_answer_while_the_program_prints() {
+    let _turn = support::hold();
+    let cases = [
+        (Print::EachLine, 0, None),
+        (Print::Paced, 0, None),
+        (Print::Paced, 20, None),
+        (Print::Paced, 20, Some(25)),
+        (Print::Paced, 100, Some(105)),
+    ]
+    .map(|(print, again, shrink): (Print, u64, Option<u64>)| Case {
+        print,
+        rows: 40,
+        answer_after: Duration::ZERO,
+        shrink_after: shrink.map(Duration::from_millis),
+        again_after: Some(Duration::from_millis(again)),
     });
     let (lost, lines) = probe(&cases);
     if cfg!(unix) {
@@ -378,7 +416,13 @@ fn a_screen_that_shrinks_while_the_program_prints() {
 fn what_a_terminal_emits_when_it_is_resized_after_the_output() {
     let _turn = support::hold();
     let mut term = Term::open(40, steps(Print::EachLine));
-    term.until_end(Duration::ZERO, None);
+    term.until_end(Case {
+        print: Print::EachLine,
+        rows: 40,
+        answer_after: Duration::ZERO,
+        shrink_after: None,
+        again_after: None,
+    });
     eprintln!(
         "TOKNILA-162 resize: the output at 160x40: {:?}",
         String::from_utf8_lossy(&term.got)

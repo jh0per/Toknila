@@ -33,28 +33,16 @@ pub struct Tok {
     pub home: PathBuf,
     /// The projects made here with `--sim` or a `--profile`: the only ones whose cards may start.
     fake: Mutex<Vec<String>>,
-    /// Test settings this `tok` and its daemon get besides [`isolate`]'s.
-    env: Vec<(String, String)>,
 }
 
 impl Tok {
     /// A `tok` whose data folder is `<dir>/home`.
     pub fn in_dir(dir: &Path) -> Self {
-        Self::in_dir_with(dir, &[])
-    }
-
-    /// [`Tok::in_dir`] whose daemon also gets the test settings `env` (a daemon reads them only
-    /// under `TOKNILA_TEST_ROOT`).
-    pub fn in_dir_with(dir: &Path, env: &[(&str, &str)]) -> Self {
         let home = dir.join("home");
         track(&home);
         Self {
             home,
             fake: Mutex::new(Vec::new()),
-            env: env
-                .iter()
-                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-                .collect(),
         }
     }
 
@@ -63,12 +51,11 @@ impl Tok {
         self.refuse_a_real_agent(args);
         // The daemon of a test is started with a lifeline, so it dies with this process.
         if args.first() != Some(&"daemon") && !daemon_healthy(&self.home) {
-            start_daemon_with(&self.home, &self.env);
+            start_daemon(&self.home);
         }
         let mut c = Command::new(env!("CARGO_BIN_EXE_tok"));
         c.args(args).env("TOKNILA_HOME", &self.home);
         isolate(&mut c, &self.home);
-        c.envs(self.env.iter().map(|(k, v)| (k, v)));
         c
     }
 
@@ -324,11 +311,6 @@ pub fn daemon_healthy(home: &Path) -> bool {
 /// Runs `tok daemon start --exit-with-parent --json` in `home`, keeping the pipe it hands to the
 /// daemon open for as long as this process lives. Returns what `tok` printed.
 pub fn start_daemon(home: &Path) -> Output {
-    start_daemon_with(home, &[])
-}
-
-/// [`start_daemon`] with the test settings `env` besides [`isolate`]'s.
-pub fn start_daemon_with(home: &Path, env: &[(String, String)]) -> Output {
     track(home);
     let begin = Instant::now();
     let at = std::time::SystemTime::now()
@@ -338,7 +320,6 @@ pub fn start_daemon_with(home: &Path, env: &[(String, String)]) -> Output {
     cmd.args(["daemon", "start", "--exit-with-parent", "--json"])
         .env("TOKNILA_HOME", home);
     isolate(&mut cmd, home);
-    cmd.envs(env.iter().map(|(k, v)| (k, v)));
     let mut child = cmd
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

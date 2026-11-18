@@ -1,13 +1,13 @@
-//! TOKNILA-162: a panel's size that comes while the agent prints, in a real daemon started as
-//! `tok` starts it (detached, with no console of its own on Windows), as the page sends it when it
-//! opens. The run log must keep every line the agent printed.
+//! TOKNILA-162: what the page does when it opens a card's terminal while the agent prints, in a
+//! real daemon started as `tok` starts it (detached, with no console of its own on Windows): it
+//! sends the panel's size, and its terminal answers the cursor query it finds in the scrollback
+//! (ConPTY's `ESC [ 6 n`, which the daemon already answered) by typing `ESC [ 1 ; 1 R` into the
+//! agent. The run log must keep every line the agent printed.
 //!
 //! The terminal-copy spec's run log lacked lines 1-12 and 1-8 in two of six Windows runs (CI run
-//! 44317344931) after the page sent 152x14 while the agent printed, while a ConPTY opened by the
-//! test process itself lost nothing when shrunk mid-output (25 of 25 runs, the daemon's
-//! `terminal_lines` probe). This test runs the same agent with the shrink sent at once
-//! (`TOKNILA_RESIZE_SETTLE_MS=0`, as before) and as the runner holds it now (until the output has
-//! been quiet), and reports both.
+//! 44317344931). A shrink alone lost nothing on the Windows runner: 50 of 50 runs from the test
+//! process (the daemon's `terminal_lines` probe, CI runs 44327828545 and 44338573473) and 4 of 4
+//! in a detached daemon (run 44338573473).
 
 mod common;
 /// The one lock of the tests that open ptys, shared with the daemon's `runner.rs`.
@@ -44,63 +44,75 @@ fn wait_until(what: &str, mut ok: impl FnMut() -> bool) {
     }
 }
 
-/// [`RUNS`] runs of a paced 80-line agent, each shrunk to 152x14 once its first line is in the
-/// log; the lines each run's log lacks.
-fn runs(env: &[(&str, &str)]) -> Vec<Vec<u32>> {
+/// What a client does once the agent's first line is in the log.
+#[derive(Debug, Clone, Copy)]
+enum Opens {
+    /// Sends the panel's size (152x14).
+    Resizes,
+    /// Types the answer to the cursor query, then sends the size: what the page does.
+    AnswersAndResizes,
+    /// Types the answer to the cursor query only.
+    Answers,
+}
+
+/// [`RUNS`] runs of a paced 80-line agent per way of opening; the lines each run's log lacks.
+fn runs(ways: &[Opens]) -> Vec<(Opens, Vec<Vec<u32>>)> {
     let dir = common::tempdir();
-    let tok = Tok::in_dir_with(dir.path(), env);
+    let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
     let mut steps = vec!["sleep".to_owned(), "0".to_owned()];
     for i in 1..=LINES {
         steps.extend(["print".to_owned(), format!("scroll line {i}")]);
         steps.extend(["sleep".to_owned(), "2".to_owned()]);
     }
-    steps.extend([
-        "print".to_owned(),
-        "printed all".to_owned(),
-        "hold".to_owned(),
-    ]);
+    steps.extend(["print".to_owned(), "printed all".to_owned()]);
+    steps.extend(["hold".to_owned()]);
     let steps: Vec<&str> = steps.iter().map(String::as_str).collect();
     tok.profile("printer", &steps, "");
     let repo = repo.to_string_lossy();
-    tok.run(&[
-        "project",
-        "new",
-        "DEMO",
-        "--repo",
-        &repo,
-        "--profile",
-        "printer",
-    ]);
+    let project = ["project", "new", "DEMO", "--repo", &repo];
+    tok.run(&[&project[..], &["--profile", "printer"]].concat());
     tok.run(&["chain", "new", "demo", "--no-autostart"]);
-    let mut lost = Vec::new();
-    for n in 1..=RUNS {
-        let key = format!("DEMO-{n}");
-        tok.run(&["ticket", "new", "demo", &format!("Run {n}")]);
-        tok.run(&["start", &key]);
-        wait_until("the first line", || tok.logs(&key).contains("scroll line"));
-        let small = toknila_api_types::TerminalSize {
-            cols: 152,
-            rows: 14,
-        };
-        tok.client().runner_size(&key, &small).expect("resize");
-        wait_until("the last line", || tok.logs(&key).contains("printed all"));
-        lost.push(missing(&tok.logs(&key)));
-        tok.run(&["cancel", &key, "done"]);
+    let small = toknila_api_types::TerminalSize {
+        cols: 152,
+        rows: 14,
+    };
+    let mut n = 0;
+    let mut out = Vec::new();
+    for &way in ways {
+        let mut lost = Vec::new();
+        for _ in 0..RUNS {
+            n += 1;
+            let key = format!("DEMO-{n}");
+            tok.run(&["ticket", "new", "demo", &format!("Run {n}")]);
+            tok.run(&["start", &key]);
+            wait_until("the first line", || tok.logs(&key).contains("scroll line"));
+            let client = tok.client();
+            if matches!(way, Opens::Answers | Opens::AnswersAndResizes) {
+                client.runner_input(&key, b"\x1b[1;1R").expect("answer");
+            }
+            if matches!(way, Opens::Resizes | Opens::AnswersAndResizes) {
+                client.runner_size(&key, &small).expect("resize");
+            }
+            wait_until("the last line", || tok.logs(&key).contains("printed all"));
+            lost.push(missing(&tok.logs(&key)));
+            tok.run(&["cancel", &key, "done"]);
+        }
+        out.push((way, lost));
     }
-    lost
+    out
 }
 
 #[test]
-fn a_size_sent_while_the_agent_prints_costs_no_line_of_the_run_log() {
+fn a_client_that_opens_the_terminal_while_the_agent_prints_costs_no_line_of_the_run_log() {
     let _turn = pty_lock::hold();
-    let at_once = runs(&[("TOKNILA_RESIZE_SETTLE_MS", "0")]);
-    let held = runs(&[]);
-    let report = format!("sent at once: {at_once:?}; held until quiet: {held:?}");
+    let ways = [Opens::Resizes, Opens::AnswersAndResizes, Opens::Answers];
+    let got = runs(&ways);
+    let report = format!("{got:?}");
     eprintln!("TOKNILA-162 detached daemon, lines missing per run: {report}");
-    assert!(held.iter().all(Vec::is_empty), "{report}");
-    // A Unix pty is a byte pipe: the control that a shrink sent at once loses nothing there.
+    let lost = got.iter().flat_map(|(_, runs)| runs).any(|r| !r.is_empty());
+    // A Unix pty is a byte pipe and its program reads no input here: nothing is lost (the control).
     if cfg!(unix) {
-        assert!(at_once.iter().all(Vec::is_empty), "{report}");
+        assert!(!lost, "{report}");
     }
 }
