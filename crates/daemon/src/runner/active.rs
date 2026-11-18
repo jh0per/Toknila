@@ -339,6 +339,12 @@ impl Active {
         state.scrollback.from(from).1.to_vec()
     }
 
+    /// A client's input: a size still held reaches the terminal first (`pty::before_typing`).
+    pub fn type_in(&self, bytes: &[u8]) -> Result<(), RunnerError> {
+        pty::before_typing(bytes, &self.pending, &self.master);
+        self.write(bytes)
+    }
+
     pub fn write(&self, bytes: &[u8]) -> Result<(), RunnerError> {
         let mut writer = lock(&self.writer);
         writer

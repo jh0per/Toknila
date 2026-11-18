@@ -179,6 +179,50 @@ pub(super) fn apply_sizes(
     }
 }
 
+/// Before a client's `input` reaches the terminal in `master`: a size still held in `pending`
+/// goes first, so typing that follows a resize meets the new size (the agent of e2e
+/// `terminal.mjs` reported 160x40 for a line typed right after the page's size, CI run
+/// 44358818741, attempt 3). A client's terminal reports alone (see [`is_typing`]) let it wait.
+pub(super) fn before_typing(
+    input: &[u8],
+    pending: &Pending,
+    master: &std::sync::Mutex<Option<Box<dyn MasterPty + Send>>>,
+) {
+    if !is_typing(input) {
+        return;
+    }
+    if let Some(size) = pending.take() {
+        let master = master
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(Err(e)) = master.as_ref().map(|m| m.resize(size)) {
+            tracing::warn!(error = %e, "cannot resize the terminal");
+        }
+    }
+}
+
+/// Whether `input` holds more than the reports a client's terminal sends by itself: a cursor
+/// position (`ESC [ r ; c R`, which the page's terminal sends for ConPTY's cursor query in the
+/// scrollback while the agent may still print), focus in or out (`ESC [ I`, `ESC [ O`), device
+/// attributes (`ESC [ ? … c`) or a status (`ESC [ … n`).
+pub(super) fn is_typing(input: &[u8]) -> bool {
+    let mut rest = input;
+    while !rest.is_empty() {
+        let Some(after) = rest.strip_prefix(b"\x1b[") else {
+            return true;
+        };
+        let params = after
+            .iter()
+            .take_while(|b| b.is_ascii_digit() || matches!(b, b';' | b'?'))
+            .count();
+        match after.get(params) {
+            Some(b'R' | b'I' | b'O' | b'c' | b'n') => rest = &after[params + 1..],
+            _ => return true,
+        }
+    }
+    false
+}
+
 /// How long the output must have been quiet before a smaller screen reaches ConPTY, and the
 /// longest a size waits for that (a program that prints without a pause still gets it).
 pub(super) const SETTLE: Duration = Duration::from_millis(300);
@@ -217,6 +261,15 @@ impl Pending {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         held.is_some()
+    }
+
+    /// The size waiting, if any, which then no longer waits.
+    pub fn take(&self) -> Option<PtySize> {
+        let mut held = self
+            .size
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        held.take().map(|(size, _)| size)
     }
 
     /// The next size to apply, once `quiet()` (how long the reader has had nothing) reaches
@@ -405,6 +458,41 @@ mod tests {
             pending.next(Duration::ZERO, Duration::ZERO, || Duration::MAX, || true),
             None
         );
+    }
+
+    #[test]
+    fn a_terminals_own_reports_are_not_typing_and_everything_else_is() {
+        for reports in [
+            &b"\x1b[1;1R"[..],
+            b"\x1b[I",
+            b"\x1b[O",
+            b"\x1b[?1;2c",
+            b"\x1b[0n",
+            b"\x1b[I\x1b[12;40R",
+            b"",
+        ] {
+            assert!(!is_typing(reports), "{reports:?}");
+        }
+        for typing in [
+            &b"hello agent"[..],
+            b"\r",
+            b"\x1b[A",
+            b"\x1b",
+            b"\x1b[1;1Rgo\r",
+            b"\x03",
+        ] {
+            assert!(is_typing(typing), "{typing:?}");
+        }
+    }
+
+    #[test]
+    fn a_waiting_size_is_taken_once() {
+        let pending = Pending::default();
+        assert_eq!(pending.take(), None);
+        pending.ask(size(152, 14));
+        assert_eq!(pending.take(), Some(size(152, 14)));
+        assert_eq!(pending.take(), None);
+        assert!(!pending.waiting());
     }
 
     #[test]

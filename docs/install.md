@@ -408,8 +408,9 @@ prints in the run's log (`tok logs <card>` prints it), and the card's Terminal t
   or show a few lines twice. **Copy all** copies what the panel holds; the run's log has each line.
   A later version makes the panel follow the console's size, which removes this.
 - When the panel gets smaller, the agent gets the new size once its output has paused for a third
-  of a second, and at most two seconds later. Made smaller just as an agent starts printing,
-  Windows' console drops the agent's first lines; waiting for the pause keeps them.
+  of a second, at most two seconds later, or as soon as you type into the terminal. Made smaller
+  just as an agent starts printing, Windows' console drops the agent's first lines; waiting for
+  the pause keeps them.
 
 ## First run: the demo chain
 

@@ -193,15 +193,12 @@ fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
-    // No hooks are wired, so the way in is the terminal. After the instruction it says its size
-    // each time it is given a line: on Windows a smaller screen reaches the agent once its output
-    // has been quiet, so the size may land after the instruction (TOKNILA-162).
-    let mut steps = vec!["print", "ready", "echo", "size"];
-    for _ in 0..40 {
-        steps.extend(["echo", "size"]);
-    }
-    steps.extend(["sleep", "30000"]);
-    tok.profile("listener", &steps, "");
+    // No hooks are wired, so the way in is the terminal.
+    tok.profile(
+        "listener",
+        &["print", "ready", "echo", "size", "sleep", "30000"],
+        "",
+    );
     tok.run(&[
         "project",
         "new",
@@ -229,27 +226,8 @@ fn a_persons_instruction_is_typed_to_the_agent_once_and_the_terminal_follows_the
         tok.logs("DEMO-1")
             .contains("got:# [instruction] use rustls")
     });
-    // Asks again (`go<n>.`) until the agent says the panel's size; ConPTY's repaints draw old
-    // lines again, so only what it printed after the newest ask counts.
-    let mut n = 0;
     wait_until(&tok, "the terminal to have the panel's size", || {
-        let logs = tok.logs("DEMO-1");
-        let echo = format!("got:go{n}.");
-        let answer = logs
-            .rfind(&echo)
-            .and_then(|at| logs[at..].find("size=").map(|s| &logs[at + s..]))
-            .filter(|a| a.contains('\n'));
-        if n > 0 && answer.is_some_and(|a| a.starts_with("size=90x30")) {
-            return true;
-        }
-        if n == 0 || answer.is_some() {
-            n += 1;
-            let _ = tok
-                .client()
-                .runner_input("DEMO-1", format!("go{n}.\r").as_bytes());
-            std::thread::sleep(Duration::from_millis(400));
-        }
-        false
+        tok.logs("DEMO-1").contains("size=90x30")
     });
     wait_until(&tok, "the delivered mark", || {
         let shown = tok.run(&["show", "DEMO-1"]);
