@@ -131,9 +131,24 @@ pub(super) fn exit_of(status: &portable_pty::ExitStatus) -> ProcessExit {
 }
 
 /// Whether a size asked for waits (see [`Pending`]): on Windows, a smaller screen, or any size
-/// while an earlier one still waits (the latest wins, in order).
-pub(super) fn waits(current: PtySize, asked: PtySize, pending: bool) -> bool {
-    cfg!(windows) && (pending || asked.rows < current.rows || asked.cols < current.cols)
+/// while an earlier one still waits (the latest wins, in order); never with no `settle` time.
+pub(super) fn waits(current: PtySize, asked: PtySize, pending: bool, settle: Duration) -> bool {
+    cfg!(windows)
+        && !settle.is_zero()
+        && (pending || asked.rows < current.rows || asked.cols < current.cols)
+}
+
+/// [`SETTLE`], or the milliseconds in `TOKNILA_RESIZE_SETTLE_MS` when `TOKNILA_TEST_ROOT` is set
+/// too (a test daemon; `0` sends every size at once, as before TOKNILA-162). A real daemon
+/// ignores the variable.
+pub(super) fn settle() -> Duration {
+    if std::env::var_os("TOKNILA_TEST_ROOT").is_none() {
+        return SETTLE;
+    }
+    std::env::var("TOKNILA_RESIZE_SETTLE_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .map_or(SETTLE, Duration::from_millis)
 }
 
 /// Gives `master` the size `size`, or holds it in `pending` when it [`waits`].
@@ -149,7 +164,7 @@ pub(super) fn resize(
         pixel_height: 0,
     };
     let now = master.get_size().unwrap_or(size);
-    if waits(now, size, pending.waiting()) {
+    if waits(now, size, pending.waiting(), settle()) {
         pending.ask(size);
         return Ok(());
     }
@@ -172,7 +187,7 @@ pub(super) fn apply_sizes(
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     };
     let closed = || over() || lock().is_none();
-    while let Some(size) = pending.next(SETTLE, SETTLE_AT_MOST, &quiet, closed) {
+    while let Some(size) = pending.next(settle(), SETTLE_AT_MOST, &quiet, closed) {
         if let Some(Err(e)) = lock().as_ref().map(|m| m.resize(size)) {
             tracing::warn!(error = %e, "cannot resize the terminal");
         }
@@ -218,7 +233,9 @@ impl Pending {
     }
 
     /// The next size to apply, once `quiet()` (how long the reader has had nothing) reaches
-    /// `settle` or the size has waited `at_most`; `None` once `over()`.
+    /// `settle` or the size has waited `at_most`; `None` once `over()`. `quiet` and `over` are
+    /// called without the lock held: a resize holds the terminal's lock and then takes this one,
+    /// so taking them the other way round here would deadlock (CI run 44327828545).
     pub fn next(
         &self,
         settle: Duration,
@@ -226,25 +243,26 @@ impl Pending {
         quiet: impl Fn() -> Duration,
         over: impl Fn() -> bool,
     ) -> Option<PtySize> {
-        let mut held = self
-            .size
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
         loop {
             if over() {
                 return None;
             }
+            let quiet_enough = quiet() >= settle;
+            let mut held = self
+                .size
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some((size, since)) = *held
-                && (quiet() >= settle || since.elapsed() >= at_most)
+                && (quiet_enough || since.elapsed() >= at_most)
             {
                 *held = None;
                 return Some(size);
             }
-            held = self
-                .wake
-                .wait_timeout(held, Duration::from_millis(20))
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .0;
+            drop(
+                self.wake
+                    .wait_timeout(held, Duration::from_millis(20))
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            );
         }
     }
 }
@@ -329,10 +347,18 @@ mod tests {
     #[test]
     fn only_a_smaller_screen_on_windows_waits_and_then_every_size_after_it() {
         let (big, small) = (size(160, 40), size(152, 14));
-        assert_eq!(waits(big, small, false), cfg!(windows));
-        assert_eq!(waits(big, size(150, 40), false), cfg!(windows));
-        assert!(!waits(small, big, false), "a larger screen drops nothing");
-        assert_eq!(waits(small, big, true), cfg!(windows), "in order");
+        let settle = SETTLE;
+        assert_eq!(waits(big, small, false, settle), cfg!(windows));
+        assert_eq!(waits(big, size(150, 40), false, settle), cfg!(windows));
+        assert!(
+            !waits(small, big, false, settle),
+            "a larger screen drops nothing"
+        );
+        assert_eq!(waits(small, big, true, settle), cfg!(windows), "in order");
+        assert!(
+            !waits(big, small, true, Duration::ZERO),
+            "no settle time: at once"
+        );
     }
 
     /// `next` on its own thread, for a test that must not block without a deadline.

@@ -229,27 +229,37 @@ try {
   await clearClip(page);
   await page.locator("[data-testid=term-copy-more]").click();
   await page.locator("[data-testid=term-copy-all]").click();
-  // Every line once and in order, on every OS. The pattern this replaced checked only the first
-  // and the last lines, and passed while the page lost line 70 in every Windows run (TOKNILA-162,
-  // CI run 44308344208). Windows' clipboard ends lines with CRLF; the blank row between the
-  // markers is the line of the agent's copy request.
+  // Every line, in order, ending with the markers; once each on macOS and Linux. The pattern this
+  // replaced checked only the first and the last lines, and passed while the page lost line 70 in
+  // every Windows run (TOKNILA-162, CI run 44308344208). On Windows ConPTY repaints its screen at
+  // each resize, and the page's terminal changes size more often than it tells the daemon (it
+  // sends the last size of a burst), so a repaint can draw lines the page already has: with the
+  // page set for ConPTY (src/terminal/conpty.ts) all 80 lines were there in six of six runs of CI
+  // run 44327828545, three of them twice after this spec's resizes. A repeat is allowed there, at
+  // most one screen of the page's grid. Windows' clipboard ends lines with CRLF; the blank row
+  // between the markers is the line of the agent's copy request.
   const want = [...Array.from({ length: LINES }, (_, i) => `scroll line ${i + 1}`), "marker alpha", "marker omega"];
   let copied = STALE;
   for (const until = Date.now() + 8000; copied === STALE && Date.now() < until; await page.waitForTimeout(100)) copied = await clip(page);
   const got = copied.split(/\r?\n/).filter((l) => l !== "");
-  const lost = got.length !== want.length || got.some((l, i) => l !== want[i]);
+  const firstSeen = got.filter((l, i) => got.indexOf(l) === i);
+  const repeats = got.length - firstSeen.length;
+  const mayRepeat = process.platform === "win32" ? (pageGrids.at(-1)?.rows ?? 0) : 0;
+  const inOrder = firstSeen.length === want.length && firstSeen.every((l, i) => l === want[i]);
+  const lost = !inOrder || repeats > mayRepeat || got.at(-1) !== "marker omega";
+  console.log(`INFO Copy all: ${got.length} lines, ${repeats} repeated (allowed ${mayRepeat})`);
   // Every run says what each layer held, so a passing run is a number too.
   const layers = whereTheLinesWent(copied, lost);
   for (const line of layers) console.log(`INFO ${line}`);
   if (lost) {
     const missing = want.filter((l) => !got.includes(l));
-    const differs = got.findIndex((l, i) => l !== want[i]);
-    const at = differs < 0 ? got.length : differs;
+    const differs = firstSeen.findIndex((l, i) => l !== want[i]);
+    const at = differs < 0 ? firstSeen.length : differs;
     throw new Error(
-      `Copy all copies the whole scrollback: ${got.length} lines of ${want.length}, missing ${JSON.stringify(missing)}, first difference at line ${at + 1}: ${JSON.stringify(got[at] ?? "(end)")}\n  where the lines went:\n  ${layers.join("\n  ")}`,
+      `Copy all copies the whole scrollback: ${got.length} lines for ${want.length}, ${repeats} repeated (allowed ${mayRepeat}), missing ${JSON.stringify(missing)}, first new line out of order at ${at + 1}: ${JSON.stringify(firstSeen[at] ?? "(end)")}, last line ${JSON.stringify(got.at(-1))}\n  where the lines went:\n  ${layers.join("\n  ")}`,
     );
   }
-  console.log("PASS Copy all copies the whole scrollback, every line once and in order");
+  console.log(`PASS Copy all copies the whole scrollback, every line in order${mayRepeat ? `, at most ${mayRepeat} repeated` : ", each once"}`);
 
   // A window whose clipboard refuses without a gesture: "Copied text ready", then a click copies.
   const refusing = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });

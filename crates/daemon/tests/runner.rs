@@ -198,15 +198,42 @@ fn input_reaches_the_process_and_its_answer_comes_back() {
     assert_eq!(rig.wait_end().exit.code, Some(0));
 }
 
+/// Steps that make the fake agent say its size each time it is given a line, `n` times.
+fn sizes_on_request(n: usize) -> Vec<String> {
+    let mut steps = Vec::new();
+    for _ in 0..n {
+        steps.extend(["echo".to_owned(), "size".to_owned()]);
+    }
+    steps
+}
+
+/// Gives the agent of [`sizes_on_request`] a line each time it has answered the last one, until
+/// its output holds `want`. Slower than the runner's settle time (a smaller screen reaches ConPTY
+/// once the output is quiet), so the output goes quiet between two asks.
+fn ask_size_until(rig: &Rig, want: &str) {
+    let until = Instant::now() + WAIT;
+    let before = rig.output().matches("size=").count();
+    let mut asked = 0;
+    while !rig.output().contains(want) {
+        assert!(Instant::now() < until, "no {want:?} in {:?}", rig.output());
+        if rig.output().matches("size=").count() == before + asked {
+            rig.runners
+                .write(rig.ticket, AgentRole::Worker, b"go\r")
+                .expect("write");
+            asked += 1;
+        }
+        std::thread::sleep(Duration::from_millis(400));
+    }
+}
+
 #[test]
 fn the_terminal_starts_at_the_default_size_and_follows_a_resize() {
     use toknila_core::instructions::terminal::{self, Size};
     let mut rig = Rig::new();
-    rig.profile(
-        "fake",
-        &["print", "ready", "size", "echo", "size", "exit", "0"],
-        "",
-    );
+    let mut steps = vec!["print".to_owned(), "ready".to_owned(), "size".to_owned()];
+    steps.extend(sizes_on_request(40));
+    let steps: Vec<&str> = steps.iter().map(String::as_str).collect();
+    rig.profile("fake", &steps, "");
     rig.start("fake");
     let first = rig.wait_for("size=");
     let d = terminal::DEFAULT;
@@ -217,11 +244,9 @@ fn the_terminal_starts_at_the_default_size_and_follows_a_resize() {
     rig.runners
         .resize(rig.ticket, Size { cols: 90, rows: 30 })
         .expect("resize");
-    rig.runners
-        .write(rig.ticket, AgentRole::Worker, b"go\r")
-        .expect("write");
-    rig.wait_for("size=90x30");
-    assert_eq!(rig.wait_end().exit.code, Some(0));
+    ask_size_until(&rig, "size=90x30");
+    rig.runners.stop(rig.ticket);
+    rig.wait_end();
     let err = rig
         .runners
         .resize(rig.ticket, Size { cols: 90, rows: 30 })
@@ -958,10 +983,7 @@ fn the_first_of_eighty_lines_reaches_the_log_and_the_scrollback() {
 }
 
 /// TOKNILA-162: a panel's size that comes while the agent still prints (the page sends it when it
-/// opens) costs no line of the run log, and the agent then gets that size. On Windows ConPTY drops
-/// the rows above a shrunk screen that it has not rendered yet, so the runner holds a smaller size
-/// until the output is quiet (two of six Windows runs of the terminal-copy spec lost lines 1-12
-/// and 1-8 from the log before, CI run 44317344931). Whenever the size lands, every line is kept.
+/// opens) costs no line of the run log, and the agent then gets that size, whenever it lands.
 #[test]
 fn a_size_that_comes_while_the_agent_prints_costs_no_line_of_the_log() {
     use toknila_core::instructions::terminal::Size;
@@ -972,42 +994,18 @@ fn a_size_that_comes_while_the_agent_prints_costs_no_line_of_the_log() {
         steps.extend(["sleep".to_owned(), "2".to_owned()]);
     }
     steps.extend(["print".to_owned(), "printed all".to_owned()]);
-    // Then it says its size each time it is given a line, until the test has the new one.
-    for _ in 0..50 {
-        steps.extend(["echo".to_owned(), "size".to_owned()]);
-    }
+    steps.extend(sizes_on_request(50));
     let steps: Vec<&str> = steps.iter().map(String::as_str).collect();
     rig.profile("fake", &steps, "");
     let started = rig.start("fake");
     rig.wait_for("scroll line");
-    rig.runners
-        .resize(
-            rig.ticket,
-            Size {
-                cols: 152,
-                rows: 14,
-            },
-        )
-        .expect("resize");
+    let small = Size {
+        cols: 152,
+        rows: 14,
+    };
+    rig.runners.resize(rig.ticket, small).expect("resize");
     rig.wait_for("printed all");
-    let until = Instant::now() + WAIT;
-    let mut sizes = 0;
-    while !rig.output().contains("size=152x14") {
-        assert!(
-            Instant::now() < until,
-            "the agent never got 152x14: {:?}",
-            rig.output()
-        );
-        let seen = rig.output().matches("size=").count();
-        if seen == sizes {
-            rig.runners
-                .write(rig.ticket, AgentRole::Worker, b"go\r")
-                .expect("write");
-            sizes += 1;
-        }
-        // Slower than the runner's settle time, so the output goes quiet between two asks.
-        std::thread::sleep(Duration::from_millis(400));
-    }
+    ask_size_until(&rig, "size=152x14");
     rig.runners.stop(rig.ticket);
     rig.wait_end();
     let log = log_of(rig.dir.path(), rig.ticket, &started.run.id.to_string());

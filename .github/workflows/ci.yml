@@ -66,7 +66,10 @@ jobs:
       - name: Terminal probe numbers (Windows, TOKNILA-162 temporary)
         if: always() && runner.os == 'Windows'
         continue-on-error: true
-        run: cargo test -p toknila-daemon --test terminal_lines --locked -- --nocapture
+        shell: bash
+        run: |
+          cargo test -p toknila-daemon --test terminal_lines --locked -- --nocapture
+          cargo test -p toknila --test terminal_resize --locked -- --nocapture
 
       # Time of each step and of each test (junit), also when verify failed.
       - name: Upload verify timing
