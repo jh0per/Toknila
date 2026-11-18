@@ -282,6 +282,10 @@ pub fn isolate(cmd: &mut Command, home: &Path) {
     // A test daemon looks at its runs every quarter second, not every five (it reads the
     // variable only because `TOKNILA_TEST_ROOT` is set, which `cargo xtask verify` does too).
     cmd.env("TOKNILA_TICK_MS", "250");
+    // A `tok` that starts a daemon waits up to a minute for it, not a person's 15 s: under the
+    // parallel suite on GitHub's Windows runner a start took up to 11 s (CI run 44308344208) and
+    // four tests failed at 15 s (run 44136517698). A daemon that hangs still fails the test.
+    cmd.env("TOKNILA_START_WAIT_SECS", "60");
     if std::env::var_os("TOKNILA_TEST_ROOT").is_none() {
         cmd.env("TOKNILA_TEST_ROOT", home);
     }
@@ -324,15 +328,25 @@ pub fn start_daemon(home: &Path) -> Output {
         .expect("spawn tok daemon start");
     let stdin = child.stdin.take().expect("stdin");
     lifelines().push((home.to_owned(), stdin));
+    // When the daemon's address file appeared (one left by an earlier daemon of this home counts
+    // at once); `tok daemon start` itself returns at the first answer, within its own wait.
+    let info = home.join("daemon.json");
+    let mut file_at = None;
+    while matches!(child.try_wait(), Ok(None)) {
+        if file_at.is_none() && info.exists() {
+            file_at = Some(begin.elapsed());
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
     let out = child.wait_with_output().expect("wait for tok daemon start");
-    note_start(at, begin.elapsed(), out.status.success());
+    note_start(at, begin.elapsed(), file_at, out.status.success());
     out
 }
 
 /// Adds one line for a daemon start to the run's `daemon-starts.txt` (under `TOKNILA_TEST_ROOT`),
 /// which `cargo xtask verify` sums up after the tests: when it began (ms since the epoch), how long
-/// it took (ms), whether it succeeded, and the test.
-fn note_start(at: u128, took: Duration, ok: bool) {
+/// it took (ms), when the address file appeared (ms, `-` if never), whether it succeeded, the test.
+fn note_start(at: u128, took: Duration, file_at: Option<Duration>, ok: bool) {
     let Some(root) = std::env::var_os("TOKNILA_TEST_ROOT") else {
         return;
     };
@@ -343,8 +357,9 @@ fn note_start(at: u128, took: Duration, ok: bool) {
         .map(str::to_owned)
         .or_else(|| std::env::args().skip(1).find(|a| !a.starts_with('-')))
         .unwrap_or_else(|| "?".to_owned());
+    let file = file_at.map_or("-".to_owned(), |d| d.as_millis().to_string());
     let line = format!(
-        "{at} {} {} {test}\n",
+        "{at} {} {file} {} {test}\n",
         took.as_millis(),
         if ok { "ok" } else { "failed" }
     );

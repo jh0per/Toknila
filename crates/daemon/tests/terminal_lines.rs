@@ -104,60 +104,105 @@ fn steps(print: Print) -> Vec<String> {
     steps
 }
 
-/// One run of `case`: the numbers of the lines the reader got.
-fn run(case: Case) -> BTreeSet<u32> {
-    let pair = native_pty_system()
-        .openpty(PtySize {
-            rows: case.rows,
-            cols: 160,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .expect("openpty");
-    let mut cmd = CommandBuilder::new(AGENT);
-    cmd.args(steps(case.print));
-    let mut child = pair.slave.spawn_command(cmd).expect("spawn");
-    drop(pair.slave);
-    let mut reader = pair.master.try_clone_reader().expect("reader");
-    let mut writer = pair.master.take_writer().expect("writer");
-    let (tx, rx) = mpsc::channel::<Vec<u8>>();
-    std::thread::spawn(move || {
-        let mut buf = [0u8; 8192];
-        while let Ok(n) = reader.read(&mut buf) {
-            if n == 0 || tx.send(buf[..n].to_vec()).is_err() {
-                break;
+/// A program in a terminal of 160 columns, and what its reader got so far.
+struct Term {
+    master: Box<dyn portable_pty::MasterPty + Send>,
+    child: Box<dyn portable_pty::Child + Send + Sync>,
+    writer: Box<dyn Write + Send>,
+    rx: mpsc::Receiver<Vec<u8>>,
+    got: Vec<u8>,
+    asked: Option<Instant>,
+    answered: bool,
+}
+
+impl Term {
+    fn open(rows: u16, steps: Vec<String>) -> Term {
+        let pair = native_pty_system()
+            .openpty(PtySize {
+                rows,
+                cols: 160,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .expect("openpty");
+        let mut cmd = CommandBuilder::new(AGENT);
+        cmd.args(steps);
+        let child = pair.slave.spawn_command(cmd).expect("spawn");
+        drop(pair.slave);
+        let mut reader = pair.master.try_clone_reader().expect("reader");
+        let writer = pair.master.take_writer().expect("writer");
+        let (tx, rx) = mpsc::channel::<Vec<u8>>();
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 8192];
+            while let Ok(n) = reader.read(&mut buf) {
+                if n == 0 || tx.send(buf[..n].to_vec()).is_err() {
+                    break;
+                }
             }
-        }
-    });
-    let mut got: Vec<u8> = Vec::new();
-    let mut asked: Option<Instant> = None;
-    let mut answered = false;
-    let until = Instant::now() + WAIT;
-    while Instant::now() < until {
-        if let Ok(chunk) = rx.recv_timeout(Duration::from_millis(10)) {
-            got.extend_from_slice(&chunk);
-        }
-        if asked.is_none() && got.windows(4).any(|w| w == b"\x1b[6n") {
-            asked = Some(Instant::now());
-        }
-        if !answered && asked.is_some_and(|t| t.elapsed() >= case.answer_after) {
-            answered = true;
-            writer.write_all(b"\x1b[1;1R").expect("answer");
-        }
-        if plain(&got).contains(END) {
-            break;
+        });
+        Term {
+            master: pair.master,
+            child,
+            writer,
+            rx,
+            got: Vec::new(),
+            asked: None,
+            answered: false,
         }
     }
-    let _ = child.kill();
-    drop(writer);
-    drop(pair.master);
-    let text = plain(&got);
-    assert!(
-        text.contains(END),
-        "{case:?}: the last line never reached the reader ({} bytes): {:?}",
-        got.len(),
-        text.chars().rev().take(300).collect::<String>()
-    );
+
+    /// Takes what arrives within 10 ms, and answers ConPTY's cursor query `answer_after` it came.
+    fn pump(&mut self, answer_after: Duration) {
+        if let Ok(chunk) = self.rx.recv_timeout(Duration::from_millis(10)) {
+            self.got.extend_from_slice(&chunk);
+        }
+        if self.asked.is_none() && self.got.windows(4).any(|w| w == b"\x1b[6n") {
+            self.asked = Some(Instant::now());
+        }
+        if !self.answered && self.asked.is_some_and(|t| t.elapsed() >= answer_after) {
+            self.answered = true;
+            self.writer.write_all(b"\x1b[1;1R").expect("answer");
+        }
+    }
+
+    /// Reads until the program's last line has arrived (or [`WAIT`] has passed).
+    fn until_end(&mut self, answer_after: Duration) {
+        let until = Instant::now() + WAIT;
+        while Instant::now() < until && !plain(&self.got).contains(END) {
+            self.pump(answer_after);
+        }
+        let text = plain(&self.got);
+        assert!(
+            text.contains(END),
+            "the last line never reached the reader ({} bytes): {:?}",
+            self.got.len(),
+            text.chars().rev().take(300).collect::<String>()
+        );
+    }
+
+    /// What arrives in the next `window`.
+    fn next_for(&mut self, window: Duration) -> Vec<u8> {
+        let from = self.got.len();
+        let until = Instant::now() + window;
+        while Instant::now() < until {
+            self.pump(Duration::ZERO);
+        }
+        self.got[from..].to_vec()
+    }
+
+    fn close(mut self) {
+        let _ = self.child.kill();
+        drop(self.writer);
+        drop(self.master);
+    }
+}
+
+/// One run of `case`: the numbers of the lines the reader got.
+fn run(case: Case) -> BTreeSet<u32> {
+    let mut term = Term::open(case.rows, steps(case.print));
+    term.until_end(case.answer_after);
+    let text = plain(&term.got);
+    term.close();
     numbers(&text)
 }
 
@@ -234,4 +279,34 @@ fn every_line_of_a_fast_program_reaches_the_terminal_reader() {
     if cfg!(unix) {
         assert!(!lost, "a Unix pty lost lines:\n{}", lines.join("\n"));
     }
+}
+
+/// What a terminal emits when it is resized after the output, as the page resizes it when it
+/// opens (152x15 in a 1280x720 window) and when the window gets shorter and taller again (the
+/// terminal-copy spec).
+#[test]
+fn what_a_terminal_emits_when_it_is_resized_after_the_output() {
+    let _turn = support::hold();
+    let mut term = Term::open(40, steps(Print::EachLine));
+    term.until_end(Duration::ZERO);
+    eprintln!(
+        "TOKNILA-162 resize: the output at 160x40: {:?}",
+        String::from_utf8_lossy(&term.got)
+    );
+    for rows in [15, 14, 15] {
+        term.master
+            .resize(PtySize {
+                rows,
+                cols: 152,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .expect("resize");
+        let after = term.next_for(Duration::from_millis(700));
+        eprintln!(
+            "TOKNILA-162 resize: after the resize to 152x{rows}: {:?}",
+            String::from_utf8_lossy(&after)
+        );
+    }
+    term.close();
 }

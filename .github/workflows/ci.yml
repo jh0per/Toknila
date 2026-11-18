@@ -56,15 +56,6 @@ jobs:
         with:
           tool: nextest
 
-      # TOKNILA-162 measurement (temporary, removed before merge): is the scanner on at all?
-      - name: Virus scanner state (Windows, TOKNILA-162 temporary)
-        if: runner.os == 'Windows'
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          Get-MpComputerStatus | Select-Object AMServiceEnabled, RealTimeProtectionEnabled, OnAccessProtectionEnabled | Format-List
-          (Get-MpPreference).ExclusionPath
-
       # The same command developers run locally. Do not inline its steps here.
       - name: cargo xtask verify
         run: cargo xtask verify

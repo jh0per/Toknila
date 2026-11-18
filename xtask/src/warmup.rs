@@ -1,9 +1,15 @@
-//! Before the tests, `verify` launches the freshly built `tok` and starts and stops one daemon with
-//! it, twice, and says how long each launch took. On a fresh Windows runner the first launches of
-//! a new `tok.exe` are slow (the virus scanner reads the new executable): four cli tests failed
-//! there with "daemon did not answer within 15 s" near the start of the run (CI run 44136517698,
-//! 2026-11-17) while the rest passed. Paid here, once, that cost is a number in the log and not a
-//! failing test. After the tests, the times of the tests' own daemon starts are summed up.
+//! How long a daemon takes to start, as numbers in every `verify` log. Before the tests, `verify`
+//! launches the freshly built `tok` and starts and stops one daemon with it, twice (the first
+//! launch of a new executable is paid here, once); after them it sums up the tests' own daemon
+//! starts.
+//!
+//! Four cli tests failed on GitHub's Windows runner with "daemon did not answer within 15 s" (CI
+//! run 44136517698, 2026-11-17). The numbers of run 44308344208 named the cost: the runner's virus
+//! scanner is off (no real-time protection), `tok --version` took 0.02 s cold, one daemon alone
+//! answered after 1.46 s cold and 0.60 s warm, but under the parallel suite the 92 test daemon
+//! starts took up to 11.01 s (median 1.22 s). The load of the suite is the slow part, so a test's
+//! `tok` waits longer than a person's (`TOKNILA_START_WAIT_SECS`, read only under
+//! `TOKNILA_TEST_ROOT`).
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
@@ -139,31 +145,45 @@ fn stop(child: &mut Child) {
     let _ = child.wait();
 }
 
-/// Prints how long the tests' own daemon starts took (one line per start in [`STARTS_FILE`]:
-/// milliseconds since the epoch at the spawn, milliseconds it took, `ok` or `failed`, the test).
+/// One daemon start of a test, as the cli tests' helper wrote it.
+#[derive(Debug, PartialEq)]
+struct Start<'a> {
+    /// Milliseconds since the epoch at the spawn.
+    at: u128,
+    /// Milliseconds until `tok daemon start` returned.
+    took: u128,
+    /// Milliseconds until the address file appeared, if it did.
+    file: Option<u128>,
+    ok: bool,
+    test: &'a str,
+}
+
+/// A line of [`STARTS_FILE`]: `<at> <took> <file or -> <ok|failed> <test>`.
+fn parse(line: &str) -> Option<Start<'_>> {
+    let mut f = line.splitn(5, ' ');
+    Some(Start {
+        at: f.next()?.parse().ok()?,
+        took: f.next()?.parse().ok()?,
+        file: f.next()?.parse().ok(),
+        ok: f.next()? == "ok",
+        test: f.next().unwrap_or("?"),
+    })
+}
+
+/// Prints how long the tests' own daemon starts took: how many, the median and the slowest, the
+/// first ones of the run, and the three slowest with the second of the run they began in.
 pub fn summary(root: &Path) {
     let Ok(text) = std::fs::read_to_string(root.join(STARTS_FILE)) else {
         return;
     };
-    let mut starts: Vec<(u128, u128, bool, &str)> = text
-        .lines()
-        .filter_map(|l| {
-            let mut f = l.splitn(4, ' ');
-            Some((
-                f.next()?.parse().ok()?,
-                f.next()?.parse().ok()?,
-                f.next()? == "ok",
-                f.next().unwrap_or("?"),
-            ))
-        })
-        .collect();
+    let mut starts: Vec<Start> = text.lines().filter_map(parse).collect();
     if starts.is_empty() {
         return;
     }
-    starts.sort_by_key(|s| s.0);
-    let mut took: Vec<u128> = starts.iter().map(|s| s.1).collect();
+    starts.sort_by_key(|s| s.at);
+    let mut took: Vec<u128> = starts.iter().map(|s| s.took).collect();
     took.sort_unstable();
-    let failed = starts.iter().filter(|s| !s.2).count();
+    let failed = starts.iter().filter(|s| !s.ok).count();
     let secs = |ms: u128| ms as f64 / 1000.0;
     eprintln!(
         "xtask verify: test daemon starts: {} ({failed} failed), median {:.2}s, slowest {:.2}s",
@@ -174,20 +194,25 @@ pub fn summary(root: &Path) {
     let first: Vec<String> = starts
         .iter()
         .take(8)
-        .map(|s| format!("{:.2}s", secs(s.1)))
+        .map(|s| format!("{:.2}s", secs(s.took)))
         .collect();
     eprintln!(
         "xtask verify: the first test daemon starts took {}",
         first.join(" ")
     );
-    let mut slow: Vec<&(u128, u128, bool, &str)> = starts.iter().collect();
-    slow.sort_by_key(|s| std::cmp::Reverse(s.1));
+    let begin = starts[0].at;
+    let mut slow: Vec<&Start> = starts.iter().collect();
+    slow.sort_by_key(|s| std::cmp::Reverse(s.took));
     for s in slow.iter().take(3) {
+        let file = s.file.map_or("no address file".to_owned(), |f| {
+            format!("address file after {:.2}s", secs(f))
+        });
         eprintln!(
-            "xtask verify: slow test daemon start: {:.2}s {} ({})",
-            secs(s.1),
-            s.3,
-            if s.2 { "ok" } else { "failed" }
+            "xtask verify: slow test daemon start: {:.2}s ({file}, {}), {:.0}s into the run: {}",
+            secs(s.took),
+            if s.ok { "ok" } else { "failed" },
+            secs(s.at - begin),
+            s.test
         );
     }
 }
@@ -202,5 +227,23 @@ mod tests {
         assert_eq!(port_of(json), Some(51234));
         assert_eq!(port_of(r#"{"port":80}"#), Some(80));
         assert_eq!(port_of(r#"{"pid": 7}"#), None);
+    }
+
+    #[test]
+    fn a_start_line_of_the_helper_is_read_back() {
+        let start = Start {
+            at: 1_700_000_000_000,
+            took: 11_010,
+            file: Some(10_950),
+            ok: true,
+            test: "chain_mv",
+        };
+        assert_eq!(parse("1700000000000 11010 10950 ok chain_mv"), Some(start));
+        let never = parse("5 15000 - failed a test name").expect("a line");
+        assert_eq!(
+            (never.file, never.ok, never.test),
+            (None, false, "a test name")
+        );
+        assert_eq!(parse("not a line"), None);
     }
 }

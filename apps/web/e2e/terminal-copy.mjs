@@ -94,13 +94,13 @@ try {
 
   browser = await launch();
   const errors = [];
-  // The grid the page's terminal last told the daemon (its fit to the panel).
-  let pageGrid = null;
+  // The grids the page's terminal told the daemon (its fit to the panel), the last one last.
+  const pageGrids = [];
   const open = async (context) => {
     const page = await context.newPage();
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("request", (r) => {
-      if (r.method() === "POST" && r.url().includes("/runner/size")) pageGrid = JSON.parse(r.postData() ?? "null");
+      if (r.method() === "POST" && r.url().includes("/runner/size")) pageGrids.push(JSON.parse(r.postData() ?? "null"));
     });
     await page.goto(cardUrl);
     return page;
@@ -142,7 +142,13 @@ try {
     out.push(layer("(b) scrollback route", served.toString("utf8")));
     out.push(layer("(c) page terminal (Copy all)", copied));
     out.push(layer("(d) (b) in xterm 160x40", await replay(served, 160, 40)));
-    if (pageGrid) out.push(layer(`(e) (b) in xterm ${pageGrid.cols}x${pageGrid.rows} (the page's grid)`, await replay(served, pageGrid.cols, pageGrid.rows)));
+    const grid = pageGrids.at(-1);
+    if (grid) out.push(layer(`(e) (b) in xterm ${grid.cols}x${grid.rows} (the page's grid)`, await replay(served, grid.cols, grid.rows)));
+    out.push(`grids the page sent: ${pageGrids.map((g) => `${g.cols}x${g.rows}`).join(" ")}`);
+    // What the terminal emitted after the agent's last line: on Windows, ConPTY's repaints.
+    const text = served.toString("utf8");
+    const end = text.indexOf("marker omega");
+    if (end >= 0) out.push(`after the output: ${JSON.stringify(text.slice(end + "marker omega".length)).slice(0, 4000)}`);
     return out;
   };
   const clip = (page) => page.evaluate(() => navigator.clipboard.readText());
