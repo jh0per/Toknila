@@ -32,8 +32,24 @@ fn run(cargo: &str, root: &Path, args: &[&str]) -> Result<(), String> {
     }
 }
 
-/// The workspace tests with the test homes created under `root`.
+/// The workspace tests with the test homes created under `root`: built first, then the built
+/// `tok` is warmed up (see `warmup`), then run; the tests' daemon starts are summed up after.
 pub fn cargo_test(cargo: &str, root: &Path) -> Result<(), String> {
+    run(
+        cargo,
+        root,
+        &["test", "--workspace", "--locked", "--no-run"],
+    )?;
+    let tok = target_dir(&crate::app::root()?)
+        .join("debug")
+        .join(format!("tok{}", std::env::consts::EXE_SUFFIX));
+    crate::warmup::run(&tok, root)?;
+    let result = tests(cargo, root);
+    crate::warmup::summary(root);
+    result
+}
+
+fn tests(cargo: &str, root: &Path) -> Result<(), String> {
     if has_nextest(cargo) {
         eprintln!("xtask verify: tests run with cargo nextest");
         // The tests of other crates start this binary; build it once, not once per test process.

@@ -308,6 +308,10 @@ pub fn daemon_healthy(home: &Path) -> bool {
 /// daemon open for as long as this process lives. Returns what `tok` printed.
 pub fn start_daemon(home: &Path) -> Output {
     track(home);
+    let begin = Instant::now();
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis());
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_tok"));
     cmd.args(["daemon", "start", "--exit-with-parent", "--json"])
         .env("TOKNILA_HOME", home);
@@ -320,7 +324,36 @@ pub fn start_daemon(home: &Path) -> Output {
         .expect("spawn tok daemon start");
     let stdin = child.stdin.take().expect("stdin");
     lifelines().push((home.to_owned(), stdin));
-    child.wait_with_output().expect("wait for tok daemon start")
+    let out = child.wait_with_output().expect("wait for tok daemon start");
+    note_start(at, begin.elapsed(), out.status.success());
+    out
+}
+
+/// Adds one line for a daemon start to the run's `daemon-starts.txt` (under `TOKNILA_TEST_ROOT`),
+/// which `cargo xtask verify` sums up after the tests: when it began (ms since the epoch), how long
+/// it took (ms), whether it succeeded, and the test.
+fn note_start(at: u128, took: Duration, ok: bool) {
+    let Some(root) = std::env::var_os("TOKNILA_TEST_ROOT") else {
+        return;
+    };
+    // The test's thread is named after it; a test run on the main thread is named by its arguments.
+    let test = std::thread::current()
+        .name()
+        .filter(|n| *n != "main")
+        .map(str::to_owned)
+        .or_else(|| std::env::args().skip(1).find(|a| !a.starts_with('-')))
+        .unwrap_or_else(|| "?".to_owned());
+    let line = format!(
+        "{at} {} {} {test}\n",
+        took.as_millis(),
+        if ok { "ok" } else { "failed" }
+    );
+    // One write per line in append mode: lines of parallel tests do not interleave.
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(PathBuf::from(root).join("daemon-starts.txt"))
+        .and_then(|mut f| f.write_all(line.as_bytes()));
 }
 
 /// Starts `tok watch` (extra `args` after `watch`) that ends when this process dies.

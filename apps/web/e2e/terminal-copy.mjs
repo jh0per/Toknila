@@ -10,9 +10,10 @@
 // the text on the clipboard once clicked.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
@@ -27,6 +28,48 @@ const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8"
 const tok = (...args) => run(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home } });
 const git = (dir, ...args) =>
   run("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args]);
+
+// Where the agent's lines went (TOKNILA-162): for each layer, its line count, first and last lines
+// and which of the numbered lines it lacks. Raw terminal output is read without its escape
+// sequences; a line is counted once however often a repaint drew it.
+const LINES = 80;
+const XTERM = fileURLToPath(new URL("../node_modules/@xterm/xterm/lib/xterm.js", import.meta.url));
+const plain = (s) =>
+  s
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b[@-Z\\-_]/g, "");
+const ranges = (ns) => {
+  const out = [];
+  for (let i = 0; i < ns.length; ) {
+    let j = i;
+    while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j++;
+    out.push(i === j ? `${ns[i]}` : `${ns[i]}-${ns[j]}`);
+    i = j + 1;
+  }
+  return out.join(", ");
+};
+const layer = (name, text) => {
+  const flat = plain(text);
+  const lines = flat.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l !== "");
+  const seen = new Set([...flat.matchAll(/scroll line (\d+)(?!\d)/g)].map((m) => Number(m[1])));
+  const missing = [];
+  for (let i = 1; i <= LINES; i++) if (!seen.has(i)) missing.push(i);
+  return `${name}: ${lines.length} lines, first ${JSON.stringify(lines[0] ?? "")}, last ${JSON.stringify(lines.at(-1) ?? "")}, numbered lines ${LINES - missing.length}/${LINES}, missing [${ranges(missing)}]`;
+};
+// The newest run log under the data folder, as the daemon wrote it.
+const newestLog = (dir) => {
+  let best = null;
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith(".log") && (!best || statSync(p).mtimeMs > best.at)) best = { p, at: statSync(p).mtimeMs };
+    }
+  };
+  walk(dir);
+  return best?.p;
+};
 
 let browser;
 try {
@@ -51,11 +94,56 @@ try {
 
   browser = await launch();
   const errors = [];
+  // The grid the page's terminal last told the daemon (its fit to the panel).
+  let pageGrid = null;
   const open = async (context) => {
     const page = await context.newPage();
     page.on("pageerror", (e) => errors.push(e.message));
+    page.on("request", (r) => {
+      if (r.method() === "POST" && r.url().includes("/runner/size")) pageGrid = JSON.parse(r.postData() ?? "null");
+    });
     await page.goto(cardUrl);
     return page;
+  };
+  // `bytes` written into a fresh xterm.js (the page's version) of `cols` x `rows`, read back as
+  // Copy all reads the page's terminal.
+  const replay = async (bytes, cols, rows) => {
+    const p = await browser.newPage();
+    try {
+      await p.setContent("<div id=t></div>");
+      await p.addScriptTag({ path: XTERM });
+      return await p.evaluate(async ([b64, c, r]) => {
+        const term = new window.Terminal({ cols: c, rows: r, scrollback: 5000 });
+        term.open(document.getElementById("t"));
+        const data = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+        await new Promise((done) => term.write(data, done));
+        const b = term.buffer.active;
+        const out = [];
+        for (let y = 0; y < b.length; y++) {
+          const line = b.getLine(y);
+          const t = line.translateToString(true);
+          if (line.isWrapped && out.length) out[out.length - 1] += t;
+          else out.push(t);
+        }
+        return out.join("\n");
+      }, [bytes.toString("base64"), cols, rows]);
+    } finally {
+      await p.close();
+    }
+  };
+  // Each layer between the agent and the clipboard: (a) the run log the daemon wrote, (b) the
+  // scrollback route's answer (`tok logs`), (c) the page terminal's buffer as Copy all handed it
+  // over, and (b) replayed into xterm.js at the size ConPTY rendered for and at the page's grid.
+  const whereTheLinesWent = async (copied) => {
+    const out = [];
+    const log = newestLog(join(home, "runs"));
+    out.push(log ? layer("(a) run log", readFileSync(log, "utf8")) : "(a) run log: none under the data folder");
+    const served = execFileSync(tokBin, ["logs", "WEB-1"], { env: { ...process.env, TOKNILA_HOME: home } });
+    out.push(layer("(b) scrollback route", served.toString("utf8")));
+    out.push(layer("(c) page terminal (Copy all)", copied));
+    out.push(layer("(d) (b) in xterm 160x40", await replay(served, 160, 40)));
+    if (pageGrid) out.push(layer(`(e) (b) in xterm ${pageGrid.cols}x${pageGrid.rows} (the page's grid)`, await replay(served, pageGrid.cols, pageGrid.rows)));
+    return out;
   };
   const clip = (page) => page.evaluate(() => navigator.clipboard.readText());
   const expectClip = async (page, want, what) => {
@@ -168,7 +256,16 @@ try {
   // Line 1 first on every OS. Windows' console ends its lines with CRLF (CI run 43854240266 showed
   // the copy starting "scroll line 1\r\n", nothing lost), so the line ends allow a CR.
   const whole = /^scroll line 1\r?\n[\s\S]*scroll line 80\r?\nmarker alpha(\r?\n)+marker omega$/;
-  await expectClip(page, whole, "Copy all copies the whole scrollback");
+  let lost = null;
+  try {
+    await expectClip(page, whole, "Copy all copies the whole scrollback");
+  } catch (e) {
+    lost = e;
+  }
+  // Every run says what each layer held, so a passing run is a number too.
+  const layers = await whereTheLinesWent(await clip(page));
+  for (const line of layers) console.log(`INFO ${line}`);
+  if (lost) throw new Error(`${lost.message}\n  where the lines went:\n  ${layers.join("\n  ")}`);
 
   // A window whose clipboard refuses without a gesture: "Copied text ready", then a click copies.
   const refusing = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -188,7 +285,7 @@ try {
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
   console.log("web terminal copy: PASS");
 } catch (e) {
-  console.error(`web terminal copy: FAIL: ${e.message.slice(0, 600)}`);
+  console.error(`web terminal copy: FAIL: ${e.message.slice(0, 3000)}`);
   process.exitCode = 1;
 } finally {
   await browser?.close();
