@@ -1,0 +1,78 @@
+# Phase 14: toward a public release. Two independent stories from the list the owner was given on
+# 2026-11-17 ("шо залишилось?") and went on with on 2026-11-18: Windows CI that holds (two rare
+# failures blocked the publication of 0.3.8 twice), and a README and install guide written for a
+# stranger who downloads the app after reading an article.
+# Import: tok chain import plans/phase-14.toml --project TOKNILA
+#
+# `after` names the cards whose files a card shares; a card without `after` may run at once.
+
+[chain]
+name = "phase-14"
+title = "Ready for strangers"
+goal = "A release is not blocked by a rare Windows failure, and a person who has never seen Toknila can install it and reach a first merged story from the README alone"
+autostart = true
+version = "0.3.9"
+
+[[ticket]]
+id = "windows-ci-holds"
+title = "Windows CI holds: the terminal keeps every line, and a slow runner does not fail a daemon's start"
+model = "opus"
+prompt = """
+Two rare failures on GitHub's Windows runner blocked the publication of 0.3.8 on 2026-11-17 (the release publishes only after CI passes on its commit, TOKNILA-141); each passed on a rerun of the same commit.
+
+A. The terminal loses lines on Windows. Run 44136517698, first attempt, job verify (windows-latest), browser spec apps/web/e2e/terminal-copy.mjs (strict on every OS since TOKNILA-148): "Copy all copies the whole scrollback: expected the clipboard to hold /^scroll line 1.../, got "scroll line 6\\r\\nscroll line 7 ... scroll line 69\\r\\nscroll line 71 ...": the first five lines are missing and so is line 70. TOKNILA-148 could not reproduce a loss in two runs and added two probes to crates/daemon/tests/runner.rs (the run log and the scrollback keep line 1 of an 80-line agent; a Windows-only test reads a ConPTY directly); both probes passed in the failing run. So the loss is real, intermittent (about one Windows run in six), not only at the head, and it is either in what ConPTY hands the reader when output is fast (ConPTY renders a screen and emits VT sequences for it; it is not a byte pipe) and the probes' agent is too slow or too small to show it, or between the scrollback route and the page's terminal (what xterm keeps, what Copy all reads). The runner opens the terminal in crates/daemon/src/runner/pty.rs (`spawn`, a fixed `SIZE`, portable-pty 0.9).
+
+B. A daemon's start is too slow for the tests. Same run, second attempt, same job: four cli tests (among them chain_release_leaves and chain_mv, each about 32 s) failed at crates/cli/tests/common/mod.rs with "tok ["project", "new", "DEMO", "--sim"]: exit code: 1 ... error: daemon did not answer within 15 s", all near the start of the test run, while 1852 other tests passed. On a fresh Windows runner the first launches of a newly built tok.exe are slow (many test daemons start at once; a virus scanner reads each new executable).
+
+Find out and fix, on the only Windows machine there is: GitHub's runner.
+
+1. For A, make a failing run say where the lines went. Extend the spec so that when the clipboard does not start at line 1 it also reports the first and last lines and the line count of (a) the run's log as the daemon serves it, (b) the scrollback route's answer, (c) the page terminal's buffer. Add a Rust probe that drives a ConPTY with an agent that prints 80 lines as fast as it can (no sleeps) and counts what the reader got. Then decide by evidence:
+   - if ConPTY itself drops lines of fast output, the record cannot be complete on Windows through this path: fix what can be fixed (a taller screen so less scrolls before a render; reading ConPTY with passthrough if portable-pty 0.9 exposes it; anything else you can show works), and if a loss remains, say so in docs (docs/install.md, the Windows section: what a person may see) and make the spec assert on Windows what does hold (the last lines and the markers, a count within a stated bound), with a comment that names this run and your probe's numbers;
+   - if the loss is between the routes and the page, fix that layer and keep the spec strict.
+   A guess is not acceptable in either direction: name the layer with numbers.
+2. For B, find where the 15 s comes from (the CLI's wait for a daemon it started; TOKNILA-37 touched it) and what the slow part is on the runner (measure: time from spawn to the address file, to the first answer). Then make the suite hold without hiding a real hang: one or more of: xtask verify starts and stops one daemon before the tests on CI so the first launch cost is paid once; the tests' helper waits longer than a person's command does (a test-only setting, as `TOKNILA_TICK_MS` is, read only under `TOKNILA_TEST_ROOT`); the Windows job excludes the build folder from the runner's virus scanner (a workflow step) if measurement shows that is the cost. Keep a person's 15 s as it is unless the evidence says a real machine needs more.
+3. Run it on Windows CI by pushing your branch to `ci/toknila-<number>` (CI runs on `ci/**`). Rules: at most eight pushes in total; look at a run with `gh run view <id>` no more than once every 15 minutes (never `gh run watch`; the API's rate limit is shared with the person); never push to `main` or a tag; if GitHub cannot give a runner ("not acquired"), wait and rerun that job rather than push again. One green run proves little for a failure seen once in six: say how many Windows runs passed in a row with your change, and rerun the Windows job of your last push at least three times (`gh run rerun <id> --failed` reruns only failed jobs; to repeat a green job, push an empty commit only if you have pushes left, else state the count you have).
+4. Run `cargo xtask verify` and `cargo xtask e2e-web` on this Mac too. When a test is gated by OS, its helpers and imports carry the same gate (AGENTS.md, Testing): check by reading, clippy runs with -D warnings on Linux and Windows.
+
+Keep the change inside crates/daemon (runner pty and its tests), crates/cli/tests (the helper), crates/cli/src only if the wait is a setting, apps/web/e2e/terminal-copy.mjs, xtask (a warm-up step), .github/workflows/ci.yml, docs/install.md, and the tests. Name in the hand-in every CI run's URL and what it showed.
+"""
+acceptance = [
+  "The layer that loses terminal lines on Windows is named with numbers from probes on the Windows runner; it is fixed, or what cannot be fixed is documented and the spec asserts on Windows what holds, citing the evidence",
+  "The cause of the slow daemon start on the Windows runner is measured, and the suite holds there without lengthening a person's wait unless the evidence asks for it",
+  "At most eight ci/ pushes, a look per run at most every 15 minutes, nothing pushed to main or a tag; the hand-in says how many Windows runs passed in a row; verify and e2e-web green on this Mac",
+]
+
+[[ticket]]
+id = "readme-for-a-stranger"
+title = "The README and the install guide are written for a person who has never seen Toknila"
+prompt = """
+Why. The owner is preparing a public announcement; readers will open the repository, read the README and download the app. Today the README says "Status: v0.2.0", carries the roadmap of phases 0 to 2, promises agents that have no profile (the catalog in crates/core/src/profile/ ships a real profile only for Claude Code, plus the simulated one and an example), shows no picture, and docs/install.md opens with "The Mac app (built locally)". A stranger cannot tell what Toknila is, whether it will run for them, or how to get to a first result.
+
+Write for that stranger: a developer or a product person who uses a CLI coding agent and has ten minutes.
+
+Build this.
+
+1. README.md, rewritten (keep it under about 150 lines):
+   - what Toknila is in three or four plain sentences (a local app that runs CLI coding agents on your own machine: you plan a project as epics of stories with the assistant, each story runs in its own git worktree with its own agent, a checker and a reviewer agent look at each hand-in, you accept, and a release is cut; your code and your agent subscription stay on your computer), and who it is for;
+   - one main screenshot under the opening and at most three more further down (see item 3);
+   - what you need: read the real minimums from the code and say them (the macOS version from the desktop bundle's settings, git, Claude Code installed and signed in; nothing else to install);
+   - install and first run as numbered steps a person can follow without the rest of the docs: download the dmg from the Releases page, open it, add a project folder, ask the assistant for a first epic, start a story, read the hand-in, Accept. Take the steps and the words from the in-app Guide (apps/web/src/store/guideText.ts) so that the README and the window say the same. One short paragraph for a build that macOS refuses to open: "System Settings, Privacy & Security, Open Anyway", marked as needed only for builds before the first signed and notarized release;
+   - what works today and what does not, honestly: Claude Code is the one agent with a shipped profile (others can be described as profiles; name the example in the docs, promise none); the desktop app is for macOS, on Linux and Windows the daemon serves the same window in a browser and the command line is complete; say plainly what is early;
+   - how it keeps your machine safe, five or six bullets from what the code enforces (the daemon listens on 127.0.0.1 with a token; an agent works in its story's worktree; the deny rules for private folders, shell history, keychains and the data home of TOKNILA-27; shell edits and commands per the command policy; nothing is sent anywhere by Toknila itself, the agent talks to its own provider). Check each claim in the code or docs/architecture.md before you write it; a claim you cannot find is left out;
+   - command line in six lines (`tok` examples that work);
+   - links: docs/install.md, docs/architecture.md, the run reports in docs/runs, the releases page;
+   - license: Elastic License 2.0, with one sentence saying what that means in practice (source-available; you may use and modify it; you may not offer it to others as a hosted service; read the file), not "open source";
+   - no version number that goes stale (point to the Releases page), no roadmap of past phases (a short "What is next" of three bullets at most, taken from this file's siblings in plans/ and docs/runs/claude-code-e2e-14.md, promising nothing dated).
+2. docs/install.md: put "Install from a release" first (the same steps as the README, a little fuller: where the data lives, how updates arrive, how to remove it), then Linux and Windows, then building from source, then the maintainer's sections as they are (releases, signing and notarizing). Fix every sentence the reorder makes wrong. Do not touch the signing and notarizing section's content.
+3. Pictures. Make them with the browser specs' own tool, not by hand: `SCREENSHOT_DIR=<folder> cargo xtask e2e-web` writes light and dark pictures through `shoot()` (apps/web/e2e/helpers.mjs; apps/web/e2e/screens.mjs is the spec that walks the screens with a simulated project). Add to that spec (or a small new one beside it, with `session()`) the views the README needs: an epic's board with a story running and one in review, a Review card with its hand-in and Needs you, the assistant's chat, the roadmap. Use the simulated project's own invented names; no real project, person or path in a picture. Commit at most four pictures, light theme, under docs/screenshots/readme/ (this story names that path), each under 400 KB (resize with `sips` if needed), and reference them from the README with alt text that says what is shown.
+4. Checks: every relative link in README.md and docs/install.md resolves (write a tiny test in xtask's guards, or a script test under .github/scripts run by `cargo xtask scripts`, that fails on a dead relative link or a missing image: seen red once with a planted bad link); the commands in the README's command-line block run against a temp home with the simulated project and print what the README says (run them, quote the output); `cargo xtask verify`, `cargo xtask web` and `cargo xtask e2e-web` pass.
+
+Rules: never name the product this project is modelled on or any other orchestration tool (AGENTS.md); agents Toknila runs may be named only where a profile ships (Claude Code). Plain words, short sentences, no slogans, no emoji. Whether the pictures look right is for a person: list them under For you with what to look at.
+
+Keep the change inside README.md, docs/install.md, docs/screenshots/readme/, apps/web/e2e (the screenshot spec), xtask or .github/scripts (the link check), and nothing in the product's code.
+"""
+acceptance = [
+  "README.md tells a stranger what Toknila is, what they need, how to install and reach a first merged story in numbered steps that match the in-app Guide, what works and what does not, how their machine is kept safe (each claim found in the code or docs), and the license in plain words; no stale version, no past roadmap, no agent promised without a profile",
+  "docs/install.md opens with installing from a release; at most four pictures made by the e2e screenshot tool sit under docs/screenshots/readme and are shown in the README with alt text",
+  "A check fails on a dead relative link or missing image (seen red once); the README's commands were run and their output quoted; verify, web and e2e-web green; the pictures are listed under For you",
+]
