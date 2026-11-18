@@ -1,13 +1,14 @@
 //! TOKNILA-162: what the page does when it opens a card's terminal while the agent prints, in a
-//! real daemon started as `tok` starts it (detached, with no console of its own on Windows): it
-//! sends the panel's size, and its terminal answers the cursor query it finds in the scrollback
-//! (ConPTY's `ESC [ 6 n`, which the daemon already answered) by typing `ESC [ 1 ; 1 R` into the
-//! agent. The run log must keep every line the agent printed.
+//! real daemon started as `tok` starts it (detached, with no console of its own on Windows): its
+//! terminal answers the cursor query it finds in the scrollback (ConPTY's `ESC [ 6 n`, which the
+//! daemon already answered) by typing `ESC [ 1 ; 1 R`, and it sends the panel's size. The run log
+//! keeps every line the agent printed.
 //!
-//! The terminal-copy spec's run log lacked lines 1-12 and 1-8 in two of six Windows runs (CI run
-//! 44317344931). A shrink alone lost nothing on the Windows runner: 50 of 50 runs from the test
-//! process (the daemon's `terminal_lines` probe, CI runs 44327828545 and 44338573473) and 4 of 4
-//! in a detached daemon (run 44338573473).
+//! On Windows a ConPTY shrunk early in the output drops the first lines (the daemon's
+//! `terminal_lines` probe), so the runner holds a smaller size until the output is quiet. Sent
+//! at once, this test's way lost nothing in 12 of 12 runs in a detached daemon on GitHub's Windows
+//! runner (CI runs 44338573473 and 44348226497); the race sits a few milliseconds after the cursor
+//! answer, earlier than a client reaches it here, so this is the end-to-end check of what holds.
 
 mod common;
 /// The one lock of the tests that open ptys, shared with the daemon's `runner.rs`.
@@ -20,8 +21,8 @@ use common::{Tok, repo};
 
 /// A ceiling, not a delay.
 const WAIT: Duration = Duration::from_secs(60);
-/// Runs of each way.
-const RUNS: usize = 4;
+/// Runs of the agent.
+const RUNS: usize = 3;
 const LINES: u32 = 80;
 
 /// The numbered lines of 1..=80 that `text` lacks ("scroll line 1" is not "scroll line 10").
@@ -44,19 +45,9 @@ fn wait_until(what: &str, mut ok: impl FnMut() -> bool) {
     }
 }
 
-/// What a client does once the agent's first line is in the log.
-#[derive(Debug, Clone, Copy)]
-enum Opens {
-    /// Sends the panel's size (152x14).
-    Resizes,
-    /// Types the answer to the cursor query, then sends the size: what the page does.
-    AnswersAndResizes,
-    /// Types the answer to the cursor query only.
-    Answers,
-}
-
-/// [`RUNS`] runs of a paced 80-line agent per way of opening; the lines each run's log lacks.
-fn runs(ways: &[Opens]) -> Vec<(Opens, Vec<Vec<u32>>)> {
+#[test]
+fn a_client_that_opens_the_terminal_while_the_agent_prints_costs_no_line_of_the_run_log() {
+    let _turn = pty_lock::hold();
     let dir = common::tempdir();
     let tok = Tok::in_dir(dir.path());
     let repo = repo(dir.path());
@@ -77,42 +68,21 @@ fn runs(ways: &[Opens]) -> Vec<(Opens, Vec<Vec<u32>>)> {
         cols: 152,
         rows: 14,
     };
-    let mut n = 0;
-    let mut out = Vec::new();
-    for &way in ways {
-        let mut lost = Vec::new();
-        for _ in 0..RUNS {
-            n += 1;
-            let key = format!("DEMO-{n}");
-            tok.run(&["ticket", "new", "demo", &format!("Run {n}")]);
-            tok.run(&["start", &key]);
-            wait_until("the first line", || tok.logs(&key).contains("scroll line"));
-            let client = tok.client();
-            if matches!(way, Opens::Answers | Opens::AnswersAndResizes) {
-                client.runner_input(&key, b"\x1b[1;1R").expect("answer");
-            }
-            if matches!(way, Opens::Resizes | Opens::AnswersAndResizes) {
-                client.runner_size(&key, &small).expect("resize");
-            }
-            wait_until("the last line", || tok.logs(&key).contains("printed all"));
-            lost.push(missing(&tok.logs(&key)));
-            tok.run(&["cancel", &key, "done"]);
-        }
-        out.push((way, lost));
+    let mut lost = Vec::new();
+    for n in 1..=RUNS {
+        let key = format!("DEMO-{n}");
+        tok.run(&["ticket", "new", "demo", &format!("Run {n}")]);
+        tok.run(&["start", &key]);
+        wait_until("the first line", || tok.logs(&key).contains("scroll line"));
+        let client = tok.client();
+        client.runner_input(&key, b"\x1b[1;1R").expect("answer");
+        client.runner_size(&key, &small).expect("resize");
+        wait_until("the last line", || tok.logs(&key).contains("printed all"));
+        lost.push(missing(&tok.logs(&key)));
+        tok.run(&["cancel", &key, "done"]);
     }
-    out
-}
-
-#[test]
-fn a_client_that_opens_the_terminal_while_the_agent_prints_costs_no_line_of_the_run_log() {
-    let _turn = pty_lock::hold();
-    let ways = [Opens::Resizes, Opens::AnswersAndResizes, Opens::Answers];
-    let got = runs(&ways);
-    let report = format!("{got:?}");
-    eprintln!("TOKNILA-162 detached daemon, lines missing per run: {report}");
-    let lost = got.iter().flat_map(|(_, runs)| runs).any(|r| !r.is_empty());
-    // A Unix pty is a byte pipe and its program reads no input here: nothing is lost (the control).
-    if cfg!(unix) {
-        assert!(!lost, "{report}");
-    }
+    assert!(
+        lost.iter().all(Vec::is_empty),
+        "lines missing from the run log, per run: {lost:?}"
+    );
 }

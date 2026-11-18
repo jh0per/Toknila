@@ -130,6 +130,130 @@ pub(super) fn exit_of(status: &portable_pty::ExitStatus) -> ProcessExit {
     }
 }
 
+/// Whether a size asked for waits (see [`Pending`]): on Windows, a smaller screen, or any size
+/// while an earlier one still waits (the latest wins, in order).
+pub(super) fn waits(current: PtySize, asked: PtySize, pending: bool) -> bool {
+    cfg!(windows) && (pending || asked.rows < current.rows || asked.cols < current.cols)
+}
+
+/// Gives `master` the size `size`, or holds it in `pending` when it [`waits`].
+pub(super) fn resize(
+    master: &(dyn MasterPty + Send),
+    pending: &Pending,
+    size: terminal::Size,
+) -> Result<(), RunnerError> {
+    let size = PtySize {
+        rows: size.rows,
+        cols: size.cols,
+        pixel_width: 0,
+        pixel_height: 0,
+    };
+    let now = master.get_size().unwrap_or(size);
+    if waits(now, size, pending.waiting()) {
+        pending.ask(size);
+        return Ok(());
+    }
+    master
+        .resize(size)
+        .map_err(|e| RunnerError::Write(e.to_string()))
+}
+
+/// Applies each size `pending` lets through to the terminal in `master` (while it is open),
+/// until `over()`. `quiet()` is how long the reader has had nothing.
+pub(super) fn apply_sizes(
+    pending: &Pending,
+    master: &std::sync::Mutex<Option<Box<dyn MasterPty + Send>>>,
+    quiet: impl Fn() -> Duration,
+    over: impl Fn() -> bool,
+) {
+    let lock = || {
+        master
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    };
+    let closed = || over() || lock().is_none();
+    while let Some(size) = pending.next(SETTLE, SETTLE_AT_MOST, &quiet, closed) {
+        if let Some(Err(e)) = lock().as_ref().map(|m| m.resize(size)) {
+            tracing::warn!(error = %e, "cannot resize the terminal");
+        }
+    }
+}
+
+/// How long the output must have been quiet before a smaller screen reaches ConPTY, and the
+/// longest a size waits for that (a program that prints without a pause still gets it).
+pub(super) const SETTLE: Duration = Duration::from_millis(300);
+pub(super) const SETTLE_AT_MOST: Duration = Duration::from_secs(2);
+
+/// A size a client asked for that has not reached the terminal yet. A ConPTY shrunk early in a
+/// program's output drops the rows above its new screen that it has not rendered: the terminal
+/// probe lost lines 1-22 in 2 of 10 runs shrunk to 152x14 5 ms after the cursor answer (CI run
+/// 44348226497), and the terminal-copy spec's run log lacked lines 1-12 and 1-8 in 2 of 6 Windows
+/// runs (run 44317344931) when the page sent its size while the agent printed. Held until the
+/// reader has had nothing for [`SETTLE`], the spec's run log kept 80 of 80 lines in 12 of 12 runs
+/// (runs 44327828545 and 44338573473).
+#[derive(Debug, Default)]
+pub(super) struct Pending {
+    /// The latest size, and when the oldest size not yet applied was asked for.
+    size: std::sync::Mutex<Option<(PtySize, std::time::Instant)>>,
+    wake: std::sync::Condvar,
+}
+
+impl Pending {
+    /// Holds `size` for [`Pending::next`]; it replaces one still waiting, which keeps its time.
+    pub fn ask(&self, size: PtySize) {
+        let mut held = self
+            .size
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let since = held.map_or_else(std::time::Instant::now, |(_, t)| t);
+        *held = Some((size, since));
+        self.wake.notify_all();
+    }
+
+    /// Whether a size is waiting.
+    pub fn waiting(&self) -> bool {
+        let held = self
+            .size
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        held.is_some()
+    }
+
+    /// The next size to apply, once `quiet()` (how long the reader has had nothing) reaches
+    /// `settle` or the size has waited `at_most`; `None` once `over()`. `quiet` and `over` are
+    /// called without the lock held: a resize holds the terminal's lock and then takes this one,
+    /// so taking them the other way round here would deadlock (CI run 44327828545).
+    pub fn next(
+        &self,
+        settle: Duration,
+        at_most: Duration,
+        quiet: impl Fn() -> Duration,
+        over: impl Fn() -> bool,
+    ) -> Option<PtySize> {
+        loop {
+            if over() {
+                return None;
+            }
+            let quiet_enough = quiet() >= settle;
+            let mut held = self
+                .size
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some((size, since)) = *held
+                && (quiet_enough || since.elapsed() >= at_most)
+            {
+                *held = None;
+                return Some(size);
+            }
+            drop(
+                self.wake
+                    .wait_timeout(held, Duration::from_millis(20))
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +320,91 @@ mod tests {
         assert!(asks_for_cursor(b"\x1b[?9001h\x1b[6nhello"));
         assert!(!asks_for_cursor(b"\x1b[6"));
         assert!(!asks_for_cursor(b"plain output"));
+    }
+
+    fn size(cols: u16, rows: u16) -> PtySize {
+        PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        }
+    }
+
+    #[test]
+    fn only_a_smaller_screen_on_windows_waits_and_then_every_size_after_it() {
+        let (big, small) = (size(160, 40), size(152, 14));
+        assert_eq!(waits(big, small, false), cfg!(windows));
+        assert_eq!(waits(big, size(150, 40), false), cfg!(windows));
+        assert!(!waits(small, big, false), "a larger screen drops nothing");
+        assert_eq!(waits(small, big, true), cfg!(windows), "in order");
+    }
+
+    /// `next` on its own thread, for a test that must not block without a deadline.
+    fn next_later(
+        pending: std::sync::Arc<Pending>,
+        settle: Duration,
+        at_most: Duration,
+        quiet_ms: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    ) -> std::sync::mpsc::Receiver<Option<PtySize>> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let quiet =
+                || Duration::from_millis(quiet_ms.load(std::sync::atomic::Ordering::SeqCst));
+            let _ = tx.send(pending.next(settle, at_most, quiet, || false));
+        });
+        rx
+    }
+
+    #[test]
+    fn a_waiting_size_goes_through_once_the_output_is_quiet_the_latest_one() {
+        use std::sync::{Arc, atomic::AtomicU64, atomic::Ordering};
+        let pending = Arc::new(Pending::default());
+        let quiet = Arc::new(AtomicU64::new(0));
+        let rx = next_later(
+            pending.clone(),
+            Duration::from_millis(50),
+            Duration::from_secs(60),
+            quiet.clone(),
+        );
+        pending.ask(size(152, 20));
+        pending.ask(size(152, 14));
+        assert!(pending.waiting());
+        assert!(
+            rx.recv_timeout(Duration::from_millis(200)).is_err(),
+            "the output is not quiet yet"
+        );
+        quiet.store(60, Ordering::SeqCst);
+        let got = rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("once quiet");
+        assert_eq!(got, Some(size(152, 14)));
+        assert!(!pending.waiting());
+    }
+
+    #[test]
+    fn a_waiting_size_goes_through_after_the_longest_wait_however_busy_the_output() {
+        let pending = std::sync::Arc::new(Pending::default());
+        let quiet = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let at_most = Duration::from_millis(100);
+        let rx = next_later(pending.clone(), Duration::from_secs(60), at_most, quiet);
+        let asked = std::time::Instant::now();
+        pending.ask(size(152, 14));
+        let got = rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("after the longest wait");
+        assert_eq!(got, Some(size(152, 14)));
+        assert!(asked.elapsed() >= at_most, "{:?}", asked.elapsed());
+    }
+
+    #[test]
+    fn a_run_that_is_over_applies_nothing() {
+        let pending = Pending::default();
+        pending.ask(size(152, 14));
+        assert_eq!(
+            pending.next(Duration::ZERO, Duration::ZERO, || Duration::MAX, || true),
+            None
+        );
     }
 
     #[test]

@@ -62,15 +62,6 @@ jobs:
         env:
           TOKNILA_REQUIRE_WEB: "1"
 
-      # TOKNILA-162 measurement (temporary, removed before merge): the terminal probe's numbers.
-      - name: Terminal probe numbers (Windows, TOKNILA-162 temporary)
-        if: always() && runner.os == 'Windows'
-        continue-on-error: true
-        shell: bash
-        run: |
-          cargo test -p toknila-daemon --test terminal_lines --locked -- --nocapture
-          cargo test -p toknila --test terminal_resize --locked -- --nocapture
-
       # Time of each step and of each test (junit), also when verify failed.
       - name: Upload verify timing
         if: always()
@@ -84,26 +75,11 @@ jobs:
           retention-days: 14
 
       - name: cargo xtask e2e-web
-        # TOKNILA-162 temporary: also after a failed verify, so the terminal spec's numbers come.
-        if: always()
         run: cargo xtask e2e-web
         env:
           # Failed scripts leave a screenshot and a trace here; the smoke script's shots always land here.
           E2E_ARTIFACTS: ${{ github.workspace }}/apps/web/e2e-artifacts
           SHOTS_DIR: ${{ github.workspace }}/apps/web/e2e-artifacts/smoke
-
-      # TOKNILA-162 measurement (temporary, removed before merge): five more samples of the spec
-      # that lost lines once in six Windows runs.
-      - name: Terminal copy spec five more times (Windows, TOKNILA-162 temporary)
-        if: always() && runner.os == 'Windows'
-        continue-on-error: true
-        shell: bash
-        working-directory: apps/web
-        run: |
-          for i in 1 2 3 4 5; do
-            echo "== terminal-copy sample $i"
-            node e2e/terminal-copy.mjs ../../target/debug/tok.exe ../../target/debug/fake-agent.exe || echo "== sample $i FAILED"
-          done
 
       # Windows has no `ps`, so xtask's leak check is skipped there: list what the e2e run left
       # before the smoke test and fail with the command lines (a fake agent that outlived its spec
