@@ -33,6 +33,8 @@ enum Print {
     Burst,
     /// One write per line, no pause between them.
     EachLine,
+    /// One write per line, two milliseconds apart: still printing when a panel's size comes.
+    Paced,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -41,6 +43,9 @@ struct Case {
     rows: u16,
     /// How long after the cursor query the answer is written (ConPTY asks once, at its start).
     answer_after: Duration,
+    /// When the screen shrinks to 152x14 (a panel's size), counted from the cursor answer (from
+    /// the start on Unix, which asks nothing); `None`: never.
+    shrink_after: Option<Duration>,
 }
 
 /// `bytes` as text without the terminal's escape sequences (CSI, OSC and two-byte ones).
@@ -97,6 +102,12 @@ fn steps(print: Print) -> Vec<String> {
                 steps.extend(["print".to_owned(), format!("scroll line {i}")]);
             }
         }
+        Print::Paced => {
+            for i in 1..=LINES {
+                steps.extend(["print".to_owned(), format!("scroll line {i}")]);
+                steps.extend(["sleep".to_owned(), "2".to_owned()]);
+            }
+        }
     }
     // It holds until killed: on macOS a terminal whose last slave end closes drops what it has not
     // delivered yet, which would be a loss of the probe's own making.
@@ -111,8 +122,9 @@ struct Term {
     writer: Box<dyn Write + Send>,
     rx: mpsc::Receiver<Vec<u8>>,
     got: Vec<u8>,
+    opened: Instant,
     asked: Option<Instant>,
-    answered: bool,
+    answered: Option<Instant>,
 }
 
 impl Term {
@@ -146,30 +158,56 @@ impl Term {
             writer,
             rx,
             got: Vec::new(),
+            opened: Instant::now(),
             asked: None,
-            answered: false,
+            answered: None,
         }
     }
 
-    /// Takes what arrives within 10 ms, and answers ConPTY's cursor query `answer_after` it came.
+    /// Takes what arrives within a millisecond, and answers ConPTY's cursor query `answer_after`
+    /// it came.
     fn pump(&mut self, answer_after: Duration) {
-        if let Ok(chunk) = self.rx.recv_timeout(Duration::from_millis(10)) {
+        if let Ok(chunk) = self.rx.recv_timeout(Duration::from_millis(1)) {
             self.got.extend_from_slice(&chunk);
         }
         if self.asked.is_none() && self.got.windows(4).any(|w| w == b"\x1b[6n") {
             self.asked = Some(Instant::now());
         }
-        if !self.answered && self.asked.is_some_and(|t| t.elapsed() >= answer_after) {
-            self.answered = true;
+        if self.answered.is_none() && self.asked.is_some_and(|t| t.elapsed() >= answer_after) {
+            self.answered = Some(Instant::now());
             self.writer.write_all(b"\x1b[1;1R").expect("answer");
         }
     }
 
-    /// Reads until the program's last line has arrived (or [`WAIT`] has passed).
-    fn until_end(&mut self, answer_after: Duration) {
+    fn resize(&self, cols: u16, rows: u16) {
+        self.master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .expect("resize");
+    }
+
+    /// Reads until the program's last line has arrived (or [`WAIT`] has passed); shrinks the
+    /// screen to 152x14 `shrink_after` the cursor answer (Unix: the start) when one is given.
+    fn until_end(&mut self, answer_after: Duration, shrink_after: Option<Duration>) {
         let until = Instant::now() + WAIT;
+        let mut shrink = shrink_after;
         while Instant::now() < until && !plain(&self.got).contains(END) {
             self.pump(answer_after);
+            let from = if cfg!(windows) {
+                self.answered
+            } else {
+                Some(self.opened)
+            };
+            if let Some(after) = shrink
+                && from.is_some_and(|t| t.elapsed() >= after)
+            {
+                self.resize(152, 14);
+                shrink = None;
+            }
         }
         let text = plain(&self.got);
         assert!(
@@ -200,7 +238,7 @@ impl Term {
 /// One run of `case`: the numbers of the lines the reader got.
 fn run(case: Case) -> BTreeSet<u32> {
     let mut term = Term::open(case.rows, steps(case.print));
-    term.until_end(case.answer_after);
+    term.until_end(case.answer_after, case.shrink_after);
     let text = plain(&term.got);
     term.close();
     numbers(&text)
@@ -230,14 +268,39 @@ fn report(case: Case, runs: &[BTreeSet<u32>]) -> String {
     let counts: Vec<String> = runs.iter().map(|r| r.len().to_string()).collect();
     let worst = runs.iter().min_by_key(|r| r.len()).expect("a run");
     let missing: Vec<u32> = (1..=LINES).filter(|n| !worst.contains(n)).collect();
+    let shrink = case
+        .shrink_after
+        .map_or("never".to_owned(), |d| format!("{}ms", d.as_millis()));
     format!(
-        "{:?} rows={} answer_after={}ms: got [{}] of {LINES}; worst missed [{}]",
+        "{:?} rows={} answer_after={}ms shrink_after={shrink}: got [{}] of {LINES}; worst missed [{}]",
         case.print,
         case.rows,
         case.answer_after.as_millis(),
         counts.join(" "),
         ranges(&missing)
     )
+}
+
+/// Runs each case [`REPS`] times, prints a report line per case; whether any run lost a line.
+fn probe(cases: &[Case]) -> (bool, Vec<String>) {
+    let mut lines = Vec::new();
+    let mut lost = false;
+    for &case in cases {
+        let runs: Vec<BTreeSet<u32>> = (0..REPS).map(|_| run(case)).collect();
+        lost |= runs.iter().any(|r| r.len() < LINES as usize);
+        let line = report(case, &runs);
+        eprintln!("TOKNILA-162 probe: {line}");
+        lines.push(line);
+    }
+    (lost, lines)
+}
+
+/// The first numbered line a repaint draws at the top of the screen (after its last `ESC [ H`).
+fn top_line(repaint: &[u8]) -> Option<u32> {
+    let home = repaint.windows(3).rposition(|w| w == b"\x1b[H")?;
+    numbers(plain(&repaint[home..]).lines().next()?)
+        .into_iter()
+        .next()
 }
 
 #[test]
@@ -248,6 +311,9 @@ fn the_escape_filter_and_the_counter_find_whole_numbered_lines() {
     assert_eq!(ranges(&[1, 2, 3, 5, 70, 71]), "1-3, 5, 70-71");
 }
 
+/// Fast output alone loses nothing, on every system: ConPTY renders before a line would scroll
+/// off its screen. On GitHub's Windows runner every case got 80 of 80 in all five runs, twice (CI
+/// runs 44308344208 and 44317344931), the cursor answered at once or 300 ms late.
 #[test]
 fn every_line_of_a_fast_program_reaches_the_terminal_reader() {
     let _turn = support::hold();
@@ -260,22 +326,42 @@ fn every_line_of_a_fast_program_reaches_the_terminal_reader() {
         (Print::EachLine, 200, late),
         (Print::Burst, 40, late),
         (Print::Burst, 200, late),
-    ];
-    let mut lines = Vec::new();
-    let mut lost = false;
-    for (print, rows, answer_after) in cases {
-        let case = Case {
-            print,
-            rows,
-            answer_after,
-        };
-        let runs: Vec<BTreeSet<u32>> = (0..REPS).map(|_| run(case)).collect();
-        lost |= runs.iter().any(|r| r.len() < LINES as usize);
-        let line = report(case, &runs);
-        eprintln!("TOKNILA-162 probe: {line}");
-        lines.push(line);
-    }
-    // A pty is a byte pipe: nothing is ever lost (the control).
+    ]
+    .map(|(print, rows, answer_after)| Case {
+        print,
+        rows,
+        answer_after,
+        shrink_after: None,
+    });
+    let (lost, lines) = probe(&cases);
+    assert!(
+        !lost,
+        "the terminal reader lost lines:\n{}",
+        lines.join("\n")
+    );
+}
+
+/// A panel's size that shrinks the screen while the program still prints: on Windows ConPTY
+/// drops the rows above its new screen that it has not rendered yet (the run log of the
+/// terminal-copy spec lacked lines 1-12 and 1-8 in two of six Windows runs of CI run
+/// 44317344931, after the page sent 152x14 during the output). On Unix nothing is lost.
+#[test]
+fn a_screen_that_shrinks_while_the_program_prints() {
+    let _turn = support::hold();
+    let cases = [
+        (Print::EachLine, 0),
+        (Print::EachLine, 5),
+        (Print::Paced, 0),
+        (Print::Paced, 20),
+        (Print::Paced, 100),
+    ]
+    .map(|(print, ms)| Case {
+        print,
+        rows: 40,
+        answer_after: Duration::ZERO,
+        shrink_after: Some(Duration::from_millis(ms)),
+    });
+    let (lost, lines) = probe(&cases);
     if cfg!(unix) {
         assert!(!lost, "a Unix pty lost lines:\n{}", lines.join("\n"));
     }
@@ -283,30 +369,41 @@ fn every_line_of_a_fast_program_reaches_the_terminal_reader() {
 
 /// What a terminal emits when it is resized after the output, as the page resizes it when it
 /// opens (152x15 in a 1280x720 window) and when the window gets shorter and taller again (the
-/// terminal-copy spec).
+/// terminal-copy spec). ConPTY keeps no lines above its screen: it repaints from the top row, and
+/// after the shrink to 14 rows and the grow back to 15 it starts at the same line, with a blank
+/// row at the bottom, where xterm.js would pull a line down from its scrollback (the page sets
+/// `windowsPty` for that, apps/web/src/terminal/conpty.ts). A Unix pty emits nothing: the program
+/// does not redraw.
 #[test]
 fn what_a_terminal_emits_when_it_is_resized_after_the_output() {
     let _turn = support::hold();
     let mut term = Term::open(40, steps(Print::EachLine));
-    term.until_end(Duration::ZERO);
+    term.until_end(Duration::ZERO, None);
     eprintln!(
         "TOKNILA-162 resize: the output at 160x40: {:?}",
         String::from_utf8_lossy(&term.got)
     );
+    let mut repaints = Vec::new();
     for rows in [15, 14, 15] {
-        term.master
-            .resize(PtySize {
-                rows,
-                cols: 152,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .expect("resize");
+        term.resize(152, rows);
         let after = term.next_for(Duration::from_millis(700));
         eprintln!(
             "TOKNILA-162 resize: after the resize to 152x{rows}: {:?}",
             String::from_utf8_lossy(&after)
         );
+        repaints.push(after);
     }
     term.close();
+    let tops: Vec<Option<u32>> = repaints.iter().map(|r| top_line(r)).collect();
+    if cfg!(windows) {
+        // Run 44317344931: 68, then 69 and 69 (the last line the program printed is "burst over").
+        let first = tops[0].expect("a repaint after the first resize");
+        assert_eq!(
+            tops,
+            [Some(first), Some(first + 1), Some(first + 1)],
+            "{repaints:?}"
+        );
+    } else {
+        assert!(repaints.iter().all(Vec::is_empty), "{repaints:?}");
+    }
 }

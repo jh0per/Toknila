@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import { writeClipboard } from "../terminal/clipboard";
 import { type TermStatus, type TerminalConnection, type TerminalSink } from "../terminal/connect";
+import { ptyOptions } from "../terminal/conpty";
 import { fitTerminal } from "../terminal/fit";
 import { isMac, keyAction } from "../terminal/keys";
 import { keepingSelection } from "../terminal/keepSelection";
@@ -96,6 +97,8 @@ export function LiveTerminal({ streamKey, connect, noneText, placeholder, offer,
         // The agent owns the mouse (tracking is on), so selecting is Option-drag on a Mac; Shift-drag
         // elsewhere is xterm's own.
         macOptionClickForcesSelection: true,
+        // On Windows a grown panel gets blank rows, as ConPTY's screen does (see `conpty`).
+        ...ptyOptions(navigator.platform),
         theme: { background: css.getPropertyValue("--term-bg").trim(), foreground: css.getPropertyValue("--term-fg").trim() },
       });
       term.open(el);

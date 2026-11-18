@@ -957,6 +957,72 @@ fn the_first_of_eighty_lines_reaches_the_log_and_the_scrollback() {
     );
 }
 
+/// TOKNILA-162: a panel's size that comes while the agent still prints (the page sends it when it
+/// opens) costs no line of the run log, and the agent then gets that size. On Windows ConPTY drops
+/// the rows above a shrunk screen that it has not rendered yet, so the runner holds a smaller size
+/// until the output is quiet (two of six Windows runs of the terminal-copy spec lost lines 1-12
+/// and 1-8 from the log before, CI run 44317344931). Whenever the size lands, every line is kept.
+#[test]
+fn a_size_that_comes_while_the_agent_prints_costs_no_line_of_the_log() {
+    use toknila_core::instructions::terminal::Size;
+    let mut rig = Rig::new();
+    let mut steps: Vec<String> = Vec::new();
+    for i in 1..=80 {
+        steps.extend(["print".to_owned(), format!("scroll line {i}")]);
+        steps.extend(["sleep".to_owned(), "2".to_owned()]);
+    }
+    steps.extend(["print".to_owned(), "printed all".to_owned()]);
+    // Then it says its size each time it is given a line, until the test has the new one.
+    for _ in 0..50 {
+        steps.extend(["echo".to_owned(), "size".to_owned()]);
+    }
+    let steps: Vec<&str> = steps.iter().map(String::as_str).collect();
+    rig.profile("fake", &steps, "");
+    let started = rig.start("fake");
+    rig.wait_for("scroll line");
+    rig.runners
+        .resize(
+            rig.ticket,
+            Size {
+                cols: 152,
+                rows: 14,
+            },
+        )
+        .expect("resize");
+    rig.wait_for("printed all");
+    let until = Instant::now() + WAIT;
+    let mut sizes = 0;
+    while !rig.output().contains("size=152x14") {
+        assert!(
+            Instant::now() < until,
+            "the agent never got 152x14: {:?}",
+            rig.output()
+        );
+        let seen = rig.output().matches("size=").count();
+        if seen == sizes {
+            rig.runners
+                .write(rig.ticket, AgentRole::Worker, b"go\r")
+                .expect("write");
+            sizes += 1;
+        }
+        // Slower than the runner's settle time, so the output goes quiet between two asks.
+        std::thread::sleep(Duration::from_millis(400));
+    }
+    rig.runners.stop(rig.ticket);
+    rig.wait_end();
+    let log = log_of(rig.dir.path(), rig.ticket, &started.run.id.to_string());
+    let on_disk = String::from_utf8_lossy(&std::fs::read(log).expect("log")).into_owned();
+    let missing: Vec<u32> = (1..=80)
+        .filter(|i| {
+            let line = format!("scroll line {i}");
+            !on_disk
+                .match_indices(&line)
+                .any(|(at, m)| !on_disk[at + m.len()..].starts_with(|c: char| c.is_ascii_digit()))
+        })
+        .collect();
+    assert!(missing.is_empty(), "the run log lacks lines {missing:?}");
+}
+
 /// TOKNILA-148 probe, layer "reader": what the pty reader itself gets first from a ConPTY of the
 /// runner's size, with no daemon code in between. Windows only: ConPTY renders a screen and may
 /// emit VT for it, so lines that scroll off before its first render never reach the reader; on

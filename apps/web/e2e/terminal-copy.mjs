@@ -4,7 +4,9 @@
 //
 // The fake agent prints lines and asks the terminal to copy "from the agent" (OSC 52). The
 // clipboard then holds that text; the Copy control copies a selection (a triple click on a line),
-// else the visible screen; "Copy all" in its menu copies the scrollback; the copy key copies the
+// else the visible screen; "Copy all" in its menu copies the scrollback, every line once and in
+// order, after the window got shorter and taller again (on Windows ConPTY repaints its screen at
+// each resize; see src/terminal/conpty.ts); the copy key copies the
 // selection; and a selection survives the window's height changing. In a second window whose
 // clipboard refuses writes, the agent's copy shows "Copied text ready" and its Copy button puts
 // the text on the clipboard once clicked.
@@ -13,7 +15,6 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { checks, cleanup, launch, session } from "./helpers.mjs";
 
 const [tokArg, agentArg] = process.argv.slice(2);
@@ -33,7 +34,6 @@ const git = (dir, ...args) =>
 // and which of the numbered lines it lacks. Raw terminal output is read without its escape
 // sequences; a line is counted once however often a repaint drew it.
 const LINES = 80;
-const XTERM = fileURLToPath(new URL("../node_modules/@xterm/xterm/lib/xterm.js", import.meta.url));
 const plain = (s) =>
   s
     .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
@@ -105,50 +105,20 @@ try {
     await page.goto(cardUrl);
     return page;
   };
-  // `bytes` written into a fresh xterm.js (the page's version) of `cols` x `rows`, read back as
-  // Copy all reads the page's terminal.
-  const replay = async (bytes, cols, rows) => {
-    const p = await browser.newPage();
-    try {
-      await p.setContent("<div id=t></div>");
-      await p.addScriptTag({ path: XTERM });
-      return await p.evaluate(async ([b64, c, r]) => {
-        const term = new window.Terminal({ cols: c, rows: r, scrollback: 5000 });
-        term.open(document.getElementById("t"));
-        const data = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
-        await new Promise((done) => term.write(data, done));
-        const b = term.buffer.active;
-        const out = [];
-        for (let y = 0; y < b.length; y++) {
-          const line = b.getLine(y);
-          const t = line.translateToString(true);
-          if (line.isWrapped && out.length) out[out.length - 1] += t;
-          else out.push(t);
-        }
-        return out.join("\n");
-      }, [bytes.toString("base64"), cols, rows]);
-    } finally {
-      await p.close();
-    }
-  };
   // Each layer between the agent and the clipboard: (a) the run log the daemon wrote, (b) the
   // scrollback route's answer (`tok logs`), (c) the page terminal's buffer as Copy all handed it
-  // over, and (b) replayed into xterm.js at the size ConPTY rendered for and at the page's grid.
-  const whereTheLinesWent = async (copied) => {
+  // over; then the grids the page asked for, and with `bytes` what the terminal emitted after the
+  // agent's last line (on Windows ConPTY's repaints, one per resize).
+  const whereTheLinesWent = (copied, bytes) => {
     const out = [];
     const log = newestLog(join(home, "runs"));
     out.push(log ? layer("(a) run log", readFileSync(log, "utf8")) : "(a) run log: none under the data folder");
-    const served = execFileSync(tokBin, ["logs", "WEB-1"], { env: { ...process.env, TOKNILA_HOME: home } });
-    out.push(layer("(b) scrollback route", served.toString("utf8")));
+    const served = execFileSync(tokBin, ["logs", "WEB-1"], { env: { ...process.env, TOKNILA_HOME: home } }).toString("utf8");
+    out.push(layer("(b) scrollback route", served));
     out.push(layer("(c) page terminal (Copy all)", copied));
-    out.push(layer("(d) (b) in xterm 160x40", await replay(served, 160, 40)));
-    const grid = pageGrids.at(-1);
-    if (grid) out.push(layer(`(e) (b) in xterm ${grid.cols}x${grid.rows} (the page's grid)`, await replay(served, grid.cols, grid.rows)));
     out.push(`grids the page sent: ${pageGrids.map((g) => `${g.cols}x${g.rows}`).join(" ")}`);
-    // What the terminal emitted after the agent's last line: on Windows, ConPTY's repaints.
-    const text = served.toString("utf8");
-    const end = text.indexOf("marker omega");
-    if (end >= 0) out.push(`after the output: ${JSON.stringify(text.slice(end + "marker omega".length)).slice(0, 4000)}`);
+    const end = served.indexOf("marker omega");
+    if (bytes && end >= 0) out.push(`after the output: ${JSON.stringify(served.slice(end + "marker omega".length)).slice(0, 4000)}`);
     return out;
   };
   const clip = (page) => page.evaluate(() => navigator.clipboard.readText());
@@ -259,19 +229,27 @@ try {
   await clearClip(page);
   await page.locator("[data-testid=term-copy-more]").click();
   await page.locator("[data-testid=term-copy-all]").click();
-  // Line 1 first on every OS. Windows' console ends its lines with CRLF (CI run 43854240266 showed
-  // the copy starting "scroll line 1\r\n", nothing lost), so the line ends allow a CR.
-  const whole = /^scroll line 1\r?\n[\s\S]*scroll line 80\r?\nmarker alpha(\r?\n)+marker omega$/;
-  let lost = null;
-  try {
-    await expectClip(page, whole, "Copy all copies the whole scrollback");
-  } catch (e) {
-    lost = e;
-  }
+  // Every line once and in order, on every OS. The pattern this replaced checked only the first
+  // and the last lines, and passed while the page lost line 70 in every Windows run (TOKNILA-162,
+  // CI run 44308344208). Windows' clipboard ends lines with CRLF; the blank row between the
+  // markers is the line of the agent's copy request.
+  const want = [...Array.from({ length: LINES }, (_, i) => `scroll line ${i + 1}`), "marker alpha", "marker omega"];
+  let copied = STALE;
+  for (const until = Date.now() + 8000; copied === STALE && Date.now() < until; await page.waitForTimeout(100)) copied = await clip(page);
+  const got = copied.split(/\r?\n/).filter((l) => l !== "");
+  const lost = got.length !== want.length || got.some((l, i) => l !== want[i]);
   // Every run says what each layer held, so a passing run is a number too.
-  const layers = await whereTheLinesWent(await clip(page));
+  const layers = whereTheLinesWent(copied, lost);
   for (const line of layers) console.log(`INFO ${line}`);
-  if (lost) throw new Error(`${lost.message}\n  where the lines went:\n  ${layers.join("\n  ")}`);
+  if (lost) {
+    const missing = want.filter((l) => !got.includes(l));
+    const differs = got.findIndex((l, i) => l !== want[i]);
+    const at = differs < 0 ? got.length : differs;
+    throw new Error(
+      `Copy all copies the whole scrollback: ${got.length} lines of ${want.length}, missing ${JSON.stringify(missing)}, first difference at line ${at + 1}: ${JSON.stringify(got[at] ?? "(end)")}\n  where the lines went:\n  ${layers.join("\n  ")}`,
+    );
+  }
+  console.log("PASS Copy all copies the whole scrollback, every line once and in order");
 
   // A window whose clipboard refuses without a gesture: "Copied text ready", then a click copies.
   const refusing = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
