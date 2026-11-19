@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
 use serde::Serialize;
+use toknila_api_types::{MachineSettings, SoundSettings};
 use toknila_client::Client;
 use toknila_daemon::info::DaemonInfo;
 use toknila_daemon::paths::Paths;
@@ -29,6 +30,15 @@ pub enum DaemonCmd {
         /// the one-minute load average is below the number of CPU cores.
         #[arg(long, value_name = "N")]
         max_checks: Option<u32>,
+        /// Play a sound in the window when a story is done: on or off (default off).
+        #[arg(long, value_enum, value_name = "on|off")]
+        sound_story_done: Option<Switch>,
+        /// Play a sound in the window when an epic is finished: on or off (default off).
+        #[arg(long, value_enum, value_name = "on|off")]
+        sound_epic_done: Option<Switch>,
+        /// Play a sound in the window when something went wrong: on or off (default off).
+        #[arg(long, value_enum, value_name = "on|off")]
+        sound_problem: Option<Switch>,
     },
     /// Run the daemon in the foreground (what `start` launches).
     Run {
@@ -90,26 +100,75 @@ pub fn run(cmd: DaemonCmd, json: bool) -> Result<()> {
             print_status(&paths, info.as_ref(), json);
             Ok(())
         }
-        DaemonCmd::Set { max_checks } => set(&paths, max_checks, json),
+        DaemonCmd::Set {
+            max_checks,
+            sound_story_done,
+            sound_epic_done,
+            sound_problem,
+        } => {
+            let sounds = SoundFlags {
+                story_done: sound_story_done,
+                epic_done: sound_epic_done,
+                problem: sound_problem,
+            };
+            set(&paths, max_checks, sounds, json)
+        }
     }
 }
 
-/// `daemon set --max-checks N`: the machine settings, through the running daemon.
-fn set(paths: &Paths, max_checks: Option<u32>, json: bool) -> Result<()> {
+/// A switch on the command line.
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum Switch {
+    On,
+    Off,
+}
+
+/// The sound switches `daemon set` was asked to change; `None` leaves one as it is.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SoundFlags {
+    pub story_done: Option<Switch>,
+    pub epic_done: Option<Switch>,
+    pub problem: Option<Switch>,
+}
+
+impl SoundFlags {
+    fn any(self) -> bool {
+        self.story_done.is_some() || self.epic_done.is_some() || self.problem.is_some()
+    }
+
+    fn apply(self, mut s: SoundSettings) -> SoundSettings {
+        let on = |flag: Option<Switch>, now: bool| flag.map_or(now, |f| matches!(f, Switch::On));
+        s.story_done = on(self.story_done, s.story_done);
+        s.epic_done = on(self.epic_done, s.epic_done);
+        s.problem = on(self.problem, s.problem);
+        s
+    }
+}
+
+/// `daemon set --max-checks N --sound-story-done on`: the machine settings, through the running
+/// daemon.
+fn set(paths: &Paths, max_checks: Option<u32>, sounds: SoundFlags, json: bool) -> Result<()> {
     if max_checks == Some(0) {
         bail!("--max-checks must be at least 1");
     }
     let client = crate::client::connect(paths)?;
-    let settings = match max_checks {
-        Some(max_checks) => {
-            client.set_machine_settings(&toknila_api_types::MachineSettings { max_checks })?
-        }
-        None => client.machine_settings()?,
-    };
+    let mut settings = client.machine_settings()?;
+    if max_checks.is_some() || sounds.any() {
+        let body = MachineSettings {
+            max_checks: max_checks.unwrap_or(settings.max_checks),
+            sounds: Some(sounds.apply(settings.sounds.unwrap_or_default())),
+        };
+        settings = client.set_machine_settings(&body)?;
+    }
     if json {
         println!("{}", serde_json::to_string(&settings)?);
     } else {
+        let sounds = settings.sounds.unwrap_or_default();
+        let word = |on: bool| if on { "on" } else { "off" };
         println!("checks at once: {}", settings.max_checks);
+        println!("sound, a story is done: {}", word(sounds.story_done));
+        println!("sound, an epic is finished: {}", word(sounds.epic_done));
+        println!("sound, something went wrong: {}", word(sounds.problem));
     }
     Ok(())
 }

@@ -27,6 +27,7 @@ import type { ThemeEffect, ThemeIntent } from "./theme";
 import type { UpdateEffect, UpdateIntent, UpdateResult } from "./updates";
 import type { UsageEffect, UsageIntent, UsageResult } from "./usage";
 import type { FollowEffect, FollowIntent, FollowResult } from "./follow";
+import type { SoundEffect, SoundIntent, SoundResult } from "./sound";
 
 /// What the person did.
 export type Intent =
@@ -55,6 +56,7 @@ export type Intent =
   | SwitcherIntent
   | UpdateIntent
   | UsageIntent
+  | SoundIntent
   | FollowIntent
   | AttachIntent
   | AskAttachMsg;
@@ -96,8 +98,10 @@ export type Msg =
   | { type: "answerNoted"; note: string }
   | { type: "linkOpened" }
   | { type: "linkClosed" }
-  | { type: "event"; event: EventRecord }
+  /// `received`: when the window got it (ms since the epoch); only a fresh event may make a sound.
+  | { type: "event"; event: EventRecord; received?: number }
   | { type: "urlChanged"; route: Route }
+  | SoundResult
   | SettingsResult
   | PlanResult
   | PlannerResult
@@ -144,6 +148,7 @@ export type Effect =
   | AssistantEffect
   | UpdateEffect
   | UsageEffect
+  | SoundEffect
   | FollowEffect
   | AttachEffect
   | AskUploadEffect
