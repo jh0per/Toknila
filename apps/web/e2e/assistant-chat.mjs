@@ -68,6 +68,13 @@ try {
   browser = await launch();
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, permissions: ["clipboard-read", "clipboard-write"] });
   const page = await context.newPage();
+  // The page learns its cards from GET /chains: slow that answer so the lines of the assistant
+  // appear while the store does not yet know the card. A line must be whole (with its card's key)
+  // from the moment it shows; before the page was fixed this failed on every run.
+  await page.route(/\/v1\/chains(\/|$)/, async (r) => {
+    if (r.request().method() === "GET") await new Promise((done) => setTimeout(done, 3000));
+    await r.continue();
+  });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const { expectText, expectPath } = checks(page);
@@ -122,12 +129,19 @@ try {
   await expectText(said, "Planned one card: the list.", "the planner's say is an assistant bubble");
   await expectText(said.locator("[data-testid=chat-chip]"), "WEB-1", "with the card as its chip");
   await expectText(t("chat-did"), "suggested: Start the design card", "the suggestion is a line of Toknila's");
-  const lines = await t("chat-did").allInnerTexts();
-  const words = lines.map((l) => l.split("\n")[0].replace(/\s+/g, " ").trim());
-  // A line that does not name its card gets the card's link after the words.
-  words[0] = words[0].replace(/ v\d+\.\d+\.\d+$/, "");
+  const readWords = async () => {
+    const lines = await t("chat-did").allInnerTexts();
+    const words = lines.map((l) => l.split("\n")[0].replace(/\s+/g, " ").trim());
+    // A line that does not name its card gets the card's link after the words.
+    if (words.length) words[0] = words[0].replace(/ v\d+\.\d+\.\d+$/, "");
+    return words;
+  };
   // The epic was made with the name `roadmap` and no title: the line reads it made readable.
   const want = ["added epic Roadmap", "added story WEB-1", "edited WEB-1", "opened thread 1 on WEB-1", "suggested: Start the design card · WEB-1"];
+  // Wait until all five lines are there, then read them once and strictly: the words of a line
+  // must be whole the moment it shows, so no wait for their text to change.
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=chat-did]").length >= 5, undefined, { timeout: 10_000 });
+  const words = await readWords();
   if (JSON.stringify(words) !== JSON.stringify(want)) throw new Error(`Toknila's lines: expected ${JSON.stringify(want)}, got ${JSON.stringify(words)}`);
   console.log("PASS what the assistant did is Toknila's lines: added chain, added card, edited, opened thread, suggested");
   // Oldest first, newest at the bottom: the lines of its work around its words, in the order they happened.

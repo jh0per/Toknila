@@ -47,15 +47,19 @@ function DidLine({ m, project, state, dispatch }: { m: ConversationMessage; proj
   // The label is looked for without regard to case: until the store knows the epic, the label is
   // its name ("roadmap") while the daemon's line already reads it made readable ("Roadmap"), and
   // the line must not end with " · roadmap" for that moment (seen on a slow CI runner).
-  const at = route && label ? m.text.toLowerCase().indexOf(label.toLowerCase()) : -1;
+  // The label is searched even while the store does not know where it leads (no route yet): the
+  // words are whole when the line appears and the link is added when the store has the card.
+  const at = label ? m.text.toLowerCase().indexOf(label.toLowerCase()) : -1;
   const link = (text: string): ReactNode =>
     route ? <NavLink route={route} dispatch={dispatch} testId="chat-did-link">{text}</NavLink> : text;
+  // A card line that does not name its card still ends with the key, linked or not.
+  const after = label && (route || m.about?.kind === "card") ? <> · {link(label)}</> : null;
   return (
     <li className="did" data-testid="chat-did" data-id={m.id}>
       {at >= 0 ? (
         <span className="did-text">{m.text.slice(0, at)}{link(m.text.slice(at, at + label.length))}{m.text.slice(at + label.length)}</span>
       ) : (
-        <span className="did-text">{m.text}{route && <> · {link(label)}</>}</span>
+        <span className="did-text">{m.text}{after}</span>
       )}
       <time className="muted" dateTime={new Date(m.at).toISOString()}>{whenText(m.at)}</time>
     </li>
