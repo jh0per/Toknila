@@ -197,6 +197,7 @@ pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
 /// A runner process ended. The journal says so; a ticket whose agent was still working is
 /// blocked by how it ended ([`toknila_core::ProcessExit::block_reason`]), unless the host ended
 /// it on purpose. A ticket that has moved on (in Review, merged, blocked already) ignores it.
+/// Whatever it moved, the schedule of its project runs: the slot the process held may be free.
 ///
 /// Returns `true` when it queued a replacement worker run (see [`replace_worker`]).
 pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<bool> {
@@ -207,23 +208,37 @@ pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<
         refused,
     } = ended;
     let ticket = run.ticket_id;
-    let role = run.role;
-    if role == AgentRole::Planner {
+    if run.role == AgentRole::Planner {
         // A project's planner is no card's agent: its end moves nothing, and the window learns of
         // it from the terminal stream.
         return Ok(false);
     }
-    let reason = exit.block_reason();
     uow.emit(&DomainEvent::RunnerExited {
         run: run.clone(),
         exit: exit.clone(),
     })?;
+    let restarted = moved_by_end(uow, &run, exit, stopped, refused)?;
+    // The process is gone, on purpose or by itself, so the slot it held may be free: a waiting
+    // card starts. The event the end sent may have been refused (the story had moved on, a
+    // person blocked it by hand), and a refused event runs no schedule of its own.
+    free_slot(uow, ticket)?;
+    Ok(restarted)
+}
+
+/// What the end of a worker or reviewer run moves on its ticket; `true` when it queued a
+/// replacement worker run.
+fn moved_by_end<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    run: &Run,
+    exit: toknila_core::ProcessExit,
+    stopped: bool,
+    refused: Option<String>,
+) -> AppResult<bool> {
+    let (ticket, role) = (run.ticket_id, run.role);
+    let reason = exit.block_reason();
     if stopped {
-        // The host ended it on purpose (a reviewer whose verdict is in, an accepted card): the
-        // slot it held is free now that the process is gone, so a waiting card starts.
-        let restarted = role == AgentRole::Worker && replace_worker(uow, &run)?;
-        free_slot(uow, ticket)?;
-        return Ok(restarted);
+        // The host ended it on purpose (a reviewer whose verdict is in, an accepted card).
+        return Ok(role == AgentRole::Worker && replace_worker(uow, run)?);
     }
     if role == AgentRole::Reviewer {
         // A reviewer reports its verdict first and exits after; one that ends while the card

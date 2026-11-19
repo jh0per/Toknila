@@ -213,7 +213,9 @@ pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
 
 /// After a daemon start: a card still waiting for a reviewer whose process is gone (`live`
 /// names the tickets whose reviewer runs) goes to a person. A simulated reviewer has no
-/// process and keeps waiting for its verdict. Returns the keys of the cards that moved.
+/// process and keeps waiting for its verdict, and a reviewer that is due but waits for a free
+/// agent (`reviewer_waits`) never had one: it stays in line. Returns the keys of the cards that
+/// moved.
 pub fn mark_lost<U: UnitOfWork + ?Sized>(
     uow: &mut U,
     live: &HashSet<TicketId>,
@@ -228,6 +230,9 @@ pub fn mark_lost<U: UnitOfWork + ?Sized>(
             .iter()
             .filter(|t| t.status == TicketStatus::Review)
             .filter(|t| matches!(t.review.turn, Some(ReviewTurn::Agent { .. })))
+            // A reviewer that only waits for a free agent never started: nothing was lost, and
+            // the schedule starts it from the line once the chains settle.
+            .filter(|t| !t.review.reviewer_waits)
             .filter(|t| resolve_reviewer(t, &chain, &project) != AgentProfile::SIM_REVIEWER)
             .filter(|t| !live.contains(&t.id))
             .map(|t| (t.id, t.key.clone()))

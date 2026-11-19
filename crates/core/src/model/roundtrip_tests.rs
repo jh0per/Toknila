@@ -383,6 +383,45 @@ fn pinned_ticket_json_shape() {
 }
 
 #[test]
+fn a_paused_agent_as_v0_3_8_stored_it_still_loads() {
+    // v0.3.8 wrote `session`, `since`, `resume` and `lost`, and had no `go_on`: an existing
+    // user's paused or lost agent must load, as a paused agent (not a story that goes on).
+    let json = r#"{"session":"sess-42","since":1793487815000,"resume":true,"lost":true}"#;
+    let p: PausedAgent = serde_json::from_str(json).expect("the v0.3.8 shape loads");
+    assert_eq!(p.session.as_deref(), Some("sess-42"));
+    assert_eq!(p.since, Timestamp(1_793_487_815_000));
+    assert!(p.resume);
+    assert!(p.lost);
+    assert_eq!(p.go_on, None);
+    let bare: PausedAgent = serde_json::from_str(r#"{"since":7}"#).expect("the sparse shape loads");
+    assert_eq!(
+        bare,
+        PausedAgent {
+            session: None,
+            since: Timestamp(7),
+            resume: false,
+            lost: false,
+            go_on: None,
+        }
+    );
+}
+
+#[test]
+fn a_review_as_v0_3_8_stored_it_still_loads() {
+    // v0.3.8 had no `reviewer_waits`: a card it left in Review with the reviewer agent's turn had
+    // its reviewer started, so it loads as one whose reviewer does not wait.
+    let json = r#"{"turn":{"by":"agent","decides":false},"nudged":true,"handed_in":"abc123","accepted":true}"#;
+    let r: Review = serde_json::from_str(json).expect("the v0.3.8 shape loads");
+    assert_eq!(r.turn, Some(ReviewTurn::Agent { decides: false }));
+    assert!(r.nudged);
+    assert_eq!(r.handed_in.as_deref(), Some("abc123"));
+    assert!(r.accepted);
+    assert!(!r.reviewer_waits);
+    assert!(r.rounds.is_empty());
+    assert_eq!(r.note, None);
+}
+
+#[test]
 fn a_patch_tells_a_cleared_position_from_one_left_out() {
     use crate::{Pos, TicketPatch};
 

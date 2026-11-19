@@ -383,6 +383,28 @@ fn an_agent_past_the_limit_is_counted_and_delays_the_line_until_it_leaves() {
 }
 
 #[test]
+fn a_live_runner_holds_its_story_s_slot_whatever_the_status_blocked_by_hand_included() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let blocked = w.card(c, TicketStatus::Blocked, false);
+    let fresh = w.card(c, TicketStatus::Ready, true);
+    // A person blocked it by hand and its agent is still alive: that is its slot, and the next
+    // story waits at the limit of 1.
+    let alive = [(blocked, AgentRole::Worker)];
+    let p = plan(&w.chains, 1, &alive);
+    assert_eq!((p.used, p.start, p.queue), (1, vec![], vec![fresh]));
+    assert_eq!(working_cards(&w.chains, &alive), [blocked]);
+    // Its process is gone: the slot is free and the next story starts.
+    let p = plan(&w.chains, 1, &[]);
+    assert_eq!((p.used, p.start), (0, vec![fresh]));
+    // The same for a story merged or cancelled whose runner is still being stopped.
+    for status in [TicketStatus::Merged, TicketStatus::Cancelled] {
+        w.chains[c].tickets[0].status = status;
+        assert_eq!(plan(&w.chains, 1, &alive).start, Vec::<TicketId>::new());
+    }
+}
+
+#[test]
 fn working_cards_are_those_that_hold_a_slot_or_have_a_live_runner_in_review() {
     let mut w = World::new();
     let c = w.chain(false);

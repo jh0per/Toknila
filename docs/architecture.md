@@ -518,10 +518,12 @@ when the merge lands.
   core and takes the live runners as input (`Reader::live_runners`, which the store fills from
   `Runner::live_runners` when a read or command begins): a card holds a slot while its agent
   works (Running or Waiting with a process, or in Review once its reviewer agent started), or
-  while any runner of it is alive in Running, Waiting or Review. A card in review with its worker
-  and its reviewer alive uses one. The reviewer agent is started like every agent: through the
-  schedule (see "Parallel agents"). A merged, cancelled or blocked card's runners are being
-  stopped by the same command, so they already count as free.
+  while any runner of it is alive, whatever its status. A card in review with its worker and its
+  reviewer alive uses one. The reviewer agent is started like every agent: through the schedule
+  (see "Parallel agents"). A card blocked by hand keeps its agent and so its slot; a merged or
+  cancelled card's runner, stopped by that command, holds it until its process is gone. Every
+  end of a runner (`runs::ended`, stopped or by itself) runs the schedule, so the slot it frees
+  is given at once.
 
 ## Settings and onboarding
 
@@ -1005,11 +1007,17 @@ A project has a limit of agents working at once, `Project::max_parallel` (defaul
   a base that is behind; an answer to a waiting story whose agent was paused; the replacement
   after the app restarted; the reviewer agent after a hand-in, or when a person runs it again. A
   story holds one slot while an agent of it works: Running or Waiting with its agent, in Review
-  once its reviewer agent started, or while any runner of it is alive (a worker still ending
-  after its hand-in, a reviewer after its verdict); its worker and reviewer alive together are
-  that one slot, so a story never waits for itself. Blocked, Merged, Released, Cancelled and
-  Backlog hold none. Simulated agents (worker and reviewer) count the same, so tests can use
-  them. The assistant's own agent (`role: planner`) is no story's and holds no slot.
+  once its reviewer agent started, or while any runner of it is alive, whatever its status (a
+  worker still ending after its hand-in, a reviewer after its verdict, the agent a block by hand
+  keeps, a runner still being stopped after a merge or a cancel); its worker and reviewer alive
+  together are that one slot, so a story never waits for itself. With no live runner, Blocked,
+  Merged, Released, Cancelled and Backlog hold none. The slot is free once the process is gone:
+  the host reports every end, stopped or by itself, and `runs::ended` runs the schedule whatever
+  the end moved (an event it sends may be refused, the story having moved on). Simulated agents
+  (worker and reviewer) count the same, so tests can use them. The assistant's own agent
+  (`role: planner`) is no story's and holds no slot. After a restart a reviewer that was due and
+  waited for a free agent had no process to lose: recovery leaves it in line (before it marks
+  the lost workers, whose schedule pass may start it) and it starts from there.
 - **Going on is a flag, not a status.** The machine never starts these agents itself. A story
   that has to go on moves to the status the table says and is marked: the worker's
   `Ticket::agent_paused` with `resume` (and `go_on`: sent back or unblocked, with the person's
@@ -1039,8 +1047,9 @@ A project has a limit of agents working at once, `Project::max_parallel` (defaul
   `POST /chains/{chain}/move` (`tok chain mv`), and the store lists chains `ORDER BY position,
   rowid` everywhere, so scheduling priority, `show_plan` and the assistant's epics list follow it
   by themselves. The roadmap's pure rules (the move, the next version) are `core::roadmap`. `Start` is now sent only
-  by the schedule, by an agent's own `started` (a fact), and by the import of stories already
-  done, which walks each through Running to Merged in one command; `ResumeStart` only by the
+  by the schedule, by a simulated agent's own `started` (a fact; for a Ready card whose agent is
+  a process, `started`, which is what `tok sim <key> start` sends, is a `Request` and the card
+  starts from the line), and by the import of stories already done, which walks each through Running to Merged in one command; `ResumeStart` only by the
   schedule. The graph's settle no longer starts autostart cards itself.
 - **When.** `with_chain` ends every command on a chain by running the schedule for its project
   (`toknila-app::schedule::run`): the cards that have a slot get `Start` through the machine in

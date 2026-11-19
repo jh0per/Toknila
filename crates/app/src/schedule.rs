@@ -2,8 +2,9 @@
 //! starts, and start them. The plan is pure and lives in core; this module loads the project's
 //! chains and sends each chosen card its start (`Start`, or `ResumeStart` for a story that has
 //! begun) through the state machine, inside the command that freed the slot or queued the card.
-//! It is the only sender of either but two that start no new work: an agent's own `started`
-//! (a fact) and the import of stories already done. The runner itself
+//! It is the only sender of either but two that start no new process: a simulated agent's own
+//! `started` (a fact; an agent that is a process says it only once it runs, and on a Ready card
+//! it is a request) and the import of stories already done. The runner itself
 //! still starts after the commit, from the effects the start emits ([`crate::external`]);
 //! nothing here touches a process.
 

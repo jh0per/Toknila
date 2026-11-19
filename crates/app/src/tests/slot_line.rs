@@ -54,7 +54,7 @@ fn start(mem: &mut Mem, t: &Ticket) {
 
 /// The host reports that the process of `t`'s agent of `role` ended: one the host stopped
 /// (`stopped`), or one that ended by itself.
-fn exits(mem: &mut Mem, t: &Ticket, role: AgentRole, stopped: bool) {
+pub(super) fn exits(mem: &mut Mem, t: &Ticket, role: AgentRole, stopped: bool) {
     mem.runner.live.borrow_mut().remove(&(t.id, role));
     let run = run_of(&RunRequest {
         ticket: t.id,
@@ -373,7 +373,7 @@ fn a_hand_in_frees_the_slot_once_the_worker_has_ended() {
 }
 
 #[test]
-fn a_block_frees_the_slot() {
+fn a_block_frees_the_slot_once_the_agent_it_kept_is_gone() {
     let mut mem = a_waits_for_b();
     let reason = BlockedReason::Manual {
         text: "wait".to_owned(),
@@ -381,26 +381,35 @@ fn a_block_frees_the_slot() {
     let t = b(&mem);
     tickets::act(&mut mem, &t, TicketEvent::Block { reason }).expect("block");
     settle(&mut mem);
+    // A block by hand keeps B's agent, and its live process keeps B's slot.
+    assert_eq!(starts(&mem, &a(&mem), AgentRole::Worker), 0, "B's agent lives");
+    assert_eq!(alive(&mem), 1);
+    exits(&mut mem, &t, AgentRole::Worker, false);
     a_went_on(&mem, "a block");
+}
+
+/// `event` stops B's runner: the slot is B's until the host reports the stopped process's end,
+/// then A goes on.
+fn stopping_frees_the_slot(event: TicketEvent, name: &str) {
+    let mut mem = a_waits_for_b();
+    let t = b(&mem);
+    tickets::act(&mut mem, &t, event).expect("act");
+    assert_eq!(starts(&mem, &a(&mem), AgentRole::Worker), 0, "{name}: B's agent lives");
+    settle(&mut mem);
+    exits(&mut mem, &t, AgentRole::Worker, true);
+    a_went_on(&mem, name);
+    assert_eq!(alive(&mem), 1, "{name}");
 }
 
 #[test]
 fn a_cancel_frees_the_slot() {
-    let mut mem = a_waits_for_b();
     let reason = "not needed".to_owned();
-    let t = b(&mem);
-    tickets::act(&mut mem, &t, TicketEvent::Cancel { reason }).expect("cancel");
-    settle(&mut mem);
-    a_went_on(&mem, "a cancel");
+    stopping_frees_the_slot(TicketEvent::Cancel { reason }, "a cancel");
 }
 
 #[test]
 fn a_persons_pause_frees_the_slot() {
-    let mut mem = a_waits_for_b();
-    let t = b(&mem);
-    tickets::act(&mut mem, &t, TicketEvent::Pause).expect("pause");
-    settle(&mut mem);
-    a_went_on(&mem, "a pause");
+    stopping_frees_the_slot(TicketEvent::Pause, "a pause");
 }
 
 #[test]
@@ -502,4 +511,189 @@ fn with_one_slot_a_storys_whole_life_completes_and_the_next_waits_for_it() {
     exits(&mut mem, &t, AgentRole::Reviewer, true);
     assert_eq!(b(&mem).status, TicketStatus::Running);
     assert_eq!(used(&mem), 1);
+}
+
+// ---- counted on the fake runner: stories with a live process, not the rule's own answer ----
+
+/// Stories with a live process on the fake runner; a story's worker and reviewer are one.
+fn alive(mem: &Mem) -> usize {
+    let live = mem.runner.live.borrow();
+    live.iter().map(|(t, _)| *t).collect::<HashSet<_>>().len()
+}
+
+fn hand_in(mem: &mut Mem, t: &Ticket) {
+    let summary = toknila_core::handin::from_plain("done");
+    agent::ticket_event(mem, t, AgentEvent::Finished { summary }).expect("finished");
+}
+
+#[test]
+fn a_worker_that_exits_by_itself_after_handing_in_starts_the_next_in_line() {
+    let mut mem = a_waits_for_b();
+    let t = b(&mem);
+    hand_in(&mut mem, &t);
+    // The host's stop has not reached B's worker yet: the hand-in's sync with main is done
+    // while it still lives, so B's slot is still taken.
+    mem.deferred
+        .retain(|e| !matches!(e, crate::external::ExternalEffect::StopWorker { .. }));
+    settle(&mut mem);
+    assert_eq!(b(&mem).review.turn, Some(ReviewTurn::Person));
+    assert_eq!(starts(&mem, &a(&mem), AgentRole::Worker), 0, "B's worker lives");
+    // B's worker ends by itself; nobody touches the project.
+    exits(&mut mem, &t, AgentRole::Worker, false);
+    assert_eq!(b(&mem).status, TicketStatus::Review);
+    a_went_on(&mem, "a worker that exited by itself");
+    assert_eq!(alive(&mem), 1);
+}
+
+#[test]
+fn a_reviewer_that_exits_by_itself_after_its_verdict_starts_the_next_in_line() {
+    // One slot, review by the agent and then a person: A works, B was started and waits.
+    let mut mem = with_agents();
+    mem.project.max_parallel = 1;
+    mem.project.default_review_mode = ReviewMode::Both;
+    mem.view.edges.clear();
+    mem.view.chain.autostart = false;
+    recover(&mut mem).expect("start");
+    for t in [a(&mem), b(&mem)] {
+        start(&mut mem, &t);
+    }
+    let t = a(&mem);
+    hand_in(&mut mem, &t);
+    settle(&mut mem);
+    exits(&mut mem, &t, AgentRole::Worker, true);
+    // A's reviewer works in A's slot; B still waits.
+    assert_eq!(starts(&mem, &t, AgentRole::Reviewer), 1);
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 0);
+    assert_eq!(alive(&mem), 1);
+    let event = AgentEvent::ReviewVerdict {
+        verdict: Verdict::Approve,
+        comment: "fine".to_owned(),
+        items: Vec::new(),
+    };
+    agent::ticket_event(&mut mem, &t, event).expect("verdict");
+    assert_eq!(a(&mem).review.turn, Some(ReviewTurn::Person), "a person decides");
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 0, "the reviewer lives");
+    // The reviewer exits by itself right after its verdict; nobody touches the project.
+    exits(&mut mem, &t, AgentRole::Reviewer, false);
+    assert_eq!(a(&mem).review.note, None, "it gave its verdict");
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 1, "B starts");
+    assert_eq!(b(&mem).status, TicketStatus::Running);
+    assert_eq!(alive(&mem), 1);
+}
+
+/// One slot: A started and works, B was started and waits; then a person blocks A by hand.
+fn a_blocked_by_hand_b_waits() -> Mem {
+    let mut mem = with_agents();
+    mem.project.max_parallel = 1;
+    mem.view.edges.clear();
+    mem.view.chain.autostart = false;
+    recover(&mut mem).expect("start");
+    for t in [a(&mem), b(&mem)] {
+        start(&mut mem, &t);
+    }
+    assert_eq!(b(&mem).status, TicketStatus::Ready, "B waits for A");
+    let reason = BlockedReason::Manual {
+        text: "waiting for the key".to_owned(),
+    };
+    let t = a(&mem);
+    tickets::act(&mut mem, &t, TicketEvent::Block { reason }).expect("block");
+    settle(&mut mem);
+    assert_eq!(a(&mem).status, TicketStatus::Blocked);
+    // A manual block keeps the agent: its process is alive, and it holds A's slot.
+    assert!(mem.runner.live.borrow().contains(&(t.id, AgentRole::Worker)));
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 0, "no second agent");
+    assert_eq!(alive(&mem), 1);
+    let line = schedule::queue(&mem).expect("line");
+    assert_eq!(line.get(&b(&mem).id), Some(&(1, "queued #1".to_owned())));
+    mem
+}
+
+#[test]
+fn a_story_blocked_by_hand_holds_its_slot_until_its_agents_process_is_gone() {
+    let mut mem = a_blocked_by_hand_b_waits();
+    let t = a(&mem);
+    exits(&mut mem, &t, AgentRole::Worker, false);
+    assert_eq!(a(&mem).status, TicketStatus::Blocked);
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 1, "B starts");
+    assert_eq!(b(&mem).status, TicketStatus::Running);
+    assert_eq!(alive(&mem), 1);
+}
+
+#[test]
+fn a_story_blocked_by_hand_and_unblocked_goes_on_with_its_agent_and_the_next_waits_until_it_is_done()
+{
+    let mut mem = a_blocked_by_hand_b_waits();
+    let t = a(&mem);
+    tickets::act(&mut mem, &t, TicketEvent::Unblock).expect("unblock");
+    settle(&mut mem);
+    assert_eq!(a(&mem).status, TicketStatus::Running);
+    assert_eq!(a(&mem).agent_paused, None, "A goes on in its own slot");
+    assert_eq!(starts(&mem, &t, AgentRole::Worker), 1, "with the process it kept");
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 0);
+    assert_eq!(alive(&mem), 1);
+    // A is done: it hands in (its worker still lives in that command) and its worker ends; then
+    // B starts.
+    hand_in(&mut mem, &t);
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 0, "A's worker lives");
+    settle(&mut mem);
+    exits(&mut mem, &t, AgentRole::Worker, true);
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 1);
+    assert_eq!(alive(&mem), 1);
+}
+
+#[test]
+fn after_a_restart_a_reviewer_that_was_due_is_not_lost_and_starts_from_the_line() {
+    let mut mem = b_works_after(review(ReviewTurn::Check));
+    let id = a(&mem).id;
+    tell_ticket(&mut mem, id, check_done(true, ReviewMode::Agent)).expect("check");
+    settle(&mut mem);
+    assert!(a(&mem).review.reviewer_waits, "A's reviewer is due and waits for B");
+    // The daemon restarts: no process outlives it.
+    mem.runner.live.borrow_mut().clear();
+    mem.runner.started.borrow_mut().clear();
+    mem.deferred.clear();
+    let report = recover(&mut mem).expect("restart");
+    assert!(report.reviews_lost.is_empty(), "{:?}", report.reviews_lost);
+    assert_eq!(report.lost, [b(&mem).key.to_string()]);
+    settle(&mut mem);
+    let t = a(&mem);
+    assert_eq!(t.review.turn, Some(ReviewTurn::Agent { decides: true }));
+    assert_eq!(t.review.note, None, "not sent to a person");
+    assert_eq!(starts(&mem, &t, AgentRole::Reviewer), 1, "first in line");
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 0);
+    let line = schedule::queue(&mem).expect("line");
+    let words = "the app restarted; goes on when an agent is free";
+    assert_eq!(line.get(&b(&mem).id), Some(&(1, words.to_owned())));
+    assert_eq!(alive(&mem), 1);
+}
+
+#[test]
+fn an_agents_started_on_a_ready_story_whose_agent_is_a_process_waits_in_line() {
+    // `tok sim <key> start` sends the agent's `started`: on a Ready story whose agent is a
+    // process it would spawn one past the limit. It goes through the line instead.
+    let mut mem = with_agents();
+    mem.project.max_parallel = 1;
+    mem.view.edges.clear();
+    mem.view.chain.autostart = false;
+    recover(&mut mem).expect("start");
+    let t = a(&mem);
+    start(&mut mem, &t);
+    for _ in 0..2 {
+        let t = b(&mem);
+        agent::ticket_event(&mut mem, &t, AgentEvent::Started).expect("started");
+        settle(&mut mem);
+    }
+    let t = b(&mem);
+    assert_eq!((t.status, t.queued), (TicketStatus::Ready, true));
+    assert_eq!(starts(&mem, &t, AgentRole::Worker), 0, "no agent past the limit");
+    let line = schedule::queue(&mem).expect("line");
+    assert_eq!(line.get(&t.id), Some(&(1, "queued #1".to_owned())));
+    assert_eq!(alive(&mem), 1);
+    // A leaves: B starts from the line.
+    let t = a(&mem);
+    hand_in(&mut mem, &t);
+    settle(&mut mem);
+    exits(&mut mem, &t, AgentRole::Worker, true);
+    assert_eq!(starts(&mem, &b(&mem), AgentRole::Worker), 1);
+    assert_eq!(alive(&mem), 1);
 }

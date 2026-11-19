@@ -11,12 +11,14 @@
 //!
 //! **Slots are stories.** A story holds one slot while an agent of it works: Running or Waiting
 //! with its agent (not paused, lost or waiting to go on), or in Review once its reviewer agent's
-//! turn has started. A simulated agent counts the same. A **live runner** of a story that is
-//! Running, Waiting or in Review holds it too (a worker still ending after its hand-in, a
-//! reviewer still ending after its verdict), and a story's worker and reviewer alive together
-//! hold one slot. Blocked, Merged, Released, Cancelled and Backlog hold none: the command that
-//! moved the story there stops its runners. The host knows which runners are alive; the
-//! application passes them in and this module stays pure.
+//! turn has started. A simulated agent counts the same. A **live runner** of a story holds it
+//! too, whatever the story's status: a worker still ending after its hand-in, a reviewer still
+//! ending after its verdict, the agent of a story a person blocked by hand (a manual block keeps
+//! its agent alive), a runner still being stopped after a merge or a cancel. A story's worker and
+//! reviewer alive together hold one slot. With no live runner, Blocked, Merged, Released,
+//! Cancelled and Backlog hold none. The slot is free once the process is gone: the host reports
+//! every end, on purpose or by itself, and the application runs the schedule for it. The host
+//! knows which runners are alive; the application passes them in and this module stays pure.
 //!
 //! **The line.** A story that has to go on and finds no free slot waits in line, and
 //! [`wait_text`] says so ("sent back; goes on when an agent is free"). Stories already begun
@@ -80,14 +82,11 @@ pub fn holds_slot(ticket: &Ticket) -> bool {
     }
 }
 
-/// Does the story hold a slot: by its state, or by a live runner while it is working or in
-/// review. Its worker and its reviewer are one slot.
+/// Does the story hold a slot: by its state, or by a live runner of it, whatever its status
+/// (Blocked by a person's hand, or still ending after a merge or a cancel). Its worker and its
+/// reviewer are one slot.
 pub fn holds(ticket: &Ticket, live: &[LiveRunner]) -> bool {
-    let active = matches!(
-        ticket.status,
-        TicketStatus::Running | TicketStatus::Waiting | TicketStatus::Review
-    );
-    holds_slot(ticket) || (active && live.iter().any(|(id, _)| *id == ticket.id))
+    holds_slot(ticket) || live.iter().any(|(id, _)| *id == ticket.id)
 }
 
 /// Has the story begun and must it go on with an agent that has no process yet: a paused or

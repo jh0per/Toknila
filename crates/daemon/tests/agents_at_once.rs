@@ -2,12 +2,17 @@
 //! ship and the real shell checker. With the limit at 1, two simulated stories complete; one is
 //! sent back by its reviewer while the other runs, waits, says so, and goes on when the other
 //! leaves. The journal is replayed afterwards: at no recorded moment did two stories hold an
-//! agent. After a restart with real processes (the workspace's `fake-agent`, never a real agent)
-//! the replacements start one per free slot.
+//! agent. With real processes (the workspace's `fake-agent`, never a real agent), counted on the
+//! runner itself rather than by the rule: after a restart the replacements and a reviewer that was
+//! due start one per free slot; a worker that exits by itself after its hand-in and a reviewer
+//! that exits by itself after its verdict give their slot to the next story with nobody touching
+//! the project; a story blocked by hand keeps its slot while its agent lives.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use axum::body::Body;
@@ -15,7 +20,10 @@ use axum::http::{Method, Request};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tokio::sync::Notify;
-use toknila_daemon::runner::Runners;
+use tokio::task::JoinHandle;
+use toknila_app::runner::Runner as _;
+use toknila_core::{AgentRole, TicketId};
+use toknila_daemon::runner::{Runners, supervise};
 use toknila_daemon::server::{AppState, router};
 use toknila_daemon::shipyard::GitShipyard;
 use toknila_daemon::store::Store;
@@ -59,30 +67,71 @@ fn repo(root: &Path) -> PathBuf {
     repo
 }
 
-/// One daemon over the database in `root`: its store, its runners and its router. The
-/// supervisor is not started: a process that dies is recorded nowhere.
+/// The agents' profiles: `holder` works until killed, `waiter` until a line is typed to it,
+/// `quitter` hands in when a line is typed and exits by itself; each `-reviewer` is its reviewer
+/// (`quitter-reviewer` approves when a line is typed and exits by itself).
+fn profiles(dir: &Path) {
+    let summary = toknila_core::handin::from_plain("done");
+    let finished = json!({ "event": "finished", "summary": summary }).to_string();
+    let approve = json!({ "event": "review_verdict", "verdict": "approve", "comment": "fine",
+        "items": [{ "item": 1, "outcome": "pass", "note": "it works" }] })
+    .to_string();
+    let events = "/tickets/{ticket}/events";
+    for (name, steps) in [
+        ("holder", "'print', 'holding', 'hold'".to_owned()),
+        ("holder-reviewer", "'print', 'reviewing', 'hold'".to_owned()),
+        ("waiter", "'print', 'ready', 'echo'".to_owned()),
+        (
+            "quitter",
+            format!("'print', 'ready', 'echo', 'post', '{events}', '{finished}'"),
+        ),
+        (
+            "quitter-reviewer",
+            format!("'print', 'ready', 'echo', 'post', '{events}', '{approve}'"),
+        ),
+    ] {
+        let toml = format!("command = ['{AGENT}', {steps}]\n");
+        std::fs::write(dir.join(format!("{name}.toml")), toml).expect("profile");
+    }
+}
+
+/// One daemon over the database in `root`: its store, its runners and its router. A `live` one
+/// runs as the daemon does: the supervisor records every process end, and the agents report to a
+/// listener. Without it a process that dies is recorded nowhere.
 struct Daemon {
     app: axum::Router,
     store: Store,
     runners: Arc<Runners>,
-    _ended: tokio::sync::mpsc::UnboundedReceiver<toknila_app::runner::RunEnded>,
+    _ended: Option<tokio::sync::mpsc::UnboundedReceiver<toknila_app::runner::RunEnded>>,
+    supervisor: Option<JoinHandle<()>>,
+    server: Option<JoinHandle<()>>,
+}
+
+impl Drop for Daemon {
+    fn drop(&mut self) {
+        for task in [self.supervisor.take(), self.server.take()].into_iter().flatten() {
+            task.abort();
+        }
+    }
 }
 
 impl Daemon {
-    fn start(root: &Path) -> Daemon {
-        let profiles = root.join("p");
-        std::fs::create_dir_all(&profiles).expect("profiles");
-        std::fs::write(
-            profiles.join("holder.toml"),
-            format!("command = ['{AGENT}', 'print', 'holding', 'hold']\n"),
-        )
-        .expect("profile");
-        let (runners, ended) = Runners::new(root.join("runs"), profiles.clone());
+    async fn start(root: &Path, live: bool) -> Daemon {
+        let dir = root.join("p");
+        std::fs::create_dir_all(&dir).expect("profiles");
+        profiles(&dir);
+        let (runners, ended) = Runners::new(root.join("runs"), dir.clone());
         let store = Store::open(&root.join("t.db"))
             .expect("store")
             .with_runner(runners.clone())
             .with_shipyard(Arc::new(GitShipyard::new(root.join("ships"))))
             .with_merger(Arc::new(toknila_daemon::github::Mergers::new()));
+        let (supervisor, ended) = if live {
+            (Some(supervise(store.clone(), runners.clone(), ended)), None)
+        } else {
+            (None, Some(ended))
+        };
+        let profiles = dir;
         let app = router(AppState {
             store: store.clone(),
             token: TOKEN.into(),
@@ -96,11 +145,77 @@ impl Daemon {
             trash: Arc::new(toknila_daemon::trash::NoTrash),
             pdf_renderer: Arc::new(toknila_daemon::designs::thumb::NoRenderer),
         });
+        let mut server = None;
+        if live {
+            // The agents report to a real listener, as hooks do.
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("bind");
+            let addr = listener.local_addr().expect("address");
+            runners.set_daemon_url(format!("http://{addr}"));
+            let served = app.clone();
+            server = Some(tokio::spawn(async move {
+                let _ = axum::serve(listener, served).await;
+            }));
+        }
         Daemon {
             app,
             store,
             runners,
             _ended: ended,
+            supervisor,
+            server,
+        }
+    }
+
+    /// Ends as the daemon ends: no process end is recorded any more, every process is killed and
+    /// gone, and the work queued is done. Nothing of the test is left running.
+    async fn shutdown(mut self) {
+        if let Some(supervisor) = self.supervisor.take() {
+            supervisor.abort();
+            let _ = supervisor.await;
+        }
+        self.runners.stop_all();
+        let until = Instant::now() + WAIT;
+        while !self.runners.live_runners().is_empty() {
+            assert!(Instant::now() < until, "{:?}", self.runners.live_runners());
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+        self.store.settled().await;
+    }
+
+    async fn id(&self, key: &str) -> TicketId {
+        let card = self.card(key).await;
+        let id = card["ticket"]["id"].as_str().expect("id");
+        id.parse().expect("ticket id")
+    }
+
+    /// Polls until the tickets with a live process of `role` are exactly `ids`, with a deadline.
+    async fn until_live(&self, role: AgentRole, ids: &[TicketId]) {
+        let want: HashSet<TicketId> = ids.iter().copied().collect();
+        let until = Instant::now() + WAIT;
+        loop {
+            let live: HashSet<TicketId> = self.runners.live_in(role).into_iter().collect();
+            if live == want {
+                return;
+            }
+            assert!(Instant::now() < until, "{role:?} live: {live:?}, not {want:?}");
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    }
+
+    /// Polls until the worker of `ticket` has printed `what`, with a deadline.
+    async fn until_printed(&self, ticket: TicketId, what: &str) {
+        let until = Instant::now() + WAIT;
+        loop {
+            let out = self.runners.read(ticket, AgentRole::Worker, None);
+            let out = out.map(|c| String::from_utf8_lossy(&c.bytes).into_owned());
+            let out = out.unwrap_or_default();
+            if out.contains(what) {
+                return;
+            }
+            assert!(Instant::now() < until, "no {what:?} in {out:?}");
+            tokio::time::sleep(Duration::from_millis(25)).await;
         }
     }
 
@@ -148,6 +263,40 @@ impl Daemon {
             assert!(Instant::now() < until, "{key}: no {what}: {}", c["ticket"]);
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
+    }
+}
+
+/// Samples the runner every few milliseconds and keeps the most stories it saw with a live
+/// process at once (a story's worker and reviewer are one): the processes themselves, not the
+/// rule's answer.
+struct Watch {
+    most: Arc<AtomicUsize>,
+    task: JoinHandle<()>,
+}
+
+impl Watch {
+    fn new(runners: &Arc<Runners>) -> Watch {
+        let most = Arc::new(AtomicUsize::new(0));
+        let (seen, runners) = (most.clone(), runners.clone());
+        let task = tokio::spawn(async move {
+            loop {
+                let live = runners.live_runners();
+                let stories: HashSet<TicketId> = live.into_iter().map(|(t, _)| t).collect();
+                seen.fetch_max(stories.len(), Ordering::SeqCst);
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        });
+        Watch { most, task }
+    }
+
+    fn most(&self) -> usize {
+        self.most.load(Ordering::SeqCst)
+    }
+}
+
+impl Drop for Watch {
+    fn drop(&mut self) {
+        self.task.abort();
     }
 }
 
@@ -214,7 +363,7 @@ async fn with_one_slot_a_story_sent_back_by_its_reviewer_while_the_other_runs_wa
 {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = repo(tmp.path());
-    let d = Daemon::start(tmp.path());
+    let d = Daemon::start(tmp.path(), false).await;
     d.post(
         "/v1/projects",
         json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(), "default_profile": "sim",
@@ -301,7 +450,7 @@ async fn with_one_slot_a_story_sent_back_by_its_reviewer_while_the_other_runs_wa
 async fn after_a_restart_the_lost_agents_come_back_one_per_free_slot() {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = repo(tmp.path());
-    let one = Daemon::start(tmp.path());
+    let one = Daemon::start(tmp.path(), false).await;
     one.post(
         "/v1/projects",
         json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(), "default_profile": "holder" }),
@@ -344,7 +493,7 @@ async fn after_a_restart_the_lost_agents_come_back_one_per_free_slot() {
     one.runners.stop_all();
     one.store.settled().await;
     drop(one);
-    let two = Daemon::start(tmp.path());
+    let two = Daemon::start(tmp.path(), true).await;
     let report = toknila_daemon::recovery::recover(&two.store)
         .await
         .expect("recover");
@@ -363,7 +512,7 @@ async fn after_a_restart_the_lost_agents_come_back_one_per_free_slot() {
     );
     assert_eq!(two.used().await, 1);
 
-    // The first leaves: the second's agent comes back.
+    // The first leaves: once its stopped process is gone, the second's agent comes back.
     two.post(
         "/v1/tickets/DEMO-1/actions/cancel",
         json!({ "text": "not needed" }),
@@ -373,12 +522,197 @@ async fn after_a_restart_the_lost_agents_come_back_one_per_free_slot() {
         c["ticket"]["status"] == "running" && c["ticket"]["agent_paused"].is_null()
     })
     .await;
-    let until = Instant::now() + WAIT;
-    while two.runners.live() != vec![ids[1]] {
-        assert!(Instant::now() < until, "live: {:?}", two.runners.live());
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
+    two.until_live(AgentRole::Worker, &[ids[1]]).await;
     assert_eq!(two.used().await, 1);
-    two.runners.stop_all();
-    two.store.settled().await;
+    two.shutdown().await;
+}
+
+/// One slot and two stories, Login and Profile, whose agents are processes of `profile`,
+/// reviewed as `mode` says.
+async fn two_stories(d: &Daemon, repo: &Path, profile: &str, mode: &str) -> [TicketId; 2] {
+    d.post(
+        "/v1/projects",
+        json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(), "default_profile": profile,
+                "max_parallel": 1, "default_review_mode": mode }),
+    )
+    .await;
+    d.post("/v1/projects/DEMO/chains", json!({ "name": "auth" }))
+        .await;
+    for title in ["Login", "Profile"] {
+        d.post(
+            "/v1/chains/auth/tickets",
+            json!({ "title": title, "prompt": "Do it.", "acceptance": ["It works"],
+                    "profile": profile }),
+        )
+        .await;
+    }
+    [d.id("DEMO-1").await, d.id("DEMO-2").await]
+}
+
+/// The worker of `key` has `file` committed in its ship and is told to go on: a `quitter` hands
+/// in and exits, a `waiter` exits.
+async fn go(d: &Daemon, key: &str, id: TicketId, file: &str) {
+    let card = d.card(key).await;
+    let ship = card["ship"]["path"].as_str().expect("the card has a ship");
+    commit_file(Path::new(ship), file);
+    d.runners
+        .write(id, AgentRole::Worker, b"go\r")
+        .expect("type to the worker");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_worker_that_exits_by_itself_after_handing_in_gives_its_slot_to_the_next_story() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let repo = repo(tmp.path());
+    let d = Daemon::start(tmp.path(), true).await;
+    let watch = Watch::new(&d.runners);
+    let [a, b] = two_stories(&d, &repo, "quitter", "human").await;
+    d.until_printed(a, "ready").await;
+    assert_eq!(state(&d.card("DEMO-2").await).1, "queued #1");
+    // A's worker hands in and exits by itself; nobody touches the project after that.
+    go(&d, "DEMO-1", a, "login.txt").await;
+    d.until_live(AgentRole::Worker, &[b]).await;
+    let ca = d.card("DEMO-1").await;
+    assert_eq!(ca["ticket"]["status"], "review", "{}", ca["ticket"]);
+    assert_eq!(state(&d.card("DEMO-2").await).0, "running");
+    assert_eq!(watch.most(), 1, "never two stories with a live process");
+    d.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_reviewer_that_exits_by_itself_after_its_verdict_gives_its_slot_to_the_next_story() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let repo = repo(tmp.path());
+    let d = Daemon::start(tmp.path(), true).await;
+    let watch = Watch::new(&d.runners);
+    let [a, b] = two_stories(&d, &repo, "quitter", "both").await;
+    d.until_printed(a, "ready").await;
+    // A hands in. B is asked for only once A's reviewer works (during A's check no agent of A
+    // works, and a story in line would take the slot then).
+    d.send(
+        Method::PATCH,
+        "/v1/chains/auth",
+        json!({ "autostart": false }),
+    )
+    .await;
+    go(&d, "DEMO-1", a, "login.txt").await;
+    d.until_live(AgentRole::Reviewer, &[a]).await;
+    d.post("/v1/tickets/DEMO-2/actions/start", json!({})).await;
+    assert_eq!(state(&d.card("DEMO-2").await).1, "queued #1");
+    // The reviewer approves and exits by itself; a person has the turn; nobody touches the
+    // project after that.
+    let reviewer = |what: &str| {
+        let out = d.runners.read(a, AgentRole::Reviewer, None);
+        out.is_some_and(|c| String::from_utf8_lossy(&c.bytes).contains(what))
+    };
+    let until = Instant::now() + WAIT;
+    while !reviewer("ready") {
+        assert!(Instant::now() < until, "the reviewer never got ready");
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    d.runners
+        .write(a, AgentRole::Reviewer, b"go\r")
+        .expect("type to the reviewer");
+    d.until_live(AgentRole::Worker, &[b]).await;
+    let ca = d.card("DEMO-1").await;
+    let review = &ca["ticket"]["review"];
+    assert_eq!(review["turn"]["by"], "person", "{review}");
+    assert!(review["note"].is_null(), "it gave its verdict: {review}");
+    assert_eq!(state(&d.card("DEMO-2").await).0, "running");
+    assert_eq!(watch.most(), 1, "never two stories with a live process");
+    d.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_story_blocked_by_hand_keeps_its_slot_while_its_agent_lives() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let repo = repo(tmp.path());
+    let d = Daemon::start(tmp.path(), true).await;
+    let watch = Watch::new(&d.runners);
+    let [a, b] = two_stories(&d, &repo, "waiter", "human").await;
+    d.until_printed(a, "ready").await;
+    d.post(
+        "/v1/tickets/DEMO-1/actions/block",
+        json!({ "text": "waiting for the key" }),
+    )
+    .await;
+    // The block keeps A's agent, and its live process keeps the slot: B does not start.
+    assert_eq!(d.card("DEMO-1").await["ticket"]["status"], "blocked");
+    assert_eq!(d.runners.live(), vec![a]);
+    assert_eq!(state(&d.card("DEMO-2").await).1, "queued #1");
+    // A's process ends by itself: the slot is free and B starts; nobody touches the project.
+    go(&d, "DEMO-1", a, "notes.txt").await;
+    d.until_live(AgentRole::Worker, &[b]).await;
+    assert_eq!(d.card("DEMO-1").await["ticket"]["status"], "blocked");
+    assert_eq!(watch.most(), 1, "never two stories with a live process");
+    d.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn after_a_restart_a_reviewer_that_was_due_starts_from_the_line_and_is_not_lost() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let repo = repo(tmp.path());
+    let one = Daemon::start(tmp.path(), false).await;
+    one.post(
+        "/v1/projects",
+        json!({ "key": "DEMO", "repo_path": repo.to_string_lossy(), "default_profile": "holder",
+                "default_review_mode": "agent" }),
+    )
+    .await;
+    one.post("/v1/projects/DEMO/chains", json!({ "name": "auth" }))
+        .await;
+    for title in ["Card 1", "Card 2"] {
+        one.post(
+            "/v1/chains/auth/tickets",
+            json!({ "title": title, "prompt": "Do it.", "acceptance": ["It works"],
+                    "profile": "holder" }),
+        )
+        .await;
+    }
+    let ids = [one.id("DEMO-1").await, one.id("DEMO-2").await];
+    one.until_live(AgentRole::Worker, &ids).await;
+    one.send(
+        Method::PATCH,
+        "/v1/projects/DEMO",
+        json!({ "max_parallel": 1 }),
+    )
+    .await;
+    // Card 1 hands in while Card 2 holds the only agent: its reviewer is due and waits.
+    hand_in(&one, "DEMO-1", "card-1.txt").await;
+    let c1 = one
+        .until("DEMO-1", "a reviewer that is due", |c| {
+            c["ticket"]["review"]["reviewer_waits"] == true
+        })
+        .await;
+    assert_eq!(state(&c1), ("review".to_owned(), json!(REVIEWER_DUE), true));
+    assert!(one.runners.live_in(AgentRole::Reviewer).is_empty());
+
+    // The update: the daemon and its processes are gone.
+    one.runners.stop_all();
+    one.store.settled().await;
+    drop(one);
+    let two = Daemon::start(tmp.path(), true).await;
+    let watch = Watch::new(&two.runners);
+    let report = toknila_daemon::recovery::recover(&two.store)
+        .await
+        .expect("recover");
+    assert!(report.reviews_lost.is_empty(), "{:?}", report.reviews_lost);
+    assert_eq!(report.lost, ["DEMO-2"]);
+    // Card 1's reviewer starts from the line, first; Card 2's agent waits for it.
+    two.until_live(AgentRole::Reviewer, &[ids[0]]).await;
+    let c1 = two.card("DEMO-1").await;
+    assert_eq!(state(&c1), ("review".to_owned(), Value::Null, false));
+    assert_eq!(c1["ticket"]["review"]["turn"]["by"], "agent");
+    assert!(c1["ticket"]["review"]["note"].is_null(), "not sent to a person");
+    let words = "the app restarted; goes on when an agent is free";
+    let c2 = two.card("DEMO-2").await;
+    assert_eq!(state(&c2), ("running".to_owned(), json!(words), true));
+    assert!(two.runners.live().is_empty(), "no worker beside the reviewer");
+    // The reviewer approves and leaves: Card 1 merges and Card 2's agent comes back.
+    verdict(&two, "DEMO-1", "approve", "pass").await;
+    two.until("DEMO-1", "merge", |c| c["ticket"]["status"] == "merged")
+        .await;
+    two.until_live(AgentRole::Worker, &[ids[1]]).await;
+    assert_eq!(watch.most(), 1, "never two stories with a live process");
+    two.shutdown().await;
 }
