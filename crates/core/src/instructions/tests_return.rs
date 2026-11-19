@@ -37,6 +37,7 @@ fn brief(acceptance: &[String]) -> RunBrief<'_> {
         check: None,
         threads: &[],
         hand_in: None,
+        told: &[],
         checklist: &[],
         review_commands: &[],
     }

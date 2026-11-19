@@ -226,6 +226,7 @@ fn brief_of_key<'a>(
         check: cx.brief.check.as_ref(),
         threads: &cx.brief.threads,
         hand_in: cx.brief.hand_in.as_deref(),
+        told: &cx.brief.told,
     }
 }
 

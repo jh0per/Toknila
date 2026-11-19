@@ -24,6 +24,60 @@ const TOKEN: &str = "t";
 /// same words on every platform's shell.
 const CHECK: &str = "git ls-files --error-unmatch ok.txt";
 
+#[tokio::test]
+async fn the_reviewers_brief_holds_a_comment_and_an_answer_also_after_a_restart() {
+    let mut rig = Rig::with_fake_reviewer().await;
+    rig.post(
+        "/v1/tickets/DEMO-1/comments",
+        json!({ "text": "Use the licence wording MIT-ZERO in the README." }),
+    )
+    .await;
+    rig.post(
+        "/v1/tickets/DEMO-1/events",
+        json!({ "event": "ask_human", "text": "Hand in with the hold only?",
+                "choices": ["Yes, the hold only", "No, the whole story"] }),
+    )
+    .await;
+    rig.post(
+        "/v1/tickets/DEMO-1/runner/answer",
+        json!({ "answer": "text", "choice": 0 }),
+    )
+    .await;
+    rig.finish("ok.txt").await;
+    let out = rig.reviewer_file().await;
+    let want = [
+        "## What the person told this story's agent",
+        "Use the licence wording MIT-ZERO in the README.",
+        "The agent asked:",
+        "Hand in with the hold only?",
+        "Yes, the hold only",
+    ];
+    for w in want {
+        assert!(out.contains(w), "{w:?} in the first brief: {out}");
+    }
+    assert!(
+        !out.contains("No, the whole story"),
+        "the choice not pressed is not shown: {out}"
+    );
+    // The daemon restarts; the reviewer asks for changes and the worker hands in again, so the
+    // second reviewer reads a hand-in that answers a Return, with its record read from the store.
+    rig.restart().await;
+    rig.post(
+        "/v1/tickets/DEMO-1/events",
+        json!({ "event": "review_verdict", "verdict": "request_changes",
+                "comment": "tidy it up", "items": [
+                { "item": 1, "outcome": "pass", "note": "works" },
+                { "item": 2, "outcome": "fail", "note": "untidy" } ] }),
+    )
+    .await;
+    rig.finish("again.txt").await;
+    let again = rig.reviewer_file().await;
+    rig.stop_reviewer();
+    for w in want {
+        assert!(again.contains(w), "{w:?} after the restart: {again}");
+    }
+}
+
 fn git(dir: &Path, args: &[&str]) {
     let out = Command::new("git")
         .arg("-C")
@@ -73,6 +127,49 @@ impl Rig {
         Rig::build(3, Some(CHECK), true).await
     }
 
+    /// A daemon restart: the store, the runners and the router are made again over the same
+    /// database file; nothing is carried in memory.
+    async fn restart(&mut self) {
+        self.stop_reviewer();
+        let tmp = self._tmp.path().to_owned();
+        let (runners, ended) =
+            toknila_daemon::runner::Runners::new(tmp.join("runs2"), tmp.join("p"));
+        let store = Store::open(&tmp.join("t.db"))
+            .expect("store")
+            .with_shipyard(Arc::new(GitShipyard::new(tmp.join("ships"))))
+            .with_merger(Arc::new(toknila_daemon::github::Mergers::new()))
+            .with_runner(runners.clone());
+        self.app = router(AppState {
+            store: store.clone(),
+            token: TOKEN.into(),
+            shutdown: Arc::new(Notify::new()),
+            profiles: tmp.join("p"),
+            runners: runners.clone(),
+            tools: Arc::new(toknila_daemon::tools::SystemTools),
+            usage: Arc::new(toknila_daemon::usage::Usage::disabled()),
+            home: tmp.clone(),
+            ships: tmp.join("ships"),
+            trash: Arc::new(toknila_daemon::trash::NoTrash),
+            pdf_renderer: Arc::new(toknila_daemon::designs::thumb::NoRenderer),
+        });
+        self.store = store;
+        self.runners = runners;
+        self._ended = ended;
+    }
+
+    /// The instructions file the reviewer was started with, as it printed it.
+    async fn reviewer_file(&self) -> String {
+        let until = Instant::now() + Duration::from_secs(30);
+        loop {
+            let out = self.reviewer_output();
+            if out.contains("exited with code") || out.contains("## How to review") {
+                return out;
+            }
+            assert!(Instant::now() < until, "no instructions file: {out:?}");
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }
+
     fn stop_reviewer(&self) {
         use toknila_app::runner::Runner;
         self.runners
@@ -111,7 +208,10 @@ impl Rig {
             let agent = env!("CARGO_BIN_EXE_fake-agent");
             std::fs::write(
                 tmp.path().join("p").join("fake-reviewer.toml"),
-                format!("command = ['{agent}', 'print', '{{kickoff}}', 'hold']\n"),
+                format!(
+                    "instructions_flag = '--instr'\n\
+                     command = ['{agent}', 'print', '{{kickoff}}', 'flagfile', '--instr', 'hold']\n"
+                ),
             )
             .expect("profile");
         }

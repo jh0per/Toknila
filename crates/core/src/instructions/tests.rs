@@ -18,7 +18,7 @@ fn instruction(gist: &str, what: Option<&str>) -> Comment {
     }
 }
 
-fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
+pub(super) fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
     RunBrief {
         key: "DEMO-3",
         title: "Generated instructions",
@@ -38,6 +38,7 @@ fn pinned_brief(acceptance: &[String]) -> RunBrief<'_> {
         check: None,
         threads: &[],
         hand_in: None,
+        told: &[],
         checklist: &[],
         review_commands: &[],
     }
@@ -216,6 +217,7 @@ fn a_brief_without_acceptance_has_no_acceptance_section() {
         check: None,
         threads: &[],
         hand_in: None,
+        told: &[],
         checklist: &[],
         review_commands: &[],
     });
@@ -310,6 +312,7 @@ fn brief<'a>(check: Option<&'a str>) -> RunBrief<'a> {
         check: None,
         threads: &[],
         hand_in: None,
+        told: &[],
         checklist: &[],
         review_commands: &[],
     }
