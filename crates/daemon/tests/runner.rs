@@ -697,6 +697,9 @@ fn a_live_child_of_the_agent_is_seen_and_an_agent_without_one_is_not() {
     let state = rig.runners.state(rig.ticket).expect("live");
     assert!(!state.busy, "no child yet");
     rig.runners.stop_all();
+    // The first rig holds the pty lock until it is dropped: a second `Rig::new()` while it lives
+    // waits for the lock this very test holds, until the lock counts as stale (TOKNILA-165).
+    drop(rig);
 
     let rig = Rig::new();
     rig.profile("fake", &["child", "hold"], "");

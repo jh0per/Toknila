@@ -41,16 +41,30 @@ pub struct PtyTurn {
     path: PathBuf,
 }
 
+thread_local! {
+    /// Set while this thread holds a turn taken by [`hold`].
+    static HOLDING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 impl Drop for PtyTurn {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.path);
+        HOLDING.with(|h| h.set(false));
     }
 }
 
 /// Waits for the pty lock (a file in the temporary folder, shared by every checkout on this
-/// computer) and holds it; fails the test after ten minutes.
+/// computer) and holds it; fails the test after ten minutes. A thread that already holds a turn
+/// and asks again would wait for itself until the lock counts as stale (five minutes, on every
+/// system, TOKNILA-165), so it panics at once instead.
 pub fn hold() -> PtyTurn {
-    hold_for(TURN_DEADLINE).expect("no turn for the pty tests within the deadline")
+    assert!(
+        !HOLDING.with(|h| h.get()),
+        "this thread already holds the pty turn: drop the first rig before taking a second"
+    );
+    let turn = hold_for(TURN_DEADLINE).expect("no turn for the pty tests within the deadline");
+    HOLDING.with(|h| h.set(true));
+    turn
 }
 
 /// [`hold`], giving up after `deadline`.
