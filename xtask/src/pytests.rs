@@ -99,7 +99,14 @@ mod tests {
             .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
             .collect();
         // Control: the two scripts' tests are found, and the scripts themselves are not.
-        assert_eq!(names, ["test_assemble_release.py", "test_wait_for_ci.py"]);
+        assert_eq!(
+            names,
+            [
+                "test_assemble_release.py",
+                "test_links.py",
+                "test_wait_for_ci.py"
+            ]
+        );
     }
 
     #[test]

@@ -1,58 +1,114 @@
 # Toknila
 
-Toknila ("token killa") is a local orchestrator for a fleet of CLI coding agents (Claude Code,
-Codex, OpenCode and others). You plan a project as **chains of tickets** with subtasks,
-dependencies and release milestones; each ticket runs on its own **ship** (a git worktree with an
-agent runner), and the ticket's status moves by itself from the agent's events: running, waiting
-for a human, blocked, ready for review.
+Toknila is an app that runs CLI coding agents on your own computer. You plan a project with the
+assistant as epics of stories. Each story runs in its own git worktree with its own agent. A
+checker and a reviewer agent look at each hand-in, you accept it, and a release is cut. Your code
+and your agent subscription stay on your computer.
 
-> Status: v0.2.0, the first version to live in day to day: the daemon, the CLI, the web page and a
-> Mac app, with real agents next to the simulated one.
->
-> Install and first run: [docs/install.md](docs/install.md) (`cargo xtask app` builds the Mac
-> app). Binaries for macOS (Apple silicon and
-> Intel), Linux and Windows are on the [releases page](https://github.com/jh0per/Toknila/releases).
+It is for a developer or a product person who already uses a CLI coding agent and wants several
+stories to move at once, each reviewed before it lands.
 
-## Layout
+![An epic's board in Toknila: one story is running, one is in review and two wait for them](docs/screenshots/readme/board.png)
 
-| Path | What |
-|---|---|
-| `crates/core` | Domain model and pure rules: ticket state machine, chain graph. No I/O, no async runtime, no database. |
-| `crates/app` | Use cases over ports: the chain unit of work, reference resolution, agent events, recovery. No I/O; the daemon implements the ports. |
-| `crates/api-types` | Request and response bodies of the daemon API; the OpenAPI document is generated from them. |
-| `crates/client` | Typed client of the daemon API, used by the CLI. |
-| `crates/daemon` | Daemon: SQLite store (single writer), HTTP API and WebSocket event stream on `127.0.0.1`. |
-| `crates/cli` | `toknila` binary and its `tok` alias, a thin client of the daemon API. |
-| `apps/web` | Web UI served by the daemon (read-only page in phase 0). |
-| `apps/desktop` | Tauri 2 shell: the window of the Mac app. |
-| `xtask` | Repository tasks; `cargo xtask verify` is the one gate for local runs and CI. |
-| `docs` | [Architecture](docs/architecture.md), decision records, install guide, agent event contract. |
+## What you need
 
-## Build and check
+- A Mac with macOS 10.15 or later (the minimum the app declares), Apple silicon or Intel.
+- `git`.
+- Claude Code installed and signed in. Toknila starts it for you; nothing else is needed.
+- The GitHub command line (`gh`) only if you want accepted work sent as pull requests.
 
-Requires a stable Rust toolchain (`rust-toolchain.toml` pins the channel and components).
+## Install and first run
+
+The steps and the words are those of the Guide inside the app (Guide, at the foot of the sidebar).
+
+1. Download the `.dmg` from the [Releases page](https://github.com/jh0per/Toknila/releases):
+   `aarch64` for Apple silicon, `x86_64` for Intel. Open it and drag Toknila onto Applications.
+   Open the app; it starts its own daemon and shows its window.
+2. **Add a project.** Choose the folder that holds your project, a git repository. If the folder is
+   missing or is not a repository yet, Toknila offers to create it or set it up. It fills in the
+   main branch, which agents start from and where approved work lands, and under Details the test
+   command that agents run before they hand in.
+3. **Plan with the assistant.** Open Assistant under your project and describe your first epic. The
+   assistant creates epics and their stories, answers your questions and steers the process. An epic
+   holds stories and ends in a release.
+4. **Start a story.** Press Start on a story, or S on the diagram. An agent then works on it in its
+   own workspace, a separate copy of the repository, so your folder stays as it is.
+5. **Read the hand-in.** When the agent is done it hands in: what changed, each check as PASS, FAIL,
+   NOT_RUN or BLOCKED, and what is left. The test command runs, then a reviewer agent reads the
+   work. Needs you lists what only you can judge, such as a look or a feeling; do those by hand.
+6. **Accept.** Accept merges the story into the main branch (or opens a pull request when the
+   project is set to). Return sends your words to the agent, which fixes and hands in again.
+
+When all the stories of an epic are done, a Release button appears at the end of its diagram.
+
+![A story in review: the agent's hand-in, Needs you, and the Accept and Return buttons](docs/screenshots/readme/review.png)
+
+If macOS refuses to open the app, open System Settings, Privacy & Security and choose Open Anyway.
+This is needed only for builds made before the first signed and notarized release.
+
+![The assistant's chat beside the roadmap, answering a request to plan a bakery shop](docs/screenshots/readme/assistant.png)
+
+## What works today, and what does not
+
+- Claude Code is the one agent with a shipped profile. Other agents can be described as profiles
+  (a TOML file; the format is at the top of `crates/core/src/profile/mod.rs`), but none is shipped
+  or promised.
+- The desktop app is for macOS. On Linux and Windows the daemon serves the same window in a
+  browser (`tok open` prints the address) and the command line is complete. Both are tested in CI
+  and have had less daily use than macOS.
+- This is early software, version 0.x. The Mac app of a release may still be signed ad hoc; the
+  [Releases page](https://github.com/jh0per/Toknila/releases) says which. Expect rough edges and
+  read each hand-in before you accept it.
+
+![The roadmap: a finished epic, the active one and two planned ones, each with its version](docs/screenshots/readme/roadmap.png)
+
+## How it keeps your machine safe
+
+Each claim is in the code or in [docs/architecture.md](docs/architecture.md). These are guards
+against mistakes, not a sandbox.
+
+- The daemon listens on `127.0.0.1` only, and every API route needs a bearer token.
+- An agent works in its story's worktree, a separate copy of your repository, not in your folder.
+- Every agent run denies reading and shell commands on your private folders: `~/.claude`, `~/.ssh`,
+  `~/.gnupg`, `Library/Keychains`, the shell history files and Toknila's own data home (except the
+  run's own folder).
+- Shell edits (`sed -i`, scripts that rewrite files) are refused in every permission mode. Other
+  commands follow the project's command policy: ask, auto or trust. Allow always remembers one
+  command for one project.
+- Each agent run gets a token for its own story; a reviewer's token can only send a verdict.
+- Toknila sends nothing anywhere itself. The app asks GitHub for a newer release and nothing more;
+  the agent talks to its own provider.
+
+## Command line
 
 ```sh
-cargo xtask web             # build the web page the daemon embeds (needs Node 22)
-cargo xtask verify          # fmt check, clippy -D warnings, tests, architecture guards
-cargo xtask e2e-web         # browser smoke test of the page (Playwright)
-cargo run --bin tok -- --version
-cargo xtask dist aarch64-apple-darwin   # release archive in dist/
-cargo xtask app             # macOS: Toknila.app and a .dmg for this Mac, ad-hoc signed (dist/app)
+tok daemon start                                   # the background daemon, on 127.0.0.1
+tok project new DEMO --sim                         # a project with the simulated agent
+tok chain new menu --project DEMO --no-autostart   # an epic
+tok ticket new menu "Menu page"                    # a story in it
+tok start DEMO-1                                   # run it
+tok ls                                             # what stands where
 ```
 
-CI runs the same tasks on Ubuntu, Windows and macOS. Pushing a `v*` tag builds the release.
+`tok open` prints the address of the window. Every command takes `--json`.
 
-## Roadmap
+## More
 
-0. **Skeleton**: monorepo, daemon with API, SQLite schema, chain/ticket/subtask/comment/release
-   model, status transitions and Ready autostart, CLI. Gate: a demo chain reaches Released using
-   only CLI commands and survives `kill -9` of the daemon.
-1. **MVP**: Claude Code profile, PTY runner on a worktree from `develop`, nudge loop, MCP server and
-   hooks, generated `CLAUDE.md`, web UI with three panels and xterm.js, review modes, auto-merge.
-2. **v1**: depot and `CONTEXT.md`, live chain editing, release milestones, ADRs from decision
-   comments, token counter, Codex and OpenCode profiles, Tauri builds.
+- [Install, update and remove](docs/install.md), including Linux, Windows and building from source.
+- [Architecture](docs/architecture.md).
+- [Run reports](docs/runs): what each batch of real agent runs found.
+- The [Releases page](https://github.com/jh0per/Toknila/releases).
+- [Contributing](CONTRIBUTING.md).
+
+## What is next
+
+- A first release whose Mac app is signed and notarized, so that macOS opens it without a warning.
+- A steadier terminal view on Windows.
+- Web trackers: new work coming in from a tracker, with the plan kept in Toknila.
 
 ## License
 
-[Elastic License 2.0](LICENSE) (source-available).
+Toknila is source-available, not open source. From version 0.3.9 it is under the
+[PolyForm Shield License 1.0.0](LICENSE): you may use Toknila, read and change the code and
+contribute, but you may not use the code to provide a product that competes with Toknila. Read the
+file for the exact terms. Versions up to 0.3.8 were released under the Elastic License 2.0.
