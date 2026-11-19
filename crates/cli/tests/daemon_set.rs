@@ -48,14 +48,25 @@ fn the_sounds_are_off_set_one_by_one_and_kept_when_the_number_changes() {
     assert!(started.status.success(), "{started:?}");
 
     let off = serde_json::json!({ "story_done": false, "epic_done": false, "problem": false });
-    assert_eq!(tok.run(&["daemon", "set"])["sounds"], off, "control: all off");
+    assert_eq!(
+        tok.run(&["daemon", "set"])["sounds"],
+        off,
+        "control: all off"
+    );
     let one = tok.run(&["daemon", "set", "--sound-epic-done", "on"]);
     assert_eq!(
         one["sounds"],
         serde_json::json!({ "story_done": false, "epic_done": true, "problem": false })
     );
     assert_eq!(one["max_checks"], 1, "the number stayed");
-    let two = tok.run(&["daemon", "set", "--sound-problem", "on", "--max-checks", "2"]);
+    let two = tok.run(&[
+        "daemon",
+        "set",
+        "--sound-problem",
+        "on",
+        "--max-checks",
+        "2",
+    ]);
     assert_eq!(
         two["sounds"],
         serde_json::json!({ "story_done": false, "epic_done": true, "problem": true })

@@ -34,8 +34,12 @@ impl Store {
             Actor::Human,
             crate::server::now(),
             move |tx| -> Result<(), StoreError> {
-                for (key, on) in SOUND_KEYS.iter().zip([s.story_done, s.epic_done, s.problem]) {
-                    tx.repo().app_setting_set(key, if on { "true" } else { "false" })?;
+                for (key, on) in SOUND_KEYS
+                    .iter()
+                    .zip([s.story_done, s.epic_done, s.problem])
+                {
+                    tx.repo()
+                        .app_setting_set(key, if on { "true" } else { "false" })?;
                 }
                 Ok(())
             },

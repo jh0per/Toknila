@@ -121,11 +121,9 @@ async fn a_database_from_before_the_sounds_reads_as_all_off() {
     let api = Api::new();
     // Only `max_checks` was ever stored, as by the daemon of TOKNILA-154.
     api.store
-        .write(
-            toknila_core::Actor::Human,
-            crate::server::now(),
-            |tx| tx.repo().app_setting_set("max_checks", "2"),
-        )
+        .write(toknila_core::Actor::Human, crate::server::now(), |tx| {
+            tx.repo().app_setting_set("max_checks", "2")
+        })
         .await
         .expect("the old row is written");
     let api = api.restart();
