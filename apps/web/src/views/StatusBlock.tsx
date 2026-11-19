@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Ticket, TicketDetail } from "../api/types";
 import { statusLine } from "../store/cardStatus";
 import type { Intent } from "../store/msg";
-import { type State, currentChain, queuePosition } from "../store/state";
+import { type State, currentChain, queuePosition, queueText } from "../store/state";
 import { Answer } from "./Answer";
 
 /// What a card's Details lead with: one sentence about where the card stands and the next step,
@@ -22,7 +22,8 @@ export function StatusBlock({ state, card, detail, dispatch }: {
     const id = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(id);
   }, [running]);
-  const line = statusLine(card, detail, { queue: queuePosition(state, card.id), autostart: chain?.chain.autostart ?? false, now });
+  const pace = { queue: queuePosition(state, card.id), wait: queueText(state, card.id), autostart: chain?.chain.autostart ?? false, now };
+  const line = statusLine(card, detail, pace);
   // The question as the daemon offers it (its answers included), when the card waits on one.
   const asked = card.status === "waiting" ? state.inbox.find((i) => i.ticket === card.key && i.kind === "question") : undefined;
   return (

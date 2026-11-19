@@ -148,6 +148,9 @@ fn a_failing_check_again_is_a_round_for_the_agent_and_keeps_the_accept() {
     );
     // The Accept is remembered: the next hand-in that passes merges without a second one.
     assert!(failed.ticket.review.accepted && !failed.ticket.review.recheck);
+    // The accepted story went back: its worker starts when an agent is free.
+    let started = super::waits_then_starts(&failed, crate::GoOn::SentBack);
+    assert!(started.effects.contains(&Effect::EnsureRunner));
 }
 
 #[test]

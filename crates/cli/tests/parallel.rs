@@ -114,3 +114,61 @@ fn a_card_started_beyond_the_limit_waits_and_the_limit_is_settable() {
     let err = tok.fails(&["project", "set", "DEMO", "--parallel", "0"]);
     assert!(err.contains("between 1 and 64"), "{err}");
 }
+
+const PAIR: &str = r#"
+[chain]
+name = "pair"
+goal = "Two stories, one agent"
+autostart = false
+
+[[ticket]]
+id = "LOGIN"
+title = "Login"
+profile = "sim"
+
+[[ticket]]
+id = "PROFILE"
+title = "Profile page"
+profile = "sim"
+"#;
+
+#[test]
+fn a_story_sent_back_while_the_only_agent_is_busy_waits_and_ls_and_show_say_so() {
+    let dir = common::tempdir();
+    let tok = Tok::in_dir(dir.path());
+    let file = dir.path().join("pair.toml");
+    std::fs::write(&file, PAIR).expect("write chain");
+    tok.run(&["project", "new", "DEMO", "--name", "Demo", "--sim"]);
+    let path = file.to_str().expect("utf-8 path");
+    tok.run(&["chain", "import", path, "--project", "DEMO"]);
+    tok.run(&["project", "set", "DEMO", "--parallel", "1"]);
+    tok.run(&["review-mode", "human", "--project", "DEMO"]);
+    tok.run(&["start", "DEMO-1"]);
+    tok.run(&["start", "DEMO-2"]);
+    tok.run(&["sim", "DEMO-1", "finish", "done"]);
+    assert_eq!(
+        tok.status("DEMO-2"),
+        "running",
+        "the hand-in freed the slot"
+    );
+
+    // Sent back while the other works: no agent for it until the other leaves.
+    tok.run(&["return", "DEMO-1", "handle the empty list"]);
+    let words = "sent back; goes on when an agent is free";
+    let shown = tok.run(&["show", "DEMO-1"]);
+    assert_eq!(shown["queue_text"], words);
+    assert_eq!(shown["ticket"]["agent_paused"]["go_on"]["why"], "sent_back");
+    let ls = tok.text(&["ls"]);
+    let row = ls.lines().find(|l| l.contains("DEMO-1")).expect("a row");
+    assert!(row.contains(&format!("({words})")), "{ls}");
+    let show = tok.text(&["show", "DEMO-1"]);
+    assert!(show.contains(&format!("({words})]")), "{show}");
+    assert!(!show.contains("agent: paused"), "{show}");
+
+    // The other hands in: the story sent back goes on, and says nothing more.
+    tok.run(&["sim", "DEMO-2", "finish", "done"]);
+    let shown = tok.run(&["show", "DEMO-1"]);
+    assert_eq!(shown["ticket"]["agent_paused"], serde_json::Value::Null);
+    assert_eq!(shown["queue_text"], serde_json::Value::Null);
+    assert!(!tok.text(&["ls"]).contains(words));
+}

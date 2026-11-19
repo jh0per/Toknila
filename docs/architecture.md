@@ -512,14 +512,18 @@ the agent hands in and passes it to the machine in the `Finished` event.
   context: a `return` (a person's, or the reviewer's remarks) goes to that same session (the
   runner is kept, and the comment is an instruction comment like any other: it is typed to the idle session or claimed by its Stop hook, and marked delivered once, see `app::instructions`; the reviewer's remarks take the same path). If the
   worker's process has exited meanwhile (which changes nothing in Review), the return starts a new
-  worker run on the same ship. `cancel` stops every runner of the ticket at once; `accept` does so
+  worker run on the same ship once an agent of the project is free. `cancel` stops every runner of the ticket at once; `accept` does so
 when the merge lands.
-- **Parallel limit.** Slots are counted over runners, not tickets. `schedule::plan` stays pure in
+- **Parallel limit.** Slots are counted over stories, not runners. `schedule::plan` stays pure in
   core and takes the live runners as input (`Reader::live_runners`, which the store fills from
-  `Runner::live_runners` when a read or command begins): a card holds a slot while it is Running
-  or Waiting, and each live runner of a card in Running, Waiting or Review holds one too, counted
-  once. A card in review with its worker and its reviewer alive uses two. A merged, cancelled or
-  blocked card's runners are being stopped by the same command, so they already count as free.
+  `Runner::live_runners` when a read or command begins): a card holds a slot while its agent
+  works (Running or Waiting with a process, or in Review once its reviewer agent started), or
+  while any runner of it is alive, whatever its status. A card in review with its worker and its
+  reviewer alive uses one. The reviewer agent is started like every agent: through the schedule
+  (see "Parallel agents"). A card blocked by hand keeps its agent and so its slot; a merged or
+  cancelled card's runner, stopped by that command, holds it until its process is gone. Every
+  end of a runner (`runs::ended`, stopped or by itself) runs the schedule, so the slot it frees
+  is given at once.
 
 ## Settings and onboarding
 
@@ -996,11 +1000,37 @@ A project has a limit of agents working at once, `Project::max_parallel` (defaul
 `tok project set <key> --parallel N`, `PATCH /v1/projects/{project}`). The rules are core's
 (`schedule`); the application only applies them.
 
-- **Slots.** A card holds a slot while it is Running or Waiting (its agent is alive). Review,
-  Blocked, Merged, Released, Cancelled and Backlog hold none. Simulated agents count the same, so
-  tests can use them. Return and Unblock put a card straight back to Running, and an agent's own
-  `started` is a fact, not a request: these may exceed the limit for a while, and the card then
-  holds a slot that delays the queue.
+- **Slots.** The limit holds on every start. No agent of a project starts or resumes while the
+  project's stories with an agent are at the limit, whatever the path: the first start; a story
+  sent back by the check, by the reviewer agent or by a person; an accepted story whose re-check
+  failed; a merge conflict handed back; an Unblock, and Start anyway or Fast-forward and start on
+  a base that is behind; an answer to a waiting story whose agent was paused; the replacement
+  after the app restarted; the reviewer agent after a hand-in, or when a person runs it again. A
+  story holds one slot while an agent of it works: Running or Waiting with its agent, in Review
+  once its reviewer agent started, or while any runner of it is alive, whatever its status (a
+  worker still ending after its hand-in, a reviewer after its verdict, the agent a block by hand
+  keeps, a runner still being stopped after a merge or a cancel); its worker and reviewer alive
+  together are that one slot, so a story never waits for itself. With no live runner, Blocked,
+  Merged, Released, Cancelled and Backlog hold none. The slot is free once the process is gone:
+  the host reports every end, stopped or by itself, and `runs::ended` runs the schedule whatever
+  the end moved (an event it sends may be refused, the story having moved on). Simulated agents
+  (worker and reviewer) count the same, so tests can use them. The assistant's own agent
+  (`role: planner`) is no story's and holds no slot. After a restart a reviewer that was due and
+  waited for a free agent had no process to lose: recovery leaves it in line (before it marks
+  the lost workers, whose schedule pass may start it) and it starts from there.
+- **Going on is a flag, not a status.** The machine never starts these agents itself. A story
+  that has to go on moves to the status the table says and is marked: the worker's
+  `Ticket::agent_paused` with `resume` (and `go_on`: sent back or unblocked, with the person's
+  stale-base decision), as a paused or lost agent already was, or `Review::reviewer_waits` for a
+  reviewer that is due. It holds no slot and waits in line; the schedule sends it `ResumeStart`
+  when an agent is free, which emits the start the transition used to (`PrepareShip` and
+  `EnsureRunner`, `ResumeRunner` for a paused or lost session, `StartReviewer`). Its place is
+  computed by `schedule::plan` and its words by `schedule::wait_text` ("sent back; goes on when an
+  agent is free"), never stored. Stories already begun go before stories that have not started,
+  each group in the order below, and a story that holds a slot through a live runner of its own
+  goes on in that slot. Lowering the limit stops nobody; an agent that is alive past the limit
+  (an agent's own `started` is a fact, not a request) is counted and shown, and delays the line
+  until it leaves.
 - **Queued is a flag on Ready, not a status.** `Ticket::queued` is set by the state machine's
   `Request` event (what `tok start` and the Start action send) and cleared by anything that
   leaves Ready. A new status would touch the transition table, the board columns, dependency
@@ -1017,7 +1047,10 @@ A project has a limit of agents working at once, `Project::max_parallel` (defaul
   `POST /chains/{chain}/move` (`tok chain mv`), and the store lists chains `ORDER BY position,
   rowid` everywhere, so scheduling priority, `show_plan` and the assistant's epics list follow it
   by themselves. The roadmap's pure rules (the move, the next version) are `core::roadmap`. `Start` is now sent only
-  by the schedule; the graph's settle no longer starts autostart cards itself.
+  by the schedule, by a simulated agent's own `started` (a fact; for a Ready card whose agent is
+  a process, `started`, which is what `tok sim <key> start` sends, is a `Request` and the card
+  starts from the line), and by the import of stories already done, which walks each through Running to Merged in one command; `ResumeStart` only by the
+  schedule. The graph's settle no longer starts autostart cards itself.
 - **When.** `with_chain` ends every command on a chain by running the schedule for its project
   (`toknila-app::schedule::run`): the cards that have a slot get `Start` through the machine in
   the same transaction, which emits the usual `PrepareShip` and `EnsureRunner` effects. Nothing
@@ -1027,9 +1060,11 @@ A project has a limit of agents working at once, `Project::max_parallel` (defaul
   back the next start. Outcomes recorded after a commit can free a slot (a failed ship blocks its
   card), so the store keeps running "effects, then outcomes" until no more work is queued.
 - **Read models.** `GET /v1/agents` lists each project's `limit`, `used` and `queued` cards
-  with their place; `TicketDetail` and `TicketItem` carry `queue_position`. The web page
-  shows a "queued #n" chip on the card and "used/limit agents" in the top bar, read-only; `tok ls`
-  and `tok show` print `(queued #n)`.
+  with their place and `text` (core's words: "queued #n" for a story that has not started, "sent
+  back; goes on when an agent is free" for one that has); `TicketDetail` and `TicketItem` carry
+  `queue_position` and `queue_text`. The web page shows the words in a chip on the card and in the
+  Details sentence, and "used/limit agents" in the top bar, read-only; `tok ls` and `tok show`
+  print them in parentheses after the status.
 
 ## Inbox
 

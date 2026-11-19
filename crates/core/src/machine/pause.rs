@@ -39,6 +39,7 @@ pub(super) fn step(
                 since: now,
                 resume: false,
                 lost: false,
+                go_on: None,
             });
             Some(stay)
         }
@@ -53,11 +54,7 @@ pub(super) fn step(
             if p.lost {
                 next.lost_resume = Some(now);
             }
-            effects.push(Effect::PrepareShip);
-            effects.push(Effect::ResumeRunner {
-                session: p.session.clone(),
-                lost: p.lost,
-            });
+            super::goes_on::worker_starts(p, effects);
             Some((TicketStatus::Running, None))
         }
         _ => None,
@@ -89,19 +86,20 @@ fn lost(
         since: now,
         resume: ticket.status == TicketStatus::Running,
         lost: true,
+        go_on: None,
     });
     Ok((ticket.status, ticket.status_reason.clone()))
 }
 
 /// Whether a card keeps its paused agent after `event` took it to `status`: a Waiting card does,
-/// and a Running one does only while its lost agent waits for a slot.
-pub(super) fn keeps(ticket: &Ticket, status: TicketStatus, event: &TicketEvent) -> bool {
-    status == TicketStatus::Waiting
-        || (status == TicketStatus::Running
-            && (matches!(
-                event,
-                TicketEvent::ResumeWanted | TicketEvent::RunnerLost { .. }
-            ) || (*event == TicketEvent::Unblock && blocked_lost(ticket))))
+/// and a Running one does until the schedule starts its agent (`ResumeStart`). A transition that
+/// goes back to Running in any other way set a fresh one itself, or the card had none.
+pub(super) fn keeps(status: TicketStatus, event: &TicketEvent) -> bool {
+    match status {
+        TicketStatus::Waiting => true,
+        TicketStatus::Running => *event != TicketEvent::ResumeStart,
+        _ => false,
+    }
 }
 
 /// Whether the card is Blocked because its runner was lost.
@@ -136,6 +134,7 @@ pub(super) fn unblock_lost(
         since: now,
         resume: running,
         lost: true,
+        go_on: None,
     });
     if running {
         (TicketStatus::Running, None)

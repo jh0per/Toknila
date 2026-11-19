@@ -14,9 +14,10 @@ pub fn reason(t: &Ticket, queue_position: Option<u32>, reason: &str) {
     }
 }
 
-/// `agent: paused, not running; waiting for ...`, or `None` while the agent is not paused.
+/// `agent: paused, not running; waiting for ...`, or `None` while the agent is not paused. A
+/// story that went on and waits for a free agent says so on its status line instead.
 pub fn agent_line(t: &Ticket, queue_position: Option<u32>) -> Option<String> {
-    let paused = t.agent_paused.as_ref()?;
+    let paused = t.agent_paused.as_ref().filter(|p| p.go_on.is_none())?;
     if paused.lost {
         let when = if paused.resume {
             "a slot is free"
@@ -65,8 +66,16 @@ mod tests {
             since: Timestamp(0),
             resume,
             lost: false,
+            go_on: None,
         });
         t
+    }
+
+    #[test]
+    fn a_story_that_went_on_has_no_paused_agent_line() {
+        let mut t = paused(true);
+        t.agent_paused.as_mut().expect("paused").go_on = Some(toknila_core::GoOn::SentBack);
+        assert_eq!(agent_line(&t, Some(1)), None);
     }
 
     #[test]

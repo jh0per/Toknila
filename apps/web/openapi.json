@@ -8356,6 +8356,44 @@
           }
         }
       },
+      "GoOn": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Sent back to its worker: by the check, the reviewer agent, a person, or a merge conflict.",
+            "required": [
+              "why"
+            ],
+            "properties": {
+              "why": {
+                "type": "string",
+                "enum": [
+                  "sent_back"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A person unblocked it; `stale` is their decision about a base branch that is behind.",
+            "required": [
+              "why"
+            ],
+            "properties": {
+              "stale": {
+                "$ref": "#/components/schemas/StalePolicy"
+              },
+              "why": {
+                "type": "string",
+                "enum": [
+                  "unblocked"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Why a story that has begun goes on with a new run of its agent once an agent is free."
+      },
       "HandInStatus": {
         "type": "string",
         "description": "How a check ended, as the agent wrote it in its hand-in.",
@@ -10422,11 +10460,22 @@
       },
       "PausedAgent": {
         "type": "object",
-        "description": "A Waiting card whose agent's process was ended after a grace, so the card holds no slot while\nit waits for a person. It keeps what the run needs to come back: Claude Code's session id.",
+        "description": "A card whose agent has no process and that comes back through the schedule: a Waiting card\nwhose agent was ended after a grace (it holds no slot while it waits for a person), a card\nwhose agent the app lost, or one that has to go on (`go_on`) and waits for a free agent. It\nkeeps what the run needs to come back: Claude Code's session id.",
         "required": [
           "since"
         ],
         "properties": {
+          "go_on": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GoOn",
+                "description": "The story went on (sent back, unblocked) while every agent was busy: its worker starts a\nnew run, as a start does, when one is free. `None` for a paused or lost agent."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "lost": {
             "type": "boolean",
             "description": "The process was lost (the app restarted), not ended on purpose: the run that replaces it\nis told so, and a second loss soon after blocks the card."
@@ -11264,7 +11313,7 @@
           "used": {
             "type": "integer",
             "format": "int32",
-            "description": "Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.",
+            "description": "Slots held now: stories with an agent (working, waiting for an answer, a reviewer at\nwork, or any live runner), one each. Can exceed `limit` after the limit was lowered.",
             "minimum": 0
           }
         }
@@ -11448,7 +11497,8 @@
         "description": "A card waiting for an agent slot.",
         "required": [
           "ticket",
-          "position"
+          "position",
+          "text"
         ],
         "properties": {
           "position": {
@@ -11456,6 +11506,10 @@
             "format": "int32",
             "description": "1 is next.",
             "minimum": 0
+          },
+          "text": {
+            "type": "string",
+            "description": "What the card says while it waits, in plain words: \"queued #2\" for a story that has not\nstarted, \"sent back; goes on when an agent is free\" for one that has."
           },
           "ticket": {
             "$ref": "#/components/schemas/TicketId"
@@ -12121,6 +12175,10 @@
             "type": "boolean",
             "description": "The check of this turn is the one Accept asked for because main moved since the last\ncheck; a pass merges by itself."
           },
+          "reviewer_waits": {
+            "type": "boolean",
+            "description": "The reviewer agent's turn came while every agent of the project was busy: it starts when\none is free (the schedule's `ResumeStart`). Only while the turn is the agent's."
+          },
           "rounds": {
             "type": "array",
             "items": {
@@ -12681,6 +12739,15 @@
           }
         },
         "additionalProperties": false
+      },
+      "StalePolicy": {
+        "type": "string",
+        "description": "What the person decided about a base branch that is behind its upstream.",
+        "enum": [
+          "refuse",
+          "fast_forward",
+          "allow"
+        ]
       },
       "StartMode": {
         "type": "string",
@@ -13639,6 +13706,13 @@
             "description": "Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.",
             "minimum": 0
           },
+          "queue_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the card says while it waits for a free agent, in plain words (\"queued #2\", \"sent\nback; goes on when an agent is free\"); absent otherwise."
+          },
           "review": {
             "$ref": "#/components/schemas/ReviewView",
             "description": "How the card is reviewed (mode, reviewer, whose turn) and the rounds so far."
@@ -13743,6 +13817,13 @@
             "format": "int32",
             "description": "Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.",
             "minimum": 0
+          },
+          "queue_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the card says while it waits for a free agent (\"queued #2\", \"sent back; goes on when\nan agent is free\"); absent otherwise."
           },
           "simulated": {
             "type": "boolean",

@@ -75,17 +75,15 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
             let th = threads::find(uow, t, &thread)?;
             threads::withdraw(uow, t, &th).map(|_| ())
         }
-        AgentEvent::Started => with_chain(uow, t.chain_id, |ctx| {
-            if t.status == TicketStatus::Ready {
-                ctx.ticket_event(t.id, TicketEvent::Start)?;
-            } else if !matches!(t.status, TicketStatus::Running | TicketStatus::Waiting) {
-                return Err(AppError::conflict(format!(
-                    "cannot start a ticket in {:?}",
-                    t.status
-                )));
-            }
-            Ok(())
-        }),
+        AgentEvent::Started => {
+            let process = match uow.chain(t.chain_id)? {
+                Some(c) => uow
+                    .project(c.project_id)?
+                    .is_some_and(|p| crate::runs::runs_process(&p, t)),
+                None => false,
+            };
+            started(uow, t, process)
+        }
         AgentEvent::AskHuman {
             text,
             permission,
@@ -174,6 +172,27 @@ pub fn ticket_event_at<U: UnitOfWork + ?Sized>(
         }),
     }
     .map(|()| t.id)
+}
+
+/// The agent says it started (`tok sim <key> start` says it for a simulated one). A simulated
+/// agent's word is a fact: a Ready card starts. A card whose agent is a process (`process`) has
+/// none yet while it is Ready, and its start would spawn one outside the schedule: it is a request
+/// instead, and the card starts from the line when an agent is free.
+fn started<U: UnitOfWork + ?Sized>(uow: &mut U, t: &Ticket, process: bool) -> AppResult<()> {
+    with_chain(uow, t.chain_id, |ctx| {
+        match t.status {
+            TicketStatus::Ready if process && t.queued => {}
+            TicketStatus::Ready if process => ctx.ticket_event(t.id, TicketEvent::Request)?,
+            TicketStatus::Ready => ctx.ticket_event(t.id, TicketEvent::Start)?,
+            TicketStatus::Running | TicketStatus::Waiting => {}
+            other => {
+                return Err(AppError::conflict(format!(
+                    "cannot start a ticket in {other:?}"
+                )));
+            }
+        }
+        Ok(())
+    })
 }
 
 /// The question a running card's note really is; `None` for a plain note, or a card that is not

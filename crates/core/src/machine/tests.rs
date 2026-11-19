@@ -77,6 +77,35 @@ fn ok(from: TicketStatus, event: TicketEvent) -> Transition {
     tr
 }
 
+/// The card went back to work with no agent started: it waits for a free one (`why`), holds no
+/// slot and emits no start; the schedule's `ResumeStart` then starts its worker. Returns that
+/// start.
+pub(super) fn waits_then_starts(tr: &Transition, why: crate::GoOn) -> Transition {
+    assert_eq!(tr.ticket.status, TicketStatus::Running);
+    let p = tr.ticket.agent_paused.as_ref().expect("waits for an agent");
+    assert_eq!((p.resume, p.lost, p.go_on), (true, false, Some(why)));
+    let starts = |e: &Effect| {
+        matches!(
+            e,
+            Effect::EnsureRunner
+                | Effect::ResumeRunner { .. }
+                | Effect::PrepareShip
+                | Effect::PrepareShipWith { .. }
+                | Effect::StartReviewer
+        )
+    };
+    assert!(!tr.effects.iter().any(starts), "{:?}", tr.effects);
+    assert!(!crate::schedule::holds_slot(&tr.ticket));
+    assert!(crate::schedule::goes_on(&tr.ticket));
+    check_invariants(&tr.ticket).expect("invariants");
+    let started = apply(&tr.ticket, &TicketEvent::ResumeStart, NOW).expect("resume start");
+    check_invariants(&started.ticket).expect("invariants");
+    assert_eq!(started.ticket.status, TicketStatus::Running);
+    assert_eq!(started.ticket.agent_paused, None);
+    assert!(crate::schedule::holds_slot(&started.ticket));
+    started
+}
+
 // ---- one test per row of the transition table ----
 
 #[test]
@@ -439,13 +468,14 @@ fn review_back_to_running_on_return_with_comment() {
     assert_eq!(tr.ticket.status, TicketStatus::Running);
     assert_eq!(
         tr.effects,
-        vec![
-            Effect::RecordInstruction {
-                text: "додай тест".to_owned()
-            },
-            Effect::PrepareShip,
-            Effect::EnsureRunner
-        ]
+        vec![Effect::RecordInstruction {
+            text: "додай тест".to_owned()
+        }]
+    );
+    let started = waits_then_starts(&tr, crate::GoOn::SentBack);
+    assert_eq!(
+        started.effects,
+        vec![Effect::PrepareShip, Effect::EnsureRunner]
     );
     let t = ticket_in(TicketStatus::Review);
     assert_eq!(
@@ -472,7 +502,15 @@ fn unblock_to_running_prepares_the_ship_again() {
     );
     assert_eq!(blocked.effects, vec![Effect::StopRunner]);
     let tr = apply(&blocked.ticket, &TicketEvent::Unblock, NOW).expect("unblock");
-    assert_eq!(tr.effects, vec![Effect::PrepareShip, Effect::EnsureRunner]);
+    assert!(tr.effects.is_empty(), "{:?}", tr.effects);
+    let why = crate::GoOn::Unblocked {
+        stale: StalePolicy::Refuse,
+    };
+    let started = waits_then_starts(&tr, why);
+    assert_eq!(
+        started.effects,
+        vec![Effect::PrepareShip, Effect::EnsureRunner]
+    );
 }
 
 #[test]
@@ -485,7 +523,14 @@ fn unblock_after_no_working_dir_starts_the_ship_and_runner_again() {
     );
     assert_eq!(blocked.effects, vec![Effect::StopRunner]);
     let tr = apply(&blocked.ticket, &TicketEvent::Unblock, NOW).expect("unblock");
-    assert_eq!(tr.effects, vec![Effect::PrepareShip, Effect::EnsureRunner]);
+    let why = crate::GoOn::Unblocked {
+        stale: StalePolicy::Refuse,
+    };
+    let started = waits_then_starts(&tr, why);
+    assert_eq!(
+        started.effects,
+        vec![Effect::PrepareShip, Effect::EnsureRunner]
+    );
 }
 
 #[test]
@@ -1029,25 +1074,21 @@ fn a_base_behind_blocks_the_start_and_offers_the_two_decisions() {
         ]
     );
 
+    // Each decision is a start: it waits for a free agent, and its start keeps the decision.
     let ff = apply(&blocked.ticket, &TicketEvent::FastForwardStart, NOW).expect("ff");
-    assert_eq!(ff.ticket.status, TicketStatus::Running);
+    let stale = StalePolicy::FastForward;
+    let ff = waits_then_starts(&ff, crate::GoOn::Unblocked { stale });
     assert_eq!(
         ff.effects,
-        vec![
-            Effect::PrepareShipWith {
-                stale: StalePolicy::FastForward
-            },
-            Effect::EnsureRunner
-        ]
+        vec![Effect::PrepareShipWith { stale }, Effect::EnsureRunner]
     );
     let anyway = apply(&blocked.ticket, &TicketEvent::StartAnyway, NOW).expect("anyway");
-    assert_eq!(
-        anyway.effects[0],
-        Effect::PrepareShipWith {
-            stale: StalePolicy::Allow
-        }
-    );
+    let stale = StalePolicy::Allow;
+    let anyway = waits_then_starts(&anyway, crate::GoOn::Unblocked { stale });
+    assert_eq!(anyway.effects[0], Effect::PrepareShipWith { stale });
     let again = apply(&blocked.ticket, &TicketEvent::Unblock, NOW).expect("unblock");
+    let stale = StalePolicy::Refuse;
+    let again = waits_then_starts(&again, crate::GoOn::Unblocked { stale });
     assert_eq!(
         again.effects,
         vec![Effect::PrepareShip, Effect::EnsureRunner]
@@ -1242,6 +1283,7 @@ fn unblocking_a_lost_runner_never_leaves_a_card_without_an_agent() {
     .expect("block")
     .ticket;
     let back = apply(&crashed, &TicketEvent::Unblock, NOW).expect("unblock");
-    assert!(back.effects.contains(&Effect::EnsureRunner));
-    assert_eq!(back.ticket.agent_paused, None);
+    let stale = StalePolicy::Refuse;
+    let started = waits_then_starts(&back, crate::GoOn::Unblocked { stale });
+    assert!(started.effects.contains(&Effect::EnsureRunner));
 }

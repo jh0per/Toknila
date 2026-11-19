@@ -7,7 +7,8 @@
 //! (autostart that a crash interrupted between commands). Simulated tickets have no process to
 //! lose, so Running stays Running. A ticket whose agent is a process lost it with the daemon:
 //! it goes to Blocked(`runner_lost`) before anything settles, so a restart is never silent. A card
-//! waiting for a reviewer process that is gone goes to a person.
+//! waiting for a reviewer process that is gone goes to a person; one whose reviewer was due but
+//! waited for a free agent had none to lose, and its reviewer starts from the line.
 
 use std::collections::HashSet;
 
@@ -42,11 +43,13 @@ pub struct Recovery {
 /// Checks every chain against the journal and settles it, inside one unit of work.
 pub fn recover<U: UnitOfWork + ?Sized>(uow: &mut U) -> AppResult<Recovery> {
     let mut report = Recovery::default();
-    // No process outlives the daemon that started it, so at startup none is live.
-    let lost = runs::mark_lost(uow, &HashSet::new())?;
-    report.lost = lost.iter().map(ToString::to_string).collect();
+    // No process outlives the daemon that started it, so at startup none is live. The reviewers
+    // go first: marking a worker lost runs the schedule, which may start a reviewer that was due
+    // and would then read as one the restart lost.
     let reviews = reviews::mark_lost(uow, &HashSet::new())?;
     report.reviews_lost = reviews.iter().map(ToString::to_string).collect();
+    let lost = runs::mark_lost(uow, &HashSet::new())?;
+    report.lost = lost.iter().map(ToString::to_string).collect();
     let checks = crate::checks::resume(uow)?;
     report.checks_resumed = checks.iter().map(ToString::to_string).collect();
     // The merge line: a card a daemon before it accepted gets its place; the holder's merge is

@@ -85,9 +85,10 @@ pub fn status_word(status: &toknila_core::TicketStatus, simulated: bool) -> Stri
     }
 }
 
-/// ` (queued #2)` for a card waiting for an agent slot, else nothing.
-fn queued(position: Option<u32>) -> String {
-    position.map_or_else(String::new, |n| format!(" (queued #{n})"))
+/// ` (queued #2)`, ` (sent back; goes on when an agent is free)`: what a card waiting for an
+/// agent slot says (the daemon's words), else nothing.
+fn queued(text: Option<&str>) -> String {
+    text.map_or_else(String::new, |w| format!(" ({w})"))
 }
 
 /// `KEY status (reason)`: the answer of ticket actions and agent events.
@@ -97,7 +98,7 @@ pub fn ticket_line(d: &TicketDetail) {
         "{} {}{}{}",
         t.key,
         status_word(&t.status, d.simulated),
-        queued(d.queue_position),
+        queued(d.queue_text.as_deref()),
         in_parens(t.status_reason.as_ref())
     );
 }
@@ -112,7 +113,7 @@ pub fn tickets(items: &[TicketItem]) {
             if t.paused {
                 status.push_str(" (paused)");
             }
-            status.push_str(&queued(it.queue_position));
+            status.push_str(&queued(it.queue_text.as_deref()));
             if t.review.turn == Some(toknila_core::ReviewTurn::Check) {
                 let words = check_words_now(it.check.as_ref());
                 status.push_str(&format!(" ({words})"));
@@ -247,7 +248,7 @@ pub fn ticket(d: &TicketDetail) {
         t.key,
         t.title,
         status_word(&t.status, d.simulated),
-        queued(d.queue_position),
+        queued(d.queue_text.as_deref()),
         duration(d.in_status_ms)
     );
     crate::paused_output::reason(t, d.queue_position, &reason(t.status_reason.as_ref()));

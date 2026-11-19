@@ -4,7 +4,7 @@ import { reduce } from "./reduce";
 import { parseRoute, routePath } from "./route";
 import {
   type State, activeProjects, currentCard, currentChain, currentProject, hiddenProjects, initialState, listedProjects,
-  queuePosition, slotsOf, ticketEvents,
+  queuePosition, queueText, slotsOf, ticketEvents,
 } from "./state";
 
 const projects = [
@@ -208,7 +208,13 @@ describe("stream events", () => {
 
 describe("agent slots", () => {
   const agents = [
-    { project: "p1", limit: 2, used: 2, queued: [{ ticket: "t2", position: 1 }, { ticket: "t3", position: 2 }], runs: [] },
+    {
+      project: "p1", limit: 2, used: 2, runs: [],
+      queued: [
+        { ticket: "t2", position: 1, text: "sent back; goes on when an agent is free" },
+        { ticket: "t3", position: 2, text: "queued #2" },
+      ],
+    },
     { project: "p2", limit: 4, used: 0, queued: [], runs: [] },
   ];
 
@@ -220,6 +226,9 @@ describe("agent slots", () => {
     const [inOther] = reduce(s, { type: "navigate", route: { name: "project", project: "OTHER" } });
     expect(slotsOf(inOther)).toEqual({ used: 0, limit: 4 });
     expect([queuePosition(s, "t2"), queuePosition(s, "t3"), queuePosition(s, "t1")]).toEqual([1, 2, undefined]);
+    expect([queueText(s, "t2"), queueText(s, "t3"), queueText(s, "t1")]).toEqual([
+      "sent back; goes on when an agent is free", "queued #2", undefined,
+    ]);
   });
 
   it("are refreshed by a journal event and by a project change", () => {

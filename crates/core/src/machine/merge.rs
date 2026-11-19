@@ -1,7 +1,6 @@
 //! The two ways a merge that is running ends inside the machine: it landed, or the base
 //! conflicts with the ship and the card goes back to the worker.
 
-use super::checks::run_on_ship;
 use super::review::{Outcome, leave};
 use super::{Effect, TransitionError};
 use crate::{Actor, ReviewTurn, Ticket, TicketStatus, Timestamp, Verdict};
@@ -56,6 +55,5 @@ pub(super) fn conflicted(
     effects.push(Effect::RecordCheckOutput {
         text: text.to_owned(),
     });
-    run_on_ship(effects);
-    Ok((TicketStatus::Running, None))
+    Ok(super::goes_on::worker(next, crate::GoOn::SentBack, now))
 }
