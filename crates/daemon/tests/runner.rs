@@ -957,6 +957,50 @@ fn the_first_of_eighty_lines_reaches_the_log_and_the_scrollback() {
     );
 }
 
+/// TOKNILA-162: a panel's size that comes while the agent still prints (the page sends it when it
+/// opens) costs no line of the run log, and a line typed after it meets the new size. On Windows
+/// a ConPTY shrunk early in the output drops the rows it has not rendered, so the runner holds a
+/// smaller size until the output is quiet, or until a client types (`pty::Pending`); this is the
+/// race, the size sent right after the first line, and every line is kept whenever it lands.
+#[test]
+fn a_size_that_comes_while_the_agent_prints_costs_no_line_and_reaches_the_next_input() {
+    use toknila_core::instructions::terminal::Size;
+    let mut rig = Rig::new();
+    let mut steps: Vec<String> = Vec::new();
+    for i in 1..=80 {
+        steps.extend(["print".to_owned(), format!("scroll line {i}")]);
+    }
+    steps.extend(["print", "printed all", "echo", "size", "hold"].map(str::to_owned));
+    let steps: Vec<&str> = steps.iter().map(String::as_str).collect();
+    rig.profile("fake", &steps, "");
+    let started = rig.start("fake");
+    rig.wait_for("scroll line");
+    let small = Size {
+        cols: 152,
+        rows: 14,
+    };
+    rig.runners.resize(rig.ticket, small).expect("resize");
+    rig.wait_for("printed all");
+    rig.runners
+        .write(rig.ticket, AgentRole::Worker, b"go\r")
+        .expect("write");
+    let out = rig.wait_for("size=");
+    assert!(out.contains("size=152x14"), "{out:?}");
+    rig.runners.stop(rig.ticket);
+    rig.wait_end();
+    let log = log_of(rig.dir.path(), rig.ticket, &started.run.id.to_string());
+    let on_disk = String::from_utf8_lossy(&std::fs::read(log).expect("log")).into_owned();
+    let missing: Vec<u32> = (1..=80)
+        .filter(|i| {
+            let line = format!("scroll line {i}");
+            !on_disk
+                .match_indices(&line)
+                .any(|(at, m)| !on_disk[at + m.len()..].starts_with(|c: char| c.is_ascii_digit()))
+        })
+        .collect();
+    assert!(missing.is_empty(), "the run log lacks lines {missing:?}");
+}
+
 /// TOKNILA-148 probe, layer "reader": what the pty reader itself gets first from a ConPTY of the
 /// runner's size, with no daemon code in between. Windows only: ConPTY renders a screen and may
 /// emit VT for it, so lines that scroll off before its first render never reach the reader; on

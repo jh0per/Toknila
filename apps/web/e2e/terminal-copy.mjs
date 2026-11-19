@@ -4,13 +4,15 @@
 //
 // The fake agent prints lines and asks the terminal to copy "from the agent" (OSC 52). The
 // clipboard then holds that text; the Copy control copies a selection (a triple click on a line),
-// else the visible screen; "Copy all" in its menu copies the scrollback; the copy key copies the
+// else the visible screen; "Copy all" in its menu copies the scrollback, every line once and in
+// order, after the window got shorter and taller again (on Windows ConPTY repaints its screen at
+// each resize; see src/terminal/conpty.ts); the copy key copies the
 // selection; and a selection survives the window's height changing. In a second window whose
 // clipboard refuses writes, the agent's copy shows "Copied text ready" and its Copy button puts
 // the text on the clipboard once clicked.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { checks, cleanup, launch, session } from "./helpers.mjs";
@@ -27,6 +29,51 @@ const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8"
 const tok = (...args) => run(tokBin, args, { env: { ...process.env, TOKNILA_HOME: home } });
 const git = (dir, ...args) =>
   run("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ...args]);
+
+// Where the agent's lines went (TOKNILA-162): for each layer, its line count, first and last lines
+// and which of the numbered lines it lacks. Raw terminal output is read without its escape
+// sequences; a line is counted once however often a repaint drew it.
+const LINES = 80;
+const plain = (s) =>
+  s
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b[@-Z\\-_]/g, "");
+const ranges = (ns) => {
+  const out = [];
+  for (let i = 0; i < ns.length; ) {
+    let j = i;
+    while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j++;
+    out.push(i === j ? `${ns[i]}` : `${ns[i]}-${ns[j]}`);
+    i = j + 1;
+  }
+  return out.join(", ");
+};
+// The numbered lines of 1..LINES that raw terminal output (or plain text) lacks.
+const missingIn = (text) => {
+  const seen = new Set([...plain(text).matchAll(/scroll line (\d+)(?!\d)/g)].map((m) => Number(m[1])));
+  const missing = [];
+  for (let i = 1; i <= LINES; i++) if (!seen.has(i)) missing.push(i);
+  return missing;
+};
+const layer = (name, text) => {
+  const lines = plain(text).split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l !== "");
+  const missing = missingIn(text);
+  return `${name}: ${lines.length} lines, first ${JSON.stringify(lines[0] ?? "")}, last ${JSON.stringify(lines.at(-1) ?? "")}, numbered lines ${LINES - missing.length}/${LINES}, missing [${ranges(missing)}]`;
+};
+// The newest run log under the data folder, as the daemon wrote it.
+const newestLog = (dir) => {
+  let best = null;
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith(".log") && (!best || statSync(p).mtimeMs > best.at)) best = { p, at: statSync(p).mtimeMs };
+    }
+  };
+  walk(dir);
+  return best?.p;
+};
 
 let browser;
 try {
@@ -51,11 +98,32 @@ try {
 
   browser = await launch();
   const errors = [];
+  // The grids the page's terminal told the daemon (its fit to the panel), the last one last.
+  const pageGrids = [];
   const open = async (context) => {
     const page = await context.newPage();
     page.on("pageerror", (e) => errors.push(e.message));
+    page.on("request", (r) => {
+      if (r.method() === "POST" && r.url().includes("/runner/size")) pageGrids.push(JSON.parse(r.postData() ?? "null"));
+    });
     await page.goto(cardUrl);
     return page;
+  };
+  // Each layer between the agent and the clipboard: (a) the run log the daemon wrote, (b) the
+  // scrollback route's answer (`tok logs`), (c) the page terminal's buffer as Copy all handed it
+  // over; then the grids the page asked for, and with `bytes` what the terminal emitted after the
+  // agent's last line (on Windows ConPTY's repaints, one per resize).
+  const whereTheLinesWent = (copied, bytes) => {
+    const out = [];
+    const log = newestLog(join(home, "runs"));
+    out.push(log ? layer("(a) run log", readFileSync(log, "utf8")) : "(a) run log: none under the data folder");
+    const served = execFileSync(tokBin, ["logs", "WEB-1"], { env: { ...process.env, TOKNILA_HOME: home } }).toString("utf8");
+    out.push(layer("(b) scrollback route", served));
+    out.push(layer("(c) page terminal (Copy all)", copied));
+    out.push(`grids the page sent: ${pageGrids.map((g) => `${g.cols}x${g.rows}`).join(" ")}`);
+    const end = served.indexOf("marker omega");
+    if (bytes && end >= 0) out.push(`after the output: ${JSON.stringify(served.slice(end + "marker omega".length)).slice(0, 4000)}`);
+    return out;
   };
   const clip = (page) => page.evaluate(() => navigator.clipboard.readText());
   const expectClip = async (page, want, what) => {
@@ -165,10 +233,55 @@ try {
   await clearClip(page);
   await page.locator("[data-testid=term-copy-more]").click();
   await page.locator("[data-testid=term-copy-all]").click();
-  // Line 1 first on every OS. Windows' console ends its lines with CRLF (CI run 43854240266 showed
-  // the copy starting "scroll line 1\r\n", nothing lost), so the line ends allow a CR.
-  const whole = /^scroll line 1\r?\n[\s\S]*scroll line 80\r?\nmarker alpha(\r?\n)+marker omega$/;
-  await expectClip(page, whole, "Copy all copies the whole scrollback");
+  // The run's log keeps every line on every OS, and on macOS and Linux Copy all has every line once
+  // and in order, ending with the markers. The pattern this replaced checked only the first and
+  // the last lines, and passed while the page lost line 70 in every Windows run (TOKNILA-162, CI
+  // run 44308344208).
+  //
+  // On Windows the page's terminal is not yet in step with ConPTY's size: it changes size the
+  // moment its panel does and tells the daemon 150 ms later, and ConPTY repaints its screen from
+  // the top row for the size it was told, onto a page screen of another size. Without the
+  // runner's hold of a smaller size the page lost one line (70) in 18 of 18 runs (CI runs
+  // 44308344208, 44317344931, 44348226497); with it, none lost and up to three repeated in 12 of
+  // 12 (runs 44327828545, 44338573473). So on Windows, until the page takes its size from the
+  // daemon (a later story; docs/install.md, Windows): at most 2 lines may be missing, never the
+  // first, the last ten or the markers, and at most one screen of the page's grid may repeat.
+  // Windows' clipboard ends lines with CRLF; the blank row between the markers is the line of the
+  // agent's copy request.
+  const win = process.platform === "win32";
+  const want = [...Array.from({ length: LINES }, (_, i) => `scroll line ${i + 1}`), "marker alpha", "marker omega"];
+  let copied = STALE;
+  for (const until = Date.now() + 8000; copied === STALE && Date.now() < until; await page.waitForTimeout(100)) copied = await clip(page);
+  const got = copied.split(/\r?\n/).filter((l) => l !== "");
+  const firstSeen = got.filter((l, i) => got.indexOf(l) === i);
+  const repeats = got.length - firstSeen.length;
+  const missing = want.filter((l) => !got.includes(l));
+  const mayRepeat = win ? (pageGrids.at(-1)?.rows ?? 0) : 0;
+  const mayMiss = win ? 2 : 0;
+  const kept = [want[0], ...want.slice(-12)];
+  const present = want.filter((l) => got.includes(l));
+  const inOrder = firstSeen.length === present.length && firstSeen.every((l, i) => l === present[i]);
+  const logPath = newestLog(join(home, "runs"));
+  const logMissing = missingIn(logPath ? readFileSync(logPath, "utf8") : "");
+  const lost =
+    !inOrder ||
+    logMissing.length > 0 ||
+    missing.length > mayMiss ||
+    missing.some((l) => kept.includes(l)) ||
+    repeats > mayRepeat ||
+    got.at(-1) !== "marker omega";
+  console.log(`INFO Copy all: ${got.length} lines, ${missing.length} missing (allowed ${mayMiss}), ${repeats} repeated (allowed ${mayRepeat})`);
+  // Every run says what each layer held, so a passing run is a number too.
+  const layers = whereTheLinesWent(copied, lost);
+  for (const line of layers) console.log(`INFO ${line}`);
+  if (lost) {
+    const differs = firstSeen.findIndex((l, i) => l !== present[i]);
+    const at = differs < 0 ? firstSeen.length : differs;
+    throw new Error(
+      `Copy all copies the whole scrollback: ${got.length} lines for ${want.length}, run log missing [${ranges(logMissing)}], missing ${JSON.stringify(missing)} (allowed ${mayMiss}), ${repeats} repeated (allowed ${mayRepeat}), first new line out of order at ${at + 1}: ${JSON.stringify(firstSeen[at] ?? "(end)")}, last line ${JSON.stringify(got.at(-1))}\n  where the lines went:\n  ${layers.join("\n  ")}`,
+    );
+  }
+  console.log(`PASS Copy all copies the whole scrollback (the run log every line; ${win ? `Copy all at most ${mayMiss} missing and ${mayRepeat} repeated` : "Copy all each line once, in order"})`);
 
   // A window whose clipboard refuses without a gesture: "Copied text ready", then a click copies.
   const refusing = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -188,7 +301,7 @@ try {
   if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`);
   console.log("web terminal copy: PASS");
 } catch (e) {
-  console.error(`web terminal copy: FAIL: ${e.message.slice(0, 600)}`);
+  console.error(`web terminal copy: FAIL: ${e.message.slice(0, 3000)}`);
   process.exitCode = 1;
 } finally {
   await browser?.close();

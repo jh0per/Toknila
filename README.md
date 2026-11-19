@@ -103,7 +103,7 @@ tok ls                                             # what stands where
 ## What is next
 
 - A first release whose Mac app is signed and notarized, so that macOS opens it without a warning.
-- A steadier terminal view on Windows.
+- A terminal panel on Windows that follows the console's size, so that it never loses a line after a resize.
 - Web trackers: new work coming in from a tracker, with the plan kept in Toknila.
 
 ## License

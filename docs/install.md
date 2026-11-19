@@ -127,6 +127,22 @@ tok open             # prints the address of the window; open it in a browser
 The browser shows the same window as the Mac app, and the command line is complete. Data lives in
 `~/.toknila` on Linux and `%APPDATA%\toknila` on Windows (see Where things live below).
 
+### What a card's terminal shows on Windows
+
+On Windows an agent runs in Windows' own console (ConPTY), which keeps a screen and redraws it
+instead of passing the agent's output on as it was printed. Toknila keeps every line the agent
+prints in the run's log (`tok logs <card>` prints it), and the card's Terminal tab and its
+**Copy all** show the same lines, with two differences from macOS and Linux:
+
+- Right after the Terminal panel changes size (the window or a side panel is resized), the console
+  redraws its screen for the new size, and the panel can lose a line near the bottom of the screen
+  or show a few lines twice. **Copy all** copies what the panel holds; the run's log has each line.
+  A later version makes the panel follow the console's size, which removes this.
+- When the panel gets smaller, the agent gets the new size once its output has paused for a third
+  of a second, at most two seconds later, or as soon as you type into the terminal. Made smaller
+  just as an agent starts printing, Windows' console drops the agent's first lines; waiting for
+  the pause keeps them.
+
 ### macOS, plain binaries
 
 The same archives exist for a Mac (`macos-arm64` for Apple silicon, `macos-x86_64` for Intel), for

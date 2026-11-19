@@ -8,7 +8,7 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
-use portable_pty::{ChildKiller, MasterPty, PtySize};
+use portable_pty::{ChildKiller, MasterPty};
 use tokio::sync::{broadcast, mpsc};
 use toknila_app::runner::{RunEnded, RunnerError, RunnerState};
 use toknila_core::instructions::terminal::Size;
@@ -60,6 +60,8 @@ pub(super) struct Active {
     stopped: AtomicBool,
     /// The terminal itself, for resizing; taken (and so closed) once the process has ended.
     master: Mutex<Option<Box<dyn MasterPty + Send>>>,
+    /// A smaller size that waits for ConPTY to render what was printed (Windows only).
+    pending: pty::Pending,
     /// When the process last printed.
     last_output: Mutex<Instant>,
     /// The agent's Stop hook reports to Toknila.
@@ -137,6 +139,7 @@ impl Active {
             killer: Mutex::new(killer),
             stopped: AtomicBool::new(false),
             master: Mutex::new(Some(master)),
+            pending: pty::Pending::default(),
             last_output: Mutex::new(Instant::now()),
             hooks,
             pid: child.process_id(),
@@ -186,7 +189,17 @@ impl Active {
                     a.finish(exit, &wake, &ended);
                 })
         };
-        if let Err(e) = pump.and(watch) {
+        // Windows: a smaller screen reaches ConPTY once the output is quiet (see `pty::Pending`).
+        let sizes = cfg!(windows).then(|| {
+            let a = active.clone();
+            let quiet = move || lock(&a.last_output).elapsed();
+            let b = active.clone();
+            let run = move || pty::apply_sizes(&b.pending, &b.master, quiet, || b.is_over());
+            std::thread::Builder::new()
+                .name("runner-resize".to_owned())
+                .spawn(run)
+        });
+        if let Err(e) = pump.and(watch).and(sizes.transpose()) {
             active.kill();
             return Err(RunnerError::Spawn(format!("cannot start threads: {e}")));
         }
@@ -326,6 +339,12 @@ impl Active {
         state.scrollback.from(from).1.to_vec()
     }
 
+    /// A client's input: a size still held reaches the terminal first (`pty::before_typing`).
+    pub fn type_in(&self, bytes: &[u8]) -> Result<(), RunnerError> {
+        pty::before_typing(bytes, &self.pending, &self.master);
+        self.write(bytes)
+    }
+
     pub fn write(&self, bytes: &[u8]) -> Result<(), RunnerError> {
         let mut writer = lock(&self.writer);
         writer
@@ -347,18 +366,12 @@ impl Active {
         })
     }
 
-    /// Gives the terminal a new size; the agent gets the window-size signal.
+    /// Gives the terminal a new size; the agent gets the window-size signal. On Windows a smaller
+    /// one waits until the output is quiet ([`pty::Pending`]).
     pub fn resize(&self, size: Size) -> Result<(), RunnerError> {
         let master = lock(&self.master);
-        let master = master.as_ref().ok_or(RunnerError::NotRunning)?;
-        master
-            .resize(PtySize {
-                rows: size.rows,
-                cols: size.cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|e| RunnerError::Write(e.to_string()))
+        let master = master.as_deref().ok_or(RunnerError::NotRunning)?;
+        pty::resize(master, &self.pending, size)
     }
 
     /// [`Active::kill`], and `note` becomes the last line of the run's log and scrollback.

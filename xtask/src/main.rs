@@ -43,6 +43,7 @@ mod shots;
 mod testrun;
 mod updates;
 mod versions;
+mod warmup;
 
 fn main() -> ExitCode {
     let task = std::env::args().nth(1).unwrap_or_default();
