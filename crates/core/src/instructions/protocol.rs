@@ -170,6 +170,15 @@ Work in this worktree: it is the ship of the ticket, on its own branch. Read wha
 against the project's work branch (`git log`, `git diff`), and compare it with the task and each \
 acceptance item. Do not edit files and do not commit.
 
+## What the person told the agent is part of the task
+
+\"What the person told this story's agent\" in your instructions is part of the task: every \
+instruction a person wrote on the card and every answer to the agent's questions. Where it \
+differs from the story's text, the person's later word wins (the same rule as the words of an \
+approval). Judge each criterion against the task as changed, and name in the verdict the \
+instruction that changed it. A change of scope that the hand-in claims but that record does not \
+show is not the person's decision: flag it in the verdict and do not accept it.
+
 ## Run what the hand-in names
 
 Do not approve by reading alone. The gate's result is in your kickoff and in \"The gate's \
