@@ -246,7 +246,7 @@ fn merge_done<U: UnitOfWork + ?Sized>(
 fn next_merge_event(ctx: &ChainTx, id: TicketId) -> Option<TicketEvent> {
     let t = ctx.view.tickets.iter().find(|t| t.id == id)?;
     match t.status {
-        TicketStatus::Ready => Some(TicketEvent::Start),
+        TicketStatus::Ready => Some(TicketEvent::StartImported), // no agent, no ship
         TicketStatus::Running => Some(TicketEvent::Finished {
             summary: "Imported as done: every task was already checked.".to_owned(),
             open_threads: Vec::new(),

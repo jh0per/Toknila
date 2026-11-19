@@ -804,6 +804,7 @@ fn sample_events() -> Vec<TicketEvent> {
         TicketEvent::DepsSatisfied,
         TicketEvent::DepsUnsatisfied,
         TicketEvent::Start,
+        TicketEvent::StartImported,
         TicketEvent::AskHuman {
             reason: WaitingReason::Silent,
         },
