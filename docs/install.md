@@ -1,29 +1,43 @@
 # Install and first run
 
-Toknila 0.2.0 runs on your Mac as an app (`Toknila.app`) that you build yourself, or as plain
-binaries (`tok` and `toknila`) from the release archives. This page starts with the app.
+Toknila runs as an app on a Mac (`Toknila.app`, from the Releases page). On Linux and Windows the
+daemon serves the same window in a browser. This page starts with the app from a release, then
+Linux and Windows, then building from source, then the sections for whoever cuts releases.
 
-## The Mac app (built locally)
+## Install from a release
 
-The app is built on the Mac that runs it, for that Mac's architecture. It is signed ad hoc (no
-Developer ID, not notarised), which is enough to run it where it was built. Needs the Rust
-toolchain, Node 22 and the Xcode command line tools. (The app of a release is signed with a
-Developer ID and notarized on the maintainer's Mac: see Signing and notarizing the Mac app.)
+What you need: a Mac with macOS 10.15 or later (the `LSMinimumSystemVersion` that `cargo xtask app` writes into the app's `Info.plist`), Apple silicon or
+Intel; `git`; Claude Code installed and signed in. The GitHub command line (`gh`) is needed only if
+accepted work is sent as pull requests. Nothing else is installed.
 
-```sh
-cargo xtask app
-```
+1. Download the `.dmg` for your Mac from the
+   [Releases page](https://github.com/jh0per/Toknila/releases):
+   `Toknila-<version>-aarch64.dmg` for Apple silicon, `Toknila-<version>-x86_64.dmg` for Intel.
+   Open it and drag Toknila onto Applications. Open the app.
+2. **Add a project.** Choose the folder that holds your project, a git repository. If the folder is
+   missing or is not a repository yet, Toknila offers to create it or set it up. It fills in the
+   main branch, which agents start from and where approved work lands, and under Details the test
+   command that agents run before they hand in. Also under Details you choose where accepted work
+   lands: merged into the main branch, or sent as a pull request on GitHub.
+3. **Plan with the assistant.** Open Assistant under your project and describe your first epic.
+   The assistant creates epics and their stories, steers the process and answers your questions.
+   An epic holds stories and ends in a release.
+4. **Start a story.** Press Start on a story, or S on the diagram. An agent then works on it in
+   its own workspace, a separate copy of the repository, so your folder stays as it is. Only as
+   many agents run at once as the project allows; other ready stories wait for a free slot.
+5. **Read the hand-in.** When the agent is done it hands in: what changed, each check as PASS,
+   FAIL, NOT_RUN or BLOCKED, and what is left. The test command runs, then a reviewer agent reads
+   the work. Needs you lists what only you can judge; do those by hand first.
+6. **Accept.** Accept merges the story into the main branch (or opens a pull request when the
+   project is set to). Return sends your words to the agent, which fixes and hands in again.
+7. **Release.** When all the stories of an epic are done, a Release button appears at the end of
+   its diagram. Check the version (it becomes the tag, like `v0.3.0`) and press Release.
 
-It builds the web page in release mode, the daemon (`toknila`) and the `tok` command in release
-mode and the window shell, then assembles `dist/app/Toknila.app` and
-`dist/app/Toknila-<version>-<arch>.dmg` (`aarch64` or `x86_64`) and prints both paths. It also
-packs the update archive (see Updates and releases below); without the signing key it says it
-skipped signing, and the build is otherwise the same. `cargo xtask app --target
-x86_64-apple-darwin` builds for the other architecture. To install, open the `.dmg` and drag
-Toknila onto Applications (or `cp -R` the `.app` there). Because the app was built here and never
-downloaded, macOS does not ask. If you copy the `.dmg` to another Mac through a browser or AirDrop,
-macOS quarantines it; right-click the app and choose Open once, or run
-`xattr -dr com.apple.quarantine /Applications/Toknila.app`.
+The Guide at the foot of the window's sidebar says the same with pictures of the window.
+
+If macOS refuses to open the app, open System Settings, Privacy & Security and choose Open Anyway
+for Toknila. This is needed only for builds made before the first signed and notarized release;
+a signed and notarized app opens without a warning.
 
 Everything the app needs is inside it: the daemon and `tok` in `Contents/MacOS`, the web page and
 the price table inside the daemon binary. The hooks, the MCP server and the status line that
@@ -37,7 +51,7 @@ app's own binary already runs, the app attaches to it; if one of another version
 copy of the app runs (after an update), the app stops it first and starts its own. On an empty
 data home the window shows onboarding: it checks `git`, `claude` and `gh`, each with a hint when
 something is missing, then asks for the repository of your first project and its base branch.
-After that, import a chain file or add cards, and set the limits and review mode in Settings. The
+After that, ask the assistant for your first epic (step 3 above), and set the limits and review mode in Settings. The
 app starts the daemon with the `PATH` of your login shell plus the usual folders such as
 `/opt/homebrew/bin`, so it finds `claude` and `gh` although Finder starts apps with a bare `PATH`.
 Closing the window leaves the daemon and its agents running; `tok daemon stop` stops them (use the
@@ -98,11 +112,190 @@ rm -rf ~/Library/Application\ Support/toknila    # only if you also want your da
 Your project repositories are yours. The ships Toknila made in them are worktrees; remove one with
 the worktree command of your version control tool, run in its repository.
 
+## Linux and Windows
+
+There is no desktop app for these systems yet. The release archives hold the daemon (`toknila`)
+and the command line (`tok`): `toknila-<version>-linux-x86_64.tar.gz` and
+`toknila-<version>-windows-x86_64.zip` (run `tok.exe` from PowerShell). Unpack one, put `tok` and
+`toknila` on your `PATH`, and make sure `git` and Claude Code are installed and signed in.
+
+```sh
+tok daemon start     # the background daemon, on 127.0.0.1
+tok open             # prints the address of the window; open it in a browser
+```
+
+The browser shows the same window as the Mac app, and the command line is complete. Data lives in
+`~/.toknila` on Linux and `%APPDATA%\toknila` on Windows (see Where things live below).
+
+### What a card's terminal shows on Windows
+
+On Windows an agent runs in Windows' own console (ConPTY), which keeps a screen and redraws it
+instead of passing the agent's output on as it was printed. Toknila keeps every line the agent
+prints in the run's log (`tok logs <card>` prints it), and the card's Terminal tab and its
+**Copy all** show the same lines, with two differences from macOS and Linux:
+
+- Right after the Terminal panel changes size (the window or a side panel is resized), the console
+  redraws its screen for the new size, and the panel can lose a line near the bottom of the screen
+  or show a few lines twice. **Copy all** copies what the panel holds; the run's log has each line.
+  A later version makes the panel follow the console's size, which removes this.
+- When the panel gets smaller, the agent gets the new size once its output has paused for a third
+  of a second, at most two seconds later, or as soon as you type into the terminal. Made smaller
+  just as an agent starts printing, Windows' console drops the agent's first lines; waiting for
+  the pause keeps them.
+
+### macOS, plain binaries
+
+The same archives exist for a Mac (`macos-arm64` for Apple silicon, `macos-x86_64` for Intel), for
+whoever wants only the command line. They are not signed or notarised yet, so download with `curl`
+(it does not set the quarantine flag) or clear the flag after a browser download. Take the version
+from the Releases page.
+
+```sh
+V=<version>
+ARCH=arm64            # or x86_64 on an Intel Mac
+curl -LO https://github.com/jh0per/Toknila/releases/download/v$V/toknila-$V-macos-$ARCH.tar.gz
+tar -xzf toknila-$V-macos-$ARCH.tar.gz
+cd toknila-$V-macos-$ARCH
+xattr -dr com.apple.quarantine . 2>/dev/null || true   # only needed after a browser download
+sudo install -m 755 tok toknila /usr/local/bin/        # or keep them here and use ./tok
+tok --version
+```
+
+If macOS still says the file "cannot be opened", open System Settings → Privacy & Security and
+choose "Open Anyway" for `tok`, or run the `xattr` line above.
+
+## Build from source
+
+Needs a stable Rust toolchain (`rust-toolchain.toml` pins the channel and components) and Node 22.
+
+```sh
+cargo xtask web             # build the web page the daemon embeds
+cargo xtask verify          # fmt check, clippy -D warnings, tests, architecture guards
+cargo xtask e2e-web         # browser tests of the page (Playwright)
+cargo run --bin tok -- --version
+cargo xtask dist aarch64-apple-darwin   # release archive in dist/
+```
+
+### The Mac app (built locally)
+
+The app is built on the Mac that runs it, for that Mac's architecture. It is signed ad hoc (no
+Developer ID, not notarised), which is enough to run it where it was built. Needs the Rust
+toolchain, Node 22 and the Xcode command line tools. (The app of a release is signed with a
+Developer ID and notarized on the maintainer's Mac: see Signing and notarizing the Mac app.)
+
+```sh
+cargo xtask app
+```
+
+It builds the web page in release mode, the daemon (`toknila`) and the `tok` command in release
+mode and the window shell, then assembles `dist/app/Toknila.app` and
+`dist/app/Toknila-<version>-<arch>.dmg` (`aarch64` or `x86_64`) and prints both paths. It also
+packs the update archive (see Updates and releases below); without the signing key it says it
+skipped signing, and the build is otherwise the same. `cargo xtask app --target
+x86_64-apple-darwin` builds for the other architecture. To install, open the `.dmg` and drag
+Toknila onto Applications (or `cp -R` the `.app` there). Because the app was built here and never
+downloaded, macOS does not ask. If you copy the `.dmg` to another Mac through a browser or AirDrop,
+macOS quarantines it; right-click the app and choose Open once, or run
+`xattr -dr com.apple.quarantine /Applications/Toknila.app`. The sections above (First run, The
+`tok` command, Backups, Updating, Removing it) apply to this app too.
+
 ### Check a build
 
 `scripts/smoke-app.sh` mounts the `.dmg`, copies the app to a temporary folder, launches it against
 a temporary data home, checks the daemon, the version, a project and a card made with the bundled
 `tok`, and that no process is left after quitting. It does not touch your data home.
+
+## First run from the command line: the demo chain
+
+```sh
+tok daemon start                      # background daemon on 127.0.0.1 (`tok daemon status` shows the data folder)
+tok project new DEMO
+tok chain import demo.toml --project DEMO
+tok chain show demo                   # A runs; B and D wait for A; C waits for release R1
+tok open                              # prints the web page address; open it in a browser
+```
+
+Keep the page open and move the chain from the terminal; the page updates live.
+
+```sh
+tok sim DEMO-1 subtask 1 done         # the simulated agent ticks a checklist item
+tok sim DEMO-1 ask "which way?"       # the agent asks: DEMO-1 is Waiting, the chain needs a human
+tok comment DEMO-1 "left"             # your answer; the agent reads it and runs again
+tok sim DEMO-1 finish "A is done"     # hand-in: Review
+tok accept DEMO-1                     # Merged; B and D start by themselves
+tok sim DEMO-2 finish "B" && tok accept DEMO-2
+tok sim DEMO-3 crash "out of memory"  # Blocked
+tok unblock DEMO-3 && tok sim DEMO-3 finish "D" && tok accept DEMO-3
+tok release start R1                  # manual milestone: cut; C starts
+tok sim R1 finish                     # the release agent is done: A, B, D are Released
+tok ls --needs-human                  # what waits on you
+tok watch --since 0                   # the whole journal, then live (Ctrl-C to stop)
+```
+
+Work nobody planned does not change the chain by itself. While DEMO-1 runs (before
+`tok accept DEMO-1`), its agent can propose a wildcard card; it waits for you:
+
+```sh
+tok sim DEMO-1 propose "Token refresh endpoint" --after DEMO-1   # DEMO-5 proposed
+tok ls --needs-human                  # DEMO-5 awaits approval; chain progress does not count it
+tok approve DEMO-5                    # it joins the plan and starts once DEMO-1 is accepted
+tok reject DEMO-5 "not now"           # or turn it down instead: Cancelled with the reason
+```
+
+Releases belong to one epic each. A version is planned by one unreleased epic of the project:
+creating or editing an epic with a version another one plans is refused ("0.3.4 is planned by
+phase-10; pick another version or move that one"). A release run that tags `vX` on the base branch
+also marks every other finished epic of the project whose story merges the tag contains (every
+story Merged, none open or Released) as released with it: its stories become Released, its Finish
+node reads "released with vX by <epic>", and a version it planned higher becomes X. For a tag that
+already exists, say it yourself:
+
+```sh
+tok release mark phase-10 --with v0.3.3   # refused when the tag is missing or lacks the epic's merges
+tok release steps phase-10                # a release is also addressed by its epic's name
+tok release run phase-10                  # the version defaults to the epic's own
+```
+
+`--before KEY` makes planned work wait for the card; approval is refused if that work has already
+started. A person proposes a card with `tok propose demo "<title>" --after DEMO-1 --from DEMO-1`.
+
+Who reviews a finished card is a setting: a person (`human`, the default), a reviewer agent
+(`agent`), or the agent first and then you with its remarks in view (`both`). Set it on a project,
+a chain or one ticket; the ticket's wins, then the chain's, then the project's:
+
+```sh
+tok review-mode both --project DEMO   # every card of the project, unless a chain or ticket says
+tok review-mode agent --chain demo    # one chain
+tok review-mode human --ticket DEMO-1 # one card
+tok sim DEMO-1 finish "A is done"     # hand-in; the simulated reviewer waits for its verdict
+tok sim DEMO-1 review request-changes "handle the empty list"   # agent mode: back to the agent
+tok accept DEMO-1 "good"              # or, in human and both mode, your verdict; remarks optional
+tok show DEMO-1                       # the review rounds so far and whose turn it is
+```
+
+The reviewer agent of profile `x` is `x-reviewer` (`claude-code-reviewer` for `claude-code`);
+`tok review-mode --reviewer <profile>` picks another. It runs next to the worker, not instead of
+it: `tok logs DEMO-1 --reviewer` reads its terminal.
+
+Toknila's own next phase is a chain too: `tok project new TOK && tok chain import phase-1.toml
+--project TOK && tok chain show phase-1`.
+
+Spec-driven projects (`specs/<n>-<name>/tasks.md`) import and export the same way; see
+[specs.md](specs.md).
+
+## Where things live on every system
+
+| What | Where |
+|---|---|
+| Data, `daemon.json`, logs | `~/Library/Application Support/toknila` on macOS, `~/.toknila` on Linux, `%APPDATA%\toknila` on Windows; `TOKNILA_HOME` overrides. A macOS `~/.toknila` from an earlier version moves to the new place on the first start after the daemon was stopped |
+| Ships (worktrees) | `~/.toknila-ships` for new ships, a path without a space; `TOKNILA_SHIPS_DIR` overrides it. Ships made before keep their place |
+| Database | `toknila.db` (SQLite) in that folder |
+| Stop the daemon | `tok daemon stop` |
+| Start over | stop the daemon, delete the folder |
+
+Every command takes `--json` for scripts.
+
+New to Toknila? Open **Guide** at the foot of the window's sidebar: it walks the work from a folder to a release.
 
 ## Updates and releases
 
@@ -370,136 +563,3 @@ your data home. Two environment variables exist for it: `TOKNILA_UPDATE_ENDPOINT
 release address (harmless in a release build: the signature is still checked against the built-in
 key, and plain `http` is refused unless the build allows it, which only the test builds do) and
 `TOKNILA_UPDATE_AUTO_RESTART=1` restarts once an update is ready and no agent runs.
-
-## macOS, plain binaries
-
-Pick the archive for your Mac: `macos-arm64` for Apple silicon (M1 and later), `macos-x86_64`
-for Intel. The binaries are not signed or notarised yet, so download with `curl` (it does not set
-the quarantine flag) or clear the flag after a browser download.
-
-```sh
-V=0.2.0
-ARCH=arm64            # or x86_64 on an Intel Mac
-curl -LO https://github.com/jh0per/Toknila/releases/download/v$V/toknila-$V-macos-$ARCH.tar.gz
-tar -xzf toknila-$V-macos-$ARCH.tar.gz
-cd toknila-$V-macos-$ARCH
-xattr -dr com.apple.quarantine . 2>/dev/null || true   # only needed after a browser download
-sudo install -m 755 tok toknila /usr/local/bin/        # or keep them here and use ./tok
-tok --version
-```
-
-If macOS still says the file "cannot be opened", open System Settings → Privacy & Security and
-choose "Open Anyway" for `tok`, or run the `xattr` line above.
-
-## Linux and Windows
-
-Same archive layout: `toknila-<version>-linux-x86_64.tar.gz` and
-`toknila-<version>-windows-x86_64.zip` (run `tok.exe` from PowerShell).
-
-### What a card's terminal shows on Windows
-
-On Windows an agent runs in Windows' own console (ConPTY), which keeps a screen and redraws it
-instead of passing the agent's output on as it was printed. Toknila keeps every line the agent
-prints in the run's log (`tok logs <card>` prints it), and the card's Terminal tab and its
-**Copy all** show the same lines, with two differences from macOS and Linux:
-
-- Right after the Terminal panel changes size (the window or a side panel is resized), the console
-  redraws its screen for the new size, and the panel can lose a line near the bottom of the screen
-  or show a few lines twice. **Copy all** copies what the panel holds; the run's log has each line.
-  A later version makes the panel follow the console's size, which removes this.
-- When the panel gets smaller, the agent gets the new size once its output has paused for a third
-  of a second, at most two seconds later, or as soon as you type into the terminal. Made smaller
-  just as an agent starts printing, Windows' console drops the agent's first lines; waiting for
-  the pause keeps them.
-
-## First run: the demo chain
-
-```sh
-tok daemon start                      # background daemon on 127.0.0.1 (`tok daemon status` shows the data folder)
-tok project new DEMO
-tok chain import demo.toml --project DEMO
-tok chain show demo                   # A runs; B and D wait for A; C waits for release R1
-tok open                              # prints the web page address; open it in a browser
-```
-
-Keep the page open and move the chain from the terminal; the page updates live.
-
-```sh
-tok sim DEMO-1 subtask 1 done         # the simulated agent ticks a checklist item
-tok sim DEMO-1 ask "which way?"       # the agent asks: DEMO-1 is Waiting, the chain needs a human
-tok comment DEMO-1 "left"             # your answer; the agent reads it and runs again
-tok sim DEMO-1 finish "A is done"     # hand-in: Review
-tok accept DEMO-1                     # Merged; B and D start by themselves
-tok sim DEMO-2 finish "B" && tok accept DEMO-2
-tok sim DEMO-3 crash "out of memory"  # Blocked
-tok unblock DEMO-3 && tok sim DEMO-3 finish "D" && tok accept DEMO-3
-tok release start R1                  # manual milestone: cut; C starts
-tok sim R1 finish                     # the release agent is done: A, B, D are Released
-tok ls --needs-human                  # what waits on you
-tok watch --since 0                   # the whole journal, then live (Ctrl-C to stop)
-```
-
-Work nobody planned does not change the chain by itself. While DEMO-1 runs (before
-`tok accept DEMO-1`), its agent can propose a wildcard card; it waits for you:
-
-```sh
-tok sim DEMO-1 propose "Token refresh endpoint" --after DEMO-1   # DEMO-5 proposed
-tok ls --needs-human                  # DEMO-5 awaits approval; chain progress does not count it
-tok approve DEMO-5                    # it joins the plan and starts once DEMO-1 is accepted
-tok reject DEMO-5 "not now"           # or turn it down instead: Cancelled with the reason
-```
-
-Releases belong to one epic each. A version is planned by one unreleased epic of the project:
-creating or editing an epic with a version another one plans is refused ("0.3.4 is planned by
-phase-10; pick another version or move that one"). A release run that tags `vX` on the base branch
-also marks every other finished epic of the project whose story merges the tag contains (every
-story Merged, none open or Released) as released with it: its stories become Released, its Finish
-node reads "released with vX by <epic>", and a version it planned higher becomes X. For a tag that
-already exists, say it yourself:
-
-```sh
-tok release mark phase-10 --with v0.3.3   # refused when the tag is missing or lacks the epic's merges
-tok release steps phase-10                # a release is also addressed by its epic's name
-tok release run phase-10                  # the version defaults to the epic's own
-```
-
-`--before KEY` makes planned work wait for the card; approval is refused if that work has already
-started. A person proposes a card with `tok propose demo "<title>" --after DEMO-1 --from DEMO-1`.
-
-Who reviews a finished card is a setting: a person (`human`, the default), a reviewer agent
-(`agent`), or the agent first and then you with its remarks in view (`both`). Set it on a project,
-a chain or one ticket; the ticket's wins, then the chain's, then the project's:
-
-```sh
-tok review-mode both --project DEMO   # every card of the project, unless a chain or ticket says
-tok review-mode agent --chain demo    # one chain
-tok review-mode human --ticket DEMO-1 # one card
-tok sim DEMO-1 finish "A is done"     # hand-in; the simulated reviewer waits for its verdict
-tok sim DEMO-1 review request-changes "handle the empty list"   # agent mode: back to the agent
-tok accept DEMO-1 "good"              # or, in human and both mode, your verdict; remarks optional
-tok show DEMO-1                       # the review rounds so far and whose turn it is
-```
-
-The reviewer agent of profile `x` is `x-reviewer` (`claude-code-reviewer` for `claude-code`);
-`tok review-mode --reviewer <profile>` picks another. It runs next to the worker, not instead of
-it: `tok logs DEMO-1 --reviewer` reads its terminal.
-
-Toknila's own next phase is a chain too: `tok project new TOK && tok chain import phase-1.toml
---project TOK && tok chain show phase-1`.
-
-Spec-driven projects (`specs/<n>-<name>/tasks.md`) import and export the same way; see
-[specs.md](specs.md).
-
-## Where things live
-
-| What | Where |
-|---|---|
-| Data, `daemon.json`, logs | `~/Library/Application Support/toknila` on macOS, `~/.toknila` on Linux, `%APPDATA%\toknila` on Windows; `TOKNILA_HOME` overrides. A macOS `~/.toknila` from an earlier version moves to the new place on the first start after the daemon was stopped |
-| Ships (worktrees) | `~/.toknila-ships` for new ships, a path without a space; `TOKNILA_SHIPS_DIR` overrides it. Ships made before keep their place |
-| Database | `toknila.db` (SQLite) in that folder |
-| Stop the daemon | `tok daemon stop` |
-| Start over | stop the daemon, delete the folder |
-
-Every command takes `--json` for scripts.
-
-New to Toknila? Open **Guide** at the foot of the window's sidebar: it walks the work from a folder to a release.
