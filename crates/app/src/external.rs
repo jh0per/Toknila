@@ -309,9 +309,11 @@ pub fn execute(host: Host<'_>, effects: Vec<ExternalEffect>) -> Vec<ExternalOutc
         }
     }
     for effect in deliveries {
+        // `insert` is false for a comment already typed or read: each is typed at most once.
         if let ExternalEffect::DeliverInstruction { ticket, comment } = effect
             && !taken.contains(&comment.id)
             && deliver(host.runner, ticket, &comment)
+            && taken.insert(comment.id)
         {
             outcomes.push(ExternalOutcome::InstructionTyped {
                 ticket,

@@ -218,6 +218,9 @@ fn a_conflict_at_accept_returns_the_card_to_the_worker_and_remembers_the_accept(
         text: "Conflicting files: a.rs.".to_owned()
     }));
     assert!(!tr.effects.contains(&Effect::Merge));
+    // The conflict is handed back to the worker, whose run starts when an agent is free.
+    let started = super::waits_then_starts(&tr, crate::GoOn::SentBack);
+    assert_eq!(started.effects, [Effect::PrepareShip, Effect::EnsureRunner]);
     // Only a merge that is running can conflict.
     assert!(
         apply(

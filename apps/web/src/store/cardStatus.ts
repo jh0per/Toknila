@@ -23,6 +23,8 @@ export interface StatusLine {
 export interface Pace {
   /// Place in line (1 is next) while the card waits for a free agent slot.
   queue: number | undefined;
+  /// What the card says while it waits for a free agent, in the daemon's words.
+  wait?: string;
   /// The chain starts its ready cards by itself.
   autostart: boolean;
   /// The clock the elapsed time of a running check is read against; the current time when absent.
@@ -51,6 +53,7 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
         ? { tone: "going", text: "Ready: starts when a slot is free" }
         : { tone: "needs", text: "Ready: start it when you want", next: "This epic does not start stories automatically; press Start." };
     case "running":
+      if (card.agent_paused?.go_on) return goesOnLine(pace.wait);
       if (card.agent_paused) return pausedLine(card, pace.queue);
       return designLine(detail) ?? {
         tone: "going",
@@ -70,6 +73,7 @@ export function statusLine(card: Ticket, detail: TicketDetail | undefined, pace:
       }
       return { tone: "needs", text: `Blocked: ${blockedText(card)}`, next: can("unblock") ? "Fix what it says, then Unblock." : undefined };
     case "review": {
+      if (card.review?.reviewer_waits) return goesOnLine(pace.wait);
       const turn = detail?.review.awaiting;
       if (turn?.by === "agent") {
         return { tone: "going", text: "In review: the reviewer agent is checking the work", next: "You can read the agent's report below meanwhile." };
@@ -143,6 +147,17 @@ function pausedLine(card: Ticket, queue: number | undefined): StatusLine {
     tone: "needs",
     text: `Waiting for your answer${asks}`,
     next: "Its agent is paused, not running, and holds no slot. Answer below and it resumes.",
+  };
+}
+
+/// The sentence of a story that has to go on (sent back, unblocked, its reviewer due) while every
+/// agent of the project is busy: the daemon's words, as a sentence.
+function goesOnLine(wait: string | undefined): StatusLine {
+  const words = wait ?? "waits for a free agent";
+  return {
+    tone: "going",
+    text: words.charAt(0).toUpperCase() + words.slice(1),
+    next: "No agent is running on it now; it goes on by itself when one of the project's agents is free.",
   };
 }
 

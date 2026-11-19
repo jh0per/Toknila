@@ -162,7 +162,10 @@ fn load_ticket_detail(
                     slots: plan.limit,
                 });
     }
+    let waits = schedule::queue(repo)?.remove(&t.id);
     Ok(TicketDetail {
+        queue_position: waits.as_ref().map(|(n, _)| *n),
+        queue_text: waits.map(|(_, text)| text),
         pending,
         simulated,
         design_waiting,
@@ -181,7 +184,6 @@ fn load_ticket_detail(
         comments,
         in_status_ms: at.millis_since(t.status_since),
         phase: toknila_core::thread::phase(&threads),
-        queue_position: schedule::queue_positions(repo)?.get(&t.id).copied(),
         ship,
         size_clamped: None,
         chain,

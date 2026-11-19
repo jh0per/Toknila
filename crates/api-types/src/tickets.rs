@@ -39,6 +39,10 @@ pub struct TicketDetail {
     pub can_move_to_chain: bool,
     /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
     pub queue_position: Option<u32>,
+    /// What the card says while it waits for a free agent, in plain words ("queued #2", "sent
+    /// back; goes on when an agent is free"); absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue_text: Option<String>,
     /// What the daemon does with the person's instruction that no agent has received yet;
     /// absent when none is pending or the card's agent is alive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -70,6 +74,10 @@ pub struct TicketItem {
     pub needs_human: bool,
     /// Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
     pub queue_position: Option<u32>,
+    /// What the card says while it waits for a free agent ("queued #2", "sent back; goes on when
+    /// an agent is free"); absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue_text: Option<String>,
     /// While the card's check runs: queued (place in the line), syncing with main, or running the
     /// check command since a time. Absent otherwise, and before the checker reports.
     #[serde(default, skip_serializing_if = "Option::is_none")]

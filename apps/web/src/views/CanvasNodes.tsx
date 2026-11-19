@@ -35,8 +35,8 @@ export function TicketNode({ ticket: t, projectKey, layout, href, style, selecte
   usage: UsageFigures | undefined;
   /// How long the card's agents ran.
   runTime: RunTime | undefined;
-  /// Place in line while it waits for a free agent slot.
-  queued: number | undefined;
+  /// What it says while it waits for a free agent slot (the daemon's words).
+  queued: string | undefined;
   /// The project's default profile: the runner chip stays away when the card uses it.
   defaultProfile: string | undefined;
   /// The pointer is on the card (its connector shows).
@@ -118,7 +118,7 @@ export function TicketNode({ ticket: t, projectKey, layout, href, style, selecte
             </span>
           )}
           {queued !== undefined && (
-            <span className="mark queued" data-testid="queued" title="Waiting for a free agent slot">queued #{queued}</span>
+            <span className="mark queued" data-testid="queued" title={queued}>{queued}</span>
           )}
           {t.pr && <PrChip pr={t.pr} />}
           {t.done_out_of_order && <span className="mark" title={outOfOrderText(t.done_out_of_order)}>out of order</span>}

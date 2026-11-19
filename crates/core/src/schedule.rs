@@ -1,35 +1,51 @@
 //! How many agents of a project work at once, and who starts next.
 //!
-//! **Slots.** A project has `max_parallel` slots (default [`DEFAULT_LIMIT`]). A card holds one
-//! while it is Running or Waiting (its agent is alive; a simulated agent counts the same).
-//! A Waiting card whose agent was paused (its process ended after a grace) holds none either; its
-//! answer makes it wanted like a ready card ("resumes when a slot is free").
-//! Review, Blocked, Merged, Released, Cancelled and Backlog hold none by their status alone: the
-//! agent is done, stopped or has not begun. A **live runner** holds one whatever the status: a
-//! worker kept alive through review, and the reviewer next to it, each take a slot. The host knows
-//! which runners are alive; the application passes them in and this module stays pure.
+//! **The limit holds on every start.** A project has `max_parallel` slots (default
+//! [`DEFAULT_LIMIT`]). No agent of a story starts or resumes while the project's stories with an
+//! agent are at the limit, whatever the path: a first start, a story sent back (by the check, the
+//! reviewer agent, a person, a merge conflict, a failed re-check), an unblock, a start despite a
+//! stale base, an answer to a paused agent, the replacement after the app restarted, the reviewer
+//! after a hand-in. The state machine never starts such an agent itself: it marks the story (the
+//! worker's `Ticket::agent_paused` with `resume`, `Review::reviewer_waits`), [`plan`] says when it
+//! starts, and the application sends it [`start_event`].
+//!
+//! **Slots are stories.** A story holds one slot while an agent of it works: Running or Waiting
+//! with its agent (not paused, lost or waiting to go on), or in Review once its reviewer agent's
+//! turn has started. A simulated agent counts the same. A **live runner** of a story that is
+//! Running, Waiting or in Review holds it too (a worker still ending after its hand-in, a
+//! reviewer still ending after its verdict), and a story's worker and reviewer alive together
+//! hold one slot. Blocked, Merged, Released, Cancelled and Backlog hold none: the command that
+//! moved the story there stops its runners. The host knows which runners are alive; the
+//! application passes them in and this module stays pure.
+//!
+//! **The line.** A story that has to go on and finds no free slot waits in line, and
+//! [`wait_text`] says so ("sent back; goes on when an agent is free"). Stories already begun
+//! (sent back, unblocked, answered, back after a restart, a reviewer that is due) go before the
+//! stories that have not started: work in progress finishes before new work begins. Inside each
+//! group the order is chain order, then the card's place in its chain's dependency order, so a
+//! card never starts before the cards it waits for. A story that holds a slot through a live
+//! runner of its own goes on in that slot: it never waits for itself.
 //!
 //! **Queued is a flag, not a status.** A card a person started while every slot was taken stays
-//! Ready with `Ticket::queued` set. A new status would touch the transition table, board
-//! categories, dependency rules, the database and every client for a state that is only "Ready,
-//! and wanted"; the flag records the one thing that cannot be derived (a person asked), and the
-//! place in line is computed here by [`plan`], never stored.
+//! Ready with `Ticket::queued` set, and a story that has begun stays in the status it went to
+//! with its agent marked as not started. A new status would touch the transition table, board
+//! categories, dependency rules, the database and every client for a state that is only "wanted,
+//! with no agent yet"; the flags record what cannot be derived, and the place in line is computed
+//! here by [`plan`], never stored.
 //!
-//! **Who starts.** [`plan`] is pure: given the project's chains (in chain order) and the limit it
-//! says which wanted cards start now and which wait, in order. A card is wanted when it is Ready
-//! with its dependencies done and either `queued` or in a chain with autostart on. Chains with
-//! autostart off therefore only run cards a person started; the queue never starts anything
-//! nobody asked for. The order is chain order, then the card's place in its chain's dependency
-//! order, so a card never starts before the cards it waits for. Lowering the limit starts
-//! nothing and stops nothing: running agents keep their slots until they leave Running/Waiting.
+//! **Who is wanted.** A story that has not started is wanted when it is Ready with its
+//! dependencies done and either `queued` or in a chain with autostart on, so the queue never
+//! starts anything nobody asked for. Lowering the limit starts nothing and stops nothing: an
+//! agent that is alive keeps its slot and delays the line until it leaves, even past the limit
+//! (an agent's own `started` is a fact, not a request).
 
 use crate::graph::ChainView;
-use std::collections::HashSet;
+use crate::machine::TicketEvent;
 
 mod runs;
 pub use runs::{LiveRun, ProjectRun, RunCard, project_runs};
 
-use crate::{AgentRole, Ticket, TicketId, TicketStatus};
+use crate::{AgentRole, ReviewTurn, Ticket, TicketId, TicketStatus};
 
 /// Slots of a project that does not say.
 pub const DEFAULT_LIMIT: u32 = 2;
@@ -50,12 +66,63 @@ pub fn check_limit(limit: u32) -> Result<u32, LimitError> {
     }
 }
 
-/// Does the card hold a slot: its agent is working or waiting for an answer. A Waiting card whose
-/// agent was paused (its process ended, `Ticket::agent_paused`) holds none until it resumes.
+/// Does the card hold a slot by its state: its worker works or waits for an answer, or its
+/// reviewer agent's turn has started. A card whose agent has no process (paused, lost, or waiting
+/// to go on) and a reviewer that waits for a free agent hold none.
 pub fn holds_slot(ticket: &Ticket) -> bool {
     match ticket.status {
         TicketStatus::Running | TicketStatus::Waiting => ticket.agent_paused.is_none(),
+        TicketStatus::Review => {
+            matches!(ticket.review.turn, Some(ReviewTurn::Agent { .. }))
+                && !ticket.review.reviewer_waits
+        }
         _ => false,
+    }
+}
+
+/// Does the story hold a slot: by its state, or by a live runner while it is working or in
+/// review. Its worker and its reviewer are one slot.
+pub fn holds(ticket: &Ticket, live: &[LiveRunner]) -> bool {
+    let active = matches!(
+        ticket.status,
+        TicketStatus::Running | TicketStatus::Waiting | TicketStatus::Review
+    );
+    holds_slot(ticket) || (active && live.iter().any(|(id, _)| *id == ticket.id))
+}
+
+/// Has the story begun and must it go on with an agent that has no process yet: a paused or
+/// lost agent whose answer arrived, a worker sent back or unblocked, a reviewer that is due.
+pub fn goes_on(ticket: &Ticket) -> bool {
+    ticket.agent_paused.as_ref().is_some_and(|p| p.resume) || ticket.review.reviewer_waits
+}
+
+/// The event the schedule sends a wanted card that gets an agent: `ResumeStart` for a story that
+/// has begun, `Start` for one that has not.
+pub fn start_event(ticket: &Ticket) -> TicketEvent {
+    if goes_on(ticket) {
+        TicketEvent::ResumeStart
+    } else {
+        TicketEvent::Start
+    }
+}
+
+/// What a story waiting for a free agent says, at `place` in line (1 is next): "queued #2" for a
+/// story that has not started, "sent back; goes on when an agent is free" for one that has.
+pub fn wait_text(ticket: &Ticket, place: u32) -> String {
+    let why = match &ticket.agent_paused {
+        _ if ticket.review.reviewer_waits => "the reviewer is due",
+        Some(p) if p.lost => "the app restarted",
+        Some(p) => p.go_on.map_or("answered", crate::GoOn::word),
+        None => return format!("queued #{place}"),
+    };
+    let what = if ticket.review.reviewer_waits {
+        "it starts"
+    } else {
+        "goes on"
+    };
+    match place {
+        1 => format!("{why}; {what} when an agent is free"),
+        n => format!("{why}; {what} when an agent is free (#{n} in line)"),
     }
 }
 
@@ -63,12 +130,14 @@ pub fn holds_slot(ticket: &Ticket) -> bool {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Plan {
     pub limit: u32,
-    /// Slots held now.
+    /// Slots held now: stories with an agent.
     pub used: u32,
     /// Wanted cards that start now, in order.
     pub start: Vec<TicketId>,
     /// Wanted cards that wait for a slot, first in line first.
     pub queue: Vec<TicketId>,
+    /// What each card of `queue` says while it waits ([`wait_text`]), in the same order.
+    pub texts: Vec<String>,
 }
 
 impl Plan {
@@ -77,74 +146,67 @@ impl Plan {
         let i = self.queue.iter().position(|t| *t == ticket)?;
         u32::try_from(i + 1).ok()
     }
+
+    /// What a card that waits says, if it waits.
+    pub fn text(&self, ticket: TicketId) -> Option<&str> {
+        let i = self.queue.iter().position(|t| *t == ticket)?;
+        self.texts.get(i).map(String::as_str)
+    }
 }
 
 /// A runner process that is alive, by the ticket it works for and its role.
 pub type LiveRunner = (TicketId, AgentRole);
 
-/// The cards of `chains` that hold a slot: each working or waiting card (its worker), and each
-/// card with a live runner that is working or in review, in chain order.
+/// The stories of `chains` that hold a slot ([`holds`]), in chain order.
 pub fn working_cards(chains: &[ChainView], live: &[LiveRunner]) -> Vec<TicketId> {
     chains
         .iter()
         .flat_map(|c| &c.tickets)
-        .filter(|t| {
-            holds_slot(t)
-                || (matches!(t.status, TicketStatus::Review)
-                    && live.iter().any(|(id, _)| *id == t.id))
-        })
+        .filter(|t| holds(t, live))
         .map(|t| t.id)
         .collect()
 }
 
-/// Slots held in `chains`: each working or waiting card (its worker), and each live runner of a
-/// card of these chains, counted once.
+/// Slots held in `chains`: one per story with an agent ([`holds`]).
 pub fn slots_used(chains: &[ChainView], live: &[LiveRunner]) -> u32 {
-    let tickets = || chains.iter().flat_map(|c| &c.tickets);
-    let mut held: HashSet<LiveRunner> = tickets()
-        .filter(|t| holds_slot(t))
-        .map(|t| (t.id, AgentRole::Worker))
-        .collect();
-    // A runner counts while its card is working or in review. A card that was merged,
-    // cancelled or blocked has its runners stopped right after the command that moved it, so
-    // they already free their slots for the cards this command starts.
-    held.extend(
-        live.iter()
-            .filter(|(id, _)| {
-                tickets().any(|t| {
-                    t.id == *id
-                        && matches!(
-                            t.status,
-                            TicketStatus::Running | TicketStatus::Waiting | TicketStatus::Review
-                        )
-                })
-            })
-            .copied(),
-    );
-    u32::try_from(held.len()).unwrap_or(u32::MAX)
+    u32::try_from(working_cards(chains, live).len()).unwrap_or(u32::MAX)
 }
 
 /// Which wanted cards of the project's `chains` (in chain order) start now with `limit` slots,
-/// given the runners that are alive.
+/// given the runners that are alive, and which wait.
 pub fn plan(chains: &[ChainView], limit: u32, live: &[LiveRunner]) -> Plan {
     let used = slots_used(chains, live);
-    let mut wanted: Vec<TicketId> = chains.iter().flat_map(ChainView::start_requests).collect();
-    // A resume is a start, and a resumed agent was already working: it goes ahead of the cards
-    // that never started (the sort is stable, so each group keeps its chain order).
-    let resumes = |id: &TicketId| {
-        chains
-            .iter()
-            .flat_map(|c| &c.tickets)
-            .any(|t| t.id == *id && t.agent_paused.is_some())
-    };
-    wanted.sort_by_key(|id| !resumes(id));
-    let free = usize::try_from(limit.saturating_sub(used)).unwrap_or(usize::MAX);
-    let queue = wanted.split_off(free.min(wanted.len()));
+    let find = |id: &TicketId| chains.iter().flat_map(|c| &c.tickets).find(|t| t.id == *id);
+    let mut wanted: Vec<&Ticket> = chains
+        .iter()
+        .flat_map(ChainView::start_requests)
+        .filter_map(|id| find(&id))
+        .collect();
+    // Work in progress first (the sort is stable, so each group keeps its chain order).
+    wanted.sort_by_key(|t| !goes_on(t));
+    let (mut start, mut queue) = (Vec::new(), Vec::new());
+    let mut taken = used;
+    for t in wanted {
+        // A story with a live runner of its own goes on in its slot while that slot is within
+        // the limit; any other takes a free one.
+        let own = holds(t, live);
+        if (own && taken <= limit) || (!own && taken < limit) {
+            taken += u32::from(!own);
+            start.push(t.id);
+        } else {
+            queue.push(t);
+        }
+    }
     Plan {
         limit,
         used,
-        start: wanted,
-        queue,
+        start,
+        texts: queue
+            .iter()
+            .zip(1..)
+            .map(|(t, n)| wait_text(t, n))
+            .collect(),
+        queue: queue.iter().map(|t| t.id).collect(),
     }
 }
 

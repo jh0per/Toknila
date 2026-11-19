@@ -11,6 +11,9 @@ pub struct QueuedCard {
     pub ticket: TicketId,
     /// 1 is next.
     pub position: u32,
+    /// What the card says while it waits, in plain words: "queued #2" for a story that has not
+    /// started, "sent back; goes on when an agent is free" for one that has.
+    pub text: String,
 }
 
 /// `GET /v1/agents`: one project's agent slots and the cards waiting for one.
@@ -39,6 +42,7 @@ impl ProjectAgents {
             .map(|(ticket, position)| QueuedCard {
                 ticket: *ticket,
                 position,
+                text: plan.text(*ticket).unwrap_or_default().to_owned(),
             });
         Self {
             project: project.id,
@@ -86,6 +90,32 @@ mod tests {
         let wire = serde_json::to_string(&agents).expect("json");
         let expected = format!(
             r#"{{"project":"{project}","limit":2,"used":1,"queued":[],"runs":[{{"card":null,"role":"planner","since":5}},{{"card":{{"id":"{card}","key":"DEMO-1","title":"Add login"}},"role":"reviewer","since":7}}]}}"#
+        );
+        assert_eq!(wire, expected);
+    }
+
+    #[test]
+    fn a_waiting_card_says_why_on_the_wire() {
+        let (sent, fresh) = (TicketId::new(), TicketId::new());
+        let queued = |ticket, position, text: &str| QueuedCard {
+            ticket,
+            position,
+            text: text.to_owned(),
+        };
+        let agents = ProjectAgents {
+            project: ProjectId::new(),
+            limit: 1,
+            used: 1,
+            queued: vec![
+                queued(sent, 1, "sent back; goes on when an agent is free"),
+                queued(fresh, 2, "queued #2"),
+            ],
+            runs: Vec::new(),
+        };
+        let wire = serde_json::to_string(&agents).expect("json");
+        let p = agents.project;
+        let expected = format!(
+            r#"{{"project":"{p}","limit":1,"used":1,"queued":[{{"ticket":"{sent}","position":1,"text":"sent back; goes on when an agent is free"}},{{"ticket":"{fresh}","position":2,"text":"queued #2"}}],"runs":[]}}"#
         );
         assert_eq!(wire, expected);
     }

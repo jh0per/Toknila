@@ -85,6 +85,7 @@ mod tests {
             since: Timestamp(0),
             resume: true,
             lost: true,
+            go_on: None,
         });
         assert_eq!(pending_reason(&paused, true, false), Some(WaitsForSlot));
         assert_eq!(pending_reason(&paused, false, false), Some(StartsAgent));

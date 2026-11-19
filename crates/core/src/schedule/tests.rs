@@ -196,7 +196,7 @@ fn limits_outside_the_range_are_refused() {
 }
 
 #[test]
-fn a_live_worker_and_reviewer_of_a_card_in_review_each_hold_a_slot() {
+fn a_story_holds_one_slot_whatever_agents_of_it_are_alive() {
     let mut w = World::new();
     let c = w.chain(false);
     let reviewed = w.card(c, TicketStatus::Review, false);
@@ -205,20 +205,181 @@ fn a_live_worker_and_reviewer_of_a_card_in_review_each_hold_a_slot() {
     // Without runners a card in review holds nothing: one slot used, the third starts.
     let none = plan(&w.chains, 2, &[]);
     assert_eq!((none.used, none.start.clone()), (1, vec![third]));
-    // With its worker and its reviewer alive the card holds two; with the running card the
-    // limit of 2 is passed and the third stays queued.
+    // Its worker still ending and its reviewer alive together are the story's one slot: with
+    // the running card the limit of 2 is reached and the third waits.
     let live = [
         (reviewed, AgentRole::Worker),
         (reviewed, AgentRole::Reviewer),
     ];
     let p = plan(&w.chains, 2, &live);
-    assert_eq!((p.used, p.start, p.queue), (3, vec![], vec![third]));
+    assert_eq!((p.used, p.start, p.queue), (2, vec![], vec![third]));
+    assert_eq!(plan(&w.chains, 3, &live).start, vec![third]);
     // A running card's live worker is the same slot, counted once; a stranger's runner is not ours.
     let same = [
         (running, AgentRole::Worker),
         (TicketId::new(), AgentRole::Worker),
     ];
     assert_eq!(plan(&w.chains, 5, &same).used, 1);
+}
+
+/// A card of chain `c` that has begun and goes on with no agent yet: sent back or unblocked
+/// (`why`), answered (`None`), or lost with the app.
+fn begun(w: &mut World, c: usize, why: Option<crate::GoOn>, lost: bool) -> TicketId {
+    let status = if why.is_some() || lost {
+        TicketStatus::Running
+    } else {
+        TicketStatus::Waiting
+    };
+    let id = w.card(c, status, false);
+    let t = w.chains[c].tickets.last_mut().expect("card");
+    t.agent_paused = Some(crate::PausedAgent {
+        session: None,
+        since: Timestamp(0),
+        resume: true,
+        lost,
+        go_on: why,
+    });
+    id
+}
+
+/// A card of chain `c` in Review whose reviewer agent is due (`waits`) or working.
+fn reviewing(w: &mut World, c: usize, waits: bool) -> TicketId {
+    let id = w.card(c, TicketStatus::Review, false);
+    let t = w.chains[c].tickets.last_mut().expect("card");
+    t.review.turn = Some(crate::ReviewTurn::Agent { decides: true });
+    t.review.reviewer_waits = waits;
+    id
+}
+
+const SENT_BACK: Option<crate::GoOn> = Some(crate::GoOn::SentBack);
+
+#[test]
+fn a_story_sent_back_while_every_slot_is_taken_waits_and_says_so() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let busy = w.card(c, TicketStatus::Running, false);
+    let sent = begun(&mut w, c, SENT_BACK, false);
+    let p = w.plan(1);
+    assert_eq!(
+        (p.used, p.start.clone(), p.queue.clone()),
+        (1, vec![], vec![sent])
+    );
+    assert_eq!(
+        p.text(sent),
+        Some("sent back; goes on when an agent is free")
+    );
+    assert_eq!(p.text(busy), None);
+    // The other leaves: the story sent back goes on, with the event that starts a begun story.
+    w.chains[c].tickets[0].status = TicketStatus::Review;
+    assert_eq!(w.plan(1).start, vec![sent]);
+    let t = &w.chains[c].tickets[1];
+    assert_eq!(start_event(t), TicketEvent::ResumeStart);
+    assert_eq!(start_event(&w.chains[c].tickets[0]), TicketEvent::Start);
+}
+
+#[test]
+fn stories_already_begun_go_before_stories_that_have_not_started_each_in_chain_order() {
+    let mut w = World::new();
+    let first = w.chain(false);
+    let second = w.chain(false);
+    let _busy = w.card(first, TicketStatus::Running, false);
+    let fresh_a = w.card(first, TicketStatus::Ready, true);
+    let reviewer = reviewing(&mut w, first, true);
+    let fresh_b = w.card(second, TicketStatus::Ready, true);
+    let sent = begun(&mut w, second, SENT_BACK, false);
+    let unblocked = begun(
+        &mut w,
+        second,
+        Some(crate::GoOn::Unblocked {
+            stale: crate::StalePolicy::Allow,
+        }),
+        false,
+    );
+    let answered = begun(&mut w, second, None, false);
+    let lost = begun(&mut w, second, None, true);
+    let full = w.plan(1);
+    assert_eq!(
+        full.queue,
+        vec![reviewer, sent, unblocked, answered, lost, fresh_a, fresh_b]
+    );
+    let words: Vec<&str> = full.texts.iter().map(String::as_str).collect();
+    assert_eq!(
+        words,
+        [
+            "the reviewer is due; it starts when an agent is free",
+            "sent back; goes on when an agent is free (#2 in line)",
+            "unblocked; goes on when an agent is free (#3 in line)",
+            "answered; goes on when an agent is free (#4 in line)",
+            "the app restarted; goes on when an agent is free (#5 in line)",
+            "queued #6",
+            "queued #7",
+        ]
+    );
+    // Two free slots go to the work in progress first.
+    let free = w.plan(3);
+    assert_eq!(free.start, vec![reviewer, sent]);
+    assert_eq!(free.position(unblocked), Some(1));
+}
+
+#[test]
+fn a_reviewer_that_is_due_waits_for_a_free_slot_and_its_turn_holds_one_once_started() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let busy = w.card(c, TicketStatus::Running, false);
+    let due = reviewing(&mut w, c, true);
+    let fresh = w.card(c, TicketStatus::Ready, true);
+    let p = w.plan(1);
+    assert_eq!((p.used, p.queue), (1, vec![due, fresh]));
+    // The worker leaves (a hand-in, a block): the reviewer gets the slot, not the fresh card.
+    w.chains[c].tickets[0].status = TicketStatus::Blocked;
+    let p = w.plan(1);
+    assert_eq!((p.start, p.queue), (vec![due], vec![fresh]));
+    // Started, the reviewer's turn holds the slot by itself, simulated or not.
+    w.chains[c].tickets[1].review.reviewer_waits = false;
+    let p = w.plan(1);
+    assert_eq!((p.used, p.start, p.queue), (1, vec![], vec![fresh]));
+    assert_eq!(working_cards(&w.chains, &[]), [due]);
+    let _ = busy;
+}
+
+#[test]
+fn a_story_goes_on_in_the_slot_its_own_live_runner_holds_but_never_past_the_limit() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    let fresh = w.card(c, TicketStatus::Ready, true);
+    let sent = begun(&mut w, c, SENT_BACK, false);
+    // Its reviewer is still ending after its verdict: that is the story's slot, and the worker
+    // goes on in it while the card that has not started waits.
+    let ending = [(sent, AgentRole::Reviewer)];
+    let p = plan(&w.chains, 1, &ending);
+    assert_eq!((p.used, p.start, p.queue), (1, vec![sent], vec![fresh]));
+    // A hand-in: the worker is still ending while the reviewer is due; the reviewer goes on.
+    let due = reviewing(&mut w, c, true);
+    let handing_in = [(due, AgentRole::Worker), (sent, AgentRole::Reviewer)];
+    let p = plan(&w.chains, 2, &handing_in);
+    assert_eq!((p.used, p.start), (2, vec![sent, due]));
+    // Past the limit (another story holds the only slot) the story waits for it to leave.
+    w.card(c, TicketStatus::Running, false);
+    let p = plan(&w.chains, 1, &ending);
+    assert_eq!(
+        (p.used, p.start, p.queue),
+        (2, vec![], vec![sent, due, fresh])
+    );
+}
+
+#[test]
+fn an_agent_past_the_limit_is_counted_and_delays_the_line_until_it_leaves() {
+    let mut w = World::new();
+    let c = w.chain(false);
+    w.card(c, TicketStatus::Running, false);
+    w.card(c, TicketStatus::Running, false);
+    let sent = begun(&mut w, c, SENT_BACK, false);
+    let p = w.plan(1);
+    assert_eq!((p.used, p.start, p.queue), (2, vec![], vec![sent]));
+    w.chains[c].tickets[0].status = TicketStatus::Review;
+    assert_eq!(w.plan(1).queue, vec![sent], "still at the limit");
+    w.chains[c].tickets[1].status = TicketStatus::Review;
+    assert_eq!(w.plan(1).start, vec![sent]);
 }
 
 #[test]
@@ -249,6 +410,7 @@ fn paused(w: &mut World, c: usize, resume: bool) -> TicketId {
         since: Timestamp(0),
         resume,
         lost: false,
+        go_on: None,
     });
     id
 }

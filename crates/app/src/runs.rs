@@ -85,6 +85,17 @@ fn start_with<U: UnitOfWork + ?Sized>(
         let comments = uow.comments(ticket)?;
         let returned = toknila_core::instructions::Returned::of(&t.review);
         let waiting = toknila_core::instructions::waiting(&comments, returned.as_ref());
+        if resume.is_none() {
+            // What waited for the agent (a Return's text, context) is typed to a run that is
+            // not told its brief, or to a worker that is still alive and is kept; a run that
+            // reads them takes them first.
+            for c in comments.iter().filter(|c| waiting.ids.contains(&c.id)) {
+                uow.defer(ExternalEffect::DeliverInstruction {
+                    ticket,
+                    comment: c.clone(),
+                });
+            }
+        }
         let resume = resume.map(|(session, lost)| Resume {
             session,
             input: answer_input(&comments, lost),
@@ -267,14 +278,16 @@ const RESTART_GUARD_MS: i64 = 5_000;
 /// The safety net for a worker the host stopped: a Running card with no live worker still needs
 /// an agent (the replacement the machine asked for may have been lost to a race with this stop),
 /// so a run starts again with the kickoff that carries the open Return and the pending
-/// instructions. A card in any other state is left alone; a run that ended right after it
-/// started blocks the card instead of starting a loop. Returns whether a start was queued.
+/// instructions. A card in any other state is left alone, and so is one whose agent waits for a
+/// free one (the schedule starts it); a run that ended right after it started blocks the card
+/// instead of starting a loop. Returns whether a start was queued.
 fn replace_worker<U: UnitOfWork + ?Sized>(uow: &mut U, run: &Run) -> AppResult<bool> {
     let ticket = run.ticket_id;
     let Some(t) = uow.ticket(ticket)? else {
         return Ok(false);
     };
     if t.status != TicketStatus::Running
+        || t.agent_paused.is_some()
         || uow.live_runners()?.contains(&(ticket, AgentRole::Worker))
     {
         return Ok(false);

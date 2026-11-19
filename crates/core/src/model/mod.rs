@@ -43,7 +43,7 @@ pub use ids::{
 pub use keys::{KeyError, ProjectKey, TicketKey};
 pub use load_hold::LoadHold;
 pub use patch::{SubtaskEdit, TicketPatch};
-pub use paused::PausedAgent;
+pub use paused::{GoOn, PausedAgent};
 pub use profile::{
     AgentProfile, AgentRole, HookWiring, McpWiring, Nudge, OutputRules, Permissions,
 };

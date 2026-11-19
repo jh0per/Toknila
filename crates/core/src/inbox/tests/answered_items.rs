@@ -10,6 +10,7 @@ fn paused(mut t: Ticket, resume: bool) -> Ticket {
         since: Timestamp(1),
         resume,
         lost: false,
+        go_on: None,
     });
     t
 }

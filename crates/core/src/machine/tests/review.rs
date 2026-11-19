@@ -2,6 +2,27 @@ use super::*;
 use crate::machine::review;
 use crate::{CheckPhase, ReviewMode, ReviewNote, ReviewTurn, Verdict, machine::TicketAction};
 
+/// The reviewer agent's turn came but nothing started it: it waits for a free agent and holds no
+/// slot; the schedule's `ResumeStart` starts it, and from then on its turn holds one.
+fn reviewer_waits_then_starts(tr: &Transition) {
+    assert!(tr.ticket.review.reviewer_waits, "{:?}", tr.ticket.review);
+    assert!(
+        !tr.effects.contains(&Effect::StartReviewer),
+        "{:?}",
+        tr.effects
+    );
+    assert!(!crate::schedule::holds_slot(&tr.ticket));
+    assert!(crate::schedule::goes_on(&tr.ticket));
+    let started = step(&tr.ticket, &TicketEvent::ResumeStart);
+    assert_eq!(started.effects, [Effect::StartReviewer]);
+    assert!(!started.ticket.review.reviewer_waits);
+    assert!(crate::schedule::holds_slot(&started.ticket));
+    assert!(
+        apply(&started.ticket, &TicketEvent::ResumeStart, NOW).is_err(),
+        "a reviewer starts once"
+    );
+}
+
 fn finished(mode: ReviewMode) -> TicketEvent {
     TicketEvent::Finished {
         summary: "done".to_owned(),
@@ -108,15 +129,15 @@ fn a_finished_card_waits_for_whoever_the_mode_says() {
         (ReviewMode::Agent, ReviewTurn::Agent { decides: true }, true),
         (ReviewMode::Both, ReviewTurn::Agent { decides: false }, true),
     ];
-    for (mode, turn, reviewer_starts) in cases {
+    for (mode, turn, reviewer_due) in cases {
         let tr = step(&ticket_in(TicketStatus::Running), &finished(mode));
         assert_eq!(tr.ticket.status, TicketStatus::Review, "{mode:?}");
         assert_eq!(tr.ticket.review.turn, Some(turn), "{mode:?}");
-        assert_eq!(
-            tr.effects.contains(&Effect::StartReviewer),
-            reviewer_starts,
-            "{mode:?}"
-        );
+        assert_eq!(tr.ticket.review.reviewer_waits, reviewer_due, "{mode:?}");
+        if reviewer_due {
+            reviewer_waits_then_starts(&tr);
+        }
+        assert!(!tr.effects.contains(&Effect::StartReviewer), "{mode:?}");
         assert!(!tr.effects.contains(&Effect::StopRunner), "{mode:?}");
     }
 }
@@ -152,10 +173,10 @@ fn in_agent_mode_requested_changes_go_back_to_the_worker() {
             Effect::RecordRemarks {
                 text: "handle the empty list".to_owned()
             },
-            Effect::PrepareShip,
-            Effect::EnsureRunner
         ]
     );
+    let started = waits_then_starts(&tr, crate::GoOn::SentBack);
+    assert_eq!(started.effects, [Effect::PrepareShip, Effect::EnsureRunner]);
     assert!(
         !tr.effects.contains(&Effect::StopRunner),
         "the worker lives on"
@@ -441,10 +462,11 @@ fn a_person_can_run_the_reviewer_again_only_after_it_gave_no_verdict() {
         Some(ReviewTurn::Agent { decides: false })
     );
     assert_eq!(
-        (tr.ticket.review.nudged, tr.ticket.review.note),
+        (tr.ticket.review.nudged, tr.ticket.review.note.clone()),
         (false, None)
     );
-    assert_eq!(tr.effects, [Effect::StartReviewer]);
+    assert!(tr.effects.is_empty(), "{:?}", tr.effects);
+    reviewer_waits_then_starts(&tr);
 }
 
 #[test]
@@ -517,8 +539,9 @@ fn a_failing_check_returns_the_card_to_the_worker_with_the_output_as_a_round() {
         sent.contains("round 1 of 3") && sent.contains("the thing failed"),
         "{sent}"
     );
-    assert!(tr.effects.contains(&Effect::EnsureRunner));
-    assert!(!tr.effects.contains(&Effect::StartReviewer));
+    let started = waits_then_starts(&tr, crate::GoOn::SentBack);
+    assert!(started.effects.contains(&Effect::EnsureRunner));
+    assert!(!started.effects.contains(&Effect::StartReviewer));
 }
 
 #[test]
@@ -599,10 +622,11 @@ fn a_passing_check_goes_on_to_whoever_the_mode_says() {
         let tr = step(&t, &check_done(true, mode, 3));
         assert_eq!(tr.ticket.status, TicketStatus::Review, "{mode:?}");
         assert_eq!(tr.ticket.review.turn, Some(turn), "{mode:?}");
-        assert_eq!(
-            tr.effects.contains(&Effect::StartReviewer),
-            mode != ReviewMode::Human
-        );
+        assert!(!tr.effects.contains(&Effect::StartReviewer));
+        assert_eq!(tr.ticket.review.reviewer_waits, mode != ReviewMode::Human);
+        if mode != ReviewMode::Human {
+            reviewer_waits_then_starts(&tr);
+        }
         let round = &tr.ticket.review.rounds[0];
         assert_eq!(
             (round.reviewer, round.verdict),
@@ -733,6 +757,33 @@ fn a_project_without_a_check_command_gets_a_round_that_says_so() {
         )
     );
     assert_eq!(tr.ticket.review.turn, Some(ReviewTurn::Person));
+    // With the reviewer agent first, it is due and waits for a free agent.
+    let t = after_hand_in_with_check(ReviewMode::Agent);
+    let mode = ReviewMode::Agent;
+    let tr = step(&t, &TicketEvent::CheckSkipped { mode });
+    reviewer_waits_then_starts(&tr);
+}
+
+#[test]
+fn a_verdict_that_comes_while_the_reviewer_waits_ends_the_wait_and_a_person_can_decide_too() {
+    let due = step(
+        &ticket_in(TicketStatus::Running),
+        &finished(ReviewMode::Agent),
+    );
+    assert!(due.ticket.review.reviewer_waits);
+    // Only the simulated reviewer can say anything before it started.
+    let back = step(&due.ticket, &verdict(Verdict::RequestChanges, "fix it"));
+    assert!(!back.ticket.review.reviewer_waits);
+    waits_then_starts(&back, crate::GoOn::SentBack);
+    let ret = TicketEvent::Return {
+        comment: "no".to_owned(),
+    };
+    let returned = step(&due.ticket, &ret);
+    assert!(!returned.ticket.review.reviewer_waits);
+    assert_eq!(returned.ticket.status, TicketStatus::Running);
+    let accepted = step(&due.ticket, &TicketEvent::Accept { comment: None });
+    assert!(!accepted.ticket.review.reviewer_waits);
+    assert!(!crate::schedule::goes_on(&accepted.ticket));
 }
 
 #[test]
