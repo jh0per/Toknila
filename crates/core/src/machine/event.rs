@@ -22,6 +22,9 @@ pub enum TicketEvent {
     Request,
     /// The schedule gave the card a slot: its runner starts.
     Start,
+    /// Import only: a card the file marks done goes Running with no agent and no ship; the work
+    /// is already in the repository.
+    StartImported,
     /// Host: a Waiting card's agent process was ended after the grace; the card holds no slot
     /// and keeps the agent's `session` for the profile's resume form.
     AgentPaused { session: Option<String> },
@@ -185,7 +188,7 @@ impl TicketEvent {
             Self::DepsSatisfied => "deps_satisfied",
             Self::DepsUnsatisfied => "deps_unsatisfied",
             Self::Request => "start",
-            Self::Start => "start",
+            Self::Start | Self::StartImported => "start",
             Self::AgentPaused { .. } => "agent_paused",
             Self::RunnerLost { .. } => "runner_lost",
             Self::ResumeWanted => "resume_wanted",

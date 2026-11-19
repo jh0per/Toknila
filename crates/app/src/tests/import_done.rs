@@ -93,3 +93,25 @@ fn a_chain_imported_from_a_spec_folder_with_a_gap_has_no_card_left_behind() {
         ]
     );
 }
+
+/// A project whose agent is a process: importing done stories queues no ship and no runner, and
+/// the stories still end Merged, in order, with the fake runner never asked for anything.
+#[test]
+fn done_stories_start_no_agent_and_make_no_ship() {
+    use crate::external::ExternalEffect;
+    let mut mem = super::runs::with_agents();
+    chains::import(&mut mem, "DEMO", FILE, None).expect("imports");
+    assert!(
+        mem.deferred.iter().all(|e| !matches!(
+            e,
+            ExternalEffect::StartRunner { .. } | ExternalEffect::PrepareShip { .. }
+        )),
+        "{:?}",
+        mem.deferred
+    );
+    super::runs::settle(&mut mem);
+    assert!(mem.runner.started.borrow().is_empty());
+    assert_eq!(card(&mem, "D").status, TicketStatus::Merged);
+    assert_eq!(card(&mem, "B").status, TicketStatus::Merged);
+    assert_eq!(card(&mem, "A").status, TicketStatus::Ready);
+}

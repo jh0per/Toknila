@@ -95,6 +95,7 @@ pub fn apply(
             run_on_ship(&mut effects);
             (S::Running, None)
         }
+        (S::Ready, TicketEvent::StartImported) => (S::Running, None),
         (S::Running, TicketEvent::AskHuman { reason }) => {
             (S::Waiting, Some(StatusReason::Waiting(reason.clone())))
         }
