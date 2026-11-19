@@ -36,7 +36,7 @@ pub use designs::{
     PlannerPlan, RenameDesign,
 };
 pub use events::{ErrorBody, EventQuery, EventRecord, InstructionClaim, NewActivity};
-pub use machine::MachineSettings;
+pub use machine::{MachineSettings, SoundSettings};
 pub use planner::{PlannerActivity, PlannerState, StartPlanner};
 pub use plans::{ChainFile, FolderNote, ImportPath, ImportPathResult, ImportedChain};
 pub use profiles::ProfileList;

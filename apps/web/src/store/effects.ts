@@ -1,8 +1,10 @@
 // Runs the effects the reducer describes. The only place that touches the network or history.
 
-import { get, post, streamUrl } from "../api/http";
+import { get, post, put, streamUrl } from "../api/http";
+import { playSound, previewSound } from "../sound/play";
+import { COLLECT_MS } from "./sound";
 import type {
-  ChainDetail, ChainItem, EventRecord, InboxItem, Project, ProjectAgents, Suggestion, TicketDetail, TicketThreads,
+  ChainDetail, ChainItem, EventRecord, InboxItem, MachineSettings, Project, ProjectAgents, Suggestion, TicketDetail, TicketThreads,
 } from "../api/types";
 import type { CardCommand, Effect, Msg, ThreadAction } from "./msg";
 import { attachFiles, uploadForAsk } from "./attachEffects";
@@ -94,6 +96,9 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     dispatch({ type: "loaded", projects, chains });
     await loadInbox();
     dispatch({ type: "agentsLoaded", agents: await get<ProjectAgents[]>("/agents") });
+    // The sound switches are the daemon's; an older daemon has none, so they stay off.
+    const machine = await get<MachineSettings>("/machine/settings");
+    if (machine.sounds) dispatch({ type: "soundsLoaded", sounds: machine.sounds });
   };
 
   /// The inbox of every project, newest first.
@@ -121,7 +126,7 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
     ws.onopen = () => dispatch({ type: "linkOpened" });
     ws.onmessage = (m) => {
       try {
-        dispatch({ type: "event", event: JSON.parse(String(m.data)) as EventRecord });
+        dispatch({ type: "event", event: JSON.parse(String(m.data)) as EventRecord, received: Date.now() });
       } catch {
         /* not an event */
       }
@@ -297,6 +302,22 @@ export function effectRunner(dispatch: Dispatch): { run: (e: Effect) => void; st
       case "connect":
         if (e.delayMs === 0) connect(e.since);
         else later("connect", () => connect(e.since), e.delayMs);
+        return;
+      case "soundWindow":
+        later("sound", () => dispatch({ type: "soundDue" }), COLLECT_MS);
+        return;
+      case "playSound":
+        playSound(e.kind);
+        return;
+      case "previewSound":
+        previewSound(e.kind);
+        return;
+      case "saveSounds":
+        // The daemon keeps the max_checks it has: the body carries it as the page last read it.
+        void get<MachineSettings>("/machine/settings")
+          .then((m) => put<MachineSettings>("/machine/settings", { max_checks: m.max_checks, sounds: e.sounds }))
+          .then((m) => m.sounds && dispatch({ type: "soundsLoaded", sounds: m.sounds }))
+          .catch(failed);
         return;
       case "pushUrl":
         window.history.pushState(null, "", `${e.path}${window.location.search}`);

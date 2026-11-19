@@ -18,6 +18,7 @@ import { type ReleaseUi, initialRelease } from "./release";
 import { type RemovalState, initialRemoval } from "./removal";
 import { type Route, type Tab, routePath } from "./route";
 import { type SettingsState, initialSettings } from "./settings";
+import { type SoundState, initialSound } from "./sound";
 import type { Theme } from "./theme";
 import { type UpdatesState, initialUpdates } from "./updates";
 import { type UsageState, initialUsage } from "./usage";
@@ -89,6 +90,8 @@ export interface State {
   askAttach: AskAttachState;
   /// Updates of the desktop app (empty in a browser).
   updates: UpdatesState;
+  /// The sound switches (the daemon's) and the sound that is due.
+  sound: SoundState;
   /// The viewer's colour theme; remembered in this browser only.
   theme: Theme;
   /// The assistant panel beside the screens: open, width, filter, the context chip.
@@ -141,6 +144,7 @@ export function initialState(route: Route): State {
     attach: initialAttach,
     askAttach: initialAskAttach,
     updates: initialUpdates,
+    sound: initialSound,
     theme: "system",
     assistant: initialAssistant,
     shortcutsOpen: false,

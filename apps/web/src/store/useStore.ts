@@ -1,6 +1,7 @@
 // Glue between the pure reducer, the effect runner and React.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { armAudio } from "../sound/play";
 import { effectRunner } from "./effects";
 import type { Effect, Intent, Msg } from "./msg";
 import { reduce } from "./reduce";
@@ -26,11 +27,13 @@ export function useStore(): [State, (intent: Intent) => void] {
     const onPop = () => dispatch({ type: "urlChanged", route: parseRoute(window.location.pathname) });
     // The desktop menu asks for a form through the address hash (`#/add-project`).
     const onHash = () => dispatch({ type: "hashChanged", hash: window.location.hash });
+    const disarm = armAudio();
     window.addEventListener("popstate", onPop);
     window.addEventListener("hashchange", onHash);
     dispatch({ type: "started" });
     if (window.location.hash) onHash();
     return () => {
+      disarm();
       window.removeEventListener("popstate", onPop);
       window.removeEventListener("hashchange", onHash);
       runner.current?.stop();

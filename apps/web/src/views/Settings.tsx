@@ -7,6 +7,7 @@ import { Checks } from "./Checks";
 import { MachineSettings } from "./MachineSettings";
 import { ProfilesSettings } from "./ProfilesSettings";
 import { ProjectSettings } from "./ProjectSettings";
+import { SoundSettings } from "./SoundSettings";
 import { TrustNote } from "./TrustNote";
 import { UpdatesSettings } from "./UpdatesSettings";
 
@@ -26,6 +27,7 @@ export function Settings({ state, dispatch }: { state: State; dispatch: (i: Inte
         {isProjectSection(section) && <ProjectSettings state={state} dispatch={dispatch} project={project} section={section} />}
         {section === "profiles" && <ProfilesSettings state={state} dispatch={dispatch} />}
         {section === "machine" && <MachineSettings />}
+        {section === "machine" && <SoundSettings state={state} dispatch={dispatch} />}
         {section === "updates" && <UpdatesSettings state={state} dispatch={dispatch} />}
         {section === "about" && <About state={state} dispatch={dispatch} />}
         {section === "checks" && (
