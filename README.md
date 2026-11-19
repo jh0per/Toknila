@@ -99,7 +99,6 @@ tok ls                                             # what stands where
 - [Architecture](docs/architecture.md).
 - [Run reports](docs/runs): what each batch of real agent runs found.
 - The [Releases page](https://github.com/jh0per/Toknila/releases).
-- [Contributing](CONTRIBUTING.md).
 
 ## What is next
 
@@ -109,8 +108,6 @@ tok ls                                             # what stands where
 
 ## License
 
-Toknila is source-available, not open source. From version 0.3.9 it is under the
-PolyForm Shield License 1.0.0: you may use Toknila, read and change the code and contribute, but
-you may not use the code to provide a product that competes with Toknila. Versions up to 0.3.8
-were released under the Elastic License 2.0. The [LICENSE](LICENSE) file of the version you have
-holds the exact terms that apply to it; read it.
+Toknila is under the Elastic License 2.0. It is source-available, not open source: you may use it
+and modify it, but you may not offer it to others as a hosted service. The [LICENSE](LICENSE) file
+holds the exact terms; read it.

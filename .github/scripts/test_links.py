@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECKED = ["README.md", "docs/install.md"]
 
 # Files a later story adds. A link to one of these passes until the file exists; once it exists the
-# entry is only a note and the link is checked like any other. TOKNILA-164 adds CONTRIBUTING.md.
-EXPECTED_LATER = {"CONTRIBUTING.md"}
+# entry is only a note and the link is checked like any other. None is expected now.
+EXPECTED_LATER = set()
 
 PICTURES = ROOT / "docs" / "screenshots" / "readme"
 MAX_PICTURES = 4
