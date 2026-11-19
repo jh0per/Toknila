@@ -6,7 +6,8 @@
 //! own runner, so a `Return` goes back to a worker session that still has its context.
 
 use super::check_phase::Checked;
-use super::checks::{non_empty, run_on_ship};
+use super::checks::non_empty;
+use super::goes_on::{self, send_back};
 use super::{Effect, TransitionError};
 use crate::{
     Actor, ItemVerdict, ReviewMode, ReviewNote, ReviewTurn, StatusReason, Ticket, TicketStatus,
@@ -19,12 +20,12 @@ pub const NUDGE_MESSAGE: &str = "Record your verdict with review_verdict; if you
 /// The most lines of the reviewer's screen a note keeps.
 const NOTE_LINES: usize = crate::question::SCREEN_LINES;
 
-/// The card was handed in: it waits for whoever `mode` says. A reviewer agent is started when
-/// the agent's verdict comes first.
+/// The card was handed in: it waits for whoever `mode` says. When the agent's verdict comes
+/// first the reviewer agent is due: it starts when an agent is free ([`goes_on`]).
 pub(super) fn enter(next: &mut Ticket, mode: ReviewMode, effects: &mut Vec<Effect>) {
     let turn = mode.first_turn();
     if matches!(turn, ReviewTurn::Agent { .. }) {
-        effects.push(Effect::StartReviewer);
+        goes_on::reviewer(next);
     }
     next.review.turn = Some(turn);
     next.review.nudged = false;
@@ -130,45 +131,8 @@ pub(super) fn check_done(
     }
     next.review
         .record(Actor::System, Verdict::RequestChanges, output, now);
-    send_back(next, max_rounds, "The check failed", output, effects, true)
-}
-
-/// A round of the loop asked for changes: the card goes back to the worker with `text`, unless
-/// `max_rounds` returns were already used since a person last decided; then it waits for the
-/// person. `by_check` says whether the text is the check's (and so not the reviewer's remarks).
-fn send_back(
-    next: &mut Ticket,
-    max_rounds: u32,
-    what: &str,
-    text: &str,
-    effects: &mut Vec<Effect>,
-    by_check: bool,
-) -> Result<Outcome, TransitionError> {
-    let used = next.review.auto_returns();
-    next.review.nudged = false;
-    if used > max_rounds {
-        next.review.turn = Some(ReviewTurn::Person);
-        effects.push(Effect::RecordNotice {
-            summary: format!(
-                "{what} again, and the {max_rounds} rounds of the loop are used; it is for a person to decide."
-            ),
-        });
-        return Ok((TicketStatus::Review, None));
-    }
-    next.review.turn = None;
-    effects.push(if by_check {
-        Effect::RecordCheckOutput {
-            text: format!(
-                "{what} (round {used} of {max_rounds}). Fix what it reports, then finish again.\n\n{text}"
-            ),
-        }
-    } else {
-        Effect::RecordRemarks {
-            text: text.to_owned(),
-        }
-    });
-    run_on_ship(effects);
-    Ok((TicketStatus::Running, None))
+    let limit = (max_rounds, now);
+    send_back(next, limit, "The check failed", output, effects, true)
 }
 
 /// What the reviewer agent said, as the machine takes it.
@@ -222,7 +186,7 @@ pub(super) fn agent_decides(
         }
         Verdict::RequestChanges => send_back(
             next,
-            said.max_rounds,
+            (said.max_rounds, now),
             "The reviewer asked for changes",
             &text,
             effects,
@@ -282,11 +246,9 @@ pub(super) fn agent_stopped(
     Ok((TicketStatus::Review, None))
 }
 
-/// A person asks for the reviewer again after it gave no verdict.
-pub(super) fn rerun(
-    next: &mut Ticket,
-    effects: &mut Vec<Effect>,
-) -> Result<Outcome, TransitionError> {
+/// A person asks for the reviewer again after it gave no verdict: it is due, and starts when an
+/// agent is free.
+pub(super) fn rerun(next: &mut Ticket) -> Result<Outcome, TransitionError> {
     if next.review.turn != Some(ReviewTurn::Person)
         || !matches!(next.review.note, Some(ReviewNote::NoVerdict { .. }))
     {
@@ -298,7 +260,7 @@ pub(super) fn rerun(
     next.review.turn = Some(ReviewTurn::Agent { decides: false });
     next.review.nudged = false;
     next.review.note = None;
-    effects.push(Effect::StartReviewer);
+    goes_on::reviewer(next);
     Ok((TicketStatus::Review, None))
 }
 

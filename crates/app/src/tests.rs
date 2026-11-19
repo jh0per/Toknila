@@ -44,6 +44,7 @@ mod runs;
 mod settings;
 mod ship_guard;
 mod ships;
+mod slot_line;
 mod thread_resume;
 mod threads;
 mod wildcards;

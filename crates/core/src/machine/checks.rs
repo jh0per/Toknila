@@ -97,13 +97,8 @@ pub(super) fn stale_start(event: &TicketEvent, ticket: &Ticket) -> Option<StaleP
     }
 }
 
-/// [`run_on_ship`] after a person decided about a base branch that is behind.
-pub(super) fn run_on_ship_with(effects: &mut Vec<Effect>, stale: StalePolicy) {
-    effects.push(Effect::PrepareShipWith { stale });
-    effects.push(Effect::EnsureRunner);
-}
-
-/// The ticket works on its ship: make sure it exists, then (re)start the runner there.
+/// The ticket works on its ship: make sure it exists, then (re)start the runner there. Only the
+/// schedule's `Start` does this at once; every other way back to work waits for a free agent.
 pub(super) fn run_on_ship(effects: &mut Vec<Effect>) {
     effects.push(Effect::PrepareShip);
     effects.push(Effect::EnsureRunner);

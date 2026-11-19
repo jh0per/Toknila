@@ -8,6 +8,7 @@ use toknila_core::{CommentBody, CommentKind, TicketStatus};
 
 use super::Mem;
 use super::runs::{a, act, settle, with_agents};
+use super::slot_line::exits;
 use crate::recovery::recover;
 use crate::{agent, paused, schedule, tickets};
 
@@ -58,6 +59,8 @@ fn cancel_b(mem: &mut Mem) {
     };
     tickets::act(mem, &t, event).expect("cancel");
     settle(mem);
+    // The cancel stopped B's runner; its slot is free once the host reports the process gone.
+    exits(mem, &t, toknila_core::AgentRole::Worker, true);
 }
 
 #[test]

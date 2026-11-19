@@ -13,10 +13,10 @@ impl ChainView {
         for node in self.topo_order() {
             let NodeRef::Ticket(id) = node else { continue };
             let Some(t) = self.ticket(id) else { continue };
-            // A paused agent whose answer arrived wants its slot back; its dependencies were
-            // satisfied when it started.
-            let resumes = t.agent_paused.as_ref().is_some_and(|p| p.resume);
-            let wanted = resumes
+            // A story that has begun and must go on wants an agent: a paused or lost one whose
+            // answer arrived, a worker sent back or unblocked, a reviewer that is due. Its
+            // dependencies were satisfied when it started.
+            let wanted = crate::schedule::goes_on(t)
                 || (t.status == TicketStatus::Ready
                     && !t.paused
                     && (t.queued || self.chain.autostart)

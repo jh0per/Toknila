@@ -39,13 +39,18 @@ pub fn check_invariants(ticket: &Ticket) -> Result<(), String> {
     if ticket.paused && ticket.status != S::Backlog {
         return Err(format!("paused ticket in {:?}", ticket.status));
     }
-    // A Running card holds one only while its lost agent waits for a slot.
+    // A Running card holds one only while its agent waits for a free one to start again.
     if ticket
         .agent_paused
         .as_ref()
-        .is_some_and(|p| ticket.status != S::Waiting && !(ticket.status == S::Running && p.lost))
+        .is_some_and(|p| ticket.status != S::Waiting && !(ticket.status == S::Running && p.resume))
     {
         return Err(format!("paused agent in {:?}", ticket.status));
+    }
+    if ticket.review.reviewer_waits
+        && !matches!(ticket.review.turn, Some(crate::ReviewTurn::Agent { .. }))
+    {
+        return Err("a reviewer waits outside its turn".to_owned());
     }
     if ticket.queued && ticket.status != S::Ready {
         return Err(format!("queued ticket in {:?}", ticket.status));

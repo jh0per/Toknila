@@ -261,6 +261,10 @@ pub struct Review {
     /// The reviewer was already nudged for a verdict in this round of review.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub nudged: bool,
+    /// The reviewer agent's turn came while every agent of the project was busy: it starts when
+    /// one is free (the schedule's `ResumeStart`). Only while the turn is the agent's.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reviewer_waits: bool,
     /// Why the card is for a person, when the reviewer gave no verdict.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<ReviewNote>,
@@ -352,17 +356,6 @@ impl Review {
             comment: comment.trim().to_owned(),
             decided_at: at,
         });
-    }
-}
-
-impl ReviewMode {
-    /// Whom a card that has just been handed in waits for.
-    pub fn first_turn(self) -> ReviewTurn {
-        match self {
-            Self::Human => ReviewTurn::Person,
-            Self::Agent => ReviewTurn::Agent { decides: true },
-            Self::Both => ReviewTurn::Agent { decides: false },
-        }
     }
 }
 

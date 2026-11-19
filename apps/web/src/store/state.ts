@@ -191,9 +191,19 @@ export function slotsOf(s: State): { used: number; limit: number } | undefined {
 
 /// Place in line (1 is next) of a card waiting for an agent slot.
 export function queuePosition(s: State, ticketId: string): number | undefined {
+  return queued(s, ticketId)?.position;
+}
+
+/// What a card waiting for an agent slot says, in the daemon's words ("queued #2", "sent back;
+/// goes on when an agent is free").
+export function queueText(s: State, ticketId: string): string | undefined {
+  return queued(s, ticketId)?.text;
+}
+
+function queued(s: State, ticketId: string): { position: number; text: string } | undefined {
   for (const a of s.agents) {
     const q = a.queued.find((c) => c.ticket === ticketId);
-    if (q) return q.position;
+    if (q) return q;
   }
   return undefined;
 }

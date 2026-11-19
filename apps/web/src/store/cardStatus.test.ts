@@ -8,6 +8,27 @@ const detail = (allowed: string[], awaiting?: TicketDetail["review"]["awaiting"]
   ({ allowed_actions: allowed, review: { rounds: [], awaiting } }) as unknown as TicketDetail;
 const pace = (over: Partial<Pace> = {}): Pace => ({ queue: undefined, autostart: true, ...over });
 
+describe("a story that has to go on while every agent is busy", () => {
+  it("says the daemon's words, for a worker sent back or unblocked and for a reviewer that is due", () => {
+    const sent = { since: 1, resume: true, go_on: { why: "sent_back" } } as Ticket["agent_paused"];
+    const wait = "sent back; goes on when an agent is free";
+    const line = statusLine(card("running", { agent_paused: sent }), detail([]), pace({ queue: 1, wait }));
+    expect(line.text).toBe("Sent back; goes on when an agent is free");
+    expect(line.tone).toBe("going");
+    const review = { rounds: [], turn: { by: "agent", decides: true }, reviewer_waits: true } as unknown as Ticket["review"];
+    const due = "the reviewer is due; it starts when an agent is free";
+    const reviewer = statusLine(card("review", { review }), detail([], { by: "agent" } as never), pace({ wait: due }));
+    expect(reviewer.text).toBe("The reviewer is due; it starts when an agent is free");
+  });
+
+  it("keeps the answered agent's own sentence", () => {
+    const answered = { since: 1, resume: true } as Ticket["agent_paused"];
+    const reason = { status: "waiting", kind: "question", text: "Which database?" } as StatusReason;
+    const line = statusLine(card("waiting", { status_reason: reason, agent_paused: answered }), detail([]), pace({ queue: 1, wait: "answered" }));
+    expect(line.text).toBe("Answered: the agent resumes when a slot is free (next in line)");
+  });
+});
+
 describe("the status sentence", () => {
   it("says a waiting card waits for your answer, with its question as the next step", () => {
     const reason = { status: "waiting", kind: "question", text: "Which database?" } as StatusReason;

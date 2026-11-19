@@ -96,6 +96,7 @@ mod tests {
             since: Timestamp(0),
             resume,
             lost: false,
+            go_on: None,
         });
         t
     }

@@ -58,6 +58,8 @@ a.node:hover { border-color: var(--on-surface-variant); }
   border-radius: var(--shape-full); padding: 0 var(--sp2); white-space: nowrap; }
 .node .st .dot { background: var(--sc); }
 .node .mark { font-size: var(--fs-label-m); line-height: var(--lh-label-m); color: var(--status-block); border: 1px solid var(--status-block); border-radius: var(--shape-xs); padding: 0 var(--sp1); white-space: nowrap; width: fit-content; }
+/* What a waiting card says can be a sentence: it gives way on a narrow card, whole on hover. */
+.node .mark.queued { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .node .mark.pr { cursor: pointer; }
 .node .mark.pr.passed { color: var(--status-done); border-color: var(--status-done); }
 .node .mark.pr.failed { color: var(--error); border-color: var(--error); }

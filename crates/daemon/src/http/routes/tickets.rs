@@ -175,7 +175,7 @@ pub async fn list_tickets(
             .into_iter()
             .map(|c| (c.id, c.name))
             .collect();
-        let queue = schedule::queue_positions(repo)?;
+        let queue = schedule::queue(repo)?;
         let projects: HashMap<_, _> = repo.projects()?.into_iter().map(|p| (p.id, p)).collect();
         let owners: HashMap<ChainId, _> = repo
             .chains(None)?
@@ -207,7 +207,8 @@ pub async fn list_tickets(
                 chain: names.get(&t.chain_id).cloned().unwrap_or_default(),
                 in_status_ms: at.millis_since(t.status_since),
                 needs_human: t.status.needs_human(),
-                queue_position: queue.get(&t.id).copied(),
+                queue_position: queue.get(&t.id).map(|(n, _)| *n),
+                queue_text: queue.get(&t.id).map(|(_, text)| text.clone()),
                 check: check_phase_of(&t, &line),
                 merge_wait,
                 ticket: t,

@@ -27,6 +27,17 @@ pub enum ReviewMode {
     Both,
 }
 
+impl ReviewMode {
+    /// Whom a card that has just been handed in waits for.
+    pub fn first_turn(self) -> super::ReviewTurn {
+        match self {
+            Self::Human => super::ReviewTurn::Person,
+            Self::Agent => super::ReviewTurn::Agent { decides: true },
+            Self::Both => super::ReviewTurn::Agent { decides: false },
+        }
+    }
+}
+
 /// Where an accepted card's work lands.
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]

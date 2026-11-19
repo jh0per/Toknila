@@ -2615,6 +2615,15 @@ export interface components {
             /** @description Relative to the repository, with `/`: `specs/001-login`, `plans/phase-1.toml`. */
             relative: string;
         };
+        /** @description Why a story that has begun goes on with a new run of its agent once an agent is free. */
+        GoOn: {
+            /** @enum {string} */
+            why: "sent_back";
+        } | {
+            stale?: components["schemas"]["StalePolicy"];
+            /** @enum {string} */
+            why: "unblocked";
+        };
         /**
          * @description How a check ended, as the agent wrote it in its hand-in.
          * @enum {string}
@@ -3376,10 +3385,13 @@ export interface components {
             title?: string | null;
         };
         /**
-         * @description A Waiting card whose agent's process was ended after a grace, so the card holds no slot while
-         *     it waits for a person. It keeps what the run needs to come back: Claude Code's session id.
+         * @description A card whose agent has no process and that comes back through the schedule: a Waiting card
+         *     whose agent was ended after a grace (it holds no slot while it waits for a person), a card
+         *     whose agent the app lost, or one that has to go on (`go_on`) and waits for a free agent. It
+         *     keeps what the run needs to come back: Claude Code's session id.
          */
         PausedAgent: {
+            go_on?: components["schemas"]["GoOn"] | null;
             /**
              * @description The process was lost (the app restarted), not ended on purpose: the run that replaces it
              *     is told so, and a second loss soon after blocks the card.
@@ -3730,7 +3742,8 @@ export interface components {
             runs: components["schemas"]["ProjectRun"][];
             /**
              * Format: int32
-             * @description Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
+             * @description Slots held now: stories with an agent (working, waiting for an answer, a reviewer at
+             *     work, or any live runner), one each. Can exceed `limit` after the limit was lowered.
              */
             used: number;
         };
@@ -3802,6 +3815,11 @@ export interface components {
              * @description 1 is next.
              */
             position: number;
+            /**
+             * @description What the card says while it waits, in plain words: "queued #2" for a story that has not
+             *     started, "sent back; goes on when an agent is free" for one that has.
+             */
+            text: string;
             ticket: components["schemas"]["TicketId"];
         };
         /** @description Body of `POST /v1/usage/quota`: the rate-limit windows an agent's status line received. */
@@ -4039,6 +4057,11 @@ export interface components {
              *     check; a pass merges by itself.
              */
             recheck?: boolean;
+            /**
+             * @description The reviewer agent's turn came while every agent of the project was busy: it starts when
+             *     one is free (the schedule's `ResumeStart`). Only while the turn is the agent's.
+             */
+            reviewer_waits?: boolean;
             /** @description Oldest first. */
             rounds?: components["schemas"]["ReviewRound"][];
             since_return?: components["schemas"]["SinceReturn"] | null;
@@ -4249,6 +4272,11 @@ export interface components {
             /** @description A story is done (merged). */
             story_done: boolean;
         };
+        /**
+         * @description What the person decided about a base branch that is behind its upstream.
+         * @enum {string}
+         */
+        StalePolicy: "refuse" | "fast_forward" | "allow";
         /**
          * @description Whether the milestone cuts itself or waits for a person.
          * @enum {string}
@@ -4567,6 +4595,11 @@ export interface components {
              * @description Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
              */
             queue_position?: number | null;
+            /**
+             * @description What the card says while it waits for a free agent, in plain words ("queued #2", "sent
+             *     back; goes on when an agent is free"); absent otherwise.
+             */
+            queue_text?: string | null;
             /** @description How the card is reviewed (mode, reviewer, whose turn) and the rounds so far. */
             review: components["schemas"]["ReviewView"];
             /** @description How long the card's agents ran: the finished runs, and the start of the one still going. */
@@ -4601,6 +4634,11 @@ export interface components {
              * @description Place in line (1 is next) while the card waits for a free agent slot; `null` otherwise.
              */
             queue_position?: number | null;
+            /**
+             * @description What the card says while it waits for a free agent ("queued #2", "sent back; goes on when
+             *     an agent is free"); absent otherwise.
+             */
+            queue_text?: string | null;
             /** @description The card's agent is the simulated one (`sim`): no process runs. */
             simulated?: boolean;
             ticket: components["schemas"]["Ticket"];

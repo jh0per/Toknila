@@ -85,6 +85,17 @@ fn start_with<U: UnitOfWork + ?Sized>(
         let comments = uow.comments(ticket)?;
         let returned = toknila_core::instructions::Returned::of(&t.review);
         let waiting = toknila_core::instructions::waiting(&comments, returned.as_ref());
+        if resume.is_none() {
+            // What waited for the agent (a Return's text, context) is typed to a run that is
+            // not told its brief, or to a worker that is still alive and is kept; a run that
+            // reads them takes them first.
+            for c in comments.iter().filter(|c| waiting.ids.contains(&c.id)) {
+                uow.defer(ExternalEffect::DeliverInstruction {
+                    ticket,
+                    comment: c.clone(),
+                });
+            }
+        }
         let resume = resume.map(|(session, lost)| Resume {
             session,
             input: answer_input(&comments, lost),
@@ -187,6 +198,7 @@ pub(crate) fn start_failed<U: UnitOfWork + ?Sized>(
 /// A runner process ended. The journal says so; a ticket whose agent was still working is
 /// blocked by how it ended ([`toknila_core::ProcessExit::block_reason`]), unless the host ended
 /// it on purpose. A ticket that has moved on (in Review, merged, blocked already) ignores it.
+/// Whatever it moved, the schedule of its project runs: the slot the process held may be free.
 ///
 /// Returns `true` when it queued a replacement worker run (see [`replace_worker`]).
 pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<bool> {
@@ -197,23 +209,37 @@ pub fn ended<U: UnitOfWork + ?Sized>(uow: &mut U, ended: RunEnded) -> AppResult<
         refused,
     } = ended;
     let ticket = run.ticket_id;
-    let role = run.role;
-    if role == AgentRole::Planner {
+    if run.role == AgentRole::Planner {
         // A project's planner is no card's agent: its end moves nothing, and the window learns of
         // it from the terminal stream.
         return Ok(false);
     }
-    let reason = exit.block_reason();
     uow.emit(&DomainEvent::RunnerExited {
         run: run.clone(),
         exit: exit.clone(),
     })?;
+    let restarted = moved_by_end(uow, &run, exit, stopped, refused)?;
+    // The process is gone, on purpose or by itself, so the slot it held may be free: a waiting
+    // card starts. The event the end sent may have been refused (the story had moved on, a
+    // person blocked it by hand), and a refused event runs no schedule of its own.
+    free_slot(uow, ticket)?;
+    Ok(restarted)
+}
+
+/// What the end of a worker or reviewer run moves on its ticket; `true` when it queued a
+/// replacement worker run.
+fn moved_by_end<U: UnitOfWork + ?Sized>(
+    uow: &mut U,
+    run: &Run,
+    exit: toknila_core::ProcessExit,
+    stopped: bool,
+    refused: Option<String>,
+) -> AppResult<bool> {
+    let (ticket, role) = (run.ticket_id, run.role);
+    let reason = exit.block_reason();
     if stopped {
-        // The host ended it on purpose (a reviewer whose verdict is in, an accepted card): the
-        // slot it held is free now that the process is gone, so a waiting card starts.
-        let restarted = role == AgentRole::Worker && replace_worker(uow, &run)?;
-        free_slot(uow, ticket)?;
-        return Ok(restarted);
+        // The host ended it on purpose (a reviewer whose verdict is in, an accepted card).
+        return Ok(role == AgentRole::Worker && replace_worker(uow, run)?);
     }
     if role == AgentRole::Reviewer {
         // A reviewer reports its verdict first and exits after; one that ends while the card
@@ -268,14 +294,16 @@ const RESTART_GUARD_MS: i64 = 5_000;
 /// The safety net for a worker the host stopped: a Running card with no live worker still needs
 /// an agent (the replacement the machine asked for may have been lost to a race with this stop),
 /// so a run starts again with the kickoff that carries the open Return and the pending
-/// instructions. A card in any other state is left alone; a run that ended right after it
-/// started blocks the card instead of starting a loop. Returns whether a start was queued.
+/// instructions. A card in any other state is left alone, and so is one whose agent waits for a
+/// free one (the schedule starts it); a run that ended right after it started blocks the card
+/// instead of starting a loop. Returns whether a start was queued.
 fn replace_worker<U: UnitOfWork + ?Sized>(uow: &mut U, run: &Run) -> AppResult<bool> {
     let ticket = run.ticket_id;
     let Some(t) = uow.ticket(ticket)? else {
         return Ok(false);
     };
     if t.status != TicketStatus::Running
+        || t.agent_paused.is_some()
         || uow.live_runners()?.contains(&(ticket, AgentRole::Worker))
     {
         return Ok(false);

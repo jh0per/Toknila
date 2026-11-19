@@ -125,7 +125,9 @@ pub(crate) fn deliver_to_sim<U: UnitOfWork + ?Sized>(
         .view
         .tickets
         .iter()
+        // A card whose agent waits for a free one has no agent to tell yet: its start does.
         .filter(|t| matches!(t.status, TicketStatus::Running | TicketStatus::Waiting))
+        .filter(|t| t.agent_paused.is_none())
         .filter(|t| {
             project
                 .as_ref()

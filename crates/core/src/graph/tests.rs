@@ -21,7 +21,7 @@ fn settle(v: &mut ChainView) -> Settled {
             return all;
         }
         for ticket in start {
-            let event = TicketEvent::Start;
+            let event = crate::schedule::start_event(v.ticket(ticket).expect("wanted"));
             let (effects, events) = v
                 .record(|v| v.apply_ticket_event(ticket, &event, T))
                 .expect("start");

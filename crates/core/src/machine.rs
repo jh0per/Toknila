@@ -15,7 +15,8 @@
 //! | Review (checking) | Review | `CheckCannotRun` (its program was not found: a person decides, no round) |
 //! | Running, Waiting | Blocked | `Block` (Review too, for a merge conflict) |
 //! | Blocked | previous status | `Unblock` |
-//! | Review | Running | `Return` (a person; the worker's runner is kept if alive) |
+//! | Review | Running | `Return` (a person; like every way back to Running but `Start`, the agent waits for a free one: `agent_paused` with `go_on`) |
+//! | Running, Waiting (no agent), Review (reviewer due) | Running / Review | `ResumeStart` (the schedule: an agent is free; the worker or the reviewer starts) |
 //! | Review | Review (merging) | `Accept`; an approving `ReviewVerdict` that decides does the same |
 //! | Review (merging) | Review (checking) | `MainMoved` (at Accept, main is at a commit the last check did not see; a pass merges by itself) |
 //! | Review (merging) | Merged | `MergeDone` (retires the ship: worktree, branch unless it holds unmerged work, record) |
@@ -40,7 +41,8 @@
 //! (dependents becoming Ready, Blocked or Backlog) come back as [`Effect`]s for the chain graph.
 
 use crate::{
-    OutOfOrder, ReviewTurn, StatusReason, Ticket, TicketStatus, Timestamp, Verdict, WaitingReason,
+    GoOn, OutOfOrder, ReviewTurn, StalePolicy, StatusReason, Ticket, TicketStatus, Timestamp,
+    Verdict, WaitingReason,
 };
 
 mod action;
@@ -163,8 +165,10 @@ pub fn apply(
                     Some(StatusReason::Waiting(WaitingReason::Silent)),
                 ),
                 (S::Running, _) => {
-                    run_on_ship(&mut effects);
-                    (S::Running, None)
+                    let why = GoOn::Unblocked {
+                        stale: StalePolicy::Refuse,
+                    };
+                    goes_on::worker(&mut next, why, now)
                 }
                 (S::Review, _) => {
                     // A merge that failed is tried again; the person or the agent has fixed
@@ -182,8 +186,7 @@ pub fn apply(
         }
         (S::Blocked, TicketEvent::FastForwardStart | TicketEvent::StartAnyway) => {
             let stale = stale_start(event, ticket).ok_or_else(refuse)?;
-            run_on_ship_with(&mut effects, stale);
-            (S::Running, None)
+            goes_on::worker(&mut next, GoOn::Unblocked { stale }, now)
         }
         (S::Review, TicketEvent::Return { comment }) => {
             review::not_merging(&next, event)?;
@@ -198,8 +201,7 @@ pub fn apply(
             effects.push(Effect::RecordInstruction {
                 text: comment.clone(),
             });
-            run_on_ship(&mut effects);
-            (S::Running, None)
+            goes_on::worker(&mut next, GoOn::SentBack, now)
         }
         (S::Review, TicketEvent::Accept { comment }) => {
             review::not_merging(&next, event)?;
@@ -253,7 +255,10 @@ pub fn apply(
         (S::Review, TicketEvent::ReviewerStopped { screen }) => {
             review::agent_stopped(&mut next, screen, &mut effects)?
         }
-        (S::Review, TicketEvent::RunReviewer) => review::rerun(&mut next, &mut effects)?,
+        (S::Review, TicketEvent::RunReviewer) => review::rerun(&mut next)?,
+        (S::Review, TicketEvent::ResumeStart) => {
+            goes_on::reviewer_starts(&mut next, &mut effects).ok_or_else(refuse)?
+        }
         (S::Backlog | S::Ready, TicketEvent::DoneOutOfOrder { behind }) => {
             if behind.is_empty() {
                 return Err(TransitionError::NothingBehind);
@@ -351,8 +356,11 @@ pub fn apply(
     if status != S::Ready {
         next.queued = false;
     }
-    if !pause::keeps(ticket, status, event) {
+    if !pause::keeps(status, event) {
         next.agent_paused = None;
+    }
+    if !matches!(next.review.turn, Some(ReviewTurn::Agent { .. })) {
+        next.review.reviewer_waits = false;
     }
     next.status = status;
     next.status_reason = reason;
@@ -365,11 +373,12 @@ pub fn apply(
 
 mod check_phase;
 mod checks;
+mod goes_on;
 mod pause;
 mod review;
 mod unfounded;
 pub use checks::person_only;
-use checks::{ask_again, block, non_empty, run_on_ship, run_on_ship_with, stale_start};
+use checks::{ask_again, block, non_empty, run_on_ship, stale_start};
 mod invariants;
 
 pub use invariants::check_invariants;

@@ -6,7 +6,7 @@ import { type EdgeRef, idOf } from "../store/edges";
 import { epicPanel } from "../store/epic";
 import { canRelease } from "../store/release";
 import type { Intent } from "../store/msg";
-import { type State, chainsOf, currentProject, hrefOf, queuePosition } from "../store/state";
+import { type State, chainsOf, currentProject, hrefOf, queueText } from "../store/state";
 import { epicTitle } from "../store/title";
 import { ContextMenu, type MenuEntry } from "./ContextMenu";
 import { EdgeLayer } from "./EdgeLayer";
@@ -281,7 +281,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
                 <TicketNode
                   key={n.key} ticket={t} projectKey={projectKey} layout={layout} href={hrefOf(route)} style={style} selected={sel === t.key} moving={moving?.id === t.id} over={over}
                   linking={Boolean(linking) && n.key !== linking} detail={state.details[t.key]}
-                  usage={chain.usage?.[t.key]} runTime={chain.run_time?.[t.key]} queued={queuePosition(state, t.id)} defaultProfile={project?.default_profile}
+                  usage={chain.usage?.[t.key]} runTime={chain.run_time?.[t.key]} queued={queueText(state, t.id)} defaultProfile={project?.default_profile}
                   onHover={(on) => setHover(on ? n.key : undefined)}
                   handlers={{
                     activate: () => {
@@ -290,7 +290,7 @@ export function Canvas({ chain, state, dispatch, onEmpty }: {
                     },
                     press: (e) => press(t.id, n.box, e),
                     grip: (e) =>
-                      begin(t.id, { w: n.box.w, h: n.box.h }, (w) => minHeight(contentOf(t, state.details[t.key], chain.usage?.[t.key] ?? chain.run_time?.[t.key], queuePosition(state, t.id)), w, measureText), e),
+                      begin(t.id, { w: n.box.w, h: n.box.h }, (w) => minHeight(contentOf(t, state.details[t.key], chain.usage?.[t.key] ?? chain.run_time?.[t.key], queueText(state, t.id)), w, measureText), e),
                     fit: () => resize(t.id, null),
                     focus: () => dispatch({ type: "peekCard", key: t.key }),
                     menu: (e) => {
