@@ -15,15 +15,19 @@ use crate::plan_files::canonical;
 use crate::shipyard::GitShipyard;
 
 /// A daemon with a shipyard, project DEMO on a fresh repository (chain `auth`, autostart), and
-/// card DEMO-1 handed in: in Review, its worktree kept, no agent working.
+/// card DEMO-1 handed in: in Review for a person, its worktree kept, no agent working (a reviewer
+/// agent at work, simulated or not, is an agent working).
 async fn reviewed(tmp: &Path) -> (Api, PathBuf, PathBuf) {
     let repo = repo(tmp);
     let api = Api::with_yard(Some(Arc::new(GitShipyard::new(
         tmp.join("home").join("ships"),
     ))));
     project(&api, &repo).await;
-    api.post("/v1/chains/auth/tickets", json!({ "title": "Login" }))
-        .await;
+    api.post(
+        "/v1/chains/auth/tickets",
+        json!({ "title": "Login", "review_mode": "human" }),
+    )
+    .await;
     let d = api.get("/v1/tickets/DEMO-1").await;
     let ship = PathBuf::from(d["ship"]["path"].as_str().expect("a ship"));
     commit_file(&ship, "login.txt", "login\n", "add login");

@@ -88,13 +88,23 @@ async fn three_started_cards_run_two_and_queue_one_until_a_slot_frees() {
         ]
     );
 
-    // The first agent hands in: Review frees its slot and the queued card starts.
+    // The first agent hands in: its story's slot passes to its reviewer agent (the project
+    // reviews with both), work in progress before the queued card.
     api.post(
         "/v1/tickets/DEMO-1/events",
         json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
     )
     .await;
     assert_eq!(api.status("DEMO-1").await, "review");
+    assert_eq!(api.status("DEMO-3").await, "ready");
+    assert_eq!(slots(&api).await, (2, 2, vec!["DEMO-3".to_owned()]));
+
+    // The reviewer gives its verdict and the card waits for a person: the queued card starts.
+    api.post(
+        "/v1/tickets/DEMO-1/events",
+        json!({ "event": "review_verdict", "verdict": "approve", "items": [] }),
+    )
+    .await;
     assert_eq!(api.status("DEMO-3").await, "running");
     assert_eq!(slots(&api).await, (2, 2, vec![]));
     assert_eq!(card(&api, "DEMO-3").await["ticket"]["queued"], false);

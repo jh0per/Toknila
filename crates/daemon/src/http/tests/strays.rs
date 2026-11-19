@@ -145,6 +145,12 @@ async fn a_deleted_chain_leaves_its_branch_in_the_list() {
     let tmp = tempfile::tempdir().expect("tmp");
     let (api, repo, ship) = api_with_card(tmp.path()).await;
     commit_file(&ship, "login.txt", "login\n", "add login");
+    // Reviewed by a person: no reviewer agent works on it when the epic is deleted.
+    let patch = json!({ "review_mode": "human" });
+    let (status, _) = api
+        .call(Method::PATCH, "/v1/tickets/DEMO-1", Some(patch))
+        .await;
+    assert_eq!(status, StatusCode::OK);
     api.post(
         "/v1/tickets/DEMO-1/events",
         json!({ "event": "finished", "summary": toknila_core::handin::from_plain("done") }),
