@@ -110,6 +110,8 @@ pub struct RunBrief {
     pub threads: Vec<toknila_core::instructions::BriefThread>,
     /// The whole hand-in under review, as its three blocks (a reviewer only).
     pub hand_in: Option<String>,
+    /// What a person told the card's agent, oldest first (a reviewer only).
+    pub told: Vec<toknila_core::instructions::BriefTold>,
     /// The run continues a card's paused agent (a worker only): see [`Resume`].
     pub resume: Option<Resume>,
 }

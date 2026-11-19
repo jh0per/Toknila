@@ -126,7 +126,10 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
         )
         .map(|m| m.text.clone());
     }
-    let hand_in = latest_hand_in(&uow.comments(ticket)?);
+    let comments = uow.comments(ticket)?;
+    let hand_in = latest_hand_in(&comments);
+    // What the person told the agent, read from the store each time the reviewer starts.
+    let told = toknila_core::instructions::BriefTold::of(&comments);
     uow.defer(ExternalEffect::StartReviewer {
         ticket,
         key: t.key.clone(),
@@ -148,6 +151,7 @@ pub(crate) fn queue_start<U: UnitOfWork + ?Sized>(
             // What the reviewer cannot open: the card's threads and the whole hand-in.
             threads,
             hand_in,
+            told,
             ..RunBrief::default()
         },
     });

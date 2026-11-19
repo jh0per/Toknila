@@ -121,6 +121,7 @@ fn start_with<U: UnitOfWork + ?Sized>(
                 check: None,
                 threads: Vec::new(),
                 hand_in: None,
+                told: Vec::new(),
                 resume,
             },
         });

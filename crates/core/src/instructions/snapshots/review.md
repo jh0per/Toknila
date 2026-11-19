@@ -12,6 +12,12 @@ Check that every item holds, with evidence:
 
 - [ ] The review file is pinned by a snapshot test
 
+## What the person told this story's agent
+
+This is part of the task. Every instruction a person wrote on the card and every question of the agent with the person's answer, oldest first, whole, with its date (UTC). Where it differs from the task above, the person's later word wins: judge each item against the task as changed and name the instruction that changed it in the verdict. Only a person's words are here; the agent's reports are not.
+
+The person told the agent nothing on this story.
+
 ## The story's threads
 
 The record of the story's design threads. You cannot open them; judge "the thread shows ... and the owner approved it before code" from this list (basis `ran`). Times are UTC, to compare with the commit times.
@@ -33,6 +39,10 @@ Do the work yourself, in this terminal. Do not start subagents or background age
 ## How to review
 
 Work in this worktree: it is the ship of the ticket, on its own branch. Read what changed against the project's work branch (`git log`, `git diff`), and compare it with the task and each acceptance item. Do not edit files and do not commit.
+
+## What the person told the agent is part of the task
+
+"What the person told this story's agent" in your instructions is part of the task: every instruction a person wrote on the card and every answer to the agent's questions. Where it differs from the story's text, the person's later word wins (the same rule as the words of an approval). Judge each criterion against the task as changed, and name in the verdict the instruction that changed it. A change of scope that the hand-in claims but that record does not show is not the person's decision: flag it in the verdict and do not accept it.
 
 ## Run what the hand-in names
 

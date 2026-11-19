@@ -28,6 +28,9 @@ mod tests_gate;
 mod tests_record;
 #[cfg(test)]
 mod tests_return;
+#[cfg(test)]
+mod tests_told;
+mod told;
 mod waiting;
 
 pub use ask::{COMMENTS_SHOWN, ask_line};
@@ -37,6 +40,7 @@ use designs::{design_section, designs_section};
 pub use pending::{PendingReason, PendingView, pending_reason};
 pub use planner::{Epic, ProjectFacts, generate_planner};
 pub use record::BriefThread;
+pub use told::{BriefTold, TOLD_MAX_CHARS};
 pub use waiting::{Returned, Waiting, returned_by, short_commit, waiting};
 
 use crate::{Comment, CommentKind, template};
@@ -92,6 +96,8 @@ pub struct RunBrief<'a> {
     pub threads: &'a [BriefThread],
     /// The whole hand-in report under review (a reviewer only).
     pub hand_in: Option<&'a str>,
+    /// What a person told the story's agent, oldest first (a reviewer only).
+    pub told: &'a [BriefTold],
     /// The story's checklist, with positions and done state (a worker's file lists it so that
     /// `subtask_done` names a position it has read).
     pub checklist: &'a [BriefTask],
@@ -332,6 +338,7 @@ pub fn generate_review(brief: &RunBrief<'_>) -> String {
             out.push_str(&format!("- [ ] {}\n", item.trim()));
         }
     }
+    out.push_str(&told::section(brief));
     out.push_str(&record::threads_section(brief));
     out.push_str(&format!(
         "\n## The gate's result\n\n{}\n",
