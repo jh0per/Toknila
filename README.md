@@ -12,7 +12,7 @@ stories to move at once, each reviewed before it lands.
 
 ## What you need
 
-- A Mac with macOS 10.15 or later (the `LSMinimumSystemVersion` in the app's `Info.plist`, written by `xtask/src/app.rs`), Apple silicon or Intel.
+- A Mac with macOS 10.15 or later, Apple silicon or Intel.
 - `git`.
 - Claude Code installed and signed in. Toknila starts it for you; nothing else is needed.
 - The GitHub command line (`gh`) only if you want accepted work sent as pull requests.
@@ -99,6 +99,7 @@ tok ls                                             # what stands where
 - [Architecture](docs/architecture.md).
 - [Run reports](docs/runs): what each batch of real agent runs found.
 - The [Releases page](https://github.com/jh0per/Toknila/releases).
+- [Contributing](CONTRIBUTING.md): report a bug, ask for a feature, send a pull request.
 
 ## What is next
 
@@ -108,6 +109,8 @@ tok ls                                             # what stands where
 
 ## License
 
-Toknila is under the Elastic License 2.0. It is source-available, not open source: you may use it
-and modify it, but you may not offer it to others as a hosted service. The [LICENSE](LICENSE) file
-holds the exact terms; read it.
+Toknila is under the [PolyForm Shield License 1.0.0](LICENSE). It is source-available, not open
+source. In plain words: you may use Toknila, read and change the code, and contribute to it; you may
+not use the code to provide a product that competes with Toknila. The [LICENSE](LICENSE) file holds
+the exact terms; read it. Versions up to 0.3.8 were released under the Elastic License 2.0 and stay
+under it. To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,0 +1,23 @@
+name: Feature request
+description: Ask for something Toknila does not do yet
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: wish
+    attributes:
+      label: What you would like
+      description: How it could work, in your words. A rough idea is enough.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+      description: Optional.

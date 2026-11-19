@@ -4,9 +4,13 @@ Toknila runs as an app on a Mac (`Toknila.app`, from the Releases page). On Linu
 daemon serves the same window in a browser. This page starts with the app from a release, then
 Linux and Windows, then building from source, then the sections for whoever cuts releases.
 
+Toknila is source-available under the [PolyForm Shield License 1.0.0](../LICENSE): you may use it,
+read and change the code and contribute, but not use the code to provide a competing product.
+Versions up to 0.3.8 were released under the Elastic License 2.0 and stay under it.
+
 ## Install from a release
 
-What you need: a Mac with macOS 10.15 or later (the `LSMinimumSystemVersion` that `cargo xtask app` writes into the app's `Info.plist`), Apple silicon or
+What you need: a Mac with macOS 10.15 or later, Apple silicon or
 Intel; `git`; Claude Code installed and signed in. The GitHub command line (`gh`) is needed only if
 accepted work is sent as pull requests. Nothing else is installed.
 

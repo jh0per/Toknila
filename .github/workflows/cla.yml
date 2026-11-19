@@ -1,0 +1,36 @@
+name: "CLA Assistant"
+
+# Asks a pull request's author to sign CLA.md once, by a comment, and records the signature.
+# Safety: with `pull_request_target` this workflow runs with the repository's token, so it never
+# checks out or runs anything from the pull request (.github/scripts/test_cla_workflow.py fails
+# if a step uses actions/checkout or a `run:`).
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+# What the action documents as its minimum; nothing else.
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  CLAAssistant:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "CLA Assistant"
+        if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
+        # contributor-assistant/github-action v2.6.1
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Signatures live on a branch of their own, never on main: the daemon merges into main
+          # locally and pushes at a release, and a bot commit on main would make that push fail.
+          path-to-signatures: 'signatures/cla.json'
+          branch: 'cla-signatures'
+          path-to-document: 'https://github.com/jh0per/Toknila/blob/main/CLA.md'
+          allowlist: jh0per,dependabot[bot]
