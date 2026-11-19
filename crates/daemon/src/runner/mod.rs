@@ -368,7 +368,7 @@ impl Runner for Runners {
     fn write(&self, ticket: TicketId, role: AgentRole, bytes: &[u8]) -> Result<(), RunnerError> {
         let active = self.active().get(&(ticket, role)).cloned();
         match active.filter(|a| !a.is_over() && !a.stopping()) {
-            Some(a) => a.write(bytes),
+            Some(a) => a.type_in(bytes),
             None => Err(RunnerError::NotRunning),
         }
     }

@@ -2,6 +2,8 @@
 //! no OS tools needed. Its arguments are steps, run in order:
 //!
 //! - `print <text>`: print a line.
+//! - `burst <n> <text>`: print the lines `<text> 1` to `<text> <n>` in one write, as fast as a
+//!   program can (a build log, a test run).
 //! - `osc52 <base64>`: ask the terminal to put the decoded text on the clipboard (`ESC]52;c;<base64>`).
 //! - `pwd`: print the working directory.
 //! - `env <NAME>`: print `NAME=<value>`.
@@ -155,6 +157,14 @@ fn main() {
     while let Some(step) = args.next() {
         match step.as_str() {
             "print" => say(&args.next().unwrap_or_default()),
+            "burst" => {
+                let n: usize = args.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+                let text = args.next().unwrap_or_default();
+                let lines: String = (1..=n).map(|i| format!("{text} {i}\n")).collect();
+                let mut out = std::io::stdout().lock();
+                let _ = out.write_all(lines.as_bytes());
+                let _ = out.flush();
+            }
             // Asks the terminal to copy: the argument is the base64 payload, as an agent sends it.
             "osc52" => say(&format!(
                 "\x1b]52;c;{}\x07",

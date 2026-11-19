@@ -223,7 +223,11 @@ pub fn start_with(paths: &Paths, lifeline: bool) -> Result<DaemonInfo> {
     crate::win::stop_inheriting_stdio();
     let mut child = cmd.spawn().context("cannot start the daemon")?;
 
-    let deadline = Instant::now() + Duration::from_secs(15);
+    let wait = start_wait(
+        std::env::var_os("TOKNILA_TEST_ROOT").is_some(),
+        std::env::var(START_WAIT_VAR).ok().as_deref(),
+    );
+    let deadline = Instant::now() + wait;
     while Instant::now() < deadline {
         if let Some(info) = running(paths)? {
             return Ok(info);
@@ -241,9 +245,29 @@ pub fn start_with(paths: &Paths, lifeline: bool) -> Result<DaemonInfo> {
         std::thread::sleep(Duration::from_millis(50));
     }
     bail!(
-        "daemon did not answer within 15 s; see logs in {}",
+        "daemon did not answer within {} s; see logs in {}",
+        wait.as_secs(),
         paths.logs().display()
     )
+}
+
+/// How long `start` waits for the daemon it started to answer.
+const START_WAIT: Duration = Duration::from_secs(15);
+/// The seconds a test's `tok` waits instead (see [`start_wait`]).
+const START_WAIT_VAR: &str = "TOKNILA_START_WAIT_SECS";
+
+/// [`START_WAIT`], or the seconds in [`START_WAIT_VAR`] when `test_root` (`TOKNILA_TEST_ROOT` is
+/// set: a test's `tok`; a person's command ignores the variable). Under the parallel test suite
+/// on GitHub's Windows runner a daemon start took up to 11 s (CI run 44308344208) and four tests
+/// failed at 15 s (run 44136517698), while one daemon alone answered in 1.5 s.
+fn start_wait(test_root: bool, value: Option<&str>) -> Duration {
+    if !test_root {
+        return START_WAIT;
+    }
+    value
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|s| *s > 0)
+        .map_or(START_WAIT, Duration::from_secs)
 }
 
 /// Stops the running daemon. Returns `false` if none was running.
@@ -278,5 +302,28 @@ fn detach(cmd: &mut Command) {
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_person_waits_fifteen_seconds_whatever_the_variable_says() {
+        assert_eq!(start_wait(false, None), Duration::from_secs(15));
+        assert_eq!(start_wait(false, Some("60")), Duration::from_secs(15));
+    }
+
+    #[test]
+    fn a_test_waits_the_seconds_it_was_given_and_fifteen_without_a_usable_value() {
+        assert_eq!(start_wait(true, Some("60")), Duration::from_secs(60));
+        for value in [None, Some(""), Some("0"), Some("soon"), Some("-5")] {
+            assert_eq!(
+                start_wait(true, value),
+                Duration::from_secs(15),
+                "{value:?}"
+            );
+        }
     }
 }
