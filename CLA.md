@@ -2,7 +2,9 @@
 
 This Agreement is adapted from the
 [Apache Software Foundation Individual Contributor License Agreement V2.2](https://www.apache.org/licenses/icla.pdf).
-Its numbered clauses and wording are kept; only the party, this opening and the way to sign differ.
+Its numbered clauses and wording are kept; only the party, this opening and the way to sign differ,
+and one sentence is left out: the Apache Foundation's promise about its nonprofit status and
+bylaws, which does not fit a project owned by a person.
 
 Thank you for your interest in Mykyta Kravtsov (the "Project Owner"), the owner of the Toknila
 project. To clarify the intellectual property license granted with Contributions from any person or
@@ -21,11 +23,9 @@ The bot records your GitHub login and the time of the comment on a branch of thi
 requests. Read this document carefully before signing.
 
 You accept and agree to the following terms and conditions for Your Contributions (present and
-future) that you submit to the Project Owner. In return, the Project Owner shall not use Your
-Contributions in a way that is contrary to the public benefit or inconsistent with its nonprofit
-status and bylaws in effect at the time of the Contribution. Except for the license granted herein
-to the Project Owner and recipients of software distributed by the Project Owner, You reserve all
-right, title, and interest in and to Your Contributions.
+future) that you submit to the Project Owner. Except for the license granted herein to the Project
+Owner and recipients of software distributed by the Project Owner, You reserve all right, title,
+and interest in and to Your Contributions.
 
 1. Definitions.
 
