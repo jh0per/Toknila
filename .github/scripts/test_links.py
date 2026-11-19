@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECKED = ["README.md", "docs/install.md"]
+CHECKED = ["README.md", "docs/install.md", "CONTRIBUTING.md", "CLA.md"]
 
 # Files a later story adds. A link to one of these passes until the file exists; once it exists the
 # entry is only a note and the link is checked like any other. None is expected now.

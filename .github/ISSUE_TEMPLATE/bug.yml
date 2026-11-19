@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in Toknila does not work as it should
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Toknila version
+      description: The output of `tok --version`, or the version in the name of the file you downloaded.
+      placeholder: "0.3.9"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Your system
+      description: macOS version (or Linux or Windows, if you use the browser window), and Apple silicon or Intel.
+      placeholder: "macOS 15.1, Apple silicon"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: Step by step, from opening the app.
+    validations:
+      required: true
+  - type: textarea
+    id: seen
+    attributes:
+      label: What you saw
+      description: What happened, and what you expected instead. A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Optional. From the `logs` folder of Toknila's data folder, or `tok logs <story>`. Look them over first; they can hold paths and parts of your code.
+      render: text
