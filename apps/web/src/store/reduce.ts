@@ -23,6 +23,7 @@ import { initialRelease, reduceRelease } from "./release";
 import { dropChain, dropProject, initialRemoval, reduceRemoval, routeGone } from "./removal";
 import { type Route, routePath } from "./route";
 import { reduceSettings, setupLoads } from "./settings";
+import { hear, reduceSound } from "./sound";
 import { nextSettingsFrom } from "./settingsNav";
 import { reduceUpdates } from "./updates";
 import { loadUsage, reduceUsage } from "./usage";
@@ -59,18 +60,14 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
       const first = !msg.projects.some((p) => !p.archived);
       return [next, [...enter(next.route, next), ...detailsWanted(next, msg.chains, true), ...(first ? setupLoads : [])]];
     }
-    case "projectsLoaded":
-      return [{ ...s, projects: msg.projects }, []];
-    case "agentsLoaded":
-      return [{ ...s, agents: msg.agents }, []];
+    case "projectsLoaded": return [{ ...s, projects: msg.projects }, []];
+    case "agentsLoaded": return [{ ...s, agents: msg.agents }, []];
     case "chainLoaded": {
       const next = { ...withChain(s, msg.chain), error: "" };
       return [next, detailsWanted(next, [msg.chain])];
     }
-    case "suggestionsLoaded":
-      return [{ ...s, suggestions: msg.suggestions }, []];
-    case "inboxLoaded":
-      return [{ ...s, inbox: msg.items }, []];
+    case "suggestionsLoaded": return [{ ...s, suggestions: msg.suggestions }, []];
+    case "inboxLoaded": return [{ ...s, inbox: msg.items }, []];
     case "detailLoaded": {
       const key = msg.detail.ticket.key;
       const peek = s.quick.peek?.key === key ? { key, fresh: true } : s.quick.peek;
@@ -91,10 +88,13 @@ export function reduce(s: State, msg: Msg): [State, Effect[]] {
     case "answerNoted":
       return [{ ...s, notice: msg.note }, []];
     case "event": {
-      const [next, fx] = applyEvent(s, msg.event);
+      const [applied, fx] = applyEvent(s, msg.event);
+      // A live event may make a sound; what the window loads or catches up on never does.
+      const [next, heard] = msg.event.seq > s.lastSeq ? hear(applied, msg.event, msg.received) : [applied, []];
       // Transcripts are not in the journal, but any activity may have moved the numbers.
-      return [next, s.route.name === "usage" ? [...fx, loadUsage(next)] : fx];
+      return [next, s.route.name === "usage" ? [...fx, ...heard, loadUsage(next)] : [...fx, ...heard]];
     }
+    case "soundsLoaded": case "soundDue": case "setSounds": case "playPreview": return reduceSound(s, msg);
     case "selectTab":
       return [{ ...s, tab: msg.tab }, []];
     case "navigate":

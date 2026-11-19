@@ -311,11 +311,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** How many hand-in checks may run at once on this machine. */
+        /** How many hand-in checks may run at once on this machine, and which sounds the window plays. */
         get: operations["get_machine_settings"];
         /**
-         * Sets how many hand-in checks may run at once (at least 1); it applies to the line at once and
-         *     is kept across restarts.
+         * Sets how many hand-in checks may run at once (at least 1; it applies to the line at once) and,
+         *     when the body has them, the sound switches; all are kept across restarts. A body without
+         *     `sounds` (an older `tok` or page) leaves the switches as they are.
          */
         put: operations["put_machine_settings"];
         post?: never;
@@ -2843,6 +2844,7 @@ export interface components {
              *     starts only while the one-minute load average is below the number of CPU cores.
              */
             max_checks: number;
+            sounds?: components["schemas"]["SoundSettings"] | null;
         };
         /** @description Body of `POST /v1/chains/{chain}/release/mark`: a person says an epic shipped in an old tag. */
         MarkRelease: {
@@ -4237,6 +4239,15 @@ export interface components {
              * @default 196
              */
             min_w: number;
+        };
+        /** @description Which sounds the window plays; each is a switch, off until a person turns it on. */
+        SoundSettings: {
+            /** @description An epic is finished (its last story is done, or its release ran through). */
+            epic_done: boolean;
+            /** @description Something went wrong (a story blocked on its own, a release step failed). */
+            problem: boolean;
+            /** @description A story is done (merged). */
+            story_done: boolean;
         };
         /**
          * @description Whether the milestone cuts itself or waits for a person.
