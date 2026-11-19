@@ -12,7 +12,7 @@ stories to move at once, each reviewed before it lands.
 
 ## What you need
 
-- A Mac with macOS 10.15 or later (the minimum the app declares), Apple silicon or Intel.
+- A Mac with macOS 10.15 or later (the `LSMinimumSystemVersion` in the app's `Info.plist`, written by `xtask/src/app.rs`), Apple silicon or Intel.
 - `git`.
 - Claude Code installed and signed in. Toknila starts it for you; nothing else is needed.
 - The GitHub command line (`gh`) only if you want accepted work sent as pull requests.
@@ -54,8 +54,9 @@ This is needed only for builds made before the first signed and notarized releas
   (a TOML file; the format is at the top of `crates/core/src/profile/mod.rs`), but none is shipped
   or promised.
 - The desktop app is for macOS. On Linux and Windows the daemon serves the same window in a
-  browser (`tok open` prints the address) and the command line is complete. Both are tested in CI
-  and have had less daily use than macOS.
+  browser (`tok open` prints the address) and the command line is complete. CI runs the Rust gate
+  and the browser tests of the window on Ubuntu, Windows and macOS; Linux and Windows have had less
+  daily use than macOS.
 - This is early software, version 0.x. The Mac app of a release may still be signed ad hoc; the
   [Releases page](https://github.com/jh0per/Toknila/releases) says which. Expect rough edges and
   read each hand-in before you accept it.
@@ -109,6 +110,7 @@ tok ls                                             # what stands where
 ## License
 
 Toknila is source-available, not open source. From version 0.3.9 it is under the
-[PolyForm Shield License 1.0.0](LICENSE): you may use Toknila, read and change the code and
-contribute, but you may not use the code to provide a product that competes with Toknila. Read the
-file for the exact terms. Versions up to 0.3.8 were released under the Elastic License 2.0.
+PolyForm Shield License 1.0.0: you may use Toknila, read and change the code and contribute, but
+you may not use the code to provide a product that competes with Toknila. Versions up to 0.3.8
+were released under the Elastic License 2.0. The [LICENSE](LICENSE) file of the version you have
+holds the exact terms that apply to it; read it.

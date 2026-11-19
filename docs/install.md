@@ -6,7 +6,7 @@ Linux and Windows, then building from source, then the sections for whoever cuts
 
 ## Install from a release
 
-What you need: a Mac with macOS 10.15 or later (the minimum the app declares), Apple silicon or
+What you need: a Mac with macOS 10.15 or later (the `LSMinimumSystemVersion` that `cargo xtask app` writes into the app's `Info.plist`), Apple silicon or
 Intel; `git`; Claude Code installed and signed in. The GitHub command line (`gh`) is needed only if
 accepted work is sent as pull requests. Nothing else is installed.
 
@@ -51,7 +51,7 @@ app's own binary already runs, the app attaches to it; if one of another version
 copy of the app runs (after an update), the app stops it first and starts its own. On an empty
 data home the window shows onboarding: it checks `git`, `claude` and `gh`, each with a hint when
 something is missing, then asks for the repository of your first project and its base branch.
-After that, import a chain file or add cards, and set the limits and review mode in Settings. The
+After that, ask the assistant for your first epic (step 3 above), and set the limits and review mode in Settings. The
 app starts the daemon with the `PATH` of your login shell plus the usual folders such as
 `/opt/homebrew/bin`, so it finds `claude` and `gh` although Finder starts apps with a bare `PATH`.
 Closing the window leaves the daemon and its agents running; `tok daemon stop` stops them (use the
