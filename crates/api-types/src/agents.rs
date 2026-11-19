@@ -23,7 +23,8 @@ pub struct ProjectAgents {
     pub project: ProjectId,
     /// Agents that may work at once.
     pub limit: u32,
-    /// Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
+    /// Slots held now: stories with an agent (working, waiting for an answer, a reviewer at
+    /// work, or any live runner), one each. Can exceed `limit` after the limit was lowered.
     pub used: u32,
     /// Waiting cards, first in line first.
     pub queued: Vec<QueuedCard>,

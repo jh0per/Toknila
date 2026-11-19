@@ -279,7 +279,7 @@ async fn with_one_slot_a_story_sent_back_by_its_reviewer_while_the_other_runs_wa
         state(&d.card(b).await),
         ("review".to_owned(), Value::Null, false)
     );
-    assert_eq!(state(&d.card(a).await).2, true, "A's reviewer waits");
+    assert!(state(&d.card(a).await).2, "A's reviewer waits");
     verdict(&d, b, "approve", "pass").await;
     d.until(b, "merge", |c| c["ticket"]["status"] == "merged")
         .await;

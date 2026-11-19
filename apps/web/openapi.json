@@ -11313,7 +11313,7 @@
           "used": {
             "type": "integer",
             "format": "int32",
-            "description": "Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.",
+            "description": "Slots held now: stories with an agent (working, waiting for an answer, a reviewer at\nwork, or any live runner), one each. Can exceed `limit` after the limit was lowered.",
             "minimum": 0
           }
         }

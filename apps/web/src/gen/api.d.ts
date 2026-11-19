@@ -3742,7 +3742,8 @@ export interface components {
             runs: components["schemas"]["ProjectRun"][];
             /**
              * Format: int32
-             * @description Slots held now (cards Running or Waiting). Can exceed `limit` after the limit was lowered.
+             * @description Slots held now: stories with an agent (working, waiting for an answer, a reviewer at
+             *     work, or any live runner), one each. Can exceed `limit` after the limit was lowered.
              */
             used: number;
         };
