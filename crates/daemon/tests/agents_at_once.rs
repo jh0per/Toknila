@@ -109,7 +109,10 @@ struct Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        for task in [self.supervisor.take(), self.server.take()].into_iter().flatten() {
+        for task in [self.supervisor.take(), self.server.take()]
+            .into_iter()
+            .flatten()
+        {
             task.abort();
         }
     }
@@ -199,7 +202,10 @@ impl Daemon {
             if live == want {
                 return;
             }
-            assert!(Instant::now() < until, "{role:?} live: {live:?}, not {want:?}");
+            assert!(
+                Instant::now() < until,
+                "{role:?} live: {live:?}, not {want:?}"
+            );
             tokio::time::sleep(Duration::from_millis(25)).await;
         }
     }
@@ -703,11 +709,17 @@ async fn after_a_restart_a_reviewer_that_was_due_starts_from_the_line_and_is_not
     let c1 = two.card("DEMO-1").await;
     assert_eq!(state(&c1), ("review".to_owned(), Value::Null, false));
     assert_eq!(c1["ticket"]["review"]["turn"]["by"], "agent");
-    assert!(c1["ticket"]["review"]["note"].is_null(), "not sent to a person");
+    assert!(
+        c1["ticket"]["review"]["note"].is_null(),
+        "not sent to a person"
+    );
     let words = "the app restarted; goes on when an agent is free";
     let c2 = two.card("DEMO-2").await;
     assert_eq!(state(&c2), ("running".to_owned(), json!(words), true));
-    assert!(two.runners.live().is_empty(), "no worker beside the reviewer");
+    assert!(
+        two.runners.live().is_empty(),
+        "no worker beside the reviewer"
+    );
     // The reviewer approves and leaves: Card 1 merges and Card 2's agent comes back.
     verdict(&two, "DEMO-1", "approve", "pass").await;
     two.until("DEMO-1", "merge", |c| c["ticket"]["status"] == "merged")
