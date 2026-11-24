@@ -527,7 +527,7 @@ architectures, so expect about 12 minutes before the notarization. With `CARGO_T
 
 1. Run the release from Toknila as usual. Keep the Mac online, and stay with it, unlocked, during
    the Build step: once an account has been through its first notarization it takes minutes, but a
-   locked Mac once could not read the notary profile mid-run (see "What a failure says"), and why
+   Mac left unattended for hours once could not read the notary profile mid-run (see "What a failure says"), and why
    is not yet understood. The command first checks, in seconds and before any build, that the
    notary profile can be read and that Apple accepts it (with and without `--no-upload`).
 2. Build ends with "xtask mac-release: PASS" and the six files. The GitHub release stays a draft

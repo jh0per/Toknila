@@ -120,8 +120,7 @@ pub fn notary_field(out: &str, key: &str) -> Option<String> {
 /// What notarytool says when the keychain holds no item for the profile's name.
 const NO_ITEM: &str = "No Keychain password item found";
 
-/// Before any build: the notary profile can be read and Apple accepts it (one `notarytool history`;
-/// the list of past submissions is not printed).
+/// Before any build: the notary profile can be read and Apple accepts it (one `notarytool history`).
 pub fn check_notary(exec: &mut dyn Exec, root: &Path, profile: &str) -> Result<(), String> {
     let cmd =
         Cmd::new("xcrun", root).args(["notarytool", "history", "--keychain-profile", profile]);
