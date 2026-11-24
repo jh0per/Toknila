@@ -40,8 +40,8 @@ accepted work is sent as pull requests. Nothing else is installed.
 The Guide at the foot of the window's sidebar says the same with pictures of the window.
 
 If macOS refuses to open the app, open System Settings, Privacy & Security and choose Open Anyway
-for Toknila. This is needed only for builds made before the first signed and notarized release;
-a signed and notarized app opens without a warning.
+for Toknila. This is needed only for versions before 0.3.10; from 0.3.10 the Mac app is signed with
+a Developer ID and notarized by Apple, and opens without a warning.
 
 Everything the app needs is inside it: the daemon and `tok` in `Contents/MacOS`, the web page and
 the price table inside the daemon binary. The hooks, the MCP server and the status line that
@@ -526,10 +526,11 @@ architectures, so expect about 12 minutes before the notarization. With `CARGO_T
 #### At each release
 
 1. Run the release from Toknila as usual. Keep the Mac online, and stay with it, unlocked, during
-   the Build step: once an account has been through its first notarization it takes minutes, but a
-   Mac left unattended for hours once could not read the notary profile mid-run (see "What a failure says"), and why
-   is not yet understood. The command first checks, in seconds and before any build, that the
-   notary profile can be read and that Apple accepts it (with and without `--no-upload`).
+   the Build step: once an account has been through its first notarization it takes minutes, but
+   a Mac left unattended for hours once could not read the notary profile mid-run (see "What a
+   failure says"), and why is not yet understood. The command first checks, in seconds and before
+   any build, that the notary profile can be read and that Apple accepts it (with and without
+   `--no-upload`).
 2. Build ends with "xtask mac-release: PASS" and the six files. The GitHub release stays a draft
    until the Release workflow publishes it, once CI passed and the Mac files are there (it waits up
    to 60 minutes).

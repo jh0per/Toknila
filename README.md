@@ -44,7 +44,8 @@ When all the stories of an epic are done, a Release button appears at the end of
 ![A story in review: the agent's hand-in, Needs you, and the Accept and Return buttons](docs/screenshots/readme/review.png)
 
 If macOS refuses to open the app, open System Settings, Privacy & Security and choose Open Anyway.
-This is needed only for builds made before the first signed and notarized release.
+This is needed only for versions before 0.3.10; from 0.3.10 the Mac app is signed with a Developer
+ID and notarized by Apple, and opens without a warning.
 
 ![The assistant's chat beside the roadmap, answering a request to plan a bakery shop](docs/screenshots/readme/assistant.png)
 
@@ -57,8 +58,8 @@ This is needed only for builds made before the first signed and notarized releas
   browser (`tok open` prints the address) and the command line is complete. CI runs the Rust gate
   and the browser tests of the window on Ubuntu, Windows and macOS; Linux and Windows have had less
   daily use than macOS.
-- This is early software, version 0.x. The Mac app of a release may still be signed ad hoc; the
-  [Releases page](https://github.com/jh0per/Toknila/releases) says which. Expect rough edges and
+- This is early software, version 0.x. From 0.3.10 the Mac app is signed and notarized (see the
+  [Releases page](https://github.com/jh0per/Toknila/releases)). Expect rough edges and
   read each hand-in before you accept it.
 
 ![The roadmap: a finished epic, the active one and two planned ones, each with its version](docs/screenshots/readme/roadmap.png)
@@ -103,7 +104,6 @@ tok ls                                             # what stands where
 
 ## What is next
 
-- A first release whose Mac app is signed and notarized, so that macOS opens it without a warning.
 - A terminal panel on Windows that follows the console's size, so that it never loses a line after a resize.
 - Web trackers: new work coming in from a tracker, with the plan kept in Toknila.
 
