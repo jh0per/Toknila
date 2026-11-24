@@ -86,6 +86,13 @@ fn expected(root: &Path, entitlements: &Path) -> Vec<Vec<String>> {
             ".ref",
         ]),
         view.clone(),
+        line(&[
+            "xcrun",
+            "notarytool",
+            "history",
+            "--keychain-profile",
+            PROFILE,
+        ]),
     ];
     let (mut files, mut sigs) = (Vec::new(), Vec::new());
     let ent = p(entitlements);
@@ -210,6 +217,10 @@ struct Fake {
     targets: &'static str,
     notary: &'static str,
     codesign_err: Option<&'static str>,
+    /// What `notarytool history` fails with; `None` is a readable, accepted profile.
+    history_err: Option<&'static str>,
+    /// What `notarytool submit` fails with (exit status 69); `None` is the answer in `notary`.
+    submit_err: Option<&'static str>,
 }
 
 impl Fake {
@@ -275,6 +286,13 @@ impl Exec for Fake {
             ("npx", [.., file]) => {
                 std::fs::write(format!("{file}.sig"), "SIG").map_err(|e| e.to_string())?;
                 ok("")
+            }
+            ("xcrun", ["notarytool", "history", ..]) => match self.history_err {
+                Some(err) => fail(err),
+                None => ok("Successfully received submission history.\n"),
+            },
+            ("xcrun", ["notarytool", "submit", ..]) if self.submit_err.is_some() => {
+                fail(self.submit_err.unwrap_or_default())
             }
             ("xcrun", ["notarytool", "submit", ..]) => ok(self.notary),
             ("spctl", _) => Ok(Ran {
@@ -399,6 +417,12 @@ fn a_draft_is_uploaded_to_without_creating_one_and_no_upload_touches_no_github()
         !fake.calls.iter().any(|c| c.program == "gh"),
         "--no-upload calls no gh"
     );
+    assert!(
+        fake.calls
+            .iter()
+            .any(|c| c.args.get(1).is_some_and(|a| a == "history")),
+        "--no-upload still checks the notary profile"
+    );
     assert_eq!(
         fake.said.last().map(String::as_str),
         Some("xtask mac-release: --no-upload, so nothing went to GitHub")
@@ -474,6 +498,123 @@ fn preflight_refuses_in_seconds_before_any_build() {
         assert!(built.is_empty(), "nothing was built for: {want}");
         assert!(!fake.calls.iter().any(|c| c.program == "codesign"));
     }
+}
+
+const NO_ITEM: &str = "Error: No Keychain password item found for profile: fake-notary-profile\n\nRun 'notarytool store-credentials' to create another credential profile.";
+
+fn history_cmd() -> Vec<String> {
+    line_any(&[
+        "xcrun",
+        "notarytool",
+        "history",
+        "--keychain-profile",
+        PROFILE,
+    ])
+}
+
+fn line_any(s: &[&str]) -> Vec<String> {
+    s.iter().map(|a| (*a).to_owned()).collect()
+}
+
+/// The check of the notary profile runs before the first build, with and without `--no-upload`,
+/// and a profile that cannot be read names the setting and what to do.
+#[test]
+fn an_unreadable_notary_profile_stops_the_release_before_any_build() {
+    let t = Temp::new("history");
+    let key = t.0.join("k");
+    for upload in [true, false] {
+        let mut fake = Fake {
+            history_err: Some(NO_ITEM),
+            ..Fake::new()
+        };
+        let mut built = Vec::new();
+        let err = release(
+            &mut fake,
+            &t.0,
+            &args(upload),
+            "9.9.9",
+            &signing(&t.0, &key),
+            &mut fake_build(&mut built),
+        )
+        .expect_err("the profile cannot be read");
+        assert_eq!(
+            err,
+            "TOKNILA_NOTARY_PROFILE names a notary profile that this Mac's keychain does not hold: check the name in the settings file, or save the profile with `xcrun notarytool store-credentials`"
+        );
+        assert!(built.is_empty(), "nothing was built (upload {upload})");
+        let all: Vec<Vec<String>> = fake
+            .calls
+            .iter()
+            .map(|c| [vec![c.program.clone()], c.args.clone()].concat())
+            .collect();
+        assert!(all.contains(&history_cmd()), "{all:?}");
+        assert!(!all.iter().any(|c| c[0] == "codesign"));
+        if !upload {
+            assert!(!all.iter().any(|c| c[0] == "gh"), "--no-upload calls no gh");
+        }
+    }
+}
+
+#[test]
+fn a_refused_login_or_no_network_says_so_with_what_notarytool_printed() {
+    let t = Temp::new("refused");
+    let key = t.0.join("k");
+    for said in [
+        "Error: HTTP status code: 401. Invalid credentials. Username or password is incorrect.",
+        "Error: The Internet connection appears to be offline.",
+    ] {
+        let mut fake = Fake {
+            history_err: Some(said),
+            ..Fake::new()
+        };
+        let mut built = Vec::new();
+        let err = release(
+            &mut fake,
+            &t.0,
+            &args(false),
+            "9.9.9",
+            &signing(&t.0, &key),
+            &mut fake_build(&mut built),
+        )
+        .expect_err("the check fails");
+        assert_eq!(
+            err,
+            format!(
+                "Apple's notary service did not accept the notary profile (no network, or a refused login); notarytool printed: {said}"
+            )
+        );
+        assert!(built.is_empty());
+    }
+}
+
+// The dmg's link to /Applications is a unix symlink (`make_dmg`), so the pipeline runs on unix.
+#[cfg(unix)]
+#[test]
+fn a_profile_that_was_readable_at_the_start_and_not_at_the_submission_says_exactly_that() {
+    let t = Temp::new("lost");
+    let key = t.0.join("k");
+    let mut fake = Fake {
+        submit_err: Some(NO_ITEM),
+        ..Fake::new()
+    };
+    let err = release(
+        &mut fake,
+        &t.0,
+        &args(true),
+        "9.9.9",
+        &signing(&t.0, &key),
+        &mut fake_build(&mut Vec::new()),
+    )
+    .expect_err("the submission fails");
+    assert_eq!(
+        err,
+        "the notary profile was readable when this run started and could not be read now (Toknila-9.9.9-aarch64.dmg was not submitted): unlock this Mac and keep it unlocked while the command runs, then run it again (the release's Build step can be pressed again); if it still fails, save the profile again with `xcrun notarytool store-credentials`"
+    );
+    assert!(
+        fake.calls
+            .iter()
+            .any(|c| c.args.get(1).is_some_and(|a| a == "history"))
+    );
 }
 
 #[cfg(unix)]

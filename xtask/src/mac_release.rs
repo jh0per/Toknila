@@ -110,6 +110,7 @@ pub fn release(
     build: &mut dyn FnMut(&str, &Path) -> Result<(), String>,
 ) -> Result<Vec<PathBuf>, String> {
     preflight(exec, root, a, version)?;
+    mac_sign::check_notary(exec, root, s.profile)?;
     let base = root.join("dist/mac-release");
     let _ = std::fs::remove_dir_all(&base);
     let mut files = Vec::new();
