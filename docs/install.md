@@ -471,17 +471,33 @@ architectures, so expect about 12 minutes before the notarization. With `CARGO_T
 
 #### Once, on the Mac that releases
 
-1. Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority:
-   your email address, "Saved to disk".
-2. developer.apple.com → Certificates, Identifiers & Profiles → Certificates → **+**, choose
-   "Developer ID Application", upload the request, download the certificate and double-click it.
-   It goes into the login keychain next to its private key; `security find-identity -v -p
-   codesigning` lists `Developer ID Application: <name> (<team id>)`.
+1. Who may create the certificate: only the team's Account Holder. If you are the Account Holder,
+   Xcode does it in one step: Settings → Apple Accounts → the team → Manage Certificates → **+** →
+   Developer ID Application; go on to step 3. If you are an Admin of a team whose Account Holder is
+   another person, Xcode answers "This operation can only be performed by the Account Holder."
+   Use steps 1a and 1b instead.
+   - 1a. On the Mac that releases (the private key must stay on it): Keychain Access → Certificate
+     Assistant → Request a Certificate From a Certificate Authority: your email address, "Saved to
+     disk".
+   - 1b. Send that request file to the Account Holder. They sign in on developer.apple.com under
+     their own login → Certificates, Identifiers & Profiles → Certificates → **+**, choose
+     "Developer ID Application" and the G2 Sub-CA, upload the request and download the
+     certificate. Double-click that certificate on the releasing Mac: it goes into the login
+     keychain next to the private key the request made.
+2. Find the identity: `security find-identity -v -p codesigning` lists several lines. The identity
+   is the line that starts with `Developer ID Application:`. An "Apple Development: <email>
+   (<code>)" line is not the identity, and the code in its parentheses is not the team ID. The team
+   ID is the code in the parentheses of the `Developer ID Application:` line; it is also on
+   developer.apple.com/account under Membership details.
 3. account.apple.com → Sign-In and Security → App-Specific Passwords: make one named
-   "notarytool". Then run `xcrun notarytool store-credentials toknila-notary --apple-id <your
-   Apple ID> --team-id <team id>` and paste that password when asked; it stays in the keychain.
+   "notarytool". A team member's own Apple ID and its own app-specific password notarize; the
+   Account Holder's login is not needed. Then run `xcrun notarytool store-credentials
+   toknila-notary --apple-id <your Apple ID> --team-id <team id>` and paste that password when
+   asked; it answers "Credentials validated" and the profile stays in the keychain.
 4. `rustup target add aarch64-apple-darwin x86_64-apple-darwin` (the command names a missing one
-   otherwise).
+   otherwise). The terminal that runs the command needs Rust on its PATH: "zsh: command not found:
+   rustup" means it has none; run `source ~/.cargo/env` in that window (or open a new one after
+   installing Rust).
 5. Write `~/.toknila-release/mac-release.env` (mode 600):
 
    ```sh
@@ -496,14 +512,24 @@ architectures, so expect about 12 minutes before the notarization. With `CARGO_T
    Enter the login password and press **Always Allow**; otherwise it asks at every signature, and
    the release's Build step runs where nobody answers. That is why this try comes before the first
    real release. It ends with "xtask mac-release: PASS in N min", and nothing goes to GitHub.
+   Apple's first notarization of an account can take most of a day: the first one here took 20
+   hours 40 minutes (submitted 22:47 UTC, accepted 19:27 UTC the next day). The command waits for
+   it with no time limit, so leave it running; to look at it, open a second terminal window and
+   run `xcrun notarytool history --keychain-profile toknila-notary`: the submission shows "In
+   Progress" and then "Accepted". Later notarizations take minutes: the next run, with the build
+   cache, notarized both architectures and passed in 7 minutes. During this wait stay with the Mac
+   and keep it unlocked (see "What a failure says").
 8. In Toknila, the project's Settings: artifact command `cargo xtask mac-release {tag}`.
 9. On GitHub, the repository's Settings → Secrets and variables → Actions → Variables → New
    repository variable: `MAC_APP_SOURCE`, value `release`.
 
 #### At each release
 
-1. Run the release from Toknila as usual. Keep the Mac awake and online during Build:
-   notarization takes minutes.
+1. Run the release from Toknila as usual. Keep the Mac online, and stay with it, unlocked, during
+   the Build step: once an account has been through its first notarization it takes minutes, but a
+   locked Mac once could not read the notary profile mid-run (see "What a failure says"), and why
+   is not yet understood. The command first checks, in seconds and before any build, that the
+   notary profile can be read and that Apple accepts it (with and without `--no-upload`).
 2. Build ends with "xtask mac-release: PASS" and the six files. The GitHub release stays a draft
    until the Release workflow publishes it, once CI passed and the Mac files are there (it waits up
    to 60 minutes).
@@ -522,6 +548,18 @@ keychain"; a refused notarization, "Apple's notary service answered Invalid for 
 setting names the setting; a tag that was not pushed, "the tag vX.Y.Z is not on GitHub: push it
 (git push origin vX.Y.Z), then run the Build step again"; a published release, "the release
 vX.Y.Z is already published".
+
+Two more concern the notary profile. At the start: "TOKNILA_NOTARY_PROFILE names a notary profile
+that this Mac's keychain does not hold: check the name in the settings file, or save the profile
+with `xcrun notarytool store-credentials`"; any other failure of that check ("Apple's notary
+service did not accept the notary profile (no network, or a refused login); notarytool printed:
+…") says what notarytool printed. During a submission: "the notary profile was readable when this
+run started and could not be read now …". That means the check at the start passed and the keychain
+item could not be read later; the cause is not established (in the one known case the Mac had
+stood unattended for hours while the first notarization waited, and the profile read fine the next
+day). Unlock this Mac and keep it unlocked while the command runs, then run it again (the
+release's Build step can be pressed again); if it still fails, save the profile again with `xcrun
+notarytool store-credentials`.
 
 #### Going back to CI's build
 

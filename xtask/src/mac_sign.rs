@@ -117,6 +117,30 @@ pub fn notary_field(out: &str, key: &str) -> Option<String> {
         .find_map(|l| l.trim().strip_prefix(&prefix).map(|v| v.trim().to_owned()))
 }
 
+/// What notarytool says when the keychain holds no item for the profile's name.
+const NO_ITEM: &str = "No Keychain password item found";
+
+/// Before any build: the notary profile can be read and Apple accepts it (one `notarytool history`;
+/// the list of past submissions is not printed).
+pub fn check_notary(exec: &mut dyn Exec, root: &Path, profile: &str) -> Result<(), String> {
+    let cmd =
+        Cmd::new("xcrun", root).args(["notarytool", "history", "--keychain-profile", profile]);
+    let ran = exec.run(&cmd)?;
+    if ran.ok {
+        return Ok(());
+    }
+    let said = format!("{}{}", ran.out, ran.err);
+    if said.contains(NO_ITEM) {
+        return Err(format!(
+            "{PROFILE} names a notary profile that this Mac's keychain does not hold: check the name in the settings file, or save the profile with `xcrun notarytool store-credentials`"
+        ));
+    }
+    Err(format!(
+        "Apple's notary service did not accept the notary profile (no network, or a refused login); notarytool printed: {}",
+        said.trim()
+    ))
+}
+
 /// Submits `dmg` to Apple's notary service and waits. Anything but Accepted prints the log of the
 /// submission and fails naming the file.
 pub fn notarize(exec: &mut dyn Exec, s: &Signing, dmg: &Path) -> Result<(), String> {
@@ -136,6 +160,11 @@ pub fn notarize(exec: &mut dyn Exec, s: &Signing, dmg: &Path) -> Result<(), Stri
             "json",
         ]);
     let ran = exec.run(&submit)?;
+    if !ran.ok && format!("{}{}", ran.out, ran.err).contains(NO_ITEM) {
+        return Err(format!(
+            "the notary profile was readable when this run started and could not be read now ({name} was not submitted): unlock this Mac and keep it unlocked while the command runs, then run it again (the release's Build step can be pressed again); if it still fails, save the profile again with `xcrun notarytool store-credentials`"
+        ));
+    }
     let status = notary_field(&ran.out, "status");
     if status.as_deref() == Some("Accepted") {
         exec.say(&format!("xtask mac-release: Apple notarized {name}"));
