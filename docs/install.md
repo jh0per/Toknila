@@ -4,9 +4,11 @@ Toknila runs as an app on a Mac (`Toknila.app`, from the Releases page). On Linu
 daemon serves the same window in a browser. This page starts with the app from a release, then
 Linux and Windows, then building from source, then the sections for whoever cuts releases.
 
-Toknila is source-available under the [PolyForm Shield License 1.0.0](../LICENSE): you may use it,
-read and change the code and contribute, but not use the code to provide a competing product.
-Versions up to 0.3.8 were released under the Elastic License 2.0 and stay under it.
+Toknila is open source under the [Apache License 2.0](../LICENSE): you may use it, copy it, change it
+and build on it, in your own products too; keep the LICENSE and NOTICE files and the copyright
+lines. The source is under this licence from 2026-11-25, after version 0.3.10; versions 0.3.9 and
+0.3.10 were released under the PolyForm Shield License 1.0.0, and versions up to 0.3.8 under the
+Elastic License 2.0.
 
 ## Install from a release
 

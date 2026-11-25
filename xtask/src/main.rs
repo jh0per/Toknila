@@ -294,6 +294,7 @@ fn dist(target: Option<String>) -> Result<(), String> {
         copy(bin.join(format!("{b}{exe}")), &format!("{b}{exe}"))?;
     }
     copy(root.join("LICENSE"), "LICENSE")?;
+    copy(root.join("NOTICE"), "NOTICE")?;
     copy(root.join("README.md"), "README.md")?;
     copy(root.join("docs/install.md"), "INSTALL.md")?;
     copy(root.join("examples/demo.toml"), "demo.toml")?;

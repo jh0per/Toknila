@@ -8,7 +8,7 @@ default-members = ["crates/core", "crates/app", "crates/api-types", "crates/clie
 version = "0.3.10"
 edition = "2024"
 rust-version = "1.88"
-license-file = "LICENSE"
+license = "Apache-2.0"
 repository = "https://github.com/jh0per/Toknila"
 publish = false
 

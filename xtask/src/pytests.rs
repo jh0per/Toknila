@@ -103,7 +103,6 @@ mod tests {
             names,
             [
                 "test_assemble_release.py",
-                "test_cla_workflow.py",
                 "test_license.py",
                 "test_links.py",
                 "test_wait_for_ci.py"

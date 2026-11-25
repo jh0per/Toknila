@@ -4,7 +4,7 @@ description = "Toknila domain model and pure rules: chains, tickets, state machi
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license-file.workspace = true
+license.workspace = true
 repository.workspace = true
 publish.workspace = true
 

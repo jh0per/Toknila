@@ -4,7 +4,8 @@
     "title": "Toknila daemon API",
     "description": "Local API of the Toknila daemon. Every /v1 route needs `Authorization: Bearer <token>` from daemon.json.",
     "license": {
-      "name": ""
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
     },
     "version": "0.3.10"
   },
