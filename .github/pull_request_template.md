@@ -17,7 +17,3 @@ Report each as PASS / FAIL / NOT_RUN / BLOCKED.
 ## Not covered
 
 What CI does not prove for this change, if anything.
-
-## Contributor agreement
-
-- [ ] I have read the [CLA](https://github.com/jh0per/Toknila/blob/main/CLA.md) and will sign it with a comment when the bot asks (once, on my first pull request).

@@ -109,8 +109,13 @@ tok ls                                             # what stands where
 
 ## License
 
-Toknila is under the [PolyForm Shield License 1.0.0](LICENSE). It is source-available, not open
-source. In plain words: you may use Toknila, read and change the code, and contribute to it; you may
-not use the code to provide a product that competes with Toknila. The [LICENSE](LICENSE) file holds
-the exact terms; read it. Versions up to 0.3.8 were released under the Elastic License 2.0 and stay
-under it. To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Toknila is open source under the [Apache License 2.0](LICENSE). In plain words: you may use it,
+copy it, change it and build on it, in your own products too. Keep the LICENSE and NOTICE files and
+the copyright lines; that is how the author is credited. The licence does not give the right to use
+the name Toknila for a fork, except to say where it came from. The [LICENSE](LICENSE) file holds the
+exact terms.
+
+History: the source in this repository is under the Apache License 2.0 from 2026-11-25, after
+version 0.3.10. Versions 0.3.9 and 0.3.10 were released under the PolyForm Shield License 1.0.0, and
+versions up to 0.3.8 under the Elastic License 2.0. To contribute, see
+[CONTRIBUTING.md](CONTRIBUTING.md).

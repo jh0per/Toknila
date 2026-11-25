@@ -33,13 +33,9 @@ description of the problem is more useful than a finished design.
 
 ## The licence, for a contributor
 
-Toknila is source-available under the [PolyForm Shield License 1.0.0](LICENSE): you may use it, read
-and change the code, and send contributions, but you may not use the code to provide a product that
-competes with Toknila. Your contribution comes with the rights described in the [CLA](CLA.md), which
-let the owner keep one licence for the whole project; you keep the copyright in your own work.
-
-## The CLA
-
-You sign the [CLA](CLA.md) once, by a comment on your first pull request: a bot asks for it, and you
-reply with the sentence it shows (`I have read the CLA Document and I hereby sign the CLA`). The
-check on the pull request turns green, and you do not sign again.
+Toknila is open source under the [Apache License 2.0](LICENSE): you may use it, copy it, change it
+and build on it; keep the LICENSE and NOTICE files and the copyright lines. A contribution is
+accepted under the same licence (section 5 of the Apache License). There is nothing to sign, and you
+keep the copyright in your own work. The source is under this licence from 2026-11-25, after version
+0.3.10; versions 0.3.9 and 0.3.10 were released under the PolyForm Shield License 1.0.0, and
+versions up to 0.3.8 under the Elastic License 2.0.
